@@ -18,8 +18,8 @@
   - [x] cmdCompare X-register dispatch bug fixed (all 3 commands verified)
   - [x] EXIT: `jmp ($0338)` → `jmp $E37B` (BASIC warm start ROM)
 
-- [/] Phase 2A Follow-on (open)
-  - [ ] Raw GETIN input loop — fixes `"` quote-mode control code injection
-  - [ ] VMM API specification (`include/vmm.inc`)
+- [x] Phase 2A Follow-on (open)
+  - [x] Raw GETIN input loop — fixes `"` quote-mode control code injection
+  - [x] VMM API specification (`include/vmm.inc`)
 
 - [ ] Phase 2B: External command support / PATH search

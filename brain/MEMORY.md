@@ -1,12 +1,10 @@
 # Session Memory
 
-## Current State (2026-05-02)
+## Current State (2026-05-03)
 - Phase 2A complete: `command64.prg` builds clean, tested on real C64 hardware
-- `CLS` — works correctly on hardware
-- `ECHO` — works correctly on hardware after CommandBuffer relocation fix
-- `EXIT` — returns cleanly to BASIC after `jmp $E37B` fix
-- Known remaining limitation: `"` in ECHO input triggers C64 screen editor quote mode
-  (cursor keys insert control codes); inherent to CHRIN/BASIN, deferred
+- Input architecture updated: Replaced `CHRIN` with `GETIN` polling loop + manual echo.
+- VMM ABI established: `include/vmm.inc` created with REU hardware ports and ZP interface.
+- Ready for Phase 2B.
 
 ## Memory Map (current)
 | Region | Purpose |

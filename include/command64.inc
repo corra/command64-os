@@ -4,7 +4,8 @@
 // --- KERNAL Jump Table Addresses ---
 // Always reference the jump table ($FF00+), never raw ROM body addresses.
 .label KernalChROUT    = $FFD2  // Output character to current channel
-.label KernalChRIN     = $FFCF  // Input character from current channel (was $FFE4=GETIN, wrong)
+.label KernalGetIn       = $FFE4  // Raw keyboard input (bypasses screen editor/quote mode)
+.label KernalChRIN     = $FFCF  // Input character from current channel (screen editor)
 .label KernalCLALL     = $FFE7  // Close all I/O channels (was $E548, raw ROM addr, wrong)
 .label KernalWarmStart = $FC68  // Warm start / BASIC restart vector
 
@@ -32,3 +33,5 @@
 .label VmmSeg   = $0200
 .label VmmOff   = $0201
 .label ReuBank  = $0202
+.label VmmMctBase = $0203 // Base of Memory Control Table in REU/Base RAM
+.label VmmFreeHead = $0204 // Pointer to first free memory block

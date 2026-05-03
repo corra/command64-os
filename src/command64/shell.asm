@@ -52,9 +52,15 @@ mainLoop:
 shellReadLine:
     ldy #0
 rlReadLoop:
-    jsr KernalChRIN         // screen editor echoes to screen; we just store the byte
+    jsr KernalGetIn         // wait for char without screen editor (raw input)
     cmp #PetCr
     beq rlDoneRead
+    
+    // If we use GETIN, we MUST manually echo the character if we want it on screen
+    // but the project decision for Phase 2A was to rely on CHRIN's auto-echo.
+    // To fix "quote mode" and maintain echo, we implement a basic echo loop.
+    
+    jsr KernalChROUT        // manually echo the character just read
     sta CommandBuffer, y
     iny
     cpy #79                 // reserve index 79 for null terminator
@@ -64,6 +70,7 @@ rlDoneRead:
     sta CommandBuffer, y    // write $00 null terminator (not $0D)
     sty CommandLen
     rts
+
 
 // ---------------------------------------------------------------------------
 // shellDispatch
