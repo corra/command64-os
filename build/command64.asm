@@ -10,12 +10,12 @@
 //   Loader        $1580  KERNAL binary loader wrapper
 //   Path          $1600  Directory search and path logic
 //   Vmm           $1700  Virtual Memory Manager (REU mapping)
-//   VmmData       $17F0  VMM temporary storage
+//   VmmData       $1A00  VMM temporary storage
 
 .file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell,Utils,Loader,Path,Vmm,VmmData"]
 
 .segmentdef Main [start=$0801]
-.segmentdef VmmData [start=$17F0]
+.segmentdef VmmData [start=$1A00]
 // Petsci, CommandTable, CommandShell, Utils, Loader, Path, Vmm, and VmmData are defined by the imported source files.
 
 #import "../include/command64.inc"
