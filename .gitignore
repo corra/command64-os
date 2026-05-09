@@ -1,0 +1,11 @@
+# Build outputs
+build/build/
+*.prg
+*.sym
+
+# Garbage
+--help
+tools/cc1541-git/
+
+# OS-specific
+.DS_Store
