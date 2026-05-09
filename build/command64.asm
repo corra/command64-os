@@ -6,15 +6,26 @@
 //   Petsci        $1000  PETSCII print routines
 //   CommandTable  $1100  Fixed-width command dispatch table
 //   CommandShell  $1200  Command loop, dispatcher, built-in handlers
+//   Utils         $1500  Hex parsing and string utilities
+//   Loader        $1580  KERNAL binary loader wrapper
+//   Path          $1600  Directory search and path logic
+//   Vmm           $1700  Virtual Memory Manager (REU mapping)
+//   VmmData       $17F0  VMM temporary storage
 
-.file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell"]
+.file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell,Utils,Loader,Path,Vmm,VmmData"]
 
 .segmentdef Main [start=$0801]
-// Petsci, CommandTable, and CommandShell are defined by the imported source files.
+.segmentdef VmmData [start=$17F0]
+// Petsci, CommandTable, CommandShell, Utils, Loader, Path, Vmm, and VmmData are defined by the imported source files.
 
 #import "../include/command64.inc"
 #import "../src/command64/petsci.asm"
+#import "../src/command64/utils.asm"
+#import "../src/command64/loader.asm"
+#import "../src/command64/path.asm"
+#import "../src/command64/vmm.asm"
 #import "../src/command64/shell.asm"
+
 
 // BASIC SYS launcher: injects a BASIC line at $0801 that does SYS $1200
 // 'start' is the entry-point label defined in shell.asm (CommandShell segment).
