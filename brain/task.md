@@ -25,9 +25,18 @@
   - [x] Improve parser robustness (ignore empty lines, trim spaces)
   - [x] VMM API specification (`include/vmm.inc`)
 
-- [/] Phase 2B: External command support / PATH search
-  - [ ] Define loader memory map
-  - [ ] Implement directory search (`path.asm`)
-  - [ ] Implement binary loader (`loader.asm`)
-  - [ ] Integrate with `shellDispatch`
+- [x] Phase 2B: External command support / PATH search
+  - [x] Define loader memory map ($2000+)
+  - [x] Implement directory search (`path.asm`) with auto-.prg extension
+  - [x] Implement binary loader (`loader.asm`) with custom address support
+  - [x] Integrate with `shellDispatch` (auto-run if no internal match)
+  - [x] Case-insensitive matching (`normalizeName`)
+  - [x] Create test environment (`tests/testcmds.d64`)
+
+- [x] Phase 2B Verification
+  - [x] Verify `HELLO` from shell (string output)
+  - [x] Verify `COLOR` from shell (visual check)
+  - [x] Verify `EXTCLS` from shell (functionality check)
+  - [x] Verify case-insensitivity (e.g., `hello` vs `HELLO`)
+  - [x] Verify custom load address (e.g., `load hello 3000`)
 

@@ -27,20 +27,19 @@ This file serves as the shared repository for architectural decisions, technical
 - **[2026-05-01] COMMAND.COM Core Logic**: The core dispatcher logic resides in `TCODE.ASM` (400+ lines). It reads input via `STD_CON_STRING_INPUT`, preprocesses it (`PRESCAN`), parses it (`PARSERINE`), and dispatches it to internal commands or initiates a file search (`PATH_SEARCH` for external commands).
 - **[2026-05-01] C64 KERNAL Integration**: C64 KERNAL routines (e.g., `CHROUT`, `CHRIN`, `LOAD`, `SAVE`, `VERIFY`) will serve as the foundational building blocks for our PETSCII and I/O abstractions.
 
-## Phase 2A Status — COMPLETE (2026-05-02)
+## Phase 2 Status — Phase 2B COMPLETE (2026-05-09)
 
 | Task | Status |
 | :--- | :--- |
-| Kick Assembler Toolchain Setup | ✅ Done |
-| PETSCII API (`petsci.asm`) | ✅ Done |
-| Command loop + dispatch (`shell.asm`) | ✅ Done |
-| Build entry (`build/command64.asm`) | ✅ Done |
-| KERNAL equates (`include/command64.inc`) | ✅ Done |
-| Assembly build — 0 errors | ✅ Done |
-| Real hardware verification | ✅ Done (CLS/ECHO/EXIT all functional) |
-| VMM API (`include/vmm.inc`) | ⏳ Pending (Phase 2B) |
+| Phase 2A: Core Dispatcher | ✅ Done |
+| Raw GETIN input loop | ✅ Done (Fixes quote mode) |
+| Phase 2B: External Commands | ✅ Done |
+| Path search & auto-.prg | ✅ Done |
+| Binary loader ($2000+) | ✅ Done |
+| Phase 2B Verification | ✅ Done (Pre-verified image.d64) |
+| VMM API (`include/vmm.inc`) | ⏳ Pending (Phase 2C) |
 
-## C64 Platform Constraints Discovered During Phase 2A
+## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
 | :--- | :--- | :--- |

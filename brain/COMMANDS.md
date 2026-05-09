@@ -8,6 +8,7 @@ This document tracks the status and priority of internal commands planned for th
 | `CLS` | Clear screen using PETSCII $93 | ✅ Done | High | DOS 4.0 |
 | `ECHO` | Print strings to standard output | ✅ Done | High | DOS 4.0 |
 | `EXIT` | Return to BASIC (Warm Start $E37B) | ✅ Done | High | DOS 4.0 |
+| `LOAD` | Load a .PRG from disk [address] | ✅ Done | Medium | C64 |
 
 ## 2. High Priority (Phase 2B / 2C)
 | Command | Description | Status | Priority | Origin |

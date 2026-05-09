@@ -45,6 +45,8 @@ These programs are essential for system maintenance and early verification of th
 | `DISKMON` | Raw disk sector editor | 💡 Idea | Medium | C64 |
 
 ## Technical Implementation Notes
-- **Loader Target**: Programs must be assembled for an entry point of `$2000`.
+- **Loader Target**: Programs default to `$2000` but can be loaded anywhere using the `LOAD` command.
+- **Auto-Search**: The shell automatically appends `.prg` and searches device 8 if an internal command is not found.
+- **Case-Insensitive**: All external command searches are case-insensitive.
 - **Termination**: External programs should terminate with an `RTS` to return control to the `command64` shell.
 - **I/O Redirection**: Standard Input/Output for these programs must route through the PETSCII API in `src/command64/petsci.asm`.
