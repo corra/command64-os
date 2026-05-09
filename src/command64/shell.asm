@@ -22,6 +22,10 @@ tableCmd:
     .word cmdCls
     .text "echo  "
     .word cmdEcho
+    .text "load  "
+    .word cmdLoad
+    .text "dir   "
+    .word cmdDir
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -31,6 +35,17 @@ tableEnd:
 
 // --- Entry point ---
 start:
+    jsr vmmInit             // Initialize VMM and check for REU
+    cmp #VMM_SUCCESS
+    beq siInitOk
+    
+    // VMM Init failed (No REU found)
+    lda #<noReuMsg
+    ldy #>noReuMsg
+    jsr petPrintString
+    // We proceed anyway for now, but external programs using VMM will fail.
+    
+siInitOk:
     lda #$93                // PETSCII clear-screen character
     jsr KernalChROUT
     lda #$0E                // switch C64 to lowercase/uppercase character mode
@@ -123,6 +138,61 @@ sdFoundCmd:
     jmp (HandlerVecLo)      // jump to handler; handler rts returns to mainLoop
 
 sdBadCmd:
+    // Try external command search
+    // Extract first token from CommandBuffer starting at ParsePos
+    ldy ParsePos
+    lda CommandBuffer, y
+    cmp #'$'                // Reject names starting with $ (avoids directory load crash)
+    beq sdRealBadCmd
+    
+    sty TempLo
+sdExtScan:
+    lda CommandBuffer, y
+    beq sdExtFoundEnd
+    cmp #' '
+    beq sdExtFoundEnd
+    iny
+    jmp sdExtScan
+sdExtFoundEnd:
+    tya
+    sec
+    sbc TempLo
+    tax                     // X = length
+    
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    sta NamePtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta NamePtrHi
+    
+    // Check if it exists as .prg
+    lda NamePtrLo
+    ldy NamePtrHi
+    // X = length
+    jsr findFile
+    bcs sdRealBadCmd        // Not found, print error
+    
+    // Found it! Load to UserProgStart ($2000)
+    lda #1
+    sta SpecificLoad
+    lda #<UserProgStart
+    sta HexValLo
+    lda #>UserProgStart
+    sta HexValHi
+    
+    lda NamePtrLo
+    ldy NamePtrHi
+    // X = length from findFile
+    jsr shellLoadPrg
+    bcs sdRealBadCmd
+    
+    // EXECUTE
+    jsr UserProgStart
+    rts
+
+sdRealBadCmd:
     lda #<badCmdMsg
     ldy #>badCmdMsg
     jsr petPrintString
@@ -250,6 +320,89 @@ echoDone:
     jsr KernalChROUT
     rts
 
+// LOAD — load a .PRG from disk [address]
+cmdLoad:
+    ldy ParsePos
+    lda CommandBuffer, y
+    beq clNoArgs
+    
+    // Save start position of name
+    sty TempLo
+clScanName:
+    lda CommandBuffer, y
+    beq clDoneScan
+    cmp #' '
+    beq clDoneScan
+    iny
+    jmp clScanName
+clDoneScan:
+    sty TempHi              // Save end position
+    
+    // Calculate length
+    tya
+    sec
+    sbc TempLo
+    pha                     // Push length to stack
+    
+    // Calculate pointer: CommandBuffer + TempLo
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    sta NamePtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta NamePtrHi
+    
+    // Check for optional address
+    ldy TempHi
+clSkipSpaces:
+    lda CommandBuffer, y
+    beq clHeaderLoad
+    cmp #' '
+    bne clFoundAddr
+    iny
+    jmp clSkipSpaces
+clFoundAddr:
+    jsr parseHex
+    bcs clHeaderLoad        // Invalid hex -> use header
+    lda #1
+    sta SpecificLoad
+    jmp clDoLoad
+clHeaderLoad:
+    lda #0
+    sta SpecificLoad
+clDoLoad:
+    lda NamePtrLo
+    ldy NamePtrHi
+    pla                     // Pull length to X
+    tax
+    jsr findFile            // Normalize, append .prg, check disk
+    bcs clError             // Not found or error
+    
+    // findFile returns updated length in X
+    lda NamePtrLo
+    ldy NamePtrHi
+    jsr shellLoadPrg
+    bcs clError
+    rts
+clNoArgs:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+clError:
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jsr petPrintString
+    rts
+
+// DIR — list directory contents (stub)
+cmdDir:
+    lda #<dirStubMsg
+    ldy #>dirStubMsg
+    jsr petPrintString
+    rts
+
 // ---------------------------------------------------------------------------
 // String literals
 // ---------------------------------------------------------------------------
@@ -260,3 +413,19 @@ promptMsg:
 badCmdMsg:
     .text "Bad command or file name"
     .byte 0
+
+dirStubMsg:
+    .text "Directory listing not yet implemented"
+    .byte $0D, 0
+
+noFileMsg:
+    .text "File name required"
+    .byte 0
+
+loadErrMsg:
+    .text "Load error"
+    .byte 0
+
+noReuMsg:
+    .text "Warning: No REU detected. VMM disabled."
+    .byte $0D, 0
