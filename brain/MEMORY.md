@@ -1,10 +1,19 @@
 # Session Memory
 
-## Current State (2026-05-03)
-- Phase 2A complete: `command64.prg` builds clean, tested on real C64 hardware
-- Input architecture updated: Replaced `CHRIN` with `GETIN` polling loop + manual echo.
-- VMM ABI established: `include/vmm.inc` created with REU hardware ports and ZP interface.
-- Ready for Phase 2B.
+## Project Documentation
+- `GEMINI.md`: Core directives and protocols
+- `brain/KNOWLEDGE.md`: Architectural decisions and technical findings
+- `brain/MEMORY.md`: Session state and task tracking (this file)
+- `brain/COMMANDS.md`: Internal command status and priority
+- `brain/EXTERNAL.md`: External program status and priority
+- `brain/task.md`: Granular task list
+
+## Current State (2026-05-08)
+- Phase 2A complete; build verified on hardware.
+- `brain/COMMANDS.md` and `brain/EXTERNAL.md` created to track system evolution.
+- Stability fixes: Y-register clobbering and GETIN polling resolved.
+- Build command: `java -jar tools/KickAss.jar build/command64.asm` (outputs to `build/`)
+- Ready for Phase 2B (External Commands & Loader).
 
 ## Memory Map (current)
 | Region | Purpose |

@@ -7,29 +7,31 @@
 // --- petPrintChar ---
 // Print a single PETSCII character.
 // Input:  A = character to print
-// Clobbers: none
 .macro petPrintChar() {
     jsr KernalChROUT
 }
 
 // --- petPrintString ---
-// Print a null-terminated PETSCII string.
+// Subroutine to print a null-terminated PETSCII string.
 // Input:  A = low byte of string address
 //         Y = high byte of string address
-// Clobbers: A, Y, PrintPtrLo ($FB), PrintPtrHi ($FC)
-//
-// PrintPtrLo/Hi are zero-page equates ($FB/$FC) — required for (zp),Y indirect.
-.macro petPrintString() {
-    sta PrintPtrLo          // store pointer low byte into ZP $FB
-    sty PrintPtrHi          // store pointer high byte into ZP $FC
+// Uses:   PrintPtrLo ($22), PrintPtrHi ($23)
+// Note:   Preserves X and Y.
+petPrintString:
+    sta PrintPtrLo          // store pointer low byte
+    sty PrintPtrHi          // store pointer high byte
     ldy #0
-psPrintLoop:
+_psLoop:
     lda (PrintPtrLo), y     // dereference: byte at [PrintPtrLo/Hi + Y]
-    beq psPrintDone         // null terminator — stop
+    beq _psDone             // null terminator — stop
+    
+    // We assume KernalChROUT preserves X and Y as per standard C64 docs.
+    // If it clobbered them, the prompt would also be garbled.
     jsr KernalChROUT
+    
     iny
-    bne psPrintLoop         // safe for strings < 256 bytes
-    inc PrintPtrHi          // Y wrapped: advance base pointer high byte
-    jmp psPrintLoop
-psPrintDone:
-}
+    bne _psLoop             // loop for current page
+    inc PrintPtrHi          // advance to next page
+    jmp _psLoop
+_psDone:
+    rts

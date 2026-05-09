@@ -20,6 +20,14 @@
 
 - [x] Phase 2A Follow-on (open)
   - [x] Raw GETIN input loop — fixes `"` quote-mode control code injection
+  - [x] Fix Y-register clobbering in PETSCII/Shell routines
+  - [x] Fix PETSCII string encoding bug (block graphics in badCmdMsg)
+  - [x] Improve parser robustness (ignore empty lines, trim spaces)
   - [x] VMM API specification (`include/vmm.inc`)
 
-- [ ] Phase 2B: External command support / PATH search
+- [/] Phase 2B: External command support / PATH search
+  - [ ] Define loader memory map
+  - [ ] Implement directory search (`path.asm`)
+  - [ ] Implement binary loader (`loader.asm`)
+  - [ ] Integrate with `shellDispatch`
+

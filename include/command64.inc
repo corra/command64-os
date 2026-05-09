@@ -10,24 +10,31 @@
 .label KernalWarmStart = $FC68  // Warm start / BASIC restart vector
 
 // --- PETSCII Control Characters ---
-.label PetCr = $0D  // Carriage return
-.label PetLl = $0A  // Line feed
+.label PetCr   = $0D  // Carriage return
+.label PetLl   = $0A  // Line feed
+.label PetVBar = $7C  // Vertical bar '|'
+.label PetLeft = $9D  // Cursor left control code
 
-// --- Zero Page: Pointer and Dispatch Scratch ($F9–$FE) ---
+// --- Zero Page: Pointer and Dispatch Scratch ($22–$2F, $F9–$FE) ---
 // Standard C64 user zero-page scratch area is $FB–$FE; $F9–$FA also safe.
-.label PrintPtrLo    = $FB  // petPrintString: pointer low byte
-.label PrintPtrHi    = $FC  // petPrintString: pointer high byte
+// However, $FB-$FE can be used by KERNAL tape/RS-232. Moving string pointers.
+.label PrintPtrLo    = $22  // petPrintString: pointer low byte
+.label PrintPtrHi    = $23  // petPrintString: pointer high byte
 .label HandlerVecLo  = $FD  // shellDispatch: resolved handler address low byte
 .label HandlerVecHi  = $FE  // shellDispatch: resolved handler address high byte
 .label ParsePos      = $F9  // index into CommandBuffer past matched command name
-.label CmpBase       = $FA  // cmdCompare: saved entry-base offset (entry start in tableCmd)
+.label CmpBase       = $FA  // cmdCompare: saved entry-base offset
 
 // --- I/O Buffers ---
-// $0300–$033B is the C64 KERNAL/BASIC indirect vector table — DO NOT USE.
-// CommandBuffer sits at $1400, safely after all code segments (~$1330 end).
-// Layout: 79 data bytes ($1400–$144E), null terminator at $144F, length at $1450.
-.label CommandBuffer = $1400
-.label CommandLen    = $1450
+// Relocating CommandBuffer to $1500 to provide more headroom for the shell code.
+.label CommandBuffer = $1500
+.label CommandLen    = $1550
+
+// --- User Program Space ---
+// External commands are loaded here. 
+// $2000 is well clear of the shell and buffers.
+.label UserProgStart = $2000
+.label UserProgEnd   = $3FFF // Allocated 8KB for most external tools
 
 // --- VMM / REU (Page 2) ---
 .label VmmSeg   = $0200

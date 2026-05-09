@@ -2,6 +2,8 @@
 // KickAssembler v5.25 - MS-DOS 4.0 shell for C64
 // Core command loop: prompt, input, dispatch, built-in commands.
 
+.encoding "petscii_mixed"
+
 // ---------------------------------------------------------------------------
 // Command Table  (loaded at $1100)
 //
@@ -14,11 +16,11 @@
 .segment CommandTable [start=$1100]
 
 tableCmd:
-    .text "EXIT  "
+    .text "exit  "
     .word cmdExit
-    .text "CLS   "
+    .text "cls   "
     .word cmdCls
-    .text "ECHO  "
+    .text "echo  "
     .word cmdEcho
 tableEnd:
 
@@ -36,7 +38,7 @@ start:
 mainLoop:
     lda #<promptMsg
     ldy #>promptMsg
-    petPrintString()
+    jsr petPrintString
 
     jsr shellReadLine       // screen editor echoes input and advances cursor on RETURN
 
@@ -52,15 +54,22 @@ mainLoop:
 shellReadLine:
     ldy #0
 rlReadLoop:
+    tya                     // KernalGetIn may clobber Y; preserve it
+    pha
+rlPoll:
     jsr KernalGetIn         // wait for char without screen editor (raw input)
+    beq rlPoll              // GETIN is non-blocking; loop until key pressed
+    
+    tax                     // save character to X (KernalChROUT preserves X)
+    jsr KernalChROUT        // manually echo the character just read
+    
+    pla                     // pull Y to A
+    tay                     // restore Y
+    txa                     // restore character to A from X
+    
     cmp #PetCr
     beq rlDoneRead
     
-    // If we use GETIN, we MUST manually echo the character if we want it on screen
-    // but the project decision for Phase 2A was to rely on CHRIN's auto-echo.
-    // To fix "quote mode" and maintain echo, we implement a basic echo loop.
-    
-    jsr KernalChROUT        // manually echo the character just read
     sta CommandBuffer, y
     iny
     cpy #79                 // reserve index 79 for null terminator
@@ -80,6 +89,18 @@ rlDoneRead:
 // Clobbers: A, X, Y, HandlerVecLo, HandlerVecHi, ParsePos
 // ---------------------------------------------------------------------------
 shellDispatch:
+    ldy #0
+sdSkipLeading:
+    lda CommandBuffer, y
+    cmp #' '
+    bne sdCheckEmpty
+    iny
+    jmp sdSkipLeading
+sdCheckEmpty:
+    cmp #0                  // if null, the line is empty or all spaces
+    beq sdExitDispatch      // early exit (NOP)
+    
+    sty ParsePos            // save start of command name for cmdCompare
     ldx #0
 sdSearchLoop:
     cpx #(tableEnd - tableCmd)
@@ -104,9 +125,10 @@ sdFoundCmd:
 sdBadCmd:
     lda #<badCmdMsg
     ldy #>badCmdMsg
-    petPrintString()
+    jsr petPrintString
     lda #PetCr
     jsr KernalChROUT
+sdExitDispatch:
     rts
 
 // ---------------------------------------------------------------------------
@@ -120,6 +142,7 @@ sdBadCmd:
 //         On mismatch, X is restored to CmpBase so sdSearchLoop's stride is clean.
 //
 // Input:  X = byte offset of entry start in tableCmd
+//         ParsePos = buffer index of command start
 // Output: Z=1 on match; X = entry_base + TABLE_NAME_LEN (points to handler word).
 //         Z=0 on mismatch; X = entry_base (restored).
 //         ParsePos = CommandBuffer index of first argument char on match.
@@ -127,36 +150,44 @@ sdBadCmd:
 // ---------------------------------------------------------------------------
 cmdCompare:
     stx CmpBase             // save entry base; restored on fail, used on match
-    ldy #0
+    ldy ParsePos            // start comparison from first non-space character
 ccCmpLoop:
-    // Compute table index for this position: X = CmpBase + Y
+    // Compute table index for this position: X = CmpBase + (Y - StartPos)
     tya
+    sec
+    sbc ParsePos            // A = current offset from command start
+    tax                     // save offset to X temporarily
+    
+    // Check if we've compared all TABLE_NAME_LEN characters
+    cpx #TABLE_NAME_LEN
+    beq ccSetMatch          // matched all fixed-width chars!
+
+    // Compute table index: CmpBase + offset
+    txa
     clc
     adc CmpBase
-    tax
+    tax                     // X = absolute index in tableCmd
+
     // Load and classify input character
     lda CommandBuffer, y
     cmp #' '
     beq ccInputSpace        // input token ended (space separator)
     cmp #0
     beq ccInputNull         // input token ended (null terminator)
-    // Compare input char against table[CmpBase + Y]
+    
+    // Compare input char against tableCmd, x
     cmp tableCmd, x
     bne ccCmpFail
+    
     iny
-    cpy #TABLE_NAME_LEN
-    bne ccCmpLoop
-    // All TABLE_NAME_LEN chars matched.
-    // X = CmpBase + Y = CmpBase + TABLE_NAME_LEN — already at handler word. ✓
-    sty ParsePos
-    lda #0                  // Z=1 → match
-    rts
+    jmp ccCmpLoop
+
 ccInputSpace:
-    // X = CmpBase + Y; table[X] must be space padding here for a match
+    // Input ended early (space). Table must be space-padded here.
     lda tableCmd, x
     cmp #' '
     bne ccCmpFail
-    // Skip any additional spaces between command name and argument
+    // Success - skip any more spaces and set match
     iny
 ccSkipSpaces:
     lda CommandBuffer, y
@@ -164,24 +195,26 @@ ccSkipSpaces:
     bne ccSetMatch
     iny
     jmp ccSkipSpaces
+
 ccInputNull:
-    // X = CmpBase + Y; table[X] must be space padding here for a match
+    // Input ended early (null). Table must be space-padded here.
     lda tableCmd, x
     cmp #' '
     bne ccCmpFail
-    // No argument — fall through to ccSetMatch
+    // Success - fall through to ccSetMatch
+
 ccSetMatch:
-    sty ParsePos
-    // Advance X to handler word: entry_base + TABLE_NAME_LEN
+    sty ParsePos            // save pointer to first arg char (or null)
     lda CmpBase
     clc
     adc #TABLE_NAME_LEN
-    tax
-    lda #0                  // Z=1 → match
+    tax                     // X = index of handler address in tableCmd
+    lda #0                  // Z=1 (Match)
     rts
+
 ccCmpFail:
-    ldx CmpBase             // restore entry base for sdSearchLoop's stride
-    lda #1                  // Z=0 → no match
+    ldx CmpBase
+    lda #1                  // Z=0 (No Match)
     rts
 
 // ---------------------------------------------------------------------------
