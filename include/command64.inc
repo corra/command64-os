@@ -45,9 +45,9 @@
 
 // --- User Program Space ---
 // External commands are loaded here. 
-// $2000 is well clear of the shell and buffers.
-.label UserProgStart = $2000
-.label UserProgEnd   = $3FFF // Allocated 8KB for most external tools
+// $4000 is well clear of the shell, buffers, and VMM MCT.
+.label UserProgStart = $4000
+.label UserProgEnd   = $BFFF // Allocated 32KB for external tools
 
 // --- VMM / REU ---
 #import "vmm.inc"

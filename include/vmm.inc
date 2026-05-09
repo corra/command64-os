@@ -13,6 +13,7 @@
 .label VmmSegHi     = $2F
 .label VmmOffLo     = $30
 .label VmmOffHi     = $31
+.label VmmBank      = $32
 
 // --- REU Hardware Registers ($DF00-$DF0A) ---
 .label REU_STATUS     = $DF00 // R: Status, W: Clear Interrupts
@@ -33,5 +34,10 @@
 .label REU_CMD_SWAP    = $92 // C64 <-> REU (Execute immediately)
 
 // --- Memory Management Structures (Base RAM) ---
-.label VmmMctBase  = $1700 // Memory Control Table (256 bytes)
-.label VmmFreeHead = $17FF // Pointer to first free memory block
+.label VmmMctBase  = $3000 // Memory Control Table (4096 bytes for 16MB)
+.label VmmFreeHead = $3FFF // Pointer to first free memory block
+
+// --- Page State Flags ---
+.label PAGE_FREE   = $00
+.label PAGE_HEAD   = $01
+.label PAGE_TAIL   = $02
