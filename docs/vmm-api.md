@@ -13,18 +13,18 @@ To provide a memory management abstraction layer that maps the 1MB logical addre
 ### VMM_INIT (Initialize the Virtual Memory Manager)
 - **Description:** Maps the base C64 memory and initializes the REU banking structure. Must be called before any other VMM function.
 - **Input:** `A` = Total memory pages to allocate in the REU (e.g., 256 for 1MB).
-- **Implementation:** Performs the initial REU handshake (writing to `$D405` and `$D406`), verifies the REU is online, and creates the Memory Control Table (MCT) in zero-page.
+- **Implementation:** Performs the initial REU handshake (checking status at `$DF00`), verifies the REU is online, and creates the Memory Control Table (MCT) in base RAM.
 
 ### VMM_READ_BYTE (Read from Virtual Address)
 - **Description:** Reads a single byte from a 16-bit logical DOS address.
-- **Input:** `VMM_SEG` = Logical Segment, `VMM_OFF` = Logical Offset.
+- **Input:** `VmmSeg` = Logical Segment, `VmmOff` = Logical Offset.
 - **Output:** `A` = Byte read from the logical address.
-- **Implementation:** Computes the 20-bit physical address, selects the correct REU bank via `$D405`, and reads the byte from the C64 I/O port.
+- **Implementation:** Computes the 20-bit physical address, selects the correct REU bank via `$DF06`, and performs a Fetch via `$DF01`.
 
 ### VMM_WRITE_BYTE (Write to Virtual Address)
 - **Description:** Writes a single byte to a 16-bit logical DOS address.
-- **Input:** `A` = Byte to write, `VMM_SEG` = Logical Segment, `VMM_OFF` = Logical Offset.
-- **Implementation:** Computes the physical address, selects the REU bank, and writes via the C64 I/O registers.
+- **Input:** `A` = Byte to write, `VmmSeg` = Logical Segment, `VmmOff` = Logical Offset.
+- **Implementation:** Computes the physical address, selects the REU bank, and performs a Stash via `$DF01`.
 
 ### VMM_ALLOC (Allocate Memory Block)
 - **Description:** Finds a contiguous block of free memory in the virtual space and reserves it.
