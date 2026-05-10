@@ -8,12 +8,13 @@
 .label VMM_ERR_INVALID  = $02
 
 // --- Register / ZP Interface ---
-// Using ZP locations $2E-$31 for 16-bit segment/offset pointers.
-.label VmmSegLo     = $2E
-.label VmmSegHi     = $2F
-.label VmmOffLo     = $30
-.label VmmOffHi     = $31
-.label VmmBank      = $32
+// Using ZP locations $61-$65 (FAC1) for 16-bit segment/offset pointers.
+// This avoids clobbering BASIC pointers ($2B-$32).
+.label VmmSegLo     = $61
+.label VmmSegHi     = $62
+.label VmmOffLo     = $63
+.label VmmOffHi     = $64
+.label VmmBank      = $65
 
 // --- REU Hardware Registers ($DF00-$DF0A) ---
 .label REU_STATUS     = $DF00 // R: Status, W: Clear Interrupts
@@ -34,8 +35,9 @@
 .label REU_CMD_SWAP    = $92 // C64 <-> REU (Execute immediately)
 
 // --- Memory Management Structures (Base RAM) ---
-.label VmmMctBase  = $3000 // Memory Control Table (4096 bytes for 16MB)
-.label VmmFreeHead = $3FFF // Pointer to first free memory block
+// $C000 is 4KB of free RAM above BASIC, safe for MCT.
+.label VmmMctBase  = $C000 // Memory Control Table (4096 bytes for 16MB)
+.label VmmFreeHead = $CFFF // Pointer to first free memory block
 
 // --- Page State Flags ---
 .label PAGE_FREE   = $00

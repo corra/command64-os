@@ -22,20 +22,21 @@
 .label PetVBar = $7C  // Vertical bar '|'
 .label PetLeft = $9D  // Cursor left control code
 
-// --- Zero Page: Pointer and Dispatch Scratch ($22–$2F) ---
-// Moving all pointers out of $F5-$FE as that range is clobbered by KERNAL I/O.
-.label PrintPtrLo    = $22  // petPrintString: pointer low byte
-.label PrintPtrHi    = $23  // petPrintString: pointer high byte
-.label NamePtrLo     = $24  // Loader: pointer to filename in buffer
-.label NamePtrHi     = $25  // Loader: pointer to filename in buffer
-.label TempLo        = $26  // Utility scratch low byte
-.label TempHi        = $27  // Utility scratch high byte
-.label HexValLo      = $28  // parseHex: result low byte
-.label HexValHi      = $29  // parseHex: result high byte
-.label ParsePos      = $2A  // index into CommandBuffer past matched command name
-.label CmpBase       = $2B  // cmdCompare: saved entry-base offset
-.label HandlerVecLo  = $2C  // shellDispatch: resolved handler address low byte
-.label HandlerVecHi  = $2D  // shellDispatch: resolved handler address high byte
+// --- Zero Page: Pointer and Dispatch Scratch ($FB–$FE, $66–$6A) ---
+// Using 100% safe area ($FB-$FE) and FAC1 workspace ($66-$6A).
+// This avoids clobbering KERNAL I/O ($90-$FA) and BASIC pointers ($2B-$32).
+.label PrintPtrLo    = $FB  // petPrintString: pointer low byte
+.label PrintPtrHi    = $FC  // petPrintString: pointer high byte
+.label NamePtrLo     = $FD  // Loader: pointer to filename in buffer
+.label NamePtrHi     = $FE  // Loader: pointer to filename in buffer
+.label TempLo        = $66  // Utility scratch low byte
+.label TempHi        = $67  // Utility scratch high byte
+.label HexValLo      = $68  // parseHex: result low byte
+.label HexValHi      = $69  // parseHex: result high byte
+.label ParsePos      = $6A  // index into CommandBuffer past matched command name
+.label CmpBase       = $02  // cmdCompare: saved entry-base offset (user safe byte)
+.label HandlerVecLo  = $03  // shellDispatch: resolved handler address low byte
+.label HandlerVecHi  = $04  // shellDispatch: resolved handler address high byte
 
 // --- I/O Buffers ---
 // Relocating CommandBuffer to $1600 to provide more headroom for the shell code.
@@ -45,9 +46,9 @@
 
 // --- User Program Space ---
 // External commands are loaded here. 
-// $4000 is well clear of the shell, buffers, and VMM MCT.
-.label UserProgStart = $4000
-.label UserProgEnd   = $BFFF // Allocated 32KB for external tools
+// $2000 is the standard entry point for the pre-verified image.d64 programs.
+.label UserProgStart = $2000
+.label UserProgEnd   = $9FFF // Allocated all remaining BASIC RAM
 
 // --- VMM / REU ---
 #import "vmm.inc"
