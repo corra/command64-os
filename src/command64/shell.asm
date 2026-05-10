@@ -4,6 +4,11 @@
 
 .encoding "petscii_mixed"
 
+// --- Version Information ---
+.const VERSION_MAJOR = "4"
+.const VERSION_MINOR = "0"
+.const BUILD_NUMBER  = "2296" // Incremented for new memory layout
+
 // ---------------------------------------------------------------------------
 // Command Table  (loaded at $1100)
 //
@@ -26,6 +31,8 @@ tableCmd:
     .word cmdLoad
     .text "dir   "
     .word cmdDir
+    .text "ver   "
+    .word cmdVer
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -50,6 +57,8 @@ siInitOk:
     jsr KernalChROUT
     lda #$0E                // switch C64 to lowercase/uppercase character mode
     jsr KernalChROUT        // required for .text lowercase strings to display correctly
+
+    jsr cmdVer              // Display version banner
 mainLoop:
     lda #<promptMsg
     ldy #>promptMsg
@@ -403,12 +412,24 @@ cmdDir:
     jsr petPrintString
     rts
 
+// VER — display version and build number
+cmdVer:
+    lda #<verMsg
+    ldy #>verMsg
+    jsr petPrintString
+    rts
+
 // ---------------------------------------------------------------------------
 // String literals
 // ---------------------------------------------------------------------------
 promptMsg:
     .text "C64:> "
     .byte 0
+
+verMsg:
+    .text "Command 64-DOS Version " + VERSION_MAJOR + "." + VERSION_MINOR
+    .text " (Build " + BUILD_NUMBER + ")"
+    .byte $0D, $0D, 0
 
 badCmdMsg:
     .text "Bad command or file name"
