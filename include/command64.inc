@@ -22,27 +22,30 @@
 .label PetVBar = $7C  // Vertical bar '|'
 .label PetLeft = $9D  // Cursor left control code
 
-// --- Zero Page: Pointer and Dispatch Scratch ($FB–$FE, $66–$6A) ---
-// Using 100% safe area ($FB-$FE) and FAC1 workspace ($66-$6A).
+// --- Zero Page: Pointer and Dispatch Scratch ---
+// Using 100% safe area ($FB-$FE, $02) and non-critical FAC1 workspace ($61-$67).
 // This avoids clobbering KERNAL I/O ($90-$FA) and BASIC pointers ($2B-$32).
 .label PrintPtrLo    = $FB  // petPrintString: pointer low byte
 .label PrintPtrHi    = $FC  // petPrintString: pointer high byte
 .label NamePtrLo     = $FD  // Loader: pointer to filename in buffer
 .label NamePtrHi     = $FE  // Loader: pointer to filename in buffer
-.label TempLo        = $66  // Utility scratch low byte
-.label TempHi        = $67  // Utility scratch high byte
-.label HexValLo      = $68  // parseHex: result low byte
-.label HexValHi      = $69  // parseHex: result high byte
-.label ParsePos      = $6A  // index into CommandBuffer past matched command name
 .label CmpBase       = $02  // cmdCompare: saved entry-base offset (user safe byte)
-.label HandlerVecLo  = $03  // shellDispatch: resolved handler address low byte
-.label HandlerVecHi  = $04  // shellDispatch: resolved handler address high byte
+
+.label HandlerVecLo  = $61  // shellDispatch: resolved handler address low byte
+.label HandlerVecHi  = $62  // shellDispatch: resolved handler address high byte
+.label ParsePos      = $63  // index into CommandBuffer past matched command name
+.label TempLo        = $64  // Utility scratch low byte
+.label TempHi        = $65  // Utility scratch high byte
+.label HexValLo      = $66  // parseHex: result low byte
+.label HexValHi      = $67  // parseHex: result high byte
 
 // --- I/O Buffers ---
-// Relocating CommandBuffer to $1600 to provide more headroom for the shell code.
-.label CommandBuffer = $1600
-.label CommandLen    = $1650
-.label SpecificLoad  = $1651 // 0=use file header, 1=use HexVal address
+// Relocating CommandBuffer to $033C (Cassette Buffer). 
+// This is 192 bytes of safe workspace if tape is not used.
+// It avoids colliding with code segments at $1600.
+.label CommandBuffer = $033C
+.label CommandLen    = $038C
+.label SpecificLoad  = $038D // 0=use file header, 1=use HexVal address
 
 // --- User Program Space ---
 // External commands are loaded here. 

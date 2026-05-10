@@ -18,7 +18,7 @@
   - [x] cmdCompare X-register dispatch bug fixed (all 3 commands verified)
   - [x] EXIT: `jmp ($0338)` → `jmp $E37B` (BASIC warm start ROM)
 
-- [x] Phase 2A Follow-on (open)
+- [x] Phase 2A Follow-on
   - [x] Raw GETIN input loop — fixes `"` quote-mode control code injection
   - [x] Fix Y-register clobbering in PETSCII/Shell routines
   - [x] Fix PETSCII string encoding bug (block graphics in badCmdMsg)
@@ -39,4 +39,15 @@
   - [x] Verify `EXTCLS` from shell (functionality check)
   - [x] Verify case-insensitivity (e.g., `hello` vs `HELLO`)
   - [x] Verify custom load address (e.g., `load hello 3000`)
+
+- [x] Phase 2C: Virtual Memory Manager (VMM)
+  - [x] Define VMM ABI and REU hardware registers
+  - [x] Relocate MCT to safe RAM ($C000) for 16MB support
+  - [x] Remap ZP pointers to safe/FAC1 workspace to prevent BASIC corruption
+  - [x] Implement `vmmInit` (MCT clearing and REU detection)
+  - [x] Implement `vmmAlloc` / `vmmFree` with 4KB Page Byte-Map strategy
+  - [x] Implement `vmmReadByte` / `vmmWriteByte` (REU DMA primitives)
+  - [x] Stabilize shell: move `CommandBuffer` to Cassette Buffer ($033C)
+  - [x] Add version tracking (0.2.3 Build 2298) and startup banner
+  - [x] Implement `HELP` internal command
 

@@ -5,9 +5,11 @@
 .encoding "petscii_mixed"
 
 // --- Version Information ---
-.const VERSION_MAJOR = "4"
-.const VERSION_MINOR = "0"
-.const BUILD_NUMBER  = "2296" // Incremented for new memory layout
+.const VERSION_MAJOR = "0"
+.const VERSION_MINOR = "2"
+.const VERSION_STAGE = "3" // Phase 2C (VMM)
+.const BUILD_NUMBER  = "2300"
+
 
 // ---------------------------------------------------------------------------
 // Command Table  (loaded at $1100)
@@ -33,6 +35,8 @@ tableCmd:
     .word cmdDir
     .text "ver   "
     .word cmdVer
+    .text "help  "
+    .word cmdHelp
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -167,6 +171,7 @@ sdExtFoundEnd:
     sec
     sbc TempLo
     tax                     // X = length
+    beq sdRealBadCmd        // Length 0? No search, just "Bad command"
     
     lda #<CommandBuffer
     clc
@@ -184,7 +189,7 @@ sdExtFoundEnd:
     bcs sdRealBadCmd        // Not found, print error
     
     // Found it! Load to UserProgStart ($2000)
-    lda #1
+    lda #0                  // 0 = Relocated (uses HexVal)
     sta SpecificLoad
     lda #<UserProgStart
     sta HexValLo
@@ -374,17 +379,17 @@ clSkipSpaces:
 clFoundAddr:
     jsr parseHex
     bcs clHeaderLoad        // Invalid hex -> use header
-    lda #1
+    lda #0                  // 0 = Relocated (uses HexVal)
     sta SpecificLoad
     jmp clDoLoad
 clHeaderLoad:
-    lda #0
+    lda #1                  // 1 = Absolute (uses Header)
     sta SpecificLoad
 clDoLoad:
-    lda NamePtrLo
-    ldy NamePtrHi
-    pla                     // Pull length to X
-    tax
+    pla                     // Pull length to A
+    tax                     // Transfer length to X
+    lda NamePtrLo           // Restore A from ZP
+    ldy NamePtrHi           // Restore Y from ZP
     jsr findFile            // Normalize, append .prg, check disk
     bcs clError             // Not found or error
     
@@ -419,6 +424,13 @@ cmdVer:
     jsr petPrintString
     rts
 
+// HELP — display help information
+cmdHelp:
+    lda #<helpMsg
+    ldy #>helpMsg
+    jsr petPrintString
+    rts
+
 // ---------------------------------------------------------------------------
 // String literals
 // ---------------------------------------------------------------------------
@@ -427,9 +439,25 @@ promptMsg:
     .byte 0
 
 verMsg:
-    .text "Command 64-DOS Version " + VERSION_MAJOR + "." + VERSION_MINOR
+    .text "Command 64-DOS Version " + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
     .text " (Build " + BUILD_NUMBER + ")"
     .byte $0D, $0D, 0
+
+helpMsg:
+    .text "CLS    - CLEAR SCREEN"
+    .byte $0D
+    .text "DIR    - LIST DIRECTORY (STUB)"
+    .byte $0D
+    .text "ECHO   - ECHO [TEXT]"
+    .byte $0D
+    .text "EXIT   - RETURN TO BASIC"
+    .byte $0D
+    .text "HELP   - SHOW THIS HELP"
+    .byte $0D
+    .text "LOAD   - LOAD [FILE] [ADDR]"
+    .byte $0D
+    .text "VER    - SHOW VERSION"
+    .byte $0D, 0
 
 badCmdMsg:
     .text "Bad command or file name"

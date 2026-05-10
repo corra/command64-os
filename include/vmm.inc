@@ -8,13 +8,13 @@
 .label VMM_ERR_INVALID  = $02
 
 // --- Register / ZP Interface ---
-// Using ZP locations $61-$65 (FAC1) for 16-bit segment/offset pointers.
-// This avoids clobbering BASIC pointers ($2B-$32).
-.label VmmSegLo     = $61
-.label VmmSegHi     = $62
-.label VmmOffLo     = $63
-.label VmmOffHi     = $64
-.label VmmBank      = $65
+// Using ZP locations $68-$6C (FAC1) for 16-bit segment/offset pointers.
+// This avoids clobbering BASIC pointers ($2B-$32) and KERNAL I/O ($90-$FA).
+.label VmmSegLo     = $68
+.label VmmSegHi     = $69
+.label VmmOffLo     = $6A
+.label VmmOffHi     = $6B
+.label VmmBank      = $6C
 
 // --- REU Hardware Registers ($DF00-$DF0A) ---
 .label REU_STATUS     = $DF00 // R: Status, W: Clear Interrupts

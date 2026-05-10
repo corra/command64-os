@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Binary Loader
 // Wraps KERNAL LOAD routine with support for specific target addresses.
 
-.segment Loader [start=$1580]
+.segment Loader [start=$1680]
 
 // --- shellLoadPrg ---
 // Loads a PRG from disk using KERNAL routines.
@@ -24,7 +24,7 @@ shellLoadPrg:
     ldy PrintPtrHi
     jsr KernalSETNAM
     
-    // SETLFS: A=channel(1), X=device(8), Y=secondary (0=Header, 1=X/Y)
+    // SETLFS: A=channel(1), X=device(8), Y=secondary (0=Relocated, 1=Absolute)
     lda #1
     ldx #8                  // Default to device 8 for now
     ldy SpecificLoad
