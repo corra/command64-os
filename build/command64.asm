@@ -7,15 +7,15 @@
 //   CommandTable  $1100  Fixed-width command dispatch table
 //   CommandShell  $1200  Command loop, dispatcher, built-in handlers
 //   Utils         $1600  Hex parsing and string utilities
-//   Loader        $1680  KERNAL binary loader wrapper
-//   Path          $1700  Directory search and path logic
-//   Vmm           $1800  Virtual Memory Manager (REU mapping)
-//   VmmData       $1B00  VMM temporary storage
+//   Loader        $1700  KERNAL binary loader wrapper
+//   Path          $1780  Directory search and path logic
+//   Vmm           $1880  Virtual Memory Manager (REU mapping)
+//   VmmData       $1B80  VMM temporary storage
 
 .file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell,Utils,Loader,Path,Vmm,VmmData"]
 
 .segmentdef Main [start=$0801]
-.segmentdef VmmData [start=$1B00]
+.segmentdef VmmData [start=$1B80]
 // Petsci, CommandTable, CommandShell, Utils, Loader, Path, Vmm, and VmmData are defined by the imported source files.
 
 #import "../include/command64.inc"

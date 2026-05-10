@@ -8,7 +8,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "3" // Phase 2C (VMM)
-.const BUILD_NUMBER  = "2300"
+.const BUILD_NUMBER  = "2301"
 
 
 // ---------------------------------------------------------------------------
@@ -410,12 +410,79 @@ clError:
     jsr petPrintString
     rts
 
-// DIR — list directory contents (stub)
+// DIR — list directory contents (non-destructive)
 cmdDir:
-    lda #<dirStubMsg
-    ldy #>dirStubMsg
-    jsr petPrintString
+    lda #1
+    ldx #<dirFname
+    ldy #>dirFname
+    jsr KernalSETNAM
+    
+    lda #2                  // File 2
+    ldx #8                  // Device 8
+    ldy #0                  // Secondary 0
+    jsr KernalSETLFS
+    
+    jsr KernalOPEN
+    bcs cdDevError
+    
+    ldx #2
+    jsr KernalCHKIN
+    
+    // Skip 2-byte load address
+    jsr KernalGetIn
+    jsr KernalGetIn
+    
+cdLineLoop:
+    // Read link bytes
+    jsr KernalGetIn
+    sta TempLo              // Link Lo
+    jsr KernalGetIn
+    ora TempLo              // Link Hi
+    beq cdDone              // EOF
+    
+    // Read block count
+    jsr KernalGetIn
+    tax                     // Count Lo
+    jsr KernalGetIn
+    tay                     // Count Hi
+    
+    // Clear TempHi (used by decimal printer for leading zero suppression)
+    lda #0
+    sta TempHi
+    jsr printDecimal16
+    
+    lda #' '
+    jsr KernalChROUT
+    
+cdReadName:
+    jsr KernalGetIn
+    beq cdLineDone
+    jsr KernalChROUT
+    jmp cdReadName
+    
+cdLineDone:
+    lda #PetCr
+    jsr KernalChROUT
+    
+    jsr KernalREADST
+    bne cdDone
+    jmp cdLineLoop
+    
+cdDone:
+    jsr KernalCLRCHN
+    lda #2
+    jsr KernalCLOSE
     rts
+
+cdDevError:
+    lda #<noDeviceMsg
+    ldy #>noDeviceMsg
+    jsr petPrintString
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+dirFname: .text "$"
 
 // VER — display version and build number
 cmdVer:
@@ -446,7 +513,7 @@ verMsg:
 helpMsg:
     .text "CLS    - CLEAR SCREEN"
     .byte $0D
-    .text "DIR    - LIST DIRECTORY (STUB)"
+    .text "DIR    - LIST DIRECTORY"
     .byte $0D
     .text "ECHO   - ECHO [TEXT]"
     .byte $0D
@@ -478,3 +545,7 @@ loadErrMsg:
 noReuMsg:
     .text "Warning: No REU detected. VMM disabled."
     .byte $0D, 0
+
+noDeviceMsg:
+    .text "Device not present"
+    .byte 0

@@ -2,7 +2,7 @@
 // Virtual Memory Manager for C64 MS-DOS Port
 // Maps 1MB DOS Address Space (Seg:Off) to C64 REU.
 
-.segment Vmm [start=$1800]
+.segment Vmm [start=$1880]
 
 // --- vmmInit ---
 // Initializes the VMM and verifies REU presence.

@@ -102,3 +102,108 @@ nnNext:
     jmp nnLoop
 nnDone:
     rts
+
+// --- printDecimal16 ---
+// Prints a 16-bit value in decimal to standard output.
+// Input:  X = Low byte, Y = High byte
+// Clobbers: A, X, Y, HexValLo/Hi (used as temporary)
+printDecimal16:
+    stx HexValLo
+    sty HexValHi
+    
+    // Check for zero
+    lda HexValLo
+    ora HexValHi
+    bne pdStart
+    lda #'0'
+    jsr KernalChROUT
+    rts
+
+pdStart:
+    // We use a simple subtraction loop for powers of 10
+    // 10000, 1000, 100, 10, 1
+    
+    // 10000s
+    ldx #0
+pd10000:
+    lda HexValLo
+    sec
+    sbc #<10000
+    tay
+    lda HexValHi
+    sbc #>10000
+    bcc pdDone10000
+    sta HexValHi
+    sty HexValLo
+    inx
+    jmp pd10000
+pdDone10000:
+    jsr pdPrintDigit
+    
+    // 1000s
+    ldx #0
+pd1000:
+    lda HexValLo
+    sec
+    sbc #<1000
+    tay
+    lda HexValHi
+    sbc #>1000
+    bcc pdDone1000
+    sta HexValHi
+    sty HexValLo
+    inx
+    jmp pd1000
+pdDone1000:
+    jsr pdPrintDigit
+
+    // 100s
+    ldx #0
+pd100:
+    lda HexValLo
+    sec
+    sbc #100
+    bcc pdDone100
+    sta HexValLo
+    inx
+    jmp pd100
+pdDone100:
+    jsr pdPrintDigit
+
+    // 10s
+    ldx #0
+pd10:
+    lda HexValLo
+    sec
+    sbc #10
+    bcc pdDone10
+    sta HexValLo
+    inx
+    jmp pd10
+pdDone10:
+    jsr pdPrintDigit
+
+    // 1s
+    lda HexValLo
+    clc
+    adc #'0'
+    jsr KernalChROUT
+    rts
+
+// Helper to print digit in X and suppress leading zeros
+pdPrintDigit:
+    txa
+    beq pdZero
+    clc
+    adc #'0'
+    jsr KernalChROUT
+    lda #1                  // Mark that we've printed a non-zero
+    sta TempHi
+    rts
+pdZero:
+    lda TempHi              // Have we printed a non-zero yet?
+    beq pdNoPrint
+    lda #'0'
+    jsr KernalChROUT
+pdNoPrint:
+    rts

@@ -48,6 +48,7 @@
   - [x] Implement `vmmAlloc` / `vmmFree` with 4KB Page Byte-Map strategy
   - [x] Implement `vmmReadByte` / `vmmWriteByte` (REU DMA primitives)
   - [x] Stabilize shell: move `CommandBuffer` to Cassette Buffer ($033C)
-  - [x] Add version tracking (0.2.3 Build 2298) and startup banner
+  - [x] Add version tracking (0.2.3 Build 2301) and startup banner
   - [x] Implement `HELP` internal command
+  - [x] Implement `DIR` internal command (non-destructive)
 

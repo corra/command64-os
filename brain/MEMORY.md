@@ -10,8 +10,9 @@
 
 ## Current State (2026-05-09)
 - Phase 2A, 2B, and 2C complete.
-- **Version**: 0.2.3 (Build 2300).
+- **Version**: 0.2.3 (Build 2301).
 - **VMM**: 16MB supported via 4KB Page Byte-Map at `$C000`. `vmmInit`, `vmmAlloc`, `vmmFree` implemented.
+- **File System**: `DIR` command implemented (non-destructive streaming).
 - **Stability**: Fixed inverted `LOAD` secondary address mapping.
 - **Stability**: Shell isolated via Cassette Buffer (`$033C`) and safe Zero Page remapping (`$FB-$FE`, `$61-$6C`).
 - **Input**: Migrated to raw `GETIN` loop; quote-mode issues resolved.
