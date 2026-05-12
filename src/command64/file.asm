@@ -303,3 +303,67 @@ fwDone:
 fwError:
     sec
     rts
+
+// --- fileDelete ---
+// Deletes a file from disk using the "Scratch" command.
+// Input:  X/Y = Pointer to filename (null-terminated)
+// Output: Carry: 0=Success, 1=Error
+fileDelete:
+    stx NamePtrLo
+    sty NamePtrHi
+    
+    // 1. Prepare "S:" in FileScratch
+    lda #'S'
+    sta FileScratch
+    lda #':'
+    sta FileScratch + 1
+    
+    // 2. Append filename
+    ldy #0
+fdCopyLoop:
+    lda (NamePtrLo), y
+    beq fdCopyDone
+    sta FileScratch + 2, y
+    iny
+    jmp fdCopyLoop
+fdCopyDone:
+    // Total length = Y + 2
+    tya
+    clc
+    adc #2
+    tay                     // Y = Total length
+    
+    // 3. Normalize filename (starting from index 2)
+    // We can just normalize the whole "S:filename" string
+    tya
+    tax                     // X = Total length
+    lda #<FileScratch
+    ldy #>FileScratch
+    jsr normalizeName
+    
+    // 4. SETNAM: A=length, X/Y=pointer
+    txa                     // Length was in X
+    ldx #<FileScratch
+    ldy #>FileScratch
+    jsr KernalSETNAM
+    
+    // 5. SETLFS: A=LFN(15), X=Device(8), Y=Secondary(15)
+    lda #15                 // LFN 15 is standard for command channel
+    ldx #8                  // Device 8
+    ldy #15                 // Secondary 15 is command channel
+    jsr KernalSETLFS
+    
+    // 6. OPEN and CLOSE
+    jsr KernalOPEN
+    bcs fdError
+    
+    lda #15
+    jsr KernalCLOSE
+    clc
+    rts
+
+fdError:
+    lda #15
+    jsr KernalCLOSE         // Ensure channel is closed even on error
+    sec
+    rts

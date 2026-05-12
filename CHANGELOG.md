@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.11] - 2026-05-12
+
+### Added
+- **Internal Commands**: Added `DEL` and `ERASE` commands for file deletion.
+- **Service Bus API**: Added `DOS_DELETE_FILE` ($41) for external program file management.
+
+### Changed
+- **Memory Map**: Realigned `VmmData` and `FileScratch` to `$1FA0` to accommodate growing file module.
+
 ## [0.2.10] - 2026-05-12
 
 ### Fixed

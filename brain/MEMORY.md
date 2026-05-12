@@ -14,10 +14,10 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), and `DOS_WRITE_FILE` ($40).
 - **Internal Commands**: Added `TYPE` and `COPY` commands.
-- **Version**: 0.2.10 (Build 2403), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `COPY` and `TYPE` fully functional with correct KERNAL API register usage.
+- **Version**: 0.2.11 (Build 2404), Stage 4.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEL` and `ERASE` fully functional.
 
-## Memory Map (current — as of Build 2403)
+## Memory Map (current — as of Build 2404)
 | Region | Purpose |
 |--------|---------|
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
@@ -37,7 +37,7 @@
 | `$1B00` | Path (findFile, checkExistence) |
 | `$1C00` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
 | `$1E00` | File (Handle-based I/O — `file.asm`) |
-| `$1F80` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
+| `$1FA0` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
 | `$2000+` | UserProgStart (External commands loaded here) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |

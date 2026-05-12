@@ -7,8 +7,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
-.const VERSION_STAGE = "10" // Phase 2F (File I/O Fixes)
-.const BUILD_NUMBER  = "2403"
+.const VERSION_STAGE = "11" // Phase 2F (DEL / ERASE)
+.const BUILD_NUMBER  = "2404"
 
 
 // ---------------------------------------------------------------------------
@@ -41,6 +41,10 @@ tableCmd:
     .word cmdType
     .text "copy  "
     .word cmdCopy
+    .text "del   "
+    .word cmdDel
+    .text "erase "
+    .word cmdDel
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -583,6 +587,61 @@ ctOpenErr:
     jsr petPrintString
     rts
 
+// DEL / ERASE — delete a file from disk
+cmdDel:
+    ldy ParsePos
+cdelSkipSpaces:
+    lda CommandBuffer, y
+    beq cdelNoArgs
+    cmp #' '
+    bne cdelFoundName
+    iny
+    jmp cdelSkipSpaces
+
+cdelFoundName:
+    // Extract filename (token until space or null)
+    sty TempLo              // Start index
+cdelScanEnd:
+    lda CommandBuffer, y
+    beq cdelGotEnd
+    cmp #' '
+    beq cdelGotEnd
+    iny
+    jmp cdelScanEnd
+cdelGotEnd:
+    // Null-terminate the name in the buffer (temporarily)
+    lda #0
+    sta CommandBuffer, y
+    
+    // Prepare pointer for API call
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    tax                     // X = Lo byte of filename
+    lda #>CommandBuffer
+    adc #0
+    tay                     // Y = Hi byte of filename
+    
+    lda #DOS_DELETE_FILE
+    jsr apiHandler
+    bcs cdelErr
+    
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+cdelNoArgs:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+
+cdelErr:
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jsr petPrintString
+    rts
+
 // COPY — copy a file
 cmdCopy:
     ldy ParsePos
@@ -776,6 +835,8 @@ helpMsg:
     .text "TYPE   - PRINT FILE CONTENTS"
     .byte $0D
     .text "COPY   - COPY [SRC] [DST]"
+    .byte $0D
+    .text "DEL    - DELETE [FILE]"
     .byte $0D
     .text "VER    - SHOW VERSION"
     .byte $0D, 0

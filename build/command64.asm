@@ -13,12 +13,12 @@
 //   Path          $1B00  Directory search and path logic
 //   Vmm           $1C00  Virtual Memory Manager (REU mapping)
 //   File          $1E00  Handle-based File I/O
-//   VmmData       $1F80  VMM temporary storage
+//   VmmData       $1FA0  VMM temporary storage
 
 .file [name="command64.prg", segments="Main,ApiStub,Petsci,CommandTable,CommandShell,Api,Utils,Loader,Path,Vmm,File,VmmData"]
 
 .segmentdef Main [start=$0801]
-.segmentdef VmmData [start=$1F80]
+.segmentdef VmmData [start=$1FA0]
 
 // Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, File, and VmmData are defined by the imported source files.
 

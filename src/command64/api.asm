@@ -33,6 +33,8 @@ apiHandler:
     beq ahRead
     cmp #DOS_WRITE_FILE
     beq ahWrite
+    cmp #DOS_DELETE_FILE
+    beq ahDelete
     cmp #DOS_ALLOC_MEM
     beq ahAllocMem
     cmp #DOS_FREE_MEM
@@ -103,6 +105,11 @@ ahWrite:
     //        HexValLo/Hi = Byte count
     lda FileHandle
     jsr fileWrite
+    rts
+
+ahDelete:
+    // Input: X/Y = Pointer to filename (null-terminated)
+    jsr fileDelete
     rts
 
 ahFreeMem:
