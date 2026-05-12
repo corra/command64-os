@@ -13,7 +13,7 @@
 // This jump will stay at $1000 even if apiHandler moves.
     jmp apiHandler
 
-.segment Api [start=$1680]
+.segment Api [start=$1800]
 
 // --- apiHandler ---
 // The centralized OS service dispatcher.
@@ -31,6 +31,8 @@ apiHandler:
     beq ahClose
     cmp #DOS_READ_FILE
     beq ahRead
+    cmp #DOS_WRITE_FILE
+    beq ahWrite
     cmp #DOS_ALLOC_MEM
     beq ahAllocMem
     cmp #DOS_FREE_MEM
@@ -76,6 +78,7 @@ _acOk:
 
 ahOpen:
     // Input: X/Y = Pointer to filename (null-terminated)
+    //        HexValLo = Access mode (0=Read, 1=Write)
     jsr fileOpen
     rts
 
@@ -89,6 +92,13 @@ ahRead:
     //        X/Y = Buffer
     //        TempLo/Hi = Bytes to read (passed via ZP)
     jsr fileRead
+    rts
+
+ahWrite:
+    // Input: A = Handle
+    //        X/Y = Buffer
+    //        HexValLo/Hi = Bytes to write
+    jsr fileWrite
     rts
 
 ahFreeMem:

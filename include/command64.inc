@@ -16,6 +16,7 @@
 .label KernalCLOSE     = $FFC3  // Close a logical file
 .label KernalREADST    = $FFB7  // Read status byte
 .label KernalCHKIN     = $FFC6  // Set input channel
+.label KernalCHKOUT    = $FFC9  // Set output channel
 .label KernalCLRCHN    = $FFCC  // Clear I/O channels
 
 // --- KERNAL Vector Table (Page 3) ---
@@ -27,6 +28,7 @@
 .label DOS_OPEN_FILE   = $3D  // Open file
 .label DOS_CLOSE_FILE  = $3E  // Close file
 .label DOS_READ_FILE   = $3F  // Read from file
+.label DOS_WRITE_FILE  = $40  // Write to file
 .label DOS_ALLOC_MEM   = $48  // Allocate memory (VMM)
 .label DOS_FREE_MEM    = $49  // Free memory (VMM)
 .label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
@@ -69,6 +71,9 @@
 .label SpecificLoad  = $038D // 0=use HexVal (Relocated), 1=use file header (Absolute)
 .label HandleTable   = $038E
 .label MAX_HANDLES   = 8
+.label SourceBuf     = $03A0 // 48 bytes
+.label DestBuf       = $03D0 // 48 bytes
+.label FileScratch   = $1D80 // Stable scratch area in VmmData segment
 
 // --- User Program Space ---
 // External commands are loaded here. 

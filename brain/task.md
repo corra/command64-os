@@ -76,5 +76,7 @@
 - [x] Phase 3: File System Integration (Handle-based I/O)
   - [x] Architecture design and planning — `brain/plans/phase3-filesystem.md`
   - [x] Define FCB structure and Handle Table layout
-  - [x] Extend DOS API with file primitives ($3D, $3E, $3F)
+  - [x] Extend DOS API with file primitives ($3D, $3E, $3F, $40)
   - [x] Implement `TYPE` internal command
+  - [x] Implement `COPY` internal command
+  - [x] Create file integration test program — `tests/src/filetest.asm`

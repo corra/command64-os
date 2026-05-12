@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 File System Module
 // Manages Handle Table and C64 KERNAL File I/O.
 
-.segment File [start=$1C00]
+.segment File [start=$1D80]
 
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.
@@ -31,6 +31,7 @@ fiLoop:
 // --- fileOpen ---
 // Opens a file on disk.
 // Input:  X/Y = Pointer to filename (null-terminated)
+//         HexValLo = Access Mode (0=Read, 1=Write)
 // Output: A = Handle (0-7) or $FF on error
 //         Carry: 0=Success, 1=Error
 fileOpen:
@@ -54,37 +55,52 @@ foFindLoop:
 foFoundFree:
     stx TempLo              // Save table offset
     
-    // 2. Prepare KERNAL OPEN
-    // We need the filename length
+    // 2. Prepare filename in FileScratch
     ldy #0
-foLenLoop:
+foCopyLoop:
     lda (NamePtrLo), y
-    beq foGotLen
+    beq foCopyDone
+    sta FileScratch, y
     iny
-    jmp foLenLoop
-foGotLen:
+    jmp foCopyLoop
+foCopyDone:
+    // Check mode
+    lda HexValLo
+    beq foSkipMode          // Read mode (default)
+    
+    // Append ",S,W" for Write
+    lda #','
+    sta FileScratch, y
+    iny
+    lda #'S'
+    sta FileScratch, y
+    iny
+    lda #','
+    sta FileScratch, y
+    iny
+    lda #'W'
+    sta FileScratch, y
+    iny
+    
+foSkipMode:
+    // 3. Prepare KERNAL SETNAM
     tya                     // Filename length
-    ldx NamePtrLo
-    ldy NamePtrHi
+    ldx #<FileScratch
+    ldy #>FileScratch
     jsr KernalSETNAM
     
     ldx TempLo
     lda HandleTable + 1, x  // Get pre-assigned LFN
-    sta TempHi              // Store LFN for later
     
     tax                     // X = LFN
     lda #8                  // Device 8
-    ldy #2                  // Secondary address (2 is standard for generic data)
+    ldy #2                  // Secondary address (2-14 are for data)
     jsr KernalSETLFS
     
     jsr KernalOPEN
     bcs foError             // KERNAL error (e.g., file not found)
     
-    // Check if OPEN actually succeeded (Disk status)
-    // On C64, OPEN can return C=0 but the drive can still have an error.
-    // However, for DOS MVP, we'll rely on C=0 for now.
-    
-    // 3. Mark handle as open
+    // 4. Mark handle as open
     ldx TempLo
     lda #1                  // Status = Open
     sta HandleTable, x
@@ -198,5 +214,79 @@ frDone:
     rts
 
 frError:
+    sec
+    rts
+
+// --- fileWrite ---
+// Writes bytes to an open file.
+// Input:  A = Handle
+//         X/Y = Destination Buffer Pointer
+//         HexValLo/Hi = Number of bytes to write
+// Output: HexValLo/Hi = Number of bytes actually written
+//         Carry: 0=Success, 1=Error
+fileWrite:
+    sta TempLo              // Save handle temporarily
+    stx PrintPtrLo          // Reuse PrintPtr for buffer
+    sty PrintPtrHi
+    
+    // 1. Validate handle
+    lda TempLo
+    asl
+    tax
+    lda HandleTable, x
+    beq fwError             // Not open
+    
+    // 2. Set output channel
+    lda HandleTable + 1, x  // Get LFN
+    jsr KernalCHKOUT
+    bcs fwError
+    
+    // 3. Write loop
+    lda #0
+    sta TempLo              // Bytes written Lo
+    sta TempHi              // Bytes written Hi
+    
+fwLoop:
+    // Check if we reached requested count
+    lda TempLo
+    cmp HexValLo
+    bne fwDoWrite
+    lda TempHi
+    cmp HexValHi
+    beq fwDone              // Finished all bytes requested
+    
+fwDoWrite:
+    ldy #0
+    lda (PrintPtrLo), y     // Get char from buffer
+    jsr KernalChROUT        // Write char to channel
+    
+    jsr KernalREADST
+    bne fwDone              // Status non-zero? (Error)
+    
+    // Advance buffer
+    inc PrintPtrLo
+    bne fwSkipInc
+    inc PrintPtrHi
+fwSkipInc:
+
+    // Increment count
+    inc TempLo
+    bne fwLoop
+    inc TempHi
+    jmp fwLoop
+
+fwDone:
+    jsr KernalCLRCHN        // Reset to screen
+    
+    // Return actual bytes written
+    lda TempLo
+    sta HexValLo
+    lda TempHi
+    sta HexValHi
+    
+    clc
+    rts
+
+fwError:
     sec
     rts

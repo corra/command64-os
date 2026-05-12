@@ -12,5 +12,6 @@ java -jar $KICKASS tests/src/color.asm -odir $OUTDIR
 java -jar $KICKASS tests/src/extcls.asm -odir $OUTDIR
 java -jar $KICKASS tests/src/apitest.asm -odir $OUTDIR
 java -jar $KICKASS tests/src/vmmtest.asm -odir $OUTDIR
+java -jar $KICKASS tests/src/filetest.asm -odir $OUTDIR
 
 echo "Done."

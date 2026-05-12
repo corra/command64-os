@@ -8,7 +8,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "4" // Phase 2D (Service Bus)
-.const BUILD_NUMBER  = "2311"
+.const BUILD_NUMBER  = "2312"
 
 
 // ---------------------------------------------------------------------------
@@ -39,6 +39,8 @@ tableCmd:
     .word cmdHelp
     .text "type  "
     .word cmdType
+    .text "copy  "
+    .word cmdCopy
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -514,6 +516,8 @@ ctGotEnd:
     sta CommandBuffer, y
     
     // Open file
+    lda #0
+    sta HexValLo            // Read mode
     lda #DOS_OPEN_FILE
     ldx #<CommandBuffer
     stx NamePtrLo           // Use ZP to compute absolute addr
@@ -573,6 +577,149 @@ ctOpenErr:
     ldy #>loadErrMsg
     jsr petPrintString
     rts
+
+// COPY — copy a file
+cmdCopy:
+    ldy ParsePos
+    // 1. Skip spaces
+ccSkip1:
+    lda CommandBuffer, y
+    bne ccCheckSpace1
+    jmp ccNoArgs            // Long jump
+ccCheckSpace1:
+    cmp #' '
+    bne ccFoundSrc
+    iny
+    jmp ccSkip1
+
+ccFoundSrc:
+    // 2. Copy source name to SourceBuf
+    ldx #0
+ccCopySrc:
+    lda CommandBuffer, y
+    bne ccCheckSpace2
+    jmp ccNoDest            // Long jump
+ccCheckSpace2:
+    cmp #' '
+    beq ccGotSrc
+    sta SourceBuf, x
+    inx
+    iny
+    jmp ccCopySrc
+ccGotSrc:
+    lda #0
+    sta SourceBuf, x
+    
+    // 3. Skip spaces to find dest
+ccSkip2:
+    lda CommandBuffer, y
+    bne ccCheckSpace3
+    jmp ccNoDest            // Long jump
+ccCheckSpace3:
+    cmp #' '
+    bne ccFoundDest
+    iny
+    jmp ccSkip2
+
+ccFoundDest:
+    // 4. Copy dest name to DestBuf
+    ldx #0
+ccCopyDest:
+    lda CommandBuffer, y
+    beq ccGotDest
+    cmp #' '
+    beq ccGotDest
+    sta DestBuf, x
+    inx
+    iny
+    jmp ccCopyDest
+ccGotDest:
+    lda #0
+    sta DestBuf, x
+    
+    // 5. Open Source for Read
+    lda #0
+    sta HexValLo            // mode=0 (Read)
+    ldx #<SourceBuf
+    ldy #>SourceBuf
+    lda #DOS_OPEN_FILE
+    jsr apiHandler
+    bcs ccOpenErr
+    sta TempLo              // TempLo = Source Handle
+    
+    // 6. Open Dest for Write
+    lda #1
+    sta HexValLo            // mode=1 (Write)
+    ldx #<DestBuf
+    ldy #>DestBuf
+    lda #DOS_OPEN_FILE
+    jsr apiHandler
+    bcs ccCloseSrcErr       // Error opening dest, close source
+    sta TempHi              // TempHi = Dest Handle
+    
+    // 7. Copy Loop
+ccLoop:
+    lda TempLo              // Source Handle
+    ldx #<CommandBuffer
+    ldy #>CommandBuffer
+    lda #1                  // 1 byte
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    lda #DOS_READ_FILE
+    jsr apiHandler
+    bcs ccDone
+    
+    // Check if read 0 bytes (EOF)
+    lda HexValLo
+    ora HexValHi
+    beq ccDone
+    
+    // Write to dest
+    lda TempHi              // Dest Handle
+    ldx #<CommandBuffer
+    ldy #>CommandBuffer
+    lda #1                  // 1 byte
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    lda #DOS_WRITE_FILE
+    jsr apiHandler
+    bcs ccDone              // Write error
+    jmp ccLoop
+
+ccDone:
+    // 8. Close both
+    lda TempLo
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+    
+    lda TempHi
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+    
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+ccNoArgs:
+ccNoDest:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+
+ccOpenErr:
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jsr petPrintString
+    rts
+
+ccCloseSrcErr:
+    lda TempLo
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+    jmp ccOpenErr
 
 dirFname: .text "$"
 
