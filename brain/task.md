@@ -73,4 +73,8 @@
   - [x] Remediation plan written — `brain/plans/2026-05-11_command64-remediation-round3.md`
   - [x] Task 1: Secure `vmmFree`
   - [x] Task 2: Secure `vmmReadByte`
-  - [x] Task 3: Secure `vmmWriteByte`
+- [/] Phase 3: File System Integration (Handle-based I/O)
+  - [x] Architecture design and planning — `brain/plans/phase3-filesystem.md`
+  - [ ] Define FCB structure and Handle Table layout
+  - [ ] Extend DOS API with file primitives ($3D, $3E, $3F)
+  - [ ] Implement `TYPE` internal command
