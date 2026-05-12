@@ -7,6 +7,12 @@
 //           X/Y = Arguments (X=Low/Arg1, Y=High/Arg2)
 //   Output: A, X, Y as per function, Carry = Status (0=Success, 1=Error)
 
+.segment ApiStub [start=$1000]
+// --- apiStub ---
+// Stable entry point for external programs.
+// This jump will stay at $1000 even if apiHandler moves.
+    jmp apiHandler
+
 .segment Api [start=$1680]
 
 // --- apiHandler ---

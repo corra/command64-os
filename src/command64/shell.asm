@@ -8,7 +8,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "4" // Phase 2D (Service Bus)
-.const BUILD_NUMBER  = "2310"
+.const BUILD_NUMBER  = "2311"
 
 
 // ---------------------------------------------------------------------------

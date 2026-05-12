@@ -5,7 +5,7 @@
 
 .const DOS_PRINT_STR  = $09
 .const DOS_EXIT       = $4C
-.const API            = $1600
+.const API            = $1000
 
 * = $2000 "ApiTest"
     cld                     // Ensure binary mode

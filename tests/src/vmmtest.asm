@@ -7,7 +7,7 @@
 .const DOS_ALLOC_MEM  = $48
 .const DOS_FREE_MEM   = $49
 .const DOS_EXIT       = $4C
-.const API            = $1600
+.const API            = $1000
 
 * = $2000 "VmmTest"
     cld                     // Ensure binary mode

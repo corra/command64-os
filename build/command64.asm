@@ -3,7 +3,8 @@
 //
 // Segment layout:
 //   Main          $0801  BASIC SYS launcher (BasicUpstart2)
-//   Petsci        $1000  PETSCII print routines
+//   ApiStub       $1000  Stable OS Entry Point (Jump Table)
+//   Petsci        $1040  PETSCII print routines
 //   CommandTable  $1100  Fixed-width command dispatch table
 //   CommandShell  $1200  Command loop, dispatcher, built-ins
 //   Api           $1680  INT 21h Service Bus (Jump Table)
@@ -14,7 +15,7 @@
 //   File          $1C00  Handle-based File I/O
 //   VmmData       $1D80  VMM temporary storage
 
-.file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell,Api,Utils,Loader,Path,Vmm,File,VmmData"]
+.file [name="command64.prg", segments="Main,ApiStub,Petsci,CommandTable,CommandShell,Api,Utils,Loader,Path,Vmm,File,VmmData"]
 
 .segmentdef Main [start=$0801]
 .segmentdef VmmData [start=$1D80]

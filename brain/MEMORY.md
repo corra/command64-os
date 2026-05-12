@@ -11,13 +11,14 @@
 ## Current State (2026-05-11)
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
+- **Stable API Entry**: Implemented a fixed Jump Table Stub at `$1000`. All external programs should now `JSR $1000`.
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
-- **Service Bus**: Extended Jump Table at `$1680` to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), and `DOS_READ_FILE` ($3F).
+- **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), and `DOS_READ_FILE` ($3F).
 - **Internal Commands**: Added `TYPE` command to display file contents using the new DOS API.
-- **Version**: 0.2.6 (Build 2310), Stage 4.
+- **Version**: 0.2.6 (Build 2311), Stage 4.
 - **Verification**: `build/command64.prg` and all test binaries assemble cleanly. Segment overlaps resolved.
 
-## Memory Map (current — as of Build 2310)
+## Memory Map (current — as of Build 2311)
 | Region | Purpose |
 |--------|---------|
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
@@ -25,7 +26,8 @@
 | `$038D` | SpecificLoad flag (1 byte) |
 | `$038E-$039D` | HandleTable (16 bytes, 8 entries) |
 | `$0801` | BASIC SYS launcher (Main segment) |
-| `$1000` | Petsci (petPrintString, petPrintChar macro) |
+| `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
+| `$1040` | Petsci (petPrintString, petPrintChar macro) |
 | `$1100` | CommandTable (8-byte fixed-width entries) |
 | `$1200` | CommandShell (main loop, dispatcher, built-ins) |
 | `$1680` | Api (INT 21h Jump Table service bus — `api.asm`) |
