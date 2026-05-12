@@ -7,8 +7,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
-.const VERSION_STAGE = "13" // Phase 2F (DIR fixes)
-.const BUILD_NUMBER  = "2406"
+.const VERSION_STAGE = "14" // Phase 2F (Input fix)
+.const BUILD_NUMBER  = "2407"
 
 
 // ---------------------------------------------------------------------------
@@ -102,17 +102,27 @@ rlReadLoop:
 rlPoll:
     jsr KernalGetIn         // wait for char without screen editor (raw input)
     beq rlPoll              // GETIN is non-blocking; loop until key pressed
-    
+
     tax                     // save character to X (KernalChROUT preserves X)
-    jsr KernalChROUT        // manually echo the character just read
-    
-    pla                     // pull Y to A
-    tay                     // restore Y
-    txa                     // restore character to A from X
-    
+    pla
+    tay                     // restore Y before any branching
+    txa                     // restore character to A
+
     cmp #PetCr
     beq rlDoneRead
-    
+
+    cmp #PetDel             // INST/DEL key ($14) — backspace
+    bne rlStoreChar
+    tya
+    beq rlReadLoop          // buffer already empty — ignore DEL silently
+    dey                     // discard previous char from logical buffer
+    lda #PetDel
+    jsr KernalChROUT        // destructive backspace on screen
+    jmp rlReadLoop
+
+rlStoreChar:
+    jsr KernalChROUT        // echo character (KernalChROUT preserves X)
+    txa                     // restore char (KernalChROUT may clobber A)
     sta CommandBuffer, y
     iny
     cpy #79                 // reserve index 79 for null terminator

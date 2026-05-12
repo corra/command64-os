@@ -14,8 +14,8 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), and `DOS_WRITE_FILE` ($40).
 - **Internal Commands**: Added `TYPE` and `COPY` commands.
-- **Version**: 0.2.13 (Build 2406), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DIR` command reporting fixed and hardened.
+- **Version**: 0.2.14 (Build 2407), Stage 4.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. Shell input (DEL key) fixed.
 
 ## Memory Map (current — as of Build 2406)
 | Region | Purpose |

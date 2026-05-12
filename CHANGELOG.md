@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.14] - 2026-05-12
+
+### Fixed
+- **Shell Input**: `shellReadLine` now correctly handles the INST/DEL key (`$14`). Previously DEL was echoed (visually correct) but also stored as a literal `$14` byte in `CommandBuffer`, causing "Bad command" errors for any input that used backspace. DEL now decrements the buffer index (logically erasing the previous character) without storing anything; DEL at an empty buffer is silently ignored. Added `PetDel = $14` constant to `command64.inc`.
+
 ## [0.2.13] - 2026-05-12
 
 ### Fixed
