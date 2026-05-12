@@ -2,15 +2,15 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Binary Loader
 // Wraps KERNAL LOAD routine with support for specific target addresses.
 
-.segment Loader [start=$1700]
+.segment Loader [start=$1800]
 
 // --- shellLoadPrg ---
 // Loads a PRG from disk using KERNAL routines.
 // Input:  A = low byte of filename pointer
 //         Y = high byte of filename pointer
 //         X = filename length
-//         HexValLo/Hi ($F7-$F8) = target address (if SpecificLoad=1)
-//         SpecificLoad ($1551) = 1 to use HexVal, 0 to use file header
+//         HexValLo/Hi ($66-$67) = target address (if SpecificLoad=0)
+//         SpecificLoad ($038D) = 0 to use HexVal, 1 to use file header
 // Output: C=0 success, C=1 error (A = KERNAL error code)
 // Clobbers: A, X, Y
 shellLoadPrg:

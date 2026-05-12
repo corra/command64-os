@@ -52,3 +52,25 @@
   - [x] Implement `HELP` internal command
   - [x] Implement `DIR` internal command (non-destructive)
 
+- [x] Phase 2C Code Review Round 1 — Service Bus & VMM Backtracking (2026-05-11)
+  - [x] Review conducted (5-agent parallel review) — `brain/reviews/2026-05-11_command64-phase2c-api-vmm.md`
+  - [x] Remediation plan written — `brain/plans/2026-05-11-api-vmm-bug-remediation.md`
+  - [x] A — Fixed `ahSetCarry`/`ahClearCarry`: `$0104,x` → `$0106,x` + updated comment
+  - [x] B — Fixed `vaSearchReset`/`vaCommitAlloc`: reconstruct MCT ptr as `#>VmmMctBase + VmmOffHi`
+  - [x] E — Fixed `ahFreeMem` branch: added `lda $0103,x` after `sta` to set Z from status
+  - [x] F — Fixed `build_tests.sh` shebang, paths, and OUTDIR (covered in Round 3 + OUTDIR absolute path)
+  - [x] J — Fixed `vmmtest.asm`: save X/Y to $64/$65 after alloc, restore before free
+
+- [x] Phase 2C Code Review Round 2 — Residual Bugs (2026-05-11)
+  - [x] Bug verification conducted — `brain/reviews/2026-05-11_command64-bug-verification.md`
+  - [x] Remediation plan written — `brain/plans/2026-05-11_command64-remediation-round2.md`
+  - [x] Implement C4: Correct `SpecificLoad` comments
+  - [x] Implement C8: Clear `TempHi` in `printDecimal16`
+  - [x] Implement I2: Add VMM initialization safety check
+
+- [x] Phase 2C Code Review Round 3 — Safety Hardening (2026-05-11)
+  - [x] Review conducted — `brain/reviews/2026-05-11_command64-round3-gemini-review.md`
+  - [x] Remediation plan written — `brain/plans/2026-05-11_command64-remediation-round3.md`
+  - [x] Task 1: Secure `vmmFree`
+  - [x] Task 2: Secure `vmmReadByte`
+  - [x] Task 3: Secure `vmmWriteByte`

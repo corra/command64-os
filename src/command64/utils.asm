@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Utility Routines
 // Hex string to 16-bit integer conversion.
 
-.segment Utils [start=$1600]
+.segment Utils [start=$1700]
 
 // --- parseHex ---
 // Parses a hex string in CommandBuffer starting at Y.
@@ -110,6 +110,9 @@ nnDone:
 printDecimal16:
     stx HexValLo
     sty HexValHi
+    
+    lda #0
+    sta TempHi              // Initialize leading-zero suppression flag
     
     // Check for zero
     lda HexValLo

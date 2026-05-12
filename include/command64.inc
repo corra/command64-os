@@ -7,7 +7,7 @@
 .label KernalGetIn       = $FFE4  // Raw keyboard input (bypasses screen editor/quote mode)
 .label KernalChRIN     = $FFCF  // Input character from current channel (screen editor)
 .label KernalCLALL     = $FFE7  // Close all I/O channels (was $E548, raw ROM addr, wrong)
-.label KernalWarmStart = $FC68  // Warm start / BASIC restart vector
+.label KernalWarmStart = $E37B  // BASIC warm start vector (was $FC68, incorrect)
 .label KernalSETMSG    = $FF90  // Set KERNAL messages
 .label KernalSETLFS    = $FFBA  // Set logical, first, and second addresses
 .label KernalSETNAM    = $FFBD  // Set file name
@@ -17,6 +17,16 @@
 .label KernalREADST    = $FFB7  // Read status byte
 .label KernalCHKIN     = $FFC6  // Set input channel
 .label KernalCLRCHN    = $FFCC  // Clear I/O channels
+
+// --- KERNAL Vector Table (Page 3) ---
+.label KernalCBINV     = $0316  // BRK Instruction Interrupt Vector
+
+// --- API Function Constants (DOS Standard Hex Codes) ---
+.label DOS_PRINT_CHAR  = $02  // Print character (PETSCII)
+.label DOS_PRINT_STR   = $09  // Print string (Null-terminated)
+.label DOS_ALLOC_MEM   = $48  // Allocate memory (VMM)
+.label DOS_FREE_MEM    = $49  // Free memory (VMM)
+.label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
 
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return
@@ -47,7 +57,7 @@
 // It avoids colliding with code segments at $1600.
 .label CommandBuffer = $033C
 .label CommandLen    = $038C
-.label SpecificLoad  = $038D // 0=use file header, 1=use HexVal address
+.label SpecificLoad  = $038D // 0=use HexVal (Relocated), 1=use file header (Absolute)
 
 // --- User Program Space ---
 // External commands are loaded here. 

@@ -6,20 +6,22 @@
 //   Petsci        $1000  PETSCII print routines
 //   CommandTable  $1100  Fixed-width command dispatch table
 //   CommandShell  $1200  Command loop, dispatcher, built-in handlers
-//   Utils         $1600  Hex parsing and string utilities
-//   Loader        $1700  KERNAL binary loader wrapper
-//   Path          $1780  Directory search and path logic
-//   Vmm           $1880  Virtual Memory Manager (REU mapping)
-//   VmmData       $1B80  VMM temporary storage
+//   Api           $1600  INT 21h Service Bus (BRK Handler)
+//   Utils         $1700  Hex parsing and string utilities
+//   Loader        $1800  KERNAL binary loader wrapper
+//   Path          $1880  Directory search and path logic
+//   Vmm           $1980  Virtual Memory Manager (REU mapping)
+//   VmmData       $1C80  VMM temporary storage
 
-.file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell,Utils,Loader,Path,Vmm,VmmData"]
+.file [name="command64.prg", segments="Main,Petsci,CommandTable,CommandShell,Api,Utils,Loader,Path,Vmm,VmmData"]
 
 .segmentdef Main [start=$0801]
-.segmentdef VmmData [start=$1B80]
-// Petsci, CommandTable, CommandShell, Utils, Loader, Path, Vmm, and VmmData are defined by the imported source files.
+.segmentdef VmmData [start=$1C80]
+// Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, and VmmData are defined by the imported source files.
 
 #import "../include/command64.inc"
 #import "../src/command64/petsci.asm"
+#import "../src/command64/api.asm"
 #import "../src/command64/utils.asm"
 #import "../src/command64/loader.asm"
 #import "../src/command64/path.asm"

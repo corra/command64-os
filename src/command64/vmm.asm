@@ -2,7 +2,7 @@
 // Virtual Memory Manager for C64 MS-DOS Port
 // Maps 1MB DOS Address Space (Seg:Off) to C64 REU.
 
-.segment Vmm [start=$1880]
+.segment Vmm [start=$1980]
 
 // --- vmmInit ---
 // Initializes the VMM and verifies REU presence.
@@ -30,9 +30,13 @@ viClearLoop:
     dex
     bne viClearLoop
     
+    lda #1
+    sta vmmInitialized      // Mark VMM as ready
     lda #VMM_SUCCESS
     rts
 viNoReu:
+    lda #0
+    sta vmmInitialized      // Mark VMM as not available
     lda #VMM_ERR_INVALID
     rts
 
@@ -42,6 +46,12 @@ viNoReu:
 // Output: A = return code
 //         VmmSegLo/Hi = starting logical segment on success
 vmmAlloc:
+    lda vmmInitialized
+    bne vaInitOk
+    lda #VMM_ERR_INVALID
+    rts
+
+vaInitOk:
     // 1. Round up paragraphs to pages (1 page = 256 paragraphs = $0100)
     // PageCount = (Paragraphs + 255) >> 8
     lda VmmSegLo
@@ -106,7 +116,10 @@ vaContigLoop:
 
 vaSearchReset:
     // Restore pointer and continue search
-    lda VmmOffHi
+    // VmmOffHi is the raw block index (0-15); reconstruct actual MCT page address
+    lda #>VmmMctBase
+    clc
+    adc VmmOffHi
     sta PrintPtrHi
     ldy VmmOffLo
     iny
@@ -120,11 +133,13 @@ vaNoMem:
     rts
 
 vaCommitAlloc:
-    // Mark pages in MCT. 
+    // Mark pages in MCT.
     // Start page = PAGE_HEAD, Tail pages = PAGE_TAIL
-    
-    // Restore start position
-    lda VmmOffHi
+
+    // Restore start position; reconstruct MCT page addr from block index
+    lda #>VmmMctBase
+    clc
+    adc VmmOffHi
     sta PrintPtrHi
     ldy VmmOffLo
     
@@ -184,6 +199,11 @@ vaDoneCommit:
 // Frees a previously allocated block.
 // Input: VmmSegHi = Page index low, VmmBank = Page index high (Bank)
 vmmFree:
+    lda vmmInitialized
+    bne vfInitOk
+    lda #VMM_ERR_INVALID
+    rts
+vfInitOk:
     // Convert Segment to MCT pointer
     lda #>VmmMctBase
     clc
@@ -226,6 +246,12 @@ vfError:
 // Input:  VmmSegLo/Hi, VmmOffLo/Hi
 // Output: A = data byte
 vmmReadByte:
+    cld
+    lda vmmInitialized
+    bne vrbInitOk
+    lda #0                  // Return 0 if not initialized
+    rts
+vrbInitOk:
     jsr vmmComputeAddress   // Compute REU address and bank
     
     // Set C64 target to a temp location (using a ZP scratch for speed)
@@ -251,7 +277,12 @@ vmmReadByte:
 // Writes a byte to DOS Seg:Off.
 // Input:  A = byte to write, VmmSegLo/Hi, VmmOffLo/Hi
 vmmWriteByte:
+    cld
     sta vmmTempByte         // Save data to write
+    lda vmmInitialized
+    bne vwbInitOk
+    rts                     // Silently ignore write if not initialized
+vwbInitOk:
     jsr vmmComputeAddress
     
     lda #<vmmTempByte
@@ -273,53 +304,56 @@ vmmWriteByte:
 // Computes 20-bit REU address from 16-bit Seg and 16-bit Off.
 // Result: REU_REU_ADDR_L/H and REU_REU_BANK set.
 //
-// Calculation:
-//   Address = (Seg * 16) + Off
-//   Addr_L = (SegLo << 4) + OffLo
-//   Addr_H = (SegLo >> 4) + (SegHi << 4) + OffHi + Carry
-//   Bank   = (SegHi >> 4) + Carry
+// Calculation: Address = (Seg << 4) + Off
 vmmComputeAddress:
-    // Low byte
+    // 1. Calculate base address bits (Seg << 4)
+    // Low byte: (SegLo << 4)
     lda VmmSegLo
-    asl                     // * 2
-    asl                     // * 4
-    asl                     // * 8
-    asl                     // * 16
+    asl
+    asl
+    asl
+    asl
+    sta TempLo              // TempLo = base Addr_L
+    
+    // Middle byte: (SegLo >> 4) | (SegHi << 4)
+    lda VmmSegLo
+    lsr
+    lsr
+    lsr
+    lsr
+    sta TempHi              // TempHi = (SegLo >> 4)
+    
+    lda VmmSegHi
+    asl
+    asl
+    asl
+    asl
+    ora TempHi
+    sta TempHi              // TempHi = (SegLo >> 4) | (SegHi << 4) = base Addr_H
+    
+    // Bank byte: (SegHi >> 4)
+    lda VmmSegHi
+    lsr
+    lsr
+    lsr
+    lsr
+    tay                     // Y = base Addr_B
+    
+    // 2. Add Offset (VmmOffHi:VmmOffLo) to the base
+    lda TempLo
     clc
     adc VmmOffLo
     sta REU_REU_ADDR_L
-    php                     // Save carry from low byte addition
     
-    // Middle byte
-    lda VmmSegLo
-    lsr
-    lsr
-    lsr
-    lsr                     // SegLo >> 4
-    sta TempLo              // Temporary storage
-    
-    lda VmmSegHi
-    asl
-    asl
-    asl
-    asl                     // SegHi << 4
-    ora TempLo              // Combine with SegLo bits
-    
-    plp                     // Restore carry from low byte
-    adc VmmOffHi            // Add Offset high byte + carry
+    lda TempHi
+    adc VmmOffHi
     sta REU_REU_ADDR_H
-    php                     // Save carry for bank
     
-    // Bank byte (High 4 bits of SegHi)
-    lda VmmSegHi
-    lsr
-    lsr
-    lsr
-    lsr                     // SegHi >> 4
-    plp                     // Restore carry
-    adc #0                  // Add carry
+    tya                     // Base Bank
+    adc #0
     sta REU_REU_BANK
     rts
 
 .segment VmmData
+vmmInitialized: .byte 0
 vmmTempByte: .byte 0

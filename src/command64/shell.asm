@@ -7,8 +7,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
-.const VERSION_STAGE = "3" // Phase 2C (VMM)
-.const BUILD_NUMBER  = "2301"
+.const VERSION_STAGE = "4" // Phase 2D (Service Bus)
+.const BUILD_NUMBER  = "2308"
 
 
 // ---------------------------------------------------------------------------
@@ -49,6 +49,7 @@ start:
     jsr vmmInit             // Initialize VMM and check for REU
     cmp #VMM_SUCCESS
     beq siInitOk
+
     
     // VMM Init failed (No REU found)
     lda #<noReuMsg
