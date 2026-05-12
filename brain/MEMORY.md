@@ -14,10 +14,10 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), and `DOS_WRITE_FILE` ($40).
 - **Internal Commands**: Added `TYPE` and `COPY` commands.
-- **Version**: 0.2.11 (Build 2404), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEL` and `ERASE` fully functional.
+- **Version**: 0.2.13 (Build 2406), Stage 4.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DIR` command reporting fixed and hardened.
 
-## Memory Map (current — as of Build 2404)
+## Memory Map (current — as of Build 2406)
 | Region | Purpose |
 |--------|---------|
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
@@ -27,17 +27,17 @@
 | `$03A0-$03CF` | SourceBuf (48 bytes, COPY command) |
 | `$03D0-$03FF` | DestBuf (48 bytes, COPY command) |
 | `$0801` | BASIC SYS launcher (Main segment) |
+| `$0C00` | Utils (parseHex, normalizeName, printDecimal16) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1040` | Petsci (petPrintString, petPrintChar macro) |
 | `$1100` | CommandTable (8-byte fixed-width entries) |
 | `$1200` | CommandShell (main loop, dispatcher, built-ins) |
-| `$1800` | Api (INT 21h Jump Table service bus — `api.asm`) |
-| `$1900` | Utils (parseHex, normalizeName, printDecimal16) |
-| `$1A80` | Loader (shellLoadPrg) |
-| `$1B00` | Path (findFile, checkExistence) |
-| `$1C00` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
-| `$1E00` | File (Handle-based I/O — `file.asm`) |
-| `$1FA0` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
+| `$1880` | Api (INT 21h Jump Table service bus — `api.asm`) |
+| `$1A00` | Loader (shellLoadPrg) |
+| `$1A80` | Path (findFile, checkExistence) |
+| `$1B80` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
+| `$1D80` | File (Handle-based I/O — `file.asm`) |
+| `$1F90` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
 | `$2000+` | UserProgStart (External commands loaded here) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |

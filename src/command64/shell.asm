@@ -7,8 +7,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
-.const VERSION_STAGE = "11" // Phase 2F (DEL / ERASE)
-.const BUILD_NUMBER  = "2404"
+.const VERSION_STAGE = "13" // Phase 2F (DIR fixes)
+.const BUILD_NUMBER  = "2406"
 
 
 // ---------------------------------------------------------------------------
@@ -45,6 +45,10 @@ tableCmd:
     .word cmdDel
     .text "erase "
     .word cmdDel
+    .text "ren   "
+    .word cmdRen
+    .text "rename"
+    .word cmdRen
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -453,9 +457,11 @@ cdLineLoop:
     
     // Read block count
     jsr KernalGetIn
-    tax                     // Count Lo
+    pha                     // Save Count Lo on stack
     jsr KernalGetIn
     tay                     // Count Hi
+    pla
+    tax                     // Restore Count Lo
     
     // Clear TempHi (used by decimal printer for leading zero suppression)
     lda #0
@@ -637,6 +643,92 @@ cdelNoArgs:
     rts
 
 cdelErr:
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jsr petPrintString
+    rts
+
+// REN / RENAME — rename a file on disk
+cmdRen:
+    ldy ParsePos
+crenSkip1:
+    lda CommandBuffer, y
+    beq crenNoArgs
+    cmp #' '
+    bne crenFoundOld
+    iny
+    jmp crenSkip1
+
+crenFoundOld:
+    sty TempLo              // Start of Old Name
+crenScan1:
+    lda CommandBuffer, y
+    beq crenNoNew           // No second argument
+    cmp #' '
+    beq crenGotOld
+    iny
+    jmp crenScan1
+crenGotOld:
+    lda #0
+    sta CommandBuffer, y    // Null-terminate Old Name
+    iny
+    
+crenSkip2:
+    lda CommandBuffer, y
+    beq crenNoNew
+    cmp #' '
+    bne crenFoundNew
+    iny
+    jmp crenSkip2
+
+crenFoundNew:
+    sty TempHi              // Start of New Name
+crenScan2:
+    lda CommandBuffer, y
+    beq crenGotNew
+    cmp #' '
+    beq crenGotNew
+    iny
+    jmp crenScan2
+crenGotNew:
+    lda #0
+    sta CommandBuffer, y    // Null-terminate New Name
+    
+    // Set up API call
+    // Old Name (X/Y)
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    tax
+    lda #>CommandBuffer
+    adc #0
+    tay
+    
+    // New Name (PrintPtrLo/Hi)
+    lda #<CommandBuffer
+    clc
+    adc TempHi
+    sta PrintPtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta PrintPtrHi
+    
+    lda #DOS_RENAME_FILE
+    jsr apiHandler
+    bcs crenErr
+    
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+crenNoArgs:
+crenNoNew:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+
+crenErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
@@ -837,6 +929,8 @@ helpMsg:
     .text "COPY   - COPY [SRC] [DST]"
     .byte $0D
     .text "DEL    - DELETE [FILE]"
+    .byte $0D
+    .text "REN    - RENAME [OLD] [NEW]"
     .byte $0D
     .text "VER    - SHOW VERSION"
     .byte $0D, 0

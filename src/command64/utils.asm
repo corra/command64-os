@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Utility Routines
 // Hex string to 16-bit integer conversion.
 
-.segment Utils [start=$1900]
+.segment Utils [start=$0C00]
 
 // --- parseHex ---
 // Parses a hex string in CommandBuffer starting at Y.
@@ -179,8 +179,12 @@ pd100:
     lda HexValLo
     sec
     sbc #100
+    tay
+    lda HexValHi
+    sbc #0
     bcc pdDone100
-    sta HexValLo
+    sta HexValHi
+    sty HexValLo
     inx
     jmp pd100
 pdDone100:
@@ -192,8 +196,12 @@ pd10:
     lda HexValLo
     sec
     sbc #10
+    tay
+    lda HexValHi
+    sbc #0
     bcc pdDone10
-    sta HexValLo
+    sta HexValHi
+    sty HexValLo
     inx
     jmp pd10
 pdDone10:

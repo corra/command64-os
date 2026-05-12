@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 File System Module
 // Manages Handle Table and C64 KERNAL File I/O.
 
-.segment File [start=$1E00]
+.segment File [start=$1D80]
 
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.
@@ -363,6 +363,89 @@ fdCopyDone:
     rts
 
 fdError:
+    lda #15
+    jsr KernalCLOSE         // Ensure channel is closed even on error
+    sec
+    rts
+
+// --- fileRename ---
+// Renames a file on disk using the "Rename" command.
+// Input:  X/Y = Pointer to Old Name (null-terminated)
+//         PrintPtrLo/Hi = Pointer to New Name (null-terminated)
+// Output: Carry: 0=Success, 1=Error
+fileRename:
+    stx NamePtrLo           // Use NamePtr as temporary for Old Name
+    sty NamePtrHi
+    
+    // 1. Prepare "R:" in FileScratch
+    lda #'R'
+    sta FileScratch
+    lda #':'
+    sta FileScratch + 1
+    
+    // 2. Append New Name from PrintPtrLo/Hi
+    ldy #0
+frCopyNew:
+    lda (PrintPtrLo), y
+    beq frGotNew
+    sta FileScratch + 2, y
+    iny
+    jmp frCopyNew
+frGotNew:
+    // FileScratch index now at Y + 2
+    
+    // 3. Append "="
+    lda #'='
+    sta FileScratch + 2, y
+    iny
+    
+    // 4. Append Old Name from NamePtrLo/Hi
+    sty TempLo              // Save current index in FileScratch
+    ldy #0
+frCopyOld:
+    lda (NamePtrLo), y
+    beq frGotOld
+    ldx TempLo
+    sta FileScratch + 2, x
+    inc TempLo
+    iny
+    jmp frCopyOld
+frGotOld:
+    // Total length = TempLo + 2
+    lda TempLo
+    clc
+    adc #2
+    tay                     // Y = Total length
+    
+    // 5. Normalize string
+    tya
+    tax                     // X = Total length
+    lda #<FileScratch
+    ldy #>FileScratch
+    jsr normalizeName
+    
+    // 6. SETNAM: A=length, X/Y=pointer
+    txa                     // Length was in X
+    ldx #<FileScratch
+    ldy #>FileScratch
+    jsr KernalSETNAM
+    
+    // 7. SETLFS: A=LFN(15), X=Device(8), Y=Secondary(15)
+    lda #15                 // LFN 15 is standard for command channel
+    ldx #8                  // Device 8
+    ldy #15                 // Secondary 15 is command channel
+    jsr KernalSETLFS
+    
+    // 8. OPEN and CLOSE
+    jsr KernalOPEN
+    bcs frenError
+    
+    lda #15
+    jsr KernalCLOSE
+    clc
+    rts
+
+frenError:
     lda #15
     jsr KernalCLOSE         // Ensure channel is closed even on error
     sec

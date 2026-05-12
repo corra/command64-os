@@ -27,6 +27,7 @@
 .label DOS_READ_FILE   = $3F  // Read from file
 .label DOS_WRITE_FILE  = $40  // Write to file
 .label DOS_DELETE_FILE = $41  // Delete file (UNLINK)
+.label DOS_RENAME_FILE = $56  // Rename file
 .label DOS_ALLOC_MEM   = $48  // Allocate memory (VMM)
 .label DOS_FREE_MEM    = $49  // Free memory (VMM)
 .label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
@@ -34,6 +35,7 @@
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return
 .label PetLl   = $0A  // Line feed
+.label PetDel  = $14  // DEL (INST/DEL key unshifted) — destructive backspace
 .label PetVBar = $7C  // Vertical bar '|'
 .label PetLeft = $9D  // Cursor left control code
 
@@ -71,7 +73,7 @@
 .label MAX_HANDLES   = 8
 .label SourceBuf     = $03A0 // 48 bytes
 .label DestBuf       = $03D0 // 48 bytes
-.label FileScratch   = $1FA2 // Filename scratch in VmmData: vmmInitialized($1FA0), vmmTempByte($1FA1), fileScratch($1FA2)
+.label FileScratch   = $1F92 // Filename scratch in VmmData: vmmInitialized($1F90), vmmTempByte($1F91), fileScratch($1F92)
 
 // --- User Program Space ---
 // External commands are loaded here. 

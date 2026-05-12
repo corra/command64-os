@@ -13,7 +13,7 @@
 // This jump will stay at $1000 even if apiHandler moves.
     jmp apiHandler
 
-.segment Api [start=$1800]
+.segment Api [start=$1880]
 
 // --- apiHandler ---
 // The centralized OS service dispatcher.
@@ -35,6 +35,8 @@ apiHandler:
     beq ahWrite
     cmp #DOS_DELETE_FILE
     beq ahDelete
+    cmp #DOS_RENAME_FILE
+    beq ahRename
     cmp #DOS_ALLOC_MEM
     beq ahAllocMem
     cmp #DOS_FREE_MEM
@@ -110,6 +112,12 @@ ahWrite:
 ahDelete:
     // Input: X/Y = Pointer to filename (null-terminated)
     jsr fileDelete
+    rts
+
+ahRename:
+    // Input: X/Y = Pointer to Old Name (null-terminated)
+    //        PrintPtrLo/Hi = Pointer to New Name (null-terminated)
+    jsr fileRename
     rts
 
 ahFreeMem:

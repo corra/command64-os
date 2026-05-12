@@ -5,6 +5,23 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.13] - 2026-05-12
+
+### Fixed
+- **Directory Reporting**: Resolved discrepancy where `DIR` reported 144 blocks free instead of 656.
+- **Decimal Printer Bug**: Fixed 16-bit math error in `printDecimal16` that ignored the high byte for values between 100 and 999.
+- **DIR Command Hardening**: Added stack-based register preservation in `cmdDir` to prevent block counts from being clobbered by the KERNAL `GETIN` routine.
+
+## [0.2.12] - 2026-05-12
+
+### Added
+- **Internal Commands**: Added `REN` and `RENAME` commands.
+- **Service Bus API**: Added `DOS_RENAME_FILE` ($56) supporting two filename pointers (`X/Y` and `PrintPtr`).
+
+### Changed
+- **Memory Optimization**: Moved `Utils` segment to `$0C00` to free up space in the `$1000-$1FFF` range.
+- **Memory Map**: Realigned all core segments and shifted `VmmData` to `$1F90` to resolve persistent overlaps as the OS grows.
+
 ## [0.2.11] - 2026-05-12
 
 ### Added
