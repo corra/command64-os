@@ -5,6 +5,43 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.10] - 2026-05-12
+
+### Fixed
+- **Critical — KERNAL API Register Mismatches**: Resolved multiple bugs in `file.asm` where LFN and Device Number registers were swapped or incorrect for `SETLFS`, `CHKIN`, and `CHKOUT` calls.
+- **Filename Normalization**: Enhanced `normalizeName` to handle lowercase PETSCII conversion, ensuring shell input matches standard uppercase disk filenames.
+- **Memory Map**: Realigned segments (`Loader`, `Path`, `Vmm`, `File`, `VmmData`) to resolve overlaps caused by expanded utility code.
+
+## [0.2.9] - 2026-05-12
+
+### Fixed
+- **Handle/Channel Conflict**: `fileOpen` now uses the Logical File Number (LFN) as the Secondary Address, ensuring unique channels for simultaneous files (fixing `COPY`).
+- **Case Sensitivity**: Added `normalizeName` call to `fileOpen` to ensure filenames match the unshifted PETSCII expected by the disk drive (fixing `TYPE` and `COPY` "Load error").
+
+## [0.2.8] - 2026-05-12
+
+### Fixed
+- **Critical — cmdCopy Handle Corruption**: `cmdCopy` was using `TempLo/Hi` for handles, which were clobbered by `fileRead/Write`. Added dedicated ZP registers `SrcHandle` ($6E) and `DstHandle` ($6F).
+- **Documentation**: Corrected outdated Zero Page addresses in `utils.asm` comments ($F7/$F8 -> $66/$67).
+
+### Changed
+- **Performance — Buffered I/O**: `TYPE` and `COPY` commands now use 64-byte buffered I/O instead of 1-byte-at-a-time, significantly improving disk performance.
+
+## [0.2.7] - 2026-05-12
+
+### Fixed
+- **C1 — FileScratch address** (`include/command64.inc`): `FileScratch` was `$1D80` (= File segment start), causing `fileOpen` to overwrite its own code when building filenames. Corrected to `$1F02` where `fileScratch` actually lives in VmmData.
+- **C2 — Handle lost in API dispatch** (`api.asm`, `shell.asm`): `ahRead`/`ahWrite`/`ahClose` were entered with A = function code, not the handle; `fileRead`/`fileWrite`/`fileClose` received garbage. Added ZP register `FileHandle = $6D` (vmm.inc). `ahRead`/`ahWrite`/`ahClose` now load A from FileHandle before delegating. Callers in `cmdType`/`cmdCopy` now `sta FileHandle` after open and before each read/write/close API call. TYPE and COPY are now functional.
+- **C3 — fileClose X clobber** (`file.asm`): `KernalCLOSE` does not preserve X; `sta HandleTable, x` after the call wrote to the wrong slot. Fixed by saving X to TempLo around the KERNAL call.
+- **N8 — Spurious `asl` in fileClose** (`file.asm`): Dead code after `jsr KernalCLOSE` removed.
+- **Dead `lda` lines in cmdType/cmdCopy** (`shell.asm`): Removed no-op handle loads that were immediately overwritten.
+
+### Changed
+- **Version**: 0.2.7 (Build 2400), Phase 2F (File I/O).
+- **HELP text**: Added TYPE and COPY to the HELP command output.
+- **ABI comments** (`api.asm`): Updated ahRead/ahWrite/ahClose comments to reflect FileHandle ZP convention.
+- **Removed `KernalCBINV`** (`include/command64.inc`): Vestigial BRK vector label from pre-v0.2.6 removed.
+
 ## [0.2.6] - 2026-05-11
 
 ### Changed

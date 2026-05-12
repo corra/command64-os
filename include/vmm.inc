@@ -15,6 +15,9 @@
 .label VmmOffLo     = $6A
 .label VmmOffHi     = $6B
 .label VmmBank      = $6C
+.label FileHandle   = $6D  // Active handle for DOS_READ/WRITE/CLOSE_FILE API calls
+.label SrcHandle    = $6E  // cmdCopy: source handle scratch
+.label DstHandle    = $6F  // cmdCopy: destination handle scratch
 
 // --- REU Hardware Registers ($DF00-$DF0A) ---
 .label REU_STATUS     = $DF00 // R: Status, W: Clear Interrupts

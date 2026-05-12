@@ -4,40 +4,50 @@
 To provide a memory management abstraction layer that maps the 1MB logical address space expected by DOS into the physical memory structure of the C64 Ultimate (64KB base + 1MB-16MB REU). The VMM handles address translation, memory banking, and allocation tracking, allowing higher-level DOS primitives to operate against a virtualized memory model.
 
 ## 2. Calling Conventions (6502)
-- **Address Passing:** Logical DOS addresses (Segment:Offset) are passed by setting zero-page pointers `VMM_SEG` and `VMM_OFF`.
-- **Return Values:** Return codes are passed in the Accumulator (A). `$00` = Success, `$01` = Out of memory, `$02` = Invalid segment.
-- **Bank Selection:** REU bank selection uses a dedicated zero-page variable `REU_BANK` ($0202).
+- **Jump Table Access:** External programs MUST call VMM services via the stable OS entry point at **`$1000`** with the appropriate function number in the Accumulator (`A`).
+- **Register Passing:** 
+    - `A`: Function Number (e.g., `DOS_ALLOC_MEM = $48`).
+    - `X/Y`: Parameter 1 (Low/Hi) or as defined by function.
+    - `Carry Flag`: Returns `0` on success, `1` on error.
+- **Data Passing:** Uses non-critical FAC1 zero-page workspace:
+    - `VmmSegLo/Hi` ($61-$62): Segment.
+    - `VmmOffLo/Hi` ($63-$64): Offset.
+    - `VmmBank` ($65): 64KB Bank index.
 
-## 3. API Contracts
+## 3. API Contracts (via JSR $1000)
 
-### VMM_INIT (Initialize the Virtual Memory Manager)
-- **Description:** Maps the base C64 memory and initializes the REU banking structure. Must be called before any other VMM function.
-- **Input:** `A` = Total memory pages to allocate in the REU (e.g., 256 for 1MB).
-- **Implementation:** Performs the initial REU handshake (checking status at `$DF00`), verifies the REU is online, and creates the Memory Control Table (MCT) in base RAM.
+### DOS_ALLOC_MEM ($48)
+- **Description:** Allocates contiguous 4KB pages in the REU.
+- **Input:** `X/Y` = Requested paragraphs (16-byte units).
+- **Output:** 
+    - `X` = Starting Page Index (`VmmSegHi`).
+    - `Y` = Starting Bank (`VmmBank`).
+    - `Carry` = 0 (Success).
+- **Error:** `Carry` = 1, `A` = `VMM_ERR_NOMEM` ($01) or `VMM_ERR_INVALID` ($02).
 
-### VMM_READ_BYTE (Read from Virtual Address)
-- **Description:** Reads a single byte from a 16-bit logical DOS address.
-- **Input:** `VmmSeg` = Logical Segment, `VmmOff` = Logical Offset.
-- **Output:** `A` = Byte read from the logical address.
-- **Implementation:** Computes the 20-bit physical address, selects the correct REU bank via `$DF06`, and performs a Fetch via `$DF01`.
+### DOS_FREE_MEM ($49)
+- **Description:** Releases a previously allocated block.
+- **Input:** 
+    - `X` = Page Index (`VmmSegHi`).
+    - `Y` = Bank (`VmmBank`).
+- **Output:** `Carry` = 0 (Success).
+- **Error:** `Carry` = 1, `A` = `VMM_ERR_INVALID` ($02).
 
-### VMM_WRITE_BYTE (Write to Virtual Address)
-- **Description:** Writes a single byte to a 16-bit logical DOS address.
-- **Input:** `A` = Byte to write, `VmmSeg` = Logical Segment, `VmmOff` = Logical Offset.
-- **Implementation:** Computes the physical address, selects the REU bank, and performs a Stash via `$DF01`.
+### VMM_READ_BYTE (Internal/Private)
+- **Description:** Reads a single byte from logical DOS Seg:Off.
+- **Input:** `VmmSegLo/Hi`, `VmmOffLo/Hi`.
+- **Output:** `A` = Data byte.
 
-### VMM_ALLOC (Allocate Memory Block)
-- **Description:** Finds a contiguous block of free memory in the virtual space and reserves it.
-- **Input:** `VMM_SEG` = Requested paragraph size (16 bytes).
-- **Output:** `A` = Result code. On success, `VMM_SEG` and `VMM_OFF` are set to the allocated block's start address.
+### VMM_WRITE_BYTE (Internal/Private)
+- **Description:** Writes a single byte to logical DOS Seg:Off.
+- **Input:** `A` = Data byte, `VmmSegLo/Hi`, `VmmOffLo/Hi`.
 
-### VMM_FREE (Release Memory Block)
-- **Description:** Returns a previously allocated block to the free pool.
-- **Input:** `VMM_SEG` = Logical Segment of the block to free.
+## 4. Implementation Details
+- **MCT (Memory Control Table):** Located at **`$C000-$CFFF`**. A 4096-byte map tracking the state of 4KB pages across 16MB of REU space.
+- **Page States:** 
+    - `$00`: Free
+    - `$01`: Head (Start of allocation)
+    - `$02`: Tail (Continuation of allocation)
 
-## 4. Data Structures
-- **Memory Control Table (MCT):** A table mapping logical segment pointers to physical REU bank numbers and base offsets.
-- **Free Block Head:** A zero-page linked list node tracking available memory blocks.
-
-## 5. Justification
-DOS assumes a flat, segment-able 1MB RAM space. The C64 Ultimate requires manual bank switching for any memory beyond the base 64KB. By implementing the VMM here, we can emulate DOS-style memory allocation (`$ALLOC`, `$DEALLOC`) without exposing the banking complexity to the command shell and file system modules.
+## 5. Memory Safety
+The VMM includes a `vmmInitialized` safety check. All entry points will fail gracefully with `VMM_ERR_INVALID` if an REU was not detected at startup.

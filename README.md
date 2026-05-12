@@ -1,26 +1,46 @@
-<img width="150" height="150" align="left" style="float: left; margin: 0 10px 0 0;" alt="MS-DOS logo" src="https://github.com/Microsoft/MS-DOS/blob/main/.readmes/msdos-logo.png">   
+# command64
 
-# MS-DOS v1.25, v2.0, v4.0 Source Code
+An MS-DOS style operating system for the Commodore 64.
 
-This repo contains the original source-code and compiled binaries for MS-DOS v1.25 and MS-DOS v2.0, plus the source-code for MS-DOS v4.00 jointly developed by IBM and
-Microsoft.
+## Overview
+command64 provides a familiar command-line interface and DOS-compatible API for the C64. It leverages the RAM Expansion Unit (REU) to provide up to 16MB of virtual memory and implements modern handle-based file I/O.
 
-The MS-DOS v1.25 and v2.0 files [were originally shared at the Computer History Museum on March 25th, 2014]( http://www.computerhistory.org/atchm/microsoft-ms-dos-early-source-code/) and are being (re)published in this repo to make them easier to find, reference-to in external writing and works, and to allow exploration and experimentation for those interested in early PC Operating Systems.  
+## Features
+- **MS-DOS Shell:** Commands like `DIR`, `TYPE`, `CLS`, and `VER`.
+- **Service Bus API:** Stable INT 21h-style entry point for external programs.
+- **Virtual Memory:** 4KB page-based allocation in the REU.
+- **Handle-based I/O:** Simplified file management over KERNAL channels.
 
-# License
+## Getting Started
 
-All files within this repo are released under the [MIT License]( https://en.wikipedia.org/wiki/MIT_License) as per the [LICENSE file](https://github.com/Microsoft/MS-DOS/blob/main/LICENSE) stored in the root of this repo.
+### Requirements
+- Commodore 64 (or VICE emulator)
+- RAM Expansion Unit (REU) - 512KB or larger recommended.
+- Kick Assembler v5.25 (for building)
 
-# For historical reference
+### Building
+Run the following command from the project root:
+```bash
+java -jar tools/KickAss.jar build/command64.asm -odir build/
+```
 
-The source files in this repo are for historical reference and will be kept static, so please **don’t send** Pull Requests suggesting any modifications to the source files, but feel free to fork this repo and experiment 😊.  
+### Running
+1. Load the compiled `command64.prg` into your C64 or emulator.
+2. Run with `SYS 4608` (if loaded via BASIC stub).
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/).  For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+## Internal Commands
 
-# Trademarks
+| Command | Description |
+|---------|-------------|
+| `CLS`   | Clear the screen. |
+| `DIR`   | List files on the current disk. |
+| `TYPE`  | Display the contents of a file (e.g., `TYPE README.TXT`). |
+| `VER`   | Show OS version and build information. |
+| `HELP`  | Display available commands. |
+| `EXIT`  | Return to BASIC. |
 
-This project may contain trademarks or logos for projects, products, or services. Authorized use of Microsoft
-trademarks or logos is subject to and must follow
-[Microsoft's Trademark & Brand Guidelines](https://www.microsoft.com/legal/intellectualproperty/trademarks/usage/general).
-Use of Microsoft trademarks or logos in modified versions of this project must not cause confusion or imply Microsoft sponsorship.
-Any use of third-party trademarks or logos are subject to those third-party's policies.
+## For Developers
+See the following documents in the `docs/` directory:
+- [API Reference](docs/api-reference.md)
+- [Programmer's Reference](docs/programmers-reference.md)
+- [VMM Specification](docs/vmm-api.md)

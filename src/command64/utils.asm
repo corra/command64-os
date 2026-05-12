@@ -6,7 +6,7 @@
 
 // --- parseHex ---
 // Parses a hex string in CommandBuffer starting at Y.
-// Result stored in HexValLo ($F7) and HexValHi ($F8).
+// Result stored in HexValLo ($66) and HexValHi ($67).
 // Input:  Y = starting index in CommandBuffer
 // Output: C=0 on success, C=1 on invalid char or overflow.
 //         HexValLo/Hi updated.
@@ -90,11 +90,24 @@ nnLoop:
     cpy TempLo
     beq nnDone
     lda (PrintPtrLo), y
+    
+    // 1. Convert lowercase $61-$7A to $41-$5A
+    cmp #$61
+    bcc nnShifted
+    cmp #$7B
+    bcs nnShifted
+    sec
+    sbc #$20
+    sta (PrintPtrLo), y
+    jmp nnNext
+
+nnShifted:
+    // 2. Convert shifted $C1-$DB to $41-$5A
     cmp #$C1                // Shifted 'A'
     bcc nnNext
     cmp #$DB                // Shifted 'Z' + 1
     bcs nnNext
-    // Is shifted A-Z. Convert to unshifted (lowercase)
+    // Is shifted A-Z. Convert to unshifted (Uppercase in standard mode)
     and #$7F
     sta (PrintPtrLo), y
 nnNext:

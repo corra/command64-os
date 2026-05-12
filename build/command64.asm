@@ -9,16 +9,16 @@
 //   CommandShell  $1200  Command loop, dispatcher, built-ins
 //   Api           $1800  INT 21h Service Bus (Jump Table)
 //   Utils         $1900  Hex parsing and string utilities
-//   Loader        $1A00  KERNAL binary loader wrapper
-//   Path          $1A80  Directory search and path logic
-//   Vmm           $1B80  Virtual Memory Manager (REU mapping)
-//   File          $1D80  Handle-based File I/O
-//   VmmData       $1F00  VMM temporary storage
+//   Loader        $1A80  KERNAL binary loader wrapper
+//   Path          $1B00  Directory search and path logic
+//   Vmm           $1C00  Virtual Memory Manager (REU mapping)
+//   File          $1E00  Handle-based File I/O
+//   VmmData       $1F80  VMM temporary storage
 
 .file [name="command64.prg", segments="Main,ApiStub,Petsci,CommandTable,CommandShell,Api,Utils,Loader,Path,Vmm,File,VmmData"]
 
 .segmentdef Main [start=$0801]
-.segmentdef VmmData [start=$1F00]
+.segmentdef VmmData [start=$1F80]
 
 // Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, File, and VmmData are defined by the imported source files.
 

@@ -7,8 +7,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
-.const VERSION_STAGE = "4" // Phase 2D (Service Bus)
-.const BUILD_NUMBER  = "2312"
+.const VERSION_STAGE = "10" // Phase 2F (File I/O Fixes)
+.const BUILD_NUMBER  = "2403"
 
 
 // ---------------------------------------------------------------------------
@@ -531,35 +531,40 @@ ctGotEnd:
     lda #DOS_OPEN_FILE
     jsr apiHandler
     bcs ctOpenErr
-    
-    sta TempLo              // Save Handle
-    
+
+    sta FileHandle          // Save handle for subsequent read/close calls
+
 ctReadLoop:
-    lda #DOS_READ_FILE
-    lda TempLo              // Handle
     ldx #<CommandBuffer     // Reuse CommandBuffer as read buffer
     ldy #>CommandBuffer
-    lda #1
-    sta HexValLo            // Read 1 byte at a time for simple TYPE
+    lda #64                 // Read 64 bytes at a time
+    sta HexValLo
     lda #0
     sta HexValHi
-    
     lda #DOS_READ_FILE
     jsr apiHandler
     bcs ctReadDone
-    
-    // Check if we actually read a byte
+
+    // Check if we actually read any bytes
     lda HexValLo
     ora HexValHi
     beq ctReadDone
-    
-    // Print the byte
-    lda CommandBuffer
+
+    // Print the bytes we read
+    ldy #0
+ctPrintLoop:
+    lda CommandBuffer, y
     jsr KernalChROUT
-    jmp ctReadLoop
+    iny
+    cpy HexValLo
+    bne ctPrintLoop
+    
+    // If we read a full 64-byte block, try to read more
+    lda HexValLo
+    cmp #64
+    beq ctReadLoop
 
 ctReadDone:
-    lda TempLo              // Handle
     lda #DOS_CLOSE_FILE
     jsr apiHandler
     lda #PetCr
@@ -645,8 +650,8 @@ ccGotDest:
     lda #DOS_OPEN_FILE
     jsr apiHandler
     bcs ccOpenErr
-    sta TempLo              // TempLo = Source Handle
-    
+    sta SrcHandle           // Use dedicated ZP handle scratch
+
     // 6. Open Dest for Write
     lda #1
     sta HexValLo            // mode=1 (Write)
@@ -655,46 +660,51 @@ ccGotDest:
     lda #DOS_OPEN_FILE
     jsr apiHandler
     bcs ccCloseSrcErr       // Error opening dest, close source
-    sta TempHi              // TempHi = Dest Handle
-    
+    sta DstHandle           // Use dedicated ZP handle scratch
+
     // 7. Copy Loop
 ccLoop:
-    lda TempLo              // Source Handle
+    lda SrcHandle           // Source Handle -> FileHandle for read call
+    sta FileHandle
     ldx #<CommandBuffer
     ldy #>CommandBuffer
-    lda #1                  // 1 byte
+    lda #64                 // 64-byte chunk
     sta HexValLo
     lda #0
     sta HexValHi
     lda #DOS_READ_FILE
     jsr apiHandler
     bcs ccDone
-    
+
     // Check if read 0 bytes (EOF)
     lda HexValLo
     ora HexValHi
     beq ccDone
-    
+
     // Write to dest
-    lda TempHi              // Dest Handle
+    lda DstHandle           // Dest Handle -> FileHandle for write call
+    sta FileHandle
     ldx #<CommandBuffer
     ldy #>CommandBuffer
-    lda #1                  // 1 byte
-    sta HexValLo
-    lda #0
-    sta HexValHi
+    // HexValLo/Hi already contains the actual count read
     lda #DOS_WRITE_FILE
     jsr apiHandler
     bcs ccDone              // Write error
-    jmp ccLoop
+
+    // If we read a full 64-byte block, try to read more
+    lda HexValLo
+    cmp #64
+    beq ccLoop
 
 ccDone:
     // 8. Close both
-    lda TempLo
+    lda SrcHandle
+    sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr apiHandler
-    
-    lda TempHi
+
+    lda DstHandle
+    sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr apiHandler
     
@@ -717,6 +727,7 @@ ccOpenErr:
 
 ccCloseSrcErr:
     lda TempLo
+    sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr apiHandler
     jmp ccOpenErr
@@ -761,6 +772,10 @@ helpMsg:
     .text "HELP   - SHOW THIS HELP"
     .byte $0D
     .text "LOAD   - LOAD [FILE] [ADDR]"
+    .byte $0D
+    .text "TYPE   - PRINT FILE CONTENTS"
+    .byte $0D
+    .text "COPY   - COPY [SRC] [DST]"
     .byte $0D
     .text "VER    - SHOW VERSION"
     .byte $0D, 0

@@ -19,9 +19,6 @@
 .label KernalCHKOUT    = $FFC9  // Set output channel
 .label KernalCLRCHN    = $FFCC  // Clear I/O channels
 
-// --- KERNAL Vector Table (Page 3) ---
-.label KernalCBINV     = $0316  // BRK Instruction Interrupt Vector
-
 // --- API Function Constants (DOS Standard Hex Codes) ---
 .label DOS_PRINT_CHAR  = $02  // Print character (PETSCII)
 .label DOS_PRINT_STR   = $09  // Print string (Null-terminated)
@@ -73,7 +70,7 @@
 .label MAX_HANDLES   = 8
 .label SourceBuf     = $03A0 // 48 bytes
 .label DestBuf       = $03D0 // 48 bytes
-.label FileScratch   = $1D80 // Stable scratch area in VmmData segment
+.label FileScratch   = $1F82 // Filename scratch in VmmData: vmmInitialized($1F80), vmmTempByte($1F81), fileScratch($1F82)
 
 // --- User Program Space ---
 // External commands are loaded here. 

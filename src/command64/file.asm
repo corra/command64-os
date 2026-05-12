@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 File System Module
 // Manages Handle Table and C64 KERNAL File I/O.
 
-.segment File [start=$1D80]
+.segment File [start=$1E00]
 
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.
@@ -64,6 +64,20 @@ foCopyLoop:
     iny
     jmp foCopyLoop
 foCopyDone:
+    // Normalize filename in FileScratch
+    tya                     // Y holds string length from copy loop
+    tax                     // X = string length for normalizeName
+    lda TempLo              // Save handle table offset (clobbered by normalizeName)
+    pha
+    
+    lda #<FileScratch       // A = string pointer low
+    ldy #>FileScratch       // Y = string pointer high
+    jsr normalizeName
+    
+    pla
+    sta TempLo              // Restore handle table offset
+    // Note: normalizeName returns with Y = string length, which is required below.
+
     // Check mode
     lda HexValLo
     beq foSkipMode          // Read mode (default)
@@ -90,11 +104,9 @@ foSkipMode:
     jsr KernalSETNAM
     
     ldx TempLo
-    lda HandleTable + 1, x  // Get pre-assigned LFN
-    
-    tax                     // X = LFN
-    lda #8                  // Device 8
-    ldy #2                  // Secondary address (2-14 are for data)
+    lda HandleTable + 1, x  // A = LFN
+    tay                     // Y = LFN (use LFN as secondary address for uniqueness)
+    ldx #8                  // X = Device 8
     jsr KernalSETLFS
     
     jsr KernalOPEN
@@ -126,14 +138,13 @@ fileClose:
     lda HandleTable, x      // Get status
     beq fcError             // Not open
     
+    stx TempLo              // Save table offset; KernalCLOSE clobbers X
     lda HandleTable + 1, x  // Get LFN
     jsr KernalCLOSE
-    
-    // Mark as free
-    asl                     // Handle is still in A? No, A was LFN. 
-                            // Need to save X.
+
+    ldx TempLo              // Restore table offset
     lda #0
-    sta HandleTable, x
+    sta HandleTable, x      // Mark slot as free
     
     clc
     rts
@@ -163,6 +174,7 @@ fileRead:
     
     // 2. Set input channel
     lda HandleTable + 1, x  // Get LFN
+    tax                     // X = LFN (Required by CHKIN)
     jsr KernalCHKIN
     bcs frError
     
@@ -238,6 +250,7 @@ fileWrite:
     
     // 2. Set output channel
     lda HandleTable + 1, x  // Get LFN
+    tax                     // X = LFN (Required by CHKOUT)
     jsr KernalCHKOUT
     bcs fwError
     

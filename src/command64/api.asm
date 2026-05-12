@@ -79,25 +79,29 @@ _acOk:
 ahOpen:
     // Input: X/Y = Pointer to filename (null-terminated)
     //        HexValLo = Access mode (0=Read, 1=Write)
+    // Output: A = Handle on success; Carry = status
     jsr fileOpen
     rts
 
 ahClose:
-    // Input: A = Handle
+    // Input: FileHandle (ZP $6D) = Handle to close
+    lda FileHandle
     jsr fileClose
     rts
 
 ahRead:
-    // Input: A = Handle
-    //        X/Y = Buffer
-    //        TempLo/Hi = Bytes to read (passed via ZP)
+    // Input: FileHandle (ZP $6D) = Handle
+    //        X/Y = Destination buffer pointer
+    //        HexValLo/Hi = Byte count
+    lda FileHandle
     jsr fileRead
     rts
 
 ahWrite:
-    // Input: A = Handle
-    //        X/Y = Buffer
-    //        HexValLo/Hi = Bytes to write
+    // Input: FileHandle (ZP $6D) = Handle
+    //        X/Y = Source buffer pointer
+    //        HexValLo/Hi = Byte count
+    lda FileHandle
     jsr fileWrite
     rts
 
