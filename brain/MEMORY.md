@@ -9,31 +9,32 @@
 - `brain/task.md`: Granular task list
 
 ## Current State (2026-05-11)
-- Phase 2A, 2B, 2C, and 2D complete (2D = Service Bus).
-- **Architecture Pivot**: Service Bus transitioned from `BRK` Trap to ** Jump Table** model (`JSR $1600`). This resolves critical stack corruption and re-entrancy issues with the KERNAL.
-- **Remediation**: All code review remediation rounds (1, 2, and 3) are COMPLETE. Build 2308 is the current stable reference.
-- **Version**: 0.2.6 (Build 2308), Stage 4.
-- **VMM**: 16MB supported via 4KB Page Byte-Map at `$C000`. Full memory safety hardening complete (all entry points check `vmmInitialized`). Corrected 20-bit address math logic.
-- **Service Bus**: `api.asm` Jump Table implemented at `$1600`. All confirmed bugs (A, B, E, J) resolved by the architectural pivot and logic fixes.
-- **Tests**: `apitest.asm` and `vmmtest.asm` updated to use `JSR $1600` ABI. Explicit lowercase mode initialization added.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly.
+- Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
+- Phase 3 complete (File System Integration).
+- **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
+- **Service Bus**: Extended Jump Table at `$1680` to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), and `DOS_READ_FILE` ($3F).
+- **Internal Commands**: Added `TYPE` command to display file contents using the new DOS API.
+- **Version**: 0.2.6 (Build 2310), Stage 4.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. Segment overlaps resolved.
 
-## Memory Map (current — as of Build 2308)
+## Memory Map (current — as of Build 2310)
 | Region | Purpose |
 |--------|---------|
-| `$033C` | CommandBuffer (192 bytes, Cassette Buffer) |
+| `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
 | `$038C` | CommandLen (1 byte) |
 | `$038D` | SpecificLoad flag (1 byte) |
+| `$038E-$039D` | HandleTable (16 bytes, 8 entries) |
 | `$0801` | BASIC SYS launcher (Main segment) |
 | `$1000` | Petsci (petPrintString, petPrintChar macro) |
 | `$1100` | CommandTable (8-byte fixed-width entries) |
 | `$1200` | CommandShell (main loop, dispatcher, built-ins) |
-| `$1600` | Api (INT 21h Jump Table service bus — `api.asm`) |
-| `$1700` | Utils (parseHex, normalizeName, printDecimal16) |
-| `$1800` | Loader (shellLoadPrg) |
-| `$1880` | Path (findFile, checkExistence) |
-| `$1980` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
-| `$1C80` | VmmData (vmmInitialized, vmmTempByte) |
+| `$1680` | Api (INT 21h Jump Table service bus — `api.asm`) |
+| `$1780` | Utils (parseHex, normalizeName, printDecimal16) |
+| `$1880` | Loader (shellLoadPrg) |
+| `$1900` | Path (findFile, checkExistence) |
+| `$1A00` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
+| `$1C00` | File (Handle-based I/O — `file.asm`) |
+| `$1D80` | VmmData (vmmInitialized, vmmTempByte) |
 | `$2000+` | UserProgStart (External commands loaded here) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
@@ -41,17 +42,13 @@
 | `$02` | Zero-page: CmpBase (User Safe) |
 
 ## C64 Hardware Gotchas (hard-won)
+- **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.
 - **BRK Trap Model is non-viable** for high-level OS calls on C64 due to KERNAL non-reentrancy.
-- **Page 3 ($0300–$033B) is KERNAL/BASIC vector table** — NEVER place buffers here.
+- **Handle LFNs**: Use LFN 2-9 for handles to avoid conflict with LFN 1 used by program loader.
 - **BASIC warm start = `jmp $E37B`** — not `jmp ($0338)`.
-- **CHRIN ($FFCF) = screen editor (BASIN)** — echoes chars itself; avoid for raw shells.
-- **GETIN ($FFE4)** — non-blocking raw input; use polling loop for shell input.
 - **KA `.text` maps lowercase ASCII → PETSCII control codes** — send `$0E` at startup for mixed-case.
 
 ## Pending Tasks
-- [ ] Phase 3: File System (INT 21h extensions)
 - [ ] Environment variable support
-
-## Next Steps
-1. Verify Build 2308 stability in VICE.
-2. Begin Phase 3 architecture: design the File Control Block (FCB) and Handle-based I/O mapping.
+- [ ] Implement `DOS_WRITE_FILE` ($40)
+- [ ] Implement `COPY` command

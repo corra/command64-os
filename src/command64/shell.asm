@@ -8,7 +8,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "4" // Phase 2D (Service Bus)
-.const BUILD_NUMBER  = "2308"
+.const BUILD_NUMBER  = "2310"
 
 
 // ---------------------------------------------------------------------------
@@ -37,6 +37,8 @@ tableCmd:
     .word cmdVer
     .text "help  "
     .word cmdHelp
+    .text "type  "
+    .word cmdType
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -47,8 +49,10 @@ tableEnd:
 // --- Entry point ---
 start:
     jsr vmmInit             // Initialize VMM and check for REU
-    cmp #VMM_SUCCESS
-    beq siInitOk
+    jsr fileInit            // Initialize File System (Handle Table)
+    
+    lda vmmInitialized
+    bne siInitOk
 
     
     // VMM Init failed (No REU found)
@@ -481,6 +485,93 @@ cdDevError:
     jsr petPrintString
     lda #PetCr
     jsr KernalChROUT
+    rts
+
+// TYPE — display contents of a file
+cmdType:
+    ldy ParsePos
+ctSkipSpaces:
+    lda CommandBuffer, y
+    beq ctNoArgs
+    cmp #' '
+    bne ctFoundName
+    iny
+    jmp ctSkipSpaces
+
+ctFoundName:
+    // Extract filename (token until space or null)
+    sty TempLo              // Start index
+ctScanEnd:
+    lda CommandBuffer, y
+    beq ctGotEnd
+    cmp #' '
+    beq ctGotEnd
+    iny
+    jmp ctScanEnd
+ctGotEnd:
+    // Null-terminate the name in the buffer (temporarily)
+    lda #0
+    sta CommandBuffer, y
+    
+    // Open file
+    lda #DOS_OPEN_FILE
+    ldx #<CommandBuffer
+    stx NamePtrLo           // Use ZP to compute absolute addr
+    lda NamePtrLo
+    clc
+    adc TempLo
+    tax                     // X = Lo byte of filename
+    lda #>CommandBuffer
+    adc #0
+    tay                     // Y = Hi byte of filename
+    lda #DOS_OPEN_FILE
+    jsr apiHandler
+    bcs ctOpenErr
+    
+    sta TempLo              // Save Handle
+    
+ctReadLoop:
+    lda #DOS_READ_FILE
+    lda TempLo              // Handle
+    ldx #<CommandBuffer     // Reuse CommandBuffer as read buffer
+    ldy #>CommandBuffer
+    lda #1
+    sta HexValLo            // Read 1 byte at a time for simple TYPE
+    lda #0
+    sta HexValHi
+    
+    lda #DOS_READ_FILE
+    jsr apiHandler
+    bcs ctReadDone
+    
+    // Check if we actually read a byte
+    lda HexValLo
+    ora HexValHi
+    beq ctReadDone
+    
+    // Print the byte
+    lda CommandBuffer
+    jsr KernalChROUT
+    jmp ctReadLoop
+
+ctReadDone:
+    lda TempLo              // Handle
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+ctNoArgs:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+
+ctOpenErr:
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jsr petPrintString
     rts
 
 dirFname: .text "$"

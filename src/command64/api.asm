@@ -7,7 +7,7 @@
 //           X/Y = Arguments (X=Low/Arg1, Y=High/Arg2)
 //   Output: A, X, Y as per function, Carry = Status (0=Success, 1=Error)
 
-.segment Api [start=$1600]
+.segment Api [start=$1680]
 
 // --- apiHandler ---
 // The centralized OS service dispatcher.
@@ -19,6 +19,12 @@ apiHandler:
     beq ahPrintChar
     cmp #DOS_PRINT_STR
     beq ahPrintStr
+    cmp #DOS_OPEN_FILE
+    beq ahOpen
+    cmp #DOS_CLOSE_FILE
+    beq ahClose
+    cmp #DOS_READ_FILE
+    beq ahRead
     cmp #DOS_ALLOC_MEM
     beq ahAllocMem
     cmp #DOS_FREE_MEM
@@ -60,6 +66,23 @@ ahAllocMem:
     rts
 _acOk:
     clc
+    rts
+
+ahOpen:
+    // Input: X/Y = Pointer to filename (null-terminated)
+    jsr fileOpen
+    rts
+
+ahClose:
+    // Input: A = Handle
+    jsr fileClose
+    rts
+
+ahRead:
+    // Input: A = Handle
+    //        X/Y = Buffer
+    //        TempLo/Hi = Bytes to read (passed via ZP)
+    jsr fileRead
     rts
 
 ahFreeMem:

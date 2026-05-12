@@ -24,6 +24,9 @@
 // --- API Function Constants (DOS Standard Hex Codes) ---
 .label DOS_PRINT_CHAR  = $02  // Print character (PETSCII)
 .label DOS_PRINT_STR   = $09  // Print string (Null-terminated)
+.label DOS_OPEN_FILE   = $3D  // Open file
+.label DOS_CLOSE_FILE  = $3E  // Close file
+.label DOS_READ_FILE   = $3F  // Read from file
 .label DOS_ALLOC_MEM   = $48  // Allocate memory (VMM)
 .label DOS_FREE_MEM    = $49  // Free memory (VMM)
 .label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
@@ -55,9 +58,17 @@
 // Relocating CommandBuffer to $033C (Cassette Buffer). 
 // This is 192 bytes of safe workspace if tape is not used.
 // It avoids colliding with code segments at $1600.
+// Workspace layout ($033C-$03FB):
+//   $033C-$038B: CommandBuffer (80 bytes)
+//   $038C:       CommandLen (1 byte)
+//   $038D:       SpecificLoad (1 byte)
+//   $038E-$039D: HandleTable (8 entries * 2 bytes = 16 bytes)
+//                Entry: Byte 0 = Status (0=Free, 1=Open), Byte 1 = C64 LFN
 .label CommandBuffer = $033C
 .label CommandLen    = $038C
 .label SpecificLoad  = $038D // 0=use HexVal (Relocated), 1=use file header (Absolute)
+.label HandleTable   = $038E
+.label MAX_HANDLES   = 8
 
 // --- User Program Space ---
 // External commands are loaded here. 

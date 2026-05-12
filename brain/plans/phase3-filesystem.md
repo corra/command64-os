@@ -1,7 +1,7 @@
 ---
 feature: phase3-filesystem
 created: 2026-05-11
-status: in-progress
+status: completed
 ---
 
 # Plan: Phase 3 - File System Integration
@@ -42,8 +42,8 @@ Now that the Service Bus (INT 21h equivalent) and VMM are stable, the next major
 
 ## Progress
 - [x] Initialize Phase 3 plan
-- [ ] Define FCB structure and Handle Table memory layout
-- [ ] Implement `DOS_OPEN_FILE`
-- [ ] Implement `DOS_READ_FILE`
-- [ ] Implement `DOS_CLOSE_FILE`
-- [ ] Implement `TYPE` internal command
+- [x] Define FCB structure and Handle Table memory layout
+- [x] Implement `DOS_OPEN_FILE`
+- [x] Implement `DOS_READ_FILE`
+- [x] Implement `DOS_CLOSE_FILE`
+- [x] Implement `TYPE` internal command
