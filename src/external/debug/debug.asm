@@ -10,7 +10,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "1"
 .const VERSION_STAGE = "2" // Remediation pass
-.const BUILD_NUMBER  = "1009"
+.const BUILD_NUMBER  = "1010"
 
 // --- Zero Page Pointers ($70-$7F) ---
 .label currentAddr = $70
@@ -133,6 +133,11 @@ dFoundCmd:
 dNotLetter:
     
     // --- Command Registry ---
+    // MAINTENANCE: Every command added below MUST be added to cmdHelp (debugHelpMsg)
+    cmp #'?'
+    bne _d0
+    jmp cmdHelp
+_d0:
     cmp #'q'
     bne _d1
     jmp cmdQuit
@@ -406,6 +411,12 @@ cmdRegs:
 cmdVer:
     lda #<verMsg
     ldy #>verMsg
+    jsr API_PRINT_STR
+    rts
+
+cmdHelp:
+    lda #<debugHelpMsg
+    ldy #>debugHelpMsg
     jsr API_PRINT_STR
     rts
 
@@ -919,6 +930,32 @@ startupMsg:
 verMsg:
     .text "DEBUG v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
     .text " (Build " + BUILD_NUMBER + ")"
+    .byte $0D, 0
+
+debugHelpMsg:
+    .text "DEBUG COMMANDS:"
+    .byte $0D
+    .text "D [RANGE]   - DUMP MEMORY"
+    .byte $0D
+    .text "E ADDR LIST - ENTER DATA"
+    .byte $0D
+    .text "F RANGE LIST- FILL MEMORY"
+    .byte $0D
+    .text "M RANGE ADDR- MOVE MEMORY"
+    .byte $0D
+    .text "C RANGE ADDR- COMPARE MEMORY"
+    .byte $0D
+    .text "S RANGE LIST- SEARCH MEMORY"
+    .byte $0D
+    .text "H VAL1 VAL2 - HEX MATH"
+    .byte $0D
+    .text "R           - SHOW REGISTERS"
+    .byte $0D
+    .text "G [ADDR]    - GO (EXECUTE)"
+    .byte $0D
+    .text "V           - SHOW VERSION"
+    .byte $0D
+    .text "Q           - QUIT TO SHELL"
     .byte $0D, 0
 
 errUnknown:
