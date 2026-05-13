@@ -8,7 +8,8 @@ This document provides technical details for developing applications for the com
 |--------|-------------|
 | `$033C - $03FB` | **OS Workspace** (Cassette Buffer). Includes Handle Table and command buffer. |
 | **`$1000`** | **OS Entry Point** (Stable Jump Table). |
-| `$1200 - $1FFF` | **command64 OS Kernel**. Includes shell, API dispatcher, and VMM. |
+| `$0C00 - $0FFF` | **OS Utils**. |
+| `$1040 - $1FFF` | **command64 OS Kernel**. Includes shell, API dispatcher, VMM, and File modules. |
 | **`$2000 - $9FFF`** | **User Program Space**. Applications should be loaded and run here. |
 | `$C000 - $CFFF` | **VMM Memory Control Table (MCT)**. Reserved for OS. |
 
@@ -17,12 +18,13 @@ This document provides technical details for developing applications for the com
 Applications should respect the following zero-page allocations to avoid system corruption.
 
 ### Safe Areas for User Programs
-- `$02 - $60`: Generally safe (OS uses `$02` as `CmpBase`).
-- `$6D - $8F`: Safe for temporary application use.
+- `$03 - $60`: Generally safe (OS uses `$02` as `CmpBase`).
+- `$70 - $8F`: Safe for temporary application use. **Note:** DEBUG.PRG uses `$70-$7F`.
 
 ### OS Reserved Zero Page
 - **`$FB - $FE`**: OS Pointer Workspace (PrintPtr, NamePtr).
-- **`$61 - $6C`**: OS Dispatcher Workspace (HandlerVec, ParsePos, Temp, HexVal, VMM Seg/Off/Bank).
+- **`$61 - $6D`**: OS Dispatcher Workspace (HandlerVec, ParsePos, Temp, HexVal, VMM, FileHandle).
+- **`$6E - $6F`**: Shell Scratch (SrcHandle, DstHandle).
 
 ## 3. Development Guidelines
 

@@ -16,6 +16,7 @@
 - **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
 - **Version**: 0.2.19 (Build 2413), Stage 4.
 - **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEBUG.PRG` help added; shell UI RETURN bug fixed.
+- **Recovery**: Recovered from a VM crash that occurred during documentation writing; README.md restored and system docs synchronized with Build 2413.
 - **External Programs**: `DEBUG.PRG` (v0.1.2 Build 1010) fully functional with internal `?` help.
 
 ## Memory Map (current — as of Build 2410)

@@ -3,13 +3,14 @@
 An MS-DOS style operating system for the Commodore 64.
 
 ## Overview
-command64 provides a familiar command-line interface and DOS-compatible API for the C64. It leverages the RAM Expansion Unit (REU) to provide up to 16MB of virtual memory and implements modern handle-based file I/O.
+command64 provides a familiar command-line interface and DOS-compatible API for the C64. It leverages the RAM Expansion Unit (REU) to provide up to 16MB of virtual memory and a robust handle-based file system.
 
 ## Features
 - **MS-DOS Shell:** Commands like `DIR`, `TYPE`, `CLS`, and `VER`.
-- **Service Bus API:** Stable INT 21h-style entry point for external programs.
-- **Virtual Memory:** 4KB page-based allocation in the REU.
-- **Handle-based I/O:** Simplified file management over KERNAL channels.
+- **Service Bus API:** Stable INT 21h-style entry point for external programs (JSR $1000).
+- **Virtual Memory:** 4KB page-based allocation in the REU (up to 16MB).
+- **Handle-based I/O:** Modern file management system mapping handles to C64 channels.
+- **External Utilities:** Support for external `.PRG` applications (e.g., `DEBUG`).
 
 ## Getting Started
 
@@ -19,14 +20,20 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 - Kick Assembler v5.25 (for building)
 
 ### Building
-Run the following command from the project root:
-```bash
-java -jar tools/KickAss.jar build/command64.asm -odir build/
-```
+The project uses **Kick Assembler v5.25**.
+1. Compile the main OS: 
+   ```bash
+   java -jar tools/KickAss.jar build/command64.asm -odir build/
+   ```
+2. Compile external utilities (optional):
+   ```bash
+   java -jar tools/KickAss.jar src/external/debug/debug.asm -odir bin/
+   ```
 
 ### Running
 1. Load the compiled `command64.prg` into your C64 or emulator.
 2. Run with `SYS 4608` (if loaded via BASIC stub).
+3. To load external utilities, ensure they are present on the same disk as the OS.
 
 ## Internal Commands
 
@@ -35,12 +42,19 @@ java -jar tools/KickAss.jar build/command64.asm -odir build/
 | `CLS`   | Clear the screen. |
 | `DIR`   | List files on the current disk. |
 | `TYPE`  | Display the contents of a file (e.g., `TYPE README.TXT`). |
+| `COPY`  | Copy a file to another location. |
+| `DEL`   | Delete a file from disk. |
+| `REN`   | Rename a file on disk. |
 | `VER`   | Show OS version and build information. |
 | `HELP`  | Display available commands. |
 | `EXIT`  | Return to BASIC. |
+
+## For Users
+See the **[Applications Guide](docs/apps/debug.md)** for details on external utilities like `DEBUG`.
 
 ## For Developers
 See the following documents in the `docs/` directory:
 - [API Reference](docs/api-reference.md)
 - [Programmer's Reference](docs/programmers-reference.md)
 - [VMM Specification](docs/vmm-api.md)
+- [PETSCII API](docs/pet-sci-api.md)

@@ -10,9 +10,9 @@ To provide a memory management abstraction layer that maps the 1MB logical addre
     - `X/Y`: Parameter 1 (Low/Hi) or as defined by function.
     - `Carry Flag`: Returns `0` on success, `1` on error.
 - **Data Passing:** Uses non-critical FAC1 zero-page workspace:
-    - `VmmSegLo/Hi` ($61-$62): Segment.
-    - `VmmOffLo/Hi` ($63-$64): Offset.
-    - `VmmBank` ($65): 64KB Bank index.
+    - `VmmSegLo/Hi` ($68-$69): Segment.
+    - `VmmOffLo/Hi` ($6A-$6B): Offset.
+    - `VmmBank` ($6C): 64KB Bank index.
 
 ## 3. API Contracts (via JSR $1000)
 

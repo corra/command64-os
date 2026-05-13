@@ -67,6 +67,20 @@ Writes bytes to an open file handle.
     - `Carry`: 0.
 - **Error:** `Carry` = 1.
 
+### DOS_DELETE_FILE ($41)
+Deletes a file from disk.
+- **Input:** `X/Y` = Pointer to null-terminated filename (Lo/Hi).
+- **Output:** `Carry` = 0.
+- **Error:** `Carry` = 1.
+
+### DOS_RENAME_FILE ($56)
+Renames a file on disk.
+- **Input:** 
+    - `X/Y`: Pointer to old filename (Lo/Hi).
+    - `PrintPtrLo/Hi` ($FB-$FC): Pointer to new filename (Lo/Hi).
+- **Output:** `Carry` = 0.
+- **Error:** `Carry` = 1.
+
 ### DOS_ALLOC_MEM ($48)
 Allocates memory in the REU.
 - **Input:** `X/Y` = Requested paragraphs (16-byte units).
