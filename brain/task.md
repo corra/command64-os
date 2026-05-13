@@ -73,6 +73,7 @@
   - [x] Remediation plan written — `brain/plans/2026-05-11_command64-remediation-round3.md`
   - [x] Task 1: Secure `vmmFree`
   - [x] Task 2: Secure `vmmReadByte`
+
 - [x] Phase 3: File System Integration (Handle-based I/O)
   - [x] Architecture design and planning — `brain/plans/phase3-filesystem.md`
   - [x] Define FCB structure and Handle Table layout
@@ -80,3 +81,22 @@
   - [x] Implement `TYPE` internal command
   - [x] Implement `COPY` internal command
   - [x] Create file integration test program — `tests/src/filetest.asm`
+
+- [x] Phase 3 Remediation & Shell Polish (2026-05-12)
+  - [x] Resolve Load Error / Register Mismatches — `brain/plans/filesystem-remediation.md`
+  - [x] Fix DIR block reporting (16-bit) — `brain/walkthroughs/dir-report-fix.md`
+  - [x] Implement `DEL` / `ERASE` commands — `brain/plans/filesystem-extended-cmds.md`
+  - [x] Implement `REN` / `RENAME` commands
+  - [x] Add destructive backspace (INST/DEL) handling in shell input loop
+
+- [x] Phase 4: External System Utilities
+  - [x] Develop `DEBUG` utility (Dump, Enter, Fill, Move, Compare, Search, Hex Math, Regs, Go, Quit)
+  - [x] Refine `DEBUG` UI for 40-column display (8-byte rows, midpoint separator)
+  - [x] Remediate `DEBUG` bugs (case sensitivity, register safety, inclusive ranges) — `brain/plans/debug-utility.md`
+  - [x] Verify `DEBUG` via formal test plan — `brain/walkthroughs/debug-test-plan.md`
+
+- [ ] Phase 5: Environment & Multi-Device Support
+  - [ ] Implement `DRIVE` command
+  - [ ] Add support for multiple devices (8, 9, 10, 11)
+  - [ ] Support subdirectories (1581 / SD2IEC)
+  - [ ] Environment variable storage (`SET`, `PATH`) in REU

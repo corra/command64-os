@@ -8,17 +8,17 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-05-11)
+## Current State (2026-05-12)
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
-- **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), and `DOS_WRITE_FILE` ($40).
-- **Internal Commands**: Added `TYPE` and `COPY` commands.
+- **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), `DOS_WRITE_FILE` ($40), `DOS_DELETE_FILE` ($41), and `DOS_RENAME_FILE` ($56).
+- **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
 - **Version**: 0.2.17 (Build 2410), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEBUG.PRG` fully remediated and verified for C64 40-col UI.
-- **External Programs**: `DEBUG.PRG` (v0.1.2 Build 1004) fully functional.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. File system remediation and UI polish complete.
+- **External Programs**: `DEBUG.PRG` (v0.1.2 Build 1007) fully functional and remediated.
 
-## Memory Map (current — as of Build 2408)
+## Memory Map (current — as of Build 2410)
 | Region | Purpose |
 |--------|---------|
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
@@ -54,7 +54,10 @@
 - **Handle LFNs**: Use LFN 2-9 for handles to avoid conflict with LFN 1 used by program loader.
 - **BASIC warm start = `jmp $E37B`** — not `jmp ($0338)`.
 - **KA `.text` maps lowercase ASCII → PETSCII control codes** — send `$0E` at startup for mixed-case.
+- **KernalGetIn ($FFE4) clobbers Y**: Always preserve Y across keyboard polling loops.
 
 ## Pending Tasks
-- [ ] Environment variable support
-- [ ] Implement `COPY` command (Shell integration complete, but needs verification)
+- [ ] Implement `DRIVE` command
+- [ ] Add support for multiple devices (8, 9, 10, 11)
+- [ ] Support subdirectories (1581 / SD2IEC)
+- [ ] Environment variable storage (`SET`, `PATH`) in REU
