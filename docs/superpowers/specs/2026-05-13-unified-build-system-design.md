@@ -133,8 +133,15 @@ Two commits, in order:
     ├── debug.prg
     ├── image.d64
     ├── test.d64
-    ├── ms-dos-c64-0.2.21.zip
-    └── ms-dos-c64-0.2.21.tar.gz
+    ├── docs/                       ← docs/ minus superpowers/ (copied at release time)
+    │   ├── api-reference.md
+    │   ├── programmers-reference.md
+    │   ├── pet-sci-api.md
+    │   ├── vmm-api.md
+    │   └── apps/
+    │       └── debug.md
+    ├── ms-dos-c64-0.2.21.zip       ← includes docs/
+    └── ms-dos-c64-0.2.21.tar.gz   ← includes docs/
 ```
 
 ---
@@ -309,10 +316,12 @@ release: $(BUILD)/image.d64 $(BUILD)/test.d64
 	mkdir -p $(RELEASE_DIR)
 	cp $(IMAGE_PRGS) $(RELEASE_DIR)/
 	cp $(BUILD)/image.d64 $(BUILD)/test.d64 $(RELEASE_DIR)/
+	cp -r docs/ $(RELEASE_DIR)/docs/
+	rm -rf $(RELEASE_DIR)/docs/superpowers
 	cd $(RELEASE_DIR) && zip -r $(RELEASE_NAME).zip \
-	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64
+	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
 	cd $(RELEASE_DIR) && tar -czf $(RELEASE_NAME).tar.gz \
-	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64
+	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
 	@echo "Release $(VERSION) ready in $(RELEASE_DIR)/"
 ```
 
@@ -373,3 +382,9 @@ git commit -m "release: v0.2.22"
 ```
 
 `make release` is never run as part of `make all` — it requires deliberate invocation. Old release archives accumulate in `release/` and are all tracked in git, providing a full release history.
+
+### Documentation in releases
+
+`make release` copies all of `docs/` into `release/docs/` then removes `docs/superpowers/`. The `superpowers/` subtree contains internal planning specs, brainstorming artifacts, and implementation plans — none of it is user-facing. Everything else (`api-reference.md`, `programmers-reference.md`, `pet-sci-api.md`, `vmm-api.md`, `apps/`) ships in the archives.
+
+To switch to a curated explicit list later, replace the `cp -r` + `rm -rf` pair with an explicit `cp` per file and update the zip/tar arguments to match.
