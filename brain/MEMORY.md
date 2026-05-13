@@ -14,8 +14,8 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), `DOS_WRITE_FILE` ($40), `DOS_DELETE_FILE` ($41), and `DOS_RENAME_FILE` ($56).
 - **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
-- **Version**: 0.2.19 (Build 2412), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEBUG.PRG` help command added.
+- **Version**: 0.2.19 (Build 2413), Stage 4.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEBUG.PRG` help added; shell UI RETURN bug fixed.
 - **External Programs**: `DEBUG.PRG` (v0.1.2 Build 1010) fully functional with internal `?` help.
 
 ## Memory Map (current — as of Build 2410)

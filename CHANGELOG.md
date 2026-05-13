@@ -10,6 +10,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - **DEBUG Utility Help**: Added `?` command to display a summary of all internal `DEBUG` commands. Established a maintenance protocol in the source code to ensure documentation stays synchronized with new features.
 
+### Fixed
+- **Shell UI**: Fixed a bug in `shellReadLine` where the cursor would not advance to a new line after pressing RETURN. Explicitly added `PetCr` echo to the completion handler.
+
 ## [0.2.18] - 2026-05-12
 
 ### Added

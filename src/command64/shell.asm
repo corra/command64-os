@@ -8,7 +8,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "14" // Phase 2F (Input fix)
-.const BUILD_NUMBER  = "2407"
+.const BUILD_NUMBER  = "2413"
 
 
 // ---------------------------------------------------------------------------
@@ -131,6 +131,8 @@ rlDoneRead:
     lda #0
     sta CommandBuffer, y    // write $00 null terminator (not $0D)
     sty CommandLen
+    lda #PetCr
+    jsr KernalChROUT        // advance cursor to next line
     rts
 
 
