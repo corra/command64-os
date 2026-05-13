@@ -14,10 +14,11 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), and `DOS_WRITE_FILE` ($40).
 - **Internal Commands**: Added `TYPE` and `COPY` commands.
-- **Version**: 0.2.14 (Build 2407), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. Shell input (DEL key) fixed.
+- **Version**: 0.2.17 (Build 2410), Stage 4.
+- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEBUG.PRG` fully remediated and verified for C64 40-col UI.
+- **External Programs**: `DEBUG.PRG` (v0.1.2 Build 1004) fully functional.
 
-## Memory Map (current — as of Build 2406)
+## Memory Map (current — as of Build 2408)
 | Region | Purpose |
 |--------|---------|
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
@@ -44,6 +45,7 @@
 | `$61–$6C` | Zero-page: HandlerVec, ParsePos, Temp, HexVal, VmmSeg/Off/Bank (FAC1) |
 | `$6D` | Zero-page: FileHandle (Active API Handle) |
 | `$6E-$6F` | Zero-page: SrcHandle, DstHandle (Shell Scratch) |
+| `$70-$7F` | Zero-page: DEBUG Pointers (External Utility) |
 | `$02` | Zero-page: CmpBase (User Safe) |
 
 ## C64 Hardware Gotchas (hard-won)

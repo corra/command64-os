@@ -5,7 +5,37 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.18] - 2026-05-12
+
+### Fixed (DEBUG.PRG v0.1.3 Build 1005)
+- **`parseHexArg` regression**: The Build 1004 `and #$7F` fix accepted shifted hex letters ($C1-$C6) but rejected unshifted ones ($41-$46). In `petscii_mixed`, the 'a'-'f' keys without Shift send $41-$46, which the new gate (`cmp #$C1; bcc phInvalid`) incorrectly rejected. Typing `f800` without Shift produced "error". Fixed with a two-branch check: unshifted $41-$46 handled first, shifted $C1-$C6 handled second (converted via `and #$7F` before the same subtraction).
+
+## [0.2.17] - 2026-05-12
+
+### Fixed
+- **DEBUG.PRG Remediation** (Build 1004): 
+  - Fixed hex parsing case sensitivity (`H`, `F`, `M` commands now work with both shifted and unshifted letters).
+  - Refactored `Dump` (D) command to use 8-byte rows for 40-column displays.
+  - Fixed `Enter` (E) command; added `Y` register preservation to prevent buffer index corruption during multi-byte entry.
+  - Fixed `readLine` UI; added explicit carriage return echo after RETURN is pressed.
+
+## [0.2.16] - 2026-05-12
+
+### Fixed (DEBUG.PRG v0.1.2 Build 1003)
+- **`readLine` Y corruption**: `KernalGetIn` may clobber Y, which was the buffer index with no push-pop guard. Applied `tya/pha … pla/tay` pattern matching `shellReadLine`.
+- **Range commands — inclusive end + wrap safety**: `cmdFill`, `cmdMove`, `cmdCompare`, `cmdSearch` checked `rangeStart == rangeEnd` before operating, silently skipping the final byte and risking a full-64KB wrap-around loop on reversed ranges. Restructured all four as do-while (operate first, exit-check after).
+- **`cmdMove` overlap corruption**: Forward copy overwrote source data when dest overlapped source from above. Added 16-bit dest-vs-src comparison; copies backwards (tail-first via `rangeEnd`/`val2` decrement) when `dest > src`, preventing corruption in all overlap cases.
+- **`TempLo` implicit dependency**: `cmdDump` used the shell's scratch ZP register `TempLo` ($64) as its row counter. Added `DebugTemp = $7A` to debug.asm's own ZP block and replaced both uses.
+
+## [0.2.15] - 2026-05-12
+
+### Fixed
+- **DEBUG Utility**: Fixed critical pointer logic. Relocated pointers (`currentAddr`, `rangeStart`, etc.) to Zero Page ($70-$7F) to support indirect-indexed addressing. Hardened `parseHexArg` to correctly handle empty arguments.
+
 ## [0.2.14] - 2026-05-12
+
+### Added
+- **External Utilities**: Implemented `DEBUG.PRG` (v0.1.0 Build 1001). Supports `D`, `E`, `F`, `M`, `C`, `S`, `H`, `R`, `G`, `V`, and `Q` commands.
 
 ### Fixed
 - **Shell Input**: `shellReadLine` now correctly handles the INST/DEL key (`$14`). Previously DEL was echoed (visually correct) but also stored as a literal `$14` byte in `CommandBuffer`, causing "Bad command" errors for any input that used backspace. DEL now decrements the buffer index (logically erasing the previous character) without storing anything; DEL at an empty buffer is silently ignored. Added `PetDel = $14` constant to `command64.inc`.
