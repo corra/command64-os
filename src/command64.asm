@@ -1,4 +1,4 @@
-// build/command64.asm
+// src/command64.asm
 // KickAssembler v5.25 - MS-DOS 4.0 shell for C64
 //
 // Segment layout:
@@ -23,14 +23,14 @@
 // Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, File, and VmmData are defined by the imported source files.
 
 #import "../include/command64.inc"
-#import "../src/command64/petsci.asm"
-#import "../src/command64/api.asm"
-#import "../src/command64/utils.asm"
-#import "../src/command64/loader.asm"
-#import "../src/command64/path.asm"
-#import "../src/command64/vmm.asm"
-#import "../src/command64/file.asm"
-#import "../src/command64/shell.asm"
+#import "command64/petsci.asm"
+#import "command64/api.asm"
+#import "command64/utils.asm"
+#import "command64/loader.asm"
+#import "command64/path.asm"
+#import "command64/vmm.asm"
+#import "command64/file.asm"
+#import "command64/shell.asm"
 
 
 // BASIC SYS launcher: injects a BASIC line at $0801 that does SYS $1200
