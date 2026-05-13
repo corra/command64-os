@@ -52,7 +52,7 @@ TEST_IMAGE_PRGS := $(IMAGE_PRGS) $(TEST_PRGS)
 # ---------------------------------------------------------------------------
 # Release
 # ---------------------------------------------------------------------------
-VERSION      := $(shell cat VERSION)
+VERSION      := $(shell cat VERSION 2>/dev/null)
 RELEASE_DIR  := release
 RELEASE_NAME := ms-dos-c64-$(VERSION)
 
@@ -118,10 +118,12 @@ $(BUILD)/test.d64: $(TEST_IMAGE_PRGS)
 # Release (intentional only — not part of `make all`)
 # ---------------------------------------------------------------------------
 release: $(BUILD)/image.d64 $(BUILD)/test.d64
+	@test -n "$(VERSION)" || { echo "ERROR: VERSION file is missing or empty"; exit 1; }
 	mkdir -p $(RELEASE_DIR)
 	cp $(IMAGE_PRGS) $(RELEASE_DIR)/
 	cp $(BUILD)/image.d64 $(BUILD)/test.d64 $(RELEASE_DIR)/
-	cp -r docs/ $(RELEASE_DIR)/docs/
+	rm -rf $(RELEASE_DIR)/docs
+	cp -r docs $(RELEASE_DIR)/docs
 	rm -rf $(RELEASE_DIR)/docs/superpowers
 	cd $(RELEASE_DIR) && zip -r $(RELEASE_NAME).zip \
 	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
