@@ -3,11 +3,13 @@ build/
 tests/bin/
 tests/*.d64
 src/external/debug/build/
+src/external/debug/bin/
 
 # Stray root-level artifacts only (leading / anchors to repo root)
 /image.d64
 /*.prg
 /*.sym
+/*.vs
 
 # Tools
 tools/cc1541-git/
