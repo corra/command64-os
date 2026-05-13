@@ -1,11 +1,15 @@
-# Build outputs
-build/*.prg
-build/*.sym
-*.prg
-*.sym
+# Build artifacts (managed by Make)
+build/
+tests/bin/
+tests/*.d64
+src/external/debug/build/
 
-# Garbage
---help
+# Stray root-level artifacts only (leading / anchors to repo root)
+/image.d64
+/*.prg
+/*.sym
+
+# Tools
 tools/cc1541-git/
 
 # OS-specific
