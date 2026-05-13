@@ -52,6 +52,11 @@ vmmAlloc:
     rts
 
 vaInitOk:
+    // Guard: zero-paragraph request is invalid (commit step does ldx #0; dex → X=$FF, marks 255 pages)
+    lda VmmSegLo
+    ora VmmSegHi
+    beq vaZeroErr
+
     // 1. Round up paragraphs to pages (1 page = 256 paragraphs = $0100)
     // PageCount = (Paragraphs + 255) >> 8
     lda VmmSegLo
@@ -128,6 +133,9 @@ vaSearchReset:
     inc TempLo
     jmp vaBlockLoop
 
+vaZeroErr:
+    lda #VMM_ERR_INVALID
+    rts
 vaNoMem:
     lda #VMM_ERR_NOMEM
     rts
@@ -357,4 +365,4 @@ vmmComputeAddress:
 .segment VmmData
 vmmInitialized: .byte 0
 vmmTempByte: .byte 0
-fileScratch: .fill 64, 0    // Space for building filenames
+fileScratch: .fill 96, 0    // 96 bytes: covers 79-char name + write suffix ",S,W" + rename "R:new=old" overhead

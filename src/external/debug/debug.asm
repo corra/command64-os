@@ -9,8 +9,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "1"
-.const VERSION_STAGE = "2" // Remediation pass
-.const BUILD_NUMBER  = "1010"
+.const VERSION_STAGE = "4" // Build 1012 parseHexArg bounds + uppercase fix
+.const BUILD_NUMBER  = "1012"
 
 // --- Zero Page Pointers ($70-$7F) ---
 .label currentAddr = $70
@@ -19,6 +19,23 @@
 .label val1        = $76
 .label val2        = $78
 .label DebugTemp   = $7A  // ZP Scratch for External Utility
+.label disasmTemp  = $7B  // Row/Count scratch for disassembler
+
+// --- Addressing Modes ---
+.const MODE_INV = 0  // Invalid
+.const MODE_IMP = 1  // Implied
+.const MODE_ACC = 2  // Accumulator
+.const MODE_IMM = 3  // Immediate
+.const MODE_ZP  = 4  // Zero Page
+.const MODE_ZPX = 5  // Zero Page,X
+.const MODE_ZPY = 6  // Zero Page,Y
+.const MODE_REL = 7  // Relative
+.const MODE_ABS = 8  // Absolute
+.const MODE_ABX = 9  // Absolute,X
+.const MODE_ABY = 10 // Absolute,Y
+.const MODE_IND = 11 // Indirect
+.const MODE_IZX = 12 // Indirect,X
+.const MODE_IZY = 13 // Indirect,Y
 
 * = $2000 "DebugEntry"
 
@@ -129,7 +146,7 @@ dFoundCmd:
     bcc dNotLetter
     cmp #'Z' + 1
     bcs dNotLetter
-    and #$7F                // Shifted ($C1) -> Unshifted ($41)
+    ora #$20                // uppercase ($41-$5A) → lowercase ($61-$7A)
 dNotLetter:
     
     // --- Command Registry ---
@@ -166,6 +183,10 @@ _d6:
     bne _d7
     jmp cmdSearch
 _d7:
+    cmp #'u'
+    bne _d7u
+    jmp cmdUnassemble
+_d7u:
     cmp #'h'
     bne _d8
     jmp cmdHexMath
@@ -711,6 +732,344 @@ cgIndirect:
     jmp (val1)
 
 // ---------------------------------------------------------------------------
+// cmdUnassemble
+// Disassembles a range of memory.
+// ---------------------------------------------------------------------------
+cmdUnassemble:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne cuHasArgs
+    
+    // No args: default to currentAddr, count 16
+    lda #16
+    sta disasmTemp
+    lda #$FF
+    sta rangeEnd
+    sta rangeEnd + 1        // effectively no range end
+    jmp cuLoop
+
+cuHasArgs:
+    // Try parsing as range first
+    jsr parseRange
+    bcc cuRangeOk
+    
+    // Not a range? Reset Y and try single address
+    ldy parsePos
+    iny                     // skip command char
+    jsr skipSpaces
+    jsr parseHexArg
+    bcc cuSingleAddr
+    jmp cuErr
+
+cuSingleAddr:
+    lda HexValLo
+    sta currentAddr
+    lda HexValHi
+    sta currentAddr + 1
+    lda #16
+    sta disasmTemp
+    lda #$FF
+    sta rangeEnd
+    sta rangeEnd + 1
+    jmp cuLoop
+
+cuRangeOk:
+    lda rangeStart
+    sta currentAddr
+    lda rangeStart + 1
+    sta currentAddr + 1
+    lda #$FF
+    sta disasmTemp          // Use range instead of count
+    
+cuLoop:
+    // Print address
+    lda currentAddr + 1
+    jsr printHex8
+    lda currentAddr
+    jsr printHex8
+    lda #':'
+    jsr KernalChROUT
+    lda #' '
+    jsr KernalChROUT
+    
+    // Get opcode
+    ldy #0
+    lda (currentAddr), y
+    tax                     // X = Opcode
+    
+    // Get mode and length
+    lda opAddrMode, x
+    sta DebugTemp           // Save mode
+    tay
+    lda modeLength, y
+    sta val1                // val1 = length
+    
+    // Print hex bytes
+    ldy #0
+cuPrintBytes:
+    lda (currentAddr), y
+    jsr printHex8
+    lda #' '
+    jsr KernalChROUT
+    iny
+    cpy val1
+    bne cuPrintBytes
+    
+    // Pad to 10 chars for bytes column (3 bytes * 3 chars = 9, +1 space)
+    lda val1
+    cmp #1
+    bne cuPad2
+    // Length 1: print 6 spaces
+    ldy #6
+    jmp cuDoPad
+cuPad2:
+    cmp #2
+    bne cuPad3
+    // Length 2: print 3 spaces
+    ldy #3
+    jmp cuDoPad
+cuPad3:
+    // Length 3: print 0 spaces
+    ldy #0
+cuDoPad:
+    cpy #0
+    beq cuMnemonic
+    lda #' '
+    jsr KernalChROUT
+    dey
+    jmp cuDoPad
+
+cuMnemonic:
+    // Print mnemonic
+    ldy #0
+    lda opMnemonicIndex, x
+    // Offset = index * 3
+    sta val2
+    asl
+    clc
+    adc val2
+    tay                     // Y = string offset
+    
+    ldx #0
+cuPrMnem:
+    lda opStringTable, y
+    jsr KernalChROUT
+    iny
+    inx
+    cpx #3
+    bne cuPrMnem
+    
+    lda #' '
+    jsr KernalChROUT
+    
+    // Print operand based on mode (stored in DebugTemp)
+    lda DebugTemp
+    asl                     // * 2 for jump table
+    tax
+    lda cuOperandTable, x
+    sta val2
+    lda cuOperandTable + 1, x
+    sta val2 + 1
+    jmp (val2)
+
+cuOperandTable:
+    .word cuOpInv, cuOpImp, cuOpAcc, cuOpImm, cuOpZp, cuOpZpx, cuOpZpy, cuOpRel, cuOpAbs, cuOpAbx, cuOpAby, cuOpInd, cuOpIzx, cuOpIzy
+
+cuOpInv:
+    jmp cuDoneLine
+
+cuOpImp:
+    jmp cuDoneLine
+
+cuOpAcc:
+    lda #'A'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpImm:
+    lda #'#'
+    jsr KernalChROUT
+    jsr cuPrintZpAddr
+    jmp cuDoneLine
+
+cuOpZp:
+    jsr cuPrintZpAddr
+    jmp cuDoneLine
+
+cuOpZpx:
+    jsr cuPrintZpAddr
+    lda #','
+    jsr KernalChROUT
+    lda #'X'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpZpy:
+    jsr cuPrintZpAddr
+    lda #','
+    jsr KernalChROUT
+    lda #'Y'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpRel:
+    lda #'$'
+    jsr KernalChROUT
+    // Target = currentAddr + 2 + signed_offset
+    ldy #1
+    lda (currentAddr), y
+    sta val2                // offset
+    lda currentAddr
+    clc
+    adc #2
+    sta DebugTemp           // base lo
+    lda currentAddr + 1
+    adc #0
+    sta DebugTemp + 1       // base hi
+    
+    lda val2
+    bpl cuRelPos
+    // Negative offset: add to 16-bit base
+    lda DebugTemp
+    clc
+    adc val2
+    tax
+    lda DebugTemp + 1
+    adc #$FF                // sign extend
+    tay
+    jmp cuRelPrint
+cuRelPos:
+    lda DebugTemp
+    clc
+    adc val2
+    tax
+    lda DebugTemp + 1
+    adc #0
+    tay
+cuRelPrint:
+    tya
+    jsr printHex8
+    txa
+    jsr printHex8
+    jmp cuDoneLine
+
+cuOpAbs:
+    jsr cuPrintAbsAddr
+    jmp cuDoneLine
+
+cuOpAbx:
+    jsr cuPrintAbsAddr
+    lda #','
+    jsr KernalChROUT
+    lda #'X'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpAby:
+    jsr cuPrintAbsAddr
+    lda #','
+    jsr KernalChROUT
+    lda #'Y'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpInd:
+    lda #'('
+    jsr KernalChROUT
+    jsr cuPrintAbsAddr
+    lda #')'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpIzx:
+    lda #'('
+    jsr KernalChROUT
+    jsr cuPrintZpAddr
+    lda #','
+    jsr KernalChROUT
+    lda #'X'
+    jsr KernalChROUT
+    lda #')'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuOpIzy:
+    lda #'('
+    jsr KernalChROUT
+    jsr cuPrintZpAddr
+    lda #')'
+    jsr KernalChROUT
+    lda #','
+    jsr KernalChROUT
+    lda #'Y'
+    jsr KernalChROUT
+    jmp cuDoneLine
+
+cuPrintZpAddr:
+    lda #'$'
+    jsr KernalChROUT
+    ldy #1
+    lda (currentAddr), y
+    jsr printHex8
+    rts
+
+cuPrintAbsAddr:
+    lda #'$'
+    jsr KernalChROUT
+    ldy #2
+    lda (currentAddr), y
+    jsr printHex8
+    ldy #1
+    lda (currentAddr), y
+    jsr printHex8
+    rts
+
+cuDoneLine:
+    lda #PetCr
+    jsr KernalChROUT
+    
+    // Advance address
+    lda currentAddr
+    clc
+    adc val1
+    sta currentAddr
+    lda currentAddr + 1
+    adc #0
+    sta currentAddr + 1
+    
+    // Check if we use count or range
+    lda disasmTemp
+    cmp #$FF
+    beq cuCheckRange
+    
+    dec disasmTemp
+    beq cuDoneCount
+    jmp cuLoop
+cuDoneCount:
+    rts
+
+cuCheckRange:
+    lda currentAddr + 1
+    cmp rangeEnd + 1
+    bcc cuLoop_jmp
+    bne cuDone              // currentAddr hi > rangeEnd hi
+    lda currentAddr
+    cmp rangeEnd
+    bcc cuLoop_jmp
+    beq cuLoop_jmp          // currentAddr <= rangeEnd (inclusive)
+cuDone:
+    rts
+
+cuLoop_jmp:
+    jmp cuLoop
+
+cuErr:
+    lda #<errUnknown
+    ldy #>errUnknown
+    jsr API_PRINT_STR
+    rts
+
+// ---------------------------------------------------------------------------
 // Utilities
 // ---------------------------------------------------------------------------
 
@@ -852,25 +1211,31 @@ phLoop:
     cmp #'9' + 1
     bcc phDigit
     
-    // Convert shifted to unshifted
-    cmp #'A'
+    // Check A-F: SHIFT+letter in lowercase mode produces $41-$46
+    cmp #'A'                // $41
     bcc phInvalid
-    cmp #'Z' + 1
-    bcs phInvalid
-    and #$7F                // To unshifted
-    
-    cmp #'a'
+    cmp #'F' + 1            // $47
+    bcc phUpperHex
+
+    // Check a-f: $61-$66
+    cmp #'a'                // $61
     bcc phInvalid
-    cmp #'f' + 1
+    cmp #'f' + 1            // $67
     bcs phInvalid
     sec
-    sbc #('a' - 10)
+    sbc #('a' - 10)         // $61→10, $62→11, ..., $66→15
+    jmp phAdd
+phUpperHex:
+    sec
+    sbc #('A' - 10)         // $41→10, $42→11, ..., $46→15
     jmp phAdd
 phDigit:
     sec
     sbc #'0'
-    
+
 phAdd:
+    cpx #4
+    beq phInvalid           // 5th digit: reject before corrupting HexVal
     pha                     // Save digit
     // HexVal = HexVal * 16
     lda HexValLo
@@ -883,7 +1248,7 @@ phAdd:
     asl
     rol HexValHi
     sta HexValLo
-    
+
     pla                     // Restore digit
     ora HexValLo
     sta HexValLo
@@ -923,10 +1288,6 @@ phnDigit:
 // Data
 // ---------------------------------------------------------------------------
 startupMsg:
-    .text "DEBUG v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
-    .text " (Build " + BUILD_NUMBER + ")"
-    .byte $0D, 0
-
 verMsg:
     .text "DEBUG v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
     .text " (Build " + BUILD_NUMBER + ")"
@@ -947,6 +1308,8 @@ debugHelpMsg:
     .byte $0D
     .text "S RANGE LIST- SEARCH MEMORY"
     .byte $0D
+    .text "U [RANGE]   - UNASSEMBLE"
+    .byte $0D
     .text "H VAL1 VAL2 - HEX MATH"
     .byte $0D
     .text "R           - SHOW REGISTERS"
@@ -965,6 +1328,55 @@ errUnknown:
 msgStub:
     .text "not yet implemented"
     .byte $0D, 0
+
+// Mode Lengths (indexed by MODE_* constants)
+modeLength:
+    .byte 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 2, 2
+
+// opStringTable: 3-letter mnemonics for all 56 standard 6502 instructions plus '???'
+// Indices 0-56
+opStringTable:
+    .text "ADCANDASLBCCBCSBEQBITBMIBNEBPLBRKBVCBVSCLCCLDCLICLVCMPCPXCPY" // 00-19
+    .text "DECDEXDEYEORINCINXINYJMPJSRLDALDXLDYLSRNOPORAPHAPHAPLAPLPROL" // 20-39
+    .text "RORRTIRTSSBCSECSEDSEISTASTXSTYTAXTAYTSXTXATXSTY???"          // 40-56
+
+// opMnemonicIndex: Maps opcode ($00-$FF) to index in opStringTable
+opMnemonicIndex:
+    .byte 10, 34, 56, 56, 56, 34, 02, 56, 36, 34, 02, 56, 56, 34, 02, 56 // $00-$0F
+    .byte 09, 34, 56, 56, 56, 34, 02, 56, 13, 34, 56, 56, 56, 34, 02, 56 // $10-$1F
+    .byte 28, 01, 56, 56, 06, 01, 39, 56, 38, 01, 39, 56, 06, 01, 39, 56 // $20-$2F
+    .byte 07, 01, 56, 56, 56, 01, 39, 56, 44, 01, 56, 56, 56, 01, 39, 56 // $30-$3F
+    .byte 41, 23, 56, 56, 56, 23, 32, 56, 35, 23, 32, 56, 27, 23, 32, 56 // $40-$4F
+    .byte 11, 23, 56, 56, 56, 23, 32, 56, 15, 23, 56, 56, 56, 23, 32, 56 // $50-$5F
+    .byte 42, 00, 56, 56, 56, 00, 40, 56, 37, 00, 40, 56, 27, 00, 40, 56 // $60-$6F
+    .byte 12, 00, 56, 56, 56, 00, 40, 56, 46, 00, 56, 56, 56, 00, 40, 56 // $70-$7F
+    .byte 56, 47, 56, 56, 49, 47, 48, 56, 22, 56, 53, 56, 49, 47, 48, 56 // $80-$8F
+    .byte 03, 47, 56, 56, 49, 47, 48, 56, 55, 47, 54, 56, 56, 47, 56, 56 // $90-$9F
+    .byte 31, 29, 30, 56, 31, 29, 30, 56, 51, 29, 50, 56, 31, 29, 30, 56 // $A0-$AF
+    .byte 04, 29, 56, 56, 31, 29, 30, 56, 16, 29, 52, 56, 31, 29, 30, 56 // $B0-$BF
+    .byte 19, 17, 56, 56, 19, 17, 20, 56, 26, 17, 21, 56, 19, 17, 20, 56 // $C0-$CF
+    .byte 08, 17, 56, 56, 56, 17, 20, 56, 14, 17, 56, 56, 56, 17, 20, 56 // $D0-$DF
+    .byte 18, 43, 56, 56, 18, 43, 24, 56, 25, 43, 33, 56, 18, 43, 24, 56 // $E0-$EF
+    .byte 05, 43, 56, 56, 56, 43, 24, 56, 45, 43, 56, 56, 56, 43, 24, 56 // $F0-$FF
+
+// opAddrMode: Maps opcode ($00-$FF) to Addressing Mode
+opAddrMode:
+    .byte MODE_IMP, MODE_IZX, MODE_INV, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_ACC, MODE_INV, MODE_INV, MODE_ABS, MODE_ABS, MODE_INV // $00
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_INV, MODE_IMP, MODE_ABY, MODE_INV, MODE_INV, MODE_INV, MODE_ABX, MODE_ABX, MODE_INV // $10
+    .byte MODE_ABS, MODE_IZX, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_ACC, MODE_INV, MODE_ABS, MODE_ABS, MODE_ABS, MODE_INV // $20
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_INV, MODE_IMP, MODE_ABY, MODE_INV, MODE_INV, MODE_INV, MODE_ABX, MODE_ABX, MODE_INV // $30
+    .byte MODE_IMP, MODE_IZX, MODE_INV, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_ACC, MODE_INV, MODE_ABS, MODE_ABS, MODE_ABS, MODE_INV // $40
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_INV, MODE_IMP, MODE_ABY, MODE_INV, MODE_INV, MODE_INV, MODE_ABX, MODE_ABX, MODE_INV // $50
+    .byte MODE_IMP, MODE_IZX, MODE_INV, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_ACC, MODE_INV, MODE_IND, MODE_ABS, MODE_ABS, MODE_INV // $60
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_INV, MODE_IMP, MODE_ABY, MODE_INV, MODE_INV, MODE_INV, MODE_ABX, MODE_ABX, MODE_INV // $70
+    .byte MODE_INV, MODE_IZX, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_INV, MODE_IMP, MODE_INV, MODE_ABS, MODE_ABS, MODE_ABS, MODE_INV // $80
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_ZPY, MODE_INV, MODE_IMP, MODE_ABY, MODE_IMP, MODE_INV, MODE_INV, MODE_ABX, MODE_INV, MODE_INV // $90
+    .byte MODE_IMM, MODE_IZX, MODE_IMM, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_IMP, MODE_INV, MODE_ABS, MODE_ABS, MODE_ABS, MODE_INV // $A0
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_ZPY, MODE_INV, MODE_IMP, MODE_ABY, MODE_IMP, MODE_INV, MODE_ABX, MODE_ABX, MODE_ABY, MODE_INV // $B0
+    .byte MODE_IMM, MODE_IZX, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_IMP, MODE_INV, MODE_ABS, MODE_ABS, MODE_ABS, MODE_INV // $C0
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_INV, MODE_IMP, MODE_ABY, MODE_INV, MODE_INV, MODE_INV, MODE_ABX, MODE_ABX, MODE_INV // $D0
+    .byte MODE_IMM, MODE_IZX, MODE_INV, MODE_INV, MODE_ZP,  MODE_ZP,  MODE_ZP,  MODE_INV, MODE_IMP, MODE_IMM, MODE_IMP, MODE_INV, MODE_ABS, MODE_ABS, MODE_ABS, MODE_INV // $E0
+    .byte MODE_REL, MODE_IZY, MODE_INV, MODE_INV, MODE_INV, MODE_ZPX, MODE_ZPX, MODE_INV, MODE_IMP, MODE_ABY, MODE_INV, MODE_INV, MODE_INV, MODE_ABX, MODE_ABX, MODE_INV // $F0
 
 // Variables
 regA: .byte 0

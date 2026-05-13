@@ -43,6 +43,8 @@ ffScanDot:
 ffAppendPrg:
     // Append ".prg" to the name in CommandBuffer
     ldy TempLo
+    cpy #77                 // TempLo >= 77 means last write lands past CommandBuffer end ($038B)
+    bcs ffNotFound
     lda #'.'
     sta (NamePtrLo), y
     iny
@@ -77,23 +79,23 @@ checkExistence:
     lda #0                  // Disable KERNAL messages
     jsr KernalSETMSG
     
-    lda #2                  // File number 2
+    lda #14                 // LFN 14 — clear of handle table (2-9), dir (13), command channel (15)
     ldx #8                  // Device 8
     ldy #0                  // Secondary address 0 (Read)
     jsr KernalSETLFS
-    
+
     lda TempLo              // Length
     ldx NamePtrLo
     ldy NamePtrHi
     jsr KernalSETNAM
-    
+
     jsr KernalOPEN
-    
+
     // Carry flag is set by OPEN if file not found or drive error.
     // If it succeeded (C=0), we still need to close it.
     php                     // Save status (including carry)
-    
-    lda #2
+
+    lda #14
     jsr KernalCLOSE
     
     plp                     // Restore status (restore Carry)

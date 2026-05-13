@@ -136,6 +136,8 @@ _afOk:
 
 ahExit:
     // DOS_EXIT: return to shell main loop.
-    // This orphans the return address from the JSR $1600 and the JSR UserProgStart,
-    // but effectively terminates the program and resets the shell state.
+    // Each call orphans 4 bytes (jsr UserProgStart + jsr $1000); stack overflows ~63 runs.
+    // Reset SP before returning to shell to prevent accumulation.
+    ldx #$FF
+    txs
     jmp mainLoop

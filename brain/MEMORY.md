@@ -8,16 +8,16 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-05-12)
+## Current State (2026-05-13)
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
+- **Phase 4 Code Review Remediation**: Full multi-agent review completed; all fixes implemented in Build 2414/1011.
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), `DOS_WRITE_FILE` ($40), `DOS_DELETE_FILE` ($41), and `DOS_RENAME_FILE` ($56).
 - **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
-- **Version**: 0.2.19 (Build 2413), Stage 4.
-- **Verification**: `build/command64.prg` and all test binaries assemble cleanly. `DEBUG.PRG` help added; shell UI RETURN bug fixed.
-- **Recovery**: Recovered from a VM crash that occurred during documentation writing; README.md restored and system docs synchronized with Build 2413.
-- **External Programs**: `DEBUG.PRG` (v0.1.2 Build 1010) fully functional with internal `?` help.
+- **Version**: 0.2.20 (command64 Build 2414, Stage 15) / DEBUG 0.1.3 (Build 1011, Stage 3).
+- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly. Awaiting manual VICE emulator smoke tests (see unified plan §4) before commit.
+- **External Programs**: `DEBUG.PRG` (v0.1.3 Build 1011) — dispatch case-sensitivity fixed, hex parsing handles SHIFT+letter A-F, verMsg deduplicated.
 
 ## Memory Map (current — as of Build 2410)
 | Region | Purpose |
@@ -52,12 +52,15 @@
 ## C64 Hardware Gotchas (hard-won)
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.
 - **BRK Trap Model is non-viable** for high-level OS calls on C64 due to KERNAL non-reentrancy.
-- **Handle LFNs**: Use LFN 2-9 for handles to avoid conflict with LFN 1 used by program loader.
+- **Handle LFNs**: Use LFN 2-9 for handles. LFN 13=cmdDir, LFN 14=checkExistence, LFN 15=command channel. Never use LFN 2 for built-in commands.
 - **BASIC warm start = `jmp $E37B`** — not `jmp ($0338)`.
 - **KA `.text` maps lowercase ASCII → PETSCII control codes** — send `$0E` at startup for mixed-case.
 - **KernalGetIn ($FFE4) clobbers Y**: Always preserve Y across keyboard polling loops.
+- **PETSCII lowercase mode dispatch**: Use `ora #$20` (not `and #$7F`) to normalize unshifted keys ($41-$5A) to lowercase ($61-$7A). `and #$7F` produces $01-$1A which matches nothing.
+- **ahExit stack discipline**: Each program run orphans 4 bytes (jsr UserProgStart + jsr $1000). Always reset SP=`#$FF` in `ahExit` before `jmp mainLoop`.
 
 ## Pending Tasks
+- [x] Implement `DEBUG` Unassemble (U) command (Disassembler)
 - [ ] Implement `DRIVE` command
 - [ ] Add support for multiple devices (8, 9, 10, 11)
 - [ ] Support subdirectories (1581 / SD2IEC)

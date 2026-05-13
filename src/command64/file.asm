@@ -226,6 +226,7 @@ frDone:
     rts
 
 frError:
+    jsr KernalCLRCHN        // defensive: ensure channel restored if future paths reach here post-CHKIN
     sec
     rts
 
@@ -301,6 +302,7 @@ fwDone:
     rts
 
 fwError:
+    jsr KernalCLRCHN        // defensive: ensure channel restored if future paths reach here post-CHKOUT
     sec
     rts
 

@@ -34,6 +34,55 @@ DEBUG uses a single-character command structure. All numerical values are in **h
 - **`V`**: **Version**. Shows the utility's version and build information.
 - **`Q`**: **Quit**. Exits `DEBUG` and returns to the `command64` shell prompt.
 
+## Examples
+
+Here are some common scenarios for using the DEBUG utility:
+
+### 1. Inspecting Memory
+To view 128 bytes of memory starting at the standard OS entry point (`$1000`):
+`-D 1000`
+
+To view exactly 32 bytes (hex `$20`) starting at `$0C00` using the length parameter:
+`-D 0C00 L 20`
+
+To view a specific range from `$0400` to `$04FF`:
+`-D 0400 04FF`
+
+### 2. Entering Data and Text
+To write a machine code instruction (`RTS`, which is `$60`) at address `$2500`:
+`-E 2500 60`
+
+To enter a mixed sequence of text and hex bytes (e.g., a "HELLO" string followed by a null terminator `$00`) at `$3000`:
+`-E 3000 "HELLO" 00`
+
+### 3. Filling Memory (e.g., Clearing Screen Memory)
+The C64's default screen memory starts at `$0400` and is 1000 bytes long (hex `$03E8`). To fill it with space characters (PETSCII `$20`):
+`-F 0400 L 03E8 20`
+
+To fill a smaller range with an alternating pattern (e.g., `$AA` and `$55`):
+`-F 1000 10FF AA 55`
+
+### 4. Searching for Strings or Bytes
+To search for the string "DOS" anywhere between `$1000` and `$1FFF`:
+`-S 1000 1FFF "DOS"`
+
+To search for a specific byte sequence (e.g., `A9 00 8D` which is `LDA #$00, STA ...`):
+`-S 1000 L 1000 A9 00 8D`
+
+### 5. Moving (Copying) Memory
+To copy 256 bytes (hex `$0100`) from `$1000` to `$2000`:
+`-M 1000 L 0100 2000`
+
+### 6. Executing Code
+To execute a subroutine located at `$C000`:
+`-G C000`
+*(Note: Ensure the routine at the target address ends with an `RTS` instruction to return control safely to DEBUG).*
+
+### 7. Hex Arithmetic
+To calculate the sum and difference of `$A500` and `$0250`:
+`-H A500 0250`
+*(Output will be `A750 A2B0`, representing the sum and difference respectively).*
+
 ## UI Behavior
 - **Prompt:** `-`
 - **Line Editing:** Supports the **INST/DEL** key for destructive backspace.

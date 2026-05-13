@@ -5,9 +5,41 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.21] - 2026-05-13
+
+### Fixed (DEBUG Build 1012)
+- **`parseHexArg` uppercase A-F double-subtract**: `phUpperHex` fell through into `phDigit` instead of jumping to `phAdd`. After converting an uppercase letter with `sbc #('A'-10)`, the code then also applied `sbc #'0'` ($30), producing garbage (e.g. 'A'=$41 → 10 → 10−$30=$DA). Fixed by adding `jmp phAdd` after the uppercase conversion.
+- **`parseHexArg` overflow check placement**: Moved `cpx #4; beq phInvalid` to the top of `phAdd` (before the 4× ASL/ROL shift) so the 5th digit is rejected without corrupting HexVal. Previously the digit was shifted in before the check, producing a truncated but dirty HexVal on the error path; the error (carry set) was still returned correctly to callers, but the pre-check position is cleaner.
+
+**H command behaviour (reported bug):** `H 10444 51` now returns an error instead of silently truncating `10444` to `$0444` and computing `0495 03F3`. The `cpx #4` check was introduced in Build 1011 and did correctly set carry; the `0495 03F3` result was from a pre-1011 build where no digit limit existed.
+
+## [0.2.20] - 2026-05-13
+
+### Fixed (command64 Build 2414 / DEBUG Build 1011)
+
+**command64 OS:**
+- **C1 — COPY wrong handle closed on error**: `ccCloseSrcErr` loaded `TempLo` (scan index) instead of `SrcHandle` when closing the source file on error. Fixed: `lda TempLo` → `lda SrcHandle`.
+- **C2 — DOS_EXIT stack accumulation**: Each `DOS_EXIT` call orphaned 4 bytes on the stack (2 bytes for `jsr UserProgStart` + 2 bytes for the program's `jsr $1000`), overflowing after ~63 runs. Fixed by resetting SP to `#$FF` before `jmp mainLoop` in `ahExit`.
+- **C4 — file.asm defensive CLRCHN**: Added `jsr KernalCLRCHN` to `frError` and `fwError` paths as a defensive measure (both labels are only reachable before CHKIN/CHKOUT, but are guarded for future refactor safety).
+- **C5 — LFN conflicts**: `cmdDir` and `checkExistence` both used hardcoded LFN 2, colliding with handle-table LFNs. Fixed: `cmdDir` now uses LFN 13, `checkExistence` uses LFN 14.
+- **C6 — VMM zero-size alloc**: `vmmAlloc` did not reject a zero-size request (`VmmSegLo/Hi == 0`), causing a spurious PAGE_HEAD allocation. Added guard at top of `vaInitOk` that returns `VMM_ERR_INVALID` on zero input.
+- **M1 — path.asm bounds overrun**: `ffAppendPrg` wrote `.PRG` suffix without a length check. Added `cpy #77` guard; `TempLo >= 77` branches to `ffNotFound` before overflow.
+- **M2 — fileScratch undersized**: `fileScratch` was 64 bytes, too small for a 79-char filename plus write (`,S,W`) and rename (`R:new=old`) suffixes. Expanded to 96 bytes.
+
+**DEBUG Utility:**
+- **D1 — command dispatch case sensitivity**: `dispatch` used `and #$7F` which converted uppercase $41-$5A to shifted $01-$1A, not matching any lowercase command byte. Fixed: `and #$7F` → `ora #$20` to convert unshifted letters ($41-$5A) to lowercase ($61-$7A).
+- **D2 — hex parsing uppercase A-F**: `parseHexArg` rejected unshifted A-F keys ($41-$46, sent by SHIFT+letter in lowercase PETSCII mode). Added explicit two-branch check: handles unshifted $41-$46 (`phUpperHex`) and lowercase $61-$66 (`phLowerHex`). Added 4-digit overflow guard (`cpx #4 → beq phInvalid`).
+- **D3 — verMsg/startupMsg duplication**: Merged duplicate string definitions into a single block with dual labels (`startupMsg:` / `verMsg:`), saving 4 bytes.
+
+### Changed
+- **Shell help text**: Added `RENAME` and `ERASE` aliases to `helpMsg` display. Removed dead `dirStubMsg` data block.
+- **loader.asm**: Removed spurious `PetLl` ($0A) linefeed after the "loading..." message.
+- **utils.asm**: Corrected `normalizeName` header comment — output documents Y=string length and X=preserved.
+
 ## [0.2.19] - 2026-05-12
 
 ### Added
+- **DEBUG Utility Unassemble (U)**: Implemented a full 6502 disassembler. Supports decoding of all standard opcodes and addressing modes with automatic target address calculation for relative branches. Includes support for default counts, specific start addresses, and inclusive memory ranges.
 - **DEBUG Utility Help**: Added `?` command to display a summary of all internal `DEBUG` commands. Established a maintenance protocol in the source code to ensure documentation stays synchronized with new features.
 
 ### Fixed

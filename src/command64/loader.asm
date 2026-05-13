@@ -40,8 +40,6 @@ shellLoadPrg:
     jsr petPrintString
     lda #PetCr
     jsr KernalChROUT
-    lda #PetLl
-    jsr KernalChROUT
     
     // LOAD: A=0(Load), X/Y=target (ignored if secondary address was 0)
     lda #0                  // 0 = Load, 1 = Verify

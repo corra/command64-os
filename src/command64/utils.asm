@@ -80,7 +80,9 @@ hdvError:
 // Input:  A = low byte of string pointer
 //         Y = high byte of string pointer
 //         X = string length
-// Clobbers: A, Y, PrintPtrLo/Hi
+// Output: Y = string length (loop exits when Y == TempLo == input X)
+//         X = preserved (unchanged — callers rely on this after the call)
+// Clobbers: A, TempLo, PrintPtrLo/Hi
 normalizeName:
     sta PrintPtrLo
     sty PrintPtrHi

@@ -7,8 +7,8 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
-.const VERSION_STAGE = "14" // Phase 2F (Input fix)
-.const BUILD_NUMBER  = "2413"
+.const VERSION_STAGE = "15" // Build 2414 Remediation
+.const BUILD_NUMBER  = "2414"
 
 
 // ---------------------------------------------------------------------------
@@ -444,15 +444,15 @@ cmdDir:
     ldy #>dirFname
     jsr KernalSETNAM
     
-    lda #2                  // File 2
+    lda #13                 // LFN 13 — clear of handle table (2-9), checkExistence (14), command channel (15)
     ldx #8                  // Device 8
     ldy #0                  // Secondary 0
     jsr KernalSETLFS
-    
+
     jsr KernalOPEN
     bcs cdDevError
-    
-    ldx #2
+
+    ldx #13
     jsr KernalCHKIN
     
     // Skip 2-byte load address
@@ -499,7 +499,7 @@ cdLineDone:
     
 cdDone:
     jsr KernalCLRCHN
-    lda #2
+    lda #13
     jsr KernalCLOSE
     rts
 
@@ -540,7 +540,6 @@ ctGotEnd:
     // Open file
     lda #0
     sta HexValLo            // Read mode
-    lda #DOS_OPEN_FILE
     ldx #<CommandBuffer
     stx NamePtrLo           // Use ZP to compute absolute addr
     lda NamePtrLo
@@ -889,7 +888,7 @@ ccOpenErr:
     rts
 
 ccCloseSrcErr:
-    lda TempLo
+    lda SrcHandle           // source handle — TempLo holds scan index here, not the handle
     sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr apiHandler
@@ -944,16 +943,16 @@ helpMsg:
     .byte $0D
     .text "REN    - RENAME [OLD] [NEW]"
     .byte $0D
+    .text "RENAME - ALIAS FOR REN"
+    .byte $0D
+    .text "ERASE  - ALIAS FOR DEL"
+    .byte $0D
     .text "VER    - SHOW VERSION"
     .byte $0D, 0
 
 badCmdMsg:
     .text "Bad command or file name"
     .byte 0
-
-dirStubMsg:
-    .text "Directory listing not yet implemented"
-    .byte $0D, 0
 
 noFileMsg:
     .text "File name required"
