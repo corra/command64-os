@@ -10,7 +10,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "1"
 .const VERSION_STAGE = "2" // Remediation pass
-.const BUILD_NUMBER  = "1007"
+.const BUILD_NUMBER  = "1009"
 
 // --- Zero Page Pointers ($70-$7F) ---
 .label currentAddr = $70
@@ -419,23 +419,22 @@ cmdEnter:
     lda HexValHi
     sta rangeStart + 1
     
-ceLoop:
-    jsr skipSpaces
-    lda inputBuf, y
-    beq ceDone
-    jsr parseHexArg
+    jsr parseList
     bcc *+5
     jmp cdErr
     
-    // Write byte to memory, preserving parsing index Y
-    tya
-    pha
-    ldy #0
-    lda HexValLo
-    sta (rangeStart), y
-    pla
-    tay
+    lda #0
+    sta listIndex
+ceLoop:
+    ldx listIndex
+    cpx listLen
+    beq ceDone
     
+    lda listBuf, x
+    ldy #0
+    sta (rangeStart), y
+    
+    inc listIndex
     inc rangeStart
     bne ceLoop
     inc rangeStart + 1
@@ -447,15 +446,30 @@ cmdFill:
     jsr parseRange          // Sets rangeStart, rangeEnd
     bcc *+5
     jmp cdErr
-    jsr skipSpaces
-    jsr parseHexArg         // Get fill byte
+    jsr parseList
     bcc *+5
     jmp cdErr
+    lda listLen
+    bne *+5
+    jmp cdErr
     
-    ldy #0
+    lda #0
+    sta listIndex
 cfLoop:
-    lda HexValLo
+    ldx listIndex
+    lda listBuf, x
+    ldy #0
     sta (rangeStart), y     // fill byte first; exit check after (inclusive end)
+    
+    // Increment list index (modulo listLen)
+    inc listIndex
+    lda listIndex
+    cmp listLen
+    bne cfNoWrap
+    lda #0
+    sta listIndex
+cfNoWrap:
+
     lda rangeStart
     cmp rangeEnd
     bne cfIncrement
@@ -621,17 +635,23 @@ cmdSearch:
     jsr parseRange
     bcc *+5
     jmp cdErr
-    jsr skipSpaces
-    jsr parseHexArg         // For now, search 1 byte
+    jsr parseList
     bcc *+5
     jmp cdErr
+    lda listLen
+    bne *+5
+    jmp cdErr
     
-    ldy #0
 csLoop:
-    lda (rangeStart), y     // search this byte first (inclusive end)
-    cmp HexValLo
-    bne csNext
-
+    ldy #0
+csCompLoop:
+    lda (rangeStart), y
+    cmp listBuf, y
+    bne csNoMatch
+    iny
+    cpy listLen
+    bne csCompLoop
+    
     // Found: print address
     lda rangeStart + 1
     jsr printHex8
@@ -640,7 +660,7 @@ csLoop:
     lda #PetCr
     jsr KernalChROUT
 
-csNext:
+csNoMatch:
     lda rangeStart
     cmp rangeEnd
     bne csInc
@@ -693,6 +713,16 @@ parseRange:
     sta rangeStart + 1
     
     jsr skipSpaces
+    
+    // Check for 'L' or 'l'
+    lda inputBuf, y
+    cmp #'l'
+    beq prLength
+    and #$7F
+    cmp #'L'
+    beq prLength
+
+    // Standard END address
     jsr parseHexArg
     bcs prErr
     lda HexValLo
@@ -701,7 +731,83 @@ parseRange:
     sta rangeEnd + 1
     clc
     rts
+
+prLength:
+    iny                     // skip 'L'
+    jsr skipSpaces
+    jsr parseHexArg
+    bcs prErr
+    
+    // rangeEnd = rangeStart + length - 1
+    lda HexValLo
+    sec
+    sbc #1
+    tax                     // save lo
+    lda HexValHi
+    sbc #0
+    tay                     // save hi
+    
+    txa
+    clc
+    adc rangeStart
+    sta rangeEnd
+    tya
+    adc rangeStart + 1
+    sta rangeEnd + 1
+    
+    clc
+    rts
+
 prErr:
+    sec
+    rts
+
+// Parses a list of bytes/strings into listBuf
+parseList:
+    lda #0
+    sta listLen
+plLoop:
+    jsr skipSpaces
+    lda inputBuf, y
+    beq plDone
+    
+    cmp #'"'
+    beq plString
+    cmp #'''
+    beq plString
+    
+    // Parse Hex Byte
+    jsr parseHexArg
+    bcs plErr               // parseHexArg sets Carry on error/empty
+    
+    ldx listLen
+    lda HexValLo
+    sta listBuf, x
+    inc listLen
+    jmp plLoop
+
+plString:
+    sta DebugTemp           // save quote char
+    iny
+plStrLoop:
+    lda inputBuf, y
+    beq plDone              // unexpected end
+    cmp DebugTemp
+    beq plStrDone
+    
+    ldx listLen
+    sta listBuf, x
+    inc listLen
+    iny
+    jmp plStrLoop
+plStrDone:
+    iny                     // skip closing quote
+    jmp plLoop
+
+plDone:
+    clc
+    rts
+plErr:
     sec
     rts
 
@@ -829,6 +935,10 @@ regX: .byte 0
 regY: .byte 0
 regP: .byte 0
 regS: .byte 0
+
+listLen:   .byte 0
+listIndex: .byte 0
+listBuf:   .fill 64, 0
 
 parsePos: .byte 0
 inputLen: .byte 0

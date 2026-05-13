@@ -8,7 +8,13 @@ These programs are essential for system maintenance and early verification of th
 | Program | Description | Status | Priority | Origin |
 |:---|:---|:---|:---|:---|
 | `CHKDSK` | Check disk status and memory usage | 📅 Planned | High | DOS 4.0 |
-| `DEBUG` | Hex editor and assembly debugger | ⚠️ In Progress (bugs) | High | DOS 4.0 |
+| `DEBUG` | Hex editor and assembly debugger | ✅ v0.1.2 (Build 1007) | High | DOS 4.0 |
+
+### DEBUG Roadmap
+- **Phase 1 (Done)**: Core memory manipulation (D, E, F, M, C, S), Hex math, and Execution (G).
+- **Phase 2 (Planned)**: I/O port commands (I, O), Length syntax (L), and Register modification (R).
+- **Phase 3 (Mid-term)**: VMM/EMS integration (XA, XM, XS) and Banked addressing (BANK:OFF).
+- **Phase 4 (Long-term)**: Disk management (N, L, W) and Disassembler (U).
 | `FORMAT` | Format C64 disks (via KERNAL wrappers) | 📅 Planned | High | DOS 4.0 |
 | `SYS` | Transfer system files to a disk | 📅 Planned | Medium | DOS 4.0 |
 

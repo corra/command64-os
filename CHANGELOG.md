@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.2.18] - 2026-05-12
 
+### Added
+- **DEBUG Parameter Alignment**:
+  - Implemented `L` (Length) syntax for all range-based commands (e.g. `D 1000 L 40`).
+  - Added support for quoted strings (`"..."` or `'...'`) in `E`, `F`, and `S` commands.
+  - Enhanced `F` (Fill) and `S` (Search) to support multi-byte lists and repeating patterns.
+  - Implemented `parseList` and `parseRange` refinements for MS-DOS parity.
+
 ### Fixed (DEBUG.PRG v0.1.3 Build 1005)
 - **`parseHexArg` regression**: The Build 1004 `and #$7F` fix accepted shifted hex letters ($C1-$C6) but rejected unshifted ones ($41-$46). In `petscii_mixed`, the 'a'-'f' keys without Shift send $41-$46, which the new gate (`cmp #$C1; bcc phInvalid`) incorrectly rejected. Typing `f800` without Shift produced "error". Fixed with a two-branch check: unshifted $41-$46 handled first, shifted $C1-$C6 handled second (converted via `and #$7F` before the same subtraction).
 
