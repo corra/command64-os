@@ -94,9 +94,14 @@
   - [x] Refine `DEBUG` UI for 40-column display (8-byte rows, midpoint separator)
   - [x] Remediate `DEBUG` bugs (case sensitivity, register safety, inclusive ranges) — `brain/plans/debug-utility.md`
   - [x] Verify `DEBUG` via formal test plan — `brain/walkthroughs/debug-test-plan.md`
+  - [x] Implement `RUN` / `G` internal commands for program execution at [address]
 
 - [ ] Phase 5: Environment & Multi-Device Support
-  - [ ] Implement `DRIVE` command
+  - [x] Implement `DRIVE` command (with `DEVICE`/`DEV` aliases)
   - [ ] Add support for multiple devices (8, 9, 10, 11)
   - [ ] Support subdirectories (1581 / SD2IEC)
   - [ ] Environment variable storage (`SET`, `PATH`) in REU
+
+- [ ] Phase 6: Advanced OS Features
+  - [ ] Implement Binary Relocator (to support `RUN` at arbitrary addresses)
+  - [ ] Add Oscar64 C-Language runtime support

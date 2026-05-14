@@ -39,6 +39,14 @@ This file serves as the shared repository for architectural decisions, technical
 | Phase 4: External System Utilities (DEBUG) | ✅ Done |
 | Phase 5: Env & Multi-Device Support | ⏳ Pending |
 
+## Architectural Decisions & Constraints
+
+### Absolute vs. Relocatable Binaries
+- **Constraint**: External programs are currently **Absolute Binaries** compiled for `$2000`.
+- **Impact**: Loading a program at an arbitrary address (e.g., `LOAD HELLO 4000`) and running it (`GO 4000`) will cause a hard crash if the program contains absolute jumps, subroutine calls, or data references.
+- **Exceptions**: Very simple "position-independent" code (like `inc $d020; rts`) will work anywhere.
+- **Future Resolution**: A **Binary Relocator** is planned for Phase 6 to patch absolute addresses in memory during the `LOAD` process.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
