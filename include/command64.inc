@@ -70,6 +70,7 @@
 .label CommandLen    = $038C
 .label SpecificLoad  = $038D // 0=use HexVal (Relocated), 1=use file header (Absolute)
 .label HandleTable   = $038E
+.label CurrentDevice = $039E // Active C64 device (8, 9, 10, 11)
 .label MAX_HANDLES   = 8
 .label SourceBuf     = $03A0 // 48 bytes
 .label DestBuf       = $03D0 // 48 bytes

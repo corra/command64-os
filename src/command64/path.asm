@@ -25,43 +25,10 @@ findFile:
     ldx TempLo
     jsr normalizeName
     
-    // Try finding the file with the name as-is
+    // Try finding the file with the name as-is (after normalization)
+    // Note: Automatic .prg appending removed as disk entries no longer include extensions.
     jsr checkExistence
-    bcc ffFound             // Found as-is!
-    
-    // Not found. Does it already have an extension?
-    ldy #0
-ffScanDot:
-    cpy TempLo
-    beq ffAppendPrg         // No dot found, try appending .prg
-    lda (NamePtrLo), y
-    cmp #'.'
-    beq ffNotFound          // Already has a dot and failed, so stop
-    iny
-    jmp ffScanDot
-
-ffAppendPrg:
-    // Append ".prg" to the name in CommandBuffer
-    ldy TempLo
-    cpy #77                 // TempLo >= 77 means last write lands past CommandBuffer end ($038B)
-    bcs ffNotFound
-    lda #'.'
-    sta (NamePtrLo), y
-    iny
-    lda #'p'
-    sta (NamePtrLo), y
-    iny
-    lda #'r'
-    sta (NamePtrLo), y
-    iny
-    lda #'g'
-    sta (NamePtrLo), y
-    iny
-    sty TempLo              // Update length
-    
-    // Try again with .prg
-    jsr checkExistence
-    bcc ffFound
+    bcc ffFound             // Found!
     
 ffNotFound:
     sec
@@ -69,7 +36,7 @@ ffNotFound:
 
 ffFound:
     clc
-    ldx TempLo              // Return updated length
+    ldx TempLo              // Return length
     rts
 
 // --- checkExistence ---
@@ -80,7 +47,7 @@ checkExistence:
     jsr KernalSETMSG
     
     lda #14                 // LFN 14 — clear of handle table (2-9), dir (13), command channel (15)
-    ldx #8                  // Device 8
+    ldx CurrentDevice
     ldy #0                  // Secondary address 0 (Read)
     jsr KernalSETLFS
 

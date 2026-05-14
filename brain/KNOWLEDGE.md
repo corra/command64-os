@@ -27,17 +27,17 @@ This file serves as the shared repository for architectural decisions, technical
 - **[2026-05-01] COMMAND.COM Core Logic**: The core dispatcher logic resides in `TCODE.ASM` (400+ lines). It reads input via `STD_CON_STRING_INPUT`, preprocesses it (`PRESCAN`), parses it (`PARSERINE`), and dispatches it to internal commands or initiates a file search (`PATH_SEARCH` for external commands).
 - **[2026-05-01] C64 KERNAL Integration**: C64 KERNAL routines (e.g., `CHROUT`, `CHRIN`, `LOAD`, `SAVE`, `VERIFY`) will serve as the foundational building blocks for our PETSCII and I/O abstractions.
 
-## Phase 2 Status — Phase 2B COMPLETE (2026-05-09)
+## Current Status — Build 2414 / Stage 15 (2026-05-13)
 
 | Task | Status |
 | :--- | :--- |
 | Phase 2A: Core Dispatcher | ✅ Done |
-| Raw GETIN input loop | ✅ Done (Fixes quote mode) |
 | Phase 2B: External Commands | ✅ Done |
-| Path search & auto-.prg | ✅ Done |
-| Binary loader ($2000+) | ✅ Done |
-| Phase 2B Verification | ✅ Done (Pre-verified image.d64) |
-| VMM API (`include/vmm.inc`) | ⏳ Pending (Phase 2C) |
+| Phase 2C: Virtual Memory Manager (VMM) | ✅ Done |
+| Phase 2D: Service Bus & VMM Stabilizing | ✅ Done |
+| Phase 3: File System Integration (Handles) | ✅ Done |
+| Phase 4: External System Utilities (DEBUG) | ✅ Done |
+| Phase 5: Env & Multi-Device Support | ⏳ Pending |
 
 ## C64 Platform Constraints Discovered
 

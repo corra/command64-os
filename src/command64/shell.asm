@@ -1,14 +1,12 @@
 // src/command64/shell.asm
-// KickAssembler v5.25 - MS-DOS 4.0 shell for C64
+// KickAssembler v5.25 - Command 64 OS shell for C64
 // Core command loop: prompt, input, dispatch, built-in commands.
-
-.encoding "petscii_mixed"
 
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "15" // Build 2414 Remediation
-.const BUILD_NUMBER  = "2414"
+#import "../../build/build_os.inc"
 
 
 // ---------------------------------------------------------------------------
@@ -20,7 +18,7 @@
 .const TABLE_ENTRY_SIZE = 8
 .const TABLE_NAME_LEN   = 6
 
-.segment CommandTable [start=$1100]
+.segment CommandTable [start=$1080]
 
 tableCmd:
     .text "exit  "
@@ -49,15 +47,23 @@ tableCmd:
     .word cmdRen
     .text "rename"
     .word cmdRen
+    .text "drive "
+    .word cmdDrive
+    .text "device"
+    .word cmdDrive
+    .text "dev   "
+    .word cmdDrive
 tableEnd:
 
 // ---------------------------------------------------------------------------
-// Command Shell  (loaded at $1200)
+// Command Shell  (loaded at $1180)
 // ---------------------------------------------------------------------------
-.segment CommandShell [start=$1200]
+.segment CommandShell [start=$1180]
 
 // --- Entry point ---
 start:
+    lda #8
+    sta CurrentDevice       // Default to device 8
     jsr vmmInit             // Initialize VMM and check for REU
     jsr fileInit            // Initialize File System (Handle Table)
     
@@ -396,14 +402,10 @@ clDoneScan:
     
     // Check for optional address
     ldy TempHi
-clSkipSpaces:
+    jsr shellSkipSpaces
     lda CommandBuffer, y
     beq clHeaderLoad
-    cmp #' '
-    bne clFoundAddr
-    iny
-    jmp clSkipSpaces
-clFoundAddr:
+    
     jsr parseHex
     bcs clHeaderLoad        // Invalid hex -> use header
     lda #0                  // 0 = Relocated (uses HexVal)
@@ -445,7 +447,7 @@ cmdDir:
     jsr KernalSETNAM
     
     lda #13                 // LFN 13 — clear of handle table (2-9), checkExistence (14), command channel (15)
-    ldx #8                  // Device 8
+    ldx CurrentDevice
     ldy #0                  // Secondary 0
     jsr KernalSETLFS
 
@@ -514,15 +516,10 @@ cdDevError:
 // TYPE — display contents of a file
 cmdType:
     ldy ParsePos
-ctSkipSpaces:
+    jsr shellSkipSpaces
     lda CommandBuffer, y
     beq ctNoArgs
-    cmp #' '
-    bne ctFoundName
-    iny
-    jmp ctSkipSpaces
-
-ctFoundName:
+    
     // Extract filename (token until space or null)
     sty TempLo              // Start index
 ctScanEnd:
@@ -894,6 +891,80 @@ ccCloseSrcErr:
     jsr apiHandler
     jmp ccOpenErr
 
+// --- shellSkipSpaces ---
+// Skips spaces in CommandBuffer starting at Y.
+// Returns Y pointing to first non-space char or null.
+shellSkipSpaces:
+    lda CommandBuffer, y
+    beq sssDone
+    cmp #' '
+    bne sssDone
+    iny
+    jmp shellSkipSpaces
+sssDone:
+    rts
+
+// DRIVE — switch active device
+cmdDrive:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    lda CommandBuffer, y
+    beq cdShowCurrent
+    
+    cmp #'8'
+    beq cdSet8
+    cmp #'9'
+    beq cdSet9
+    cmp #'1'
+    beq cdCheck10
+    jmp cdError
+
+cdShowCurrent:
+    lda #<currentDevMsg
+    ldy #>currentDevMsg
+    jsr petPrintString
+    
+    lda CurrentDevice
+    tax
+    ldy #0
+    jsr printDecimal16
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+cdSet8:
+    lda #8
+    sta CurrentDevice
+    rts
+cdSet9:
+    lda #9
+    sta CurrentDevice
+    rts
+
+cdCheck10:
+    iny
+    lda CommandBuffer, y
+    cmp #'0'
+    beq cdSet10
+    cmp #'1'
+    beq cdSet11
+    jmp cdError
+
+cdSet10:
+    lda #10
+    sta CurrentDevice
+    rts
+cdSet11:
+    lda #11
+    sta CurrentDevice
+    rts
+
+cdError:
+    lda #<badDeviceMsg
+    ldy #>badDeviceMsg
+    jsr petPrintString
+    rts
+
 dirFname: .text "$"
 
 // VER — display version and build number
@@ -947,6 +1018,8 @@ helpMsg:
     .byte $0D
     .text "ERASE  - ALIAS FOR DEL"
     .byte $0D
+    .text "DRIVE  - SWITCH DEVICE [8-11]"
+    .byte $0D
     .text "VER    - SHOW VERSION"
     .byte $0D, 0
 
@@ -965,6 +1038,14 @@ loadErrMsg:
 noReuMsg:
     .text "Warning: No REU detected. VMM disabled."
     .byte $0D, 0
+
+badDeviceMsg:
+    .text "Invalid device"
+    .byte $0D, 0
+
+currentDevMsg:
+    .text "Current device: "
+    .byte 0
 
 noDeviceMsg:
     .text "Device not present"

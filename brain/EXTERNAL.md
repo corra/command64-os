@@ -2,19 +2,20 @@
 
 This document tracks the status and priority of external programs (.COM / .EXE) planned for the `command64` environment. These utilities will be loaded into the User Program Space ($2000+) via the Phase 2B loader.
 
-## 1. High Priority (Phase 2B / 2C)
+## 1. High Priority (Phase 2B / 2C / 4)
 These programs are essential for system maintenance and early verification of the binary loader.
 
 | Program | Description | Status | Priority | Origin |
 |:---|:---|:---|:---|:---|
 | `CHKDSK` | Check disk status and memory usage | 📅 Planned | High | DOS 4.0 |
-| `DEBUG` | Hex editor and assembly debugger | ✅ v0.1.2 (Build 1007) | High | DOS 4.0 |
+| `DEBUG` | Hex editor and assembly debugger | ✅ v0.1.3 (Build 1011) | High | DOS 4.0 |
 
 ### DEBUG Roadmap
 - **Phase 1 (Done)**: Core memory manipulation (D, E, F, M, C, S), Hex math, and Execution (G).
-- **Phase 2 (Planned)**: I/O port commands (I, O), Length syntax (L), and Register modification (R).
+- **Phase 2 (Done)**: I/O port commands (I, O), Length syntax (L), and Register modification (R).
 - **Phase 3 (Mid-term)**: VMM/EMS integration (XA, XM, XS) and Banked addressing (BANK:OFF).
-- **Phase 4 (Long-term)**: Disk management (N, L, W) and Disassembler (U).
+- **Phase 4 (Done)**: Disk management (N, L, W) and Disassembler (U).
+
 | `FORMAT` | Format C64 disks (via KERNAL wrappers) | 📅 Planned | High | DOS 4.0 |
 | `SYS` | Transfer system files to a disk | 📅 Planned | Medium | DOS 4.0 |
 
@@ -57,36 +58,25 @@ These programs are essential for system maintenance and early verification of th
 - **Termination**: External programs should terminate with an `RTS` to return control to the `command64` shell.
 - **I/O Redirection**: Standard Input/Output for these programs must route through the PETSCII API in `src/command64/petsci.asm`.
 
-### DEBUG.PRG — Known Bugs & Remediation (Build 1003, 2026-05-12)
+### DEBUG.PRG — Known Bugs & Remediation (Build 1011, 2026-05-13)
 
-1. **Hex Parsing & Case Sensitivity** (Critical):
-   - **Symptom**: Commands like `H`, `F`, and `M` fail with `error` for certain hex letters (e.g., `-H FFFF 0001`).
-   - **Root Cause**: `dispatch` and `parseHexArg` use `ora #$20` to lowercase input. In `petscii_mixed`, shifted characters map to `$C1-$DA`. `ora #$20` corrupts these.
-   - **Remediation**: Use `and #$7F` to convert shifted to unshifted PETSCII. Update digit comparisons to match unshifted uppercase letters ($41-$5A).
+1. **Hex Parsing & Case Sensitivity** (Fixed):
+   - **Remediation**: Correctly handle both uppercase/shifted and lowercase letters in hex parsing.
 
-2. **Enter (E) Command Failure** (Critical):
-   - **Symptom**: `-E 5000 11 22 33 44` completes but memory is not modified.
-   - **Root Cause**: `cmdEnter` uses `ldy #0` then `sta (rangeStart), y`. However, `Y` is the live buffer parsing index. Clobbering `Y` causes the command to terminate or error after the first byte.
-   - **Remediation**: Preserve `Y` on the stack during memory writes.
+2. **Enter (E) Command Failure** (Fixed):
+   - **Remediation**: Preserved Y register during memory writes.
 
-3. **Dump (D) Width** (Major):
-   - **Symptom**: Output is 16 bytes per line, exceeding 40 columns and wrapping.
-   - **Remediation**: Refactor `cmdDump` to 8 bytes per line.
+3. **Dump (D) Width** (Fixed):
+   - **Remediation**: Refactored to 8 bytes per line for 40-column display.
 
-4. **Return Key UI** (Minor):
-   - **Symptom**: Pressing RETURN does not advance the cursor.
-   - **Root Cause**: `rlDone` echoes `A` which is 0 (null) rather than the required CR character.
-   - **Remediation**: Explicitly `lda #PetCr` before the echo call.
+4. **Return Key UI** (Fixed):
+   - **Remediation**: Advanced cursor correctly after RETURN.
 
-5. **Register Preservation** (Major):
-   - **Symptom**: Random input behavior.
-   - **Root Cause**: `KernalGetIn` clobbers Y.
-   - **Remediation**: Fixed via `tya/pha…pla/tay` in Build 1003.
+5. **Register Preservation** (Fixed):
+   - **Remediation**: KernalGetIn clobbering Y handled.
 
-6. **Range Loop Logic** (Critical):
-   - **Symptom**: Off-by-one or infinite loops on range commands.
-   - **Remediation**: Restructured as do-while (operate then check) in Build 1003.
+6. **Range Loop Logic** (Fixed):
+   - **Remediation**: Restructured as do-while.
 
-7. **Overlap Corruption** (Major):
-   - **Symptom**: `Move` corrupts source if dest overlaps from above.
-   - **Remediation**: Backward-copy logic implemented in Build 1003.
+7. **Overlap Corruption** (Fixed):
+   - **Remediation**: Backward-copy logic implemented.

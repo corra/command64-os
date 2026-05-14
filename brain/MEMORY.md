@@ -15,8 +15,9 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), `DOS_WRITE_FILE` ($40), `DOS_DELETE_FILE` ($41), and `DOS_RENAME_FILE` ($56).
 - **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
-- **Version**: 0.2.20 (command64 Build 2414, Stage 15) / DEBUG 0.1.3 (Build 1011, Stage 3).
-- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly. Awaiting manual VICE emulator smoke tests (see unified plan §4) before commit.
+- **Version**: 0.2.21 (command64 Build 2414, Stage 15) / DEBUG 0.1.3 (Build 1011, Stage 3).
+- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly. Unified build system (`Makefile`) implemented and verified.
+- **Documentation**: Synchronized `COMMANDS.md`, `EXTERNAL.md`, and `KNOWLEDGE.md` with current codebase state.
 - **External Programs**: `DEBUG.PRG` (v0.1.3 Build 1011) — dispatch case-sensitivity fixed, hex parsing handles SHIFT+letter A-F, verMsg deduplicated.
 
 ## Memory Map (current — as of Build 2410)

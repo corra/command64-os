@@ -1,14 +1,16 @@
 // src/command64.asm
-// KickAssembler v5.25 - MS-DOS 4.0 shell for C64
+// KickAssembler v5.25 - Command 64 OS shell for C64
 //
+.encoding "petscii_mixed"
+
 // Segment layout:
 //   Main          $0801  BASIC SYS launcher (BasicUpstart2)
 //   Utils         $0C00  Hex parsing and string utilities
 //   ApiStub       $1000  Stable OS Entry Point (Jump Table)
 //   Petsci        $1040  PETSCII print routines
-//   CommandTable  $1100  Fixed-width command dispatch table
-//   CommandShell  $1200  Command loop, dispatcher, built-ins
-//   Api           $1880  INT 21h Service Bus (Jump Table)
+//   CommandTable  $1080  Fixed-width command dispatch table
+//   CommandShell  $1180  Command loop, dispatcher, built-ins
+//   Api           $1900  INT 21h Service Bus (Jump Table)
 //   Loader        $1A00  KERNAL binary loader wrapper
 //   Path          $1A80  Directory search and path logic
 //   Vmm           $1B80  Virtual Memory Manager (REU mapping)

@@ -93,24 +93,14 @@ nnLoop:
     beq nnDone
     lda (PrintPtrLo), y
     
-    // 1. Convert lowercase $61-$7A to $41-$5A
-    cmp #$61
-    bcc nnShifted
-    cmp #$7B
-    bcs nnShifted
-    sec
-    sbc #$20
-    sta (PrintPtrLo), y
-    jmp nnNext
-
-nnShifted:
-    // 2. Convert shifted $C1-$DB to $41-$5A
-    cmp #$C1                // Shifted 'A'
+    // 1. Convert shifted characters (A-Z) to unshifted
+    // In petscii_mixed, unshifted is lowercase, shifted is uppercase.
+    // Disk entries are unshifted. So we normalize everything to unshifted.
+    cmp #$C1                // PETSCII Shifted 'A'
     bcc nnNext
-    cmp #$DB                // Shifted 'Z' + 1
+    cmp #$DB                // PETSCII Shifted 'Z' + 1
     bcs nnNext
-    // Is shifted A-Z. Convert to unshifted (Uppercase in standard mode)
-    and #$7F
+    and #$7F                // Convert shifted to unshifted
     sta (PrintPtrLo), y
 nnNext:
     iny

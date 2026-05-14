@@ -20,7 +20,7 @@ ABSBUILD := $(abspath $(BUILD))
 # ---------------------------------------------------------------------------
 # Disk image metadata
 # ---------------------------------------------------------------------------
-DISK_NAME := ms-dos 64
+DISK_NAME := Command 64
 DISK_ID   := 2a
 
 # ---------------------------------------------------------------------------
@@ -29,7 +29,7 @@ DISK_ID   := 2a
 
 # command64 OS — entry point passed to KickAssembler; sources tracked for deps
 CMD64_ENTRY := src/command64.asm
-CMD64_SRCS  := $(wildcard src/command64/*.asm) $(wildcard include/*.inc)
+CMD64_SRCS  := $(CMD64_ENTRY) $(wildcard src/command64/*.asm) $(wildcard include/*.inc)
 
 # debug utility
 DEBUG_ENTRY := src/external/debug/debug.asm
@@ -54,7 +54,13 @@ TEST_IMAGE_PRGS := $(IMAGE_PRGS) $(TEST_PRGS)
 # ---------------------------------------------------------------------------
 VERSION      := $(shell cat VERSION 2>/dev/null)
 RELEASE_DIR  := release
-RELEASE_NAME := ms-dos-c64-$(VERSION)
+RELEASE_NAME := command64-os-$(VERSION)
+
+# Build number automation
+BUILD_OS_FILE := BUILD_OS
+BUILD_DEBUG_FILE := BUILD_DEBUG
+BUILD_OS_INC := $(BUILD)/build_os.inc
+BUILD_DEBUG_INC := $(BUILD)/build_debug.inc
 
 # ---------------------------------------------------------------------------
 # Phony targets
@@ -82,12 +88,32 @@ $(BUILD) $(BUILD)/tests:
 # Build rules
 # ---------------------------------------------------------------------------
 
+# Dynamic build number generation
+# We only increment the persistent file if sources are newer than it.
+$(BUILD_OS_FILE): $(CMD64_SRCS)
+	@OLD=$$(cat $@ 2>/dev/null || echo 2417); \
+	NEW=$$(($$OLD + 1)); \
+	echo $$NEW > $@; \
+	echo "Incrementing OS Build to $$NEW"
+
+$(BUILD_DEBUG_FILE): $(DEBUG_SRCS)
+	@OLD=$$(cat $@ 2>/dev/null || echo 1012); \
+	NEW=$$(($$OLD + 1)); \
+	echo $$NEW > $@; \
+	echo "Incrementing DEBUG Build to $$NEW"
+
+$(BUILD_OS_INC): $(BUILD_OS_FILE) | $(BUILD)
+	@echo ".const BUILD_NUMBER = \"$$(cat $<)\"" > $@
+
+$(BUILD_DEBUG_INC): $(BUILD_DEBUG_FILE) | $(BUILD)
+	@echo ".const BUILD_NUMBER = \"$$(cat $<)\"" > $@
+
 # command64 OS
-$(BUILD)/command64.prg: $(CMD64_ENTRY) $(CMD64_SRCS) | $(BUILD)
+$(BUILD)/command64.prg: $(CMD64_SRCS) $(BUILD_OS_INC) | $(BUILD)
 	$(JAVA) -jar $(KICKASS) $(CMD64_ENTRY) -odir $(ABSBUILD)
 
 # debug utility
-$(BUILD)/debug.prg: $(DEBUG_SRCS) | $(BUILD)
+$(BUILD)/debug.prg: $(DEBUG_SRCS) $(BUILD_DEBUG_INC) | $(BUILD)
 	$(JAVA) -jar $(KICKASS) $(DEBUG_ENTRY) -odir $(ABSBUILD)
 
 # test PRGs — pattern rule, one per tests/src/*.asm

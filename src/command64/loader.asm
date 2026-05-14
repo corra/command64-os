@@ -24,9 +24,9 @@ shellLoadPrg:
     ldy PrintPtrHi
     jsr KernalSETNAM
     
-    // SETLFS: A=channel(1), X=device(8), Y=secondary (0=Relocated, 1=Absolute)
+    // SETLFS: A=channel(1), X=device(CurrentDevice), Y=secondary (0=Relocated, 1=Absolute)
     lda #1
-    ldx #8                  // Default to device 8 for now
+    ldx CurrentDevice
     ldy SpecificLoad
     jsr KernalSETLFS
     

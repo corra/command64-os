@@ -106,7 +106,7 @@ foSkipMode:
     ldx TempLo
     lda HandleTable + 1, x  // A = LFN
     tay                     // Y = LFN (use LFN as secondary address for uniqueness)
-    ldx #8                  // X = Device 8
+    ldx CurrentDevice       // X = Current Device
     jsr KernalSETLFS
     
     jsr KernalOPEN
@@ -349,9 +349,9 @@ fdCopyDone:
     ldy #>FileScratch
     jsr KernalSETNAM
     
-    // 5. SETLFS: A=LFN(15), X=Device(8), Y=Secondary(15)
+    // 5. SETLFS: A=LFN(15), X=Device(CurrentDevice), Y=Secondary(15)
     lda #15                 // LFN 15 is standard for command channel
-    ldx #8                  // Device 8
+    ldx CurrentDevice
     ldy #15                 // Secondary 15 is command channel
     jsr KernalSETLFS
     
@@ -432,9 +432,9 @@ frGotOld:
     ldy #>FileScratch
     jsr KernalSETNAM
     
-    // 7. SETLFS: A=LFN(15), X=Device(8), Y=Secondary(15)
+    // 7. SETLFS: A=LFN(15), X=Device(CurrentDevice), Y=Secondary(15)
     lda #15                 // LFN 15 is standard for command channel
-    ldx #8                  // Device 8
+    ldx CurrentDevice
     ldy #15                 // Secondary 15 is command channel
     jsr KernalSETLFS
     
