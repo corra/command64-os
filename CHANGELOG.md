@@ -7,12 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Phase 5: Environment Support**:
+  - Implemented Master Environment Block (4KB) in the REU.
+  - Added `SET` internal command to display environment variables.
+  - Added `PATH` internal command placeholder for future executable search logic.
+- **Program Execution**:
+  - Implemented `RUN` and `GO` internal commands to execute programs at arbitrary memory addresses (defaults to `$2000`).
+- **Multi-Device Support**:
+  - Implemented `DRIVE` command (with `DEVICE` and `DEV` aliases) to switch active C64 device (8-11).
+  - Replaced hardcoded device #8 references with dynamic `CurrentDevice` workspace variable.
+  - Enhanced `DRIVE` command to report current device if called without arguments.
+
+### Changed
+- **Memory Layout Consolidation**:
+  - Relocated OS segments (`Api`, `Loader`, `Path`) to the `$0D00-$0FFF` range.
+  - Realigned `CommandTable` ($1080) and `CommandShell` ($1180), providing over 2.5KB of growth space for the shell.
+- **System Automation**:
+  - Implemented persistent build number tracking (`BUILD_OS`, `BUILD_DEBUG`) in the Makefile.
+  - Automated `.inc` generation for injecting build numbers into assembly without manual source edits.
+- **Disk Image Format**:
+  - Stripped `.prg` extensions from disk directory entries for cleaner command resolution.
+  - Centralized PETSCII encoding and improved `normalizeName` to correctly map shifted characters for disk matching.
+
 ### Fixed
-- debug: cuOpRel no longer writes to DebugTemp+1 ($7B = disasmTemp); base address now
-  computed into val2/val2+1 via stack-saved offset, eliminating ZP alias that corrupted
-  the U command's row counter after any relative branch instruction
-- debug: parseList now rejects lists longer than 64 bytes (returns error) instead of
-  overflowing listBuf into parsePos, inputLen, and inputBuf
+- **Parsing Robustness**: Centralized argument parsing via `shellSkipSpaces` to prevent label-reuse bugs.
+- **Filename Match**: Resolved issue where lowercase disk entries failed to match normalized uppercase shell input.
 
 ## [0.2.21] - 2026-05-13
 
