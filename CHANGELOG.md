@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- debug: cuOpRel no longer writes to DebugTemp+1 ($7B = disasmTemp); base address now
+  computed into val2/val2+1 via stack-saved offset, eliminating ZP alias that corrupted
+  the U command's row counter after any relative branch instruction
+
 ## [0.2.21] - 2026-05-13
 
 ### Fixed (DEBUG Build 1012)

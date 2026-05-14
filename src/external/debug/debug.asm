@@ -916,36 +916,37 @@ cuOpRel:
     lda #'$'
     jsr KernalChROUT
     // Target = currentAddr + 2 + signed_offset
+    // Save offset on stack; compute base into val2 (avoids DebugTemp+1 = disasmTemp alias)
     ldy #1
     lda (currentAddr), y
-    sta val2                // offset
+    pha                     // push signed offset; restored after base is ready
+
     lda currentAddr
     clc
     adc #2
-    sta DebugTemp           // base lo
+    sta val2                // base lo ($78)
     lda currentAddr + 1
     adc #0
-    sta DebugTemp + 1       // base hi
-    
-    lda val2
+    sta val2 + 1            // base hi ($79) — safe, no alias with disasmTemp ($7B)
+
+    pla                     // restore offset → A; sign still intact
     bpl cuRelPos
-    // Negative offset: add to 16-bit base
-    lda DebugTemp
+    // Negative offset: target = base + sign-extended offset
     clc
     adc val2
-    tax
-    lda DebugTemp + 1
-    adc #$FF                // sign extend
-    tay
+    tax                     // target lo → X
+    lda val2 + 1
+    adc #$FF                // sign extend carry (offset was negative)
+    tay                     // target hi → Y
     jmp cuRelPrint
 cuRelPos:
-    lda DebugTemp
+    // Positive offset: target = base + offset
     clc
     adc val2
-    tax
-    lda DebugTemp + 1
+    tax                     // target lo → X
+    lda val2 + 1
     adc #0
-    tay
+    tay                     // target hi → Y
 cuRelPrint:
     tya
     jsr printHex8
@@ -1290,7 +1291,7 @@ phnDigit:
 startupMsg:
 verMsg:
     .text "DEBUG v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
-    .text " (Build " + BUILD_NUMBER + ")"
+    .text "." + BUILD_NUMBER
     .byte $0D, 0
 
 debugHelpMsg:
