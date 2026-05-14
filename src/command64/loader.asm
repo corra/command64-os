@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Binary Loader
 // Wraps KERNAL LOAD routine with support for specific target addresses.
 
-.segment Loader [start=$0E00]
+.segment Loader [start=$09C0]
 
 // --- shellLoadPrg ---
 // Loads a PRG from disk using KERNAL routines.

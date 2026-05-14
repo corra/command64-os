@@ -10,13 +10,13 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-05-13)
+## Current State (2026-05-14)
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, code review + remediation done Build 1012).
-- Phase 5 pending (DRIVE/multi-device, CD/CHDIR, MD/MKDIR).
+- Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
 - **Phase 6A — App Manager**: Design spec + Phase A implementation plan **written and ready to execute**. See below.
-- **Version**: 0.2.21 (command64 Build 2414, Stage 15) / DEBUG 0.1.4 (Build 1012).
+- **Version**: 0.2.22 (command64 Build 2430, Stage 15) / DEBUG 0.1.4 (Build 1012).
 - **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly.
 
 ## Phase 6A — App Manager (next up)

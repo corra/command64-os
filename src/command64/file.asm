@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 File System Module
 // Manages Handle Table and C64 KERNAL File I/O.
 
-.segment File [start=$1D80]
+.segment File [start=$0D00]
 
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.

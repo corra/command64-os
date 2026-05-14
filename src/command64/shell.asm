@@ -95,20 +95,43 @@ siInitOk:
     lda #1                  // 256 paragraphs = 4KB = 1 page
     sta VmmSegHi
     jsr vmmAlloc
+    cmp #VMM_SUCCESS
+    beq siEnvOk
+    
+    lda #0
+    sta vmmInitialized      // Allocation failed, disable VMM
+    lda #<noReuMsg
+    ldy #>noReuMsg
+    jsr petPrintString
+    jmp siSkipEnv
+
+siEnvOk:
     lda VmmSegLo
     sta EnvSegmentLo
     lda VmmSegHi
     sta EnvSegmentHi
     
-    // Initialize with double null (empty environment)
+    // Zero the entire 4KB env segment to prevent garbage data from hanging env scans.
+    // vmmComputeAddress clobbers Y (via TAY), so Y cannot be used as a loop counter.
+    // vmmWriteByte/vmmComputeAddress do NOT clobber X, so X is the outer page counter.
+    // VmmOffLo itself serves as the inner byte counter: inc+wrap at 256.
     lda #0
     sta VmmOffLo
     sta VmmOffHi
-    lda #0                  // Null char
-    jsr vmmWriteByte
-    inc VmmOffLo
-    lda #0                  // Second null
-    jsr vmmWriteByte
+    ldx #16                 // 16 pages of 256 bytes = 4096 bytes
+siZeroEnvOuter:
+siZeroEnvByte:
+    lda #0
+    jsr vmmWriteByte        // writes 0 at VmmSeg:VmmOffHi:VmmOffLo; clobbers A and Y
+    inc VmmOffLo            // advance to next byte; wraps at 256 naturally
+    bne siZeroEnvByte       // loop until VmmOffLo wraps (256 bytes = 1 page)
+    inc VmmOffHi            // next page
+    dex
+    bne siZeroEnvOuter      // repeat for all 16 pages
+
+    lda #0
+    sta VmmOffLo
+    sta VmmOffHi
 
 siSkipEnv:
     lda #$93                // PETSCII clear-screen character
@@ -1052,12 +1075,68 @@ csVmmOk:
     lda CommandBuffer, y
     beq cmdSetPrint
 
-    // Parse VAR=VAL
-    // For Phase 1: only implementing display.
-    // TODO: Implement VAR=VAL parsing and REU storage.
-    lda #<notImplMsg
-    ldy #>notImplMsg
+    // Parse VAR into SourceBuf, converting to unshifted (normalized case)
+    ldx #0
+csScanVar:
+    lda CommandBuffer, y
+    beq csQuery             // End of line -> Query
+    cmp #'='
+    beq csFoundEq
+    
+    cmp #$C1                // PETSCII Shifted 'A'
+    bcc csNotShifted
+    cmp #$DB                // PETSCII Shifted 'Z' + 1
+    bcs csNotShifted
+    and #$7F                // Convert shifted to unshifted
+csNotShifted:
+    sta SourceBuf, x
+    inx
+    cpx #39
+    beq csFoundEq           // Buffer full
+    iny
+    jmp csScanVar
+
+csFoundEq:
+    lda #0
+    sta SourceBuf, x        // Null terminate VAR
+    iny                     // Skip '='
+    sty ParsePos            // VAL starts here
+    
+    jsr envSearch           // Returns C=0 if found, VmmOff points to start
+    php
+    bcc csHasOld
+    plp
+    jmp csCheckAppend
+
+csHasOld:
+    jsr envDelete           // Removes string at VmmOff and shifts block down
+    plp
+
+csCheckAppend:
+    ldy ParsePos
+    lda CommandBuffer, y
+    beq csDone              // VAL is empty, just deleted old (if any)
+    
+    jsr envFindEnd          // VmmOff points to first null of double-null
+    jsr envAppend           // Appends SourceBuf + '=' + CommandBuffer[ParsePos]
+    rts
+
+csQuery:
+    lda #0
+    sta SourceBuf, x
+    jsr envSearch
+    bcs csNotFound
+    
+    jsr envPrintVal         // Print after '=' until '\0'
+    rts
+
+csNotFound:
+    lda #<noEnvMsg
+    ldy #>noEnvMsg
     jsr petPrintString
+    rts
+
+csDone:
     rts
 
 cmdSetPrint:
@@ -1081,32 +1160,363 @@ cspLoop:
 
 cspNull:
     // One null reached. Is the next one also null?
-    lda #PetCr
-    jsr KernalChROUT
-    
     inc VmmOffLo
     bne cspCheckNext
     inc VmmOffHi
 cspCheckNext:
     jsr vmmReadByte
     beq cspDone             // Double null reached
+    
+    lda #PetCr
+    jsr KernalChROUT
     jmp cspLoop             // More strings follow
 
 cspDone:
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+// --- envSearch ---
+// Input: SourceBuf (null-terminated VAR)
+// Output: C=0 found, VmmOff = start of string
+//         C=1 not found, VmmOff = end of block (first null)
+envSearch:
+    lda #0
+    sta VmmOffLo
+    sta VmmOffHi
+    lda EnvSegmentLo
+    sta VmmSegLo
+    lda EnvSegmentHi
+    sta VmmSegHi
+
+esNext:
+    // Save start of current string
+    lda VmmOffLo
+    sta TempHi              // Save offset Lo
+    lda VmmOffHi
+    sta CmpBase             // Save offset Hi
+
+    jsr vmmReadByte
+    beq esCheckEnd          // Double null?
+
+    ldx #0
+esLoop:
+    lda SourceBuf, x
+    beq esFoundMatch        // End of VAR
+    sta TempLo
+    jsr vmmReadByte
+    cmp TempLo
+    bne esSkip              // Mismatch
+    inc VmmOffLo
+    bne esInc1
+    inc VmmOffHi
+esInc1:
+    inx
+    jmp esLoop
+
+esFoundMatch:
+    jsr vmmReadByte
+    cmp #'='
+    beq esReturnFound       // Match!
+
+esSkip:
+    jsr vmmReadByte
+    beq esStartNext
+    inc VmmOffLo
+    bne esSkip
+    inc VmmOffHi
+    jmp esSkip
+
+esStartNext:
+    inc VmmOffLo
+    bne esNext
+    inc VmmOffHi
+    jmp esNext
+
+esCheckEnd:
+    // Block end
+    sec
+    rts                     // Not found, VmmOff points to end
+
+esReturnFound:
+    lda TempHi
+    sta VmmOffLo
+    lda CmpBase
+    sta VmmOffHi
+    clc
+    rts
+
+// --- envDelete ---
+// Removes the string starting at VmmOffLo/Hi by shifting everything down.
+envDelete:
+    lda VmmOffLo
+    sta NamePtrLo           // Use NamePtr ($FD) as destination pointer
+    lda VmmOffHi
+    sta NamePtrHi           // $FE
+
+edScanNext:
+    jsr vmmReadByte
+    beq edFoundEndStr
+    inc VmmOffLo
+    bne edScanNext
+    inc VmmOffHi
+    jmp edScanNext
+
+edFoundEndStr:
+    inc VmmOffLo            // Skip null
+    bne edShiftLoop
+    inc VmmOffHi
+
+edShiftLoop:
+    jsr vmmReadByte
+    sta TempLo              // Byte to move
+    
+    // Save Source
+    lda VmmOffLo
+    pha
+    lda VmmOffHi
+    pha
+    
+    // Set Destination
+    lda NamePtrLo
+    sta VmmOffLo
+    lda NamePtrHi
+    sta VmmOffHi
+    lda TempLo
+    jsr vmmWriteByte
+    
+    // Increment Destination
+    inc NamePtrLo
+    bne edIncDstOk
+    inc NamePtrHi
+edIncDstOk:
+
+    // Restore and Increment Source
+    pla
+    sta VmmOffHi
+    pla
+    sta VmmOffLo
+    
+    lda TempLo
+    bne edNextByte
+    
+    // Moved a null. Is next also null?
+    inc VmmOffLo
+    bne edCheckDouble
+    inc VmmOffHi
+edCheckDouble:
+    jsr vmmReadByte
+    beq edDoubleDone
+    jmp edShiftLoop         // More to move
+
+edNextByte:
+    inc VmmOffLo
+    bne edShiftLoop
+    inc VmmOffHi
+    jmp edShiftLoop
+
+edDoubleDone:
+    lda NamePtrLo
+    sta VmmOffLo
+    lda NamePtrHi
+    sta VmmOffHi
+    lda #0
+    jsr vmmWriteByte        // Write final double null
+    rts
+
+// --- envAppend ---
+// Input: VmmOff points to the end-of-block null.
+envAppend:
+    // Bounds check: 4KB segment ($1000 bytes)
+    lda VmmOffHi
+    cmp #$10                // Offset $1000?
+    bcc eaCheckSpace
+    lda #<envFullMsg
+    ldy #>envFullMsg
+    jsr petPrintString
+    rts
+
+eaCheckSpace:
+    ldx #0
+eaVarLoop:
+    lda SourceBuf, x
+    beq eaWriteEq
+    jsr vmmWriteByte
+    inc VmmOffLo
+    bne eaVarNext
+    inc VmmOffHi
+eaVarNext:
+    inx
+    jmp eaVarLoop
+
+eaWriteEq:
+    lda #'='
+    jsr vmmWriteByte
+    inc VmmOffLo
+    bne eaEqNext
+    inc VmmOffHi
+eaEqNext:
+
+    ldy ParsePos
+eaValLoop:
+    lda CommandBuffer, y
+    beq eaDone
+    jsr vmmWriteByte        // vmmWriteByte preserves Y (via vmmComputeAddress stack fix)
+    inc VmmOffLo
+    bne eaValNext
+    inc VmmOffHi
+eaValNext:
+    iny
+    jmp eaValLoop
+
+eaDone:
+    lda #0
+    jsr vmmWriteByte
+    inc VmmOffLo
+    bne eaFinalNull
+    inc VmmOffHi
+eaFinalNull:
+    lda #0
+    jsr vmmWriteByte
+    rts
+
+// --- envFindEnd ---
+// Output: VmmOff points to the correct location to append a new string.
+//         For an empty environment (\0\0), returns 0.
+//         For a non-empty environment (S1\0S2\0\0), returns the offset of the second \0.
+envFindEnd:
+    lda #0
+    sta VmmOffLo
+    sta VmmOffHi
+    lda EnvSegmentLo
+    sta VmmSegLo
+    lda EnvSegmentHi
+    sta VmmSegHi
+
+    jsr vmmReadByte
+    beq efeDone             // If [0] is null, environment is empty, start at 0
+
+efeLoop:
+    jsr vmmReadByte
+    beq efeCheckDouble
+    inc VmmOffLo
+    bne efeLoop
+    inc VmmOffHi
+    jmp efeLoop
+
+efeCheckDouble:
+    inc VmmOffLo            // Advance to the potential second null
+    bne efeCheck2
+    inc VmmOffHi
+efeCheck2:
+    jsr vmmReadByte
+    beq efeDone             // Found second null, return this position
+    jmp efeLoop             // Not a double null (just end of string), keep scanning
+
+efeDone:
+    rts
+
+// --- envPrintVal ---
+envPrintVal:
+epvScanEq:
+    jsr vmmReadByte
+    cmp #'='
+    beq epvStartPrint
+    inc VmmOffLo
+    bne epvScanEq
+    inc VmmOffHi
+    jmp epvScanEq
+
+epvStartPrint:
+    inc VmmOffLo
+    bne epvLoop
+    inc VmmOffHi
+
+epvLoop:
+    jsr vmmReadByte
+    beq epvDone
+    jsr KernalChROUT
+    inc VmmOffLo
+    bne epvLoop
+    inc VmmOffHi
+    jmp epvLoop
+
+epvDone:
+    lda #PetCr
+    jsr KernalChROUT
     rts
 
 // PATH [path] — display or set search path
 cmdPath:
-    // Effectively an alias for SET PATH=...
-    // For now, just print "not implemented"
-    lda #<notImplMsg
-    ldy #>notImplMsg
+    ldy ParsePos
+    jsr shellSkipSpaces
+    lda CommandBuffer, y
+    beq cpQuery
+    
+    // Set up VAR="path"
+    lda #'p'
+    sta SourceBuf
+    lda #'a'
+    sta SourceBuf+1
+    lda #'t'
+    sta SourceBuf+2
+    lda #'h'
+    sta SourceBuf+3
+    lda #0
+    sta SourceBuf+4
+    
+    sty ParsePos            // VAL starts at current Y
+
+    // Delete old path if it exists
+    jsr envSearch
+    php
+    bcc cpHasOld
+    plp
+    jmp cpAppend
+cpHasOld:
+    jsr envDelete
+    plp
+
+cpAppend:
+    jsr envFindEnd
+    jsr envAppend
+    rts
+    
+cpQuery:
+    lda #'p'
+    sta SourceBuf
+    lda #'a'
+    sta SourceBuf+1
+    lda #'t'
+    sta SourceBuf+2
+    lda #'h'
+    sta SourceBuf+3
+    lda #0
+    sta SourceBuf+4
+    jsr envSearch
+    bcs cpNotFound
+    
+    jsr envPrintVal
+    rts
+
+cpNotFound:
+    lda #<noEnvMsg
+    ldy #>noEnvMsg
     jsr petPrintString
     rts
 
 notImplMsg:
     .text "Feature not yet fully implemented"
     .byte $0D, 0
+
+noEnvMsg:
+    .text "Environment variable not defined"
+    .byte $0D, 0
+
+envFullMsg:
+    .text "Environment space full"
+    .byte $0D, 0
+
 cmdVer:
     lda #<verMsg
     ldy #>verMsg

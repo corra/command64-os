@@ -34,6 +34,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Parsing Robustness**: Centralized argument parsing via `shellSkipSpaces` to prevent label-reuse bugs.
 - **Filename Match**: Resolved issue where lowercase disk entries failed to match normalized uppercase shell input.
 
+## [0.2.22] - 2026-05-14
+
+### Fixed
+- **Environment Management**: Resolved critical hang in `SET` command by zero-initializing the 4KB environment segment in the REU. This prevents infinite loops caused by searching for double-null terminators in uninitialized memory.
+- **PATH Command**: Refactored `cmdPath` to correctly initialize the search variable name and update `ParsePos`, fixing bugs where it would skip characters and fail to set the search path correctly.
+
 ## [0.2.21] - 2026-05-13
 
 ### Fixed (DEBUG Build 1012)

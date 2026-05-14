@@ -13,7 +13,7 @@
 // This jump will stay at $1000 even if apiHandler moves.
     jmp apiHandler
 
-.segment Api [start=$0D00]
+.segment Api [start=$0920]
 
 // --- apiHandler ---
 // The centralized OS service dispatcher.

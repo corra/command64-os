@@ -2,7 +2,7 @@
 // Virtual Memory Manager for C64 MS-DOS Port
 // Maps 1MB DOS Address Space (Seg:Off) to C64 REU.
 
-.segment Vmm [start=$1B80]
+.segment Vmm [start=$0B00]
 
 // --- vmmInit ---
 // Initializes the VMM and verifies REU presence.
@@ -314,6 +314,14 @@ vwbInitOk:
 //
 // Calculation: Address = (Seg << 4) + Off
 vmmComputeAddress:
+    // Preserve scratch registers and Y
+    tya
+    pha
+    lda TempLo
+    pha
+    lda TempHi
+    pha
+
     // 1. Calculate base address bits (Seg << 4)
     // Low byte: (SegLo << 4)
     lda VmmSegLo
@@ -360,6 +368,14 @@ vmmComputeAddress:
     tya                     // Base Bank
     adc #0
     sta REU_REU_BANK
+
+    // Restore scratch registers and Y
+    pla
+    sta TempHi
+    pla
+    sta TempLo
+    pla
+    tay
     rts
 
 .segment VmmData
