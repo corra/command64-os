@@ -15,10 +15,10 @@
 - **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
 - **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), `DOS_WRITE_FILE` ($40), `DOS_DELETE_FILE` ($41), and `DOS_RENAME_FILE` ($56).
 - **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
-- **Version**: 0.2.21 (command64 Build 2414, Stage 15) / DEBUG 0.1.3 (Build 1011, Stage 3).
+- **Version**: 0.2.21 (command64 Build 2414, Stage 15) / DEBUG 0.1.4 (Build 1012, Stage 4).
 - **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly. Unified build system (`Makefile`) implemented and verified.
 - **Documentation**: Synchronized `COMMANDS.md`, `EXTERNAL.md`, and `KNOWLEDGE.md` with current codebase state.
-- **External Programs**: `DEBUG.PRG` (v0.1.3 Build 1011) — dispatch case-sensitivity fixed, hex parsing handles SHIFT+letter A-F, verMsg deduplicated.
+- **External Programs**: `DEBUG.PRG` (v0.1.4 Build 1012) — dispatch case-sensitivity fixed, hex parsing handles SHIFT+letter A-F, verMsg deduplicated, cuOpRel ZP alias fixed (U command now correct for relative branches), parseList buffer overflow fixed (65+ byte lists now return error).
 
 ## Memory Map (current — as of Build 2410)
 | Region | Purpose |
@@ -33,9 +33,9 @@
 | `$0C00` | Utils (parseHex, normalizeName, printDecimal16) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1040` | Petsci (petPrintString, petPrintChar macro) |
-| `$1100` | CommandTable (8-byte fixed-width entries) |
-| `$1200` | CommandShell (main loop, dispatcher, built-ins) |
-| `$1880` | Api (INT 21h Jump Table service bus — `api.asm`) |
+| `$1080` | CommandTable (8-byte fixed-width entries) |
+| `$1180` | CommandShell (main loop, dispatcher, built-ins) |
+| `$1900` | Api (INT 21h Jump Table service bus — `api.asm`) |
 | `$1A00` | Loader (shellLoadPrg) |
 | `$1A80` | Path (findFile, checkExistence) |
 | `$1B80` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
