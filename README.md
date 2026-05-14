@@ -57,7 +57,8 @@ The project uses a unified **Makefile**.
 | `EXIT`  | Return to BASIC. |
 
 ## For Users
-See the **[Applications Guide](docs/apps/debug.md)** for details on external utilities like `DEBUG`.
+See the **[User Manual](docs/user-manual.md)** for a comprehensive guide to using command64.
+Details on external utilities like `DEBUG` can be found in the **[Applications Guide](docs/apps/debug.md)**.
 
 ## For Developers
 See the following documents in the `docs/` directory:

@@ -1,6 +1,6 @@
 # DEBUG Utility User Guide
 
-**Version:** 0.1.2 (Build 1010)
+**Version:** 0.1.4 (Build 1015)
 **Origin:** MS-DOS 4.0
 **Target Address:** $2000
 

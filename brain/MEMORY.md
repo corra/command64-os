@@ -2,6 +2,8 @@
 
 ## Project Documentation
 - `GEMINI.md`: Core directives and protocols
+- `README.md`: Project overview and quick start
+- `docs/user-manual.md`: Comprehensive usage guide (the "whole shebang")
 - `brain/KNOWLEDGE.md`: Architectural decisions and technical findings
 - `brain/MEMORY.md`: Session state and task tracking (this file)
 - `brain/COMMANDS.md`: Internal command status and priority
