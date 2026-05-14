@@ -13,14 +13,35 @@
 ## Current State (2026-05-13)
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
-- **Phase 4 Code Review Remediation**: Full multi-agent review completed; all fixes implemented in Build 2414/1011.
-- **Handle-based I/O**: Implemented modern MS-DOS style handle system. Maps handles 0-7 to C64 LFNs 2-9.
-- **Service Bus**: Extended Jump Table to support `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), `DOS_WRITE_FILE` ($40), `DOS_DELETE_FILE` ($41), and `DOS_RENAME_FILE` ($56).
-- **Internal Commands**: Added `TYPE`, `COPY`, `DEL`, `ERASE`, `REN`, and `RENAME`.
-- **Version**: 0.2.21 (command64 Build 2414, Stage 15) / DEBUG 0.1.4 (Build 1012, Stage 4).
-- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly. Unified build system (`Makefile`) implemented and verified.
-- **Documentation**: Synchronized `COMMANDS.md`, `EXTERNAL.md`, and `KNOWLEDGE.md` with current codebase state.
-- **External Programs**: `DEBUG.PRG` (v0.1.4 Build 1012) — dispatch case-sensitivity fixed, hex parsing handles SHIFT+letter A-F, verMsg deduplicated, cuOpRel ZP alias fixed (U command now correct for relative branches), parseList buffer overflow fixed (65+ byte lists now return error).
+- Phase 4 complete (DEBUG external utility, code review + remediation done Build 1012).
+- Phase 5 pending (DRIVE/multi-device, CD/CHDIR, MD/MKDIR).
+- **Phase 6A — App Manager**: Design spec + Phase A implementation plan **written and ready to execute**. See below.
+- **Version**: 0.2.21 (command64 Build 2414, Stage 15) / DEBUG 0.1.4 (Build 1012).
+- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly.
+
+## Phase 6A — App Manager (next up)
+
+### Superpowers Artifacts
+| Artifact | Path |
+|----------|------|
+| Design spec | `docs/superpowers/specs/2026-05-13-app-manager-design.md` |
+| Phase A plan | `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
+
+### What Phase A delivers (11 tasks, ~$350 bytes of new code)
+- New segment `AppTable` at `$2000`; `UserProgStart` shifts from `$2000` → `$2200`.
+- `apptable.asm`: `aptInit`, `aptProtectedCheck`, `aptSlotBase`, `aptNameMatch`, `aptFind`, `aptRegister`, `aptRemove`, `aptList`, `aptPrintHex8`.
+- `LOAD` gated: protected-address check ($0000–$21FF, $C000–$FFFF) + table-full check before disk I/O; registers entry on success.
+- `RUN`/`GO` gated: requires app table membership; supports `RUN <name>` and `RUN <addr>`.
+- New commands: `APPS`/`PS` (list loaded programs), `FREE` (remove entry, guards APP_RUNNING).
+- `debug.asm` and all `tests/src/*.asm` compile address moved from `$2000` → `$2200`.
+
+### Key implementation details
+- App table stored in VMM: 1 page (4 KB), segment saved in `AptSegLo/Hi` ($03F2–$03F3).
+- Entry stride 40 bytes × 16 slots + 4-byte header = 644 bytes total (fits in 1 VMM page).
+- `vmmReadByte`/`vmmWriteByte` clobbers `TempLo/Hi` and `Y`; preserves `X` and `VmmOffLo/Hi`.
+- `aptRegister` calling convention: `NamePtrLo/Hi` + `SrcHandle` = name, `HexValLo/Hi` = load addr, `TempLo/Hi` = KernalLOAD end+1 return.
+- `aptFind` calling convention: carry clear = name mode (`NamePtrLo/Hi`, `SrcHandle`); carry set = address mode (`HexValLo/Hi`). Returns X = slot index, `HandlerVecLo/Hi` = LoadAddr on found.
+- Phases B and C extend `apptable.asm` without changing the API surface.
 
 ## Memory Map (current — as of Build 2410)
 | Region | Purpose |
@@ -46,7 +67,9 @@
 | `$1B80` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
 | `$1D80` | File (Handle-based I/O — `file.asm`) |
 | `$1F90` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
-| `$2000+` | UserProgStart (External commands loaded here) |
+| `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
+| `$2000-$21FF` | AppTable segment (apptable.asm — 512 bytes reserved) |
+| `$2200+` | UserProgStart (External commands loaded here — shifted from $2000 by Phase 6A) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
 | `$61–$6C` | Zero-page: HandlerVec, ParsePos, Temp, HexVal, VmmSeg/Off/Bank (FAC1) |
@@ -67,7 +90,19 @@
 
 ## Pending Tasks
 - [x] Implement `DEBUG` Unassemble (U) command (Disassembler)
+- [x] DEBUG code review + remediation (Build 1012 — cuOpRel ZP alias, parseList overflow)
+- [ ] **Execute App Manager Phase A** — plan at `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md`
+- [ ] Binary Relocator (Phase 6B prerequisite)
 - [ ] Implement `DRIVE` command
 - [ ] Add support for multiple devices (8, 9, 10, 11)
 - [ ] Support subdirectories (1581 / SD2IEC)
 - [ ] Environment variable storage (`SET`, `PATH`) in REU
+
+## Superpowers Docs Index
+| Document | Path |
+|----------|------|
+| App Manager design | `docs/superpowers/specs/2026-05-13-app-manager-design.md` |
+| App Manager Phase A plan | `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
+| DEBUG remediation plan | `docs/superpowers/plans/2026-05-13-debug-asm-zp-alias-and-listbuf-overflow.md` |
+| Unified build system design | `docs/superpowers/specs/2026-05-13-unified-build-system-design.md` |
+| Unified build system plan | `docs/superpowers/plans/2026-05-13-unified-build-system.md` |
