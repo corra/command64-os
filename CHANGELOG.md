@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - debug: cuOpRel no longer writes to DebugTemp+1 ($7B = disasmTemp); base address now
   computed into val2/val2+1 via stack-saved offset, eliminating ZP alias that corrupted
   the U command's row counter after any relative branch instruction
+- debug: parseList now rejects lists longer than 64 bytes (returns error) instead of
+  overflowing listBuf into parsePos, inputLen, and inputBuf
 
 ## [0.2.21] - 2026-05-13
 

@@ -1152,6 +1152,8 @@ plLoop:
     bcs plErr               // parseHexArg sets Carry on error/empty
     
     ldx listLen
+    cpx #64             // listBuf is 64 bytes; index 64 would overflow into parsePos
+    bcs plErr
     lda HexValLo
     sta listBuf, x
     inc listLen
@@ -1167,7 +1169,9 @@ plStrLoop:
     beq plStrDone
     
     ldx listLen
-    sta listBuf, x
+    cpx #64             // listBuf is 64 bytes; index 64 would overflow into parsePos
+    bcs plErr
+    sta listBuf, x      // A still holds the character from lda inputBuf,y above
     inc listLen
     iny
     jmp plStrLoop
