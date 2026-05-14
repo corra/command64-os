@@ -53,6 +53,14 @@ tableCmd:
     .word cmdDrive
     .text "dev   "
     .word cmdDrive
+    .text "run   "
+    .word cmdRun
+    .text "go    "
+    .word cmdRun
+    .text "set   "
+    .word cmdSet
+    .text "path  "
+    .word cmdPath
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -78,6 +86,31 @@ start:
     // We proceed anyway for now, but external programs using VMM will fail.
     
 siInitOk:
+    lda vmmInitialized
+    beq siSkipEnv           // No REU, no environment
+
+    // Initialize Master Environment Block
+    lda #0
+    sta VmmSegLo
+    lda #1                  // 256 paragraphs = 4KB = 1 page
+    sta VmmSegHi
+    jsr vmmAlloc
+    lda VmmSegLo
+    sta EnvSegmentLo
+    lda VmmSegHi
+    sta EnvSegmentHi
+    
+    // Initialize with double null (empty environment)
+    lda #0
+    sta VmmOffLo
+    sta VmmOffHi
+    lda #0                  // Null char
+    jsr vmmWriteByte
+    inc VmmOffLo
+    lda #0                  // Second null
+    jsr vmmWriteByte
+
+siSkipEnv:
     lda #$93                // PETSCII clear-screen character
     jsr KernalChROUT
     lda #$0E                // switch C64 to lowercase/uppercase character mode
@@ -436,6 +469,43 @@ clNoArgs:
 clError:
     lda #<loadErrMsg
     ldy #>loadErrMsg
+    jsr petPrintString
+    rts
+
+// RUN [address] — execute a program in memory
+cmdRun:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    lda CommandBuffer, y
+    beq crDefault
+    
+    jsr parseHex
+    bcs crError
+    
+    lda HexValLo
+    sta HandlerVecLo
+    lda HexValHi
+    sta HandlerVecHi
+    jmp crExecute
+
+crDefault:
+    lda #<UserProgStart
+    sta HandlerVecLo
+    lda #>UserProgStart
+    sta HandlerVecHi
+
+crExecute:
+    // Execute via JSR. If the program RTS, we return to mainLoop.
+    // If it uses DOS_EXIT, it resets stack and JMPs to mainLoop.
+    jsr crJump
+    rts
+
+crJump:
+    jmp (HandlerVecLo)
+
+crError:
+    lda #<badAddrMsg
+    ldy #>badAddrMsg
     jsr petPrintString
     rts
 
@@ -967,7 +1037,76 @@ cdError:
 
 dirFname: .text "$"
 
-// VER — display version and build number
+// SET [VAR=VAL] — display or set environment variables
+cmdSet:
+    lda vmmInitialized
+    bne csVmmOk
+    lda #<noReuMsg
+    ldy #>noReuMsg
+    jsr petPrintString
+    rts
+
+csVmmOk:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    lda CommandBuffer, y
+    beq cmdSetPrint
+
+    // Parse VAR=VAL
+    // For Phase 1: only implementing display.
+    // TODO: Implement VAR=VAL parsing and REU storage.
+    lda #<notImplMsg
+    ldy #>notImplMsg
+    jsr petPrintString
+    rts
+
+cmdSetPrint:
+    // Print environment from REU
+    lda #0
+    sta VmmOffLo
+    sta VmmOffHi
+    lda EnvSegmentLo
+    sta VmmSegLo
+    lda EnvSegmentHi
+    sta VmmSegHi
+
+cspLoop:
+    jsr vmmReadByte         // A = byte from REU
+    beq cspNull
+    jsr KernalChROUT
+    inc VmmOffLo
+    bne cspLoop
+    inc VmmOffHi
+    jmp cspLoop
+
+cspNull:
+    // One null reached. Is the next one also null?
+    lda #PetCr
+    jsr KernalChROUT
+    
+    inc VmmOffLo
+    bne cspCheckNext
+    inc VmmOffHi
+cspCheckNext:
+    jsr vmmReadByte
+    beq cspDone             // Double null reached
+    jmp cspLoop             // More strings follow
+
+cspDone:
+    rts
+
+// PATH [path] — display or set search path
+cmdPath:
+    // Effectively an alias for SET PATH=...
+    // For now, just print "not implemented"
+    lda #<notImplMsg
+    ldy #>notImplMsg
+    jsr petPrintString
+    rts
+
+notImplMsg:
+    .text "Feature not yet fully implemented"
+    .byte $0D, 0
 cmdVer:
     lda #<verMsg
     ldy #>verMsg
@@ -990,7 +1129,7 @@ promptMsg:
 
 verMsg:
     .text "Command 64-DOS Version " + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
-    .text " (Build " + BUILD_NUMBER + ")"
+    .text "." + BUILD_NUMBER
     .byte $0D, $0D, 0
 
 helpMsg:
@@ -1020,6 +1159,12 @@ helpMsg:
     .byte $0D
     .text "DRIVE  - SWITCH DEVICE [8-11]"
     .byte $0D
+    .text "SET    - ENV VARIABLES"
+    .byte $0D
+    .text "PATH   - SEARCH PATH"
+    .byte $0D
+    .text "RUN    - EXECUTE [ADDR]"
+    .byte $0D
     .text "VER    - SHOW VERSION"
     .byte $0D, 0
 
@@ -1046,6 +1191,10 @@ badDeviceMsg:
 currentDevMsg:
     .text "Current device: "
     .byte 0
+
+badAddrMsg:
+    .text "Invalid address"
+    .byte $0D, 0
 
 noDeviceMsg:
     .text "Device not present"

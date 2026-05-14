@@ -6,13 +6,13 @@
 // Segment layout:
 //   Main          $0801  BASIC SYS launcher (BasicUpstart2)
 //   Utils         $0C00  Hex parsing and string utilities
+//   Api           $0D00  INT 21h Service Bus (Jump Table)
+//   Loader        $0E00  KERNAL binary loader wrapper
+//   Path          $0F00  Directory search and path logic
 //   ApiStub       $1000  Stable OS Entry Point (Jump Table)
 //   Petsci        $1040  PETSCII print routines
 //   CommandTable  $1080  Fixed-width command dispatch table
 //   CommandShell  $1180  Command loop, dispatcher, built-ins
-//   Api           $1900  INT 21h Service Bus (Jump Table)
-//   Loader        $1A00  KERNAL binary loader wrapper
-//   Path          $1A80  Directory search and path logic
 //   Vmm           $1B80  Virtual Memory Manager (REU mapping)
 //   File          $1D80  Handle-based File I/O
 //   VmmData       $1F90  VMM temporary storage

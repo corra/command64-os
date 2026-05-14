@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Path & Directory Logic
 // Handles file discovery and extension appending (.prg).
 
-.segment Path [start=$1A80]
+.segment Path [start=$0F00]
 
 // --- findFile ---
 // Checks if a file exists on disk. 

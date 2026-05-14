@@ -27,8 +27,11 @@
 | `$038C` | CommandLen (1 byte) |
 | `$038D` | SpecificLoad flag (1 byte) |
 | `$038E-$039D` | HandleTable (16 bytes, 8 entries) |
-| `$03A0-$03CF` | SourceBuf (48 bytes, COPY command) |
-| `$03D0-$03FF` | DestBuf (48 bytes, COPY command) |
+| `$039E` | CurrentDevice (1 byte) |
+| `$039F-$03A0` | EnvSegmentLo/Hi (2 bytes) |
+| `$03A1` | EnvBank (1 byte) |
+| `$03A2-$03C9` | SourceBuf (40 bytes, COPY command) |
+| `$03CA-$03F1` | DestBuf (40 bytes, COPY command) |
 | `$0801` | BASIC SYS launcher (Main segment) |
 | `$0C00` | Utils (parseHex, normalizeName, printDecimal16) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |

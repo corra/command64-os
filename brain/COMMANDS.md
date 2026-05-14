@@ -16,6 +16,9 @@ This document tracks the status and priority of internal commands planned for th
 | `DEL` / `ERASE`| Delete files from disk | ✅ Done | Medium | DOS 4.0 |
 | `COPY` | Copy files between devices | ✅ Done | High | DOS 4.0 |
 | `REN` / `RENAME`| Rename files | ✅ Done | Medium | DOS 4.0 |
+| `RUN` / `G` | Execute program at [address] | ✅ Done | High | DOS 4.0 |
+| `SET` | Set environment variables | ✅ Done | Medium | DOS 4.0 |
+| `PATH` | Set executable search path | ✅ Done | High | DOS 4.0 |
 
 ## 2. High Priority (Phase 5)
 | Command | Description | Status | Priority | Origin |
@@ -23,8 +26,7 @@ This document tracks the status and priority of internal commands planned for th
 | `DRIVE` | Switch active device (8, 9, 10, 11) | 💡 Idea | High | C64 |
 | `CD` / `CHDIR` | Change current directory/device | 📅 Planned | High | DOS 4.0 |
 | `MD` / `MKDIR` | Create new directory | 📅 Planned | Medium | DOS 4.0 |
-| `SET` | Set environment variables | 📅 Planned | Medium | DOS 4.0 |
-| `PATH` | Set executable search path | 📅 Planned | High | DOS 4.0 |
+
 
 ## 3. Backlog (MS-DOS 4.0 Standards)
 | Command | Description | Status | Priority | Origin |

@@ -71,9 +71,12 @@
 .label SpecificLoad  = $038D // 0=use HexVal (Relocated), 1=use file header (Absolute)
 .label HandleTable   = $038E
 .label CurrentDevice = $039E // Active C64 device (8, 9, 10, 11)
+.label EnvSegmentLo  = $039F
+.label EnvSegmentHi  = $03A0
+.label EnvBank       = $03A1
 .label MAX_HANDLES   = 8
-.label SourceBuf     = $03A0 // 48 bytes
-.label DestBuf       = $03D0 // 48 bytes
+.label SourceBuf     = $03A2 // 40 bytes
+.label DestBuf       = $03CA // 40 bytes
 .label FileScratch   = $1F92 // Filename scratch in VmmData: vmmInitialized($1F90), vmmTempByte($1F91), fileScratch($1F92)
 
 // --- User Program Space ---

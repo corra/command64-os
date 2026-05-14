@@ -47,6 +47,11 @@ This file serves as the shared repository for architectural decisions, technical
 - **Exceptions**: Very simple "position-independent" code (like `inc $d020; rts`) will work anywhere.
 - **Future Resolution**: A **Binary Relocator** is planned for Phase 6 to patch absolute addresses in memory during the `LOAD` process.
 
+### Master Environment Block
+- **Storage**: Allocated in the REU via `vmmAlloc` (4KB / 1 page) during shell initialization.
+- **Format**: MS-DOS standard double-null terminated strings (`VAR1=VAL1\0VAR2=VAL2\0\0`).
+- **Access**: Managed via the `SET` and `PATH` internal commands. External programs can access it via the VMM API.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
