@@ -17,8 +17,8 @@
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.2.22 (command64 Build 2441, Stage 15) / DEBUG 0.1.4 (Build 1020).
-- **Verification**: Both `build-cmake/command64.prg` and `build-cmake/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte.
+- **Version**: 0.2.22 (command64 Build 2442, Stage 15) / DEBUG 0.1.4 (Build 1021).
+- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte.
 
 ## Phase 6A — App Manager (next up)
 

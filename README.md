@@ -28,17 +28,17 @@ The project is built using **CMake**. A `Makefile` wrapper is also provided at t
 
 1. **Configure CMake**:
    ```bash
-   cmake -B build-cmake
+   cmake -B build
    ```
 2. **Build the OS and all utilities**:
    ```bash
-   cmake --build build-cmake
+   cmake --build build
    # OR using the Makefile wrapper:
    make all
    ```
 3. **Build the OS disk image only**:
    ```bash
-   cmake --build build-cmake --target image_d64
+   cmake --build build --target image_d64
    # OR using the Makefile wrapper:
    make image
    ```

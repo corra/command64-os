@@ -1,8 +1,8 @@
 # Makefile — Proxy to CMake Build System
 #
-# This file forwards standard targets to the new CMake build system in build-cmake/.
+# This file forwards standard targets to the new CMake build system in build/.
 
-BUILD_DIR := build-cmake
+BUILD_DIR := build
 
 .PHONY: all image testimage test release clean $(BUILD_DIR)
 
@@ -22,7 +22,6 @@ release: $(BUILD_DIR)
 	cmake --build $(BUILD_DIR) --target release
 
 clean:
-	rm -rf build
 	rm -rf $(BUILD_DIR)
 
 $(BUILD_DIR):
