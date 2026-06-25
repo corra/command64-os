@@ -16,9 +16,9 @@
 - Phase 4 complete (DEBUG external utility, code review + remediation done Build 1016).
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
-- **Phase 6A — App Manager**: Design spec + Phase A implementation plan **written and ready to execute**. See below.
-- **Version**: 0.2.22 (command64 Build 2436, Stage 15) / DEBUG 0.1.4 (Build 1016).
-- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly.
+- **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
+- **Version**: 0.2.22 (command64 Build 2441, Stage 15) / DEBUG 0.1.4 (Build 1020).
+- **Verification**: Both `build-cmake/command64.prg` and `build-cmake/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte.
 
 ## Phase 6A — App Manager (next up)
 
