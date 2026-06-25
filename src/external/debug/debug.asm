@@ -10,7 +10,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "1"
 .const VERSION_STAGE = "4" // Build 1012 parseHexArg bounds + uppercase fix
-#import "../../../build/build_debug.inc"
+#import "build_debug.inc"
 
 // --- Zero Page Pointers ($70-$7F) ---
 .label currentAddr = $70

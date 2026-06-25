@@ -30,7 +30,7 @@ Prints a null-terminated PETSCII string to the screen.
 - **Output:** `Carry` = 0.
 
 ### DOS_OPEN_FILE ($3D)
-Opens a file on disk (Device 8).
+Opens a file on disk (CurrentDevice).
 - **Input:** 
     - `X/Y`: Pointer to null-terminated filename (Lo/Hi).
     - `HexValLo` ($66): Access Mode (0 = Read, 1 = Write).

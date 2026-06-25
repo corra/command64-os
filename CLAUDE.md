@@ -20,7 +20,12 @@
 
 ## Build & Test
 
-No build or test at this time.
+- **Configure CMake**: `cmake -B build-cmake`
+- **Build All**: `cmake --build build-cmake` (or `make`)
+- **Build OS Disk Image**: `cmake --build build-cmake --target image_d64` (or `make image`)
+- **Build Test Disk Image**: `cmake --build build-cmake --target test_image_d64` (or `make testimage`)
+- **Create Release Package**: `cmake --build build-cmake --target release` (or `make release`)
+- **Clean Build**: `make clean` (removes `build/` and `build-cmake/`)
 
 ## Technical Standards
 

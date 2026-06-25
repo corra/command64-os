@@ -19,17 +19,27 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 ### Requirements
 - Commodore 64 (or VICE emulator)
 - RAM Expansion Unit (REU) - 512KB or larger recommended.
-- Kick Assembler v5.25 (for building)
-- GNU Make
+- Java Runtime Environment (for KickAssembler)
+- CMake (version 3.20 or newer)
+- GNU Make (optional wrapper)
 
 ### Building
-The project uses a unified **Makefile**.
-1. To build the OS and all utilities:
+The project is built using **CMake**. A `Makefile` wrapper is also provided at the root for convenience.
+
+1. **Configure CMake**:
    ```bash
+   cmake -B build-cmake
+   ```
+2. **Build the OS and all utilities**:
+   ```bash
+   cmake --build build-cmake
+   # OR using the Makefile wrapper:
    make all
    ```
-2. Build the OS disk image only:
+3. **Build the OS disk image only**:
    ```bash
+   cmake --build build-cmake --target image_d64
+   # OR using the Makefile wrapper:
    make image
    ```
 

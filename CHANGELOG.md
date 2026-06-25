@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **CMake Build System Migration**:
+  - Replaced the legacy single GNU Makefile with a modular, cross-platform CMake build system configured via root `CMakeLists.txt`.
+  - Implemented custom CMake Find modules (`FindKickAss.cmake`, `Findcc1541.cmake`, `FindOscar64.cmake`) and target helpers (`KickAssembler.cmake`, `cc1541.cmake`, `Oscar64.cmake`) to manage toolchain paths and discovery natively.
+  - Created a cross-platform build-time counter script (`IncrementBuildNumber.cmake`) and release packager (`PackRelease.cmake`) executing via `cmake -P` to replace shell-dependent cat/tar/zip commands.
+  - Configured a Makefile wrapper proxy to forward standard commands (`all`, `image`, `testimage`, `test`, `release`, `clean`) to CMake for backward compatibility.
+  - Updated all build system documentation, including `README.md` and `CLAUDE.md`.
 - **Project Infrastructure**:
   - Initialized Codebase Memory knowledge graph for `command64-os`.
   - Configured Taskwarrior with 5 active and pending milestones under the `command64-os` project.
@@ -26,6 +32,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced `DRIVE` command to report current device if called without arguments.
 
 ### Changed
+- **Assembly Imports Refactoring**:
+  - Removed hardcoded relative build directory prefixes from `src/command64/shell.asm` and `src/external/debug/debug.asm`.
+  - Configured KickAssembler's `-libdir` search path to find build-time generated counters dynamically.
 - **Memory Layout Consolidation**:
   - Relocated OS segments (`Api`, `Loader`, `Path`) to the `$0D00-$0FFF` range.
   - Realigned `CommandTable` ($1080) and `CommandShell` ($1180), providing over 2.5KB of growth space for the shell.

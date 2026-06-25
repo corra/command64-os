@@ -6,10 +6,15 @@ This document provides technical details for developing applications for the com
 
 | Region | Description |
 |--------|-------------|
-| `$033C - $03FB` | **OS Workspace** (Cassette Buffer). Includes Handle Table and command buffer. |
+| `$033C - $03FB` | **OS Workspace** (Cassette Buffer). Includes Handle Table, Env pointers, and command buffer. |
+| `$0C00 - $0CFF` | **OS Utils** (Hex parsing, decimal printer). |
+| `$0D00 - $0FFF` | **OS Core** (API, Loader, Path). |
 | **`$1000`** | **OS Entry Point** (Stable Jump Table). |
-| `$0C00 - $0FFF` | **OS Utils**. |
-| `$1040 - $1FFF` | **command64 OS Kernel**. Includes shell, API dispatcher, VMM, and File modules. |
+| `$1040 - $107F` | **PETSCII Library**. |
+| `$1080 - $10FF` | **Command Table**. |
+| `$1180 - $19FF` | **Command Shell**. |
+| `$1B80 - $1D7F` | **VMM Module**. |
+| `$1D80 - $1F8F` | **File System Module**. |
 | **`$2000 - $9FFF`** | **User Program Space**. Applications should be loaded and run here. |
 | `$C000 - $CFFF` | **VMM Memory Control Table (MCT)**. Reserved for OS. |
 
@@ -40,6 +45,7 @@ Always use the stable entry point at **`$1000`** for OS services. Never jump dir
 Use the VMM API (`DOS_ALLOC_MEM`, `DOS_FREE_MEM`) to manage memory in the REU. Do not write directly to REU registers unless you are managing your own banked memory and are certain it does not conflict with the OS MCT.
 
 ## 4. Build System
-The project uses **Kick Assembler v5.25**.
-- **Main Project:** `build/command64.asm`
+The project uses **Kick Assembler v5.25** and **GNU Make**.
+- **Main Entry Point:** `src/command64.asm`
+- **Makefile:** Run `make all` to build the full system.
 - **Output:** `build/command64.prg`

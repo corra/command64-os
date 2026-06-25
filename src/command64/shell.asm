@@ -6,7 +6,7 @@
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "2"
 .const VERSION_STAGE = "15" // Build 2414 Remediation
-#import "../../build/build_os.inc"
+#import "build_os.inc"
 
 
 // ---------------------------------------------------------------------------

@@ -1,5 +1,6 @@
 # Build artifacts (managed by Make)
 build/
+build-cmake/
 tests/bin/
 tests/*.d64
 src/external/debug/build/

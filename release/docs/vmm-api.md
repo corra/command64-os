@@ -49,5 +49,12 @@ To provide a memory management abstraction layer that maps the 1MB logical addre
     - `$01`: Head (Start of allocation)
     - `$02`: Tail (Continuation of allocation)
 
-## 5. Memory Safety
+## 5. System Allocation: Master Environment Block
+The OS shell reserves a 4KB (1 page) block in the REU during initialization for environment variable storage. 
+
+- **Access:** Internal commands `SET` and `PATH` manage this block.
+- **Format:** Double-null terminated ASCII/PETSCII strings (`VAR=VAL\0VAR=VAL\0\0`).
+- **Relocatability:** The logical segment of this block is stored in the OS workspace at `EnvSegmentLo/Hi` ($039F-$03A0).
+
+## 6. Memory Safety
 The VMM includes a `vmmInitialized` safety check. All entry points will fail gracefully with `VMM_ERR_INVALID` if an REU was not detected at startup.
