@@ -12,6 +12,7 @@ This file serves as the shared repository for architectural decisions, technical
 | 2026-05-01 | VMM and RAL as Constitutional Pillars | Virtual Memory Manager (VMM) and Register Abstraction Layer (RAL) are mandatory because the 8086's segmented memory architecture and rich register set do not exist on the 6502. The port treats the entire OS as an emulation layer, not a direct translation. | Active |
 | 2026-05-01 | Kick Assembler | Selected for 6502 assembly support. | Active |
 | 2026-05-01 | Oscar64 | Selected as the C compiler for C64 target. | Active |
+| 2026-06-25 | Code Wiki & Project Tooling | Created structured code wiki under wiki/, corrected child DOX index paths, and initialized Taskwarrior + Codebase Memory. | Active |
 
 ## Technical Findings
 
@@ -27,7 +28,7 @@ This file serves as the shared repository for architectural decisions, technical
 - **[2026-05-01] COMMAND.COM Core Logic**: The core dispatcher logic resides in `TCODE.ASM` (400+ lines). It reads input via `STD_CON_STRING_INPUT`, preprocesses it (`PRESCAN`), parses it (`PARSERINE`), and dispatches it to internal commands or initiates a file search (`PATH_SEARCH` for external commands).
 - **[2026-05-01] C64 KERNAL Integration**: C64 KERNAL routines (e.g., `CHROUT`, `CHRIN`, `LOAD`, `SAVE`, `VERIFY`) will serve as the foundational building blocks for our PETSCII and I/O abstractions.
 
-## Current Status — Build 2414 / Stage 15 (2026-05-13)
+## Current Status — Build 2436 / Stage 15 (2026-06-25)
 
 | Task | Status |
 | :--- | :--- |
@@ -37,7 +38,7 @@ This file serves as the shared repository for architectural decisions, technical
 | Phase 2D: Service Bus & VMM Stabilizing | ✅ Done |
 | Phase 3: File System Integration (Handles) | ✅ Done |
 | Phase 4: External System Utilities (DEBUG) | ✅ Done |
-| Phase 5: Env & Multi-Device Support | ⏳ Pending |
+| Phase 5: Env & Multi-Device Support | ⏳ In-Progress (Taskwarrior & Wiki setup done) |
 | Phase 6A: App Manager (Phase A) | 📋 Plan ready — `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
 
 ## Architectural Decisions & Constraints

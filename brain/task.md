@@ -1,6 +1,7 @@
 # Project Tasks
 
 - [x] Workspace initialization & state management setup
+- [x] Project infrastructure setup: Taskwarrior & Codebase Memory initialized, Code Wiki created (2026-06-25)
 
 - [x] Phase 2A: Core Dispatcher Proof-of-Concept (`CLS`, `ECHO`, `EXIT`, Command Loop)
   - [x] Kick Assembler toolchain setup and verification
