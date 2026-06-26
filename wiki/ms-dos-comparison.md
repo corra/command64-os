@@ -63,30 +63,39 @@ This matrix maps each internal CLI command, identifying its MS-DOS implementatio
 
 ---
 
-## 3. Kernel and System Services (`MSDOS.SYS`)
+### 3. Kernel and System Services (`MSDOS.SYS`)
 
-### Memory Allocation
-- **MS-DOS v4.0 (`ALLOC.ASM`):** Manages host conventional memory ($0000-$9FFF / 640KB limit) using a chain of **Memory Control Blocks (MCBs)**. Supports first-fit, best-fit, and last-fit allocation policies.
-- **Command 64 OS (`vmm.asm`):** Bypasses C64 conventional RAM constraints by mapping a 16MB virtual address space via a Commodore **RAM Expansion Unit (REU)**. Uses a 4KB Page Byte-Map strategy for allocation.
-- **Analysis:** Command 64 OS is functionally complete in memory management, providing advanced memory capacity compared to MS-DOS's 640KB limit.
+### MSDOS.SYS Kernel Feature Matrix
 
-### Process Management & Executable Loader
-- **MS-DOS v4.0 (`EXEC.ASM`):** Relocates executables dynamically (MZ header relocation table), creates the **Program Segment Prefix (PSP)** containing execution metadata, and handles parent/child environment block inheritance via INT 21h call `$4B` (EXEC).
-- **Command 64 OS (`loader.asm`):** Relies on static load addresses (standard user program space at `$2200`). Relocation is not yet supported (prerequisite for Phase 6B relocator).
-- **Analysis:** Command 64 OS is partially complete. A dynamic binary relocator is required to achieve MS-DOS parity.
+This matrix maps core kernel subsystems of `MSDOS.SYS` to their Command 64 OS equivalents.
 
-### File Handle Table
-- **MS-DOS v4.0 (`HANDLE.ASM`):** Tracks open file descriptors, maps handles to system File Control Blocks (FCBs), and implements seek (`LSEEK`), flush, and duplicate handle functions.
-- **Command 64 OS (`file.asm`):** Implements a handle table mapping LFNs to C64 KERNAL channels. 
-- **Analysis:** Command 64 OS internally implements handle operations for shell commands (`TYPE`, `COPY`). However, the public INT 21h service bus (`api.asm`) does *not* yet expose hooks like `DOS_OPEN_FILE` ($3D), `DOS_CLOSE_FILE` ($3E), `DOS_READ_FILE` ($3F), and `DOS_WRITE_FILE` ($40) for external user programs to utilize.
+| Subsystem | MS-DOS v4.0 Source File | Command 64 Equivalent | Status | C64 Implementation / Gap Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **API Dispatcher** | `DOS/DISPATCH.ASM`, `SRVCALL.ASM` | [api.asm](file:///home/morgan/development/c64/command64-os/src/command64/api.asm) | **Partial** | Subroutine Jump Table (`JSR $1000`) instead of CPU interrupt vector (due to 6502 stack/interrupt limits). |
+| **Memory Manager** | `DOS/ALLOC.ASM` | [vmm.asm](file:///home/morgan/development/c64/command64-os/src/command64/vmm.asm) | **Complete** | Maps 16MB virtual address space in REU (4KB page byte-map), exceeding MS-DOS conventional 640KB bounds. |
+| **File I/O Handle Table** | `DOS/HANDLE.ASM`, `FILE.ASM` | [file.asm](file:///home/morgan/development/c64/command64-os/src/command64/file.asm) | **Partial** | Maps handles 0-7 to C64 secondary addresses. Critical Gap: Handles are not yet exposed on public JSR service bus ($3D-$40). |
+| **Program Exec / Loader** | `DOS/EXEC.ASM` | [loader.asm](file:///home/morgan/development/c64/command64-os/src/command64/loader.asm) | **Partial** | Standard binary loader loading to flat `$2200` space. Relocation support is missing (planned relocator for Phase 6B). |
+| **Directory Search** | `DOS/SEARCH.ASM`, `PATH.ASM` | [path.asm](file:///home/morgan/development/c64/command64-os/src/command64/path.asm) | **Partial** | Searches filenames on disk, matches case-insensitively. Gaps: Hierarchical subdirectories and partition-walking are missing. |
+| **FAT File Allocation Table**| `DOS/FAT.ASM`, `DISK.ASM` | *(C64 Drive ROM)* | **Complete** | Delegated to the Commodore floppy disk drive (e.g. 1541/1571/1581) which handles sectors and BAM directly. |
+| **File Buffering** | `DOS/BUF.ASM` | [file.asm](file:///home/morgan/development/c64/command64-os/src/command64/file.asm) | **Complete** | Command 64 implements 64-byte buffered I/O read/write segments to optimize C64 IEC serial bus performance. |
 
 ---
 
 ## 4. Input/Output System (`IO.SYS` / BIOS)
 
-- **MS-DOS v4.0 (`BIOS/` & `DOS/DEV.ASM`):** Configures device headers and driver tables for character devices (`CON`, `PRN`, `AUX`) and block device sectors.
-- **Command 64 OS:** Completely delegates character output and sector read/write execution to the built-in **C64 KERNAL ROM** (e.g., `CHROUT` at `$FFD2`, `GETIN` at `$FFE4`, `OPEN`/`CLOSE`/`LISTEN`/`TALK` vectors).
-- **Analysis:** Complete. Reusing the KERNAL ROM is the correct architectural choice for the C64 platform, minimizing OS footprint.
+### IO.SYS BIOS / Device Driver Feature Matrix
+
+This matrix maps core BIOS low-level device drivers of `IO.SYS` to their Command 64 OS equivalents.
+
+| Driver / Device | MS-DOS v4.0 Source File | Command 64 Equivalent | Status | C64 Implementation / Gap Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **CON (Console Screen)** | `BIOS/MSCON.ASM` | KERNAL ROM + [petsci.asm](file:///home/morgan/development/c64/command64-os/src/command64/petsci.asm) | **Complete** | Screen editor screen writing (`CHROUT` at `$FFD2`) and standard 40-column PETSCII character output. |
+| **CON (Keyboard Input)** | `BIOS/MSCON.ASM` | KERNAL ROM | **Complete** | Keyboard scan buffer polling (`GETIN` at `$FFE4`) with backspace and input buffering. |
+| **Block Device (Disk Controller)**| `BIOS/MSDISK.ASM` | KERNAL ROM | **Complete** | Uses standard serial IEC bus protocols (`TALK`/`LISTEN`/`ACPTR`/`CIOUT`) to command disk drives. |
+| **PRN / LPT (Printer)** | `BIOS/MSLPT.ASM` | KERNAL ROM | **Complete** | Can direct output to device #4 (standard C64 printer address) via KERNAL serial bus. |
+| **AUX / COM (Serial/RS232)** | `BIOS/MSAUX.ASM` | KERNAL ROM | **Complete** | Can stream to C64 RS-232 device vectors if serial cartridge is connected. |
+| **CLOCK (System Clock)** | `BIOS/MSCLOCK.ASM` | *(None)* | **Missing** | CIA 1 / CIA 2 Time of Day (TOD) clock reads are not yet implemented. |
+| **SYSINIT (System Startup)** | `BIOS/MSINIT.ASM` | [shell.asm](file:///home/morgan/development/c64/command64-os/src/command64/shell.asm) | **Complete** | Boot init clears variables, verifies REU presence, installs Jump Table, and boots prompt. |
 
 ---
 
