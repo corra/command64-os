@@ -2,6 +2,9 @@
 
 ## Core Directives
 
+The folder @ms-dos/* is for **functional reference only** it **IS NOT**
+part of the source for *Command 64 OS* and should only be refered to in the context of determing feature completeness.
+
 ### Tasks
 
 1.

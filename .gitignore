@@ -5,6 +5,8 @@ tests/*.d64
 src/external/debug/build/
 src/external/debug/bin/
 
+ms-dos/
+
 # Stray root-level artifacts only (leading / anchors to repo root)
 /image.d64
 /*.prg

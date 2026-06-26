@@ -14,6 +14,7 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
   - [Virtual Memory Manager (VMM) Specification](file:///home/morgan/development/c64/command64-os/wiki/vmm-api.md) - 4KB paging, RAM Expansion Unit (REU) DMA, and MCT details.
   - [PETSCII Helper API](file:///home/morgan/development/c64/command64-os/wiki/pet-sci-api.md) - PETSCII printing macros and lowercase normalization rules.
   - [C64 Hardware Gotchas](file:///home/morgan/development/c64/command64-os/wiki/hardware-gotchas.md) - Hard-won findings about C64 hardware traps, REU clobbering, and input limits.
+  - [MS-DOS v4.0 Feature Completeness Comparison](file:///home/morgan/development/c64/command64-os/wiki/ms-dos-comparison.md) - Functional and architectural comparison mapping.
 
 ## Active & Pending Tasks
 
