@@ -107,3 +107,20 @@
 - [ ] Phase 6: Advanced OS Features
   - [ ] Implement Binary Relocator (to support `RUN` at arbitrary addresses)
   - [ ] Add Oscar64 C-Language runtime support
+
+- [ ] Time, Date & Disk Label Support
+  - [ ] VOL / LABEL Command Implementation (Task #17)
+    - [ ] Implement `cmdVol` routine in `shell.asm` to read and print the disk header name/ID
+    - [ ] Implement `cmdLabel` routine in `shell.asm` to write a new name to the disk header using the floppy disk command channel
+    - [ ] Register `VOL` and `LABEL` in the command table and the `HELP` output
+    - [ ] Verify functionality on standard D64 disk images
+  - [ ] TIME Command Implementation (Task #18)
+    - [ ] Implement TOD clock initialization routine at system boot
+    - [ ] Implement `cmdTime` handler in `shell.asm` to format and print time
+    - [ ] Implement CIA 1 TOD register write routines to allow user clock adjustments
+    - [ ] Register `TIME` in the command table and the `HELP` output
+  - [ ] DATE Command Implementation (Task #19)
+    - [ ] Define system date storage structures in kernel RAM and REU space
+    - [ ] Implement `cmdDate` handler in `shell.asm` to print and parse date inputs
+    - [ ] Register `DATE` in the command table and the `HELP` output
+    - [ ] Verify date persistence across warm starts

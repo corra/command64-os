@@ -19,7 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Configured Taskwarrior with 5 active and pending milestones under the `command64-os` project.
   - Created a structured Code Wiki under the `wiki/` directory including Home, User Manual, Debug Utility, API Reference, Programmer's Reference, VMM Specs, PETSCII Library, and C64 Hardware Gotchas.
   - Added individual task spec files under `wiki/tasks/` to track milestone requirements.
+  - Registered `VOL/LABEL` (Task #17), `TIME` (Task #18), and `DATE` (Task #19) commands in Taskwarrior and `brain/task.md`.
   - Corrected path mismatches in root `AGENTS.md` child DOX index and established missing child contracts (`src/AGENTS.md`, `tests/AGENTS.md`, `wiki/AGENTS.md`, `wiki/tasks/AGENTS.md`).
+
 - **Phase 5: Environment Support**:
   - Implemented Master Environment Block (4KB) in the REU.
   - Added `SET` internal command to display environment variables.
