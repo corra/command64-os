@@ -7,6 +7,7 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
 - **User Documentation:**
   - [OS User Manual](file:///home/morgan/development/c64/command64-os/wiki/user-manual.md) - Learn how to build, run, and use the shell commands.
   - [DEBUG Utility Manual](file:///home/morgan/development/c64/command64-os/wiki/debug-utility.md) - Learn how to use the built-in and external interactive assembly debugger.
+  - [LABEL Utility Manual](file:///home/morgan/development/c64/command64-os/wiki/label-utility.md) - Learn how to rename disk volume labels without losing data.
 
 - **Developer Specifications & References:**
   - [OS Service Bus API Reference](file:///home/morgan/development/c64/command64-os/wiki/api-reference.md) - The stable entry point (`JSR $1000`) and function codes ($02–$56).
