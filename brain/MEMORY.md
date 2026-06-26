@@ -98,6 +98,9 @@
 - [ ] Add support for multiple devices (8, 9, 10, 11)
 - [ ] Support subdirectories (1581 / SD2IEC)
 - [ ] Environment variable storage (`SET`, `PATH`) in REU
+- [ ] Implement `VOL` and `LABEL` commands (disk directory header editing)
+- [ ] Implement `TIME` command using CIA 1 TOD clock
+- [ ] Implement `DATE` command (software calendar + REU storage)
 
 ## Superpowers Docs Index
 | Document | Path |

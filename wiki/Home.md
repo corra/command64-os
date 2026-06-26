@@ -26,3 +26,8 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
   - [Phase 6A: App Manager](file:///home/morgan/development/c64/command64-os/wiki/tasks/phase-6a-app-manager.md)
   - [Phase 6B: Binary Relocator](file:///home/morgan/development/c64/command64-os/wiki/tasks/phase-6b-binary-relocator.md)
   - [Phase 6C: Oscar64 Runtime Support](file:///home/morgan/development/c64/command64-os/wiki/tasks/phase-6c-oscar64-support.md)
+
+- **Time, Date & Disk Label Support**
+  - [VOL / LABEL Command Implementation](file:///home/morgan/development/c64/command64-os/wiki/tasks/vol-label.md)
+  - [TIME Command Implementation](file:///home/morgan/development/c64/command64-os/wiki/tasks/time.md)
+  - [DATE Command Implementation](file:///home/morgan/development/c64/command64-os/wiki/tasks/date.md)
