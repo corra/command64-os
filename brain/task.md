@@ -109,11 +109,13 @@
   - [ ] Add Oscar64 C-Language runtime support
 
 - [ ] Time, Date & Disk Label Support
-  - [ ] VOL / LABEL Command Implementation (Task #17)
-    - [ ] Implement `cmdVol` routine in `shell.asm` to read and print the disk header name/ID
-    - [ ] Implement `cmdLabel` routine in `shell.asm` to write a new name to the disk header using the floppy disk command channel
-    - [ ] Register `VOL` and `LABEL` in the command table and the `HELP` output
-    - [ ] Verify functionality on standard D64 disk images
+  - [x] VOL / LABEL Command Implementation (Task #17)
+    - [x] Implement `cmdVol` routine in `shell.asm` to read and print the disk header name/ID
+    - [x] Implement `cmdLabel` routine in `shell.asm` to write a new name to the disk header using the floppy disk command channel
+    - [x] Register `VOL` and `LABEL` in the command table and the `HELP` output
+    - [x] Verify functionality on standard D64 disk images
+    - [ ] LABEL: Fix interaction inconsistencies (Task #21)
+    - [ ] LABEL: Implement syntax updates for quotes and spaces (Task #22)
   - [ ] TIME Command Implementation (Task #18)
     - [ ] Implement TOD clock initialization routine at system boot
     - [ ] Implement `cmdTime` handler in `shell.asm` to format and print time
