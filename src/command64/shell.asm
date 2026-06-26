@@ -59,8 +59,11 @@ tableCmd:
     .word cmdRun
     .text "set   "
     .word cmdSet
+    .text "vol   "
+    .word cmdVol
     .text "path  "
     .word cmdPath
+
 tableEnd:
 
 // ---------------------------------------------------------------------------
@@ -1452,7 +1455,7 @@ cmdPath:
     jsr shellSkipSpaces
     lda CommandBuffer, y
     beq cpQuery
-    
+
     // Set up VAR="path"
     lda #'p'
     sta SourceBuf
@@ -1464,7 +1467,7 @@ cmdPath:
     sta SourceBuf+3
     lda #0
     sta SourceBuf+4
-    
+
     sty ParsePos            // VAL starts at current Y
 
     // Delete old path if it exists
@@ -1481,7 +1484,7 @@ cpAppend:
     jsr envFindEnd
     jsr envAppend
     rts
-    
+
 cpQuery:
     lda #'p'
     sta SourceBuf
@@ -1495,7 +1498,7 @@ cpQuery:
     sta SourceBuf+4
     jsr envSearch
     bcs cpNotFound
-    
+
     jsr envPrintVal
     rts
 
@@ -1504,6 +1507,186 @@ cpNotFound:
     ldy #>noEnvMsg
     jsr petPrintString
     rts
+
+// VOL — display disk volume label
+cmdVol:
+    lda #1
+    ldx #<dirFname
+    ldy #>dirFname
+    jsr KernalSETNAM
+
+    lda #13
+    ldx CurrentDevice
+    ldy #0
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    bcc volOpenOk
+    jmp volDevError
+volOpenOk:
+
+    ldx #13
+    jsr KernalCHKIN
+    bcc volChkinOk
+    jmp volDevError
+volChkinOk:
+
+    // Skip 2-byte load address
+    jsr KernalChRIN
+    jsr KernalChRIN
+
+    // Skip 2-byte link pointer
+    jsr KernalChRIN
+    jsr KernalChRIN
+
+    // Skip 2-byte block count
+    jsr KernalChRIN
+    jsr KernalChRIN
+
+    // Read characters of the header line into SourceBuf
+    ldy #0
+volReadLoop:
+    jsr KernalREADST
+    bne volReadDone
+    jsr KernalChRIN
+    beq volReadDone
+    sta SourceBuf, y
+    iny
+    cpy #38
+    bne volReadLoop
+volReadDone:
+    lda #0
+    sta SourceBuf, y        // null terminate the string
+
+    jsr KernalCLRCHN
+    lda #13
+    jsr KernalCLOSE
+
+    // Parse the header string in SourceBuf
+    // Format:  0 "DISK NAME       " ID 2A
+    // Find the first double quote
+    ldy #0
+volFindFirstQuote:
+    lda SourceBuf, y
+    bne volFindFirstQuoteNotEnd
+    jmp volParseError
+volFindFirstQuoteNotEnd:
+    cmp #$22                // double quote character
+    beq volFoundFirstQuote
+    iny
+    jmp volFindFirstQuote
+
+volFoundFirstQuote:
+    iny                     // point past the first quote
+    sty TempLo              // store start of disk name
+    
+volFindSecondQuote:
+    lda SourceBuf, y
+    bne volFindSecondQuoteNotEnd
+    jmp volParseError
+volFindSecondQuoteNotEnd:
+    cmp #$22                // double quote character
+    beq volFoundSecondQuote
+    iny
+    jmp volFindSecondQuote
+
+volFoundSecondQuote:
+    // Null terminate the disk name at the second quote
+    lda #0
+    sta SourceBuf, y
+    
+    // Parse disk ID (next non-space characters after second quote)
+    iny                     // point past the second quote
+volFindIdStart:
+    lda SourceBuf, y
+    bne volFindIdStartNotEmpty
+    jmp volNoId
+volFindIdStartNotEmpty:
+    cmp #' '
+    bne volFoundIdStart
+    iny
+    jmp volFindIdStart
+
+volFoundIdStart:
+    lda SourceBuf, y
+    bne volFoundIdStartNotEmpty
+    jmp volNoId
+volFoundIdStartNotEmpty:
+    sta DestBuf
+    iny
+    lda SourceBuf, y
+    bne volFoundIdNotEmpty2
+    jmp volNoId2
+volFoundIdNotEmpty2:
+    sta DestBuf+1
+    jmp volIdDone
+
+volNoId:
+    lda #'?'
+    sta DestBuf
+volNoId2:
+    lda #'?'
+    sta DestBuf+1
+volIdDone:
+    lda #0
+    sta DestBuf+2
+
+    // Print: Volume in drive X is DISK NAME
+    lda #<volDriveMsg
+    ldy #>volDriveMsg
+    jsr petPrintString
+
+    lda CurrentDevice
+    tax
+    ldy #0
+    jsr printDecimal16
+
+    lda #<volIsMsg
+    ldy #>volIsMsg
+    jsr petPrintString
+
+    // Print the disk name (stored in SourceBuf at offset TempLo)
+    lda #<SourceBuf
+    clc
+    adc TempLo
+    sta PrintPtrLo
+    lda #>SourceBuf
+    adc #0
+    sta PrintPtrHi
+
+    lda PrintPtrLo
+    ldy PrintPtrHi
+    jsr petPrintString
+
+    lda #$0D
+    jsr KernalChROUT
+
+    // Print: Volume ID is AB
+    lda #<volIdMsg
+    ldy #>volIdMsg
+    jsr petPrintString
+
+    lda #<DestBuf
+    ldy #>DestBuf
+    jsr petPrintString
+
+    lda #$0D
+    jsr KernalChROUT
+    rts
+
+volParseError:
+    lda #<volParseErrMsg
+    ldy #>volParseErrMsg
+    jsr petPrintString
+    rts
+
+volDevError:
+    lda #<noDeviceMsg
+    ldy #>noDeviceMsg
+    jsr petPrintString
+    lda #$0D
+    jsr KernalChROUT
+    rts
+
 
 notImplMsg:
     .text "Feature not yet fully implemented"
@@ -1573,6 +1756,8 @@ helpMsg:
     .byte $0D
     .text "PATH   - SEARCH PATH"
     .byte $0D
+    .text "VOL    - SHOW DISK LABEL"
+    .byte $0D
     .text "RUN    - EXECUTE [ADDR]"
     .byte $0D
     .text "VER    - SHOW VERSION"
@@ -1609,3 +1794,20 @@ badAddrMsg:
 noDeviceMsg:
     .text "Device not present"
     .byte 0
+
+volDriveMsg:
+    .text "Volume in drive "
+    .byte 0
+
+volIsMsg:
+    .text " is "
+    .byte 0
+
+volIdMsg:
+    .text "Volume ID is "
+    .byte 0
+
+volParseErrMsg:
+    .text "Error reading volume label"
+    .byte $0D, 0
+

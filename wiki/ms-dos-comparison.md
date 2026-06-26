@@ -46,18 +46,21 @@ This matrix maps each internal CLI command, identifying its MS-DOS implementatio
 | **DATE** | `TCMD2A.ASM` | *(None)* | **Missing** | Requires reading C64 CIA Real Time Clock. |
 | **TIME** | `TCMD2A.ASM` | *(None)* | **Missing** | Requires reading C64 CIA Real Time Clock. |
 | **PROMPT** | `TENV.ASM` | *(None)* | **Missing** | Prompts are currently static. |
-| **VOL / LABEL** | `TCMD1B.ASM` | *(None)* | **Missing** | Read/write disk header label. |
+| **VOL / LABEL** | `TCMD1B.ASM` | `cmdVol`/`cmdLabel` | **Complete** | Read/write disk directory header volume label. |
 
-#### Key Gaps:
+#### Key Gaps
+
 1. **Subdirectories:** MS-DOS v4.0 has hierarchical directory navigation (`CD`, `MD`, `RD`). Command 64 OS is currently limited to flat disk operations (partially addressed by SD2IEC/1581 partitions in Phase 5).
 2. **System Clock:** MS-DOS has `DATE` and `TIME` (driven by hardware interrupts and `TIME.ASM`). Command 64 OS has no clock support.
-3. **Shell Customization:** MS-DOS has `PROMPT` to customize the command prompt dynamically. Command 64 OS has a static prompt (`C64:> `).
+3. **Shell Customization:** MS-DOS has `PROMPT` to customize the command prompt dynamically. Command 64 OS has a static prompt (`C64:>`).
 
 ### Redirection & Piping
+
 - **MS-DOS v4.0 (`TPIPE.ASM`):** Implements input/output redirection (`<`, `>`) and program command piping (`|`) by spooling temporary files to disk.
 - **Command 64 OS:** No redirection or piping features exist. Standard input is tied to the keyboard and output is tied to the C64 screen.
 
 ### Batch Scripting (`.BAT`)
+
 - **MS-DOS v4.0 (`TBATCH.ASM`):** Supports batch script parsing, variable expansion (`%1` to `%9`), and control flow instructions (`IF`, `GOTO`, `FOR`).
 - **Command 64 OS:** No support for batch execution.
 
@@ -114,12 +117,15 @@ To achieve functional completeness compared to MS-DOS v4.0, the following major 
 ## 6. Actionable Recommendations
 
 ### Short-Term (Priority 1)
+
 - **Expose Handle API on Service Bus:** Add dispatch wrappers in `api.asm` pointing to the existing file functions in `file.asm` for `$3D` (Open), `$3E` (Close), `$3F` (Read), and `$40` (Write).
 
 ### Medium-Term (Priority 2)
+
 - **Integrate Directory Walking:** Complete the pending Phase 5 subdirectory parsing tasks to support nested structures.
 - **Implement Binary Relocator:** Proceed with Phase 6B relocator design to decouple program execution from static memory boundaries.
 
 ### Long-Term (Priority 3)
+
 - **Time of Day CIA Clock:** Read C64 CIA registers to drive system time tracking.
 - **I/O Redirection:** Implement basic output redirection (e.g., `DIR > OUTFILE.TXT`) by intercepting character output vectors.

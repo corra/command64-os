@@ -24,4 +24,3 @@ and to that end certain reasonable concessions and source code modifications wil
     if it will aid your development.
 - `brain/KNOWLEDGE.md`: Record architectural decisions and findings.
 - `brain/MEMORY.md`: Update at session end with current status and next steps.
-

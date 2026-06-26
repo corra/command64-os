@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **Shell Command Table**: Restored the accidentally deleted `cmdPath` handler and corrected the `tableCmd` command table alignment to prevent crashes when executing commands.
+- **External LABEL Utility**: Relocated the drive initialization command (`I`) to execute *before* the data channel is opened. This resolves the `"70,no channel"` error by avoiding resetting buffers after they have been allocated for the data channel. Updated the U1, B-P, and U2 command strings to use standard colons (`U1:`, `B-P:`, `U2:`) to ensure correct parsing across drive firmware. Also, implemented a BAM cache flush by sending the `"I"` command again *after* a successful block write, forcing the drive to synchronize its internal BAM cache with the disk so the new label takes effect immediately.
+
 ### Added
 - **CMake Build System Migration**:
   - Replaced the legacy single GNU Makefile with a modular, cross-platform CMake build system configured via root `CMakeLists.txt`.
@@ -50,6 +54,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Parsing Robustness**: Centralized argument parsing via `shellSkipSpaces` to prevent label-reuse bugs.
 - **Filename Match**: Resolved issue where lowercase disk entries failed to match normalized uppercase shell input.
+- **Volume Name & Label**: Fixed the `31,syntax error` in `cmdLabel` by using raw binary parameters (`U1:`, `B-P:`, `U2:`) sent byte-by-byte instead of ASCII string representation. Fixed a data channel LFN clobbering bug by storing it in a persistent RAM variable `labelLfn` rather than zero-page `NamePtrLo`.
 
 ## [0.2.22] - 2026-05-14
 

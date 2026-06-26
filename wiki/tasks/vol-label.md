@@ -9,7 +9,7 @@ Implement the internal shell commands `VOL` and `LABEL` for reading and writing 
 - Limit inputs to standard C64 filename lengths (up to 16 characters for label).
 
 ## Sub-tasks
-- [ ] Implement `cmdVol` routine in `shell.asm` to read and print the disk header name/ID.
-- [ ] Implement `cmdLabel` routine in `shell.asm` to write a new name to the disk header using the floppy disk command channel.
-- [ ] Register `VOL` and `LABEL` in the command table and the `HELP` output.
-- [ ] Verify functionality on standard D64 disk images.
+- [x] Implement `cmdVol` routine in `shell.asm` to read and print the disk header name/ID.
+- [x] Implement `cmdLabel` routine in `shell.asm` to write a new name to the disk header using the floppy disk command channel.
+- [x] Register `VOL` and `LABEL` in the command table and the `HELP` output.
+- [x] Verify functionality on standard D64 disk images.

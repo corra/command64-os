@@ -40,6 +40,9 @@ set(CMD64_ENTRY "src/command64.asm")
 file(GLOB_RECURSE DEBUG_SRCS "src/external/debug/*.asm" "include/*.inc")
 set(DEBUG_ENTRY "src/external/debug/debug.asm")
 
+file(GLOB_RECURSE LABEL_SRCS "src/external/label/*.asm" "include/*.inc")
+set(LABEL_ENTRY "src/external/label/label.asm")
+
 # Dynamic build numbers custom commands
 # These trigger the increment script only when dependency files change
 add_custom_command(
@@ -82,7 +85,13 @@ add_kickass_target(debug
     INCLUDE_DIRS "${CMAKE_BINARY_DIR}"
 )
 
-# 3. Test PRGs (one per tests/src/*.asm)
+# 3. LABEL External Command PRG Target
+add_kickass_target(label
+    ENTRY_FILE "${LABEL_ENTRY}"
+    SOURCES ${LABEL_SRCS}
+)
+
+# 4. Test PRGs (one per tests/src/*.asm)
 file(GLOB TEST_SRCS "tests/src/*.asm")
 set(TEST_TARGETS "")
 foreach(TEST_SRC ${TEST_SRCS})
@@ -96,7 +105,7 @@ foreach(TEST_SRC ${TEST_SRCS})
     list(APPEND TEST_TARGETS ${TEST_TARGET})
 endforeach()
 
-# 4. Oscar64 C Targets (inert until C sources are added)
+# 5. Oscar64 C Targets (inert until C sources are added)
 file(GLOB_RECURSE C_SRCS "src/*.c" "src/**/*.c")
 set(C_TARGETS "")
 if(Oscar64_FOUND AND C_SRCS)
@@ -109,8 +118,8 @@ if(Oscar64_FOUND AND C_SRCS)
     endforeach()
 endif()
 
-# 5. Disk images
-set(IMAGE_PRG_TARGETS command64 debug ${C_TARGETS})
+# 6. Disk images
+set(IMAGE_PRG_TARGETS command64 debug label ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS})
 
 add_c64_disk_image(image_d64
