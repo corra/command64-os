@@ -116,6 +116,7 @@
     - [x] Verify functionality on standard D64 disk images
     - [ ] LABEL: Fix interaction inconsistencies (Task #21)
     - [ ] LABEL: Implement syntax updates for quotes and spaces (Task #22)
+    - [ ] LABEL: Support target device parameter like 9:NEWLABEL (Task #23)
   - [ ] TIME Command Implementation (Task #18)
     - [ ] Implement TOD clock initialization routine at system boot
     - [ ] Implement `cmdTime` handler in `shell.asm` to format and print time
