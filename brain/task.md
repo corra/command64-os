@@ -100,6 +100,7 @@
 - [ ] Phase 5: Environment & Multi-Device Support
   - [x] Implement `DRIVE` command (with `DEVICE`/`DEV` aliases)
   - [ ] Add support for multiple devices (8, 9, 10, 11)
+  - [ ] CLI: Generalize device targeting syntax for commands like DIR, TYPE, VOL, LABEL (Task #24)
   - [ ] Support subdirectories (1581 / SD2IEC)
   - [x] Environment variable storage (`SET`, `PATH`) in REU
   - [x] Remediate environment hang and PATH bugs (2026-05-14) — `brain/plans/2026-05-14-env-var-remediation.md`
