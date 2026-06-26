@@ -22,9 +22,31 @@ This is a running document comparing the features of **Command 64 OS** to the re
 
 ## 2. Core Shell & CLI Interpreter (`COMMAND.COM`)
 
-### Internal Commands Comparison
-- **Command 64 OS (Implemented):** `CLS`, `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VER`, `HELP`, `SET`, `PATH`, `DRIVE` (device selection), `EXIT`.
-- **MS-DOS v4.0 (Reference):** `CLS`, `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VER`, `SET`, `PATH`, `DATE`, `TIME`, `MD`/`MKDIR`, `RD`/`RMDIR`, `CD`/`CHDIR`, `VOL`, `LABEL`, `PROMPT`, `BREAK`, `EXIT`.
+### Internal Commands Feature Matrix
+
+This matrix maps each internal CLI command, identifying its MS-DOS implementation file, its Command 64 OS equivalent code/handler, its completeness status, and C64-specific considerations.
+
+| Command | MS-DOS v4.0 Source File | Command 64 Handler | Status | C64 Implementation / Gap Notes |
+| :--- | :--- | :--- | :--- | :--- |
+| **CLS** | `TCMD2A.ASM` | `cmdCls` | **Complete** | Clears screen and resets cursor via standard KERNAL screen editor call. |
+| **DIR** | `TCMD1A.ASM` | `cmdDir` | **Complete** | Streams and lists filenames from C64 disk drive via KERNAL channel. |
+| **TYPE** | `TCMD1A.ASM` | `cmdType` | **Complete** | Prints file contents using standard KERNAL streaming. |
+| **COPY** | `COPY.ASM` | `cmdCopy` | **Complete** | Copies files via open source/destination handles using 64-byte buffering. |
+| **DEL / ERASE** | `TCMD1B.ASM` | `cmdDel` | **Complete** | Scratches disk files using the floppy disk command channel. |
+| **REN / RENAME** | `TCMD1B.ASM` | `cmdRename` | **Complete** | Renames files via the disk command channel. |
+| **VER** | `TCMD1A.ASM` | `cmdVer` | **Complete** | Displays kernel version and build number. |
+| **HELP** | *(None - External)* | `cmdHelp` | **Complete** | Command 64 custom command displaying help text for internal functions. |
+| **SET** | `TENV.ASM` | `cmdSet` | **Complete** | Lists environment variables stored persistently in the REU. |
+| **PATH** | `TENV.ASM` | `cmdPath` | **Complete** | Manages executable search path stored in the REU. |
+| **DRIVE / DEV** | *(Drive letters, e.g., `A:`)* | `cmdDrive` | **Complete** | Command 64 custom command to switch the active device (8-11). |
+| **EXIT** | `TCMD2B.ASM` | `cmdExit` | **Complete** | Terminates Command 64 and warm-starts BASIC (`JMP $E37B`). |
+| **CD / CHDIR** | `TCMD1B.ASM` | *(None)* | **Missing** | Planned for partition/directory navigation (1581/SD2IEC). |
+| **MD / MKDIR** | `TCMD1B.ASM` | *(None)* | **Missing** | Planned for subdirectories. |
+| **RD / RMDIR** | `TCMD1B.ASM` | *(None)* | **Missing** | Planned for subdirectory removal. |
+| **DATE** | `TCMD2A.ASM` | *(None)* | **Missing** | Requires reading C64 CIA Real Time Clock. |
+| **TIME** | `TCMD2A.ASM` | *(None)* | **Missing** | Requires reading C64 CIA Real Time Clock. |
+| **PROMPT** | `TENV.ASM` | *(None)* | **Missing** | Prompts are currently static. |
+| **VOL / LABEL** | `TCMD1B.ASM` | *(None)* | **Missing** | Read/write disk header label. |
 
 #### Key Gaps:
 1. **Subdirectories:** MS-DOS v4.0 has hierarchical directory navigation (`CD`, `MD`, `RD`). Command 64 OS is currently limited to flat disk operations (partially addressed by SD2IEC/1581 partitions in Phase 5).
