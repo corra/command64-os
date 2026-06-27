@@ -137,6 +137,24 @@ command64 supports up to four disk devices simultaneously (8, 9, 10, and 11).
 - `DRIVE 9` — Switches all future operations (DIR, LOAD, etc.) to device 9.
 - `DRIVE` — Displays the currently active device.
 
+### Target Device Routing
+
+**Description:** Temporarily redirects a single disk operation to a specific drive (8, 9, 10, or 11) using the drive number followed by a colon (`:`).
+This routing applies only to the duration of that specific command, leaving the active device (set by `DRIVE`) unchanged.
+
+**Supported Commands:** `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and `LABEL`.
+
+**Examples:**
+- `DIR 9:` — Lists the directory of the disk in device 9.
+- `VOL 9:` — Displays the volume label of the disk in device 9.
+- `TYPE 9:README` — Displays the file `README` from device 9.
+- `LABEL 9:NEWLABEL` — Sets the volume label of device 9 to `NEWLABEL`.
+- `DEL 9:OLDDATA` — Deletes `OLDDATA` on device 9.
+- `REN 9:OLD NEW` — Renames `OLD` to `NEW` on device 9.
+- `COPY 9:FILE1 8:FILE2` — Copies `FILE1` from device 9 to device 8 as `FILE2`.
+- `COPY FILE 9:FILE` — Copies `FILE` from the active drive (e.g., 8) to device 9.
+- `COPY 9:FILE FILE` — Copies `FILE` from device 9 to the active drive.
+
 ---
 
 <a name="environment-variables"></a>

@@ -82,17 +82,20 @@ foCopyDone:
     lda HexValLo
     beq foSkipMode          // Read mode (default)
     
-    // Append ",S,W" for Write
+    // Append ",<type>,W" for Write (using standard unshifted ASCII characters)
     lda #','
     sta FileScratch, y
     iny
-    lda #'S'
+    lda HexValHi            // Check if caller specified a custom file type (e.g. 'P' or 'S')
+    bne foUseType
+    lda #$50                // Default to unshifted 'P' (PRG) if not specified
+foUseType:
     sta FileScratch, y
     iny
     lda #','
     sta FileScratch, y
     iny
-    lda #'W'
+    lda #$57                // unshifted 'W'
     sta FileScratch, y
     iny
     
@@ -314,29 +317,30 @@ fileDelete:
     stx NamePtrLo
     sty NamePtrHi
     
-    // 1. Prepare "S:" in FileScratch
-    lda #'S'
+    // 1. Prepare "S0:" in FileScratch (using standard unshifted ASCII 'S')
+    lda #$53                // unshifted 'S'
     sta FileScratch
-    lda #':'
+    lda #'0'
     sta FileScratch + 1
+    lda #':'
+    sta FileScratch + 2
     
     // 2. Append filename
     ldy #0
 fdCopyLoop:
     lda (NamePtrLo), y
     beq fdCopyDone
-    sta FileScratch + 2, y
+    sta FileScratch + 3, y
     iny
     jmp fdCopyLoop
 fdCopyDone:
-    // Total length = Y + 2
+    // Total length = Y + 3
     tya
     clc
-    adc #2
+    adc #3
     tay                     // Y = Total length
     
-    // 3. Normalize filename (starting from index 2)
-    // We can just normalize the whole "S:filename" string
+    // 3. Normalize filename (starting from index 3 or whole string)
     tya
     tax                     // X = Total length
     lda #<FileScratch
@@ -379,26 +383,28 @@ fileRename:
     stx NamePtrLo           // Use NamePtr as temporary for Old Name
     sty NamePtrHi
     
-    // 1. Prepare "R:" in FileScratch
-    lda #'R'
+    // 1. Prepare "R0:" in FileScratch (using standard unshifted ASCII 'R')
+    lda #$52                // unshifted 'R'
     sta FileScratch
-    lda #':'
+    lda #'0'
     sta FileScratch + 1
+    lda #':'
+    sta FileScratch + 2
     
     // 2. Append New Name from PrintPtrLo/Hi
     ldy #0
 frCopyNew:
     lda (PrintPtrLo), y
     beq frGotNew
-    sta FileScratch + 2, y
+    sta FileScratch + 3, y
     iny
     jmp frCopyNew
 frGotNew:
-    // FileScratch index now at Y + 2
+    // FileScratch index now at Y + 3
     
     // 3. Append "="
     lda #'='
-    sta FileScratch + 2, y
+    sta FileScratch + 3, y
     iny
     
     // 4. Append Old Name from NamePtrLo/Hi
@@ -408,15 +414,15 @@ frCopyOld:
     lda (NamePtrLo), y
     beq frGotOld
     ldx TempLo
-    sta FileScratch + 2, x
+    sta FileScratch + 3, x
     inc TempLo
     iny
     jmp frCopyOld
 frGotOld:
-    // Total length = TempLo + 2
+    // Total length = TempLo + 3
     lda TempLo
     clc
-    adc #2
+    adc #3
     tay                     // Y = Total length
     
     // 5. Normalize string

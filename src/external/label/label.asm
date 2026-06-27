@@ -30,6 +30,7 @@
 
 // Zero-page scratch ($70 is free for external program use)
 .label ArgIdx = $70     // CommandBuffer index of first label char
+.label SavedDevice = $71 // Saved device number
 
 // Drive protocol constants
 .const CMD_CHANNEL  = 15    // CBM DOS command channel (always LFN/SA 15)
@@ -44,6 +45,10 @@
 // Entry point
 // ---------------------------------------------------------------------------
 start:
+    // Save original CurrentDevice
+    lda CurrentDevice
+    sta SavedDevice
+
     // The shell sets ParsePos ($63) to the CommandBuffer index of the first
     // character of the typed command ("label ..."). Scan past that token
     // to find where the label argument begins.
@@ -70,9 +75,28 @@ skipSpaces:
 
 endSpaces:
     cmp #0                  // null after all the spaces → nothing to set
-    bne countStart
+    beq labelNoArg
+    
+    // Parse device prefix
+    jsr parseDevicePrefix
+    bcc labelNoPrefix
+    sta CurrentDevice
+    
+    // Skip spaces after prefix
+skipSpacesPostPrefix:
+    lda CommandBuffer, y
+    cmp #' '
+    bne checkNullPostPrefix
+    iny
+    jmp skipSpacesPostPrefix
+checkNullPostPrefix:
+    cmp #0
+    bne labelNoPrefix
+    
+labelNoArg:
     jmp noArgErr
 
+labelNoPrefix:
     // -----------------------------------------------------------------------
     // Count label characters; enforce maximum length of 16.
     // -----------------------------------------------------------------------
@@ -292,7 +316,7 @@ closeCommandChannel:
     ldy #>okMsg
     lda #DOS_PRINT_STR
     jsr $1000
-    rts
+    jmp labelExit
 
 printDriveError:
     // Print the raw drive status string for diagnostics.
@@ -306,7 +330,7 @@ printErrLoop:
 printErrDone:
     lda #$0D
     jsr KernalChROUT
-    rts
+    jmp labelExit
 
     // -----------------------------------------------------------------------
     // Error paths (argument / length / device errors)
@@ -316,20 +340,112 @@ noArgErr:
     ldy #>reqMsg
     lda #DOS_PRINT_STR
     jsr $1000
-    rts
+    jmp labelExit
 
 tooLongErr:
     ldx #<lenMsg
     ldy #>lenMsg
     lda #DOS_PRINT_STR
     jsr $1000
-    rts
+    jmp labelExit
 
 openErr:
     ldx #<devMsg
     ldy #>devMsg
     lda #DOS_PRINT_STR
     jsr $1000
+    jmp labelExit
+
+// --- parseDevicePrefix ---
+// Parses a device prefix (8:, 9:, 10:, 11:) in CommandBuffer starting at Y.
+// Output: 
+//   Carry: 1 = Prefix found, target device in A, Y advanced past the prefix.
+//          0 = No prefix found, Y unchanged.
+//   A = Target device number (8-11), or unchanged if Carry=0.
+// Clobbers: A
+parseDevicePrefix:
+    lda CommandBuffer, y
+    cmp #'8'
+    beq pdpCheck8
+    cmp #'9'
+    beq pdpCheck9
+    cmp #'1'
+    beq pdpCheck10or11
+    clc                     // No match
+    rts
+
+pdpCheck8:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound8
+    dey                     // Restore Y
+    clc
+    rts
+pdpFound8:
+    iny                     // Skip ':'
+    lda #8
+    sec
+    rts
+
+pdpCheck9:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound9
+    dey                     // Restore Y
+    clc
+    rts
+pdpFound9:
+    iny                     // Skip ':'
+    lda #9
+    sec
+    rts
+
+pdpCheck10or11:
+    iny
+    lda CommandBuffer, y
+    cmp #'0'
+    beq pdpCheck10
+    cmp #'1'
+    beq pdpCheck11
+    dey                     // Restore Y
+    clc
+    rts
+
+pdpCheck10:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound10
+    dey                     // Restore Y for ':'
+    dey                     // Restore Y for '0'
+    clc
+    rts
+pdpFound10:
+    iny                     // Skip ':'
+    lda #10
+    sec
+    rts
+
+pdpCheck11:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound11
+    dey                     // Restore Y for ':'
+    dey                     // Restore Y for '1'
+    clc
+    rts
+pdpFound11:
+    iny                     // Skip ':'
+    lda #11
+    sec
+    rts
+
+labelExit:
+    lda SavedDevice
+    sta CurrentDevice
     rts
 
 // ---------------------------------------------------------------------------

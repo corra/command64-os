@@ -136,6 +136,13 @@ add_c64_disk_image(test_image_d64
     PRGS ${TEST_IMAGE_PRG_TARGETS}
 )
 
+# Add test SEQ file to test.d64
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending SEQ test file to test.d64"
+)
+
 # 6. Release Target
 # Gather built binary paths to pass to release script
 get_target_property(CMD64_PATH command64 C64_PRG_PATH)

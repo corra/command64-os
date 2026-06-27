@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
+- **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
+
 ### Fixed
+- **File System Primitives**: Fixed a critical bug in `file.asm` where drive suffixes `,S,W`, `S:`, and `R:` were compiled as shifted PETSCII due to `petscii_mixed` encoding, causing drive-side syntax errors. Replaced them with unshifted byte values (`$53`, `$57`, `$52`). Also, prepended the drive number `'0'` (e.g. `S0:`, `R0:`) to scratch and rename command strings to comply with the standard 1541 DOS syntax. Changed default file creation suffix from `,S,W` (Sequential Write) to `,P,W` (Program Write) to preserve the `PRG` file type on copied files.
 - **Shell Command Table**: Restored the accidentally deleted `cmdPath` handler and corrected the `tableCmd` command table alignment to prevent crashes when executing commands.
 - **External LABEL Utility**: Relocated the drive initialization command (`I`) to execute *before* the data channel is opened. This resolves the `"70,no channel"` error by avoiding resetting buffers after they have been allocated for the data channel. Updated the U1, B-P, and U2 command strings to use standard colons (`U1:`, `B-P:`, `U2:`) to ensure correct parsing across drive firmware. Also, implemented a BAM cache flush by sending the `"I"` command again *after* a successful block write, forcing the drive to synchronize its internal BAM cache with the disk so the new label takes effect immediately.
 

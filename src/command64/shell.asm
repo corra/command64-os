@@ -69,7 +69,7 @@ tableEnd:
 // ---------------------------------------------------------------------------
 // Command Shell  (loaded at $1180)
 // ---------------------------------------------------------------------------
-.segment CommandShell [start=$1180]
+.segment CommandShell [start=$1130]
 
 // --- Entry point ---
 start:
@@ -537,6 +537,16 @@ crError:
 
 // DIR — list directory contents (non-destructive)
 cmdDir:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    
+    lda CurrentDevice
+    sta SavedDevice
+    
+    jsr parseDevicePrefix
+    bcc dirNoPrefix
+    sta CurrentDevice
+dirNoPrefix:
     lda #1
     ldx #<dirFname
     ldy #>dirFname
@@ -599,7 +609,7 @@ cdDone:
     jsr KernalCLRCHN
     lda #13
     jsr KernalCLOSE
-    rts
+    jmp dirExit
 
 cdDevError:
     lda #<noDeviceMsg
@@ -607,6 +617,11 @@ cdDevError:
     jsr petPrintString
     lda #PetCr
     jsr KernalChROUT
+    // fall through to dirExit
+
+dirExit:
+    lda SavedDevice
+    sta CurrentDevice
     rts
 
 // TYPE — display contents of a file
@@ -616,6 +631,14 @@ cmdType:
     lda CommandBuffer, y
     beq ctNoArgs
     
+    lda CurrentDevice
+    sta SavedDevice
+    
+    jsr parseDevicePrefix
+    bcc typeNoPrefix
+    sta CurrentDevice
+    jsr shellSkipSpaces
+typeNoPrefix:
     // Extract filename (token until space or null)
     sty TempLo              // Start index
 ctScanEnd:
@@ -683,22 +706,30 @@ ctReadDone:
     jsr apiHandler
     lda #PetCr
     jsr KernalChROUT
-    rts
+    jmp typeExit
 
 ctNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    rts
+    jmp typeExit
 
 ctOpenErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
+    jmp typeExit
+
+typeExit:
+    lda SavedDevice
+    sta CurrentDevice
     rts
 
 // DEL / ERASE — delete a file from disk
 cmdDel:
+    lda CurrentDevice
+    sta SavedDevice
+
     ldy ParsePos
 cdelSkipSpaces:
     lda CommandBuffer, y
@@ -709,6 +740,11 @@ cdelSkipSpaces:
     jmp cdelSkipSpaces
 
 cdelFoundName:
+    jsr parseDevicePrefix
+    bcc delNoPrefix
+    sta CurrentDevice
+    jsr shellSkipSpaces
+delNoPrefix:
     // Extract filename (token until space or null)
     sty TempLo              // Start index
 cdelScanEnd:
@@ -738,22 +774,30 @@ cdelGotEnd:
     
     lda #PetCr
     jsr KernalChROUT
-    rts
+    jmp delExit
 
 cdelNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    rts
+    jmp delExit
 
 cdelErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
+    jmp delExit
+
+delExit:
+    lda SavedDevice
+    sta CurrentDevice
     rts
 
 // REN / RENAME — rename a file on disk
 cmdRen:
+    lda CurrentDevice
+    sta SavedDevice
+
     ldy ParsePos
 crenSkip1:
     lda CommandBuffer, y
@@ -764,6 +808,11 @@ crenSkip1:
     jmp crenSkip1
 
 crenFoundOld:
+    jsr parseDevicePrefix
+    bcc renNoPrefix
+    sta CurrentDevice
+    jsr shellSkipSpaces
+renNoPrefix:
     sty TempLo              // Start of Old Name
 crenScan1:
     lda CommandBuffer, y
@@ -786,6 +835,8 @@ crenSkip2:
     jmp crenSkip2
 
 crenFoundNew:
+    jsr parseDevicePrefix
+    jsr shellSkipSpaces
     sty TempHi              // Start of New Name
 crenScan2:
     lda CommandBuffer, y
@@ -823,23 +874,31 @@ crenGotNew:
     
     lda #PetCr
     jsr KernalChROUT
-    rts
+    jmp renExit
 
 crenNoArgs:
 crenNoNew:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    rts
+    jmp renExit
 
 crenErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
+    jmp renExit
+
+renExit:
+    lda SavedDevice
+    sta CurrentDevice
     rts
 
 // COPY — copy a file
 cmdCopy:
+    lda CurrentDevice
+    sta SavedDevice
+
     ldy ParsePos
     // 1. Skip spaces
 ccSkip1:
@@ -853,6 +912,15 @@ ccCheckSpace1:
     jmp ccSkip1
 
 ccFoundSrc:
+    // Parse prefix on source
+    jsr parseDevicePrefix
+    bcs ccSrcPrefixFound
+    // No prefix on source: use CurrentDevice
+    lda CurrentDevice
+ccSrcPrefixFound:
+    sta SrcDevice
+    jsr shellSkipSpaces
+
     // 2. Copy source name to SourceBuf
     ldx #0
 ccCopySrc:
@@ -882,6 +950,15 @@ ccCheckSpace3:
     jmp ccSkip2
 
 ccFoundDest:
+    // Parse prefix on dest
+    jsr parseDevicePrefix
+    bcs ccDstPrefixFound
+    // No prefix on dest: default to SavedDevice
+    lda SavedDevice
+ccDstPrefixFound:
+    sta DstDevice
+    jsr shellSkipSpaces
+
     // 4. Copy dest name to DestBuf
     ldx #0
 ccCopyDest:
@@ -897,7 +974,28 @@ ccGotDest:
     lda #0
     sta DestBuf, x
     
+    // Check if DestBuf is empty (first character is 0)
+    lda DestBuf
+    bne ccDestNotEmpty
+    
+    // DestBuf is empty: copy SourceBuf to DestBuf
+    ldx #0
+ccCopySrcToDest:
+    lda SourceBuf, x
+    sta DestBuf, x
+    beq ccDestNotEmpty      // copy stops after null terminator is written
+    inx
+    jmp ccCopySrcToDest
+    
+ccDestNotEmpty:
+    // Determine source file type before opening it
+    jsr getSourceFileType
+    sta HexValHi            // Save file type for destination open
+    
     // 5. Open Source for Read
+    lda SrcDevice
+    sta CurrentDevice
+    
     lda #0
     sta HexValLo            // mode=0 (Read)
     ldx #<SourceBuf
@@ -908,6 +1006,9 @@ ccGotDest:
     sta SrcHandle           // Use dedicated ZP handle scratch
 
     // 6. Open Dest for Write
+    lda DstDevice
+    sta CurrentDevice
+    
     lda #1
     sta HexValLo            // mode=1 (Write)
     ldx #<DestBuf
@@ -917,11 +1018,14 @@ ccGotDest:
     bcs ccCloseSrcErr       // Error opening dest, close source
     sta DstHandle           // Use dedicated ZP handle scratch
 
+    lda #0
+    sta HexValHi            // Clear HexValHi so we don't leak the type to other file opens
+
     // 7. Copy Loop
 ccLoop:
     lda SrcHandle           // Source Handle -> FileHandle for read call
     sta FileHandle
-    ldx #<CommandBuffer
+    ldx #<CommandBuffer     // Reuse CommandBuffer as read buffer
     ldy #>CommandBuffer
     lda #64                 // 64-byte chunk
     sta HexValLo
@@ -965,20 +1069,20 @@ ccDone:
     
     lda #PetCr
     jsr KernalChROUT
-    rts
+    jmp copyExit
 
 ccNoArgs:
 ccNoDest:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    rts
+    jmp copyExit
 
 ccOpenErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
-    rts
+    jmp copyExit
 
 ccCloseSrcErr:
     lda SrcHandle           // source handle — TempLo holds scan index here, not the handle
@@ -986,6 +1090,11 @@ ccCloseSrcErr:
     lda #DOS_CLOSE_FILE
     jsr apiHandler
     jmp ccOpenErr
+
+copyExit:
+    lda SavedDevice
+    sta CurrentDevice
+    rts
 
 // --- shellSkipSpaces ---
 // Skips spaces in CommandBuffer starting at Y.
@@ -999,6 +1108,265 @@ shellSkipSpaces:
     jmp shellSkipSpaces
 sssDone:
     rts
+
+// --- parseDevicePrefix ---
+// Parses a device prefix (8:, 9:, 10:, 11:) in CommandBuffer starting at Y.
+// Output: 
+//   Carry: 1 = Prefix found, target device in A, Y advanced past the prefix.
+//          0 = No prefix found, Y unchanged.
+//   A = Target device number (8-11), or unchanged if Carry=0.
+// Clobbers: A
+parseDevicePrefix:
+    lda CommandBuffer, y
+    cmp #'8'
+    beq pdpCheck8
+    cmp #'9'
+    beq pdpCheck9
+    cmp #'1'
+    beq pdpCheck10or11
+    clc                     // No match
+    rts
+
+pdpCheck8:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound8
+    dey                     // Restore Y
+    clc
+    rts
+pdpFound8:
+    iny                     // Skip ':'
+    lda #8
+    sec
+    rts
+
+pdpCheck9:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound9
+    dey                     // Restore Y
+    clc
+    rts
+pdpFound9:
+    iny                     // Skip ':'
+    lda #9
+    sec
+    rts
+
+pdpCheck10or11:
+    iny
+    lda CommandBuffer, y
+    cmp #'0'
+    beq pdpCheck10
+    cmp #'1'
+    beq pdpCheck11
+    dey                     // Restore Y
+    clc
+    rts
+
+pdpCheck10:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound10
+    dey                     // Restore Y for ':'
+    dey                     // Restore Y for '0'
+    clc
+    rts
+pdpFound10:
+    iny                     // Skip ':'
+    lda #10
+    sec
+    rts
+
+pdpCheck11:
+    iny
+    lda CommandBuffer, y
+    cmp #':'
+    beq pdpFound11
+    dey                     // Restore Y for ':'
+    dey                     // Restore Y for '1'
+    clc
+    rts
+pdpFound11:
+    iny                     // Skip ':'
+    lda #11
+    sec
+    rts
+
+// Local variables for device routing state
+SavedDevice: .byte 0
+SrcDevice:   .byte 0
+DstDevice:   .byte 0
+
+// --- getSourceFileType ---
+// Finds the file type of the file in SourceBuf on SrcDevice by reading the directory.
+// Output: A = 'P' ($50) or 'S' ($53) or 'U' ($55)
+// Clobbers: A, X, Y
+getSourceFileType:
+    // Open directory on SrcDevice
+    lda #1
+    ldx #<dirFname          // "$"
+    ldy #>dirFname
+    jsr KernalSETNAM
+    
+    lda #13                 // LFN 13
+    ldx SrcDevice
+    ldy #0
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    bcc gsftOpenOk
+    jmp gsftDefault         // If open fails, default to PRG
+gsftOpenOk:
+    
+    ldx #13
+    jsr KernalCHKIN
+    bcc gsftChkinOk
+    jmp gsftDefault
+gsftChkinOk:
+    
+    // Skip 2-byte load address
+    jsr KernalGetIn
+    jsr KernalGetIn
+    
+    // Skip 2-byte link pointer
+    jsr KernalGetIn
+    jsr KernalGetIn
+    
+    // Skip 2-byte block count
+    jsr KernalGetIn
+    jsr KernalGetIn
+    
+    // Read header line until null
+gsftSkipHeader:
+    jsr KernalGetIn
+    bne gsftSkipHeader
+    
+gsftLineLoop:
+    // Read link bytes
+    jsr KernalGetIn
+    sta TempLo
+    jsr KernalGetIn
+    ora TempLo
+    bne gsftLinkOk
+    jmp gsftNotFound        // Link Lo/Hi is 0 -> EOF
+gsftLinkOk:
+    
+    // Read block count (line number)
+    jsr KernalGetIn
+    jsr KernalGetIn
+    
+    // Read until first quote
+gsftFindQuote:
+    jsr KernalGetIn
+    bne gsftQuoteCheck
+    jmp gsftLineDone        // unexpected null
+gsftQuoteCheck:
+    cmp #$22                // double quote
+    bne gsftFindQuote
+    
+    // Read filename and compare with SourceBuf
+    ldx #0                  // Index into filename
+gsftReadName:
+    jsr KernalGetIn
+    bne gsftCharCheck
+    jmp gsftLineDone        // unexpected null
+gsftCharCheck:
+    cmp #$22                // second quote
+    beq gsftNameDone
+    
+    // Compare character with SourceBuf, x
+    // Normalize both characters to lowercase for comparison
+    pha
+    jsr petsciiToLower
+    sta TempHi
+    lda SourceBuf, x
+    jsr petsciiToLower
+    cmp TempHi
+    beq gsftCharMatch
+    // Character mismatch! Mark mismatch
+    lda #$FF
+    sta gsftMismatchFlag
+gsftCharMatch:
+    pla
+    inx
+    jmp gsftReadName
+
+gsftNameDone:
+    // Check if lengths match
+    // SourceBuf is null-terminated, so SourceBuf, x should be 0!
+    lda SourceBuf, x
+    bne gsftNoMatch
+    
+    // Check mismatch flag
+    lda gsftMismatchFlag
+    bne gsftNoMatch
+    
+    // Found it! Now read characters and skip spaces to find file type
+gsftFindType:
+    jsr KernalGetIn
+    bne gsftTypeCheck
+    jmp gsftLineDone
+gsftTypeCheck:
+    cmp #' '
+    beq gsftFindType
+    
+    // We found the first non-space char of the type (e.g. 'P' or 'S')
+    // Save it in TempHi
+    sta TempHi
+    
+    // Read remaining characters until null (to clear the line)
+gsftClearLine:
+    jsr KernalGetIn
+    bne gsftClearLine
+    
+    // Close directory
+    jsr KernalCLRCHN
+    lda #13
+    jsr KernalCLOSE
+    
+    // Return type character in A
+    lda TempHi
+    rts
+
+gsftNoMatch:
+    // Reset mismatch flag
+    lda #0
+    sta gsftMismatchFlag
+    
+    // Read rest of line until null
+gsftSkipLine:
+    jsr KernalGetIn
+    bne gsftSkipLine
+    jmp gsftLineLoop
+
+gsftLineDone:
+    // Line ended unexpectedly (null)
+    jmp gsftLineLoop
+
+gsftNotFound:
+gsftDefault:
+    jsr KernalCLRCHN
+    lda #13
+    jsr KernalCLOSE
+    lda #$50                // Default to 'P'
+    rts
+
+gsftMismatchFlag:
+    .byte 0
+
+// Helper to convert character in A to lowercase PETSCII
+petsciiToLower:
+    cmp #$C1
+    bcc ptlNoShift
+    cmp #$DB
+    bcs ptlNoShift
+    and #$7F
+ptlNoShift:
+    rts
+
 
 // DRIVE — switch active device
 cmdDrive:
@@ -1510,6 +1878,17 @@ cpNotFound:
 
 // VOL — display disk volume label
 cmdVol:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    
+    lda CurrentDevice
+    sta SavedDevice
+    
+    jsr parseDevicePrefix
+    bcc volNoPrefix
+    sta CurrentDevice
+    jsr shellSkipSpaces
+volNoPrefix:
     lda #1
     ldx #<dirFname
     ldy #>dirFname
@@ -1671,13 +2050,13 @@ volIdDone:
 
     lda #$0D
     jsr KernalChROUT
-    rts
+    jmp volExit
 
 volParseError:
     lda #<volParseErrMsg
     ldy #>volParseErrMsg
     jsr petPrintString
-    rts
+    jmp volExit
 
 volDevError:
     lda #<noDeviceMsg
@@ -1685,6 +2064,11 @@ volDevError:
     jsr petPrintString
     lda #$0D
     jsr KernalChROUT
+    jmp volExit
+
+volExit:
+    lda SavedDevice
+    sta CurrentDevice
     rts
 
 

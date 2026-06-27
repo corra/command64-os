@@ -61,7 +61,7 @@
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1040` | Petsci (petPrintString, petPrintChar macro) |
 | `$1080` | CommandTable (8-byte fixed-width entries) |
-| `$1180` | CommandShell (main loop, dispatcher, built-ins) |
+| `$1130` | CommandShell (main loop, dispatcher, built-ins) |
 | `$1900` | Api (INT 21h Jump Table service bus — `api.asm`) |
 | `$1A00` | Loader (shellLoadPrg) |
 | `$1A80` | Path (findFile, checkExistence) |
