@@ -1,6 +1,7 @@
 # Session Memory
 
 ## Project Documentation
+
 - `GEMINI.md`: Core directives and protocols
 - `README.md`: Project overview and quick start
 - `docs/user-manual.md`: Comprehensive usage guide (the "whole shebang")
@@ -11,6 +12,7 @@
 - `brain/task.md`: Granular task list
 
 ## Current State (2026-06-25)
+
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, code review + remediation done Build 1016).
@@ -23,12 +25,14 @@
 ## Phase 6A — App Manager (next up)
 
 ### Superpowers Artifacts
+
 | Artifact | Path |
 |----------|------|
 | Design spec | `docs/superpowers/specs/2026-05-13-app-manager-design.md` |
 | Phase A plan | `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
 
 ### What Phase A delivers (11 tasks, ~$350 bytes of new code)
+
 - New segment `AppTable` at `$2000`; `UserProgStart` shifts from `$2000` → `$2200`.
 - `apptable.asm`: `aptInit`, `aptProtectedCheck`, `aptSlotBase`, `aptNameMatch`, `aptFind`, `aptRegister`, `aptRemove`, `aptList`, `aptPrintHex8`.
 - `LOAD` gated: protected-address check ($0000–$21FF, $C000–$FFFF) + table-full check before disk I/O; registers entry on success.
@@ -37,6 +41,7 @@
 - `debug.asm` and all `tests/src/*.asm` compile address moved from `$2000` → `$2200`.
 
 ### Key implementation details
+
 - App table stored in VMM: 1 page (4 KB), segment saved in `AptSegLo/Hi` ($03F2–$03F3).
 - Entry stride 40 bytes × 16 slots + 4-byte header = 644 bytes total (fits in 1 VMM page).
 - `vmmReadByte`/`vmmWriteByte` clobbers `TempLo/Hi` and `Y`; preserves `X` and `VmmOffLo/Hi`.
@@ -45,6 +50,7 @@
 - Phases B and C extend `apptable.asm` without changing the API surface.
 
 ## Memory Map (current — as of Build 2410)
+
 | Region | Purpose |
 |--------|---------|
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
@@ -80,6 +86,7 @@
 | `$02` | Zero-page: CmpBase (User Safe) |
 
 ## C64 Hardware Gotchas (hard-won)
+
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.
 - **BRK Trap Model is non-viable** for high-level OS calls on C64 due to KERNAL non-reentrancy.
 - **Handle LFNs**: Use LFN 2-9 for handles. LFN 13=cmdDir, LFN 14=checkExistence, LFN 15=command channel. Never use LFN 2 for built-in commands.
@@ -90,6 +97,7 @@
 - **ahExit stack discipline**: Each program run orphans 4 bytes (jsr UserProgStart + jsr $1000). Always reset SP=`#$FF` in `ahExit` before `jmp mainLoop`.
 
 ## Pending Tasks
+
 - [x] Implement `DEBUG` Unassemble (U) command (Disassembler)
 - [x] DEBUG code review + remediation (Build 1012 — cuOpRel ZP alias, parseList overflow)
 - [ ] **Execute App Manager Phase A** — plan at `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md`
@@ -103,6 +111,7 @@
 - [ ] Implement `DATE` command (software calendar + REU storage)
 
 ## Superpowers Docs Index
+
 | Document | Path |
 |----------|------|
 | App Manager design | `docs/superpowers/specs/2026-05-13-app-manager-design.md` |

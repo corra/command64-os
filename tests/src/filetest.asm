@@ -14,6 +14,7 @@
 // ZP equates from command64.inc
 .label HexValLo = $66
 .label HexValHi = $67
+.label FileHandle = $6D
 
 * = $2000 "FileTest"
     cld
@@ -32,6 +33,7 @@
 
     // 2. Write string to file
     lda handle
+    sta FileHandle
     ldx #<writeData
     ldy #>fname             // wait, writeData
     ldx #<writeData
@@ -46,6 +48,7 @@
 
     // 3. Close file
     lda handle
+    sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr API
 
@@ -61,6 +64,7 @@
 
     // 5. Read from file
     lda handle
+    sta FileHandle
     ldx #<readBuf
     ldy #>readBuf
     lda #32                 // request 32 bytes
@@ -91,6 +95,7 @@
 
     // 7. Close file
     lda handle
+    sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr API
 
