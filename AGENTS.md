@@ -217,6 +217,7 @@ When the user requests a durable behavior change, record it here or in the relev
 
 ## Child DOX Index
 
--[src/AGENTS.md](file:///home/morgan/development/c64/command64-os/src/AGENTS.md)
--[tests/AGENTS.md](file:///home/morgan/development/c64/command64-os/tests/AGENTS.md)
--[wiki/AGENTS.md](file:///home/morgan/development/c64/command64-os/wiki/AGENTS.md)
+-[src/AGENTS.md](src/AGENTS.md)
+-[tests/AGENTS.md](tests/AGENTS.md)
+-[wiki/AGENTS.md](wiki/AGENTS.md)
+

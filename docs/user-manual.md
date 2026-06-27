@@ -72,6 +72,12 @@ The command64 shell is the primary interface for the OS.
 **Description:** Lists the files on the currently active disk.
 **Syntax:** `DIR`
 
+### ECHO
+
+**Description:** Echoes the typed text back to the screen.
+**Syntax:** `ECHO [text]`
+**Example:** `ECHO HELLO WORLD`
+
 ### TYPE
 
 **Description:** Displays the contents of a sequential or program file to the screen.
@@ -98,6 +104,11 @@ The command64 shell is the primary interface for the OS.
 
 **Description:** Displays the current OS version and build number.
 **Syntax:** `VER`
+
+### VOL
+
+**Description:** Displays the disk volume label and ID of the active drive.
+**Syntax:** `VOL`
 
 ### HELP
 
@@ -134,7 +145,6 @@ This routing applies only to the duration of that specific command, leaving the 
 **Supported Commands:** `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and `LABEL`.
 
 **Examples:**
-
 - `DIR 9:` — Lists the directory of the disk in device 9.
 - `VOL 9:` — Displays the volume label of the disk in device 9.
 - `TYPE 9:README` — Displays the file `README` from device 9.
@@ -187,7 +197,13 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 
 **Description:** Executes a program already resident in memory.
 **Syntax:** `RUN [address]` or `GO [address]`
-**Default:** If no address is provided, it defaults to `$2000` (Standard User Program Space).
+**Default:** If no address is provided, it defaults to `$2200` (Standard User Program Space, shifted from $2000 in Phase 6A).
+
+### LABEL
+
+**Description:** Sets a new volume label (up to 16 characters) on the disk in the active drive.
+**Syntax:** `LABEL [new-label]`
+**Example:** `LABEL NEWDISK`
 
 ---
 
@@ -200,7 +216,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **$2000 - $9FFF:** **User Program Space.** Most external utilities should be compiled for `$2000`.
+- **$2200 - $9FFF:** **User Program Space.** Most external utilities should be compiled for `$2200`.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity
@@ -233,4 +249,4 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 
 ### Program Crashes after `RUN`
 
-- Ensure the program was compiled for the address you are running it from. Most programs are designed for `$2000`. Running a program from a non-native address will cause a crash unless it is specifically designed to be position-independent.
+- Ensure the program was compiled for the address you are running it from. Most programs are designed for `$2200`. Running a program from a non-native address will cause a crash unless it is specifically designed to be position-independent.

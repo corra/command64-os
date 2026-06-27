@@ -117,6 +117,30 @@ if(Oscar64_FOUND AND C_SRCS)
         list(APPEND C_TARGETS ${C_NAME})
     endforeach()
 endif()
+# 5.5 Automated Documentation Synchronization
+# Copies documentation files from wiki/ to docs/ automatically during builds.
+set(SYNC_FILES
+    api-reference.md
+    pet-sci-api.md
+    programmers-reference.md
+    user-manual.md
+    vmm-api.md
+)
+
+set(SYNC_OUTPUTS "")
+foreach(FILE ${SYNC_FILES})
+    add_custom_command(
+        OUTPUT "${CMAKE_SOURCE_DIR}/docs/${FILE}"
+        COMMAND "${CMAKE_COMMAND}" -E copy
+            "${CMAKE_SOURCE_DIR}/wiki/${FILE}"
+            "${CMAKE_SOURCE_DIR}/docs/${FILE}"
+        DEPENDS "${CMAKE_SOURCE_DIR}/wiki/${FILE}"
+        COMMENT "Syncing ${FILE} from wiki/ to docs/"
+    )
+    list(APPEND SYNC_OUTPUTS "${CMAKE_SOURCE_DIR}/docs/${FILE}")
+endforeach()
+
+add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
 set(IMAGE_PRG_TARGETS command64 debug label ${C_TARGETS})

@@ -3,9 +3,11 @@
 An MS-DOS style operating system for the Commodore 64.
 
 ## Overview
+
 command64 provides a familiar command-line interface and DOS-compatible API for the C64. It leverages the RAM Expansion Unit (REU) to provide up to 16MB of virtual memory and a robust handle-based file system.
 
 ## Features
+
 - **MS-DOS Shell:** Commands like `DIR`, `TYPE`, `CLS`, and `VER`.
 - **Environment Variables:** Persistent configuration (`SET`, `PATH`) stored in the REU.
 - **Service Bus API:** Stable INT 21h-style entry point for external programs (JSR $1000).
@@ -17,6 +19,7 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 ## Getting Started
 
 ### Requirements
+
 - Commodore 64 (or VICE emulator)
 - RAM Expansion Unit (REU) - 512KB or larger recommended.
 - Java Runtime Environment (for KickAssembler)
@@ -24,19 +27,25 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 - GNU Make (optional wrapper)
 
 ### Building
+
 The project is built using **CMake**. A `Makefile` wrapper is also provided at the root for convenience.
 
 1. **Configure CMake**:
+
    ```bash
    cmake -B build
    ```
+
 2. **Build the OS and all utilities**:
+
    ```bash
    cmake --build build
    # OR using the Makefile wrapper:
    make all
    ```
+
 3. **Build the OS disk image only**:
+
    ```bash
    cmake --build build --target image_d64
    # OR using the Makefile wrapper:
@@ -44,6 +53,7 @@ The project is built using **CMake**. A `Makefile` wrapper is also provided at t
    ```
 
 ### Running
+
 1. Load the compiled `command64.prg` into your C64 or emulator.
 2. Run with `SYS 4608` (or simply `RUN` if loaded via BASIC).
 3. To load external utilities, ensure they are present on the same disk as the OS.
@@ -67,11 +77,14 @@ The project is built using **CMake**. A `Makefile` wrapper is also provided at t
 | `EXIT`  | Return to BASIC. |
 
 ## For Users
+
 See the **[User Manual](docs/user-manual.md)** for a comprehensive guide to using command64.
 Details on external utilities like `DEBUG` can be found in the **[Applications Guide](docs/apps/debug.md)**.
 
 ## For Developers
+
 See the following documents in the `docs/` directory:
+
 - [API Reference](docs/api-reference.md)
 - [Programmer's Reference](docs/programmers-reference.md)
 - [VMM Specification](docs/vmm-api.md)
