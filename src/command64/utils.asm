@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Utility Routines
 // Hex string to 16-bit integer conversion.
 
-.segment Utils [start=$0820]
+.segment Utils
 
 // --- parseHex ---
 // Parses a hex string in CommandBuffer starting at Y.
@@ -222,4 +222,121 @@ pdZero:
     lda #'0'
     jsr KernalChROUT
 pdNoPrint:
+    rts
+
+// --- parsePointerDevice ---
+// Parses a device prefix (8:, 9:, 10:, 11:) from the filename pointer stored
+// at ZP offset X.
+// Input:  X = ZP offset of the pointer (e.g. $FD for NamePtrLo)
+// Output: A = resolved device number (8-11, or CurrentDevice if not found)
+//         Carry: 1 = prefix found (pointer advanced), 0 = no prefix (pointer unchanged)
+// Clobbers: A, Y, TempLo, TempHi
+parsePointerDevice:
+    // Copy the pointer at ZP offset X to TempLo/Hi
+    lda $00, x
+    sta TempLo
+    lda $01, x
+    sta TempHi
+    
+    ldy #0
+    lda (TempLo), y
+    cmp #'8'
+    beq ppdCheck8
+    cmp #'9'
+    beq ppdCheck9
+    cmp #'1'
+    beq ppdCheck10or11
+    
+ppdNoMatch:
+    lda CurrentDevice
+    clc                     // Carry=0: no prefix
+    rts
+
+ppdCheck8:
+    iny
+    lda (TempLo), y
+    cmp #':'
+    beq ppdFound8
+    jmp ppdNoMatch
+
+ppdFound8:
+    // Advance pointer in ZP by 2 bytes (skip '8:')
+    lda $00, x
+    clc
+    adc #2
+    sta $00, x
+    lda $01, x
+    adc #0
+    sta $01, x
+    lda #8
+    sec                     // Carry=1: prefix found
+    rts
+
+ppdCheck9:
+    iny
+    lda (TempLo), y
+    cmp #':'
+    beq ppdFound9
+    jmp ppdNoMatch
+
+ppdFound9:
+    // Advance pointer in ZP by 2 bytes (skip '9:')
+    lda $00, x
+    clc
+    adc #2
+    sta $00, x
+    lda $01, x
+    adc #0
+    sta $01, x
+    lda #9
+    sec                     // Carry=1: prefix found
+    rts
+
+ppdCheck10or11:
+    iny
+    lda (TempLo), y
+    cmp #'0'
+    beq ppdCheck10
+    cmp #'1'
+    beq ppdCheck11
+    jmp ppdNoMatch
+
+ppdCheck10:
+    iny
+    lda (TempLo), y
+    cmp #':'
+    beq ppdFound10
+    jmp ppdNoMatch
+
+ppdFound10:
+    // Advance pointer in ZP by 3 bytes (skip '10:')
+    lda $00, x
+    clc
+    adc #3
+    sta $00, x
+    lda $01, x
+    adc #0
+    sta $01, x
+    lda #10
+    sec                     // Carry=1: prefix found
+    rts
+
+ppdCheck11:
+    iny
+    lda (TempLo), y
+    cmp #':'
+    beq ppdFound11
+    jmp ppdNoMatch
+
+ppdFound11:
+    // Advance pointer in ZP by 3 bytes (skip '11:')
+    lda $00, x
+    clc
+    adc #3
+    sta $00, x
+    lda $01, x
+    adc #0
+    sta $01, x
+    lda #11
+    sec                     // Carry=1: prefix found
     rts

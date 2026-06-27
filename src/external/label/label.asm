@@ -77,11 +77,27 @@ endSpaces:
     cmp #0                  // null after all the spaces → nothing to set
     beq labelNoArg
     
-    // Parse device prefix
-    jsr parseDevicePrefix
-    bcc labelNoPrefix
+    // Construct pointer to CommandBuffer + Y
+    tya
+    clc
+    adc #<CommandBuffer
+    sta PrintPtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta PrintPtrHi
+
+    // Call API to parse prefix
+    ldx #PrintPtrLo
+    lda #DOS_PARSE_PREFIX
+    jsr $1000
     sta CurrentDevice
-    
+
+    // Recalculate Y index from advanced pointer
+    lda PrintPtrLo
+    sec
+    sbc #<CommandBuffer
+    tay
+
     // Skip spaces after prefix
 skipSpacesPostPrefix:
     lda CommandBuffer, y
@@ -356,92 +372,7 @@ openErr:
     jsr $1000
     jmp labelExit
 
-// --- parseDevicePrefix ---
-// Parses a device prefix (8:, 9:, 10:, 11:) in CommandBuffer starting at Y.
-// Output: 
-//   Carry: 1 = Prefix found, target device in A, Y advanced past the prefix.
-//          0 = No prefix found, Y unchanged.
-//   A = Target device number (8-11), or unchanged if Carry=0.
-// Clobbers: A
-parseDevicePrefix:
-    lda CommandBuffer, y
-    cmp #'8'
-    beq pdpCheck8
-    cmp #'9'
-    beq pdpCheck9
-    cmp #'1'
-    beq pdpCheck10or11
-    clc                     // No match
-    rts
 
-pdpCheck8:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound8
-    dey                     // Restore Y
-    clc
-    rts
-pdpFound8:
-    iny                     // Skip ':'
-    lda #8
-    sec
-    rts
-
-pdpCheck9:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound9
-    dey                     // Restore Y
-    clc
-    rts
-pdpFound9:
-    iny                     // Skip ':'
-    lda #9
-    sec
-    rts
-
-pdpCheck10or11:
-    iny
-    lda CommandBuffer, y
-    cmp #'0'
-    beq pdpCheck10
-    cmp #'1'
-    beq pdpCheck11
-    dey                     // Restore Y
-    clc
-    rts
-
-pdpCheck10:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound10
-    dey                     // Restore Y for ':'
-    dey                     // Restore Y for '0'
-    clc
-    rts
-pdpFound10:
-    iny                     // Skip ':'
-    lda #10
-    sec
-    rts
-
-pdpCheck11:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound11
-    dey                     // Restore Y for ':'
-    dey                     // Restore Y for '1'
-    clc
-    rts
-pdpFound11:
-    iny                     // Skip ':'
-    lda #11
-    sec
-    rts
 
 labelExit:
     lda SavedDevice

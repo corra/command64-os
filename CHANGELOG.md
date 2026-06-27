@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **Refactored Device Routing**: Centralized target device prefix routing (`8:`, `9:`, etc.) from individual shell commands and external utilities into the core filesystem primitives (`fileOpen`, `fileDelete`, `fileRename`) and a new API function `DOS_PARSE_PREFIX` ($57). This eliminates duplicate parsing code, reduces side-effect risks (no longer overriding `CurrentDevice` in shell commands), and reclaims resident shell memory.
+- **Centralized Segment Packing**: Relocated the memory start addresses of all core OS segments (`Utils`, `Api`, `Loader`, `Path`, `Vmm`, `File`) in `src/command64.asm` to allow optimized packing and eliminate memory overlap issues as segments grow.
+
 ### Added
 - **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
 - **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
@@ -14,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **File System Primitives**: Fixed a critical bug in `file.asm` where drive suffixes `,S,W`, `S:`, and `R:` were compiled as shifted PETSCII due to `petscii_mixed` encoding, causing drive-side syntax errors. Replaced them with unshifted byte values (`$53`, `$57`, `$52`). Also, prepended the drive number `'0'` (e.g. `S0:`, `R0:`) to scratch and rename command strings to comply with the standard 1541 DOS syntax. Changed default file creation suffix from `,S,W` (Sequential Write) to `,P,W` (Program Write) to preserve the `PRG` file type on copied files.
 - **Shell Command Table**: Restored the accidentally deleted `cmdPath` handler and corrected the `tableCmd` command table alignment to prevent crashes when executing commands.
+- **LOAD Command Address Parsing**: Restructured `cmdLoad` to parse optional target addresses before parsing zero-page pointers, preventing `TempHi` from being clobbered by `parsePointerDevice`. This fixes a critical bug where `LOAD` either relocated programs to page zero ($000D) or corrupted hex arguments.
+- **LOAD Command Filename Length Restoration**: Fixed register `X` (filename length) clobbering in `cmdLoad` by preserving the stripped length in `TempLo` and loading it back into `X` immediately before calling `findFile`.
 - **External LABEL Utility**: Relocated the drive initialization command (`I`) to execute *before* the data channel is opened. This resolves the `"70,no channel"` error by avoiding resetting buffers after they have been allocated for the data channel. Updated the U1, B-P, and U2 command strings to use standard colons (`U1:`, `B-P:`, `U2:`) to ensure correct parsing across drive firmware. Also, implemented a BAM cache flush by sending the `"I"` command again *after* a successful block write, forcing the drive to synchronize its internal BAM cache with the disk so the new label takes effect immediately.
 
 ### Added

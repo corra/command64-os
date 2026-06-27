@@ -101,6 +101,7 @@
   - [x] Implement `DRIVE` command (with `DEVICE`/`DEV` aliases)
   - [x] Add support for multiple devices (8, 9, 10, 11)
   - [x] CLI: Generalize device targeting syntax for commands like DIR, TYPE, VOL, LABEL (Task #24)
+  - [x] Refactor device routing into filesystem and API layer
   - [ ] Support subdirectories (1581 / SD2IEC)
   - [x] Environment variable storage (`SET`, `PATH`) in REU
   - [x] Remediate environment hang and PATH bugs (2026-05-14) — `brain/plans/2026-05-14-env-var-remediation.md`
@@ -115,9 +116,9 @@
     - [x] Implement `cmdLabel` routine in `shell.asm` to write a new name to the disk header using the floppy disk command channel
     - [x] Register `VOL` and `LABEL` in the command table and the `HELP` output
     - [x] Verify functionality on standard D64 disk images
-    - [ ] LABEL: Fix interaction inconsistencies (Task #21)
-    - [ ] LABEL: Implement syntax updates for quotes and spaces (Task #22)
-    - [ ] LABEL: Support target device parameter like 9:NEWLABEL (Task #23)
+    - [x] LABEL: Fix interaction inconsistencies (Task #21)
+    - [x] LABEL: Implement syntax updates for quotes and spaces (Task #22)
+    - [x] LABEL: Support target device parameter like 9:NEWLABEL (Task #23)
   - [ ] TIME Command Implementation (Task #18)
     - [ ] Implement TOD clock initialization routine at system boot
     - [ ] Implement `cmdTime` handler in `shell.asm` to format and print time

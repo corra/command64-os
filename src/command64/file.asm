@@ -2,7 +2,7 @@
 // KickAssembler v5.25 - MS-DOS 4.0 File System Module
 // Manages Handle Table and C64 KERNAL File I/O.
 
-.segment File [start=$0D00]
+.segment File
 
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.
@@ -37,6 +37,10 @@ fiLoop:
 fileOpen:
     stx NamePtrLo
     sty NamePtrHi
+    
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta TargetDevice
     
     // 1. Find a free handle
     ldx #0
@@ -109,7 +113,7 @@ foSkipMode:
     ldx TempLo
     lda HandleTable + 1, x  // A = LFN
     tay                     // Y = LFN (use LFN as secondary address for uniqueness)
-    ldx CurrentDevice       // X = Current Device
+    ldx TargetDevice        // X = Target Device
     jsr KernalSETLFS
     
     jsr KernalOPEN
@@ -317,6 +321,10 @@ fileDelete:
     stx NamePtrLo
     sty NamePtrHi
     
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta TargetDevice
+    
     // 1. Prepare "S0:" in FileScratch (using standard unshifted ASCII 'S')
     lda #$53                // unshifted 'S'
     sta FileScratch
@@ -353,9 +361,9 @@ fdCopyDone:
     ldy #>FileScratch
     jsr KernalSETNAM
     
-    // 5. SETLFS: A=LFN(15), X=Device(CurrentDevice), Y=Secondary(15)
+    // 5. SETLFS: A=LFN(15), X=Device(TargetDevice), Y=Secondary(15)
     lda #15                 // LFN 15 is standard for command channel
-    ldx CurrentDevice
+    ldx TargetDevice
     ldy #15                 // Secondary 15 is command channel
     jsr KernalSETLFS
     
@@ -382,6 +390,13 @@ fdError:
 fileRename:
     stx NamePtrLo           // Use NamePtr as temporary for Old Name
     sty NamePtrHi
+    
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta TargetDevice        // Resolve device from Old Name
+    
+    ldx #PrintPtrLo
+    jsr parsePointerDevice  // Strip prefix from New Name if present
     
     // 1. Prepare "R0:" in FileScratch (using standard unshifted ASCII 'R')
     lda #$52                // unshifted 'R'
@@ -438,9 +453,9 @@ frGotOld:
     ldy #>FileScratch
     jsr KernalSETNAM
     
-    // 7. SETLFS: A=LFN(15), X=Device(CurrentDevice), Y=Secondary(15)
+    // 7. SETLFS: A=LFN(15), X=Device(TargetDevice), Y=Secondary(15)
     lda #15                 // LFN 15 is standard for command channel
-    ldx CurrentDevice
+    ldx TargetDevice
     ldy #15                 // Secondary 15 is command channel
     jsr KernalSETLFS
     
@@ -458,3 +473,6 @@ frenError:
     jsr KernalCLOSE         // Ensure channel is closed even on error
     sec
     rts
+
+TargetDevice:
+    .byte 0

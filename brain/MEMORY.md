@@ -19,7 +19,7 @@
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.2.22 (command64 Build 2442, Stage 15) / DEBUG 0.1.4 (Build 1021).
+- **Version**: 0.2.22 (command64 Build 2470, Stage 15) / DEBUG 0.1.4 (Build 1021).
 - **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte.
 
 ## Phase 6A — App Manager (next up)
@@ -63,16 +63,16 @@
 | `$03A2-$03C9` | SourceBuf (40 bytes, COPY command) |
 | `$03CA-$03F1` | DestBuf (40 bytes, COPY command) |
 | `$0801` | BASIC SYS launcher (Main segment) |
-| `$0C00` | Utils (parseHex, normalizeName, printDecimal16) |
+| `$0820` | Utils (parseHex, normalizeName, printDecimal16, parsePointerDevice) |
+| `$09C0` | Api (INT 21h Jump Table service bus — `api.asm`) |
+| `$0A50` | Loader (shellLoadPrg) |
+| `$0AA0` | Path (findFile, checkExistence) |
+| `$0B30` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
+| `$0CE0` | File (Handle-based File I/O — `file.asm`) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1040` | Petsci (petPrintString, petPrintChar macro) |
 | `$1080` | CommandTable (8-byte fixed-width entries) |
 | `$1130` | CommandShell (main loop, dispatcher, built-ins) |
-| `$1900` | Api (INT 21h Jump Table service bus — `api.asm`) |
-| `$1A00` | Loader (shellLoadPrg) |
-| `$1A80` | Path (findFile, checkExistence) |
-| `$1B80` | Vmm (vmmInit, vmmAlloc, vmmFree, vmmRead/WriteByte) |
-| `$1D80` | File (Handle-based I/O — `file.asm`) |
 | `$1F90` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
 | `$2000-$21FF` | AppTable segment (apptable.asm — 512 bytes reserved) |
@@ -102,11 +102,11 @@
 - [x] DEBUG code review + remediation (Build 1012 — cuOpRel ZP alias, parseList overflow)
 - [ ] **Execute App Manager Phase A** — plan at `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md`
 - [ ] Binary Relocator (Phase 6B prerequisite)
-- [ ] Implement `DRIVE` command
-- [ ] Add support for multiple devices (8, 9, 10, 11)
+- [x] Implement `DRIVE` command
+- [x] Add support for multiple devices (8, 9, 10, 11)
 - [ ] Support subdirectories (1581 / SD2IEC)
-- [ ] Environment variable storage (`SET`, `PATH`) in REU
-- [ ] Implement `VOL` and `LABEL` commands (disk directory header editing)
+- [x] Environment variable storage (`SET`, `PATH`) in REU
+- [x] Implement `VOL` and `LABEL` commands (disk directory header editing)
 - [ ] Implement `TIME` command using CIA 1 TOD clock
 - [ ] Implement `DATE` command (software calendar + REU storage)
 

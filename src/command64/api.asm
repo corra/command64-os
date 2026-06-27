@@ -13,7 +13,7 @@
 // This jump will stay at $1000 even if apiHandler moves.
     jmp apiHandler
 
-.segment Api [start=$0920]
+.segment Api
 
 // --- apiHandler ---
 // The centralized OS service dispatcher.
@@ -43,6 +43,8 @@ apiHandler:
     beq ahFreeMem
     cmp #DOS_EXIT
     beq ahExit
+    cmp #DOS_PARSE_PREFIX
+    beq ahParsePrefix
     
     // Unknown function — return with error (C=1)
     sec
@@ -141,3 +143,10 @@ ahExit:
     ldx #$FF
     txs
     jmp mainLoop
+
+ahParsePrefix:
+    // Input: X = ZP offset of pointer to parse
+    // Output: A = resolved device number (8-11 or CurrentDevice)
+    //         Carry: 1 = prefix found, 0 = no prefix
+    jsr parsePointerDevice
+    rts

@@ -31,6 +31,7 @@
 .label DOS_ALLOC_MEM   = $48  // Allocate memory (VMM)
 .label DOS_FREE_MEM    = $49  // Free memory (VMM)
 .label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
+.label DOS_PARSE_PREFIX = $57  // Parse target device prefix from ZP pointer
 
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return

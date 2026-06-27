@@ -17,9 +17,15 @@
 //   CommandShell  $1180  Command loop, dispatcher, built-ins
 //   VmmData       $1F90  VMM temporary storage
 
-.file [name="command64.prg", segments="Main,ApiStub,Petsci,CommandTable,CommandShell,Api,Utils,Loader,Path,Vmm,File,VmmData"]
+.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData"]
 
 .segmentdef Main [start=$0801]
+.segmentdef Utils [start=$0820]
+.segmentdef Api [start=$09C0]
+.segmentdef Loader [start=$0A50]
+.segmentdef Path [start=$0AA0]
+.segmentdef Vmm [start=$0B30]
+.segmentdef File [start=$0CE0]
 .segmentdef VmmData [start=$1F90]
 
 // Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, File, and VmmData are defined by the imported source files.

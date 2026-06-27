@@ -218,8 +218,9 @@ sdSkipLeading:
     jmp sdSkipLeading
 sdCheckEmpty:
     cmp #0                  // if null, the line is empty or all spaces
-    beq sdExitDispatch      // early exit (NOP)
-    
+    bne sdNotEmpty
+    rts
+sdNotEmpty:
     sty ParsePos            // save start of command name for cmdCompare
     ldx #0
 sdSearchLoop:
@@ -259,12 +260,6 @@ sdExtScan:
     iny
     jmp sdExtScan
 sdExtFoundEnd:
-    tya
-    sec
-    sbc TempLo
-    tax                     // X = length
-    beq sdRealBadCmd        // Length 0? No search, just "Bad command"
-    
     lda #<CommandBuffer
     clc
     adc TempLo
@@ -273,12 +268,30 @@ sdExtFoundEnd:
     adc #0
     sta NamePtrHi
     
-    // Check if it exists as .prg
+    lda CurrentDevice
+    sta SavedDevice
+    
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta CurrentDevice
+    
+    ldy #0
+sdExtCountLen:
+    lda (NamePtrLo), y
+    beq sdExtGotLen
+    cmp #' '
+    beq sdExtGotLen
+    iny
+    jmp sdExtCountLen
+sdExtGotLen:
+    tya
+    tax                     // X = length
+    beq sdExtError          // Length 0?
+    
     lda NamePtrLo
     ldy NamePtrHi
-    // X = length
     jsr findFile
-    bcs sdRealBadCmd        // Not found, print error
+    bcs sdExtError
     
     // Found it! Load to UserProgStart ($2000)
     lda #0                  // 0 = Relocated (uses HexVal)
@@ -290,13 +303,20 @@ sdExtFoundEnd:
     
     lda NamePtrLo
     ldy NamePtrHi
-    // X = length from findFile
     jsr shellLoadPrg
-    bcs sdRealBadCmd
+    bcs sdExtError
+    
+    lda SavedDevice
+    sta CurrentDevice
     
     // EXECUTE
     jsr UserProgStart
     rts
+
+sdExtError:
+    lda SavedDevice
+    sta CurrentDevice
+    jmp sdRealBadCmd
 
 sdRealBadCmd:
     lda #<badCmdMsg
@@ -444,22 +464,7 @@ clScanName:
 clDoneScan:
     sty TempHi              // Save end position
     
-    // Calculate length
-    tya
-    sec
-    sbc TempLo
-    pha                     // Push length to stack
-    
-    // Calculate pointer: CommandBuffer + TempLo
-    lda #<CommandBuffer
-    clc
-    adc TempLo
-    sta NamePtrLo
-    lda #>CommandBuffer
-    adc #0
-    sta NamePtrHi
-    
-    // Check for optional address
+    // Check for optional address (do this first, before ZP pointers are parsed)
     ldy TempHi
     jsr shellSkipSpaces
     lda CommandBuffer, y
@@ -469,29 +474,71 @@ clDoneScan:
     bcs clHeaderLoad        // Invalid hex -> use header
     lda #0                  // 0 = Relocated (uses HexVal)
     sta SpecificLoad
-    jmp clDoLoad
+    jmp clPostAddr
 clHeaderLoad:
     lda #1                  // 1 = Absolute (uses Header)
     sta SpecificLoad
+    
+clPostAddr:
+    // Calculate pointer: CommandBuffer + TempLo
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    sta NamePtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta NamePtrHi
+    
+    // Parse target device prefix
+    lda CurrentDevice
+    sta SavedDevice
+    
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta CurrentDevice
+    
+    // Count length of filename past the prefix
+    ldy #0
+clCountLen:
+    lda (NamePtrLo), y
+    beq clGotLen
+    cmp #' '
+    beq clGotLen
+    iny
+    jmp clCountLen
+clGotLen:
+    tya
+    sta TempLo              // Save length in TempLo
+    
 clDoLoad:
-    pla                     // Pull length to A
-    tax                     // Transfer length to X
-    lda NamePtrLo           // Restore A from ZP
-    ldy NamePtrHi           // Restore Y from ZP
+    lda NamePtrLo
+    ldy NamePtrHi
+    ldx TempLo              // Restore length in X
     jsr findFile            // Normalize, append .prg, check disk
-    bcs clError             // Not found or error
+    bcs clLoadErr           // Not found or error
     
     // findFile returns updated length in X
     lda NamePtrLo
     ldy NamePtrHi
     jsr shellLoadPrg
-    bcs clError
+    bcs clLoadErr
+    
+    // Success: restore device and return
+    lda SavedDevice
+    sta CurrentDevice
     rts
+
 clNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
     rts
+
+clLoadErr:
+    lda SavedDevice
+    sta CurrentDevice
+    // fall through to clError
+
 clError:
     lda #<loadErrMsg
     ldy #>loadErrMsg
@@ -539,14 +586,31 @@ crError:
 cmdDir:
     ldy ParsePos
     jsr shellSkipSpaces
+    sty ParsePos
+    
+    lda #<CommandBuffer
+    clc
+    adc ParsePos
+    sta PrintPtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta PrintPtrHi
     
     lda CurrentDevice
     sta SavedDevice
     
-    jsr parseDevicePrefix
-    bcc dirNoPrefix
+    ldx #PrintPtrLo
+    jsr parsePointerDevice
     sta CurrentDevice
-dirNoPrefix:
+    
+    lda PrintPtrLo
+    sec
+    sbc #<CommandBuffer
+    sta ParsePos
+    
+    ldy ParsePos
+    jsr shellSkipSpaces
+    sty ParsePos
     lda #1
     ldx #<dirFname
     ldy #>dirFname
@@ -631,14 +695,6 @@ cmdType:
     lda CommandBuffer, y
     beq ctNoArgs
     
-    lda CurrentDevice
-    sta SavedDevice
-    
-    jsr parseDevicePrefix
-    bcc typeNoPrefix
-    sta CurrentDevice
-    jsr shellSkipSpaces
-typeNoPrefix:
     // Extract filename (token until space or null)
     sty TempLo              // Start index
 ctScanEnd:
@@ -706,30 +762,22 @@ ctReadDone:
     jsr apiHandler
     lda #PetCr
     jsr KernalChROUT
-    jmp typeExit
+    rts
 
 ctNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    jmp typeExit
+    rts
 
 ctOpenErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
-    jmp typeExit
-
-typeExit:
-    lda SavedDevice
-    sta CurrentDevice
     rts
 
 // DEL / ERASE — delete a file from disk
 cmdDel:
-    lda CurrentDevice
-    sta SavedDevice
-
     ldy ParsePos
 cdelSkipSpaces:
     lda CommandBuffer, y
@@ -740,11 +788,6 @@ cdelSkipSpaces:
     jmp cdelSkipSpaces
 
 cdelFoundName:
-    jsr parseDevicePrefix
-    bcc delNoPrefix
-    sta CurrentDevice
-    jsr shellSkipSpaces
-delNoPrefix:
     // Extract filename (token until space or null)
     sty TempLo              // Start index
 cdelScanEnd:
@@ -774,30 +817,22 @@ cdelGotEnd:
     
     lda #PetCr
     jsr KernalChROUT
-    jmp delExit
+    rts
 
 cdelNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    jmp delExit
+    rts
 
 cdelErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
-    jmp delExit
-
-delExit:
-    lda SavedDevice
-    sta CurrentDevice
     rts
 
 // REN / RENAME — rename a file on disk
 cmdRen:
-    lda CurrentDevice
-    sta SavedDevice
-
     ldy ParsePos
 crenSkip1:
     lda CommandBuffer, y
@@ -808,11 +843,6 @@ crenSkip1:
     jmp crenSkip1
 
 crenFoundOld:
-    jsr parseDevicePrefix
-    bcc renNoPrefix
-    sta CurrentDevice
-    jsr shellSkipSpaces
-renNoPrefix:
     sty TempLo              // Start of Old Name
 crenScan1:
     lda CommandBuffer, y
@@ -835,8 +865,6 @@ crenSkip2:
     jmp crenSkip2
 
 crenFoundNew:
-    jsr parseDevicePrefix
-    jsr shellSkipSpaces
     sty TempHi              // Start of New Name
 crenScan2:
     lda CommandBuffer, y
@@ -874,95 +902,110 @@ crenGotNew:
     
     lda #PetCr
     jsr KernalChROUT
-    jmp renExit
+    rts
 
 crenNoArgs:
 crenNoNew:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
-    jmp renExit
+    rts
 
 crenErr:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
-    jmp renExit
-
-renExit:
-    lda SavedDevice
-    sta CurrentDevice
     rts
 
-// COPY — copy a file
 cmdCopy:
     lda CurrentDevice
     sta SavedDevice
 
-    ldy ParsePos
-    // 1. Skip spaces
+    // Construct pointer to CommandBuffer + ParsePos
+    lda #<CommandBuffer
+    clc
+    adc ParsePos
+    sta PrintPtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta PrintPtrHi
+
+    // 1. Skip spaces to find source
 ccSkip1:
-    lda CommandBuffer, y
-    bne ccCheckSpace1
-    jmp ccNoArgs            // Long jump
-ccCheckSpace1:
+    ldy #0
+    lda (PrintPtrLo), y
+    bne ccSkip1NotNoArgs
+    jmp ccNoArgs
+ccSkip1NotNoArgs:
     cmp #' '
     bne ccFoundSrc
-    iny
+    inc PrintPtrLo
+    bne ccSkip1
+    inc PrintPtrHi
     jmp ccSkip1
 
 ccFoundSrc:
-    // Parse prefix on source
-    jsr parseDevicePrefix
-    bcs ccSrcPrefixFound
-    // No prefix on source: use CurrentDevice
-    lda CurrentDevice
-ccSrcPrefixFound:
+    // Parse target device prefix on source
+    ldx #PrintPtrLo
+    jsr parsePointerDevice
     sta SrcDevice
-    jsr shellSkipSpaces
 
-    // 2. Copy source name to SourceBuf
+    // Copy source name from PrintPtr to SourceBuf
+    ldy #0
     ldx #0
 ccCopySrc:
-    lda CommandBuffer, y
-    bne ccCheckSpace2
-    jmp ccNoDest            // Long jump
-ccCheckSpace2:
+    lda (PrintPtrLo), y
+    beq ccGotSrcNull
     cmp #' '
-    beq ccGotSrc
+    beq ccGotSrcSpace
     sta SourceBuf, x
     inx
     iny
     jmp ccCopySrc
-ccGotSrc:
+
+ccGotSrcNull:
+    lda #0
+    sta SourceBuf, x
+    jmp ccNoDest            // No destination argument specified
+
+ccGotSrcSpace:
     lda #0
     sta SourceBuf, x
     
+    // Advance PrintPtr past the copied source filename
+    tya
+    clc
+    adc PrintPtrLo
+    sta PrintPtrLo
+    lda #0
+    adc PrintPtrHi
+    sta PrintPtrHi
+
     // 3. Skip spaces to find dest
 ccSkip2:
-    lda CommandBuffer, y
-    bne ccCheckSpace3
-    jmp ccNoDest            // Long jump
-ccCheckSpace3:
+    ldy #0
+    lda (PrintPtrLo), y
+    bne ccSkip2NotNoDest
+    jmp ccNoDest
+ccSkip2NotNoDest:
     cmp #' '
     bne ccFoundDest
-    iny
+    inc PrintPtrLo
+    bne ccSkip2
+    inc PrintPtrHi
     jmp ccSkip2
 
 ccFoundDest:
-    // Parse prefix on dest
-    jsr parseDevicePrefix
-    bcs ccDstPrefixFound
-    // No prefix on dest: default to SavedDevice
-    lda SavedDevice
-ccDstPrefixFound:
+    // Parse target device prefix on destination
+    ldx #PrintPtrLo
+    jsr parsePointerDevice
     sta DstDevice
-    jsr shellSkipSpaces
 
-    // 4. Copy dest name to DestBuf
+    // Copy dest name to DestBuf
+    ldy #0
     ldx #0
 ccCopyDest:
-    lda CommandBuffer, y
+    lda (PrintPtrLo), y
     beq ccGotDest
     cmp #' '
     beq ccGotDest
@@ -973,11 +1016,11 @@ ccCopyDest:
 ccGotDest:
     lda #0
     sta DestBuf, x
-    
+
     // Check if DestBuf is empty (first character is 0)
     lda DestBuf
     bne ccDestNotEmpty
-    
+
     // DestBuf is empty: copy SourceBuf to DestBuf
     ldx #0
 ccCopySrcToDest:
@@ -1109,92 +1152,7 @@ shellSkipSpaces:
 sssDone:
     rts
 
-// --- parseDevicePrefix ---
-// Parses a device prefix (8:, 9:, 10:, 11:) in CommandBuffer starting at Y.
-// Output: 
-//   Carry: 1 = Prefix found, target device in A, Y advanced past the prefix.
-//          0 = No prefix found, Y unchanged.
-//   A = Target device number (8-11), or unchanged if Carry=0.
-// Clobbers: A
-parseDevicePrefix:
-    lda CommandBuffer, y
-    cmp #'8'
-    beq pdpCheck8
-    cmp #'9'
-    beq pdpCheck9
-    cmp #'1'
-    beq pdpCheck10or11
-    clc                     // No match
-    rts
 
-pdpCheck8:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound8
-    dey                     // Restore Y
-    clc
-    rts
-pdpFound8:
-    iny                     // Skip ':'
-    lda #8
-    sec
-    rts
-
-pdpCheck9:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound9
-    dey                     // Restore Y
-    clc
-    rts
-pdpFound9:
-    iny                     // Skip ':'
-    lda #9
-    sec
-    rts
-
-pdpCheck10or11:
-    iny
-    lda CommandBuffer, y
-    cmp #'0'
-    beq pdpCheck10
-    cmp #'1'
-    beq pdpCheck11
-    dey                     // Restore Y
-    clc
-    rts
-
-pdpCheck10:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound10
-    dey                     // Restore Y for ':'
-    dey                     // Restore Y for '0'
-    clc
-    rts
-pdpFound10:
-    iny                     // Skip ':'
-    lda #10
-    sec
-    rts
-
-pdpCheck11:
-    iny
-    lda CommandBuffer, y
-    cmp #':'
-    beq pdpFound11
-    dey                     // Restore Y for ':'
-    dey                     // Restore Y for '1'
-    clc
-    rts
-pdpFound11:
-    iny                     // Skip ':'
-    lda #11
-    sec
-    rts
 
 // Local variables for device routing state
 SavedDevice: .byte 0
@@ -1880,15 +1838,31 @@ cpNotFound:
 cmdVol:
     ldy ParsePos
     jsr shellSkipSpaces
+    sty ParsePos
+    
+    lda #<CommandBuffer
+    clc
+    adc ParsePos
+    sta PrintPtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta PrintPtrHi
     
     lda CurrentDevice
     sta SavedDevice
     
-    jsr parseDevicePrefix
-    bcc volNoPrefix
+    ldx #PrintPtrLo
+    jsr parsePointerDevice
     sta CurrentDevice
+    
+    lda PrintPtrLo
+    sec
+    sbc #<CommandBuffer
+    sta ParsePos
+    
+    ldy ParsePos
     jsr shellSkipSpaces
-volNoPrefix:
+    sty ParsePos
     lda #1
     ldx #<dirFname
     ldy #>dirFname
