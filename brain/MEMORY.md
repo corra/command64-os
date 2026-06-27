@@ -19,7 +19,7 @@
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.2.22 (command64 Build 2470, Stage 15) / DEBUG 0.1.4 (Build 1021).
+- **Version**: 0.2.22 (command64 Build 2471, Stage 15) / DEBUG 0.1.4 (Build 1021).
 - **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte.
 
 ## Phase 6A — App Manager (next up)
@@ -27,7 +27,7 @@
 ### Superpowers Artifacts
 
 | Artifact | Path |
-|----------|------|
+| ---------- | ------ |
 | Design spec | `docs/superpowers/specs/2026-05-13-app-manager-design.md` |
 | Phase A plan | `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
 
@@ -52,7 +52,7 @@
 ## Memory Map (current — as of Build 2410)
 
 | Region | Purpose |
-|--------|---------|
+| -------- | --------- |
 | `$033C` | CommandBuffer (80 bytes, Cassette Buffer) |
 | `$038C` | CommandLen (1 byte) |
 | `$038D` | SpecificLoad flag (1 byte) |
@@ -113,7 +113,7 @@
 ## Superpowers Docs Index
 
 | Document | Path |
-|----------|------|
+| ---------- | ------ |
 | App Manager design | `docs/superpowers/specs/2026-05-13-app-manager-design.md` |
 | App Manager Phase A plan | `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
 | DEBUG remediation plan | `docs/superpowers/plans/2026-05-13-debug-asm-zp-alias-and-listbuf-overflow.md` |

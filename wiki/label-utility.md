@@ -5,19 +5,20 @@
 
 ## Overview
 
-`LABEL` is an external disk management utility that allows you to change the volume name of a floppy disk without erasing its contents. 
+`LABEL` is an external disk management utility that allows you to change the volume name of a floppy disk without erasing its contents.
 
 Standard Commodore DOS only permits setting a disk name when formatting a disk (using the `NEW` command), which destroys all existing files. `LABEL` bypasses the standard file system using CBM DOS Direct Access Commands, editing the BAM sector directly on Track 18, Sector 0.
 
 ## Command Syntax
 
-```
+```bash
 LABEL [new-label]
 ```
 
 ### Parameters
+
 * **`[new-label]`**: The new name for the disk. It can be up to 16 characters long.
-  * If the label contains spaces, ensure they are typed directly. 
+  * If the label contains spaces, ensure they are typed directly.
   * Names shorter than 16 characters are automatically padded with PETSCII shifted space characters (`$A0`), which is the Commodore standard for directory headers.
   * Attempting to set a label longer than 16 characters will return an error without modifying the disk.
 
@@ -44,19 +45,22 @@ Under the hood, `LABEL` operates directly on the disk controller of the active d
 ## Practical Examples
 
 ### 1. Renaming the Disk
+
 To rename the disk currently in Drive 8 to "GAMES 2026":
 `LABEL GAMES 2026`
 *Output:* `Label updated`
 
 To verify the change took effect immediately:
 `VOL`
-*Output:* 
-```
+*Output:*
+
+```text
 Volume in drive 8 is GAMES 2026
 Volume ID is 2A
 ```
 
 ### 2. Error Handling
+
 * **Write Protected Disk:** If you attempt to rename a write-protected floppy disk:
   `LABEL NEWNAME`
   *Output:* `26, WRITE PROTECT ON, 00, 00`

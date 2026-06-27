@@ -286,7 +286,7 @@ sdExtCountLen:
 sdExtGotLen:
     tya
     tax                     // X = length
-    beq sdExtError          // Length 0?
+    beq sdExtSwitchDrive    // Length 0? Switch drive shortcut!
     
     lda NamePtrLo
     ldy NamePtrHi
@@ -311,6 +311,9 @@ sdExtGotLen:
     
     // EXECUTE
     jsr UserProgStart
+    rts
+
+sdExtSwitchDrive:
     rts
 
 sdExtError:

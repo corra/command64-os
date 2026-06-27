@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
+- **Drive Switch Shortcut**: Added support for typing `<device_number>:` (e.g. `9:`) directly at the command prompt to permanently switch the active drive, equivalent to `drive <device_number>`.
 - **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
 
 ### Fixed

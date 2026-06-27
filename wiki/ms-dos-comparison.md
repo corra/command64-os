@@ -79,7 +79,7 @@ This matrix maps core kernel subsystems of `MSDOS.SYS` to their Command 64 OS eq
 | **File I/O Handle Table** | `DOS/HANDLE.ASM`, `FILE.ASM` | [file.asm](file:///home/morgan/development/c64/command64-os/src/command64/file.asm) | **Partial** | Maps handles 0-7 to C64 secondary addresses. Critical Gap: Handles are not yet exposed on public JSR service bus ($3D-$40). |
 | **Program Exec / Loader** | `DOS/EXEC.ASM` | [loader.asm](file:///home/morgan/development/c64/command64-os/src/command64/loader.asm) | **Partial** | Standard binary loader loading to flat `$2200` space. Relocation support is missing (planned relocator for Phase 6B). |
 | **Directory Search** | `DOS/SEARCH.ASM`, `PATH.ASM` | [path.asm](file:///home/morgan/development/c64/command64-os/src/command64/path.asm) | **Partial** | Searches filenames on disk, matches case-insensitively. Gaps: Hierarchical subdirectories and partition-walking are missing. |
-| **FAT File Allocation Table**| `DOS/FAT.ASM`, `DISK.ASM` | *(C64 Drive ROM)* | **Complete** | Delegated to the Commodore floppy disk drive (e.g. 1541/1571/1581) which handles sectors and BAM directly. |
+| **FAT File Allocation Table** | `DOS/FAT.ASM`, `DISK.ASM` | *(C64 Drive ROM)* | **Complete** | Delegated to the Commodore floppy disk drive (e.g. 1541/1571/1581) which handles sectors and BAM directly. |
 | **File Buffering** | `DOS/BUF.ASM` | [file.asm](file:///home/morgan/development/c64/command64-os/src/command64/file.asm) | **Complete** | Command 64 implements 64-byte buffered I/O read/write segments to optimize C64 IEC serial bus performance. |
 
 ---
@@ -94,7 +94,7 @@ This matrix maps core BIOS low-level device drivers of `IO.SYS` to their Command
 | :--- | :--- | :--- | :--- | :--- |
 | **CON (Console Screen)** | `BIOS/MSCON.ASM` | KERNAL ROM + [petsci.asm](file:///home/morgan/development/c64/command64-os/src/command64/petsci.asm) | **Complete** | Screen editor screen writing (`CHROUT` at `$FFD2`) and standard 40-column PETSCII character output. |
 | **CON (Keyboard Input)** | `BIOS/MSCON.ASM` | KERNAL ROM | **Complete** | Keyboard scan buffer polling (`GETIN` at `$FFE4`) with backspace and input buffering. |
-| **Block Device (Disk Controller)**| `BIOS/MSDISK.ASM` | KERNAL ROM | **Complete** | Uses standard serial IEC bus protocols (`TALK`/`LISTEN`/`ACPTR`/`CIOUT`) to command disk drives. |
+| **Block Device (Disk Controller)** | `BIOS/MSDISK.ASM` | KERNAL ROM | **Complete** | Uses standard serial IEC bus protocols (`TALK`/`LISTEN`/`ACPTR`/`CIOUT`) to command disk drives. |
 | **PRN / LPT (Printer)** | `BIOS/MSLPT.ASM` | KERNAL ROM | **Complete** | Can direct output to device #4 (standard C64 printer address) via KERNAL serial bus. |
 | **AUX / COM (Serial/RS232)** | `BIOS/MSAUX.ASM` | KERNAL ROM | **Complete** | Can stream to C64 RS-232 device vectors if serial cartridge is connected. |
 | **CLOCK (System Clock)** | `BIOS/MSCLOCK.ASM` | *(None)* | **Missing** | CIA 1 / CIA 2 Time of Day (TOD) clock reads are not yet implemented. |

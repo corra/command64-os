@@ -135,6 +135,7 @@ command64 supports up to four disk devices simultaneously (8, 9, 10, and 11).
 **Examples:**
 
 - `DRIVE 9` — Switches all future operations (DIR, LOAD, etc.) to device 9.
+- `9:` — Shortcut equivalent to `DRIVE 9` to permanently switch to device 9.
 - `DRIVE` — Displays the currently active device.
 
 ### Target Device Routing
