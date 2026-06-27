@@ -30,6 +30,10 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
     + Do: Make meaningful, intentional edits that serve the current task.
     + Don't: Make gratuitous edits that do not serve the current task.
     + Don't: Fix unrelated issues or make "improvements" that are not required or requested by the current task.
+2.
+    + Do: Use relative paths when referencing files within the project.
+    + Don't: **DO NOT USE** absolute paths when referencing files within the project which may be incorrect
+    under a different development environment.
 
 ### Bug Fixes
 
@@ -220,4 +224,3 @@ When the user requests a durable behavior change, record it here or in the relev
 -[src/AGENTS.md](src/AGENTS.md)
 -[tests/AGENTS.md](tests/AGENTS.md)
 -[wiki/AGENTS.md](wiki/AGENTS.md)
-
