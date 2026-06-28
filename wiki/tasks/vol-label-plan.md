@@ -6,7 +6,7 @@ Implement the internal shell commands `VOL` and `LABEL` for reading and writing 
 
 On the C64, the disk directory header (track 18, sector 0 — the BAM sector) contains the 16-character disk name and 2-character disk ID. The `$` directory listing exposes this as the first line of output:
 
-```
+```text
 0 "DISK NAME       " ID 2A
 ```
 
@@ -21,8 +21,6 @@ The existing `cmdDir` at [shell.asm:536](file:///home/morgan/development/c64/com
 - **Require label argument** — `LABEL` with no argument prints an error. Interactive prompt deferred to a follow-up task.
 - **Disk name only** — `LABEL` does not modify the disk ID. Disk ID modification deferred to a future disk-utility.
 
-
-
 ---
 
 ## Proposed Changes
@@ -32,7 +30,9 @@ The existing `cmdDir` at [shell.asm:536](file:///home/morgan/development/c64/com
 #### [MODIFY] [shell.asm](file:///home/morgan/development/c64/command64-os/src/command64/shell.asm)
 
 **Command Table** (lines 21–64):
+
 - Add two new 8-byte entries before `tableEnd`:
+
   ```asm
       .text "vol   "
       .word cmdVol
@@ -42,7 +42,9 @@ The existing `cmdDir` at [shell.asm:536](file:///home/morgan/development/c64/com
   ```
 
 **HELP Message** (lines 1545–1579):
+
 - Add two new lines to the `helpMsg` string block:
+
   ```asm
       .text "VOL    - SHOW DISK LABEL"
       .byte $0D
@@ -59,6 +61,7 @@ The existing `cmdDir` at [shell.asm:536](file:///home/morgan/development/c64/com
 New routine `cmdVol` inserted before the string literals section (~line 1519, after `cmdPath` and before `cmdVer`).
 
 **Algorithm:**
+
 1. Open the directory channel (`$`, LFN 13, secondary 0) — same as `cmdDir`.
 2. Skip 2-byte load address.
 3. Skip 2-byte link pointer.
@@ -68,10 +71,12 @@ New routine `cmdVol` inserted before the string literals section (~line 1519, af
    - The disk name is between the first and second `"` (PETSCII `$22`).
    - The disk ID follows the second `"`, after a space.
 7. Print in MS-DOS style format:
-   ```
+
+   ```text
    Volume in drive X is DISK NAME
    Volume ID is AB
    ```
+
    Where `X` is `CurrentDevice`.
 8. Close channel, return.
 
@@ -88,13 +93,16 @@ New routine `cmdVol` inserted before the string literals section (~line 1519, af
 New routine `cmdLabel` inserted adjacent to `cmdVol`.
 
 **Algorithm:**
+
 1. Parse the argument from `CommandBuffer` at `ParsePos` (using `shellSkipSpaces`, same as `cmdRen`, `cmdType`, etc.).
 2. If no argument → print error message, return.
 3. Validate label length ≤ 16 characters. If too long → print error, return.
 4. Build the command channel string in `FileScratch`:
-   ```
+
+   ```text
    R0:NEW NAME=0:OLD NAME
    ```
+
    **Wait — this is the Rename command.** For changing the disk header name, the correct CBM DOS command is:
    - **Method: Block-Write via command channel.** The standard approach on the C64 1541 is:
      1. Open the command channel (LFN 15, secondary 15).
@@ -120,6 +128,7 @@ New routine `cmdLabel` inserted adjacent to `cmdVol`.
    **This is the standard, safe, well-documented approach for relabeling C64 disks.**
 
 **Implementation steps:**
+
 1. Parse argument (new label name).
 2. Open command channel: `SETLFS(15, CurrentDevice, 15)`, `SETNAM(0, ...)`, `OPEN`.
 3. Send `I` command (initialize): `CHKOUT(15)`, write "I", `CLRCHN`.

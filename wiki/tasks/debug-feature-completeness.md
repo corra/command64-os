@@ -18,12 +18,14 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 ## Sub-tasks
 
 ### Phase 1: Interactive Register Editing and File I/O (`R`, `N`, `L`, `W`)
+
 - [ ] Implement register name parsing and interactive modification for `R` command (`R A`, `R X`, etc. prompting with `:`).
 - [ ] Implement `N` command to write input arguments to the filename buffer `fileNameBuf`.
 - [ ] Implement `L` command to load files from disk, supporting optional address override.
 - [ ] Implement `W` command to parse memory range and save data to disk using C64 Kernal.
 
 ### Phase 2: Interactive Inline 6502 Assembler (`A`)
+
 - [ ] Implement command dispatching for `A` and prompt loop displaying `currentAddr:`.
 - [ ] Implement assembler lexer/parser separating mnemonics from operand expressions.
 - [ ] Implement syntax parser mapping operands to 6502 addressing modes (e.g. `#`, `(`, `,X`, `,Y`).
@@ -31,6 +33,7 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 - [ ] Implement opcode lookup dictionary and memory write logic.
 
 ### Phase 3: Software Breakpoint Debugger (`T`, `P`)
+
 - [ ] Implement C64 CBINV interrupt vector hijacking and restoration routines.
 - [ ] Implement 6502 instruction decoder determining execution length and potential targets.
 - [ ] Implement dynamic software breakpoint insertion and original code backup.
@@ -38,8 +41,8 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 - [ ] Implement breakpoint intercept logic (saving state, removing breakpoints, printing registers and next disassembly).
 
 ### Verification and Documentation
+
 - [ ] Verify Phase 1 register editing and load/save operations.
 - [ ] Verify Phase 2 assembly of simple loops and comparison with disassemble output.
 - [ ] Verify Phase 3 step-into and step-over tracing operations.
 - [ ] Update user documentation and `CHANGELOG.md` to reflect new commands.
-
