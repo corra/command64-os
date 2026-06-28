@@ -101,3 +101,33 @@ To calculate the sum and difference of `$A500` and `$0250`:
 - **Prompt:** `-`
 - **Line Editing:** Supports the **INST/DEL** key for destructive backspace.
 - **Display:** Optimized for the C64's 40-column screen (8-byte rows with grouping separators).
+
+---
+
+## Roadmap & MS-DOS Parity Status
+
+The Command 64 OS `DEBUG` utility is under active development. The table below outlines the current command parity status and implementation plans:
+
+| Command | Status | Notes / Plan |
+| :---: | :---: | :--- |
+| **`A`** | *Planned (Phase 2)* | Interactive 6502 Assembler. |
+| **`C`** | Implemented | Memory compare. |
+| **`D`** | Implemented | Memory dump (8-byte rows). |
+| **`E`** | Implemented | Enter memory list / text. |
+| **`F`** | Implemented | Fill memory range. |
+| **`G`** | Implemented | Go (execute subroutine). |
+| **`H`** | Implemented | Hex arithmetic. |
+| **`I`** | *Not Planned* | MS-DOS port input. Redundant on 6502 (I/O is memory-mapped). |
+| **`L`** | *Planned (Phase 1)* | Load file from disk. |
+| **`M`** | Implemented | Move (copy) memory block. |
+| **`N`** | *Planned (Phase 1)* | Set target filename. |
+| **`O`** | *Not Planned* | MS-DOS port output. Redundant on 6502 (I/O is memory-mapped). |
+| **`P`** | *Planned (Phase 3)* | Proceed (step over subroutines/loops). |
+| **`Q`** | Implemented | Quit to shell. |
+| **`R`** | *Partial (Phase 1)*| View registers (modify registers planned in Phase 1). |
+| **`S`** | Implemented | Search memory range. |
+| **`T`** | *Planned (Phase 3)* | Trace (step into instructions). |
+| **`U`** | Implemented | Unassemble (disassemble 6502 code). |
+| **`W`** | *Planned (Phase 1)* | Write memory range to file. |
+| **`V`** | Implemented | Show utility version (custom command). |
+

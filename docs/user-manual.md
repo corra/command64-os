@@ -146,6 +146,7 @@ This routing applies only to the duration of that specific command, leaving the 
 **Supported Commands:** `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and `LABEL`.
 
 **Examples:**
+
 - `DIR 9:` — Lists the directory of the disk in device 9.
 - `VOL 9:` — Displays the volume label of the disk in device 9.
 - `TYPE 9:README` — Displays the file `README` from device 9.

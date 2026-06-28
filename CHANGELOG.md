@@ -7,18 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DEBUG Utility Feature Parity Plans**: Documented complete implementation roadmaps and blueprints for achieving parity with MS-DOS `DEBUG`: Phase 1 (Interactive registers `R` and File I/O `N`/`L`/`W`), Phase 2 (Interactive 6502 assembler `A`), and Phase 3 (Software breakpoint tracer `T`/`P`). Added individual phase plan documents to `brain/plans/`, registered a new meta-task and sub-tasks in Task Warrior, and updated the Code Wiki user guide.
+
 ### Changed
+
 - **Refactored Device Routing**: Centralized target device prefix routing (`8:`, `9:`, etc.) from individual shell commands and external utilities into the core filesystem primitives (`fileOpen`, `fileDelete`, `fileRename`) and a new API function `DOS_PARSE_PREFIX` ($57). This eliminates duplicate parsing code, reduces side-effect risks (no longer overriding `CurrentDevice` in shell commands), and reclaims resident shell memory.
 - **Centralized Segment Packing**: Relocated the memory start addresses of all core OS segments (`Utils`, `Api`, `Loader`, `Path`, `Vmm`, `File`) in `src/command64.asm` to allow optimized packing and eliminate memory overlap issues as segments grow.
 - **DEBUG Utility Range Refactoring**: Refactored the range-checking logic in `debug.asm` to reduce duplication. Extracted a centralized `checkRangeLimit` subroutine for single-byte step checks, simplified the length specifier case-masking check in `parseRange` to a single instruction, and optimized inclusive boundary address checks in `cmdUnassemble` and `cmdDump` by reversing comparisons.
 
 ### Added
+
 - **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
 - **Drive Switch Shortcut**: Added support for typing `<device_number>:` (e.g. `9:`) directly at the command prompt to permanently switch the active drive, equivalent to `drive <device_number>`.
 - **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
 - **LABEL Build Tracking**: Added build counter and automated build tracking to the external `LABEL` utility, matching the behavior of `COMMAND64` and `DEBUG`. The version header (e.g. `LABEL v0.1.0.1001`) is displayed on utility execution.
 
 ### Fixed
+
 - **DEBUG Utility Range & Dump**:
   - Fixed uppercase `L` (Shift+L) length parameter parsing case-sensitivity bug in `parseRange` where it was compared to the compiled value of `'L'` after masking.
   - Implemented proper range and length parameter support in `cmdDump` (`D` command), preventing it from ignoring end address/length specifiers and defaulting to a fixed 128-byte dump.
@@ -31,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **External LABEL Utility**: Relocated the drive initialization command (`I`) to execute *before* the data channel is opened. This resolves the `"70,no channel"` error by avoiding resetting buffers after they have been allocated for the data channel. Updated the U1, B-P, and U2 command strings to use standard colons (`U1:`, `B-P:`, `U2:`) to ensure correct parsing across drive firmware. Also, implemented a BAM cache flush by sending the `"I"` command again *after* a successful block write, forcing the drive to synchronize its internal BAM cache with the disk so the new label takes effect immediately.
 
 ### Added
+
 - **CMake Build System Migration**:
   - Replaced the legacy single GNU Makefile with a modular, cross-platform CMake build system configured via root `CMakeLists.txt`.
   - Implemented custom CMake Find modules (`FindKickAss.cmake`, `Findcc1541.cmake`, `FindOscar64.cmake`) and target helpers (`KickAssembler.cmake`, `cc1541.cmake`, `Oscar64.cmake`) to manage toolchain paths and discovery natively.
@@ -57,6 +65,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Enhanced `DRIVE` command to report current device if called without arguments.
 
 ### Changed
+
 - **Assembly Imports Refactoring**:
   - Removed hardcoded relative build directory prefixes from `src/command64/shell.asm` and `src/external/debug/debug.asm`.
   - Configured KickAssembler's `-libdir` search path to find build-time generated counters dynamically.
@@ -71,6 +80,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Centralized PETSCII encoding and improved `normalizeName` to correctly map shifted characters for disk matching.
 
 ### Fixed
+
 - **Parsing Robustness**: Centralized argument parsing via `shellSkipSpaces` to prevent label-reuse bugs.
 - **Filename Match**: Resolved issue where lowercase disk entries failed to match normalized uppercase shell input.
 - **Volume Name & Label**: Fixed the `31,syntax error` in `cmdLabel` by using raw binary parameters (`U1:`, `B-P:`, `U2:`) sent byte-by-byte instead of ASCII string representation. Fixed a data channel LFN clobbering bug by storing it in a persistent RAM variable `labelLfn` rather than zero-page `NamePtrLo`.
@@ -78,12 +88,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.22] - 2026-05-14
 
 ### Fixed
+
 - **Environment Management**: Resolved critical hang in `SET` command by zero-initializing the 4KB environment segment in the REU. This prevents infinite loops caused by searching for double-null terminators in uninitialized memory.
 - **PATH Command**: Refactored `cmdPath` to correctly initialize the search variable name and update `ParsePos`, fixing bugs where it would skip characters and fail to set the search path correctly.
 
 ## [0.2.21] - 2026-05-13
 
 ### Fixed (DEBUG Build 1012)
+
 - **`parseHexArg` uppercase A-F double-subtract**: `phUpperHex` fell through into `phDigit` instead of jumping to `phAdd`. After converting an uppercase letter with `sbc #('A'-10)`, the code then also applied `sbc #'0'` ($30), producing garbage (e.g. 'A'=$41 → 10 → 10−$30=$DA). Fixed by adding `jmp phAdd` after the uppercase conversion.
 - **`parseHexArg` overflow check placement**: Moved `cpx #4; beq phInvalid` to the top of `phAdd` (before the 4× ASL/ROL shift) so the 5th digit is rejected without corrupting HexVal. Previously the digit was shifted in before the check, producing a truncated but dirty HexVal on the error path; the error (carry set) was still returned correctly to callers, but the pre-check position is cleaner.
 
@@ -94,6 +106,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed (command64 Build 2414 / DEBUG Build 1011)
 
 **command64 OS:**
+
 - **C1 — COPY wrong handle closed on error**: `ccCloseSrcErr` loaded `TempLo` (scan index) instead of `SrcHandle` when closing the source file on error. Fixed: `lda TempLo` → `lda SrcHandle`.
 - **C2 — DOS_EXIT stack accumulation**: Each `DOS_EXIT` call orphaned 4 bytes on the stack (2 bytes for `jsr UserProgStart` + 2 bytes for the program's `jsr $1000`), overflowing after ~63 runs. Fixed by resetting SP to `#$FF` before `jmp mainLoop` in `ahExit`.
 - **C4 — file.asm defensive CLRCHN**: Added `jsr KernalCLRCHN` to `frError` and `fwError` paths as a defensive measure (both labels are only reachable before CHKIN/CHKOUT, but are guarded for future refactor safety).
@@ -103,11 +116,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **M2 — fileScratch undersized**: `fileScratch` was 64 bytes, too small for a 79-char filename plus write (`,S,W`) and rename (`R:new=old`) suffixes. Expanded to 96 bytes.
 
 **DEBUG Utility:**
+
 - **D1 — command dispatch case sensitivity**: `dispatch` used `and #$7F` which converted uppercase $41-$5A to shifted $01-$1A, not matching any lowercase command byte. Fixed: `and #$7F` → `ora #$20` to convert unshifted letters ($41-$5A) to lowercase ($61-$7A).
 - **D2 — hex parsing uppercase A-F**: `parseHexArg` rejected unshifted A-F keys ($41-$46, sent by SHIFT+letter in lowercase PETSCII mode). Added explicit two-branch check: handles unshifted $41-$46 (`phUpperHex`) and lowercase $61-$66 (`phLowerHex`). Added 4-digit overflow guard (`cpx #4 → beq phInvalid`).
 - **D3 — verMsg/startupMsg duplication**: Merged duplicate string definitions into a single block with dual labels (`startupMsg:` / `verMsg:`), saving 4 bytes.
 
 ### Changed
+
 - **Shell help text**: Added `RENAME` and `ERASE` aliases to `helpMsg` display. Removed dead `dirStubMsg` data block.
 - **loader.asm**: Removed spurious `PetLl` ($0A) linefeed after the "loading..." message.
 - **utils.asm**: Corrected `normalizeName` header comment — output documents Y=string length and X=preserved.
@@ -115,15 +130,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.19] - 2026-05-12
 
 ### Added
+
 - **DEBUG Utility Unassemble (U)**: Implemented a full 6502 disassembler. Supports decoding of all standard opcodes and addressing modes with automatic target address calculation for relative branches. Includes support for default counts, specific start addresses, and inclusive memory ranges.
 - **DEBUG Utility Help**: Added `?` command to display a summary of all internal `DEBUG` commands. Established a maintenance protocol in the source code to ensure documentation stays synchronized with new features.
 
 ### Fixed
+
 - **Shell UI**: Fixed a bug in `shellReadLine` where the cursor would not advance to a new line after pressing RETURN. Explicitly added `PetCr` echo to the completion handler.
 
 ## [0.2.18] - 2026-05-12
 
 ### Added
+
 - **DEBUG Parameter Alignment**:
   - Implemented `L` (Length) syntax for all range-based commands (e.g. `D 1000 L 40`).
   - Added support for quoted strings (`"..."` or `'...'`) in `E`, `F`, and `S` commands.
@@ -131,12 +149,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Implemented `parseList` and `parseRange` refinements for MS-DOS parity.
 
 ### Fixed (DEBUG.PRG v0.1.3 Build 1005)
+
 - **`parseHexArg` regression**: The Build 1004 `and #$7F` fix accepted shifted hex letters ($C1-$C6) but rejected unshifted ones ($41-$46). In `petscii_mixed`, the 'a'-'f' keys without Shift send $41-$46, which the new gate (`cmp #$C1; bcc phInvalid`) incorrectly rejected. Typing `f800` without Shift produced "error". Fixed with a two-branch check: unshifted $41-$46 handled first, shifted $C1-$C6 handled second (converted via `and #$7F` before the same subtraction).
 
 ## [0.2.17] - 2026-05-12
 
 ### Fixed
-- **DEBUG.PRG Remediation** (Build 1004): 
+
+- **DEBUG.PRG Remediation** (Build 1004):
   - Fixed hex parsing case sensitivity (`H`, `F`, `M` commands now work with both shifted and unshifted letters).
   - Refactored `Dump` (D) command to use 8-byte rows for 40-column displays.
   - Fixed `Enter` (E) command; added `Y` register preservation to prevent buffer index corruption during multi-byte entry.
@@ -145,6 +165,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.16] - 2026-05-12
 
 ### Fixed (DEBUG.PRG v0.1.2 Build 1003)
+
 - **`readLine` Y corruption**: `KernalGetIn` may clobber Y, which was the buffer index with no push-pop guard. Applied `tya/pha … pla/tay` pattern matching `shellReadLine`.
 - **Range commands — inclusive end + wrap safety**: `cmdFill`, `cmdMove`, `cmdCompare`, `cmdSearch` checked `rangeStart == rangeEnd` before operating, silently skipping the final byte and risking a full-64KB wrap-around loop on reversed ranges. Restructured all four as do-while (operate first, exit-check after).
 - **`cmdMove` overlap corruption**: Forward copy overwrote source data when dest overlapped source from above. Added 16-bit dest-vs-src comparison; copies backwards (tail-first via `rangeEnd`/`val2` decrement) when `dest > src`, preventing corruption in all overlap cases.
@@ -153,19 +174,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.15] - 2026-05-12
 
 ### Fixed
+
 - **DEBUG Utility**: Fixed critical pointer logic. Relocated pointers (`currentAddr`, `rangeStart`, etc.) to Zero Page ($70-$7F) to support indirect-indexed addressing. Hardened `parseHexArg` to correctly handle empty arguments.
 
 ## [0.2.14] - 2026-05-12
 
 ### Added
+
 - **External Utilities**: Implemented `DEBUG.PRG` (v0.1.0 Build 1001). Supports `D`, `E`, `F`, `M`, `C`, `S`, `H`, `R`, `G`, `V`, and `Q` commands.
 
 ### Fixed
+
 - **Shell Input**: `shellReadLine` now correctly handles the INST/DEL key (`$14`). Previously DEL was echoed (visually correct) but also stored as a literal `$14` byte in `CommandBuffer`, causing "Bad command" errors for any input that used backspace. DEL now decrements the buffer index (logically erasing the previous character) without storing anything; DEL at an empty buffer is silently ignored. Added `PetDel = $14` constant to `command64.inc`.
 
 ## [0.2.13] - 2026-05-12
 
 ### Fixed
+
 - **Directory Reporting**: Resolved discrepancy where `DIR` reported 144 blocks free instead of 656.
 - **Decimal Printer Bug**: Fixed 16-bit math error in `printDecimal16` that ignored the high byte for values between 100 and 999.
 - **DIR Command Hardening**: Added stack-based register preservation in `cmdDir` to prevent block counts from being clobbered by the KERNAL `GETIN` routine.
@@ -173,25 +198,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.12] - 2026-05-12
 
 ### Added
+
 - **Internal Commands**: Added `REN` and `RENAME` commands.
 - **Service Bus API**: Added `DOS_RENAME_FILE` ($56) supporting two filename pointers (`X/Y` and `PrintPtr`).
 
 ### Changed
+
 - **Memory Optimization**: Moved `Utils` segment to `$0C00` to free up space in the `$1000-$1FFF` range.
 - **Memory Map**: Realigned all core segments and shifted `VmmData` to `$1F90` to resolve persistent overlaps as the OS grows.
 
 ## [0.2.11] - 2026-05-12
 
 ### Added
+
 - **Internal Commands**: Added `DEL` and `ERASE` commands for file deletion.
 - **Service Bus API**: Added `DOS_DELETE_FILE` ($41) for external program file management.
 
 ### Changed
+
 - **Memory Map**: Realigned `VmmData` and `FileScratch` to `$1FA0` to accommodate growing file module.
 
 ## [0.2.10] - 2026-05-12
 
 ### Fixed
+
 - **Critical — KERNAL API Register Mismatches**: Resolved multiple bugs in `file.asm` where LFN and Device Number registers were swapped or incorrect for `SETLFS`, `CHKIN`, and `CHKOUT` calls.
 - **Filename Normalization**: Enhanced `normalizeName` to handle lowercase PETSCII conversion, ensuring shell input matches standard uppercase disk filenames.
 - **Memory Map**: Realigned segments (`Loader`, `Path`, `Vmm`, `File`, `VmmData`) to resolve overlaps caused by expanded utility code.
@@ -199,21 +229,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.9] - 2026-05-12
 
 ### Fixed
+
 - **Handle/Channel Conflict**: `fileOpen` now uses the Logical File Number (LFN) as the Secondary Address, ensuring unique channels for simultaneous files (fixing `COPY`).
 - **Case Sensitivity**: Added `normalizeName` call to `fileOpen` to ensure filenames match the unshifted PETSCII expected by the disk drive (fixing `TYPE` and `COPY` "Load error").
 
 ## [0.2.8] - 2026-05-12
 
 ### Fixed
+
 - **Critical — cmdCopy Handle Corruption**: `cmdCopy` was using `TempLo/Hi` for handles, which were clobbered by `fileRead/Write`. Added dedicated ZP registers `SrcHandle` ($6E) and `DstHandle` ($6F).
 - **Documentation**: Corrected outdated Zero Page addresses in `utils.asm` comments ($F7/$F8 -> $66/$67).
 
 ### Changed
+
 - **Performance — Buffered I/O**: `TYPE` and `COPY` commands now use 64-byte buffered I/O instead of 1-byte-at-a-time, significantly improving disk performance.
 
 ## [0.2.7] - 2026-05-12
 
 ### Fixed
+
 - **C1 — FileScratch address** (`include/command64.inc`): `FileScratch` was `$1D80` (= File segment start), causing `fileOpen` to overwrite its own code when building filenames. Corrected to `$1F02` where `fileScratch` actually lives in VmmData.
 - **C2 — Handle lost in API dispatch** (`api.asm`, `shell.asm`): `ahRead`/`ahWrite`/`ahClose` were entered with A = function code, not the handle; `fileRead`/`fileWrite`/`fileClose` received garbage. Added ZP register `FileHandle = $6D` (vmm.inc). `ahRead`/`ahWrite`/`ahClose` now load A from FileHandle before delegating. Callers in `cmdType`/`cmdCopy` now `sta FileHandle` after open and before each read/write/close API call. TYPE and COPY are now functional.
 - **C3 — fileClose X clobber** (`file.asm`): `KernalCLOSE` does not preserve X; `sta HandleTable, x` after the call wrote to the wrong slot. Fixed by saving X to TempLo around the KERNAL call.
@@ -221,6 +255,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Dead `lda` lines in cmdType/cmdCopy** (`shell.asm`): Removed no-op handle loads that were immediately overwritten.
 
 ### Changed
+
 - **Version**: 0.2.7 (Build 2400), Phase 2F (File I/O).
 - **HELP text**: Added TYPE and COPY to the HELP command output.
 - **ABI comments** (`api.asm`): Updated ahRead/ahWrite/ahClose comments to reflect FileHandle ZP convention.
@@ -229,6 +264,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.6] - 2026-05-11
 
 ### Changed
+
 - **Service Bus Architecture Pivot**: Transitioned from a `BRK`-based trap model to a **Jump Table** model (`JSR $1600`). This resolves infinite recursion crashes and stack corruption caused by conflicts between custom `BRK` handlers and the non-reentrant C64 KERNAL interrupt routines.
 - **ABI Update**: The Service Bus now follows standard subroutine conventions:
   - Entry point: `$1600`
@@ -237,6 +273,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Output: `A, X, Y` as per function, `Carry`=Status (0=Success, 1=Error)
 
 ### Fixed
+
 - **Stability**: Removed all hardcoded `BRK` vector hooks (`$0316`), making the system 100% stable under emulator and real-hardware conditions.
 - **Infinite Recursion**: Fixed the "stack drain" issue where nested interrupts caused the stack pointer to wrap around.
 
@@ -245,21 +282,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.4] - 2026-05-11
 
 ### Added
+
 - **Phase 2D (Service Bus)**: Implemented INT 21h-style BRK service bus (`api.asm`, segment `$1600`). Handles DOS_PRINT_CHAR ($02), DOS_PRINT_STR ($09), DOS_ALLOC_MEM ($48), DOS_FREE_MEM ($49), DOS_EXIT ($4C).
 - **BRK Vector Install**: Shell startup installs `apiHandler` to `KernalCBINV` ($0316/$0317) at boot.
 - **VMM Safety Guard**: Added `vmmInitialized` flag; `vmmAlloc` returns `VMM_ERR_INVALID` if REU detection failed, preventing MCT corruption.
 - **Test Scaffolding**: Added `tests/src/apitest.asm` and `tests/src/vmmtest.asm` integration test stubs.
 
 ### Fixed
+
 - **printDecimal16**: Initialized `TempHi` to 0 at entry to prevent garbage leading zeros from prior callers.
 
 ### Changed
+
 - **Segment Layout Cascade**: Inserted `Api` at $1600; relocated `Utils`→$1700, `Loader`→$1800, `Path`→$1880, `Vmm`→$1980, `VmmData`→$1C80.
 - **Version**: 0.2.4 (Build 2303), Stage 4.
 
 ## [0.2.3] - 2026-05-09
 
 ### Added
+
 - **Phase 2C (VMM) Core**: Implemented Virtual Memory Manager primitives (`vmmInit`, `vmmReadByte`, `vmmWriteByte`) mapping 1MB-16MB REU space.
 - **Dynamic Allocation**: Implemented `vmmAlloc` and `vmmFree` using a 4KB Page Byte-Map strategy ($01 Head, $02 Tail).
 - **Version Tracking**: Added startup version banner and internal `VER` command.
@@ -271,6 +312,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Zero Page Remapping**: Migrated all pointers to safe/FAC1 workspace ($FB-$FE, $61-$6C) to prevent BASIC/KERNAL corruption.
 
 ### Changed
+
 - Reverted `UserProgStart` to $2000 for compatibility with existing pre-compiled programs.
 - Refined versioning scheme to 0.x.x (Pre-Alpha) to better track project sub-stages.
 

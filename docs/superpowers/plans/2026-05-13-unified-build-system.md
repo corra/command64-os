@@ -30,6 +30,7 @@
 ## Task 1: Fix `.gitignore` and Untrack Build Artifacts
 
 **Files:**
+
 - Modify: `.gitignore`
 
 The current `.gitignore` has `*.prg` (no leading slash) which matches anywhere in the tree — it would silently ignore `release/command64.prg` once the release directory is added. Fix it to use root-anchored patterns, then untrack the three build artifacts that are currently committed.
@@ -37,11 +38,14 @@ The current `.gitignore` has `*.prg` (no leading slash) which matches anywhere i
 - [ ] **Step 1: Verify what is currently tracked**
 
 Run:
+
 ```bash
 git ls-files build/command64.prg tests/image.d64 tests/testcmds.d64
 ```
+
 Expected output (all three lines):
-```
+
+```bash
 build/command64.prg
 tests/image.d64
 tests/testcmds.d64
@@ -50,6 +54,7 @@ tests/testcmds.d64
 - [ ] **Step 2: Replace `.gitignore` contents**
 
 Write `.gitignore`:
+
 ```gitignore
 # Build artifacts (managed by Make)
 build/
@@ -76,7 +81,9 @@ The leading `/` on `/*.prg` and `/*.sym` means only root-level `.prg`/`.sym` fil
 ```bash
 git rm --cached build/command64.prg tests/image.d64 tests/testcmds.d64
 ```
+
 Expected:
+
 ```
 rm 'build/command64.prg'
 rm 'tests/image.d64'
@@ -88,6 +95,7 @@ rm 'tests/testcmds.d64'
 ```bash
 git status
 ```
+
 Expected: `.gitignore` shows as modified, the three files show as deleted (from index). They must NOT appear as untracked — the new `.gitignore` patterns must be suppressing them. If any appear as untracked, the `.gitignore` pattern is wrong.
 
 - [ ] **Step 5: Commit**
@@ -102,6 +110,7 @@ git commit -m "chore: fix .gitignore and untrack build artifacts"
 ## Task 2: Move Entry Point and Remove Dead Files
 
 **Files:**
+
 - Move: `build/command64.asm` → `src/command64.asm`
 - Modify import paths: `src/command64.asm`
 - Delete: `tests/build_tests.sh`, `tools/create_d64.py`
@@ -167,10 +176,13 @@ BasicUpstart2(start)
 ```bash
 java -jar tools/KickAss.jar src/command64.asm -odir build/
 ```
+
 Expected (last line):
-```
+
+```text
 Writing prg file: command64.prg
 ```
+
 If KickAssembler reports any import errors, the path update in Step 2 is wrong — re-check that `command64/petsci.asm` resolves from `src/`.
 
 - [ ] **Step 4: Remove dead files**
@@ -178,8 +190,10 @@ If KickAssembler reports any import errors, the path update in Step 2 is wrong �
 ```bash
 git rm tests/build_tests.sh tools/create_d64.py
 ```
+
 Expected:
-```
+
+```bash
 rm 'tests/build_tests.sh'
 rm 'tools/create_d64.py'
 ```
@@ -190,6 +204,7 @@ rm 'tools/create_d64.py'
 git add src/command64.asm
 git commit -m "refactor: restructure repository layout for unified build system"
 ```
+
 This commit must contain only: the `git mv`, the import path fix, and the two deleted files. No Makefile yet.
 
 ---
@@ -197,12 +212,14 @@ This commit must contain only: the `git mv`, the import path fix, and the two de
 ## Task 3: Write the Makefile and VERSION File
 
 **Files:**
+
 - Create: `Makefile`
 - Create: `VERSION`
 
 This is the complete Makefile — all variables, rules, and targets written in one step. Verification follows rule-by-rule.
 
 **Background on the Makefile mechanics:**
+
 - `$(wildcard ...)` expands glob patterns at parse time — used for dependency tracking
 - `| $(BUILD)` is an order-only prerequisite: the directory must exist before the recipe runs, but a newer directory timestamp does not trigger a rebuild
 - `$(foreach prg,$^,...)` iterates over all prerequisites expanding the cc1541 `-f`/`-w` pair for each PRG
@@ -289,13 +306,13 @@ testimage: $(TEST_PRGS) $(BUILD)/test.d64
 test: $(TEST_PRGS)
 
 clean:
-	rm -rf $(BUILD)
+ rm -rf $(BUILD)
 
 # ---------------------------------------------------------------------------
 # Directory creation (order-only prerequisites)
 # ---------------------------------------------------------------------------
 $(BUILD) $(BUILD)/tests:
-	mkdir -p $@
+ mkdir -p $@
 
 # ---------------------------------------------------------------------------
 # Build rules
@@ -303,19 +320,19 @@ $(BUILD) $(BUILD)/tests:
 
 # command64 OS
 $(BUILD)/command64.prg: $(CMD64_ENTRY) $(CMD64_SRCS) | $(BUILD)
-	$(JAVA) -jar $(KICKASS) $(CMD64_ENTRY) -odir $(BUILD)
+ $(JAVA) -jar $(KICKASS) $(CMD64_ENTRY) -odir $(BUILD)
 
 # debug utility
 $(BUILD)/debug.prg: $(DEBUG_SRCS) | $(BUILD)
-	$(JAVA) -jar $(KICKASS) $(DEBUG_ENTRY) -odir $(BUILD)
+ $(JAVA) -jar $(KICKASS) $(DEBUG_ENTRY) -odir $(BUILD)
 
 # test PRGs — pattern rule, one per tests/src/*.asm
 $(BUILD)/tests/%.prg: tests/src/%.asm $(wildcard include/*.inc) | $(BUILD)/tests
-	$(JAVA) -jar $(KICKASS) $< -odir $(BUILD)/tests
+ $(JAVA) -jar $(KICKASS) $< -odir $(BUILD)/tests
 
 # Oscar64 C sources — pattern rule, inert until a .c file exists
 $(BUILD)/%.prg: src/%.c | $(BUILD)
-	$(OSCAR64) -o $@ $<
+ $(OSCAR64) -o $@ $<
 
 # ---------------------------------------------------------------------------
 # Disk images
@@ -323,30 +340,30 @@ $(BUILD)/%.prg: src/%.c | $(BUILD)
 
 # Release image — rm -f ensures cc1541 starts fresh, not appending to stale image
 $(BUILD)/image.d64: $(IMAGE_PRGS)
-	rm -f $@
-	$(CC1541) -n "$(DISK_NAME)" -i "$(DISK_ID)" $@ \
-	    $(foreach prg,$^,-f "$(notdir $(basename $(prg)))" -w $(prg))
+ rm -f $@
+ $(CC1541) -n "$(DISK_NAME)" -i "$(DISK_ID)" $@ \
+     $(foreach prg,$^,-f "$(notdir $(basename $(prg)))" -w $(prg))
 
 # Test image
 $(BUILD)/test.d64: $(TEST_IMAGE_PRGS)
-	rm -f $@
-	$(CC1541) -n "$(DISK_NAME)" -i "$(DISK_ID)" $@ \
-	    $(foreach prg,$^,-f "$(notdir $(basename $(prg)))" -w $(prg))
+ rm -f $@
+ $(CC1541) -n "$(DISK_NAME)" -i "$(DISK_ID)" $@ \
+     $(foreach prg,$^,-f "$(notdir $(basename $(prg)))" -w $(prg))
 
 # ---------------------------------------------------------------------------
 # Release (intentional only — not part of `make all`)
 # ---------------------------------------------------------------------------
 release: $(BUILD)/image.d64 $(BUILD)/test.d64
-	mkdir -p $(RELEASE_DIR)
-	cp $(IMAGE_PRGS) $(RELEASE_DIR)/
-	cp $(BUILD)/image.d64 $(BUILD)/test.d64 $(RELEASE_DIR)/
-	cp -r docs/ $(RELEASE_DIR)/docs/
-	rm -rf $(RELEASE_DIR)/docs/superpowers
-	cd $(RELEASE_DIR) && zip -r $(RELEASE_NAME).zip \
-	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
-	cd $(RELEASE_DIR) && tar -czf $(RELEASE_NAME).tar.gz \
-	    $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
-	@echo "Release $(VERSION) ready in $(RELEASE_DIR)/"
+ mkdir -p $(RELEASE_DIR)
+ cp $(IMAGE_PRGS) $(RELEASE_DIR)/
+ cp $(BUILD)/image.d64 $(BUILD)/test.d64 $(RELEASE_DIR)/
+ cp -r docs/ $(RELEASE_DIR)/docs/
+ rm -rf $(RELEASE_DIR)/docs/superpowers
+ cd $(RELEASE_DIR) && zip -r $(RELEASE_NAME).zip \
+     $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
+ cd $(RELEASE_DIR) && tar -czf $(RELEASE_NAME).tar.gz \
+     $(notdir $(IMAGE_PRGS)) image.d64 test.d64 docs/
+ @echo "Release $(VERSION) ready in $(RELEASE_DIR)/"
 ```
 
 **Important:** Makefile recipes must be indented with a real TAB character, not spaces. If copying this text, ensure your editor hasn't converted tabs to spaces.
@@ -356,7 +373,9 @@ release: $(BUILD)/image.d64 $(BUILD)/test.d64
 ```bash
 make build/command64.prg
 ```
+
 Expected (last line):
+
 ```
 Writing prg file: command64.prg
 ```
@@ -366,7 +385,9 @@ Writing prg file: command64.prg
 ```bash
 make build/debug.prg
 ```
+
 Expected (last line):
+
 ```
 Writing prg file: debug.prg
 ```
@@ -376,11 +397,15 @@ Writing prg file: debug.prg
 ```bash
 make test
 ```
+
 Expected: KickAssembler runs once per `tests/src/*.asm` file. Final output contains one `Writing prg file:` line per test source. Check `build/tests/` contains the PRGs:
+
 ```bash
 ls build/tests/
 ```
+
 Expected:
+
 ```
 apitest.prg  color.prg  extcls.prg  filetest.prg  hello.prg  vmmtest.prg
 ```
@@ -390,10 +415,13 @@ apitest.prg  color.prg  extcls.prg  filetest.prg  hello.prg  vmmtest.prg
 ```bash
 make image
 ```
+
 Expected: cc1541 runs and `build/image.d64` exists:
+
 ```bash
 ls -lh build/image.d64
 ```
+
 Expected: a file of approximately 170KB (174848 bytes).
 
 - [ ] **Step 7: Verify `make testimage`**
@@ -401,7 +429,9 @@ Expected: a file of approximately 170KB (174848 bytes).
 ```bash
 make testimage
 ```
+
 Expected: `build/test.d64` exists and is larger than (or equal to) `build/image.d64` — it contains the test PRGs in addition to the OS and debug utility.
+
 ```bash
 ls -lh build/test.d64
 ```
@@ -409,10 +439,12 @@ ls -lh build/test.d64
 - [ ] **Step 8: Verify dependency tracking**
 
 Touch a source file and confirm only the affected target rebuilds:
+
 ```bash
 touch src/command64/shell.asm
 make image
 ```
+
 Expected: Only `command64.prg` reassembles, then `image.d64` is rebuilt. `debug.prg` must NOT reassemble (no KickAssembler output for it).
 
 - [ ] **Step 9: Verify `make clean`**
@@ -421,7 +453,9 @@ Expected: Only `command64.prg` reassembles, then `image.d64` is rebuilt. `debug.
 make clean
 ls build/ 2>&1
 ```
+
 Expected:
+
 ```
 ls: cannot access 'build/': No such file or directory
 ```
@@ -431,6 +465,7 @@ ls: cannot access 'build/': No such file or directory
 ```bash
 make
 ```
+
 Expected: All targets build in dependency order — `command64.prg`, `debug.prg`, test PRGs, `image.d64`, `test.d64`. No errors.
 
 - [ ] **Step 11: Commit**
@@ -445,6 +480,7 @@ git commit -m "feat: add GNU Make unified build system"
 ## Task 4: Verify and Commit the Release Target
 
 **Files:**
+
 - No new files — testing `make release` and committing its output
 
 The release target is intentionally excluded from `make all`. This task verifies it end-to-end and produces the first committed release snapshot.
@@ -454,7 +490,9 @@ The release target is intentionally excluded from `make all`. This task verifies
 ```bash
 make release
 ```
+
 Expected final line:
+
 ```
 Release 0.2.21 ready in release/
 ```
@@ -464,7 +502,9 @@ Release 0.2.21 ready in release/
 ```bash
 ls release/
 ```
+
 Expected:
+
 ```
 command64.prg  debug.prg  docs/  image.d64  ms-dos-c64-0.2.21.tar.gz  ms-dos-c64-0.2.21.zip  test.d64
 ```
@@ -472,7 +512,9 @@ command64.prg  debug.prg  docs/  image.d64  ms-dos-c64-0.2.21.tar.gz  ms-dos-c64
 ```bash
 ls release/docs/
 ```
+
 Expected (superpowers/ must NOT be present):
+
 ```
 api-reference.md  apps/  pet-sci-api.md  programmers-reference.md  vmm-api.md
 ```
@@ -482,6 +524,7 @@ api-reference.md  apps/  pet-sci-api.md  programmers-reference.md  vmm-api.md
 ```bash
 unzip -l release/ms-dos-c64-0.2.21.zip
 ```
+
 Expected: lists `command64.prg`, `debug.prg`, `image.d64`, `test.d64`, and `docs/` tree. No `docs/superpowers/` entries.
 
 - [ ] **Step 4: Commit the release artifacts**
@@ -496,6 +539,7 @@ git commit -m "release: v0.2.21 — initial unified build system release"
 ## Self-Review Checklist
 
 **Spec coverage:**
+
 - [x] Repo restructure: git mv, git rm --cached, .gitignore fix — Task 1–2
 - [x] `make`, `make image`, `make testimage`, `make test`, `make clean` — Task 3
 - [x] Dependency tracking verification — Task 3 Step 8
