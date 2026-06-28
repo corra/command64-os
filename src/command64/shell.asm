@@ -144,9 +144,7 @@ siSkipEnv:
 
     jsr cmdVer              // Display version banner
 mainLoop:
-    lda #<promptMsg
-    ldy #>promptMsg
-    jsr petPrintString
+    jsr printPrompt
 
     jsr shellReadLine       // screen editor echoes input and advances cursor on RETURN
 
@@ -2075,10 +2073,33 @@ cmdHelp:
     rts
 
 // ---------------------------------------------------------------------------
+// printPrompt
+// Prints the dynamic shell prompt: "C64[N]:> " where N is CurrentDevice.
+// ---------------------------------------------------------------------------
+printPrompt:
+    lda #<promptPrefixMsg
+    ldy #>promptPrefixMsg
+    jsr petPrintString
+
+    lda CurrentDevice
+    tax
+    ldy #0
+    jsr printDecimal16
+
+    lda #<promptSuffixMsg
+    ldy #>promptSuffixMsg
+    jsr petPrintString
+    rts
+
+// ---------------------------------------------------------------------------
 // String literals
 // ---------------------------------------------------------------------------
-promptMsg:
-    .text "C64:> "
+promptPrefixMsg:
+    .text "C64["
+    .byte 0
+
+promptSuffixMsg:
+    .text "]:> "
     .byte 0
 
 verMsg:
