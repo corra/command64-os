@@ -96,6 +96,10 @@
   - [x] Remediate `DEBUG` bugs (case sensitivity, register safety, inclusive ranges) — `brain/plans/debug-utility.md`
   - [x] Verify `DEBUG` via formal test plan — `brain/walkthroughs/debug-test-plan.md`
   - [x] Implement `RUN` / `G` internal commands for program execution at [address]
+  - [x] Remediate `DEBUG` range and dump bugs (uppercase L parsing, dump range support) — `brain/plans/debug-range-remediation.md`
+  - [x] Refactor range checks to eliminate redundancy in `debug.asm` — `brain/plans/debug-refactor-ranges.md`
+  - [x] Fix hex letter parsing in `parseHexArg` (`debug.asm`) — `brain/plans/debug-hex-parsing-fix.md`
+  - [x] Fix Y-register clobbering in `prLength` (`debug.asm`) — `brain/plans/debug-prlength-y-preservation.md`
 
 - [ ] Phase 5: Environment & Multi-Device Support
   - [x] Implement `DRIVE` command (with `DEVICE`/`DEV` aliases)

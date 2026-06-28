@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **Refactored Device Routing**: Centralized target device prefix routing (`8:`, `9:`, etc.) from individual shell commands and external utilities into the core filesystem primitives (`fileOpen`, `fileDelete`, `fileRename`) and a new API function `DOS_PARSE_PREFIX` ($57). This eliminates duplicate parsing code, reduces side-effect risks (no longer overriding `CurrentDevice` in shell commands), and reclaims resident shell memory.
 - **Centralized Segment Packing**: Relocated the memory start addresses of all core OS segments (`Utils`, `Api`, `Loader`, `Path`, `Vmm`, `File`) in `src/command64.asm` to allow optimized packing and eliminate memory overlap issues as segments grow.
+- **DEBUG Utility Range Refactoring**: Refactored the range-checking logic in `debug.asm` to reduce duplication. Extracted a centralized `checkRangeLimit` subroutine for single-byte step checks, simplified the length specifier case-masking check in `parseRange` to a single instruction, and optimized inclusive boundary address checks in `cmdUnassemble` and `cmdDump` by reversing comparisons.
 
 ### Added
 - **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
@@ -17,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
 
 ### Fixed
+- **DEBUG Utility Range & Dump**:
+  - Fixed uppercase `L` (Shift+L) length parameter parsing case-sensitivity bug in `parseRange` where it was compared to the compiled value of `'L'` after masking.
+  - Implemented proper range and length parameter support in `cmdDump` (`D` command), preventing it from ignoring end address/length specifiers and defaulting to a fixed 128-byte dump.
+  - Fixed a critical bug in `parseHexArg` where lowercase hex letters `a`–`f` (PETSCII `$41`–`$46`) were incorrectly rejected as invalid characters due to assembler encoding side effects.
+  - Fixed a critical parser corruption bug in `prLength` where the `Y` register (which acts as the parser index `y`) was clobbered during 16-bit range calculations. This caused trailing command arguments (like fill bytes or copy destinations) to be parsed from the beginning of the buffer, producing syntax errors.
 - **File System Primitives**: Fixed a critical bug in `file.asm` where drive suffixes `,S,W`, `S:`, and `R:` were compiled as shifted PETSCII due to `petscii_mixed` encoding, causing drive-side syntax errors. Replaced them with unshifted byte values (`$53`, `$57`, `$52`). Also, prepended the drive number `'0'` (e.g. `S0:`, `R0:`) to scratch and rename command strings to comply with the standard 1541 DOS syntax. Changed default file creation suffix from `,S,W` (Sequential Write) to `,P,W` (Program Write) to preserve the `PRG` file type on copied files.
 - **Shell Command Table**: Restored the accidentally deleted `cmdPath` handler and corrected the `tableCmd` command table alignment to prevent crashes when executing commands.
 - **LOAD Command Address Parsing**: Restructured `cmdLoad` to parse optional target addresses before parsing zero-page pointers, preventing `TempHi` from being clobbered by `parsePointerDevice`. This fixes a critical bug where `LOAD` either relocated programs to page zero ($000D) or corrupted hex arguments.

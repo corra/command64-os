@@ -9,7 +9,7 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "1"
-.const VERSION_STAGE = "4" // Build 1012 parseHexArg bounds + uppercase fix
+.const VERSION_STAGE = "8" // Build 1027 Y-register fix
 #import "build_debug.inc"
 
 // --- Zero Page Pointers ($70-$7F) ---
@@ -233,23 +233,51 @@ cmdQuit:
 
 cmdDump:
     jsr skipSpaces
-    
-    // Check if address provided
     lda inputBuf, y
-    beq cdUseDefault
+    bne cdHasArgs
     
+    // No args: default to currentAddr, dump 128 bytes (16 rows of 8)
+    lda #16
+    sta DebugTemp           // Row counter
+    lda #$FF
+    sta rangeEnd
+    sta rangeEnd + 1        // effectively no range end
+    jmp cdRowLoop
+    
+cdHasArgs:
+    // Try parsing as range first
+    jsr parseRange
+    bcc cdRangeOk
+    
+    // Not a range? Reset Y and try single address
+    ldy parsePos
+    iny                     // skip command char
+    jsr skipSpaces
     jsr parseHexArg
-    bcc *+5
+    bcc cdSingleAddr
     jmp cdErr
+    
+cdSingleAddr:
     lda HexValLo
     sta currentAddr
     lda HexValHi
     sta currentAddr + 1
-    
-cdUseDefault:
-    // For now, dump 128 bytes (16 rows of 8)
     lda #16
-    sta DebugTemp           // Row counter
+    sta DebugTemp
+    lda #$FF
+    sta rangeEnd
+    sta rangeEnd + 1
+    jmp cdRowLoop
+    
+cdRangeOk:
+    lda rangeStart
+    sta currentAddr
+    lda rangeStart + 1
+    sta currentAddr + 1
+    lda #$FF
+    sta DebugTemp           // Use range check instead of count
+    // rangeEnd is already set by parseRange
+    jmp cdRowLoop
     
 cdRowLoop:
     // Print address
@@ -318,9 +346,27 @@ cdNextChar:
     adc #0
     sta currentAddr + 1
     
+    // Check if we use count or range
+    lda DebugTemp
+    cmp #$FF
+    beq cdCheckRange
+    
     dec DebugTemp
     bne cdRowLoop
     rts
+
+cdCheckRange:
+    lda rangeEnd + 1
+    cmp currentAddr + 1
+    bne cdSkipLo
+    lda rangeEnd
+    cmp currentAddr
+cdSkipLo:
+    bcs cdRowLoop_jmp
+    rts
+
+cdRowLoop_jmp:
+    jmp cdRowLoop
 
 cdErr:
     lda #<errUnknown
@@ -502,11 +548,7 @@ cfLoop:
     sta listIndex
 cfNoWrap:
 
-    lda rangeStart
-    cmp rangeEnd
-    bne cfIncrement
-    lda rangeStart + 1
-    cmp rangeEnd + 1
+    jsr checkRangeLimit
     beq cfDone
 cfIncrement:
     inc rangeStart
@@ -560,11 +602,7 @@ cmBackLoop:
     ldy #0
     lda (rangeEnd), y       // read from tail of source
     sta (val2), y           // write to tail of dest
-    lda rangeEnd
-    cmp rangeStart
-    bne cmBackDec
-    lda rangeEnd + 1
-    cmp rangeStart + 1
+    jsr checkRangeLimit
     beq cmDone              // processed the first (last remaining) byte
 cmBackDec:
     lda rangeEnd            // dec src pointer
@@ -584,11 +622,7 @@ cmForward:
 cmFwdLoop:
     lda (rangeStart), y
     sta (val1), y
-    lda rangeStart          // exit check after copy (inclusive end)
-    cmp rangeEnd
-    bne cmFwdInc
-    lda rangeStart + 1
-    cmp rangeEnd + 1
+    jsr checkRangeLimit
     beq cmDone
 cmFwdInc:
     inc rangeStart
@@ -645,11 +679,7 @@ ccpLoop:
     jsr KernalChROUT
 
 ccpNext:
-    lda rangeStart
-    cmp rangeEnd
-    bne ccpInc
-    lda rangeStart + 1
-    cmp rangeEnd + 1
+    jsr checkRangeLimit
     beq ccpDone
 ccpInc:
     inc rangeStart
@@ -693,11 +723,7 @@ csCompLoop:
     jsr KernalChROUT
 
 csNoMatch:
-    lda rangeStart
-    cmp rangeEnd
-    bne csInc
-    lda rangeStart + 1
-    cmp rangeEnd + 1
+    jsr checkRangeLimit
     beq csDone
 csInc:
     inc rangeStart
@@ -1050,15 +1076,13 @@ cuDoneCount:
     rts
 
 cuCheckRange:
-    lda currentAddr + 1
-    cmp rangeEnd + 1
-    bcc cuLoop_jmp
-    bne cuDone              // currentAddr hi > rangeEnd hi
-    lda currentAddr
-    cmp rangeEnd
-    bcc cuLoop_jmp
-    beq cuLoop_jmp          // currentAddr <= rangeEnd (inclusive)
-cuDone:
+    lda rangeEnd + 1
+    cmp currentAddr + 1
+    bne cuSkipLo
+    lda rangeEnd
+    cmp currentAddr
+cuSkipLo:
+    bcs cuLoop_jmp
     rts
 
 cuLoop_jmp:
@@ -1087,10 +1111,8 @@ parseRange:
     
     // Check for 'L' or 'l'
     lda inputBuf, y
-    cmp #'l'
-    beq prLength
     and #$7F
-    cmp #'L'
+    cmp #'l'
     beq prLength
 
     // Standard END address
@@ -1109,6 +1131,9 @@ prLength:
     jsr parseHexArg
     bcs prErr
     
+    tya
+    pha                     // Save parser index Y
+    
     // rangeEnd = rangeStart + length - 1
     lda HexValLo
     sec
@@ -1116,7 +1141,7 @@ prLength:
     tax                     // save lo
     lda HexValHi
     sbc #0
-    tay                     // save hi
+    tay                     // save hi (clobbers Y)
     
     txa
     clc
@@ -1125,6 +1150,9 @@ prLength:
     tya
     adc rangeStart + 1
     sta rangeEnd + 1
+    
+    pla
+    tay                     // Restore parser index Y
     
     clc
     rts
@@ -1216,23 +1244,14 @@ phLoop:
     cmp #'9' + 1
     bcc phDigit
     
-    // Check A-F: SHIFT+letter in lowercase mode produces $41-$46
-    cmp #'A'                // $41
+    // Check A-F / a-f: unshifted $41-$46 or shifted $C1-$C6
+    and #$7F
+    cmp #$41            // 'a'
     bcc phInvalid
-    cmp #'F' + 1            // $47
-    bcc phUpperHex
-
-    // Check a-f: $61-$66
-    cmp #'a'                // $61
-    bcc phInvalid
-    cmp #'f' + 1            // $67
+    cmp #$47            // 'g'
     bcs phInvalid
     sec
-    sbc #('a' - 10)         // $61→10, $62→11, ..., $66→15
-    jmp phAdd
-phUpperHex:
-    sec
-    sbc #('A' - 10)         // $41→10, $42→11, ..., $46→15
+    sbc #$37            // Convert to 10-15
     jmp phAdd
 phDigit:
     sec
@@ -1268,6 +1287,15 @@ phDone:
     cpx #0
     beq phInvalid
     clc
+    rts
+
+checkRangeLimit:
+    lda rangeStart
+    cmp rangeEnd
+    bne crlSkipLo
+    lda rangeStart + 1
+    cmp rangeEnd + 1
+crlSkipLo:
     rts
 
 printHex8:
