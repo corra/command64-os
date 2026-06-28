@@ -69,6 +69,18 @@ add_custom_command(
     COMMENT "Checking/Incrementing DEBUG build counter"
 )
 
+add_custom_command(
+    OUTPUT "${CMAKE_BINARY_DIR}/build_label.inc"
+    COMMAND "${CMAKE_COMMAND}"
+        -DBUILD_FILE="${CMAKE_SOURCE_DIR}/BUILD_LABEL"
+        -DINC_FILE="${CMAKE_BINARY_DIR}/build_label.inc"
+        -DDEFAULT_VERSION=1000
+        -DVAR_NAME="BUILD_NUMBER"
+        -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
+    DEPENDS ${LABEL_SRCS}
+    COMMENT "Checking/Incrementing LABEL build counter"
+)
+
 # 1. OS PRG Target
 add_kickass_target(command64
     ENTRY_FILE "${CMD64_ENTRY}"
@@ -89,6 +101,8 @@ add_kickass_target(debug
 add_kickass_target(label
     ENTRY_FILE "${LABEL_ENTRY}"
     SOURCES ${LABEL_SRCS}
+    DEPENDS "${CMAKE_BINARY_DIR}/build_label.inc"
+    INCLUDE_DIRS "${CMAKE_BINARY_DIR}"
 )
 
 # 4. Test PRGs (one per tests/src/*.asm)

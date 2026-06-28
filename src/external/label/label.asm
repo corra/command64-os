@@ -26,6 +26,11 @@
 
 #import "../../../include/command64.inc"
 
+.const VERSION_MAJOR = "0"
+.const VERSION_MINOR = "1"
+.const VERSION_STAGE = "0"
+#import "build_label.inc"
+
 .encoding "petscii_mixed"
 
 // Zero-page scratch ($70 is free for external program use)
@@ -45,6 +50,12 @@
 // Entry point
 // ---------------------------------------------------------------------------
 start:
+    // Print version banner
+    ldx #<verMsg
+    ldy #>verMsg
+    lda #DOS_PRINT_STR
+    jsr $1000
+
     // Save original CurrentDevice
     lda CurrentDevice
     sta SavedDevice
@@ -419,6 +430,11 @@ reqMsg:
 
 devMsg:
     .text "Device not present"
+    .byte $0D, $00
+
+verMsg:
+    .text "LABEL v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+    .text "." + BUILD_NUMBER
     .byte $0D, $00
 
 // Runtime buffers (initialized at load time)
