@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG Full Feature Test Plan**: Created a comprehensive manual verification plan for the `DEBUG` utility, covering all existing interactive commands (Dump, Enter, Fill, Move, Compare, Search, Register display/edit, Hex math, Go, Version, Help), input buffer edge cases, and filename and disk I/O. Added placeholder test suites for the planned assembler and breakpoints. Updated CMakeLists.txt build-time documentation sync and the Code Wiki index.
 - **DEBUG Load SEQ and USR Files**: Added support for loading sequential (`SEQ`) and user (`USR`) files into memory via custom byte-by-byte file streaming. Added optional type prefix parsing (`L [P/S/U] [addr]`) matching the `W` command syntax.
 - **DEBUG Interactive Registers**: Added interactive register modification support (`R [register]`) to the `DEBUG` utility, enabling viewing and modifying individual CPU registers (`A`, `X`, `Y`, `P`, `S`) with 8-bit hex validation and far branch condition correction.
 - **DEBUG Utility Feature Parity Plans**: Documented complete implementation roadmaps and blueprints for achieving parity with MS-DOS `DEBUG`: Phase 1 (Interactive registers `R` and File I/O `N`/`L`/`W`), Phase 2 (Interactive 6502 assembler `A`), and Phase 3 (Software breakpoint tracer `T`/`P`). Added individual phase plan documents to `brain/plans/`, registered a new meta-task and sub-tasks in Task Warrior, and updated the Code Wiki user guide.

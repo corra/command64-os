@@ -19,10 +19,10 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 
 ### Phase 1: Interactive Register Editing and File I/O (`R`, `N`, `L`, `W`)
 
-- [ ] Implement register name parsing and interactive modification for `R` command (`R A`, `R X`, etc. prompting with `:`).
-- [ ] Implement `N` command to write input arguments to the filename buffer `fileNameBuf`.
-- [ ] Implement `L` command to load files from disk, supporting optional address override.
-- [ ] Implement `W` command to parse memory range and save data to disk using C64 Kernal.
+- [x] Implement register name parsing and interactive modification for `R` command (`R A`, `R X`, etc. prompting with `:`).
+- [x] Implement `N` command to write input arguments to the filename buffer `fileNameBuf`.
+- [x] Implement `L` command to load files from disk, supporting optional address override.
+- [x] Implement `W` command to parse memory range and save data to disk using C64 Kernal.
 
 ### Phase 2: Interactive Inline 6502 Assembler (`A`)
 
@@ -42,7 +42,8 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 
 ### Verification and Documentation
 
-- [ ] Verify Phase 1 register editing and load/save operations.
+- [x] Verify Phase 1 register editing and load/save operations.
+- [x] Create and document a full feature test plan for `debug` (maintained continuously).
 - [ ] Verify Phase 2 assembly of simple loops and comparison with disassemble output.
 - [ ] Verify Phase 3 step-into and step-over tracing operations.
 - [ ] Update user documentation and `CHANGELOG.md` to reflect new commands.
