@@ -66,20 +66,26 @@ External user-space applications (located in `src/external/`) must follow a stri
 2. **Persistent Build Counter File**: Create a file named `BUILD_<APPNAME_UPPER>` at the repository root containing the initial build number (usually `1000`).
 3. **Assembly Integration**:
    - Define version major, minor, and stage in the main assembly file:
+
      ```assembly
      .const VERSION_MAJOR = "0"
      .const VERSION_MINOR = "1"
      .const VERSION_STAGE = "0"
      #import "build_<appname>.inc"
      ```
+
    - Embed the version and build number in the application startup/identification text using `BUILD_NUMBER`:
+
      ```assembly
      .text "MYAPP v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE + "." + BUILD_NUMBER
      ```
+
 4. **CMake Target**: Update `CMakeLists.txt` to define the target using the `add_external_app` helper function:
+
    ```cmake
    file(GLOB_RECURSE MYAPP_SRCS "src/external/myapp/*.asm" "include/*.inc")
    set(MYAPP_ENTRY "src/external/myapp/myapp.asm")
    add_external_app(myapp "${MYAPP_ENTRY}" MYAPP_SRCS 1000)
    ```
+
    This helper automatically configures the target, schedules the build number increment script on modification of source files, and enforces that the `BUILD_MYAPP` file exists at configure time.

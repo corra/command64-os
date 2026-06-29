@@ -148,7 +148,7 @@ dFoundCmd:
     bcc dNotLetter
     cmp #'Z' + 1
     bcs dNotLetter
-    ora #$20                // uppercase ($41-$5A) → lowercase ($61-$7A)
+    and #$7F                // Shifted ($C1-$DA) → Unshifted ($41-$5A)
 dNotLetter:
     
     // --- Command Registry ---
@@ -631,6 +631,8 @@ cnSet:
 cnCopyLoop:
     lda inputBuf, y
     beq cnCopyDone
+    cmp #' '
+    beq cnCopyDone
     cpx #32
     beq cnTooLong
     sta fileNameBuf, x
@@ -732,14 +734,14 @@ cmdWrite:
     lda #$50
     sta fileType
     // P/S/U are not valid hex chars, so safe to check for type prefix first.
-    // Normalize to lowercase for comparison (ora #$20).
+    // Normalize to unshifted PETSCII for comparison (and #$7F).
     lda inputBuf, y
-    ora #$20
-    cmp #$70            // 'p'
+    and #$7F
+    cmp #'p'
     beq cwTypeP
-    cmp #$73            // 's'
+    cmp #'s'
     beq cwTypeS
-    cmp #$75            // 'u'
+    cmp #'u'
     beq cwTypeU
     jmp cwParseRange
 cwTypeP:
