@@ -57,30 +57,6 @@ add_custom_command(
     COMMENT "Checking/Incrementing OS build counter"
 )
 
-add_custom_command(
-    OUTPUT "${CMAKE_BINARY_DIR}/build_debug.inc"
-    COMMAND "${CMAKE_COMMAND}"
-        -DBUILD_FILE="${CMAKE_SOURCE_DIR}/BUILD_DEBUG"
-        -DINC_FILE="${CMAKE_BINARY_DIR}/build_debug.inc"
-        -DDEFAULT_VERSION=1012
-        -DVAR_NAME="BUILD_NUMBER"
-        -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
-    DEPENDS ${DEBUG_SRCS}
-    COMMENT "Checking/Incrementing DEBUG build counter"
-)
-
-add_custom_command(
-    OUTPUT "${CMAKE_BINARY_DIR}/build_label.inc"
-    COMMAND "${CMAKE_COMMAND}"
-        -DBUILD_FILE="${CMAKE_SOURCE_DIR}/BUILD_LABEL"
-        -DINC_FILE="${CMAKE_BINARY_DIR}/build_label.inc"
-        -DDEFAULT_VERSION=1000
-        -DVAR_NAME="BUILD_NUMBER"
-        -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
-    DEPENDS ${LABEL_SRCS}
-    COMMENT "Checking/Incrementing LABEL build counter"
-)
-
 # 1. OS PRG Target
 add_kickass_target(command64
     ENTRY_FILE "${CMD64_ENTRY}"
@@ -90,20 +66,10 @@ add_kickass_target(command64
 )
 
 # 2. DEBUG Utility PRG Target
-add_kickass_target(debug
-    ENTRY_FILE "${DEBUG_ENTRY}"
-    SOURCES ${DEBUG_SRCS}
-    DEPENDS "${CMAKE_BINARY_DIR}/build_debug.inc"
-    INCLUDE_DIRS "${CMAKE_BINARY_DIR}"
-)
+add_external_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012)
 
 # 3. LABEL External Command PRG Target
-add_kickass_target(label
-    ENTRY_FILE "${LABEL_ENTRY}"
-    SOURCES ${LABEL_SRCS}
-    DEPENDS "${CMAKE_BINARY_DIR}/build_label.inc"
-    INCLUDE_DIRS "${CMAKE_BINARY_DIR}"
-)
+add_external_app(label "${LABEL_ENTRY}" LABEL_SRCS 1000)
 
 # 4. Test PRGs (one per tests/src/*.asm)
 file(GLOB TEST_SRCS "tests/src/*.asm")

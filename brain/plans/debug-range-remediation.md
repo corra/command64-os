@@ -7,19 +7,23 @@ status: planned
 # Plan: DEBUG Range and Dump Remediation
 
 ## Goal & Rationale
+
 The `DEBUG` utility has two known bugs affecting memory ranges:
+
 1. **Uppercase `L` Case-Sensitivity Bug**: Range commands with length parameters (e.g., `F 1000 L 10 FF` or `U 2000 L 10`) fail if typed with an uppercase `L` (Shift+L) because of a character conversion discrepancy under `petscii_mixed` encoding.
 2. **Missing Dump Range Support**: The Dump (`D`) command only accepts a starting address and always dumps 128 bytes, ignoring end address or length range specifiers (e.g. `D 1000 1020` or `D 1000 L 20`), despite being documented as range-capable.
 
 This plan addresses both issues to restore range parity as specified in the user manual.
 
 ## Scope
+
 - Modify `src/external/debug/debug.asm` to:
   - Fix length identifier parsing in `parseRange`.
   - Add range and length parameter parsing and enforcement to `cmdDump`.
 - Modify `CHANGELOG.md` to document the fixes.
 
 ## Files to Create/Modify
+
 | File | Action | Notes |
 |------|--------|-------|
 | `src/external/debug/debug.asm` | Modify | Fix range parsing case-sensitivity and implement `D` command range logic. |
@@ -28,7 +32,9 @@ This plan addresses both issues to restore range parity as specified in the user
 ## Key Design Decisions
 
 ### 1. Fix Uppercase `L` Parsing
+
 In `parseRange`:
+
 ```asm
     // Check for 'L' or 'l'
     lda inputBuf, y
@@ -38,10 +44,13 @@ In `parseRange`:
     cmp #'L'
     beq prLength
 ```
+
 Since `'L'` compiles to `$CC` in `petscii_mixed`, the `and #$7F` instruction yields `$4C` from shifted `$CC`, but comparing it against `'L'` (`$CC`) fails. Changing `cmp #'L'` to `cmp #'l'` (or comparing the masked value to `'l'`) resolves the case-insensitive comparison correctly.
 
 ### 2. Implement `D` Command Range Logic
+
 Refactor `cmdDump` to use a structure similar to `cmdUnassemble`:
+
 - Try parsing the arguments as a range first via `parseRange`.
 - If `parseRange` succeeds:
   - Set `currentAddr` to `rangeStart`.
@@ -56,6 +65,7 @@ Refactor `cmdDump` to use a structure similar to `cmdUnassemble`:
     - Set `DebugTemp` to 16 (default rows).
 
 In the row loop of `cmdDump`:
+
 - After advancing `currentAddr` by 8, check if `DebugTemp` is `$FF`.
 - If it is `$FF`, branch to a check: `currentAddr` vs `rangeEnd`.
   - If `currentAddr` <= `rangeEnd` (inclusive check), loop again.
@@ -66,6 +76,7 @@ This mirrors the robust, tested disassembly range loop logic in `cmdUnassemble`.
 ## Verification Plan
 
 ### Manual Verification
+
 1. Build the updated debug utility using `make`.
 2. Boot into the OS and launch `debug`.
 3. Verify Uppercase `L` parsing:
@@ -77,6 +88,7 @@ This mirrors the robust, tested disassembly range loop logic in `cmdUnassemble`.
    - `-D 4000` -> Should dump exactly 16 rows (default 128 bytes).
 
 ## Progress
+
 - [ ] Implement uppercase `L` fix in `parseRange`
 - [ ] Refactor `cmdDump` to parse and enforce ranges
 - [ ] Verify fix in build

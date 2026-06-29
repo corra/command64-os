@@ -42,3 +42,48 @@ function(add_kickass_target TARGET_NAME)
     # Expose the generated PRG file path as a property
     set_target_properties(${TARGET_NAME} PROPERTIES C64_PRG_PATH "${OUTPUT_PRG}")
 endfunction()
+ 
+# Helper function to define an external C64 application target with enforced versioning.
+# It checks for a persistent build number file (BUILD_<NAME_UPPER>) in the source root
+# and fails at configure time if it is missing, ensuring strict version enforcement.
+function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
+    string(TOUPPER "${TARGET_NAME}" TARGET_NAME_UPPER)
+    set(BUILD_FILE "${CMAKE_SOURCE_DIR}/BUILD_${TARGET_NAME_UPPER}")
+    set(INC_FILE "${CMAKE_BINARY_DIR}/build_${TARGET_NAME}.inc")
+
+    # Enforce that the BUILD_<APP> file exists in the source directory
+    if(NOT EXISTS "${BUILD_FILE}")
+        message(FATAL_ERROR 
+            "\n"
+            "========================================================================\n"
+            " VERSIONING VIOLATION:\n"
+            " External application target '${TARGET_NAME}' requires a persistent build\n"
+            " counter file at: '${BUILD_FILE}'.\n"
+            " Please create this file containing the starting build number (e.g. 1000)\n"
+            " before configuring.\n"
+            "========================================================================"
+        )
+    endif()
+
+    # Dynamic build numbers custom command
+    # Triggers the increment script only when dependency files change
+    add_custom_command(
+        OUTPUT "${INC_FILE}"
+        COMMAND "${CMAKE_COMMAND}"
+            -DBUILD_FILE="${BUILD_FILE}"
+            -DINC_FILE="${INC_FILE}"
+            -DDEFAULT_VERSION=${DEFAULT_VERSION}
+            -DVAR_NAME="BUILD_NUMBER"
+            -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
+        DEPENDS ${${SOURCES_VAR}}
+        COMMENT "Checking/Incrementing ${TARGET_NAME_UPPER} build counter"
+    )
+
+    # Compile the application using Kick Assembler
+    add_kickass_target(${TARGET_NAME}
+        ENTRY_FILE "${ENTRY_FILE}"
+        SOURCES ${${SOURCES_VAR}}
+        DEPENDS "${INC_FILE}"
+        INCLUDE_DIRS "${CMAKE_BINARY_DIR}"
+    )
+endfunction()
