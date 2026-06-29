@@ -12,6 +12,7 @@
 .label KernalSETLFS    = $FFBA  // Set logical, first, and second addresses
 .label KernalSETNAM    = $FFBD  // Set file name
 .label KernalLOAD      = $FFD5  // Load or verify file
+.label KernalSAVE      = $FFD8  // Save memory range to file
 .label KernalOPEN      = $FFC0  // Open a logical file
 .label KernalCLOSE     = $FFC3  // Close a logical file
 .label KernalREADST    = $FFB7  // Read status byte

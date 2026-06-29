@@ -386,6 +386,10 @@ openErr:
 
 
 labelExit:
+    lda #CMD_CHANNEL
+    jsr KernalCLOSE
+    lda #DATA_CHANNEL
+    jsr KernalCLOSE
     lda SavedDevice
     sta CurrentDevice
     rts

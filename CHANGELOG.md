@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG Interactive Registers**: Added interactive register modification support (`R [register]`) to the `DEBUG` utility, enabling viewing and modifying individual CPU registers (`A`, `X`, `Y`, `P`, `S`) with 8-bit hex validation and far branch condition correction.
 - **DEBUG Utility Feature Parity Plans**: Documented complete implementation roadmaps and blueprints for achieving parity with MS-DOS `DEBUG`: Phase 1 (Interactive registers `R` and File I/O `N`/`L`/`W`), Phase 2 (Interactive 6502 assembler `A`), and Phase 3 (Software breakpoint tracer `T`/`P`). Added individual phase plan documents to `brain/plans/`, registered a new meta-task and sub-tasks in Task Warrior, and updated the Code Wiki user guide.
 
 ### Changed
@@ -26,6 +27,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **DEBUG Case Normalization**: Fixed register name case-normalization in `cmdRegs` (`R` command) to use `and #$7F` instead of `ora #$20`, ensuring compatibility with `petscii_mixed` character encoding and resolving `error` outputs for both uppercase and lowercase inputs.
+- **DEBUG Command Fallback Logic**: Added strict validation to single-address command fallbacks in `cmdDump` (`D`) and `cmdUnassemble` (`U`), ensuring that range syntax errors (such as start address > end address) immediately return `error` instead of silently falling back to a single-address default print.
+- **Device Detection & Switching Cleanup**: Resolved a critical issue where querying/accessing a non-existent device left the KERNAL's logical file tables corrupted with an orphaned open channel. Added explicit `KernalCLOSE` cleanup calls to error paths in `cmdDir`, `cmdVol`, `fileOpen`, and `label.asm`, restoring proper device routing and preventing subsequent accesses to valid devices (like device 8) from failing with "Device not present".
+- **DEBUG Global Range Order Validation**: Implemented a global range verification check inside `parseRange` to enforce `rangeStart <= rangeEnd`, preventing infinite wrapping loops and memory corruption across `W` (Write), `F` (Fill), `S` (Search), and `M` (Move) commands.
+- **DEBUG Load Command Address Tracking**: Corrected `cmdLoad` to update `currentAddr` to the program's starting address upon successful loads (supporting relocated addresses and reading KERNAL `$C1/$C2` for header loads). Also fixed `cmdLoad` to immediately reject invalid address arguments with `error` instead of silently falling back to header loading.
 - **DEBUG Utility Range & Dump**:
   - Fixed uppercase `L` (Shift+L) length parameter parsing case-sensitivity bug in `parseRange` where it was compared to the compiled value of `'L'` after masking.
   - Implemented proper range and length parameter support in `cmdDump` (`D` command), preventing it from ignoring end address/length specifiers and defaulting to a fixed 128-byte dump.

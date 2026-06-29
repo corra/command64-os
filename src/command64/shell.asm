@@ -677,12 +677,14 @@ cdDone:
     jmp dirExit
 
 cdDevError:
+    lda #13
+    jsr KernalCLOSE
     lda #<noDeviceMsg
     ldy #>noDeviceMsg
     jsr petPrintString
     lda #PetCr
     jsr KernalChROUT
-    // fall through to dirExit
+    jmp dirExit
 
 dirExit:
     lda SavedDevice
@@ -2034,6 +2036,8 @@ volParseError:
     jmp volExit
 
 volDevError:
+    lda #13
+    jsr KernalCLOSE
     lda #<noDeviceMsg
     ldy #>noDeviceMsg
     jsr petPrintString
@@ -2120,7 +2124,7 @@ helpMsg:
     .byte $0D
     .text "LOAD   - LOAD [FILE] [ADDR]"
     .byte $0D
-    .text "TYPE   - PRINT FILE CONTENTS"
+    .text "TYPE   - DISPLAY FILE"
     .byte $0D
     .text "COPY   - COPY [SRC] [DST]"
     .byte $0D
@@ -2132,7 +2136,7 @@ helpMsg:
     .byte $0D
     .text "ERASE  - ALIAS FOR DEL"
     .byte $0D
-    .text "DRIVE  - SWITCH DEVICE [8-11]"
+    .text "DRIVE  - SWITCH DEV [8-11]"
     .byte $0D
     .text "SET    - ENV VARIABLES"
     .byte $0D

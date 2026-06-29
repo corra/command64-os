@@ -131,7 +131,9 @@ dispatch:
     ldy #0
 dSkipSpaces:
     lda inputBuf, y
-    beq dExit               // Empty line
+    bne dSkipCheck
+    rts                     // Empty line — inline return; dExit is now out of branch range
+dSkipCheck:
     cmp #' '
     bne dFoundCmd
     iny
@@ -200,8 +202,20 @@ _d9:
     jmp cmdRegs
 _d10:
     cmp #'v'
-    bne _d11
+    bne _d10n
     jmp cmdVer
+_d10n:
+    cmp #'n'
+    bne _d10l
+    jmp cmdName
+_d10l:
+    cmp #'l'
+    bne _d10w
+    jmp cmdLoad
+_d10w:
+    cmp #'w'
+    bne _d11
+    jmp cmdWrite
 _d11:
     
     // Unknown command
@@ -249,6 +263,13 @@ cdHasArgs:
     jsr parseRange
     bcc cdRangeOk
     
+    // Check error type returned in A:
+    // A = 0: no second argument -> try single address fallback
+    // A = 1: invalid range specified -> abort immediately
+    cmp #0
+    beq cdTrySingle
+    jmp cdErr
+cdTrySingle:
     // Not a range? Reset Y and try single address
     ldy parsePos
     iny                     // skip command char
@@ -427,6 +448,104 @@ cmdHexMath:
     rts
 
 cmdRegs:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne dHasRegArg
+    jmp printAllRegs
+dHasRegArg:
+    
+    // Save register name char, then check that it's exactly 1 character
+    tax                 // X = char
+    iny
+    lda inputBuf, y
+    beq regNameOk
+    cmp #' '
+    beq regNameOk
+    jmp cdErr           // invalid register name if extra characters follow
+regNameOk:
+    txa
+    and #$7F            // normalize shifted to unshifted PETSCII (lowercase)
+    cmp #'a'
+    beq modifyA
+    cmp #'x'
+    beq modifyX
+    cmp #'y'
+    beq modifyY
+    cmp #'p'
+    beq modifyP
+    cmp #'s'
+    beq modifyS
+    jmp cdErr
+
+modifyA:
+    lda #'A'
+    ldx #<regA
+    ldy #>regA
+    jmp modifyReg
+modifyX:
+    lda #'X'
+    ldx #<regX
+    ldy #>regX
+    jmp modifyReg
+modifyY:
+    lda #'Y'
+    ldx #<regY
+    ldy #>regY
+    jmp modifyReg
+modifyP:
+    lda #'P'
+    ldx #<regP
+    ldy #>regP
+    jmp modifyReg
+modifyS:
+    lda #'S'
+    ldx #<regS
+    ldy #>regS
+    jmp modifyReg
+
+modifyReg:
+    stx val1
+    sty val1 + 1
+    
+    // Print register name and current value, e.g. "A xx"
+    jsr KernalChROUT
+    lda #' '
+    jsr KernalChROUT
+    ldy #0
+    lda (val1), y
+    jsr printHex8
+    lda #PetCr
+    jsr KernalChROUT
+    
+    // Print prompt and read line
+    lda #':'
+    jsr KernalChROUT
+    jsr readLine
+    
+    // If empty input, leave unmodified
+    ldy #0
+    jsr skipSpaces
+    lda inputBuf, y
+    beq mrDone
+    
+    // Parse hex byte (must fit in 8 bits)
+    jsr parseHexArg
+    bcs mrErr
+    lda HexValHi
+    bne mrErr           // must be 8-bit
+    jsr skipSpaces
+    lda inputBuf, y
+    bne mrErr           // extra trailing characters -> error
+    
+    lda HexValLo
+    ldy #0
+    sta (val1), y
+mrDone:
+    rts
+mrErr:
+    jmp cdErr
+
+printAllRegs:
     // Print A=.. X=.. Y=.. P=.. S=..
     lda #'A'
     jsr KernalChROUT
@@ -478,6 +597,244 @@ cmdRegs:
 cmdVer:
     lda #<verMsg
     ldy #>verMsg
+    jsr API_PRINT_STR
+    rts
+
+// ---------------------------------------------------------------------------
+// cmdName - Set or display the current filename for L/W commands.
+// Syntax: N [filename]
+//   N filename → store up to 32 chars in fileNameBuf
+//   N (none)   → display current filename if one is set
+// ---------------------------------------------------------------------------
+cmdName:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne cnSet
+    // No argument: display current filename if set
+    lda fileNameLen
+    beq cnSilent
+    ldx #0
+cnShowLoop:
+    cpx fileNameLen
+    beq cnShowDone
+    lda fileNameBuf, x
+    jsr KernalChROUT
+    inx
+    jmp cnShowLoop
+cnShowDone:
+    lda #PetCr
+    jsr KernalChROUT
+cnSilent:
+    rts
+cnSet:
+    ldx #0
+cnCopyLoop:
+    lda inputBuf, y
+    beq cnCopyDone
+    cpx #32
+    beq cnTooLong
+    sta fileNameBuf, x
+    inx
+    iny
+    jmp cnCopyLoop
+cnCopyDone:
+    stx fileNameLen
+    rts
+cnTooLong:
+    lda #<errUnknown
+    ldy #>errUnknown
+    jsr API_PRINT_STR
+    rts
+
+// ---------------------------------------------------------------------------
+// cmdLoad - Load the named file into memory.
+// Syntax: L [addr]
+//   addr (none) → load to PRG header address (SA=1)
+//   addr        → relocate load to specified address (SA=0)
+// Requires N to have been set.
+// ---------------------------------------------------------------------------
+cmdLoad:
+    lda fileNameLen
+    bne clHaveName
+    jmp cdErr
+clHaveName:
+    jsr skipSpaces
+    lda inputBuf, y
+    beq clFromHeader
+    jsr parseHexArg
+    bcc clRelocate
+    jmp cdErr
+clRelocate:
+    // Relocating load: save target address then SETNAM/SETLFS/LOAD
+    lda HexValLo
+    sta val1
+    lda HexValHi
+    sta val1 + 1
+    lda fileNameLen
+    ldx #<fileNameBuf
+    ldy #>fileNameBuf
+    jsr KernalSETNAM
+    lda #1              // LFN=1
+    ldx CurrentDevice
+    ldy #0              // SA=0: use address from X/Y in LOAD call
+    jsr KernalSETLFS
+    lda #0              // 0=load (not verify)
+    ldx val1
+    ldy val1 + 1
+    jsr KernalLOAD
+    bcs clErr
+    
+    // Update currentAddr to the load address
+    lda val1
+    sta currentAddr
+    lda val1 + 1
+    sta currentAddr + 1
+    rts
+clFromHeader:
+    lda fileNameLen
+    ldx #<fileNameBuf
+    ldy #>fileNameBuf
+    jsr KernalSETNAM
+    lda #1              // LFN=1
+    ldx CurrentDevice
+    ldy #1              // SA=1: use PRG header address
+    jsr KernalSETLFS
+    lda #0              // 0=load
+    ldx #0
+    ldy #0
+    jsr KernalLOAD
+    bcs clErr
+    
+    // Update currentAddr to start address stored in MEMUSS ($C1/$C2) by KERNAL
+    lda $C1
+    sta currentAddr
+    lda $C2
+    sta currentAddr + 1
+    rts
+clErr:
+    lda #<errUnknown
+    ldy #>errUnknown
+    jsr API_PRINT_STR
+    rts
+
+// ---------------------------------------------------------------------------
+// cmdWrite - Write a range of memory to the named file.
+// Syntax: W [type] start end|Llen
+//   type → optional P (PRG, default), S (SEQ), or U (USR)
+//   PRG prepends a 2-byte load address header; SEQ/USR write raw bytes.
+// Requires N to have been set. Open string is built in listBuf at runtime.
+// ---------------------------------------------------------------------------
+cmdWrite:
+    jsr skipSpaces
+    lda inputBuf, y
+    beq cwNoRange
+    // Default type = P (PRG), stored as unshifted byte $50
+    lda #$50
+    sta fileType
+    // P/S/U are not valid hex chars, so safe to check for type prefix first.
+    // Normalize to lowercase for comparison (ora #$20).
+    lda inputBuf, y
+    ora #$20
+    cmp #$70            // 'p'
+    beq cwTypeP
+    cmp #$73            // 's'
+    beq cwTypeS
+    cmp #$75            // 'u'
+    beq cwTypeU
+    jmp cwParseRange
+cwTypeP:
+    lda #$50            // 'P'
+    sta fileType
+    jmp cwConsumeType
+cwTypeS:
+    lda #$53            // 'S'
+    sta fileType
+    jmp cwConsumeType
+cwTypeU:
+    lda #$55            // 'U'
+    sta fileType
+cwConsumeType:
+    iny                 // skip type char
+    jsr skipSpaces
+cwParseRange:
+    jsr parseRange
+    bcc cwHaveRange
+cwNoRange:
+    jmp cdErr
+cwHaveRange:
+    lda fileNameLen
+    bne cwHaveName
+    jmp cdErr
+cwHaveName:
+    // Build open string in listBuf: copy fileNameBuf then append ",T,W"
+    // Max total = 32 + 4 = 36 bytes; listBuf is 64 bytes — safe.
+    ldx #0
+    ldy #0
+cwCopyName:
+    cpx fileNameLen
+    beq cwAppendSuffix
+    lda fileNameBuf, x
+    sta listBuf, y
+    inx
+    iny
+    jmp cwCopyName
+cwAppendSuffix:
+    lda #$2C            // ','
+    sta listBuf, y
+    iny
+    lda fileType        // 'P'=$50 / 'S'=$53 / 'U'=$55
+    sta listBuf, y
+    iny
+    lda #$2C            // ','
+    sta listBuf, y
+    iny
+    lda #$57            // 'W'
+    sta listBuf, y
+    iny
+    sty DebugTemp       // save total open-string length
+    lda DebugTemp
+    ldx #<listBuf
+    ldy #>listBuf
+    jsr KernalSETNAM
+    lda #1              // LFN=1
+    ldx CurrentDevice
+    ldy #2              // SA=2: data channel
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    ldx #1              // LFN=1
+    jsr KernalCHKOUT
+    bcs cwOpenErr
+    // PRG only: prepend 2-byte load address header before data
+    lda fileType
+    cmp #$53            // 'S' → skip header
+    beq cwWriteLoop
+    cmp #$55            // 'U' → skip header
+    beq cwWriteLoop
+    lda rangeStart      // PRG header lo
+    jsr KernalChROUT
+    lda rangeStart + 1  // PRG header hi
+    jsr KernalChROUT
+cwWriteLoop:
+    ldy #0              // reset Y each iteration; KernalChROUT may clobber it
+    lda (rangeStart), y
+    jsr KernalChROUT
+    jsr checkRangeLimit
+    beq cwWriteDone
+    inc rangeStart
+    bne cwWriteLoop
+    inc rangeStart + 1
+    jmp cwWriteLoop
+cwWriteDone:
+    jsr KernalCLRCHN
+    lda #1
+    jsr KernalCLOSE
+    rts
+cwOpenErr:
+    jsr KernalCLRCHN
+    lda #1
+    jsr KernalCLOSE
+    lda #<errUnknown
+    ldy #>errUnknown
     jsr API_PRINT_STR
     rts
 
@@ -779,6 +1136,13 @@ cuHasArgs:
     jsr parseRange
     bcc cuRangeOk
     
+    // Check error type returned in A:
+    // A = 0: no second argument -> try single address fallback
+    // A = 1: invalid range specified -> abort immediately
+    cmp #0
+    beq cuTrySingle
+    jmp cuErr
+cuTrySingle:
     // Not a range? Reset Y and try single address
     ldy parsePos
     iny                     // skip command char
@@ -1101,35 +1465,35 @@ cuErr:
 parseRange:
     jsr skipSpaces
     jsr parseHexArg
-    bcs prErr
+    bcs prNoArgsErr
     lda HexValLo
     sta rangeStart
     lda HexValHi
     sta rangeStart + 1
     
     jsr skipSpaces
+    lda inputBuf, y
+    beq prNoSecondArg
     
     // Check for 'L' or 'l'
-    lda inputBuf, y
     and #$7F
     cmp #'l'
     beq prLength
 
     // Standard END address
     jsr parseHexArg
-    bcs prErr
+    bcs prInvalidRangeErr
     lda HexValLo
     sta rangeEnd
     lda HexValHi
     sta rangeEnd + 1
-    clc
-    rts
+    jmp prValidate
 
 prLength:
     iny                     // skip 'L'
     jsr skipSpaces
     jsr parseHexArg
-    bcs prErr
+    bcs prInvalidRangeErr
     
     tya
     pha                     // Save parser index Y
@@ -1154,10 +1518,31 @@ prLength:
     pla
     tay                     // Restore parser index Y
     
+prValidate:
+    // Verify rangeStart <= rangeEnd to prevent infinite wrapping loops/underflows
+    lda rangeEnd + 1
+    cmp rangeStart + 1
+    bcc prInvalidRangeErr // end hi < start hi -> error
+    bne prRangeOk       // end hi > start hi -> valid
+    lda rangeEnd
+    cmp rangeStart
+    bcc prInvalidRangeErr // end lo < start lo -> error
+prRangeOk:
     clc
     rts
 
-prErr:
+prNoArgsErr:
+    lda #1
+    sec
+    rts
+
+prNoSecondArg:
+    lda #0
+    sec
+    rts
+
+prInvalidRangeErr:
+    lda #1
     sec
     rts
 
@@ -1349,6 +1734,12 @@ debugHelpMsg:
     .byte $0D
     .text "G [ADDR]    - GO (EXECUTE)"
     .byte $0D
+    .text "N [FILE]    - NAME FILE"
+    .byte $0D
+    .text "L [ADDR]    - LOAD NAMED FILE"
+    .byte $0D
+    .text "W [P/S/U] RANGE - WRITE FILE"
+    .byte $0D
     .text "V           - SHOW VERSION"
     .byte $0D
     .text "Q           - QUIT TO SHELL"
@@ -1425,3 +1816,7 @@ listBuf:   .fill 64, 0
 parsePos: .byte 0
 inputLen: .byte 0
 inputBuf: .fill 64, 0
+
+fileNameLen: .byte 0
+fileType:    .byte $50    // Default: 'P' (PRG)
+fileNameBuf: .fill 32, 0

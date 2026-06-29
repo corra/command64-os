@@ -131,6 +131,9 @@ foSkipMode:
     rts
 
 foError:
+    ldx TempLo
+    lda HandleTable + 1, x  // A = LFN
+    jsr KernalCLOSE
     sec
     lda #$FF
     rts
