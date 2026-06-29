@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG Load SEQ and USR Files**: Added support for loading sequential (`SEQ`) and user (`USR`) files into memory via custom byte-by-byte file streaming. Added optional type prefix parsing (`L [P/S/U] [addr]`) matching the `W` command syntax.
 - **DEBUG Interactive Registers**: Added interactive register modification support (`R [register]`) to the `DEBUG` utility, enabling viewing and modifying individual CPU registers (`A`, `X`, `Y`, `P`, `S`) with 8-bit hex validation and far branch condition correction.
 - **DEBUG Utility Feature Parity Plans**: Documented complete implementation roadmaps and blueprints for achieving parity with MS-DOS `DEBUG`: Phase 1 (Interactive registers `R` and File I/O `N`/`L`/`W`), Phase 2 (Interactive 6502 assembler `A`), and Phase 3 (Software breakpoint tracer `T`/`P`). Added individual phase plan documents to `brain/plans/`, registered a new meta-task and sub-tasks in Task Warrior, and updated the Code Wiki user guide.
 
@@ -27,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **DEBUG Filename Buffer Corruption**: Implemented length pre-scanning inside the name (`N`) command to reject too-long input strings ($>32$ characters) before modifying the internal filename buffer, preventing filename corruption.
+- **DEBUG Load Custom Channel Secondary Address**: Corrected the KERNAL secondary address from `0` (which is reserved by Commodore DOS for `LOAD` operations) to `2` inside the custom byte-by-byte loader, restoring proper file reading for non-program file streams.
 - **DEBUG Case Normalization**: Fixed register name case-normalization in `cmdRegs` (`R` command) to use `and #$7F` instead of `ora #$20`, ensuring compatibility with `petscii_mixed` character encoding and resolving `error` outputs for both uppercase and lowercase inputs.
 - **DEBUG Command Fallback Logic**: Added strict validation to single-address command fallbacks in `cmdDump` (`D`) and `cmdUnassemble` (`U`), ensuring that range syntax errors (such as start address > end address) immediately return `error` instead of silently falling back to a single-address default print.
 - **Device Detection & Switching Cleanup**: Resolved a critical issue where querying/accessing a non-existent device left the KERNAL's logical file tables corrupted with an orphaned open channel. Added explicit `KernalCLOSE` cleanup calls to error paths in `cmdDir`, `cmdVol`, `fileOpen`, and `label.asm`, restoring proper device routing and preventing subsequent accesses to valid devices (like device 8) from failing with "Device not present".

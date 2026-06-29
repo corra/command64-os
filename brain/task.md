@@ -101,7 +101,7 @@
   - [x] Fix hex letter parsing in `parseHexArg` (`debug.asm`) — `brain/plans/debug-hex-parsing-fix.md`
   - [x] Fix Y-register clobbering in `prLength` (`debug.asm`) — `brain/plans/debug-prlength-y-preservation.md`
   - [x] Add build tracking to `LABEL` external utility — `brain/plans/label-build-tracking.md`
-  - [x] Remediate Phase 1 Peer Review findings (interactive registers, load tracking, global range check) — `brain/reviews/2026-06-28_debug-phase1-peer-review.md`
+  - [x] Remediate Phase 1 Peer Review findings (interactive registers, load tracking, global range check) and complete Phase 1 I/O (N/L/W) type prefixes and SEQ/USR custom loaders — `brain/reviews/2026-06-28_debug-phase1-peer-review.md`
 
 - [ ] Phase 5: Environment & Multi-Device Support
   - [x] Implement `DRIVE` command (with `DEVICE`/`DEV` aliases)

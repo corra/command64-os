@@ -627,20 +627,36 @@ cnShowDone:
 cnSilent:
     rts
 cnSet:
+    // Pre-scan length of the filename token (up to first space or null)
+    sty TempLo
+    ldx #0
+cnLenLoop:
+    lda inputBuf, y
+    beq cnLenDone
+    cmp #' '
+    beq cnLenDone
+    inx
+    iny
+    jmp cnLenLoop
+cnLenDone:
+    ldy TempLo              // Restore start index
+    cpx #33
+    bcs cnTooLong           // >= 33 chars -> error
+    cpx #0
+    beq cnTooLong           // 0 chars -> error
+    
+    stx fileNameLen
     ldx #0
 cnCopyLoop:
     lda inputBuf, y
     beq cnCopyDone
     cmp #' '
     beq cnCopyDone
-    cpx #32
-    beq cnTooLong
     sta fileNameBuf, x
     inx
     iny
     jmp cnCopyLoop
 cnCopyDone:
-    stx fileNameLen
     rts
 cnTooLong:
     lda #<errUnknown
@@ -662,16 +678,80 @@ cmdLoad:
 clHaveName:
     jsr skipSpaces
     lda inputBuf, y
-    beq clFromHeader
+    beq clNoArgs
+    
+    // Default type = P (PRG), stored as unshifted byte $50
+    lda #$50
+    sta fileType
+    
+    // Check for P/S/U type prefix
+    lda inputBuf, y
+    and #$7F
+    cmp #'p'
+    beq clTypeP
+    cmp #'s'
+    beq clTypeS
+    cmp #'u'
+    beq clTypeU
+    jmp clParseAddress      // Not a type prefix, parse it directly as address
+    
+clTypeP:
+    lda #$50
+    sta fileType
+    jmp clConsumeType
+clTypeS:
+    lda #$53
+    sta fileType
+    jmp clConsumeType
+clTypeU:
+    lda #$55
+    sta fileType
+clConsumeType:
+    iny                     // skip type char
+    jsr skipSpaces
+    
+clParseAddress:
+    lda inputBuf, y
+    beq clNoAddress
     jsr parseHexArg
-    bcc clRelocate
+    bcc clHaveAddress
     jmp cdErr
-clRelocate:
-    // Relocating load: save target address then SETNAM/SETLFS/LOAD
+
+clNoAddress:
+    // No address parameter!
+    // Check file type: if PRG, load to header. If SEQ/USR, load to currentAddr.
+    lda fileType
+    cmp #$50            // 'P'
+    beq clFromHeader
+    
+    // SEQ/USR: load to currentAddr
+    lda currentAddr
+    sta val1
+    lda currentAddr + 1
+    sta val1 + 1
+    jmp clLoadSeqUsr
+
+clHaveAddress:
+    // Address parameter was provided!
     lda HexValLo
     sta val1
     lda HexValHi
     sta val1 + 1
+    
+    // Check file type: if PRG, load relocated. If SEQ/USR, load to val1.
+    lda fileType
+    cmp #$50            // 'P'
+    beq clRelocate
+    jmp clLoadSeqUsr
+
+clNoArgs:
+    // No arguments at all -> default to PRG load from header
+    lda #$50
+    sta fileType
+    jmp clFromHeader
+
+clRelocate:
+    // Relocating load: SETNAM/SETLFS/LOAD
     lda fileNameLen
     ldx #<fileNameBuf
     ldy #>fileNameBuf
@@ -692,6 +772,7 @@ clRelocate:
     lda val1 + 1
     sta currentAddr + 1
     rts
+
 clFromHeader:
     lda fileNameLen
     ldx #<fileNameBuf
@@ -713,10 +794,85 @@ clFromHeader:
     lda $C2
     sta currentAddr + 1
     rts
+
 clErr:
     lda #<errUnknown
     ldy #>errUnknown
     jsr API_PRINT_STR
+    rts
+
+clLoadSeqUsr:
+    // Open the file and load byte-by-byte
+    lda fileNameLen
+    ldx #<fileNameBuf
+    ldy #>fileNameBuf
+    jsr KernalSETNAM
+    lda #1              // LFN=1
+    ldx CurrentDevice
+    ldy #2              // SA=2 (Read)
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    bcc clSeqUsrOpenOk
+    jmp clErr
+clSeqUsrOpenOk:
+    ldx #1
+    jsr KernalCHKIN
+    bcc clSeqUsrChkinOk
+    
+    // Open succeeded but CHKIN failed -> close channel and fail
+    jsr KernalCLRCHN
+    lda #1
+    jsr KernalCLOSE
+    jmp clErr
+
+clSeqUsrChkinOk:
+    // Copy target start address to currentAddr before we increment it
+    lda val1
+    sta currentAddr
+    lda val1 + 1
+    sta currentAddr + 1
+    
+    // Call byte loading loop
+    jsr clByteLoop      // returns Carry clear on success, Carry set on error
+    bcc clSeqUsrSuccess
+    jmp clErr
+
+clSeqUsrSuccess:
+    rts
+
+clByteLoop:
+    jsr KernalREADST
+    sta val2            // Save status in val2
+    
+    lda val2
+    and #$BF            // Check all bits except EOF (bit 6)
+    bne clByteErr       // Any other error -> abort
+    
+    lda val2
+    and #$40            // Check EOF (bit 6)
+    bne clByteDone      // If EOF is set, we are done!
+    
+    jsr KernalChRIN
+    ldy #0
+    sta (val1), y
+    
+    inc val1
+    bne clByteLoop
+    inc val1 + 1
+    jmp clByteLoop
+
+clByteDone:
+    jsr KernalCLRCHN
+    lda #1
+    jsr KernalCLOSE
+    clc
+    rts
+
+clByteErr:
+    jsr KernalCLRCHN
+    lda #1
+    jsr KernalCLOSE
+    sec
     rts
 
 // ---------------------------------------------------------------------------
