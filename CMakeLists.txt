@@ -101,6 +101,7 @@ endif()
 # Copies documentation files from wiki/ to docs/ automatically during builds.
 set(SYNC_FILES
     api-reference.md
+    debug-io-test-plan.md
     pet-sci-api.md
     programmers-reference.md
     user-manual.md

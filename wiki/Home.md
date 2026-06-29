@@ -7,6 +7,7 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
 - **User Documentation:**
   - [OS User Manual](user-manual.md) - Learn how to build, run, and use the shell commands.
   - [DEBUG Utility Manual](debug-utility.md) - Learn how to use the built-in and external interactive assembly debugger.
+  - [DEBUG I/O Test Plan](debug-io-test-plan.md) - Manual verification test suites for Name, Load, and Write commands.
   - [LABEL Utility Manual](label-utility.md) - Learn how to rename disk volume labels without losing data.
 
 - **Developer Specifications & References:**
