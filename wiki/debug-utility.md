@@ -1,8 +1,8 @@
 # DEBUG Utility User Guide
 
-**Version:** 0.1.4 (Build 1015)
+**Version:** 0.1.8 (C64 Command64 OS Port: Build 1049)
 **Origin:** MS-DOS 4.0
-**Target Address:** $2200 (shifted from $2000 in Phase 6A)
+**Target Address:** $2000
 
 ## Overview
 
@@ -104,30 +104,41 @@ To calculate the sum and difference of `$A500` and `$0250`:
 
 ---
 
-## Roadmap & MS-DOS Parity Status
+## MS-DOS Parity Status
 
-The Command 64 OS `DEBUG` utility is under active development. The table below outlines the current command parity status and implementation plans:
+The Command 64 OS `DEBUG` utility targets functional parity with MS-DOS `DEBUG` v4.0, adapted for the MOS 6502/6510 processor. The table below reflects the current implementation status.
 
-| Command | Status | Notes / Plan |
+| Command | Status | Notes |
 | :---: | :---: | :--- |
-| **`A`** | *Planned (Phase 2)* | Interactive 6502 Assembler. |
-| **`C`** | Implemented | Memory compare. |
-| **`D`** | Implemented | Memory dump (8-byte rows). |
-| **`E`** | Implemented | Enter memory list / text. |
-| **`F`** | Implemented | Fill memory range. |
-| **`G`** | Implemented | Go (execute subroutine). |
-| **`H`** | Implemented | Hex arithmetic. |
-| **`I`** | *Not Planned* | MS-DOS port input. Redundant on 6502 (I/O is memory-mapped). |
-| **`L`** | *Planned (Phase 1)* | Load file from disk. |
-| **`M`** | Implemented | Move (copy) memory block. |
-| **`N`** | *Planned (Phase 1)* | Set target filename. |
-| **`O`** | *Not Planned* | MS-DOS port output. Redundant on 6502 (I/O is memory-mapped). |
-| **`P`** | *Planned (Phase 3)* | Proceed (step over subroutines/loops). |
-| **`Q`** | Implemented | Quit to shell. |
-| **`R`** | *Partial (Phase 1)*| View registers (modify registers planned in Phase 1). |
-| **`S`** | Implemented | Search memory range. |
-| **`T`** | *Planned (Phase 3)* | Trace (step into instructions). |
-| **`U`** | Implemented | Unassemble (disassemble 6502 code). |
-| **`W`** | *Planned (Phase 1)* | Write memory range to file. |
-| **`V`** | Implemented | Show utility version (custom command). |
+| **`A`** | **Implemented** | Interactive 6502 assembler. All 13 addressing modes; auto branch-offset calculation. |
+| **`C`** | **Implemented** | Memory compare; reports mismatched addresses and values. |
+| **`D`** | **Implemented** | Memory dump (8-byte rows with PETSCII column). |
+| **`E`** | **Implemented** | Enter memory — interactive byte editing or direct hex/string list. |
+| **`F`** | **Implemented** | Fill memory range with a repeating byte pattern. |
+| **`G`** | **Implemented** | Go (execute subroutine via JSR; returns to DEBUG on RTS). Inline breakpoints not yet supported (MS-DOS `G =addr bp1 bp2...`). |
+| **`H`** | **Implemented** | Hex arithmetic — 16-bit sum and difference. |
+| **`I`** | **N/A** | MS-DOS port-input opcode. 6502 has no `IN` instruction; all I/O is memory-mapped. |
+| **`L`** | **Implemented** | Load named file from disk; supports PRG header address or explicit relocation address. |
+| **`M`** | **Implemented** | Move (copy) memory block; overlap-safe backward-copy logic. |
+| **`N`** | **Implemented** | Set/read active filename for `L` and `W` operations. |
+| **`O`** | **N/A** | MS-DOS port-output opcode. Same reason as `I`. |
+| **`P`** | *Planned (Phase 3)* | Proceed — step over subroutines/loops via software `BRK` breakpoints. |
+| **`Q`** | **Implemented** | Quit to shell. |
+| **`R`** | **Implemented** | Display and interactively edit registers `A`, `X`, `Y`, `P`, `S` (8-bit) and `PC` (16-bit). |
+| **`S`** | **Implemented** | Search memory range for byte sequence or string. |
+| **`T`** | *Planned (Phase 3)* | Trace — single-step via software `BRK` breakpoints. |
+| **`U`** | **Implemented** | Unassemble (disassemble 6502 machine code). |
+| **`V`** | **Implemented** | Show version — C64 extension, no MS-DOS equivalent. |
+| **`W`** | **Implemented** | Write memory range to named file; supports PRG/SEQ/USR type prefixes. |
+| **`XA`/`XD`/`XM`/`XS`** | **N/A** | MS-DOS EMS (Expanded Memory) commands. C64 extended memory (REU) is managed by the OS VMM, not DEBUG. |
 
+### Key Deviations from MS-DOS DEBUG
+
+| Feature | MS-DOS | C64 DEBUG |
+| :--- | :--- | :--- |
+| **`D` row width** | 16 bytes | 8 bytes (fits 40-column display) |
+| **Address prefix** | `G =C000` (equals sign before entry address) | `G C000` (no equals sign) |
+| **`R F` flag display** | Symbolic flag names (`NV UP DI PL NZ NA PO NC`) with individual toggle | `P` shown/edited as a raw hex byte; see flag table in [full docs](../docs/apps/debug.md) |
+| **`T`/`P` count** | `T 5` traces 5 instructions | Single instruction only; count not supported |
+| **`G` breakpoints** | Up to 10 inline breakpoint addresses | Not yet supported |
+| **`I`/`O`** | x86 port I/O | Not implemented; use `D`/`E` on memory-mapped I/O addresses |

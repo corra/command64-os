@@ -27,6 +27,7 @@
 9. [Module Reference — External Commands](#9-module-reference--external-commands)
    - 9.1 [debug.asm — Interactive Memory Monitor](#91-debugasm--interactive-memory-monitor)
    - 9.2 [label.asm — Disk Volume Label Writer](#92-labelasm--disk-volume-label-writer)
+   - 9.3 [conway.asm — Conway's Game of Life](#93-conwayasm--conways-game-of-life)
 10. [API Call Stacks](#10-api-call-stacks)
 11. [Code Graph and Interrelations](#11-code-graph-and-interrelations)
 12. [Shell Command Reference](#12-shell-command-reference)
@@ -201,7 +202,7 @@ $1130        CommandShell             start (OS entry), mainLoop, shellReadLine,
 $1F90        VmmData                  vmmInitialized (1), vmmTempByte (1),
                                      fileScratch (96 bytes)
 ──────────── ──────────────────────── ────────────────────────────────────────────
-$2000–$9FFF  User Program Space       External programs load and execute here
+$2000–$CFFF  User Program Space       External programs load and execute here (BASIC ROM banked out)
 $C000–$CFFF  VMM MCT                  Memory Control Table (4096 bytes for 16MB REU)
 ```
 
@@ -1064,7 +1065,7 @@ loop:
 
 **`envDelete` algorithm:**  
 
-```
+```asm
 dest = VmmOff (start of string to delete)
 src  = VmmOff + strlen(string) + 1 (first byte after the null)
 loop:
@@ -1090,7 +1091,7 @@ DEBUG is a port of the MS-DOS `DEBUG.COM` interactive memory/register tool.
 #### Zero Page Usage (private to DEBUG)
 
 | ZP | Label | Purpose |
-|----|-------|---------|
+| ---- | ------- | --------- |
 | `$70`–`$71` | `currentAddr` | 16-bit current address pointer |
 | `$72`–`$73` | `rangeStart` | Range start address |
 | `$74`–`$75` | `rangeEnd` | Range end address |
@@ -1108,7 +1109,7 @@ Captures the CPU register state at the moment DEBUG is called (A, X, Y, P, S →
 
 #### `mainLoop`
 
-```
+```asm
 print '-' prompt
 JSR readLine       ← read into inputBuf (64-byte buffer), handles DEL
 JSR dispatch       ← parse first char and jump to handler
@@ -1215,11 +1216,75 @@ Under `.encoding "petscii_mixed"`, uppercase character literals assemble to shif
 
 ---
 
+### 9.3 `conway.asm` — Conway's Game of Life
+
+**File**: [src/external/conway/conway.asm](src/external/conway/conway.asm)  
+**Load address**: `$2000`
+
+Full-screen cellular automaton. The 40×25 text screen is used 1:1 as the simulation grid (1000 cells). Rules: B3/S23 with toroidal wrapping on all four edges.
+
+#### Double-Buffer Design
+
+Two 1024-byte page-aligned buffers at `$3000` and `$3400` alternate roles each generation. `computeNext` reads from the active buffer via `zpPrev/Curr/Next` row pointers and writes results to the inactive buffer via `zpDst`. `swapBufs` toggles `zpBufSel` (0↔1) to exchange roles. Page-alignment allows multi-page iteration with a plain `INC zpHi` rather than a full 16-bit pointer increment.
+
+#### Row Pointer Setup (`setThreeRowPtrs`)
+
+A 25-entry precomputed table (`rowOffLo` / `rowOffHi`) stores `N × 40` for rows 0–24, avoiding a runtime multiply. For each row, three 16-bit base+offset additions set `zpPrev`, `zpCurr`, and `zpNext` to their row start addresses. Carry from the lo-byte `ADC` propagates naturally into the hi-byte add, making the arithmetic correct for offsets that cross a page boundary (rows 7+).
+
+#### Neighbour Accumulation
+
+For each cell, the column loop resolves left/right column indices with compare-and-substitute for the toroidal wrap at columns 0 and 39. Six `(ptr),Y` reads (three rows × left column), two center-column reads, and six more right-column reads accumulate the 8-cell Moore count into `zpCount`. Conway B3/S23 rules are applied with a simple branch tree; result is written to `(zpDstLo),Y`.
+
+#### Branch Distance
+
+The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branch limit. The back-edge uses `BEQ cnColDone / JMP cnColLoop`.
+
+#### Key Labels
+
+| Label | ZP / Address | Purpose |
+| --- | --- | --- |
+| `zpPrevLo/Hi` | `$70–$71` | Previous-row pointer in active buffer |
+| `zpCurrLo/Hi` | `$72–$73` | Current-row pointer in active buffer |
+| `zpNextLo/Hi` | `$74–$75` | Next-row pointer in active buffer |
+| `zpDstLo/Hi` | `$76–$77` | Destination-row pointer in inactive buffer |
+| `zpRow` | `$78` | Row loop index (0–24) |
+| `zpCol` | `$79` | Column loop index (0–39) |
+| `zpCount` | `$7A` | Accumulated neighbour count |
+| `zpLfsr` | `$7B` | 8-bit Galois LFSR state (RNG) |
+| `zpPaused` | `$7C` | Pause flag: 0 = running, $FF = paused |
+| `zpBufSel` | `$7D` | Active buffer: 0 = grid0 (`$3000`), 1 = grid1 (`$3400`) |
+| `rowOffLo/Hi` | in PRG | 25-entry row-offset table (N×40, lo and hi bytes) |
+| `cellCharTbl` | in PRG | 2-byte display map: `[0]=$20` (space), `[1]=$A0` (solid block) |
+| `stpBLo/Hi` | in PRG | Scratch: buffer base address saved across `setThreeRowPtrs` calls |
+| `dgPageCnt` | in PRG | Outer page counter for `drawGrid` (X clobbered by `TAX` inside loop) |
+
+#### Subroutine Summary
+
+| Routine | Description |
+| --- | --- |
+| `start` | Entry point: seed LFSR, set colors, call `randomizeGrid` + `drawGrid`, enter `mainLoop` |
+| `mainLoop` | Poll keys, wait delay, `computeNext`, `swapBufs`, `drawGrid`, repeat |
+| `handleKeys` | Non-blocking `KernalGetIn` poll; dispatches Q/STOP/SPACE/R/C |
+| `waitDelay` | Busy-waits `GEN_DELAY` jiffy ticks (default 3, ≈50 ms per generation) |
+| `computeNext` | Outer row loop → `setThreeRowPtrs` + `setDstRowPtr` → inner column loop with neighbour count and rule application |
+| `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
+| `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
+| `getCurrBase` | Returns active buffer base (A=lo, X=hi) based on `zpBufSel` |
+| `getNextBase` | Returns inactive buffer base (A=lo, X=hi) based on `zpBufSel` |
+| `swapBufs` | `zpBufSel ^= 1` |
+| `randomizeGrid` | Fills active buffer with ~25% live cells via LFSR; alive when `(LFSR & $0A) == 0` |
+| `clearGrid` | Zeros all 1000 cells in active buffer |
+| `drawGrid` | Copies active buffer to screen RAM (`$0400`), converting via `cellCharTbl` |
+| `clearScreen` | Fills screen RAM with `$20` (space) |
+| `lfsrStep` | Advances `zpLfsr` one step; result in A. Galois right-shift, mask `$B8` |
+
+---
+
 ## 10. API Call Stacks
 
 ### External Program → Print String
 
-```
+```asm
 EXTERNAL PROGRAM
   lda #DOS_PRINT_STR   ; $09
   ldx #<myString
@@ -1240,7 +1305,7 @@ EXTERNAL PROGRAM
 
 ### External Program → Open File
 
-```
+```asm
 EXTERNAL PROGRAM
   lda #0               ; read mode
   sta HexValLo

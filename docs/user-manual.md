@@ -207,6 +207,20 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 **Syntax:** `LABEL [new-label]`
 **Example:** `LABEL NEWDISK`
 
+### CONWAY
+
+**Description:** Conway's Game of Life — a full-screen cellular automaton simulation. The 40×25 text screen is used as a live grid; cells are born, survive, or die each generation according to the classic B3/S23 rules. The grid wraps toroidally (all four edges connect).
+**Syntax:** `CONWAY`
+
+**Controls (during simulation):**
+
+| Key | Action |
+| --- | --- |
+| `SPACE` | Pause / resume |
+| `R` | Re-randomize grid |
+| `C` | Clear grid (all cells dead) |
+| `Q` or RUN/STOP | Quit and return to shell |
+
 ---
 
 <a name="technical-limits"></a>
@@ -218,7 +232,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **$2200 - $9FFF:** **User Program Space.** Most external utilities should be compiled for `$2200`.
+- **$2200 - $CFFF:** **User Program Space.** Most external utilities should be compiled for `$2200` (expanded by banking out BASIC ROM).
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity

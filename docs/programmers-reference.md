@@ -15,7 +15,7 @@ This document provides technical details for developing applications for the com
 | `$1180 - $19FF` | **Command Shell**. |
 | `$1B80 - $1D7F` | **VMM Module**. |
 | `$1D80 - $1F8F` | **File System Module**. |
-| **`$2200 - $9FFF`** | **User Program Space**. Applications should be loaded and run here (note: shifted from $2000 to accommodate App Table in Phase 6A). |
+| **`$2200 - $CFFF`** | **User Program Space**. Applications should be loaded and run here (note: shifted from $2000 to accommodate App Table in Phase 6A; expanded to $CFFF by banking out BASIC ROM). |
 | `$C000 - $CFFF` | **VMM Memory Control Table (MCT)**. Reserved for OS. |
 
 ## 2. Zero Page Usage
