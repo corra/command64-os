@@ -121,7 +121,7 @@ Frees previously allocated REU memory.
 
 ### DOS_EXIT ($4C)
 
-Terminates the program and returns to the command64 shell.
+Termates the program and returns to the command64 shell.
 
 - **Input:** None.
 - **Action:** Does not return to the caller.
