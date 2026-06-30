@@ -16,10 +16,21 @@
 .label HexValHi = $67
 .label FileHandle = $6D
 
+.const VERSION_MAJOR = "0"
+.const VERSION_MINOR = "1"
+.const VERSION_STAGE = "0"
+#import "build_test_filetest.inc"
+
 * = $2000 "FileTest"
     cld
     lda #$0E
     jsr $FFD2
+
+    // Print start message
+    lda #DOS_PRINT_STR
+    ldx #<msgStart
+    ldy #>msgStart
+    jsr API
 
     // 1. Open "test.txt" for Write
     lda #1
@@ -133,3 +144,7 @@ msgOpenErr:  .text "error opening file"
              .byte $0D, 0
 msgWriteErr: .text "error writing file"
              .byte $0D, 0
+
+msgStart:    .text "FILETEST v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE + "." + BUILD_NUMBER
+              .text " - Testing file read/write"
+              .byte $0d, 0

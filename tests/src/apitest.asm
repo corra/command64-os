@@ -7,6 +7,11 @@
 .const DOS_EXIT       = $4C
 .const API            = $1000
 
+.const VERSION_MAJOR = "0"
+.const VERSION_MINOR = "1"
+.const VERSION_STAGE = "0"
+#import "build_test_apitest.inc"
+
 * = $2000 "ApiTest"
     cld                     // Ensure binary mode
     lda #$0E                // Switch to lowercase mode
@@ -22,5 +27,6 @@
     lda #DOS_EXIT
     jsr API
 
-msg: .text "Service Bus API: String output works!"
+msg: .text "APITEST v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE + "." + BUILD_NUMBER
+     .text " - String output works!"
      .byte $0d, 0
