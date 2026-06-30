@@ -125,7 +125,7 @@ The assembler will utilize the safe Zero Page range `$7C-$7F` to track assembler
 
 1. Assemble a simple program at `$4000`:
 
-   ```text
+   ```asm
    LDA #$01      ; Imm
    LDX #$00      ; Imm
    STA $D020,X   ; Abx
