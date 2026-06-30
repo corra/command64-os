@@ -43,6 +43,9 @@ set(DEBUG_ENTRY "src/external/debug/debug.asm")
 file(GLOB_RECURSE LABEL_SRCS "src/external/label/*.asm" "include/*.inc")
 set(LABEL_ENTRY "src/external/label/label.asm")
 
+file(GLOB_RECURSE CONWAY_SRCS "src/external/conway/*.asm" "include/*.inc")
+set(CONWAY_ENTRY "src/external/conway/conway.asm")
+
 # Dynamic build numbers custom commands
 # These trigger the increment script only when dependency files change
 add_custom_command(
@@ -71,7 +74,10 @@ add_external_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012)
 # 3. LABEL External Command PRG Target
 add_external_app(label "${LABEL_ENTRY}" LABEL_SRCS 1000)
 
-# 4. Test PRGs (one per tests/src/*.asm)
+# 4. CONWAY Game of Life
+add_external_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1000)
+
+# 5. Test PRGs (one per tests/src/*.asm)
 file(GLOB TEST_SRCS "tests/src/*.asm")
 set(TEST_TARGETS "")
 foreach(TEST_SRC ${TEST_SRCS})
@@ -124,7 +130,7 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug label ${C_TARGETS})
+set(IMAGE_PRG_TARGETS command64 debug label conway ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS})
 
 add_c64_disk_image(image_d64
