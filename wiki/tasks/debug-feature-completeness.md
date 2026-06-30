@@ -26,11 +26,11 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 
 ### Phase 2: Interactive Inline 6502 Assembler (`A`)
 
-- [ ] Implement command dispatching for `A` and prompt loop displaying `currentAddr:`.
-- [ ] Implement assembler lexer/parser separating mnemonics from operand expressions.
-- [ ] Implement syntax parser mapping operands to 6502 addressing modes (e.g. `#`, `(`, `,X`, `,Y`).
-- [ ] Implement branch instruction relative offset calculation and out-of-range checks.
-- [ ] Implement opcode lookup dictionary and memory write logic.
+- [x] Implement command dispatching for `A` and prompt loop displaying `currentAddr:`.
+- [x] Implement assembler lexer/parser separating mnemonics from operand expressions.
+- [x] Implement syntax parser mapping operands to 6502 addressing modes (e.g. `#`, `(`, `,X`, `,Y`).
+- [x] Implement branch instruction relative offset calculation and out-of-range checks.
+- [x] Implement opcode lookup dictionary and memory write logic.
 
 ### Phase 3: Software Breakpoint Debugger (`T`, `P`)
 
@@ -44,6 +44,6 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 
 - [x] Verify Phase 1 register editing and load/save operations.
 - [x] Create and document a full feature test plan for `debug` (maintained continuously).
-- [ ] Verify Phase 2 assembly of simple loops and comparison with disassemble output.
+- [x] Verify Phase 2 assembly of simple loops and comparison with disassemble output.
 - [ ] Verify Phase 3 step-into and step-over tracing operations.
 - [ ] Update user documentation and `CHANGELOG.md` to reflect new commands.

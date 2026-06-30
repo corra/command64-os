@@ -478,31 +478,133 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 ---
 
-## Test Suite 9 (Future): Interactive Inline 6502 Assembler (`A`)
+## Test Suite 9: Interactive Inline 6502 Assembler (`A`)
 
-*(Note: The `A` command is planned for implementation in Phase 2)*
+This suite verifies that the interactive assembler correctly prompts, reads, parses mnemonics/operands, handles case insensitivity and optional prefixes, performs addressing mode fallback, calculates signed branch offsets, and writes correct opcodes/operands to memory.
 
 ### Test 9.1: Command Activation & Address Prompt
 
-- **Proposed Input**: `A 2000` or `A`
+- **Input**:
+  1. `A` at the `-` prompt.
+  2. `A 4000` at the `-` prompt.
+  3. `A G000` at the `-` prompt.
+  4. Press `[Enter]` on an empty prompt (e.g. `4000:`).
+- **Procedure**:
+  1. Launch `debug` and type `A` with no address, press `[Enter]`.
+  2. Exit the loop, type `A 4000`, press `[Enter]`.
+  3. Exit, type `A G000`, press `[Enter]`.
+  4. At prompt `4000:`, press `[Enter]` without typing any characters.
+- **Pass Criteria**:
+  - Typing `A` starts the assembler at `currentAddr` (normally `0000:` on startup or last used memory address) with prompt.
+  - Typing `A 4000` starts the assembler at `$4000` with prompt `4000:`.
+  - Typing `A G000` displays `error` and returns to `-` prompt.
+  - Pressing `[Enter]` on an empty prompt line exits the assembler loop and returns to the `-` prompt.
 
-- **Expected Flow**: Starts an assembler loop, prompting the user with `2000:` or the active address. An empty line exits back to the `-` prompt.
+### Test 9.2: Mnemonic Parsing & Case Normalization
 
-### Test 9.2: Mnemonic Parsing & Addressing Modes
+- **Input**: Assemble `LDA #$01` using different cases and invalid mnemonics:
+  1. `lda #$01`
+  2. `LDA #$01`
+  3. `Lda #$01`
+  4. `XYZ #$01`
+- **Procedure**:
+  1. Start assembler via `A 4000`.
+  2. Type each input and press `[Enter]`.
+- **Pass Criteria**:
+  - Inputs 1, 2, and 3 parse successfully and advance the prompt to `4002:`.
+  - Input 4 outputs `error` on the next line and repeats prompt `4002:` (does not advance).
 
-- **Proposed Inputs**:
-  - `LDA #10` (Immediate)
-  - `STA $70` (Zero Page)
-  - `LDA ($70),Y` (Indirect Indexed)
-  - `JMP $C000` (Absolute)
+### Test 9.3: Syntax Parsing for all 13 Addressing Modes
 
-- **Expected Flow**: Instruction is parsed, matched, translated to hex opcodes/operands, and written to memory. The prompt address increments by the byte size of the instruction.
+- **Input**: Type the following instructions consecutively at `A 4000`:
+  1. `NOP` (Implied)
+  2. `LSR` (Accumulator - empty operand fallback)
+  3. `ASL A` (Accumulator)
+  4. `LDA #$01` (Immediate with `$`)
+  5. `LDX #10` (Immediate without `$`)
+  6. `STA $10` (Zero Page with `$`)
+  7. `STX 20` (Zero Page without `$`)
+  8. `LDY $10,X` (Zero Page,X)
+  9. `LDX $10,Y` (Zero Page,Y)
+  10. `JMP ($1234)` (Indirect)
+  11. `LDA ($12,X)` (Indirect,X)
+  12. `LDA ($12),Y` (Indirect,Y)
+  13. `STA $1234` (Absolute)
+  14. `LDA $1234,X` (Absolute,X)
+  15. `LDX $1234,Y` (Absolute,Y)
+- **Procedure**:
+  1. Enter the above instructions in order starting at `$4000`.
+  2. Exit the assembler and type `U 4000` to check the disassembly output.
+- **Pass Criteria**:
+  - All 15 instructions compile successfully and advance the prompt.
+  - The unassemble (`U`) command shows the identical mnemonics and operands matching the compiled byte sequences:
+    1. `NOP` $\rightarrow$ `EA`
+    2. `LSR A` $\rightarrow$ `4A`
+    3. `ASL A` $\rightarrow$ `0A`
+    4. `LDA #$01` $\rightarrow$ `A9 01`
+    5. `LDX #$10` $\rightarrow$ `A2 10`
+    6. `STA $10` $\rightarrow$ `85 10`
+    7. `STX $20` $\rightarrow$ `86 20`
+    8. `LDY $10,X` $\rightarrow$ `B4 10`
+    9. `LDX $10,Y` $\rightarrow$ `B6 10`
+    10. `JMP ($1234)` $\rightarrow$ `6C 34 12`
+    11. `LDA ($12,X)` $\rightarrow$ `A1 12`
+    12. `LDA ($12),Y` $\rightarrow$ `B1 12`
+    13. `STA $1234` $\rightarrow$ `8D 34 12`
+    14. `LDA $1234,X` $\rightarrow$ `BD 34 12`
+    15. `LDX $1234,Y` $\rightarrow$ `BE 34 12`
 
-### Test 9.3: Relative Branch Offset Generation
+### Test 9.4: Addressing Mode Fallback / Promotion
 
-- **Proposed Inputs**: `BNE $2000` (when assembling at `$2005`)
+- **Input**: Assemble absolute targets specified with 2-digit zero-page numbers:
+  1. `JMP $0020` (deduced as ZP, fallback/promoted to Absolute)
+  2. `JSR $0050` (deduced as ZP, fallback/promoted to Absolute)
+  3. `LDA $0010,Y` (deduced as ZP,Y, fallback/promoted to Absolute,Y)
+- **Procedure**:
+  1. Start assembler via `A 4000`.
+  2. Enter each of the three instructions, then exit.
+  3. Disassemble using `U 4000`.
+- **Pass Criteria**:
+  - Instructions parse successfully and compile as absolute length-3 instructions:
+    1. `JMP $0020` $\rightarrow$ `4C 20 00`
+    2. `JSR $0050` $\rightarrow$ `20 50 00`
+    3. `LDA $0010,Y` $\rightarrow$ `B9 10 00`
 
-- **Expected Flow**: Calculates offset (`$F9` or `-7` relative) and writes relative instruction `D0 F9`. Out-of-range offsets (>+127 or <-128 bytes) output `error`.
+### Test 9.5: Relative Branch Offset Generation & Range Checks
+
+- **Input**: Assemble relative branch instructions:
+  1. `BNE $4000` (at assembly prompt address `$4004`)
+  2. `BEQ $400A` (at assembly prompt address `$4000`)
+  3. `BPL $4100` (at assembly prompt address `$4000` - out of range)
+  4. `BMI $4000` (at assembly prompt address `$4100` - out of range)
+- **Procedure**:
+  1. Start assembler at `$4004` via `A 4004`. Type `BNE $4000`, press `[Enter]`.
+  2. Exit and start assembler at `$4000` via `A 4000`. Type `BEQ $400A`, press `[Enter]`.
+  3. Exit, start assembler at `$4000` via `A 4000`. Type `BPL $4100`, press `[Enter]`.
+  4. Exit, start assembler at `$4100` via `A 4100`. Type `BMI $4000`, press `[Enter]`.
+- **Pass Criteria**:
+  - `BNE $4000` at `$4004` compiles to `D0 FA` (offset is `-6` relative to `$4006`).
+  - `BEQ $400A` at `$4000` compiles to `F0 08` (offset is `+8` relative to `$4002`).
+  - `BPL $4100` at `$4000` outputs `error` and prompt remains at `4000:` (offset `+254` is out of signed 8-bit range).
+  - `BMI $4000` at `$4100` outputs `error` and prompt remains at `4100:` (offset `-258` is out of signed 8-bit range).
+
+### Test 9.6: Syntax Whitespace Tolerance
+
+- **Input**:
+  1. `LDA   #  $01`
+  2. `STA   $D020  ,  X`
+  3. `LDA   (  $12  )  ,  Y`
+- **Procedure**:
+  1. Start assembler via `A 4000`.
+  2. Type each instruction containing multiple spaces between arguments and symbols.
+  3. Exit and disassembled using `U 4000`.
+- **Pass Criteria**:
+  - All three instructions are successfully parsed and compiled:
+    1. `LDA #$01` $\rightarrow$ `A9 01`
+    2. `STA $D020,X` $\rightarrow$ `9D 20 D0`
+    3. `LDA ($12),Y` $\rightarrow$ `B1 12`
+
+---
 
 ---
 

@@ -40,6 +40,7 @@ Implement an interactive line-by-line assembler (`A [address]`) allowing direct 
 ### 2. Zero Page & Memory Management
 
 The assembler will utilize the safe Zero Page range `$7C-$7F` to track assembler state during compilation:
+
 ```asm
 .label mnemIndex    = $7C  // Index of matched mnemonic (0-56)
 .label deducedMode  = $7D  // Deduced addressing mode
@@ -122,16 +123,17 @@ The assembler will utilize the safe Zero Page range `$7C-$7F` to track assembler
 
 ### Manual Verification
 
-1. Assemble a simple program at `$2000`:
+1. Assemble a simple program at `$4000`:
+
    ```text
    LDA #$01      ; Imm
    LDX #$00      ; Imm
    STA $D020,X   ; Abx
    INX           ; Imp
    CPX #$0A      ; Imm
-   BNE $2004     ; Rel
+   BNE $4004     ; Rel
    RTS           ; Imp
    ```
 
-2. Run `U 2000` to verify that disassembly output matches the input instructions.
-3. Run `G 2000` to execute and verify that it turns the screen border color white.
+2. Run `U 4000` to verify that disassembly output matches the input instructions.
+3. Run `G 4000` to execute and verify that it turns the screen border color white.

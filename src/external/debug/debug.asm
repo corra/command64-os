@@ -20,6 +20,10 @@
 .label val2        = $78
 .label DebugTemp   = $7A  // ZP Scratch for External Utility
 .label disasmTemp  = $7B  // Row/Count scratch for disassembler
+.label mnemIndex    = $7C  // Index of matched mnemonic (0-56)
+.label deducedMode  = $7D  // Deduced addressing mode
+.label operandValLo = $7E  // Parsed operand value low byte
+.label operandValHi = $7F  // Parsed operand value high byte
 
 // --- Addressing Modes ---
 .const MODE_INV = 0  // Invalid
@@ -80,7 +84,7 @@ mainLoop:
 readLine:
     ldy #0
 rlLoop:
-    tya                     // KernalGetIn may clobber Y; preserve it
+    tya                     // KernalGetIn clobbers Y; preserve it
     pha
 rlPoll:
     jsr KernalGetIn
@@ -153,6 +157,10 @@ dNotLetter:
     
     // --- Command Registry ---
     // MAINTENANCE: Every command added below MUST be added to cmdHelp (debugHelpMsg)
+    cmp #'a'
+    bne _d0a
+    jmp cmdAssemble
+_d0a:
     cmp #'?'
     bne _d0
     jmp cmdHelp
@@ -1273,6 +1281,533 @@ cgIndirect:
     jmp (val1)
 
 // ---------------------------------------------------------------------------
+// cmdAssemble
+// Interactively compiles 6502 assembly lines into memory.
+// ---------------------------------------------------------------------------
+cmdAssemble:
+    jsr skipSpaces
+    lda inputBuf, y
+    beq caUseDefault
+    jsr parseHexArg
+    bcc caAddrParsed
+    jmp caErr
+caAddrParsed:
+    lda HexValLo
+    sta currentAddr
+    lda HexValHi
+    sta currentAddr + 1
+caUseDefault:
+caLoop:
+    lda currentAddr + 1
+    jsr printHex8
+    lda currentAddr
+    jsr printHex8
+    lda #':'
+    jsr KernalChROUT
+    lda #' '
+    jsr KernalChROUT
+
+    jsr readLine
+    lda inputBuf
+    beq caExit              // empty line -> exit
+
+    ldy #0
+    jsr compileLine
+    bcc caLoop              // if compile ok, repeat prompt at advanced currentAddr
+    
+    // Compile error: print error message
+    lda #<errUnknown
+    ldy #>errUnknown
+    jsr API_PRINT_STR
+    jmp caLoop              // repeat prompt at SAME address
+
+caExit:
+    rts
+
+caErr:
+    lda #<errUnknown
+    ldy #>errUnknown
+    jsr API_PRINT_STR
+    rts
+
+compileLine:
+    jsr parseMnemonic
+    bcc clMnemOk
+    sec
+    rts
+clMnemOk:
+    jsr parseOperand
+    bcc clOperandOk
+    sec
+    rts
+clOperandOk:
+    jsr lookupOpcode
+    bcc clLookupOk
+    sec
+    rts
+clLookupOk:
+    jsr writeInstruction
+    clc
+    rts
+
+parseMnemonic:
+    jsr skipSpaces
+    ldx #0
+pmReadLoop:
+    lda inputBuf, y
+    beq pmReadErr
+    cmp #' '
+    beq pmReadErr
+    
+    jsr toUpper             // Normalize case
+    sta mnemBuf, x
+    iny
+    inx
+    cpx #3
+    bne pmReadLoop
+    
+    // Save parser position Y
+    sty parsePos
+    
+    // Search opStringTable
+    ldx #0
+pmFindLoop:
+    txa
+    sta val1                // temp store index
+    asl
+    clc
+    adc val1
+    tay                     // Y = offset = index * 3
+    
+    lda opStringTable, y
+    cmp mnemBuf
+    bne pmNextMnem
+    lda opStringTable + 1, y
+    cmp mnemBuf + 1
+    bne pmNextMnem
+    lda opStringTable + 2, y
+    cmp mnemBuf + 2
+    bne pmNextMnem
+    
+    // Found match! Index is in X
+    stx mnemIndex
+    ldy parsePos            // Restore parser position Y
+    clc
+    rts
+    
+pmNextMnem:
+    inx
+    cpx #56                 // 56 mnemonics
+    bcc pmFindLoop
+    
+pmReadErr:
+    sec
+    rts
+
+parseOperand:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poNotEmpty
+    
+    // Empty operand: Implied or Accumulator
+    lda #MODE_IMP
+    sta deducedMode
+    clc
+    rts
+    
+poNotEmpty:
+    jsr toUpper
+    cmp #'A'
+    bne poNotAcc
+poTryAcc:
+    iny
+    lda inputBuf, y
+    beq poIsAcc
+    cmp #' '
+    beq poIsAcc
+    dey                     // backtrack
+    jmp poNotAcc
+poIsAcc:
+    lda #MODE_ACC
+    sta deducedMode
+    clc
+    rts
+    
+poNotAcc:
+    // Check for Immediate mode
+    cmp #'#'
+    bne poNotImm
+    iny                     // skip '#'
+    jsr skipSpaces
+    jsr parseHexWithDollar
+    bcs poErr
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErr
+    
+    lda #MODE_IMM
+    sta deducedMode
+    lda HexValLo
+    sta operandValLo
+    lda HexValHi
+    sta operandValHi
+    clc
+    rts
+
+poErr:
+    sec
+    rts
+    
+poNotImm:
+    // Check for Indirect modes
+    cmp #'('
+    bne poNotInd
+    iny                     // skip '('
+    jsr skipSpaces
+    jsr parseHexWithDollar
+    bcs poErr
+    lda HexValLo
+    sta operandValLo
+    lda HexValHi
+    sta operandValHi
+    
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #','
+    bne poIndNoCommaX
+    
+    // Indirect X: (zp,X)
+    iny                     // skip ','
+    jsr skipSpaces
+    lda inputBuf, y
+    jsr toUpper             // Normalize case
+    cmp #'X'
+    bne poErr
+    iny                     // skip 'X'
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #')'
+    bne poErr
+    iny                     // skip ')'
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErr
+    
+    lda #MODE_IZX
+    sta deducedMode
+    clc
+    rts
+    
+poIndNoCommaX:
+    cmp #')'
+    bne poErr
+    iny                     // skip ')'
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #','
+    bne poIndAbsolute
+    
+    // Indirect Y: (zp),Y
+    iny                     // skip ','
+    jsr skipSpaces
+    lda inputBuf, y
+    jsr toUpper             // Normalize case
+    cmp #'Y'
+    bne poErr
+    iny                     // skip 'Y'
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErr
+    
+    lda #MODE_IZY
+    sta deducedMode
+    clc
+    rts
+    
+poIndAbsolute:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErr
+    
+    lda #MODE_IND
+    sta deducedMode
+    clc
+    rts
+    
+poErrLocal2:
+    sec
+    rts
+
+poNotInd:
+    // Indexed or Direct Address
+    jsr parseHexWithDollar
+    bcs poErrLocal2
+    lda HexValLo
+    sta operandValLo
+    lda HexValHi
+    sta operandValHi
+    
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #','
+    bne poDirectAddress
+    
+    // Indexed Address
+    iny                     // skip ','
+    jsr skipSpaces
+    lda inputBuf, y
+    jsr toUpper             // Normalize case
+    cmp #'X'
+    bne poTryY
+    
+    // Indexed by X
+    iny                     // skip 'X'
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErrLocal
+    
+    jsr isBranchMnemonic
+    bcs poErrLocal
+    
+    lda operandValHi
+    bne poAbsX
+    lda #MODE_ZPX
+    sta deducedMode
+    clc
+    rts
+poAbsX:
+    lda #MODE_ABX
+    sta deducedMode
+    clc
+    rts
+    
+poTryY:
+    cmp #'Y'
+    bne poErrLocal
+    iny                     // skip 'Y'
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErrLocal
+    
+    jsr isBranchMnemonic
+    bcs poErrLocal
+    
+    lda operandValHi
+    bne poAbsY
+    lda #MODE_ZPY
+    sta deducedMode
+    clc
+    rts
+poAbsY:
+    lda #MODE_ABY
+    sta deducedMode
+    clc
+    rts
+    
+poDirectAddress:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne poErrLocal
+    
+    jsr isBranchMnemonic
+    bcc poNotBranch
+    
+    // Relative Branch Target
+    jsr calcRelOffset
+    rts
+    
+poNotBranch:
+    lda operandValHi
+    bne poAbsDirect
+    lda #MODE_ZP
+    sta deducedMode
+    clc
+    rts
+poAbsDirect:
+    lda #MODE_ABS
+    sta deducedMode
+    clc
+    rts
+
+poErrLocal:
+    sec
+    rts
+
+toUpper:
+    cmp #$41
+    bcc tuNotLetter
+    cmp #$5A + 1
+    bcs tuNotUnshifted
+    ora #$80
+tuNotUnshifted:
+    rts
+tuNotLetter:
+    rts
+
+isBranchMnemonic:
+    lda mnemIndex
+    cmp #3
+    beq yesBranch
+    cmp #4
+    beq yesBranch
+    cmp #5
+    beq yesBranch
+    cmp #7
+    beq yesBranch
+    cmp #8
+    beq yesBranch
+    cmp #9
+    beq yesBranch
+    cmp #11
+    beq yesBranch
+    cmp #12
+    beq yesBranch
+    clc
+    rts
+yesBranch:
+    sec
+    rts
+
+parseHexWithDollar:
+    lda inputBuf, y
+    cmp #'$'
+    bne phwdNoDollar
+    iny
+phwdNoDollar:
+    jsr parseHexArg
+    rts
+
+calcRelOffset:
+    lda operandValLo
+    sec
+    sbc currentAddr
+    sta val1
+    lda operandValHi
+    sbc currentAddr + 1
+    sta val2
+    
+    // Subtract 2
+    lda val1
+    sec
+    sbc #2
+    sta val1
+    lda val2
+    sbc #0
+    sta val2
+    
+    // Range check: val2 must be $00 (if val1 < $80) or $FF (if val1 >= $80)
+    lda val1
+    and #$80
+    beq croPositive
+    
+    lda val2
+    cmp #$FF
+    bne croErr
+    jmp croOk
+    
+croPositive:
+    lda val2
+    cmp #$00
+    bne croErr
+    
+croOk:
+    lda val1
+    sta operandValLo
+    lda #MODE_REL
+    sta deducedMode
+    clc
+    rts
+    
+croErr:
+    sec
+    rts
+
+lookupOpcode:
+    ldx #0
+loLoop:
+    lda opMnemonicIndex, x
+    cmp mnemIndex
+    bne loNext
+    lda opAddrMode, x
+    cmp deducedMode
+    bne loNext
+    
+    // Found match! Opcode is in X
+    clc
+    rts
+    
+loNext:
+    inx
+    bne loLoop
+    
+    // Try ZP fallback/promotion
+    lda deducedMode
+    cmp #MODE_ZP
+    bne loTryZpx
+    lda #MODE_ABS
+    sta deducedMode
+    jmp lookupOpcode
+    
+loTryZpx:
+    cmp #MODE_ZPX
+    bne loTryZpy
+    lda #MODE_ABX
+    sta deducedMode
+    jmp lookupOpcode
+    
+loTryZpy:
+    cmp #MODE_ZPY
+    bne loTryImp
+    lda #MODE_ABY
+    sta deducedMode
+    jmp lookupOpcode
+
+loTryImp:
+    cmp #MODE_IMP
+    bne loFailed
+    lda #MODE_ACC
+    sta deducedMode
+    jmp lookupOpcode
+    
+loFailed:
+    sec
+    rts
+
+writeInstruction:
+    txa                     // opcode
+    ldy #0
+    sta (currentAddr), y
+    
+    ldy deducedMode
+    lda modeLength, y
+    sta val1                // length
+    
+    cmp #1
+    beq wiDone
+    
+    ldy #1
+    lda operandValLo
+    sta (currentAddr), y
+    
+    lda val1
+    cmp #2
+    beq wiDone
+    
+    ldy #2
+    lda operandValHi
+    sta (currentAddr), y
+    
+wiDone:
+    lda currentAddr
+    clc
+    adc val1
+    sta currentAddr
+    lda currentAddr + 1
+    adc #0
+    sta currentAddr + 1
+    rts
+
+// ---------------------------------------------------------------------------
 // cmdUnassemble
 // Disassembles a range of memory.
 // ---------------------------------------------------------------------------
@@ -1783,16 +2318,16 @@ phLoop:
     
     // Convert to value 0-15
     cmp #'0'
-    bcc phInvalid
+    bcc phDone
     cmp #'9' + 1
     bcc phDigit
     
     // Check A-F / a-f: unshifted $41-$46 or shifted $C1-$C6
     and #$7F
     cmp #$41            // 'a'
-    bcc phInvalid
+    bcc phDone
     cmp #$47            // 'g'
-    bcs phInvalid
+    bcs phDone
     sec
     sbc #$37            // Convert to 10-15
     jmp phAdd
@@ -1871,6 +2406,8 @@ verMsg:
 
 debugHelpMsg:
     .text "DEBUG COMMANDS:"
+    .byte $0D
+    .text "A [ADDR]    - ASSEMBLE"
     .byte $0D
     .text "D [RANGE]   - DUMP MEMORY"
     .byte $0D
@@ -1978,3 +2515,4 @@ inputBuf: .fill 64, 0
 fileNameLen: .byte 0
 fileType:    .byte $50    // Default: 'P' (PRG)
 fileNameBuf: .fill 32, 0
+mnemBuf:     .fill 3, 0
