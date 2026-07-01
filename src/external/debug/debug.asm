@@ -425,7 +425,13 @@ cmdHexMath:
     jsr parseHexArg         // Get val2
     bcc *+5
     jmp cdErr
-    
+
+    jsr skipSpaces
+    lda inputBuf, y
+    beq hmNoExtra           // must be end of input; extra params are an error
+    jmp cdErr
+hmNoExtra:
+
     // Sum
     lda val1
     clc
