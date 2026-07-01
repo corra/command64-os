@@ -7,7 +7,8 @@
 .label KernalGetIn       = $FFE4  // Raw keyboard input (bypasses screen editor/quote mode)
 .label KernalChRIN     = $FFCF  // Input character from current channel (screen editor)
 .label KernalCLALL     = $FFE7  // Close all I/O channels (was $E548, raw ROM addr, wrong)
-.label KernalWarmStart = $E37B  // BASIC warm start vector (was $FC68, incorrect)
+.label KernalWarmStart = $E37B  // BASIC warm start (assumes ZP intact — NOT safe after shell)
+.label KernalColdStart = $E394  // BASIC cold start (full re-init of interpreter state)
 .label KernalSETMSG    = $FF90  // Set KERNAL messages
 .label KernalSETLFS    = $FFBA  // Set logical, first, and second addresses
 .label KernalSETNAM    = $FFBD  // Set file name
@@ -79,13 +80,13 @@
 .label MAX_HANDLES   = 8
 .label SourceBuf     = $03A2 // 40 bytes
 .label DestBuf       = $03CA // 40 bytes
-.label FileScratch   = $1F92 // Filename scratch in VmmData: vmmInitialized($1F90), vmmTempByte($1F91), fileScratch($1F92)
+.label FileScratch   = $1FA2 // Filename scratch in VmmData: vmmInitialized($1FA0), vmmTempByte($1FA1), fileScratch($1FA2)
 
 // --- User Program Space ---
 // External commands are loaded here. 
 // $2000 is the standard entry point for the pre-verified image.d64 programs.
 .label UserProgStart = $2000
-.label UserProgEnd   = $9FFF // Allocated all remaining BASIC RAM
+.label UserProgEnd   = $CFFF // Allocated all remaining RAM (BASIC ROM banked out)
 
 // --- VMM / REU ---
 #import "vmm.inc"

@@ -73,6 +73,10 @@ tableEnd:
 
 // --- Entry point ---
 start:
+    lda $01
+    and #$fe                // Clear bit 0 (LORAM = 0) -> bank out BASIC ROM
+    sta $01
+
     lda #8
     sta CurrentDevice       // Default to device 8
     jsr vmmInit             // Initialize VMM and check for REU
@@ -419,11 +423,16 @@ ccCmpFail:
 // Each handler performs its action and returns via rts → mainLoop.
 // ---------------------------------------------------------------------------
 
-// EXIT — return to BASIC warm start
-// $E37B is the BASIC warm-start entry in C64 ROM: clears state, prints READY., enters command mode.
-// If BASIC ROM has been banked out or overwritten, this will crash — acceptable per project decision.
+// EXIT — return to BASIC cold start
+// $E394 is the BASIC cold-start entry in C64 ROM: reinitializes all BASIC vectors,
+// zero-page memory pointers ($2B-$38), clears variables, and prints READY.
+// A warm start ($E37B) is insufficient because the shell clobbers BASIC's ZP state
+// during operation, leaving pointers stale when BASIC ROM is re-mapped.
 cmdExit:
-    jmp $E37B
+    lda $01
+    ora #$07                // Set bits 0-2 (LORAM, HIRAM, CHAREN = 1) -> restore BASIC/KERNAL ROM and I/O
+    sta $01
+    jmp $E394               // BASIC cold start: full re-init of interpreter state
 
 // CLS — clear screen and restore lowercase mode
 cmdCls:
