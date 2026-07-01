@@ -608,18 +608,168 @@ This suite verifies that the interactive assembler correctly prompts, reads, par
 
 ---
 
-## Test Suite 10 (Future): Breakpoint Tracing (`T`, `P`)
+## Test Suite 10: Single-Step Instruction Tracing (`T`)
 
-- **Note**: *Tracing is planned for implementation in Phase 3*
+> [!IMPORTANT]
+> **Safety Constraint**: All manual tracing/proceed tests must use target addresses (e.g. `$4000+`) that are safe from memory collisions with the resident `debug` program itself (located at `$2000-$376B`), unless they are explicitly intended to test boundary conditions or destructive behavior.
 
-### Test 10.1: Single-Step Tracing (`T`)
+### Test 10.1: Default Trace (Current PC)
 
-- **Proposed Input**: `T` or `T 2000`
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble at `$4000` via `A 4000`:
 
-- **Expected Flow**: Hijacks instruction execution at target address. Replaces the next instruction with a software breakpoint (`BRK`). Restores CPU registers, executes the single instruction, catches the break, restores original code, prints updated registers and next disassembled instruction, and returns to the `-` prompt.
+     ```asm
+     4000: LDA #$05
+     4002: INX
+     ```
 
-### Test 10.2: Step-Over Proceed Tracing (`P`)
+  2. Set `PC` to `$4000` and `X` to `$00` (`R PC` -> `4000`, `R X` -> `00`).
+  3. Execute `T`.
+- **Pass Criteria**:
+  - The CPU executes `LDA #$05`.
+  - The printed register line displays: `A=05 X=00 Y=00 P=xx S=xx PC=4002` (validating virtual registers and PC update).
+  - The next instruction is disassembled: `4002: INX`.
+  - Returns control to the `-` prompt.
 
-- **Proposed Input**: `P`
+### Test 10.2: Relocated Trace (Address Argument)
 
-- **Expected Flow**: Similar to `T`, but if the next instruction is a subroutine call (`JSR`), it places the breakpoint at the instruction *after* the `JSR` and executes without stopping, step-over proceeding the subroutine and breaking only on return.
+- **Input**: `T 4002`
+- **Procedure**:
+  1. Verify the setup from Test 10.1 is still active.
+  2. Execute `T 4002`.
+- **Pass Criteria**:
+  - The CPU executes the `INX` instruction at `$4002`.
+  - Registers printed show: `A=05 X=01 Y=00 P=xx S=xx PC=4003` (verifying `X` is incremented and `PC` is advanced).
+
+### Test 10.3: Conditional Branching (Taken & Not Taken Paths)
+
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble a branch sequence at `$4000`:
+
+     ```asm
+     4000: CPX #$01
+     4002: BEQ $4006
+     4004: NOP
+     4005: RTS
+     4006: SEC
+     4007: RTS
+     ```
+
+  2. Test Case A (Branch Taken): Set `PC` to `$4000`, `X` to `$01`.
+     - Execute `T` (executes `CPX #$01`).
+     - Execute `T` (reaches `BEQ $4006` with Zero flag set).
+     - Execute `T`.
+     - **Pass Criteria**: `PC` lands at `$4006` (`SEC`). Breakpoints were successfully handled on both relative branch paths, and the taken path was followed.
+  3. Test Case B (Branch Not Taken): Set `PC` to `$4000`, `X` to `$00`.
+     - Execute `T` (executes `CPX #$01`).
+     - Execute `T` (reaches `BEQ $4006` with Zero flag clear).
+     - Execute `T`.
+     - **Pass Criteria**: `PC` lands at `$4004` (`NOP`). The not-taken path was followed.
+
+---
+
+## Test Suite 11: Proceed Step-Over (`P`)
+
+### Test 11.1: Proceed Over Subroutine Call (`JSR`)
+
+- **Input**: `P`
+- **Procedure**:
+  1. Assemble at `$4000`:
+
+     ```asm
+     4000: JSR $4500
+     4003: NOP
+     ```
+
+  2. Assemble a subroutine at `$4500`:
+
+     ```asm
+     4500: LDY #$aa
+     4502: RTS
+     ```
+
+  3. Set `PC` to `$4000`, `Y` to `$00`.
+  4. Execute `P` on the JSR instruction.
+- **Pass Criteria**:
+  - The debugger steps over the subroutine call.
+  - Registers print shows: `A=xx X=xx Y=AA P=xx S=xx PC=4003`.
+  - Next instruction disassembled: `4003: NOP`.
+  - This confirms that the subroutine ran to completion, modified `Y`, and execution safely broke on return.
+
+### Test 11.2: Proceed Over Branch Loop
+
+- **Input**: `P`
+- **Procedure**:
+  1. Assemble at `$4000`:
+
+     ```asm
+     4000: LDX #$02
+     4002: DEX
+     4003: BNE $4002
+     4005: NOP
+     ```
+
+  2. Set `PC` to `$4000`.
+  3. Execute `T` (executes `LDX #$02`).
+  4. Execute `T` (executes `DEX`, `X` becomes `01`).
+  5. Execute `P` on the `BNE $4002` loop branch.
+- **Pass Criteria**:
+  - The program executes the remaining loop iterations without stopping on each one.
+  - Breaks cleanly on the `NOP` at `$4005` with register state `X=00`.
+
+---
+
+## Test Suite 12: ROM Safety Protection & Guards
+
+### Test 12.1: JSR to ROM Target (Step-Over Fallback)
+
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble a JSR to KERNAL `CHROUT` at `$4000`:
+
+     ```asm
+     4000: JSR $FFD2
+     4003: RTS
+     ```
+
+  2. Set `PC` to `$4000`, `A` to `$41` (character 'A').
+  3. Execute `T` on the JSR.
+- **Pass Criteria**:
+  - The character `'A'` is printed to the screen.
+  - The tracer detects that the target `$FFD2` is inside ROM ($\ge \$D000$) and automatically steps over it.
+  - Breaks cleanly at `$4003` (`RTS`) without crashing.
+
+### Test 12.2: JMP to ROM Target (Execution Guard)
+
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble `JMP $FFD2` at `$4000`.
+  2. Set `PC` to `$4000`.
+  3. Execute `T`.
+- **Pass Criteria**:
+  - The trace is safely blocked.
+  - The debugger prints: `error: cannot trace target in ROM`
+  - Returns immediately to the `-` command prompt.
+
+---
+
+## Test Suite 13: Exit Banking Restoration
+
+### Test 13.1: BASIC ROM Restore on Quit
+
+- **Input**: `Q` followed by `EXIT`
+- **Procedure**:
+  1. Start `DEBUG`.
+  2. Verify BASIC ROM is banked out (e.g., run `D A000` to dump, write bytes using `E A000`, and confirm memory is writable RAM).
+  3. Type `Q` to quit `DEBUG` and return to the `command64` shell.
+  4. Type `EXIT` in the shell prompt.
+- **Pass Criteria**:
+  - The system returns to the Commodore BASIC prompt:
+
+    ```petscii
+    READY.
+    ```
+
+  - The warm start displays cleanly, and typing BASIC commands (like `PRINT 1+1`) works and prints outputs (confirming the BASIC ROM mapping was fully restored before jumping to KERNAL warm start).

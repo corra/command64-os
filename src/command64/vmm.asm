@@ -381,4 +381,4 @@ vmmComputeAddress:
 .segment VmmData
 vmmInitialized: .byte 0
 vmmTempByte: .byte 0
-fileScratch: .fill 96, 0    // 96 bytes: covers 79-char name + write suffix ",S,W" + rename "R:new=old" overhead
+fileScratch: .fill 90, 0    // 90 bytes: covers 79-char name + write suffix ",S,W" + rename "R:new=old" overhead

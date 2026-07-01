@@ -26,7 +26,7 @@
 .segmentdef Path [start=$0AA0]
 .segmentdef Vmm [start=$0B30]
 .segmentdef File [start=$0CE0]
-.segmentdef VmmData [start=$1F90]
+.segmentdef VmmData [start=$1FA0]
 
 // Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, File, and VmmData are defined by the imported source files.
 

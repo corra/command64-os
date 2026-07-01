@@ -9,6 +9,11 @@
 .const DOS_EXIT       = $4C
 .const API            = $1000
 
+.const VERSION_MAJOR = "0"
+.const VERSION_MINOR = "1"
+.const VERSION_STAGE = "0"
+#import "build_test_vmmtest.inc"
+
 * = $2000 "VmmTest"
     cld                     // Ensure binary mode
     lda #$0E                // Switch to lowercase mode
@@ -70,7 +75,8 @@ exit:
     lda #DOS_EXIT
     jsr API
 
-msgStart:    .text "Testing VMM Allocation via API..."
+msgStart:    .text "VMMTEST v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE + "." + BUILD_NUMBER
+             .text " - Testing VMM Allocation via API..."
              .byte $0d, 0
 msgOk:       .text "Allocation successful!"
              .byte $0d, 0

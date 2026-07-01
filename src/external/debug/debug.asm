@@ -52,7 +52,7 @@ start:
     sty regY
     pla
     sta regP
-    tsx
+    ldx #$FF
     stx regS
     
     // 2. Initialize pointers
@@ -222,8 +222,16 @@ _d10l:
     jmp cmdLoad
 _d10w:
     cmp #'w'
-    bne _d11
+    bne _d10t
     jmp cmdWrite
+_d10t:
+    cmp #'t'
+    bne _d10p
+    jmp cmdTrace
+_d10p:
+    cmp #'p'
+    bne _d11
+    jmp cmdProceed
 _d11:
     
     // Unknown command
@@ -461,8 +469,21 @@ cmdRegs:
     bne dHasRegArg
     jmp printAllRegs
 dHasRegArg:
+    lda inputBuf, y
+    and #$7F            // normalize
+    cmp #'p'
+    bne singleCharReg
     
-    // Save register name char, then check that it's exactly 1 character
+    // It starts with 'P'. Check if next char is 'C' or space/null
+    iny
+    lda inputBuf, y
+    and #$7F
+    cmp #'c'
+    beq modifyPC_Dispatch
+    
+    // Not 'C', backtrack Y to first char and parse as single character register
+    dey
+singleCharReg:
     tax                 // X = char
     iny
     lda inputBuf, y
@@ -484,6 +505,16 @@ regNameOk:
     cmp #'s'
     beq modifyS
     jmp cdErr
+
+modifyPC_Dispatch:
+    iny                 // Consume 'C'
+    lda inputBuf, y
+    beq pcNameOk
+    cmp #' '
+    beq pcNameOk
+    jmp cdErr
+pcNameOk:
+    jmp modifyPC
 
 modifyA:
     lda #'A'
@@ -510,6 +541,51 @@ modifyS:
     ldx #<regS
     ldy #>regS
     jmp modifyReg
+
+modifyPC:
+    // Print "PC xxxx"
+    lda #'P'
+    jsr KernalChROUT
+    lda #'C'
+    jsr KernalChROUT
+    lda #' '
+    jsr KernalChROUT
+    lda regPC + 1
+    jsr printHex8
+    lda regPC
+    jsr printHex8
+    lda #PetCr
+    jsr KernalChROUT
+    
+    // Print prompt and read line
+    lda #':'
+    jsr KernalChROUT
+    jsr readLine
+    
+    // If empty input, leave unmodified
+    ldy #0
+    jsr skipSpaces
+    lda inputBuf, y
+    beq mpcDone
+    
+    // Parse hex word
+    jsr parseHexArg
+    bcs mpcErr
+    
+    // Check for trailing characters
+    jsr skipSpaces
+    lda inputBuf, y
+    bne mpcErr
+    
+    // Save to regPC
+    lda HexValLo
+    sta regPC
+    lda HexValHi
+    sta regPC + 1
+mpcDone:
+    rts
+mpcErr:
+    jmp cdErr
 
 modifyReg:
     stx val1
@@ -596,6 +672,19 @@ printAllRegs:
     lda #'='
     jsr KernalChROUT
     lda regS
+    jsr printHex8
+    
+    lda #' '
+    jsr KernalChROUT
+    lda #'P'
+    jsr KernalChROUT
+    lda #'C'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regPC + 1
+    jsr printHex8
+    lda regPC
     jsr printHex8
     
     lda #PetCr
@@ -774,11 +863,13 @@ clRelocate:
     jsr KernalLOAD
     bcs clErr
     
-    // Update currentAddr to the load address
+    // Update currentAddr and regPC to the load address
     lda val1
     sta currentAddr
+    sta regPC
     lda val1 + 1
     sta currentAddr + 1
+    sta regPC + 1
     rts
 
 clFromHeader:
@@ -796,11 +887,13 @@ clFromHeader:
     jsr KernalLOAD
     bcs clErr
     
-    // Update currentAddr to start address stored in MEMUSS ($C1/$C2) by KERNAL
+    // Update currentAddr and regPC to start address stored in MEMUSS ($C1/$C2) by KERNAL
     lda $C1
     sta currentAddr
+    sta regPC
     lda $C2
     sta currentAddr + 1
+    sta regPC + 1
     rts
 
 clErr:
@@ -846,6 +939,10 @@ clSeqUsrChkinOk:
     jmp clErr
 
 clSeqUsrSuccess:
+    lda currentAddr
+    sta regPC
+    lda currentAddr + 1
+    sta regPC + 1
     rts
 
 clByteLoop:
@@ -1279,6 +1376,482 @@ cgDo:
     rts
 cgIndirect:
     jmp (val1)
+
+cmdTrace:
+    lda #0
+    sta traceMode
+    jmp cmdTraceProceedCommon
+
+cmdProceed:
+    lda #1
+    sta traceMode
+
+cmdTraceProceedCommon:
+    jsr skipSpaces
+    lda inputBuf, y
+    beq ctpcNoArgs
+    
+    jsr parseHexArg
+    bcs ctpcErr
+    lda HexValLo
+    sta regPC
+    lda HexValHi
+    sta regPC + 1
+    
+    jsr skipSpaces
+    lda inputBuf, y
+    bne ctpcErr
+    
+ctpcNoArgs:
+    jsr launchProgram
+    rts
+ctpcErr:
+    jmp cdErr
+
+isAddressSafe:
+    lda val1 + 1
+    cmp #$d0
+    bcs iasUnsafe
+    sec                 // Safe RAM (carry set)
+    rts
+iasUnsafe:
+    clc                 // Unsafe ROM/IO (carry clear)
+    rts
+
+decodeTargets:
+    lda #0
+    sta bpCount
+    sta bp1Active
+    sta bp2Active
+
+    // Copy regPC into ZP currentAddr so (currentAddr),Y indirect works correctly
+    lda regPC
+    sta currentAddr
+    lda regPC + 1
+    sta currentAddr + 1
+
+    ldy #0
+    lda (currentAddr), y
+    tax                 // X = opcode
+    
+    lda opAddrMode, x
+    tay
+    lda modeLength, y
+    sta DebugTemp       // DebugTemp = instruction length
+    
+    // Check if conditional branch: (opcode & $1F) == $10
+    txa
+    and #$1f
+    cmp #$10
+    bne dtNotBranch
+    
+    // Target A (Not Taken): regPC + 2
+    lda regPC
+    clc
+    adc #2
+    sta bpAddr1
+    lda regPC + 1
+    adc #0
+    sta bpAddr1 + 1
+    
+    // Target B (Taken): regPC + 2 + signed_offset
+    ldy #1
+    lda (currentAddr), y
+    tax                 // X = offset
+    cpx #$80
+    bcc dtBranchPos
+    ldy #$ff
+    jmp dtBranchOffsetDone
+dtBranchPos:
+    ldy #$00
+dtBranchOffsetDone:
+    clc
+    txa
+    adc bpAddr1
+    sta bpAddr2
+    tya
+    adc bpAddr1 + 1
+    sta bpAddr2 + 1
+    
+    // Proceed mode: only break on fall-through, not taken path
+    lda traceMode
+    bne dtBranchOne
+
+    // Avoid duplicates if bpAddr1 == bpAddr2
+    lda bpAddr1
+    cmp bpAddr2
+    bne dtBranchTwo
+    lda bpAddr1 + 1
+    cmp bpAddr2 + 1
+    beq dtBranchOne     // equal -> set only 1 BP
+dtBranchTwo:
+    lda #2
+    sta bpCount
+    rts
+dtBranchOne:
+    lda #1
+    sta bpCount
+    rts
+
+dtNotBranch:
+    cpx #$20            // JSR
+    bne dtNotJsr
+    
+    lda traceMode
+    bne dtJsrStepOver
+    
+    // Trace step-into: check if target is safe
+    ldy #1
+    lda (currentAddr), y
+    sta val1
+    iny
+    lda (currentAddr), y
+    sta val1 + 1
+    jsr isAddressSafe
+    bcs dtJsrSafe
+    
+dtJsrStepOver:
+    // Proceed step-over: regPC + 3
+    lda regPC
+    clc
+    adc #3
+    sta bpAddr1
+    lda regPC + 1
+    adc #0
+    sta bpAddr1 + 1
+    lda #1
+    sta bpCount
+    rts
+dtJsrSafe:
+    lda val1
+    sta bpAddr1
+    lda val1 + 1
+    sta bpAddr1 + 1
+    lda #1
+    sta bpCount
+    rts
+
+dtNotJsr:
+    cpx #$4C            // JMP Absolute
+    bne dtNotJmpAbs
+    
+    ldy #1
+    lda (currentAddr), y
+    sta bpAddr1
+    iny
+    lda (currentAddr), y
+    sta bpAddr1 + 1
+    lda #1
+    sta bpCount
+    rts
+
+dtNotJmpAbs:
+    cpx #$6C            // JMP Indirect
+    bne dtNotJmpInd
+    
+    ldy #1
+    lda (currentAddr), y
+    sta val1
+    iny
+    lda (currentAddr), y
+    sta val1 + 1
+    
+    ldy #0
+    lda (val1), y
+    sta bpAddr1
+    
+    lda val1
+    cmp #$ff
+    bne dtJmpIndNormal
+    
+    // page wrap bug
+    lda val1
+    sec
+    sbc #$ff
+    sta val2
+    lda val1 + 1
+    sta val2 + 1
+    ldy #0
+    lda (val2), y
+    sta bpAddr1 + 1
+    jmp dtJmpIndDone
+dtJmpIndNormal:
+    lda val1
+    clc
+    adc #1
+    sta val2
+    lda val1 + 1
+    adc #0
+    sta val2 + 1
+    ldy #0
+    lda (val2), y
+    sta bpAddr1 + 1
+dtJmpIndDone:
+    lda #1
+    sta bpCount
+    rts
+
+dtNotJmpInd:
+    cpx #$60            // RTS
+    bne dtNotRts
+    
+    ldx regS
+    inx
+    lda $0100, x
+    sta val1
+    inx
+    lda $0100, x
+    sta val1 + 1
+    
+    lda val1
+    clc
+    adc #1
+    sta bpAddr1
+    lda val1 + 1
+    adc #0
+    sta bpAddr1 + 1
+    lda #1
+    sta bpCount
+    rts
+
+dtNotRts:
+    cpx #$40            // RTI
+    bne dtNotRti
+    
+    ldx regS
+    inx
+    inx
+    lda $0100, x
+    sta bpAddr1
+    inx
+    lda $0100, x
+    sta bpAddr1 + 1
+    lda #1
+    sta bpCount
+    rts
+
+dtNotRti:
+    // Default instruction target
+    lda regPC
+    clc
+    adc DebugTemp
+    sta bpAddr1
+    lda regPC + 1
+    adc #0
+    sta bpAddr1 + 1
+    lda #1
+    sta bpCount
+    rts
+
+setBreakpoints:
+    lda #0
+    sta bp1Active
+    sta bp2Active
+    lda bpCount
+    beq sbpDone
+    
+    lda bpAddr1 + 1
+    cmp #$d0
+    bcs sbpBp2
+
+    lda bpAddr1         // copy bpAddr1 into val1 for ZP indirect access
+    sta val1
+    lda bpAddr1 + 1
+    sta val1 + 1
+    ldy #0
+    lda (val1), y
+    sta bpByte1
+    lda #$00            // BRK opcode
+    sta (val1), y
+    lda #1
+    sta bp1Active
+
+sbpBp2:
+    lda bpCount
+    cmp #2
+    bne sbpDone
+
+    lda bpAddr2 + 1
+    cmp #$d0
+    bcs sbpDone
+
+    lda bpAddr2         // copy bpAddr2 into val1 for ZP indirect access
+    sta val1
+    lda bpAddr2 + 1
+    sta val1 + 1
+    ldy #0
+    lda (val1), y
+    sta bpByte2
+    lda #$00
+    sta (val1), y
+    lda #1
+    sta bp2Active
+sbpDone:
+    rts
+
+removeBreakpoints:
+    lda bp1Active
+    beq rbp2
+    lda bpAddr1         // copy bpAddr1 into val1 for ZP indirect access
+    sta val1
+    lda bpAddr1 + 1
+    sta val1 + 1
+    lda bpByte1
+    ldy #0
+    sta (val1), y
+    lda #0
+    sta bp1Active
+rbp2:
+    lda bp2Active
+    beq rbpDone
+    lda bpAddr2         // copy bpAddr2 into val1 for ZP indirect access
+    sta val1
+    lda bpAddr2 + 1
+    sta val1 + 1
+    lda bpByte2
+    ldy #0
+    sta (val1), y
+    lda #0
+    sta bp2Active
+rbpDone:
+    rts
+
+launchProgram:
+    jsr decodeTargets
+    jsr setBreakpoints
+    
+    lda bpCount
+    beq lpLaunch
+    
+    lda bp1Active
+    ora bp2Active
+    bne lpBpOk
+    
+    // Target is ROM
+    jsr removeBreakpoints
+    lda traceMode
+    beq lpRomError      // T (trace into): show error and return
+
+    // P (proceed/step-over): skip the blocked instruction and show state at next PC
+    lda regPC
+    clc
+    adc DebugTemp
+    sta regPC
+    lda regPC + 1
+    adc #0
+    sta regPC + 1
+
+    jsr printAllRegs
+    lda regPC
+    sta currentAddr
+    lda regPC + 1
+    sta currentAddr + 1
+    lda #1
+    sta disasmTemp
+    jsr cuLoop
+    jmp mainLoop
+
+lpRomError:
+    lda #<errRomTarget
+    ldy #>errRomTarget
+    jsr API_PRINT_STR
+    rts
+    
+lpBpOk:
+    // Hijack CBINV vector
+    sei
+    lda $0316
+    sta origCBINV
+    lda $0317
+    sta origCBINV + 1
+    
+    lda #<myBrkHandler
+    sta $0316
+    lda #>myBrkHandler
+    sta $0317
+    cli
+
+lpLaunch:
+    // Backup debugger SP
+    tsx
+    stx dbgS
+    
+    // Setup target stack frame
+    ldx regS
+    lda regPC + 1
+    sta $0100, x
+    dex
+    lda regPC
+    sta $0100, x
+    dex
+    lda regP
+    sta $0100, x
+    
+    // Switch stack pointer
+    dex
+    txs
+    
+    // Restore registers
+    lda regA
+    ldy regY
+    ldx regX
+    
+    rti
+
+myBrkHandler:
+    tsx
+    
+    // Extract program state from KERNAL stack frame
+    lda $0101, x
+    sta regY
+    lda $0102, x
+    sta regX
+    lda $0103, x
+    sta regA
+    lda $0104, x
+    sta regP
+    
+    lda $0105, x
+    sec
+    sbc #2
+    sta regPC
+    lda $0106, x
+    sbc #0
+    sta regPC + 1
+    
+    txa
+    clc
+    adc #6
+    sta regS
+    
+    // Restore vector
+    sei
+    lda origCBINV
+    sta $0316
+    lda origCBINV + 1
+    sta $0317
+    cli
+    
+    // Restore debugger stack pointer
+    ldx dbgS
+    txs
+    
+    jsr removeBreakpoints
+
+    jsr printAllRegs
+
+    // Update disassembler pointer and print next instruction
+    lda regPC
+    sta currentAddr
+    lda regPC + 1
+    sta currentAddr + 1
+
+    lda #1
+    sta disasmTemp
+    jsr cuLoop
+    // RTI frame was written over the JSR return addresses on the debugger stack,
+    // so RTS would jump to garbage. Re-enter the main loop directly instead.
+    jmp mainLoop
 
 // ---------------------------------------------------------------------------
 // cmdAssemble
@@ -2429,6 +3002,10 @@ debugHelpMsg:
     .byte $0D
     .text "G [ADDR]    - GO (EXECUTE)"
     .byte $0D
+    .text "T [ADDR]    - TRACE STEP-INTO"
+    .byte $0D
+    .text "P [ADDR]    - PROCEED STEP-OVER"
+    .byte $0D
     .text "N [FILE]    - NAME FILE"
     .byte $0D
     .text "L [ADDR]    - LOAD NAMED FILE"
@@ -2442,6 +3019,10 @@ debugHelpMsg:
 
 errUnknown:
     .text "error"
+    .byte $0D, 0
+
+errRomTarget:
+    .text "error: cannot trace target in ROM"
     .byte $0D, 0
 
 msgStub:
@@ -2503,6 +3084,17 @@ regX: .byte 0
 regY: .byte 0
 regP: .byte 0
 regS: .byte 0
+regPC: .word 0  // Virtual PC
+traceMode: .byte 0  // 0 = Trace, 1 = Proceed
+dbgS: .byte 0  // Saved stack pointer
+origCBINV: .word 0  // Saved CBINV vector
+bpCount: .byte 0
+bpAddr1: .word 0
+bpByte1: .byte 0
+bp1Active: .byte 0
+bpAddr2: .word 0
+bpByte2: .byte 0
+bp2Active: .byte 0
 
 listLen:   .byte 0
 listIndex: .byte 0

@@ -18,3 +18,6 @@ tools/cc1541-git/
 
 # OS-specific
 .DS_Store
+package-lock.json
+package.json
+node_modules/

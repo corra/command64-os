@@ -77,17 +77,19 @@ add_external_app(label "${LABEL_ENTRY}" LABEL_SRCS 1000)
 # 4. CONWAY Game of Life
 add_external_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1000)
 
-# 5. Test PRGs (one per tests/src/*.asm)
+# 5. Test PRGs (one per tests/src/*.asm, automatically registered via glob with version tracking)
 file(GLOB TEST_SRCS "tests/src/*.asm")
 set(TEST_TARGETS "")
 foreach(TEST_SRC ${TEST_SRCS})
     get_filename_component(TEST_NAME "${TEST_SRC}" NAME_WE)
     set(TEST_TARGET "test_${TEST_NAME}")
-    add_kickass_target(${TEST_TARGET}
-        ENTRY_FILE "${TEST_SRC}"
-        SOURCES "${TEST_SRC}"
-        OUTPUT_DIR "${CMAKE_BINARY_DIR}/tests"
-    )
+    
+    # Create sources variable dynamically for the external app macro
+    set(TMP_SRCS_${TEST_NAME} "${TEST_SRC}")
+    
+    # Register as external application with version/build tracking
+    add_external_app(${TEST_TARGET} "${TEST_SRC}" TMP_SRCS_${TEST_NAME} 1000)
+    
     list(APPEND TEST_TARGETS ${TEST_TARGET})
 endforeach()
 
