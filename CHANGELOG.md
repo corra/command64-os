@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG Status Flags Editing (`R P` / `R`)**: Extended the `R` command to display CPU status register flags on a second line in the format `P=XX: N=x V=x * B=x D=x I=x Z=x C=x` (with bit 5 reserved and displaying as `*`). Supported editing the status register `P` either as a whole 8-bit hex number or by modifying individual flags via case-insensitive, space-separated equations (e.g. `n=1 c=0`), with validation checking.
 - **DEBUG Phase 3 - Software Breakpoint Debugger (`T`, `P`)**: Implemented single-step instruction tracing (`T`) and proceed step-over (`P`) using software breakpoints (`BRK`). Added context-restoring launcher (`launchProgram`) framing PC, registers, and flags onto the stack for launch via `RTI`, and interrupt hijack handler (`myBrkHandler`) intercepting the `CBINV` vector (`$0316/$0317`), restoring vectors/memory, printing virtual registers and disassembling the next instruction. Includes branch target calculations (taken/not-taken), indirect jumps with NMOS page-wrap emulation, call step-overs, and ROM safety guards.
 - **BASIC ROM Banking**: Integrated memory banking on boot (`start:`) to disable BASIC ROM (`$A000-$BFFF`), exposing 8KB of RAM and expanding contiguous User Program Space to `$2000-$CFFF` (44KB). Restores BASIC ROM on `cmdExit` (`ora #$07` on `$0001`) before returning to BASIC prompt (`jmp $E37B`).
 - **CONWAY External Command**: Implemented a full-screen Conway's Game of Life cellular automaton utility (`conway.asm`) for the C64. Features double-buffered computation at `$3000`/`$3400`, toroidal boundary wrapping on all edges, and a fast precomputed row-offset lookup table. Includes timing control based on the KERNAL jiffy clock, an 8-bit Galois LFSR pseudo-random generator, and interactive keyboard controls (SPACE to pause, R to re-randomize, C to clear, and Q/RUN-STOP to quit). Integrated the program into the CMake build system, the OS disk image (`conway.prg`), user manuals, and the codebase reference.
@@ -17,6 +18,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DEBUG Load SEQ and USR Files**: Added support for loading sequential (`SEQ`) and user (`USR`) files into memory via custom byte-by-byte file streaming. Added optional type prefix parsing (`L [P/S/U] [addr]`) matching the `W` command syntax.
 - **DEBUG Interactive Registers**: Added interactive register modification support (`R [register]`) to the `DEBUG` utility, enabling viewing and modifying individual CPU registers (`A`, `X`, `Y`, `P`, `S`) with 8-bit hex validation and far branch condition correction.
 - **DEBUG Utility Feature Parity Plans**: Documented complete implementation roadmaps and blueprints for achieving parity with MS-DOS `DEBUG`: Phase 1 (Interactive registers `R` and File I/O `N`/`L`/`W`), Phase 2 (Interactive 6502 assembler `A`), and Phase 3 (Software breakpoint tracer `T`/`P`). Added individual phase plan documents to `brain/plans/`, registered a new meta-task and sub-tasks in Task Warrior, and updated the Code Wiki user guide.
+
+### Fixed
+
+- **DEBUG Parser Backtracking Bug**: Fixed a register name parsing bug where looking ahead for register `PC` (when `'p'` was typed) and backtracking via `dey` clobbered the register name character in accumulator `A`. Added logic to reload and normalize the character from `inputBuf, y` before parsing as a single-character register, allowing both `r p` and single-character register edits (`r a`, `r x`, etc.) to execute correctly.
+- **DEBUG printBitA Calling Convention**: Standardized the `printBitA` helper subroutine to use clean subroutine returns (`jsr KernalChROUT` + `rts`) instead of tail-call jumps (`jmp KernalChROUT`).
 
 ### Changed
 

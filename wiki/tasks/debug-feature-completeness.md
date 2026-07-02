@@ -20,6 +20,7 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 ### Phase 1: Interactive Register Editing and File I/O (`R`, `N`, `L`, `W`)
 
 - [x] Implement register name parsing and interactive modification for `R` command (`R A`, `R X`, etc. prompting with `:`).
+- [x] Implement register `P` flags displaying/editing: print `P=XX: N=x V=x * B=x D=x I=x Z=x C=x` and support editing as a whole byte or via flag expressions (e.g. `n=1`).
 - [x] Implement `N` command to write input arguments to the filename buffer `fileNameBuf`.
 - [x] Implement `L` command to load files from disk, supporting optional address override.
 - [x] Implement `W` command to parse memory range and save data to disk using C64 Kernal.

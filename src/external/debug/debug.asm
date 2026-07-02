@@ -489,6 +489,8 @@ dHasRegArg:
     
     // Not 'C', backtrack Y to first char and parse as single character register
     dey
+    lda inputBuf, y
+    and #$7F            // restore normalized register name character to A
 singleCharReg:
     tax                 // X = char
     iny
@@ -538,10 +540,9 @@ modifyY:
     ldy #>regY
     jmp modifyReg
 modifyP:
-    lda #'P'
-    ldx #<regP
-    ldy #>regP
-    jmp modifyReg
+    jmp modifyP_Custom
+    rts
+
 modifyS:
     lda #'S'
     ldx #<regS
@@ -695,9 +696,303 @@ printAllRegs:
     
     lda #PetCr
     jsr KernalChROUT
+    jsr printPFlags
+    rts
+
+printPFlags:
+    // Print "P="
+    lda #'P'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    jsr printHex8
+    
+    // Print ": N="
+    lda #':'
+    jsr KernalChROUT
+    lda #' '
+    jsr KernalChROUT
+    lda #'N'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$80
+    jsr printBitA
+    
+    // Print " V="
+    lda #' '
+    jsr KernalChROUT
+    lda #'V'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$40
+    jsr printBitA
+    
+    // Print " *"
+    lda #' '
+    jsr KernalChROUT
+    lda #'*'
+    jsr KernalChROUT
+    
+    // Print " B="
+    lda #' '
+    jsr KernalChROUT
+    lda #'B'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$10
+    jsr printBitA
+    
+    // Print " D="
+    lda #' '
+    jsr KernalChROUT
+    lda #'D'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$08
+    jsr printBitA
+    
+    // Print " I="
+    lda #' '
+    jsr KernalChROUT
+    lda #'I'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$04
+    jsr printBitA
+    
+    // Print " Z="
+    lda #' '
+    jsr KernalChROUT
+    lda #'Z'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$02
+    jsr printBitA
+    
+    // Print " C="
+    lda #' '
+    jsr KernalChROUT
+    lda #'C'
+    jsr KernalChROUT
+    lda #'='
+    jsr KernalChROUT
+    lda regP
+    and #$01
+    jsr printBitA
+    
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+printBitA:
+    beq pbZero
+    lda #'1'
+    jsr KernalChROUT
+    rts
+pbZero:
+    lda #'0'
+    jsr KernalChROUT
+    rts
+
+hasEqualsChar:
+    tya
+    pha
+heLoop:
+    lda inputBuf, y
+    beq heNotFound
+    cmp #'='
+    beq heFound
+    iny
+    jmp heLoop
+heFound:
+    pla
+    tay
+    sec
+    rts
+heNotFound:
+    pla
+    tay
+    clc
+    rts
+
+parsePFlags:
+    jsr skipSpaces
+    lda inputBuf, y
+    bne pFlagsNotDone
+    rts
+pFlagsNotDone:
+
+    
+    tax                 // save character in X
+    iny                 // advance past the flag character
+    
+    cpx #'n'
+    beq setMaskN
+    cpx #'N'
+    beq setMaskN
+    cpx #'v'
+    beq setMaskV
+    cpx #'V'
+    beq setMaskV
+    cpx #'b'
+    beq setMaskB
+    cpx #'B'
+    beq setMaskB
+    cpx #'d'
+    beq setMaskD
+    cpx #'D'
+    beq setMaskD
+    cpx #'i'
+    beq setMaskI
+    cpx #'I'
+    beq setMaskI
+    cpx #'z'
+    beq setMaskZ
+    cpx #'Z'
+    beq setMaskZ
+    cpx #'c'
+    beq setMaskC
+    cpx #'C'
+    beq setMaskC
+    
+    // Any other character is a syntax error
+    jmp pFlagsErr
+
+setMaskN:
+    lda #$80
+    sta val2
+    jmp findEquals
+setMaskV:
+    lda #$40
+    sta val2
+    jmp findEquals
+setMaskB:
+    lda #$10
+    sta val2
+    jmp findEquals
+setMaskD:
+    lda #$08
+    sta val2
+    jmp findEquals
+setMaskI:
+    lda #$04
+    sta val2
+    jmp findEquals
+setMaskZ:
+    lda #$02
+    sta val2
+    jmp findEquals
+setMaskC:
+    lda #$01
+    sta val2
+    jmp findEquals
+
+findEquals:
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #'='
+    bne pFlagsErr
+    iny                 // consume '='
+    
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #'0'
+    beq clearFlag
+    cmp #'1'
+    beq setFlag
+    jmp pFlagsErr
+
+clearFlag:
+    // clear the bit in regP
+    lda val2
+    eor #$FF
+    and regP
+    sta regP
+    iny                 // consume '0'
+    jmp parsePFlags    // loop for next flag
+
+setFlag:
+    // set the bit in regP
+    lda regP
+    ora val2
+    sta regP
+    iny                 // consume '1'
+    jmp parsePFlags    // loop for next flag
+
+pFlagsDone:
+    rts
+
+pFlagsErr:
+    jmp cdErr
+
+modifyP_Custom:
+    // Print "P xx"
+    lda #'P'
+    jsr KernalChROUT
+    lda #' '
+    jsr KernalChROUT
+    lda regP
+    jsr printHex8
+    lda #PetCr
+    jsr KernalChROUT
+    
+    // Print the second line: "P=XX: N=x V=x * B=x D=x I=x Z=x C=x"
+    jsr printPFlags
+    
+    // Print prompt and read line
+    lda #':'
+    jsr KernalChROUT
+    jsr readLine
+    
+    // If empty input, leave unmodified
+    ldy #0
+    jsr skipSpaces
+    lda inputBuf, y
+    beq mpDone
+    
+    // Check if we need to parse as flags or as hex.
+    // If there is an '=' in the remaining input, parse as flags.
+    jsr hasEqualsChar
+    bcs mpParseFlags
+    
+    // Parse as a hex byte (must fit in 8 bits)
+    jsr parseHexArg
+    bcs mpErr
+    lda HexValHi
+    bne mpErr           // must be 8-bit
+    jsr skipSpaces
+    lda inputBuf, y
+    bne mpErr           // extra trailing characters -> error
+    
+    lda HexValLo
+    sta regP
+    jmp mpDone
+
+mpParseFlags:
+    jsr parsePFlags
+    jmp mpDone
+
+mpErr:
+    jmp cdErr
+
+mpDone:
     rts
 
 cmdVer:
+
     lda #<verMsg
     ldy #>verMsg
     jsr API_PRINT_STR
