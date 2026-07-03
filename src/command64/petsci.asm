@@ -1,4 +1,6 @@
 // src/command64/petsci.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // KickAssembler v5.25 - PETSCII API Layer for command64
 // Provides character and string output via C64 KERNAL routines.
 

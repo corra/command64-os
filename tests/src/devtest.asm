@@ -1,4 +1,6 @@
 // tests/src/devtest.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Tests the DOS_PARSE_PREFIX API function ($57).
 
 .encoding "petscii_mixed"

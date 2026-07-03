@@ -1,4 +1,6 @@
 // include/vmm.inc
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // VMM (Virtual Memory Manager) API Specification
 // Maps 1MB logical DOS space to C64 Ultimate REU
 

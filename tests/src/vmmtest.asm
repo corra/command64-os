@@ -1,4 +1,6 @@
 // tests/src/vmmtest.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Tests the INT 21h Service Bus: DOS_ALLOC_MEM, DOS_FREE_MEM, DOS_PRINT_STR
 
 .encoding "petscii_mixed"

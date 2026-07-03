@@ -1,4 +1,6 @@
 // src/command64/loader.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Binary Loader
 // Wraps KERNAL LOAD routine with support for specific target addresses.
 

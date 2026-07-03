@@ -1,4 +1,6 @@
 // src/command64/shell.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // KickAssembler v5.25 - Command 64 OS shell for C64
 // Core command loop: prompt, input, dispatch, built-in commands.
 

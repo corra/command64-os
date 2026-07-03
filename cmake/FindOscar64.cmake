@@ -1,4 +1,6 @@
 # cmake/FindOscar64.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Find Oscar64 C compiler
 
 find_program(Oscar64_EXECUTABLE

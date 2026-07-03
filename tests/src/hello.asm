@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
+
 .encoding "petscii_mixed"
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "1"

@@ -1,4 +1,6 @@
 # cmake/Findcc1541.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Find cc1541 compiler tool
 
 find_program(cc1541_EXECUTABLE

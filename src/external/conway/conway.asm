@@ -1,4 +1,6 @@
 // src/external/conway/conway.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Conway's Game of Life for Command 64 OS
 //
 // Rules (B3/S23):

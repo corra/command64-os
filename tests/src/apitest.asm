@@ -1,4 +1,6 @@
 // tests/src/apitest.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Tests the INT 21h Service Bus: DOS_PRINT_STR and DOS_EXIT
 
 .encoding "petscii_mixed"

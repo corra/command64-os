@@ -1,4 +1,6 @@
 // include/command64.inc
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // KickAssembler v5.25 - MS-DOS 4.0 to C64 Port Core Definitions
 
 // --- KERNAL Jump Table Addresses ---

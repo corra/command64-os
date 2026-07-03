@@ -1,4 +1,6 @@
 # cmake/Oscar64.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Helper function to compile C source files via Oscar64 compiler
 
 function(add_oscar64_target TARGET_NAME)

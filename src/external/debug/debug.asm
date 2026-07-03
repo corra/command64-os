@@ -1,4 +1,6 @@
 // src/external/debug/debug.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // C64 port of MS-DOS DEBUG.COM
 // Interactive memory editor, monitor, and debugger.
 

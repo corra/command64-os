@@ -1,4 +1,6 @@
 // tests/src/banktest.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Tests the memory banking: verifies RAM under BASIC ROM ($A000-$BFFF) is writable/readable.
 
 .encoding "petscii_mixed"

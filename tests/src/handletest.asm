@@ -1,4 +1,6 @@
 // tests/src/handletest.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Tests file handle limits (max 8) and API open/close/delete services.
 
 .encoding "petscii_mixed"

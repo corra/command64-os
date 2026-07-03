@@ -1,4 +1,6 @@
 # cmake/FindKickAss.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Find KickAssembler JAR file
 
 find_file(KickAss_JAR

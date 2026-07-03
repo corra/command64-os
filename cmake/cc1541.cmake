@@ -1,4 +1,6 @@
 # cmake/cc1541.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Helper function to generate C64 D64 disk images using cc1541
 
 function(add_c64_disk_image TARGET_NAME)

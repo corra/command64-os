@@ -1,4 +1,6 @@
 # cmake/KickAssembler.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Helper function to assemble 6502/6510 source files via KickAssembler
 
 function(add_kickass_target TARGET_NAME)

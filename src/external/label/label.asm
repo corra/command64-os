@@ -1,4 +1,6 @@
 // src/external/label/label.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // C64 port of MS-DOS LABEL.COM (non-interactive mode)
 // Sets the disk volume label via CBM DOS direct access commands.
 //

@@ -1,4 +1,6 @@
 // src/command64/api.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // INT 21h Service Bus for C64 MS-DOS Port
 // Jump Table Entry point: JSR $1600
 //

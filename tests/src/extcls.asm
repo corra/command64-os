@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
+
 .encoding "petscii_mixed"
 
 .const DOS_PRINT_STR = $09

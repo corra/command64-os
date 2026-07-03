@@ -1,4 +1,6 @@
 // src/command64/vmm.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Virtual Memory Manager for C64 MS-DOS Port
 // Maps 1MB DOS Address Space (Seg:Off) to C64 REU.
 

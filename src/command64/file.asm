@@ -1,4 +1,6 @@
 // src/command64/file.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // KickAssembler v5.25 - MS-DOS 4.0 File System Module
 // Manages Handle Table and C64 KERNAL File I/O.
 

@@ -1,4 +1,6 @@
 # cmake/IncrementBuildNumber.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Cross-platform build number increment script executed at build time via cmake -P
 #
 # Arguments expected via -D command line arguments:

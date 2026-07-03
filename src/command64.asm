@@ -1,4 +1,6 @@
 // src/command64.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // KickAssembler v5.25 - Command 64 OS shell for C64
 //
 .encoding "petscii_mixed"

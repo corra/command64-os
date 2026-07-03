@@ -1,4 +1,6 @@
 # cmake/PackRelease.cmake
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Command64 project contributors
 # Cross-platform release packager executed at build time via cmake -P
 #
 # Arguments expected via -D command line arguments:

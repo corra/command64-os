@@ -1,4 +1,6 @@
 // tests/src/filetest.asm
+// SPDX-License-Identifier: MIT
+// Copyright (c) 2026 Command64 project contributors
 // Tests the INT 21h Service Bus: DOS_OPEN_FILE, DOS_WRITE_FILE, DOS_READ_FILE, DOS_CLOSE_FILE
 
 .encoding "petscii_mixed"
