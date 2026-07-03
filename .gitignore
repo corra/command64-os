@@ -12,6 +12,7 @@ ms-dos/
 /*.prg
 /*.sym
 /*.vs
+unsloth_compiled_cache/
 
 # Tools
 tools/cc1541-git/
