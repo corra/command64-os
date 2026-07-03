@@ -9,6 +9,9 @@
 // Each entry is 2 bytes: [Status, LFN]
 // We pre-assign LFNs 2-9 to handles 0-7 to avoid channel conflicts.
 fileInit:
+    lda #$60                // RTS opcode — seeds UserProgStart so a bare
+    sta UserProgStart        // RUN/GO with nothing loaded there yet just
+                              // returns instead of executing garbage RAM.
     lda #0
     ldx #0
 fiLoop:
