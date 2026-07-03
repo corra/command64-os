@@ -6,6 +6,153 @@
 
 .segment File
 
+// --- checkDeviceReady ---
+// Verifies a device is present on the IEC bus and has a disk ready.
+// Two phases:
+//   1. A pure ATN-handshake presence probe (LISTEN/UNLSN, no data phase).
+//      This is essential, not cosmetic: OPEN's carry flag is NOT reliable
+//      for "device not present" on its own. Empirically (verified under
+//      VICE), OPEN/CHKIN can report success against a device address with
+//      nothing listening, and the actual byte transfer that follows
+//      (CHRIN -> the KERNAL's low-level serial bit-receive routine) then
+//      spins forever waiting for a byte that will never arrive, since only
+//      the initial LISTEN handshake has a bounded timeout — the data phase
+//      does not. Probing with LISTEN/UNLSN alone never enters that data
+//      phase, so it can't hang, and STATUS bit 7 after it reliably reports
+//      whether anything answered.
+//   2. Only once a device is confirmed present do we open its command/error
+//      channel (secondary 15) and read the status — this is what tells us
+//      "74,DRIVE NOT READY" (no disk) vs. ready, and is itself safe now
+//      because a real, present drive always services its command channel
+//      regardless of disk state. "73" (the DOS-version power-on banner) is
+//      special: a drive reports it only on the very first status read after
+//      reset, regardless of whether a disk is actually in it, so seeing it
+//      does NOT confirm readiness — this routine re-queries once more in
+//      that case to get the real, current status.
+// Input:  A = device number to check
+// Output: A = 0 ready / 1 no device / 2 no disk / 3 other drive error
+//         Carry: 0 = ready, 1 = error (mirrors A<>0)
+// Clobbers: A, X, Y, TempLo, TempHi
+checkDeviceReady:
+    pha                     // Stash device number across the presence probe
+    jsr KernalLISTEN        // A = device number (still set from before the push)
+    jsr KernalUNLSN
+    jsr KernalREADST
+    and #$80                // Bit 7 = device did not respond to LISTEN
+    beq cdrPresent
+    pla                     // Discard the stashed device number
+    lda #1
+    sec
+    rts
+
+cdrPresent:
+    pla
+    sta CdrDevice           // Remember device number across the status re-query
+    lda #0
+    sta CdrRetried
+
+cdrQueryStatus:
+    ldx CdrDevice           // Device number for SETLFS
+    lda #0                  // No filename — just open the status channel
+    ldy #0
+    jsr KernalSETNAM
+
+    lda #15                 // LFN 15 = command/error channel
+    ldy #15                 // Secondary address 15
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    bcs cdrNoDevice         // Device answered LISTEN but OPEN still failed
+
+    ldx #15
+    jsr KernalCHKIN
+    bcs cdrCloseNoDevice
+
+    jsr KernalChRIN         // Status digit 1 (tens)
+    sta TempLo
+    jsr KernalChRIN         // Status digit 2 (units)
+    sta TempHi
+
+    jsr KernalCLRCHN
+    lda #15
+    jsr KernalCLOSE
+
+    // "00" = OK
+    lda TempLo
+    cmp #'0'
+    bne cdrCheck73
+    lda TempHi
+    cmp #'0'
+    beq cdrOk
+
+cdrCheck73:
+    lda TempLo
+    cmp #'7'
+    bne cdrCheck74
+    lda TempHi
+    cmp #'3'
+    bne cdrCheck74
+    lda CdrRetried          // Power-on banner: re-query once for the real status
+    bne cdrOk               // already retried — trust it this time
+    inc CdrRetried
+    jmp cdrQueryStatus
+
+cdrCheck74:
+    lda TempLo
+    cmp #'7'
+    bne cdrOtherErr
+    lda TempHi
+    cmp #'4'
+    beq cdrNotReady
+
+cdrOtherErr:
+    lda #3
+    sec
+    rts
+
+cdrOk:
+    lda #0
+    clc
+    rts
+
+cdrNotReady:
+    lda #2
+    sec
+    rts
+
+cdrCloseNoDevice:
+    lda #15
+    jsr KernalCLOSE
+cdrNoDevice:
+    lda #1
+    sec
+    rts
+
+// --- printDeviceStatusMsg ---
+// Prints the message matching a checkDeviceReady/fileOpen/fileDelete/
+// fileRename/findFile error status code, without a trailing carriage return
+// (callers that want one add it themselves, matching each command's existing
+// error-message convention). Message strings live in shell.asm.
+// Input: A = status code (1=no device, 2=no disk, anything else=generic error)
+// Clobbers: A, X, Y
+printDeviceStatusMsg:
+    cmp #1
+    beq pdsmNoDevice
+    cmp #2
+    beq pdsmNoDisk
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jmp pdsmPrint
+pdsmNoDevice:
+    lda #<noDeviceMsg
+    ldy #>noDeviceMsg
+    jmp pdsmPrint
+pdsmNoDisk:
+    lda #<noDiskMsg
+    ldy #>noDiskMsg
+pdsmPrint:
+    jsr petPrintString
+    rts
+
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.
 // Each entry is 2 bytes: [Status, LFN]
@@ -42,11 +189,17 @@ fiLoop:
 fileOpen:
     stx NamePtrLo
     sty NamePtrHi
-    
+
     ldx #NamePtrLo
     jsr parsePointerDevice
     sta TargetDevice
-    
+
+    // Preflight: fail fast (with a specific reason) if the device is
+    // missing or has no disk, instead of opening a channel with no data.
+    lda TargetDevice
+    jsr checkDeviceReady
+    bcs foDeviceErr
+
     // 1. Find a free handle
     ldx #0
 foFindLoop:
@@ -133,6 +286,10 @@ foSkipMode:
     txa
     lsr
     clc                     // Success
+    rts
+
+foDeviceErr:
+    sec                     // A already holds the checkDeviceReady status code
     rts
 
 foError:
@@ -328,11 +485,15 @@ fwError:
 fileDelete:
     stx NamePtrLo
     sty NamePtrHi
-    
+
     ldx #NamePtrLo
     jsr parsePointerDevice
     sta TargetDevice
-    
+
+    lda TargetDevice
+    jsr checkDeviceReady
+    bcs fdDeviceErr
+
     // 1. Prepare "S0:" in FileScratch (using standard unshifted ASCII 'S')
     lda #$53                // unshifted 'S'
     sta FileScratch
@@ -387,7 +548,12 @@ fdCopyDone:
 fdError:
     lda #15
     jsr KernalCLOSE         // Ensure channel is closed even on error
+    lda #3                  // Device was ready; some other drive error occurred
     sec
+    rts
+
+fdDeviceErr:
+    sec                     // A already holds the checkDeviceReady status code
     rts
 
 // --- fileRename ---
@@ -402,9 +568,13 @@ fileRename:
     ldx #NamePtrLo
     jsr parsePointerDevice
     sta TargetDevice        // Resolve device from Old Name
-    
+
     ldx #PrintPtrLo
     jsr parsePointerDevice  // Strip prefix from New Name if present
+
+    lda TargetDevice
+    jsr checkDeviceReady
+    bcs frDeviceErr
     
     // 1. Prepare "R0:" in FileScratch (using standard unshifted ASCII 'R')
     lda #$52                // unshifted 'R'
@@ -479,8 +649,18 @@ frGotOld:
 frenError:
     lda #15
     jsr KernalCLOSE         // Ensure channel is closed even on error
+    lda #3                  // Device was ready; some other drive error occurred
     sec
     rts
 
+frDeviceErr:
+    sec                     // A already holds the checkDeviceReady status code
+    rts
+
 TargetDevice:
+    .byte 0
+
+CdrDevice:
+    .byte 0
+CdrRetried:
     .byte 0

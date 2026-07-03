@@ -13,6 +13,7 @@
 //         Y = high byte of name pointer
 //         X = name length
 // Output: C=0 exists, C=1 not found.
+//         A = status code on error (1=no device, 2=no disk, 3=not found)
 //         NamePtrLo/Hi updated to point to (possibly modified) name.
 //         X = updated length.
 // Clobbers: A, X, Y
@@ -20,20 +21,20 @@ findFile:
     sta NamePtrLo
     sty NamePtrHi
     stx TempLo              // Store original length
-    
+
     // Normalize to lowercase for case-insensitive matching
     lda NamePtrLo
     ldy NamePtrHi
     ldx TempLo
     jsr normalizeName
-    
+
     // Try finding the file with the name as-is (after normalization)
     // Note: Automatic .prg appending removed as disk entries no longer include extensions.
     jsr checkExistence
     bcc ffFound             // Found!
-    
+
 ffNotFound:
-    sec
+    sec                     // A already holds the status code from checkExistence
     rts
 
 ffFound:
@@ -44,10 +45,20 @@ ffFound:
 // --- checkExistence ---
 // Helper: Checks if file in NamePtrLo/Hi with length TempLo exists.
 // Uses KERNAL OPEN then CLOSE to check for existence silently.
+// Output: C=0 exists, C=1 error. On error, A = status code from checkDeviceReady
+//         (1=no device, 2=no disk), or 3 if the device is ready but the file
+//         itself was not found.
 checkExistence:
+    // Preflight: bail out before touching the real file if the device isn't
+    // there or has no disk — avoids reading garbage off a channel with no
+    // data behind it.
+    lda CurrentDevice
+    jsr checkDeviceReady
+    bcs ceDeviceErr
+
     lda #0                  // Disable KERNAL messages
     jsr KernalSETMSG
-    
+
     lda #14                 // LFN 14 — clear of handle table (2-9), dir (13), command channel (15)
     ldx CurrentDevice
     ldy #0                  // Secondary address 0 (Read)
@@ -66,6 +77,15 @@ checkExistence:
 
     lda #14
     jsr KernalCLOSE
-    
+
     plp                     // Restore status (restore Carry)
+    bcc ceOk
+    lda #3                  // Device was ready; the file itself wasn't found
+    sec
+ceOk:
     rts
+
+ceDeviceErr:
+    rts                     // A already holds the checkDeviceReady status code
+    // checkDeviceReady itself lives in file.asm (File segment) — Path's
+    // fixed $0AA0-$0B30 window is too small to also hold it.

@@ -22,6 +22,8 @@
 .label KernalCHKIN     = $FFC6  // Set input channel
 .label KernalCHKOUT    = $FFC9  // Set output channel
 .label KernalCLRCHN    = $FFCC  // Clear I/O channels
+.label KernalLISTEN    = $FFB1  // Send LISTEN on the serial bus (ATN handshake only)
+.label KernalUNLSN     = $FFAE  // Send UNLISTEN (releases the bus, no data phase)
 
 // --- API Function Constants (DOS Standard Hex Codes) ---
 .label DOS_PRINT_CHAR  = $02  // Print character (PETSCII)

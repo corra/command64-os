@@ -49,6 +49,10 @@ set(LABEL_ENTRY "src/external/label/label.asm")
 file(GLOB_RECURSE CONWAY_SRCS "src/external/conway/*.asm" "include/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway.asm")
 
+# NOTE: dvorak (src/external/dvorak/dvorak.asm) is deliberately not wired up
+# as a build target — it has known fundamental problems (see header comment
+# in the source) and is parked for a future rework before it's built/bundled.
+
 # Dynamic build numbers custom commands
 # These trigger the increment script only when dependency files change
 add_custom_command(

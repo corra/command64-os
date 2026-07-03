@@ -254,7 +254,6 @@ sdBadCmd:
     lda CommandBuffer, y
     cmp #'$'                // Reject names starting with $ (avoids directory load crash)
     beq sdRealBadCmd
-    
     sty TempLo
 sdExtScan:
     lda CommandBuffer, y
@@ -296,7 +295,7 @@ sdExtGotLen:
     ldy NamePtrHi
     jsr findFile
     bcs sdExtError
-    
+
     // Found it! Load to UserProgStart ($2000)
     lda #0                  // 0 = Relocated (uses HexVal)
     sta SpecificLoad
@@ -304,15 +303,15 @@ sdExtGotLen:
     sta HexValLo
     lda #>UserProgStart
     sta HexValHi
-    
+
     lda NamePtrLo
     ldy NamePtrHi
     jsr shellLoadPrg
     bcs sdExtError
-    
+
     lda SavedDevice
     sta CurrentDevice
-    
+
     // EXECUTE
     jsr UserProgStart
     rts
@@ -527,14 +526,14 @@ clDoLoad:
     ldy NamePtrHi
     ldx TempLo              // Restore length in X
     jsr findFile            // Normalize, append .prg, check disk
-    bcs clLoadErr           // Not found or error
-    
+    bcs clFindErr           // Device missing/not ready, or file not found
+
     // findFile returns updated length in X
     lda NamePtrLo
     ldy NamePtrHi
     jsr shellLoadPrg
     bcs clLoadErr
-    
+
     // Success: restore device and return
     lda SavedDevice
     sta CurrentDevice
@@ -544,6 +543,14 @@ clNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
+    rts
+
+clFindErr:
+    pha                     // Save findFile's status code across the device restore
+    lda SavedDevice
+    sta CurrentDevice
+    pla
+    jsr printDeviceStatusMsg
     rts
 
 clLoadErr:
@@ -614,12 +621,15 @@ cmdDir:
     ldx #PrintPtrLo
     jsr parsePointerDevice
     sta CurrentDevice
-    
+                             // A still holds the device number (STA doesn't clobber it)
+    jsr checkDeviceReady
+    bcs cdDevError
+
     lda PrintPtrLo
     sec
     sbc #<CommandBuffer
     sta ParsePos
-    
+
     ldy ParsePos
     jsr shellSkipSpaces
     sty ParsePos
@@ -627,23 +637,36 @@ cmdDir:
     ldx #<dirFname
     ldy #>dirFname
     jsr KernalSETNAM
-    
+
     lda #13                 // LFN 13 — clear of handle table (2-9), checkExistence (14), command channel (15)
     ldx CurrentDevice
     ldy #0                  // Secondary 0
     jsr KernalSETLFS
 
     jsr KernalOPEN
-    bcs cdDevError
+    bcs cdDevError            // Preflight passed but the real OPEN still failed —
+                               // a rare race, not a classified device status, so A
+                               // falls through to printDeviceStatusMsg's generic
+                               // message rather than being forced to "device not
+                               // present".
 
     ldx #13
     jsr KernalCHKIN
-    
+
     // Skip 2-byte load address
     jsr KernalGetIn
     jsr KernalGetIn
-    
+
+    // CmpBase is reused below as a dir-entry safety counter — cmdCompare
+    // (its usual owner) only runs during command dispatch, never inside a
+    // handler. No reset needed: incrementing from whatever it was last left
+    // at still wraps to 0 within at most 255 iterations either way, which
+    // is all that matters — it just needs to be bounded, not exact.
 cdLineLoop:
+    inc CmpBase
+    beq cdDone                // Wrapped past 255 entries — far more than any
+                               // real disk holds; bail out.
+
     // Read link bytes
     jsr KernalGetIn
     sta TempLo              // Link Lo
@@ -666,8 +689,16 @@ cdLineLoop:
     
     lda #' '
     jsr KernalChROUT
-    
+
+    // Safety net for the name itself, not just the entry count: a single
+    // non-terminating "filename" would otherwise loop here forever, before
+    // the entry cap above ever gets a chance to apply. HexValLo is idle
+    // here (printDecimal16 above is its last user until the next entry) and
+    // needs no reset — incrementing from whatever it was left at still
+    // wraps within at most 255 iterations either way.
 cdReadName:
+    inc HexValLo
+    beq cdLineDone             // Wrapped past 255 chars in one name — bail
     jsr KernalGetIn
     beq cdLineDone
     jsr KernalChROUT
@@ -678,9 +709,8 @@ cdLineDone:
     jsr KernalChROUT
     
     jsr KernalREADST
-    bne cdDone
-    jmp cdLineLoop
-    
+    beq cdLineLoop           // No error/EOF yet — keep reading entries
+
 cdDone:
     jsr KernalCLRCHN
     lda #13
@@ -688,11 +718,13 @@ cdDone:
     jmp dirExit
 
 cdDevError:
+    // Closing LFN13 is a harmless no-op if the preflight failed before we
+    // ever opened it.
+    pha
     lda #13
     jsr KernalCLOSE
-    lda #<noDeviceMsg
-    ldy #>noDeviceMsg
-    jsr petPrintString
+    pla
+    jsr printDeviceStatusMsg
     lda #PetCr
     jsr KernalChROUT
     jmp dirExit
@@ -785,9 +817,7 @@ ctNoArgs:
     rts
 
 ctOpenErr:
-    lda #<loadErrMsg
-    ldy #>loadErrMsg
-    jsr petPrintString
+    jsr printDeviceStatusMsg
     rts
 
 // DEL / ERASE — delete a file from disk
@@ -840,10 +870,7 @@ cdelNoArgs:
     rts
 
 cdelErr:
-    lda #<loadErrMsg
-    ldy #>loadErrMsg
-    jsr petPrintString
-    rts
+    jmp ctOpenErr             // Identical body — device-status message + rts
 
 // REN / RENAME — rename a file on disk
 cmdRen:
@@ -926,10 +953,7 @@ crenNoNew:
     rts
 
 crenErr:
-    lda #<loadErrMsg
-    ldy #>loadErrMsg
-    jsr petPrintString
-    rts
+    jmp ctOpenErr             // Identical body — device-status message + rts
 
 cmdCopy:
     lda CurrentDevice
@@ -1136,16 +1160,17 @@ ccNoDest:
     jmp copyExit
 
 ccOpenErr:
-    lda #<loadErrMsg
-    ldy #>loadErrMsg
-    jsr petPrintString
+    jsr printDeviceStatusMsg
     jmp copyExit
 
 ccCloseSrcErr:
     lda SrcHandle           // source handle — TempLo holds scan index here, not the handle
     sta FileHandle
     lda #DOS_CLOSE_FILE
-    jsr apiHandler
+    jsr apiHandler          // On the rare chance this ALSO fails, its status
+                             // (not the dest-open failure's) is what gets
+                             // reported below — an acceptable simplification
+                             // for this double-fault edge case.
     jmp ccOpenErr
 
 copyExit:
@@ -1868,12 +1893,17 @@ cmdVol:
     ldx #PrintPtrLo
     jsr parsePointerDevice
     sta CurrentDevice
-    
+                             // A still holds the device number (STA doesn't clobber it)
+    jsr checkDeviceReady
+    bcc volReady
+    jmp volDevError
+volReady:
+
     lda PrintPtrLo
     sec
     sbc #<CommandBuffer
     sta ParsePos
-    
+
     ldy ParsePos
     jsr shellSkipSpaces
     sty ParsePos
@@ -2047,19 +2077,11 @@ volParseError:
     jmp volExit
 
 volDevError:
-    lda #13
-    jsr KernalCLOSE
-    lda #<noDeviceMsg
-    ldy #>noDeviceMsg
-    jsr petPrintString
-    lda #$0D
-    jsr KernalChROUT
-    jmp volExit
+    jmp cdDevError             // Shares cmdDir's device-error handler — same
+                                // report + close + restore-device logic.
 
 volExit:
-    lda SavedDevice
-    sta CurrentDevice
-    rts
+    jmp dirExit                // Same SavedDevice-restore logic as cmdDir
 
 
 notImplMsg:
@@ -2190,6 +2212,10 @@ badAddrMsg:
 
 noDeviceMsg:
     .text "Device not present"
+    .byte 0
+
+noDiskMsg:
+    .text "No disk in drive"
     .byte 0
 
 volDriveMsg:
