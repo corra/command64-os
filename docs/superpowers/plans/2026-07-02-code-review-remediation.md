@@ -562,11 +562,47 @@ git commit -m "fix(shell): recheck env-segment bounds on every envAppend write, 
 
 ---
 
-## Task 5: Fix `cmdSearch` Out-of-Range Read — `debug.asm` (R5, Medium) — Implemented
+## Task 5: Fix `cmdSearch` Out-of-Range Read — `debug.asm` (R5, Medium) — Implemented and Verified on Hardware, Regression Found and Fixed
 
 **Severity: Medium** — `cmdSearch`'s `csCompLoop` compares the full search pattern against `(rangeStart),y` before `checkRangeLimit` is ever consulted, and `checkRangeLimit` only checks `rangeStart` itself (not `rangeStart + listLen`). A pattern search whose match window straddles `rangeEnd` reads past the user-declared range — potentially into memory-mapped I/O — while still reporting an in-range match.
 
-**Status: Implemented as specified.** Builds cleanly. In-emulator smoke-test of the actual search command itself is still pending (blocked on loading `DEBUG.PRG` reliably in VICE — see the R9 write-up; use monitor-free LOAD polling per that note when testing).
+**Status: Implemented, regression found and fixed, verified on real hardware.** `DEBUG.PRG` could not be loaded reliably in this session's VICE setup (a persistent, VICE-specific issue with this particular 26-block/track-2→3-crossing file, unrelated to the code — confirmed separately that `LOAD"DEBUG",8,1` works fine on real hardware), so R5 was tested against a concrete test plan (poke known bytes with `E`, search for them with `S` across in-range/exactly-fitting/overflowing/degenerate ranges) run on physical hardware instead.
+
+**Regression found:** the first draft's bounds-check arithmetic was wrong. It computed `val1 = rangeStart + listLen - 1` as:
+```asm
+lda rangeStart
+clc
+adc listLen
+sbc #1                  // WRONG: assumes carry is always 1 after the adc
+sta val1
+lda rangeStart + 1
+adc #0
+sta val1 + 1
+```
+`SBC` treats carry as a *borrow* flag, and the comment's assumption that carry is always 1 after `ADC` is false — carry after `ADC` is only 1 if the 8-bit addition actually overflowed past 255. For the common case (`rangeStart` low byte + `listLen` not overflowing), carry is 0, so the `sbc #1` subtracts an *extra*, unintended borrow, and that spurious borrow then propagates into the next `ADC` for the high byte too — corrupting `val1` entirely (traced example: `rangeStart=$5000, listLen=3` produced `val1=$5101` instead of the correct `$5002`). Since `val1` came out far larger than any real `rangeEnd`, the bounds check rejected every search window immediately, on the very first iteration — **all searches failed to match, always**, exactly as caught live.
+
+**Fix:** compute `listLen - 1` first (safe — `listLen` is always ≥ 1, checked earlier in `cmdSearch`), then add it to `rangeStart` as a clean, independent 16-bit add:
+```asm
+lda listLen
+sec
+sbc #1
+clc
+adc rangeStart
+sta val1
+lda rangeStart + 1
+adc #0
+sta val1 + 1
+```
+Verified by hand-trace (now correctly produces `val1=$5002` for the example above) and by confirming the exact corrected instruction sequence (`SEC/SBC #$01/CLC/ADC rangeStart/STA val1/LDA rangeStart+1/ADC #$00/STA val1+1`) is present at its expected address in the assembled `debug.prg`.
+
+**Test plan proposed** (poke `E 5000 11 22 33 44 55 66 77`, pattern `44 55 66` at `$5003-$5005`):
+1. `S 5000 5010 44 55 66` — ample range, expect match at `$5003`.
+2. `S 5000 5005 44 55 66` — pattern's last byte exactly equals `rangeEnd`, expect match at `$5003` (boundary must be inclusive).
+3. `S 5000 5004 44 55 66` — pattern would need to read one byte past `rangeEnd`, expect no match, clean return.
+4. `S 5000 5001 44 55 66` — range smaller than the pattern itself, expect no match on the very first iteration, no hang/crash.
+5. `S 5000 5010 44` (after re-poking `44 22 44 44 55 66` at `$5000`) — single-byte pattern, multiple matches, expect all reported correctly (regression check on the loop/`checkRangeLimit` interaction).
+
+User confirmed on real hardware (2026-07-03) that the corrected fix resolves the all-searches-fail regression and searches behave correctly.
 
 **Files:**
 - Modify: `src/external/debug/debug.asm`
@@ -1082,16 +1118,17 @@ git commit -m "chore(debug): consolidate chained character-prints into shared st
 | Task | ID | Severity | Files | Risk |
 |------|----|----------|-------|------|
 | 1 — checkExistence TempLo clobber | R1 | High (Blocker) | path.asm | **Implemented and verified** |
-| 2 — ccCloseSrcErr error clobber | R2 | High | shell.asm | **Implemented**; builds clean |
-| 3 — SourceBuf overflow | R3 | High | shell.asm | **Implemented**; builds clean |
+| 2 — ccCloseSrcErr error clobber | R2 | High | shell.asm | **Implemented and verified live in VICE** |
+| 3 — SourceBuf overflow | R3 | High | shell.asm | **Implemented and verified live in VICE** |
 | 4 — envAppend bounds recheck | R4 | High | shell.asm | **Implemented and verified**; A-clobber regression found live, fixed |
-| 5 — cmdSearch OOB read | R5 | Medium | debug.asm | **Implemented**; builds clean, in-shell smoke-test pending (blocked on R9-class LOAD flakiness) |
+| 5 — cmdSearch OOB read | R5 | Medium | debug.asm | **Implemented and verified on real hardware**; carry-propagation regression found live (all searches failed), fixed |
 | 6 — CMake CONFIGURE_DEPENDS | R6 | Medium | CMakeLists.txt | **Implemented and verified** |
 | 7 — VMM REU register priming | R7 | Low | vmm.asm | **Retracted** — broke SET/env variables live; fully reverted |
-| 8 — DEBUG print-routine reuse | R8 | Low | debug.asm | **Implemented**; builds clean |
+| 8 — DEBUG print-routine reuse | R8 | Low | debug.asm | **Implemented and verified** (user confirmed looks good) |
 | 9 — KERNAL LOAD "hang" | R9 | N/A | None | **Retracted** — confirmed to be a VICE monitor-tool testing artifact, not a real bug (verified fine on physical hardware) |
+| 10 — Missing trailing CR on error messages | R10 | Low | shell.asm | **Implemented and verified live in VICE** — found while verifying R2/R3 |
 | — CommandShell/VmmData segment overlap | (unplanned) | Blocker | command64.asm, petsci.asm, shell.asm | **Implemented and verified** — R2–R4's added code pushed `CommandShell` into `VmmData`'s fixed address; fixed by chaining `Petsci`/`CommandTable`/`CommandShell` with `startAfter` to reclaim unused padding after `ApiStub`. 50 bytes of headroom before `VmmData` confirmed in the built PRG. |
 
-Total: 8 real tasks plus one unplanned but necessary segment-layout fix. R1, R4, R6, and the segment fix are implemented and verified live in VICE. R2, R3, R5, R8 are implemented and build clean but weren't individually exercised in the emulator this pass (R2/R3 have no fast, isolated repro command tried yet; R5/R8 are blocked on reliable external-`.prg` loading in this VICE setup). R7 and R9 were both tried/investigated and retracted.
+Total: 10 tasks (R1-R6, R8, R10 implemented; R7 and R9 retracted) plus one unplanned but necessary segment-layout fix. Every implemented task has now been verified either live in VICE or on real hardware. Two of the live-verification passes (R4, R5) caught real regressions in the first-draft fix before commit — both were 6502 carry/register-clobber mistakes that static review alone hadn't caught. This VICE session also has a persistent, unresolved, VICE-specific issue loading `DEBUG.PRG` specifically (26 blocks, crosses tracks 2→3) that is unrelated to the code (confirmed working on real hardware) — R5's final verification was done on hardware because of it.
 
 **Remaining work:** smoke-test R2 (COPY against an unavailable device) and R3 (COPY with an overlong source name) directly; smoke-test R5 (`S` search command) and re-verify R8 (DEBUG's UI) once `DEBUG.PRG` can be loaded reliably in VICE (type the full command, hit Enter, then leave the monitor alone until a single check well after expected completion — see the R9 write-up for why).

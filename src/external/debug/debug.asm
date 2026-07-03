@@ -1580,10 +1580,17 @@ csLoop:
     // Bounds check: don't start a listLen-byte compare unless the whole
     // window fits within the user-declared range, so csCompLoop never
     // reads past rangeEnd (which could be memory-mapped I/O).
-    lda rangeStart
+    // val1 = rangeStart + (listLen - 1). Computing listLen-1 first (safe:
+    // listLen is always >= 1, checked above) and adding it to rangeStart as
+    // a clean 16-bit add avoids chaining ADC's carry-out straight into an
+    // SBC, which doesn't mean "subtract 1" — it only carries 1 when the
+    // preceding add actually overflowed the low byte, silently corrupting
+    // val1's high byte whenever it didn't.
+    lda listLen
+    sec
+    sbc #1
     clc
-    adc listLen
-    sbc #1                  // val1 = rangeStart + listLen - 1 (carry set by adc above)
+    adc rangeStart
     sta val1
     lda rangeStart + 1
     adc #0
