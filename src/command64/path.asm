@@ -49,6 +49,9 @@ ffFound:
 //         (1=no device, 2=no disk), or 3 if the device is ready but the file
 //         itself was not found.
 checkExistence:
+    lda TempLo
+    pha                     // Save filename length — checkDeviceReady clobbers TempLo/TempHi
+
     // Preflight: bail out before touching the real file if the device isn't
     // there or has no disk — avoids reading garbage off a channel with no
     // data behind it.
@@ -64,7 +67,9 @@ checkExistence:
     ldy #0                  // Secondary address 0 (Read)
     jsr KernalSETLFS
 
-    lda TempLo              // Length
+    pla                     // Restore filename length (was clobbered by checkDeviceReady)
+    sta TempLo
+    lda TempLo
     ldx NamePtrLo
     ldy NamePtrHi
     jsr KernalSETNAM
@@ -86,6 +91,7 @@ ceOk:
     rts
 
 ceDeviceErr:
+    pla                     // Balance the stack — saved length isn't needed on this path
     rts                     // A already holds the checkDeviceReady status code
     // checkDeviceReady itself lives in file.asm (File segment) — Path's
     // fixed $0AA0-$0B30 window is too small to also hold it.

@@ -324,11 +324,10 @@ cdRowLoop:
     jsr printHex8
     lda currentAddr
     jsr printHex8
-    lda #':'
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
-    
+    lda #<sepColonSp
+    ldy #>sepColonSp
+    jsr API_PRINT_STR
+
     // Print 8 bytes (Hex)
     ldy #0
 cdHexLoop:
@@ -457,11 +456,10 @@ hmNoExtra:
     jsr printHex8
     txa                     // sum Lo
     jsr printHex8
-    lda #' '
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
-    
+    lda #<twoSpaces
+    ldy #>twoSpaces
+    jsr API_PRINT_STR
+
     // Print diff
     lda val2 + 1
     jsr printHex8
@@ -553,22 +551,18 @@ modifyS:
 
 modifyPC:
     // Print "PC xxxx"
-    lda #'P'
-    jsr KernalChROUT
-    lda #'C'
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
+    lda #<lblPC
+    ldy #>lblPC
+    jsr API_PRINT_STR
     lda regPC + 1
     jsr printHex8
     lda regPC
     jsr printHex8
-    lda #PetCr
-    jsr KernalChROUT
-    
+
     // Print prompt and read line
-    lda #':'
-    jsr KernalChROUT
+    lda #<crColonPrompt
+    ldy #>crColonPrompt
+    jsr API_PRINT_STR
     jsr readLine
     
     // If empty input, leave unmodified
@@ -607,12 +601,11 @@ modifyReg:
     ldy #0
     lda (val1), y
     jsr printHex8
-    lda #PetCr
-    jsr KernalChROUT
-    
+
     // Print prompt and read line
-    lda #':'
-    jsr KernalChROUT
+    lda #<crColonPrompt
+    ldy #>crColonPrompt
+    jsr API_PRINT_STR
     jsr readLine
     
     // If empty input, leave unmodified
@@ -640,62 +633,44 @@ mrErr:
 
 printAllRegs:
     // Print A=.. X=.. Y=.. P=.. S=..
-    lda #'A'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblRegA
+    ldy #>lblRegA
+    jsr API_PRINT_STR
     lda regA
     jsr printHex8
-    
-    lda #' '
-    jsr KernalChROUT
-    lda #'X'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+
+    lda #<lblRegX
+    ldy #>lblRegX
+    jsr API_PRINT_STR
     lda regX
     jsr printHex8
 
-    lda #' '
-    jsr KernalChROUT
-    lda #'Y'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblRegY
+    ldy #>lblRegY
+    jsr API_PRINT_STR
     lda regY
     jsr printHex8
 
-    lda #' '
-    jsr KernalChROUT
-    lda #'P'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblRegP
+    ldy #>lblRegP
+    jsr API_PRINT_STR
     lda regP
     jsr printHex8
 
-    lda #' '
-    jsr KernalChROUT
-    lda #'S'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblRegS
+    ldy #>lblRegS
+    jsr API_PRINT_STR
     lda regS
     jsr printHex8
-    
-    lda #' '
-    jsr KernalChROUT
-    lda #'P'
-    jsr KernalChROUT
-    lda #'C'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+
+    lda #<lblRegPC
+    ldy #>lblRegPC
+    jsr API_PRINT_STR
     lda regPC + 1
     jsr printHex8
     lda regPC
     jsr printHex8
-    
+
     lda #PetCr
     jsr KernalChROUT
     jsr printPFlags
@@ -703,98 +678,73 @@ printAllRegs:
 
 printPFlags:
     // Print "P="
-    lda #'P'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfP
+    ldy #>lblPfP
+    jsr API_PRINT_STR
     lda regP
     jsr printHex8
-    
+
     // Print ": N="
-    lda #':'
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
-    lda #'N'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfN
+    ldy #>lblPfN
+    jsr API_PRINT_STR
     lda regP
     and #$80
     jsr printBitA
-    
+
     // Print " V="
-    lda #' '
-    jsr KernalChROUT
-    lda #'V'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfV
+    ldy #>lblPfV
+    jsr API_PRINT_STR
     lda regP
     and #$40
     jsr printBitA
-    
+
     // Print " *"
-    lda #' '
-    jsr KernalChROUT
-    lda #'*'
-    jsr KernalChROUT
-    
+    lda #<lblPfStar
+    ldy #>lblPfStar
+    jsr API_PRINT_STR
+
     // Print " B="
-    lda #' '
-    jsr KernalChROUT
-    lda #'B'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfB
+    ldy #>lblPfB
+    jsr API_PRINT_STR
     lda regP
     and #$10
     jsr printBitA
-    
+
     // Print " D="
-    lda #' '
-    jsr KernalChROUT
-    lda #'D'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfD
+    ldy #>lblPfD
+    jsr API_PRINT_STR
     lda regP
     and #$08
     jsr printBitA
-    
+
     // Print " I="
-    lda #' '
-    jsr KernalChROUT
-    lda #'I'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfI
+    ldy #>lblPfI
+    jsr API_PRINT_STR
     lda regP
     and #$04
     jsr printBitA
-    
+
     // Print " Z="
-    lda #' '
-    jsr KernalChROUT
-    lda #'Z'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfZ
+    ldy #>lblPfZ
+    jsr API_PRINT_STR
     lda regP
     and #$02
     jsr printBitA
-    
+
     // Print " C="
-    lda #' '
-    jsr KernalChROUT
-    lda #'C'
-    jsr KernalChROUT
-    lda #'='
-    jsr KernalChROUT
+    lda #<lblPfC
+    ldy #>lblPfC
+    jsr API_PRINT_STR
     lda regP
     and #$01
     jsr printBitA
-    
+
     lda #PetCr
     jsr KernalChROUT
     rts
@@ -942,10 +892,9 @@ pFlagsErr:
 
 modifyP_Custom:
     // Print "P xx"
-    lda #'P'
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
+    lda #<lblPSpace
+    ldy #>lblPSpace
+    jsr API_PRINT_STR
     lda regP
     jsr printHex8
     lda #PetCr
@@ -2178,10 +2127,9 @@ caLoop:
     jsr printHex8
     lda currentAddr
     jsr printHex8
-    lda #':'
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
+    lda #<sepColonSp
+    ldy #>sepColonSp
+    jsr API_PRINT_STR
 
     jsr readLine
     lda inputBuf
@@ -2746,11 +2694,10 @@ cuLoop:
     jsr printHex8
     lda currentAddr
     jsr printHex8
-    lda #':'
-    jsr KernalChROUT
-    lda #' '
-    jsr KernalChROUT
-    
+    lda #<sepColonSp
+    ldy #>sepColonSp
+    jsr API_PRINT_STR
+
     // Get opcode
     ldy #0
     lda (currentAddr), y
@@ -2857,18 +2804,16 @@ cuOpZp:
 
 cuOpZpx:
     jsr cuPrintZpAddr
-    lda #','
-    jsr KernalChROUT
-    lda #'X'
-    jsr KernalChROUT
+    lda #<sufX
+    ldy #>sufX
+    jsr API_PRINT_STR
     jmp cuDoneLine
 
 cuOpZpy:
     jsr cuPrintZpAddr
-    lda #','
-    jsr KernalChROUT
-    lda #'Y'
-    jsr KernalChROUT
+    lda #<sufY
+    ldy #>sufY
+    jsr API_PRINT_STR
     jmp cuDoneLine
 
 cuOpRel:
@@ -2919,18 +2864,16 @@ cuOpAbs:
 
 cuOpAbx:
     jsr cuPrintAbsAddr
-    lda #','
-    jsr KernalChROUT
-    lda #'X'
-    jsr KernalChROUT
+    lda #<sufX
+    ldy #>sufX
+    jsr API_PRINT_STR
     jmp cuDoneLine
 
 cuOpAby:
     jsr cuPrintAbsAddr
-    lda #','
-    jsr KernalChROUT
-    lda #'Y'
-    jsr KernalChROUT
+    lda #<sufY
+    ldy #>sufY
+    jsr API_PRINT_STR
     jmp cuDoneLine
 
 cuOpInd:
@@ -2945,24 +2888,18 @@ cuOpIzx:
     lda #'('
     jsr KernalChROUT
     jsr cuPrintZpAddr
-    lda #','
-    jsr KernalChROUT
-    lda #'X'
-    jsr KernalChROUT
-    lda #')'
-    jsr KernalChROUT
+    lda #<sufXClose
+    ldy #>sufXClose
+    jsr API_PRINT_STR
     jmp cuDoneLine
 
 cuOpIzy:
     lda #'('
     jsr KernalChROUT
     jsr cuPrintZpAddr
-    lda #')'
-    jsr KernalChROUT
-    lda #','
-    jsr KernalChROUT
-    lda #'Y'
-    jsr KernalChROUT
+    lda #<sufCloseY
+    ldy #>sufCloseY
+    jsr API_PRINT_STR
     jmp cuDoneLine
 
 cuPrintZpAddr:
@@ -3331,6 +3268,88 @@ errRomTarget:
 msgStub:
     .text "not yet implemented"
     .byte $0D, 0
+
+// UI label/separator strings (shared across print sites via API_PRINT_STR)
+sepColonSp:
+    .text ": "
+    .byte 0
+
+twoSpaces:
+    .text "  "
+    .byte 0
+
+lblPC:
+    .text "PC "
+    .byte 0
+
+crColonPrompt:
+    .byte $0D
+    .text ":"
+    .byte 0
+
+lblPSpace:
+    .text "P "
+    .byte 0
+
+lblRegA:
+    .text "A="
+    .byte 0
+lblRegX:
+    .text " X="
+    .byte 0
+lblRegY:
+    .text " Y="
+    .byte 0
+lblRegP:
+    .text " P="
+    .byte 0
+lblRegS:
+    .text " S="
+    .byte 0
+lblRegPC:
+    .text " PC="
+    .byte 0
+
+lblPfP:
+    .text "P="
+    .byte 0
+lblPfN:
+    .text ": N="
+    .byte 0
+lblPfV:
+    .text " V="
+    .byte 0
+lblPfStar:
+    .text " *"
+    .byte 0
+lblPfB:
+    .text " B="
+    .byte 0
+lblPfD:
+    .text " D="
+    .byte 0
+lblPfI:
+    .text " I="
+    .byte 0
+lblPfZ:
+    .text " Z="
+    .byte 0
+lblPfC:
+    .text " C="
+    .byte 0
+
+sufX:
+    .text ",X"
+    .byte 0
+sufY:
+    .text ",Y"
+    .byte 0
+sufXClose:
+    .text ",X)"
+    .byte 0
+sufCloseY:
+    .text "),Y"
+    .byte 0
 
 // Mode Lengths (indexed by MODE_* constants)
 modeLength:
