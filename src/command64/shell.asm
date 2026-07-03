@@ -551,6 +551,8 @@ clFindErr:
     sta CurrentDevice
     pla
     jsr printDeviceStatusMsg
+    lda #PetCr
+    jsr KernalChROUT
     rts
 
 clLoadErr:
@@ -562,6 +564,8 @@ clError:
     lda #<loadErrMsg
     ldy #>loadErrMsg
     jsr petPrintString
+    lda #PetCr
+    jsr KernalChROUT
     rts
 
 // RUN [address] — execute a program in memory
@@ -818,6 +822,8 @@ ctNoArgs:
 
 ctOpenErr:
     jsr printDeviceStatusMsg
+    lda #PetCr
+    jsr KernalChROUT
     rts
 
 // DEL / ERASE — delete a file from disk
@@ -1169,6 +1175,8 @@ ccNoDest:
 
 ccOpenErr:
     jsr printDeviceStatusMsg
+    lda #PetCr
+    jsr KernalChROUT
     jmp copyExit
 
 ccCloseSrcErr:
@@ -2226,11 +2234,11 @@ badCmdMsg:
 
 noFileMsg:
     .text "File name required"
-    .byte 0
+    .byte $0D, 0
 
 nameTooLongMsg:
     .text "File name too long"
-    .byte 0
+    .byte $0D, 0
 
 loadErrMsg:
     .text "Load error"

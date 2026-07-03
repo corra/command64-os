@@ -205,11 +205,13 @@ git commit -m "fix(path): preserve filename length across checkDeviceReady in ch
 
 ---
 
-## Task 2: Fix `ccCloseSrcErr` Error-Code Clobber — `shell.asm` (R2, High) — Implemented
+## Task 2: Fix `ccCloseSrcErr` Error-Code Clobber — `shell.asm` (R2, High) — Implemented and Verified
 
 **Severity: High** — COPY's dest-open-failure path always reports a generic "Load error" instead of the real reason ("Device not present" / "No disk in drive"), because closing the source handle overwrites the register `printDeviceStatusMsg` reads.
 
-**Status: Implemented as specified.** Builds cleanly; no issues found during the R2–R7 verification pass.
+**Status: Implemented and verified live in VICE.** `copy command64 11:foo` (device 11 unconfigured in this VICE session — no `Drive11Type` in `vicerc`) now correctly prints `Device not present` instead of the old generic `Load error`, and the shell returns cleanly to the prompt.
+
+**Testing note:** the same test against device 9 hung indefinitely (KERNAL stuck in the low-level serial byte-receive wait loop, same symptom as the retracted R9 investigation) — this VICE session's `vicerc` has `Drive9Type=1542` configured, meaning device 9 isn't truly absent from the bus; it's a drive with no disk inserted, an ambiguous state that appears to trigger the exact "data phase has no timeout" hazard `checkDeviceReady`'s own header comment warns about. This is a testing-environment quirk, not a code defect — retested against device 11 (genuinely unconfigured) and got a clean, fast result. Prefer a device number with no `DriveNType` entry in `vicerc` when testing "device not present" paths in this environment.
 
 **Root cause:** `ccCloseSrcErr` (`shell.asm:1166`) is entered with `A` holding the dest-open error status (set by the failed `DOS_OPEN_FILE` call at line 1098, `bcs ccCloseSrcErr` at line 1099). It then closes the source file, whose own close-status overwrites `A` before falling into `ccOpenErr` → `printDeviceStatusMsg`, which reads `A` as its input status code (`file.asm:135`).
 
@@ -280,11 +282,13 @@ git commit -m "fix(shell): preserve dest-open error code across ccCloseSrcErr's 
 
 ---
 
-## Task 3: Add Bounds Check to `cmdCopy`'s Source-Name Copy — `shell.asm` (R3, High) — Implemented
+## Task 3: Add Bounds Check to `cmdCopy`'s Source-Name Copy — `shell.asm` (R3, High) — Implemented and Verified
 
 **Severity: High** — `COPY <45+ char name> dest.prg` overflows the 40-byte `SourceBuf` into the immediately-following 40-byte `DestBuf` (`include/command64.inc:85-86`), since `CommandBuffer` allows up to 79 chars of input.
 
-**Status: Implemented as specified.** Builds cleanly; no issues found during the R2–R7 verification pass.
+**Status: Implemented and verified live in VICE.** `copy` with a 45-character source name now prints `File name too long` and returns cleanly to the prompt, with `DestBuf`/subsequent commands unaffected. Confirmed the assembled binary actually contains the fix by locating the `CPX #$28` (40 decimal) bounds check and the `File name too long` string at their expected addresses in the built `.prg` before trusting the live result.
+
+**Testing note:** the first live attempt appeared to fail (`Load error` instead of the new message) — root-caused to lost keystrokes during batched keyboard-buffer injection (the C64 keyboard buffer is only 10 bytes, so a 53-character command needs 6 separate writes, and one was dropped). Confirmed by reading `CommandBuffer` directly after injection and counting the actual bytes landed (only ~35 of the intended 45 `A`s on the first attempt) before re-running with each batch's drain verified. Lesson: for any test where the exact character count matters (like this one), verify `CommandBuffer` content directly rather than trusting the screen echo or assuming batched injection succeeded.
 
 **Root cause:** `ccCopySrc` (`shell.asm:994`) copies bytes from the parsed command line into `SourceBuf, x` with no check on `x` against the buffer's 40-byte size.
 
@@ -972,6 +976,25 @@ REU-backed I/O only kicks in once a REU is present. In VICE, enable the REU (Set
 git add src/command64/vmm.asm CHANGELOG.md
 git commit -m "perf(vmm): prime REU transfer registers once in vmmInit instead of every byte"
 ```
+
+---
+
+## Task 10: Missing Trailing CR on Several Error Messages — `shell.asm` (R10, Low) — Found and Fixed During R2/R3 Verification
+
+**Severity: Low (cosmetic, but user-visible on every occurrence)** — Several error messages ran directly into the next `C64[8]:>` prompt with no line break (e.g. `Load errorC64[8]:>`), noticed live while smoke-testing R2/R3.
+
+**Root cause:** `printDeviceStatusMsg`'s own doc comment (`file.asm`) explicitly says it prints *without* a trailing CR, "callers that want one add it themselves" — but 3 of its 4 call sites (`clFindErr`/LOAD, `ctOpenErr`/TYPE+DEL+REN, `ccOpenErr`/COPY) forgot to; only `cdDevError`/DIR did it correctly. Separately, `clError` (LOAD's real-`KernalLOAD`-failure path, printing `loadErrMsg`) and the five `noFileMsg` ("File name required") call sites (LOAD/TYPE/DEL/REN/COPY with no args) had the same gap, plus this session's own new `nameTooLongMsg` (R3) had it too.
+
+**Fix, in two parts:**
+1. Added `lda #PetCr / jsr KernalChROUT` after the `printDeviceStatusMsg`/`petPrintString` call in `clFindErr`, `ctOpenErr`, `ccOpenErr`, and `clError`.
+2. For `noFileMsg` and `nameTooLongMsg` — each with multiple call sites, all terminal (nothing printed after) — embedded `$0D` directly into the message's own `.byte` terminator instead of patching every call site individually, matching the convention most other terminal messages in this file already use (`noReuMsg`, `badAddrMsg`, `badDeviceMsg`, `noEnvMsg`, `envFullMsg`, `volParseErrMsg`, `verMsg`, `helpMsg` all embed their own `$0D`).
+
+**Audited and confirmed NOT bugs** (mid-line prefixes that correctly get their CR later, or already end in mid-string `$0D`): `currentDevMsg` (DRIVE), `volDriveMsg`/`volIsMsg`/`volIdMsg` (VOL — CR added after the full concatenated line), `promptPrefixMsg`/`promptSuffixMsg` (the prompt itself, intentionally same-line), `badCmdMsg` (caller already adds CR).
+
+**Status: Implemented and verified live in VICE.** `load hello` (not found on `image.d64`), `copy` (no args), and `copy command64 11:foo` (R2's device-not-present path) all now print their message on its own line before the next prompt.
+
+**Files:**
+- Modified: `src/command64/shell.asm`
 
 ---
 
