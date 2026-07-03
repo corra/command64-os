@@ -20,7 +20,7 @@
 .const TABLE_ENTRY_SIZE = 8
 .const TABLE_NAME_LEN   = 6
 
-.segment CommandTable [start=$1080]
+.segment CommandTable
 
 tableCmd:
     .text "exit  "
@@ -71,7 +71,7 @@ tableEnd:
 // ---------------------------------------------------------------------------
 // Command Shell  (loaded at $1180)
 // ---------------------------------------------------------------------------
-.segment CommandShell [start=$1130]
+.segment CommandShell
 
 // --- Entry point ---
 start:
@@ -992,6 +992,8 @@ ccFoundSrc:
     ldy #0
     ldx #0
 ccCopySrc:
+    cpx #40                 // SourceBuf is 40 bytes — refuse to write index 40+
+    bcs ccSrcTooLong
     lda (PrintPtrLo), y
     beq ccGotSrcNull
     cmp #' '
@@ -1000,6 +1002,12 @@ ccCopySrc:
     inx
     iny
     jmp ccCopySrc
+
+ccSrcTooLong:
+    lda #<nameTooLongMsg
+    ldy #>nameTooLongMsg
+    jsr petPrintString
+    jmp copyExit
 
 ccGotSrcNull:
     lda #0
@@ -1164,13 +1172,14 @@ ccOpenErr:
     jmp copyExit
 
 ccCloseSrcErr:
+    pha                     // Save the dest-open error status; the source-close
+                             // call below clobbers A with its own (irrelevant) status
     lda SrcHandle           // source handle — TempLo holds scan index here, not the handle
     sta FileHandle
     lda #DOS_CLOSE_FILE
-    jsr apiHandler          // On the rare chance this ALSO fails, its status
-                             // (not the dest-open failure's) is what gets
-                             // reported below — an acceptable simplification
-                             // for this double-fault edge case.
+    jsr apiHandler          // Close source; its own status is not reported —
+                             // the original dest-open failure is what the user needs to see
+    pla                     // Restore the real dest-open error status for printDeviceStatusMsg
     jmp ccOpenErr
 
 copyExit:
@@ -1695,20 +1704,18 @@ edDoubleDone:
 // --- envAppend ---
 // Input: VmmOff points to the end-of-block null.
 envAppend:
-    // Bounds check: 4KB segment ($1000 bytes)
-    lda VmmOffHi
-    cmp #$10                // Offset $1000?
-    bcc eaCheckSpace
-    lda #<envFullMsg
-    ldy #>envFullMsg
-    jsr petPrintString
-    rts
+    jsr eaCheckBounds
+    bcs eaAbort
 
 eaCheckSpace:
     ldx #0
 eaVarLoop:
     lda SourceBuf, x
     beq eaWriteEq
+    pha                     // eaCheckBounds clobbers A (reads VmmOffHi) — save the char first
+    jsr eaCheckBounds
+    bcs eaVarAbort
+    pla
     jsr vmmWriteByte
     inc VmmOffLo
     bne eaVarNext
@@ -1717,7 +1724,13 @@ eaVarNext:
     inx
     jmp eaVarLoop
 
+eaVarAbort:
+    pla                     // balance the stack before falling into the shared abort path
+    jmp eaAbort
+
 eaWriteEq:
+    jsr eaCheckBounds
+    bcs eaAbort
     lda #'='
     jsr vmmWriteByte
     inc VmmOffLo
@@ -1729,6 +1742,10 @@ eaEqNext:
 eaValLoop:
     lda CommandBuffer, y
     beq eaDone
+    pha                     // eaCheckBounds clobbers A (reads VmmOffHi) — save the char first
+    jsr eaCheckBounds
+    bcs eaValAbort
+    pla
     jsr vmmWriteByte        // vmmWriteByte preserves Y (via vmmComputeAddress stack fix)
     inc VmmOffLo
     bne eaValNext
@@ -1737,15 +1754,36 @@ eaValNext:
     iny
     jmp eaValLoop
 
+eaValAbort:
+    pla                     // balance the stack before falling into the shared abort path
+    jmp eaAbort
+
 eaDone:
+    jsr eaCheckBounds
+    bcs eaAbort
     lda #0
     jsr vmmWriteByte
     inc VmmOffLo
     bne eaFinalNull
     inc VmmOffHi
 eaFinalNull:
+    jsr eaCheckBounds
+    bcs eaAbort
     lda #0
     jsr vmmWriteByte
+    rts
+
+eaAbort:
+    lda #<envFullMsg
+    ldy #>envFullMsg
+    jsr petPrintString
+    rts
+
+// --- eaCheckBounds [Private] ---
+// Output: Carry set if VmmOffHi has reached the 4KB env-segment limit ($1000).
+eaCheckBounds:
+    lda VmmOffHi
+    cmp #$10
     rts
 
 // --- envFindEnd ---
@@ -2188,6 +2226,10 @@ badCmdMsg:
 
 noFileMsg:
     .text "File name required"
+    .byte 0
+
+nameTooLongMsg:
+    .text "File name too long"
     .byte 0
 
 loadErrMsg:

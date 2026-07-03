@@ -4,7 +4,7 @@
 // KickAssembler v5.25 - PETSCII API Layer for command64
 // Provides character and string output via C64 KERNAL routines.
 
-.segment Petsci [start=$1040]
+.segment Petsci
 
 // --- petPrintChar ---
 // Print a single PETSCII character.

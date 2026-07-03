@@ -13,11 +13,16 @@
 //   Path          $0A60  Directory search and path logic
 //   Vmm           $0B00  Virtual Memory Manager (REU mapping)
 //   File          $0D00  Handle-based File I/O
-//   ApiStub       $1000  Stable OS Entry Point (Jump Table)
-//   Petsci        $1040  PETSCII print routines
-//   CommandTable  $1080  Fixed-width command dispatch table
-//   CommandShell  $1180  Command loop, dispatcher, built-ins
-//   VmmData       $1F90  VMM temporary storage
+//   ApiStub       $1000  Stable OS Entry Point (Jump Table) — fixed: external
+//                        apps hardcode `jsr $1000`, must never move.
+//   Petsci        packed immediately after ApiStub — no external code
+//   CommandTable  packed immediately after Petsci    references these three
+//   CommandShell  packed immediately after CommandTable  segments' addresses,
+//                        so they float to reclaim the padding that otherwise
+//                        went unused between fixed-address segments.
+//   VmmData       $1FA0  VMM temporary storage — fixed: FileScratch/
+//                        vmmInitialized/vmmTempByte are hardcoded absolute
+//                        addresses in command64.inc, must never move.
 
 .file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData"]
 
@@ -28,9 +33,15 @@
 .segmentdef Path [start=$0AA0]
 .segmentdef Vmm [start=$0B30]
 .segmentdef File [start=$0CE0]
+.segmentdef Petsci [startAfter="ApiStub"]
+.segmentdef CommandTable [startAfter="Petsci"]
+.segmentdef CommandShell [startAfter="CommandTable"]
 .segmentdef VmmData [start=$1FA0]
 
-// Petsci, CommandTable, CommandShell, Api, Utils, Loader, Path, Vmm, File, and VmmData are defined by the imported source files.
+// Api, Utils, Loader, Path, Vmm, and File get their segment contents from the
+// imported source files; ApiStub keeps its own fixed start=$1000 declared
+// inline in api.asm. Petsci/CommandTable/CommandShell chain via startAfter
+// so they pack immediately behind one another with no wasted padding.
 
 #import "../include/command64.inc"
 #import "command64/petsci.asm"

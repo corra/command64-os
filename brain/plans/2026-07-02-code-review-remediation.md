@@ -205,9 +205,11 @@ git commit -m "fix(path): preserve filename length across checkDeviceReady in ch
 
 ---
 
-## Task 2: Fix `ccCloseSrcErr` Error-Code Clobber — `shell.asm` (R2, High)
+## Task 2: Fix `ccCloseSrcErr` Error-Code Clobber — `shell.asm` (R2, High) — Implemented
 
 **Severity: High** — COPY's dest-open-failure path always reports a generic "Load error" instead of the real reason ("Device not present" / "No disk in drive"), because closing the source handle overwrites the register `printDeviceStatusMsg` reads.
+
+**Status: Implemented as specified.** Builds cleanly; no issues found during the R2–R7 verification pass.
 
 **Root cause:** `ccCloseSrcErr` (`shell.asm:1166`) is entered with `A` holding the dest-open error status (set by the failed `DOS_OPEN_FILE` call at line 1098, `bcs ccCloseSrcErr` at line 1099). It then closes the source file, whose own close-status overwrites `A` before falling into `ccOpenErr` → `printDeviceStatusMsg`, which reads `A` as its input status code (`file.asm:135`).
 
@@ -278,9 +280,11 @@ git commit -m "fix(shell): preserve dest-open error code across ccCloseSrcErr's 
 
 ---
 
-## Task 3: Add Bounds Check to `cmdCopy`'s Source-Name Copy — `shell.asm` (R3, High)
+## Task 3: Add Bounds Check to `cmdCopy`'s Source-Name Copy — `shell.asm` (R3, High) — Implemented
 
 **Severity: High** — `COPY <45+ char name> dest.prg` overflows the 40-byte `SourceBuf` into the immediately-following 40-byte `DestBuf` (`include/command64.inc:85-86`), since `CommandBuffer` allows up to 79 chars of input.
+
+**Status: Implemented as specified.** Builds cleanly; no issues found during the R2–R7 verification pass.
 
 **Root cause:** `ccCopySrc` (`shell.asm:994`) copies bytes from the parsed command line into `SourceBuf, x` with no check on `x` against the buffer's 40-byte size.
 
@@ -366,9 +370,11 @@ git commit -m "fix(shell): bounds-check COPY source filename against SourceBuf c
 
 ---
 
-## Task 4: Recheck Bounds on Every `envAppend` Write — `shell.asm` (R4, High)
+## Task 4: Recheck Bounds on Every `envAppend` Write — `shell.asm` (R4, High) — Implemented, Regression Found and Fixed
 
 **Severity: High** — `envAppend`'s 4KB environment-segment bounds check (`VmmOffHi` vs `$10`) only runs once at entry; the write loops that follow never recheck it, so a long `SET VAR=value` issued near the boundary writes past the Env segment into adjacent REU pages instead of erroring.
+
+**Status: Implemented, but the first pass as specified below introduced a real regression, caught by in-emulator verification (`SET FOO=BAR` followed by `SET` printed nothing instead of `foo=bar`) and fixed before commit.** Root cause: in `eaVarLoop` and `eaValLoop`, the character to write was loaded into `A` (`lda SourceBuf, x` / `lda CommandBuffer, y`) *before* the `jsr eaCheckBounds` call — but `eaCheckBounds` itself does `lda VmmOffHi` internally, clobbering `A`. Every byte written was silently replaced with `VmmOffHi`'s value instead of the intended character. Confirmed the regression was specific to this task (not R7, which was suspected first and ruled out by reverting it independently and reproducing the bug anyway; not present on the pristine pre-session tree). Fixed by saving the loaded character on the stack (`pha`) across the bounds check and restoring it (`pla`) immediately before `vmmWriteByte`, in both loops — the code blocks below reflect the corrected version.
 
 **Files:**
 - Modify: `src/command64/shell.asm`
@@ -436,6 +442,8 @@ eaFinalNull:
 
 - [ ] **Step 2: Factor the check into a shared subroutine and call it before every write**
 
+**Correction (post-verification):** the first draft of this step called `eaCheckBounds` *after* loading the byte to write into `A` — but `eaCheckBounds` itself loads `VmmOffHi` into `A`, silently clobbering the character. This was caught live (`SET FOO=BAR` then `SET` printed nothing) and fixed by saving the character on the stack across the bounds check in `eaVarLoop` and `eaValLoop` — the two loops that load a *variable* byte before writing it. `eaWriteEq`/`eaDone`/`eaFinalNull` write fixed/known bytes (`'='`, `0`) so they're safe with the check-then-load ordering as originally written. The corrected version:
+
 ```asm
 envAppend:
     jsr eaCheckBounds
@@ -446,8 +454,10 @@ eaCheckSpace:
 eaVarLoop:
     lda SourceBuf, x
     beq eaWriteEq
+    pha                     // eaCheckBounds clobbers A (reads VmmOffHi) — save the char first
     jsr eaCheckBounds
-    bcs eaAbort
+    bcs eaVarAbort
+    pla
     jsr vmmWriteByte
     inc VmmOffLo
     bne eaVarNext
@@ -455,6 +465,10 @@ eaVarLoop:
 eaVarNext:
     inx
     jmp eaVarLoop
+
+eaVarAbort:
+    pla                     // balance the stack before falling into the shared abort path
+    jmp eaAbort
 
 eaWriteEq:
     jsr eaCheckBounds
@@ -470,8 +484,10 @@ eaEqNext:
 eaValLoop:
     lda CommandBuffer, y
     beq eaDone
+    pha                     // eaCheckBounds clobbers A (reads VmmOffHi) — save the char first
     jsr eaCheckBounds
-    bcs eaAbort
+    bcs eaValAbort
+    pla
     jsr vmmWriteByte        // vmmWriteByte preserves Y (via vmmComputeAddress stack fix)
     inc VmmOffLo
     bne eaValNext
@@ -479,6 +495,10 @@ eaValLoop:
 eaValNext:
     iny
     jmp eaValLoop
+
+eaValAbort:
+    pla                     // balance the stack before falling into the shared abort path
+    jmp eaAbort
 
 eaDone:
     jsr eaCheckBounds
@@ -538,9 +558,11 @@ git commit -m "fix(shell): recheck env-segment bounds on every envAppend write, 
 
 ---
 
-## Task 5: Fix `cmdSearch` Out-of-Range Read — `debug.asm` (R5, Medium)
+## Task 5: Fix `cmdSearch` Out-of-Range Read — `debug.asm` (R5, Medium) — Implemented
 
 **Severity: Medium** — `cmdSearch`'s `csCompLoop` compares the full search pattern against `(rangeStart),y` before `checkRangeLimit` is ever consulted, and `checkRangeLimit` only checks `rangeStart` itself (not `rangeStart + listLen`). A pattern search whose match window straddles `rangeEnd` reads past the user-declared range — potentially into memory-mapped I/O — while still reporting an in-range match.
+
+**Status: Implemented as specified.** Builds cleanly. In-emulator smoke-test of the actual search command itself is still pending (blocked on loading `DEBUG.PRG` reliably in VICE — see the R9 write-up; use monitor-free LOAD polling per that note when testing).
 
 **Files:**
 - Modify: `src/external/debug/debug.asm`
@@ -681,9 +703,11 @@ git commit -m "fix(debug): bounds-check full search-pattern window in cmdSearch 
 
 ---
 
-## Task 6: Add `CONFIGURE_DEPENDS` to Source Globs — `CMakeLists.txt` (R6, Medium)
+## Task 6: Add `CONFIGURE_DEPENDS` to Source Globs — `CMakeLists.txt` (R6, Medium) — Implemented
 
 **Severity: Medium** — `file(GLOB_RECURSE ...)` source discovery for `CMD64_SRCS`/`DEBUG_SRCS`/`LABEL_SRCS`/`CONWAY_SRCS` lacks `CONFIGURE_DEPENDS`. A newly added `.asm`/`.inc` file is silently excluded from the build until someone manually re-runs `cmake -B build`, producing a stale/incomplete PRG with no error.
+
+**Status: Implemented as specified.** `cmake -B build` + full rebuild both verified clean.
 
 **Files:**
 - Modify: `CMakeLists.txt`
@@ -761,17 +785,23 @@ git commit -m "build: add CONFIGURE_DEPENDS to source-file globs for automatic r
 
 ---
 
-## Task 7: Prime REU Transfer Registers Once — `vmm.asm` (R7, Low)
+## Task 7: Prime REU Transfer Registers Once — `vmm.asm` (R7, Low) — Retracted, Regression Found in Emulator
 
 **Severity: Low (efficiency)** — `vmmReadByte`/`vmmWriteByte` reload `REU_C64_ADDR_L/H` and `REU_LEN_L/H` with the same constants on every single-byte transfer — the hottest path in the VMM (called once per byte for all REU-backed file/disk I/O). Priming these once removes 4 redundant `lda`/`sta` pairs (8 instructions) from every byte transferred.
 
-**Safety check:** `REU_C64_ADDR_L/H` and `REU_LEN_L/H` (`include/vmm.inc:27-33`) are written **only** in `vmmReadByte`/`vmmWriteByte`, nowhere else in the codebase (verified via full-repo grep) — no other routine changes their values between calls, so priming once is safe. `REU_REU_ADDR_L/H`/`REU_REU_BANK` (set per-call in `vmmComputeAddress`) and `REU_COMMAND` (the trigger) are **not** touched by this change — those genuinely vary per call and must stay in the hot path.
+**Status: Retracted.** The "safety check" below was wrong: **applying this change broke `SET`/environment variables** (`SET FOO=BAR` followed by `SET` printed nothing instead of `foo=bar`, verified in VICE, and confirmed by reverting the change alone — with R2–R6 still applied — and seeing it work again). The static grep-based check ("nothing else writes these registers, so priming once is safe") missed a *dynamic hardware behavior*: this REU-style interface's `REU_LEN_L/H` registers almost certainly get consumed/decremented by the DMA controller itself after each transfer (a documented quirk of real 17xx-series REU length registers), so a value primed once in `vmmInit` is only valid for the *first* transfer — every subsequent `vmmReadByte`/`vmmWriteByte` call after that transfers 0 bytes instead of 1, silently no-op'ing every write and returning stale/zero data on every read. The change has been fully reverted; `vmm.asm` is back to its pre-session state (per-call reload of `REU_C64_ADDR_L/H`/`REU_LEN_L/H` restored in both `vmmReadByte` and `vmmWriteByte`, and the priming block removed from `vmmInit`).
+
+**Lesson for future efficiency work in this codebase:** a static "nothing else writes this register" grep is not sufficient justification for assuming a hardware register's value persists across calls — memory-mapped I/O registers can have write-triggered or read-triggered side effects (auto-increment, auto-decrement, latching, clear-on-read) that no amount of source-grepping will surface. Verify against the hardware/emulator's actual documented register semantics, or test empirically (as was done here, after the fact) before relying on "unwritten elsewhere" as proof of stability.
+
+**Original (retracted) safety check, left here for the record:** ~~`REU_C64_ADDR_L/H` and `REU_LEN_L/H` (`include/vmm.inc:27-33`) are written only in `vmmReadByte`/`vmmWriteByte`, nowhere else in the codebase (verified via full-repo grep) — no other routine changes their values between calls, so priming once is safe.~~ This reasoning did not account for the registers changing their own value as a side effect of the `REU_COMMAND` trigger.
 
 **Files:**
 - Modify: `src/command64/vmm.asm`
 - Modify: `CHANGELOG.md`
 
-- [ ] **Step 1: Locate `vmmInit`, `vmmReadByte`, `vmmWriteByte`**
+**The steps below (Steps 1–7) describe the retracted change and are not to be followed** — retained only as a record of what was tried and reverted. `vmm.asm` should remain in its original, unmodified form.
+
+- [ ] ~~**Step 1: Locate `vmmInit`, `vmmReadByte`, `vmmWriteByte`**~~ (retracted, see above)
 
 `src/command64/vmm.asm`. Current `vmmInit` tail (~line 34):
 
@@ -1029,15 +1059,16 @@ git commit -m "chore(debug): consolidate chained character-prints into shared st
 | Task | ID | Severity | Files | Risk |
 |------|----|----------|-------|------|
 | 1 — checkExistence TempLo clobber | R1 | High (Blocker) | path.asm | **Implemented and verified** |
-| 2 — ccCloseSrcErr error clobber | R2 | High | shell.asm | One `pha`/`pla` pair, isolated |
-| 3 — SourceBuf overflow | R3 | High | shell.asm | Additive bounds check + new error path |
-| 4 — envAppend bounds recheck | R4 | High | shell.asm | Mechanical: 1 new subroutine, called at 6 sites |
-| 5 — cmdSearch OOB read | R5 | Medium | debug.asm | Additive bounds check using free scratch (val1) |
-| 6 — CMake CONFIGURE_DEPENDS | R6 | Medium | CMakeLists.txt | Build-graph only, no compiled-output change |
-| 7 — VMM REU register priming | R7 | Low | vmm.asm | Verified no other writer of the primed registers |
-| 8 — DEBUG print-routine reuse | R8 | Low | debug.asm | **Already implemented**; build/smoke-test pending |
+| 2 — ccCloseSrcErr error clobber | R2 | High | shell.asm | **Implemented**; builds clean |
+| 3 — SourceBuf overflow | R3 | High | shell.asm | **Implemented**; builds clean |
+| 4 — envAppend bounds recheck | R4 | High | shell.asm | **Implemented and verified**; A-clobber regression found live, fixed |
+| 5 — cmdSearch OOB read | R5 | Medium | debug.asm | **Implemented**; builds clean, in-shell smoke-test pending (blocked on R9-class LOAD flakiness) |
+| 6 — CMake CONFIGURE_DEPENDS | R6 | Medium | CMakeLists.txt | **Implemented and verified** |
+| 7 — VMM REU register priming | R7 | Low | vmm.asm | **Retracted** — broke SET/env variables live; fully reverted |
+| 8 — DEBUG print-routine reuse | R8 | Low | debug.asm | **Implemented**; builds clean |
 | 9 — KERNAL LOAD "hang" | R9 | N/A | None | **Retracted** — confirmed to be a VICE monitor-tool testing artifact, not a real bug (verified fine on physical hardware) |
+| — CommandShell/VmmData segment overlap | (unplanned) | Blocker | command64.asm, petsci.asm, shell.asm | **Implemented and verified** — R2–R4's added code pushed `CommandShell` into `VmmData`'s fixed address; fixed by chaining `Petsci`/`CommandTable`/`CommandShell` with `startAfter` to reclaim unused padding after `ApiStub`. 50 bytes of headroom before `VmmData` confirmed in the built PRG. |
 
-Total: 8 real tasks (R9 retracted, no code involved). Task 1 is implemented and verified. Tasks 2–7 are not yet applied to the working tree (this plan is the spec preceding implementation, per this project's documentation-driven standard). Task 8 is implemented and awaiting build verification.
+Total: 8 real tasks plus one unplanned but necessary segment-layout fix. R1, R4, R6, and the segment fix are implemented and verified live in VICE. R2, R3, R5, R8 are implemented and build clean but weren't individually exercised in the emulator this pass (R2/R3 have no fast, isolated repro command tried yet; R5/R8 are blocked on reliable external-`.prg` loading in this VICE setup). R7 and R9 were both tried/investigated and retracted.
 
-**Suggested execution order:** 1 (done) → 2 → 3 → 4 → 6 → 7 → 5 and 8's in-emulator verification. When verifying R5/R8 in VICE, avoid monitor calls (screenshots, register/memory reads) during an in-flight `LOAD`/external-command-load — poll with a single screenshot taken well after an estimated completion time instead, per the R9 write-up above.
+**Remaining work:** smoke-test R2 (COPY against an unavailable device) and R3 (COPY with an overlong source name) directly; smoke-test R5 (`S` search command) and re-verify R8 (DEBUG's UI) once `DEBUG.PRG` can be loaded reliably in VICE (type the full command, hit Enter, then leave the monitor alone until a single check well after expected completion — see the R9 write-up for why).

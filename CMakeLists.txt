@@ -37,16 +37,16 @@ else()
 endif()
 
 # Source file discovery
-file(GLOB_RECURSE CMD64_SRCS "src/command64/*.asm" "include/*.inc")
+file(GLOB_RECURSE CMD64_SRCS CONFIGURE_DEPENDS "src/command64/*.asm" "include/*.inc")
 set(CMD64_ENTRY "src/command64.asm")
 
-file(GLOB_RECURSE DEBUG_SRCS "src/external/debug/*.asm" "include/*.inc")
+file(GLOB_RECURSE DEBUG_SRCS CONFIGURE_DEPENDS "src/external/debug/*.asm" "include/*.inc")
 set(DEBUG_ENTRY "src/external/debug/debug.asm")
 
-file(GLOB_RECURSE LABEL_SRCS "src/external/label/*.asm" "include/*.inc")
+file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.asm" "include/*.inc")
 set(LABEL_ENTRY "src/external/label/label.asm")
 
-file(GLOB_RECURSE CONWAY_SRCS "src/external/conway/*.asm" "include/*.inc")
+file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.asm" "include/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway.asm")
 
 # NOTE: dvorak (src/external/dvorak/dvorak.asm) is deliberately not wired up

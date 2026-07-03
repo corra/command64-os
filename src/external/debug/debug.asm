@@ -1577,6 +1577,28 @@ cmdSearch:
     jmp cdErr
     
 csLoop:
+    // Bounds check: don't start a listLen-byte compare unless the whole
+    // window fits within the user-declared range, so csCompLoop never
+    // reads past rangeEnd (which could be memory-mapped I/O).
+    lda rangeStart
+    clc
+    adc listLen
+    sbc #1                  // val1 = rangeStart + listLen - 1 (carry set by adc above)
+    sta val1
+    lda rangeStart + 1
+    adc #0
+    sta val1 + 1
+
+    lda rangeEnd + 1
+    cmp val1 + 1
+    bne csSkipLo
+    lda rangeEnd
+    cmp val1
+csSkipLo:
+    bcs csWindowOk           // rangeEnd >= val1: the full window fits, safe to compare
+    jmp csDone               // window would run past rangeEnd: no more matches possible
+
+csWindowOk:
     ldy #0
 csCompLoop:
     lda (rangeStart), y
@@ -1585,7 +1607,7 @@ csCompLoop:
     iny
     cpy listLen
     bne csCompLoop
-    
+
     // Found: print address
     lda rangeStart + 1
     jsr printHex8
