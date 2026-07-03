@@ -8,13 +8,16 @@
 //   Live cell with 2 or 3 live neighbours survives.
 //   Dead cell with exactly 3 live neighbours is born.
 //
-// Grid: 40x25 toroidal (edges wrap). 1 byte/cell (0=dead, 1=alive).
+// Grid: 40x24 toroidal (edges wrap). 1 byte/cell (0=dead, 1=alive).
+//       The screen's bottom row (row 24) is reserved for a status line
+//       showing the keybindings, so it is excluded from the simulation.
 // Buffers: double-buffered at fixed page-aligned addresses $3000/$3400.
 //          Page-alignment lets multi-page iteration use INC zpHi without
 //          an explicit page-boundary check in the inner loops.
 //
 // Display: Direct writes to screen RAM ($0400). Live cell = solid block
 //          ($A0, reverse-space). Dead cell = space ($20). Green on black.
+//          Bottom row: static keybinding reminder, drawn once at startup.
 //
 // Controls (PETSCII, standard keyboard mode):
 //   SPACE        pause / resume
@@ -35,8 +38,10 @@
 // Grid dimensions
 // ---------------------------------------------------------------------------
 .const GRID_W    = 40           // columns  — matches the C64 text-screen width
-.const GRID_H    = 25           // rows     — matches the C64 text-screen height
-.const GRID_SIZE = 1000         // GRID_W * GRID_H
+.const GRID_H    = 24           // rows — one less than the screen; row 24 is
+                                 // reserved for the keybinding status line
+.const GRID_SIZE = 960          // GRID_W * GRID_H
+.const STATUS_ROW_OFFSET = 960  // GRID_SIZE: offset of screen row 24
 
 // ---------------------------------------------------------------------------
 // Hardware addresses
@@ -49,8 +54,8 @@
 
 // ---------------------------------------------------------------------------
 // Buffer base addresses (page-aligned; low byte is always $00)
-//   grid0: $3000-$33E7  (1000 cells; remainder of page is harmless padding)
-//   grid1: $3400-$37E7  (same layout, second buffer)
+//   grid0: $3000-$33BF  (960 cells; remainder of page is harmless padding)
+//   grid1: $3400-$37BF  (same layout, second buffer)
 // Code fits comfortably below $3000 (~600 bytes from $2000).
 // ---------------------------------------------------------------------------
 .const GRID0_LO  = $00
@@ -131,6 +136,7 @@ fillColorTail:
 
     jsr randomizeGrid
     jsr drawGrid
+    jsr drawStatusLine
 
 // ---------------------------------------------------------------------------
 // Main loop
@@ -242,7 +248,7 @@ swapBufs:
 // A cell is set alive when (LFSR_output & $0A) == 0, i.e. when bits 1 and 3
 // are both zero (probability 1/4 for a uniform LFSR).
 //
-// Iterates 3 full 256-byte pages then a 232-byte tail (total 1000 bytes).
+// Iterates 3 full 256-byte pages then a 192-byte tail (total 960 bytes).
 // The X register counts pages; Y iterates within each page.
 // ---------------------------------------------------------------------------
 randomizeGrid:
@@ -270,7 +276,7 @@ rgStore:
     cpx #3
     bne rgCell                  // pages 0, 1, 2 done; fall through at page 3
 
-    // Final partial page: 232 cells
+    // Final partial page: 192 cells
     ldy #0
 rgTail:
     jsr lfsrStep
@@ -283,7 +289,7 @@ rgTailAlive:
 rgTailStore:
     sta (zpCurrLo), y
     iny
-    cpy #232
+    cpy #192
     bne rgTail
     rts
 
@@ -310,7 +316,7 @@ cgPage:
 cgTail:
     sta (zpCurrLo), y
     iny
-    cpy #232
+    cpy #192
     bne cgTail
     rts
 
@@ -379,7 +385,8 @@ dgPage:
     cmp #3
     bne dgPage                  // Y is 0 after wrap; safe to restart inner loop
 
-    // Final 232-cell tail (1000 - 3*256 = 232)
+    // Final 192-cell tail (960 - 3*256 = 192). Leaves screen row 24
+    // ($0400+960..$0400+999) untouched for the keybinding status line.
     ldy #0
 dgTail:
     lda (zpCurrLo), y
@@ -387,7 +394,7 @@ dgTail:
     lda cellCharTbl, x
     sta (zpDstLo), y
     iny
-    cpy #232
+    cpy #192
     bne dgTail
     rts
 
@@ -680,21 +687,52 @@ cellCharTbl:
 
 // Row N starts at byte offset N*40 within the buffer.
 // Split into lo/hi for fast 16-bit address computation.
-// Precomputed to avoid runtime multiply; indexed by row number (0-24).
+// Precomputed to avoid runtime multiply; indexed by row number (0-23).
+// Grid rows only run 0-23 — screen row 24 is the status line and is never
+// looked up through these tables.
 //
 // Row  0: offset   0 = $0000    Row  7: offset 280 = $0118
 // Row 12: offset 480 = $01E0    Row 13: offset 520 = $0208
 // Row 19: offset 760 = $02F8    Row 20: offset 800 = $0320
-// Row 24: offset 960 = $03C0
+// Row 23: offset 920 = $0398
 
 rowOffLo:
     .byte $00,$28,$50,$78,$A0,$C8,$F0   // rows  0-6
     .byte $18,$40,$68,$90,$B8,$E0       // rows  7-12
     .byte $08,$30,$58,$80,$A8,$D0,$F8   // rows 13-19
-    .byte $20,$48,$70,$98,$C0           // rows 20-24
+    .byte $20,$48,$70,$98               // rows 20-23
 
 rowOffHi:
     .byte $00,$00,$00,$00,$00,$00,$00   // rows  0-6   (offsets 0-240)
     .byte $01,$01,$01,$01,$01,$01       // rows  7-12  (offsets 280-480)
     .byte $02,$02,$02,$02,$02,$02,$02   // rows 13-19  (offsets 520-760)
-    .byte $03,$03,$03,$03,$03           // rows 20-24  (offsets 800-960)
+    .byte $03,$03,$03,$03               // rows 20-23  (offsets 800-920)
+
+// ---------------------------------------------------------------------------
+// Status line text — POKEd directly into screen RAM, so it needs actual
+// screencodes, not PETSCII (the file's default encoding, set above, is
+// "petscii_mixed"). Scoped to "screencode_mixed" so this table gets real
+// screencodes; lowercase source letters assemble to the unshifted ($01-$1A)
+// screencodes that render as uppercase letters in the OS's default charset.
+// ---------------------------------------------------------------------------
+.encoding "screencode_mixed"
+statusText:
+    .text "space=pause  r=random  c=clear  q=quit"
+statusTextEnd:
+.encoding "petscii_mixed"
+.const STATUS_TEXT_LEN = statusTextEnd - statusText
+
+// ---------------------------------------------------------------------------
+// drawStatusLine  — write the keybinding reminder to screen row 24.
+// Drawn once at startup; drawGrid never touches this row, so it persists
+// for the life of the program.
+// ---------------------------------------------------------------------------
+drawStatusLine:
+    ldx #0
+dslLoop:
+    lda statusText, x
+    sta SCREEN + STATUS_ROW_OFFSET, x
+    inx
+    cpx #STATUS_TEXT_LEN
+    bne dslLoop
+    rts
