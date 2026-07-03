@@ -12,8 +12,10 @@
 
 ### MCPs
 
-- **Codebase Memory MCP**: `codebase-memory-mcp' is installed and should be prefered as a first-line option over re-reading the codebase. Do not waste tokens needlessly.
-- **Task Warrior MCP**: `taskwarrior mcp' is installed and must be used for task tracking.
+- **Codebase Memory MCP**: `codebase-memory-mcp` is installed and **MUST BE** prefered as the first-line
+    option for searching the codebase. Do not waste tokens unnecesarily by `find`ing and
+    `grep`ing or making custom tools.
+- **Task Warrior MCP**: `taskwarrior mcp` is installed and **MUST BE** used for task tracking if available.
 - **Missing MCPs**:
     +If a MCP is *unavailable*, **STOP** Ask the user to install or activate it.
     +**The User** may directy you to proceed until otherwise directed when a MCP is unavailable. Use alternative methods. **You are NOT ALLOWED to proceed without EXPLICIT PERMISION**

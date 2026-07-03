@@ -12,7 +12,8 @@ To provide a memory management abstraction layer that maps the 1MB logical addre
 - **Data Passing:** Uses non-critical FAC1 zero-page workspace:
     - `VmmSegLo/Hi` ($68-$69): Segment.
     - `VmmOffLo/Hi` ($6A-$6B): Offset.
-    - `VmmBank` ($6C): 64KB Bank index.
+    - `VmmBank` ($6C): 1MB block index (0-15). Combined with the bank nibble derived
+      from `VmmSegHi` to form the 64KB-granularity value written to `REU_REU_BANK`.
 
 ## 3. API Contracts (via JSR $1000)
 
@@ -54,7 +55,9 @@ The OS shell reserves a 4KB (1 page) block in the REU during initialization for 
 
 - **Access:** Internal commands `SET` and `PATH` manage this block.
 - **Format:** Double-null terminated ASCII/PETSCII strings (`VAR=VAL\0VAR=VAL\0\0`).
-- **Relocatability:** The logical segment of this block is stored in the OS workspace at `EnvSegmentLo/Hi` ($039F-$03A0).
+- **Relocatability:** The logical segment of this block is stored in the OS workspace at
+  `EnvSegmentLo/Hi` ($039F-$03A0), with its `VmmBank` value preserved at `EnvBank` ($03A1)
+  and restored into `VmmBank` before every VMM read/write against the environment block.
 
 ## 6. Memory Safety
 The VMM includes a `vmmInitialized` safety check. All entry points will fail gracefully with `VMM_ERR_INVALID` if an REU was not detected at startup.

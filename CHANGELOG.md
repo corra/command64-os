@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **VMM Bank Register Mapping (S1)**: Corrected `vmmComputeAddress` to combine `VmmBank` (the 1MB block index) with the bank offset `(VmmSegHi >> 4)` into the final `REU_REU_BANK` register, allowing memory reads/writes to span the full 16MB REU space without wrapping into Bank 0.
+- **Shell Environment Bank Tracking (S2)**: Fixed `shell.asm` to preserve `VmmBank` into `EnvBank` on environment initialization and load it back before environment variable VMM read/write operations.
+- **Segment Overlap & String Cleanup**: Removed the unused `notImplMsg` string from `shell.asm` to reclaim 36 bytes of memory and prevent `CommandShell` from overlapping `VmmData` at `$1FA0`.
 - **DEBUG Parser Backtracking Bug**: Fixed a register name parsing bug where looking ahead for register `PC` (when `'p'` was typed) and backtracking via `dey` clobbered the register name character in accumulator `A`. Added logic to reload and normalize the character from `inputBuf, y` before parsing as a single-character register, allowing both `r p` and single-character register edits (`r a`, `r x`, etc.) to execute correctly.
 - **DEBUG printBitA Calling Convention**: Standardized the `printBitA` helper subroutine to use clean subroutine returns (`jsr KernalChROUT` + `rts`) instead of tail-call jumps (`jmp KernalChROUT`).
 

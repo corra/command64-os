@@ -119,6 +119,8 @@ siEnvOk:
     sta EnvSegmentLo
     lda VmmSegHi
     sta EnvSegmentHi
+    lda VmmBank
+    sta EnvBank
     
     // Zero the entire 4KB env segment to prevent garbage data from hanging env scans.
     // vmmComputeAddress clobbers Y (via TAY), so Y cannot be used as a loop counter.
@@ -1533,6 +1535,8 @@ cmdSetPrint:
     sta VmmSegLo
     lda EnvSegmentHi
     sta VmmSegHi
+    lda EnvBank
+    sta VmmBank
 
 cspLoop:
     jsr vmmReadByte         // A = byte from REU
@@ -1573,6 +1577,8 @@ envSearch:
     sta VmmSegLo
     lda EnvSegmentHi
     sta VmmSegHi
+    lda EnvBank
+    sta VmmBank
 
 esNext:
     // Save start of current string
@@ -1806,6 +1812,8 @@ envFindEnd:
     sta VmmSegLo
     lda EnvSegmentHi
     sta VmmSegHi
+    lda EnvBank
+    sta VmmBank
 
     jsr vmmReadByte
     beq efeDone             // If [0] is null, environment is empty, start at 0
@@ -2129,10 +2137,6 @@ volDevError:
 volExit:
     jmp dirExit                // Same SavedDevice-restore logic as cmdDir
 
-
-notImplMsg:
-    .text "Feature not yet fully implemented"
-    .byte $0D, 0
 
 noEnvMsg:
     .text "Environment variable not defined"

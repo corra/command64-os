@@ -356,19 +356,29 @@ vmmComputeAddress:
     lsr
     lsr
     tay                     // Y = base Addr_B
-    
+
     // 2. Add Offset (VmmOffHi:VmmOffLo) to the base
     lda TempLo
     clc
     adc VmmOffLo
     sta REU_REU_ADDR_L
-    
+
     lda TempHi
     adc VmmOffHi
-    sta REU_REU_ADDR_H
-    
-    tya                     // Base Bank
-    adc #0
+    sta REU_REU_ADDR_H      // Carry flag is active here
+
+    tya                     // A = base Addr_B
+    adc #0                  // Add carry from offset addition to base Addr_B
+    tay                     // Y = base Addr_B + carry (C flag is now 0)
+
+    lda VmmBank             // Load 1MB block index (0-15)
+    asl
+    asl
+    asl
+    asl                     // Shift block index to upper nibble (0-240)
+    sty TempLo              // TempLo is free now
+    clc
+    adc TempLo              // Combine: (VmmBank << 4) + (base Addr_B + carry)
     sta REU_REU_BANK
 
     // Restore scratch registers and Y
