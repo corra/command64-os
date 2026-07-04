@@ -5,6 +5,14 @@
 
 .segment AppTable
 
+// Overlap check temporary variables (stored in safe Cassette Buffer workspace)
+.label AptTempLoadLo = $03F4
+.label AptTempLoadHi = $03F5
+.label AptTempSizeLo = $03F6
+.label AptTempSizeHi = $03F7
+.label AptTempEndLo  = $03F8
+.label AptTempEndHi  = $03F9
+
 // -----------------------------------------------------------------------
 // aptSlotBase — set VmmSeg/Off to the base of slot X's entry
 // Input:  X = slot index 0..APT_MAX_SLOTS-1
@@ -201,6 +209,234 @@ afNextSlot:
     inx
     jmp afScanLoop
 afNotFound:
+    sec
+    rts
+
+// -----------------------------------------------------------------------
+// aptRemove — clear a slot entry and decrement UsedSlots
+// Phase A: does not touch REU backing store (no REU_BACKED entries yet).
+// Input:  X = slot index (from aptFind)
+// Output: carry clear always
+// Clobbers: A, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi
+// Preserves: X
+// -----------------------------------------------------------------------
+aptRemove:
+    // Zero the Flags byte (clears SLOT_USED and all other flags)
+    jsr aptSlotBase         // VmmSeg/Off = entry base
+    lda #0
+    jsr vmmWriteByte
+
+    // Decrement UsedSlots (VMM header offset 1)
+    lda AptSegLo
+    sta VmmSegLo
+    lda AptSegHi
+    sta VmmSegHi
+    lda #1
+    sta VmmOffLo
+    lda #0
+    sta VmmOffHi
+    jsr vmmReadByte         // A = UsedSlots
+    sec
+    sbc #1
+    jsr vmmWriteByte
+    clc
+    rts
+
+// -----------------------------------------------------------------------
+// aptRegister — add or overwrite an app table entry
+// If an entry with the same name already exists, it is overwritten (re-LOAD).
+// Otherwise, the first free slot is used and UsedSlots is incremented.
+// Enforces address-overlap eviction checking against all active slots first.
+// Input:  NamePtrLo/Hi = pointer to app name; SrcHandle = name byte length (1-16)
+//         HexValLo/Hi = load address
+//         TempLo/Hi = end_addr+1 from KernalLOAD return
+// Output: carry clear on success; carry set if table full (no free slot found)
+// Clobbers: A, X, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi
+// Preserves: NamePtrLo/Hi, HexValLo/Hi
+// -----------------------------------------------------------------------
+aptRegister:
+    // Save TempLo/Hi — clobbered by VMM writes, needed for size computation at end
+    lda TempHi
+    pha
+    lda TempLo
+    pha
+
+    // --- Overlap Eviction Scan ---
+    ldx #0                  // slot loop index
+arOverlapLoop:
+    cpx #APT_MAX_SLOTS
+    bcs arOverlapDone
+    jsr aptSlotBase         // VmmSeg/Off = entry base
+    jsr vmmReadByte         // A = Flags
+    and #APT_FLAG_USED
+    beq arNextOverlap       // unused slot -> skip
+
+    // Read CurrLoadAddr (offset 17)
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR
+    sta VmmOffLo
+    bcc arReadLoadLo
+    inc VmmOffHi
+arReadLoadLo:
+    jsr vmmReadByte
+    sta AptTempLoadLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempLoadHi
+
+    // Read CurrSize (offset 19)
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeHi
+
+    // Compute CurrEndAddr = CurrLoadAddr + CurrSize
+    clc
+    lda AptTempLoadLo
+    adc AptTempSizeLo
+    sta AptTempEndLo
+    lda AptTempLoadHi
+    adc AptTempSizeHi
+    sta AptTempEndHi
+
+    // Compare CurrLoadAddr >= Temp (B)
+    // If true (Carry set) -> no overlap
+    sec
+    lda AptTempLoadLo
+    sbc TempLo
+    lda AptTempLoadHi
+    sbc TempHi
+    bcs arNextOverlap
+
+    // Compare HexVal (A) >= CurrEndAddr (B)
+    // If true (Carry set) -> no overlap
+    sec
+    lda HexValLo
+    sbc AptTempEndLo
+    lda HexValHi
+    sbc AptTempEndHi
+    bcs arNextOverlap
+
+    // Overlap detected! Remove the entry at slot X
+    // aptRemove preserves X
+    jsr aptRemove
+
+arNextOverlap:
+    inx
+    jmp arOverlapLoop
+arOverlapDone:
+
+    // --- Search / Overwrite Check ---
+    clc                     // name mode
+    jsr aptFind
+    bcs arFindFree          // not found -> find a free slot
+    // Found: X = existing slot index; overwrite without bumping UsedSlots
+    jmp arWriteEntry
+
+arFindFree:
+    ldx #0
+arFreeLoop:
+    cpx #APT_MAX_SLOTS
+    bcc arNotFull
+    jmp arFull
+arNotFull:
+    jsr aptSlotBase
+    jsr vmmReadByte         // A = Flags
+    and #APT_FLAG_USED
+    beq arGotFree
+    inx
+    jmp arFreeLoop
+
+arGotFree:
+    // Increment UsedSlots (VMM header offset 1)
+    lda AptSegLo
+    sta VmmSegLo
+    lda AptSegHi
+    sta VmmSegHi
+    lda #1
+    sta VmmOffLo
+    lda #0
+    sta VmmOffHi
+    jsr vmmReadByte         // A = current UsedSlots
+    clc
+    adc #1
+    jsr vmmWriteByte        // write incremented value
+
+arWriteEntry:
+    jsr aptSlotBase         // VmmSeg/Off = entry base for slot X
+
+    // --- Flags: set SLOT_USED ---
+    lda #APT_FLAG_USED
+    jsr vmmWriteByte
+    inc VmmOffLo            // -> APT_OFF_NAME (base + 1)
+
+    // --- Name: copy SrcHandle bytes from NamePtrLo/Hi, null-pad to 16 bytes ---
+    lda SrcHandle
+    sta DstHandle           // byte countdown
+    lda #0
+    sta aptNameIndex        // source byte index
+arNameLoop:
+    lda DstHandle
+    beq arNamePad
+    ldy aptNameIndex
+    lda (NamePtrLo), y      // read source name byte
+    jsr vmmWriteByte
+    inc VmmOffLo
+    inc aptNameIndex
+    dec DstHandle
+    jmp arNameLoop
+arNamePad:
+    // Pad remaining bytes to fill 16-byte name field
+    lda #16
+    sec
+    sbc SrcHandle           // remaining = 16 - name_length
+    sta DstHandle
+    beq arNameDone
+arPadLoop:
+    lda #0
+    jsr vmmWriteByte
+    inc VmmOffLo
+    dec DstHandle
+    bne arPadLoop
+arNameDone:
+    // VmmOffLo is now at base + 17 = APT_OFF_ADDR
+
+    // --- LoadAddr lo/hi ---
+    lda HexValLo
+    jsr vmmWriteByte
+    inc VmmOffLo
+    lda HexValHi
+    jsr vmmWriteByte
+    inc VmmOffLo
+    // VmmOffLo is now at base + 19 = APT_OFF_SIZE
+
+    // --- Size = (end_addr+1) - LoadAddr ---
+    // Restore TempLo/Hi (were pushed at top)
+    pla
+    sta TempLo              // end_addr+1 lo
+    pla
+    sta TempHi              // end_addr+1 hi
+    lda TempLo
+    sec
+    sbc HexValLo
+    pha                     // save size lo
+    lda TempHi
+    sbc HexValHi            // size hi (carries borrow)
+    tax                     // stash size hi in X
+    pla                     // restore size lo
+    jsr vmmWriteByte        // write size lo (VmmOff is at base + 19)
+    inc VmmOffLo
+    txa
+    jsr vmmWriteByte        // write size hi
+    clc
+    rts
+
+arFull:
+    pla                     // clean stack (TempLo)
+    pla                     // clean stack (TempHi)
     sec
     rts
 
