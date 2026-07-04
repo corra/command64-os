@@ -99,7 +99,7 @@
 
 - [x] Implement `DEBUG` Unassemble (U) command (Disassembler)
 - [x] DEBUG code review + remediation (Build 1012 — cuOpRel ZP alias, parseList overflow)
-- [ ] **Execute App Manager Phase A** — plan at `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md`
+- [x] **Execute App Manager Phase A** — plan at `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md`
 - [ ] Binary Relocator (Phase 6B prerequisite)
 - [x] Implement `DRIVE` command
 - [x] Add support for multiple devices (8, 9, 10, 11)
