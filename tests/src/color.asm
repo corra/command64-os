@@ -11,7 +11,7 @@
 .const VERSION_STAGE = "0"
 #import "build_test_color.inc"
 
-* = $2000 "Color"
+* = $2200 "Color"
     cld
     lda #$0e
     jsr $ffd2

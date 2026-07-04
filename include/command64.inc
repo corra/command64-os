@@ -86,10 +86,26 @@
 .label DestBuf       = $03CA // 40 bytes
 .label FileScratch   = $1FA2 // Filename scratch in VmmData: vmmInitialized($1FA0), vmmTempByte($1FA1), fileScratch($1FA2)
 
+// --- App Table: Phase A Constants ---
+.label APT_MAX_SLOTS    = 16       // compile-time max entries
+.label APT_ENTRY_SIZE   = 40       // bytes per entry
+.label APT_HEADER_SIZE  = 4        // bytes for table header (MaxSlots, UsedSlots, reserved×2)
+.label APT_OFF_FLAGS    = 0        // entry field: Flags
+.label APT_OFF_NAME     = 1        // entry field: Name (16 bytes, PETSCII null-padded)
+.label APT_OFF_ADDR     = 17       // entry field: LoadAddr lo/hi
+.label APT_OFF_SIZE     = 19       // entry field: Size lo/hi (byte count)
+.label APT_FLAG_USED    = $01      // Bit 0: slot in use
+.label APT_FLAG_RUNNING = $02      // Bit 1: app currently executing
+.label APT_FLAG_REU     = $04      // Bit 2: REU-backed image (Phase C)
+.label APT_FLAG_STACK   = $08      // Bit 3: stack saved (Phase C)
+// AptSegLo/Hi occupy first 2 bytes of cassette buffer free area ($03F2-$03FF)
+.label AptSegLo         = $03F2    // persistent: APT VMM segment lo (0 = not yet allocated)
+.label AptSegHi         = $03F3    // persistent: APT VMM segment hi
+
 // --- User Program Space ---
 // External commands are loaded here. 
-// $2000 is the standard entry point for the pre-verified image.d64 programs.
-.label UserProgStart = $2000
+// Shifted from $2000 to $2200 to make room for the AppTable segment ($2000-$21FF).
+.label UserProgStart = $2200
 .label UserProgEnd   = $CFFF // Allocated all remaining RAM (BASIC ROM banked out)
 
 // --- VMM / REU ---

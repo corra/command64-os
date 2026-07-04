@@ -11,7 +11,7 @@
 .const VERSION_STAGE = "0"
 #import "build_test_extcls.inc"
 
-* = $2000 "Cls"
+* = $2200 "Cls"
     cld
     lda #$0e
     jsr $ffd2

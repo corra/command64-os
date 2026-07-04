@@ -144,6 +144,8 @@ siZeroEnvByte:
     sta VmmOffLo
     sta VmmOffHi
 
+    jsr aptInit             // Allocate AppTable VMM page and write header
+
 siSkipEnv:
     lda #$93                // PETSCII clear-screen character
     jsr KernalChROUT

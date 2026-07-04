@@ -43,7 +43,7 @@
 .const MODE_IZX = 12 // Indirect,X
 .const MODE_IZY = 13 // Indirect,Y
 
-* = $2000 "DebugEntry"
+* = $2200 "DebugEntry"
 
 // --- Entry Point ---
 start:

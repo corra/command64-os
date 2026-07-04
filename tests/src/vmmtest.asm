@@ -16,7 +16,7 @@
 .const VERSION_STAGE = "0"
 #import "build_test_vmmtest.inc"
 
-* = $2000 "VmmTest"
+* = $2200 "VmmTest"
     cld                     // Ensure binary mode
     lda #$0E                // Switch to lowercase mode
     jsr $FFD2               // CHROUT

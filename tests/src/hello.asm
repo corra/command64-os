@@ -7,7 +7,7 @@
 .const VERSION_STAGE = "0"
 #import "build_test_hello.inc"
 
-* = $2000 "Hello"
+* = $2200 "Hello"
     lda #<msg
     ldy #>msg
     jsr printString

@@ -23,8 +23,9 @@
 //   VmmData       $1FA0  VMM temporary storage — fixed: FileScratch/
 //                        vmmInitialized/vmmTempByte are hardcoded absolute
 //                        addresses in command64.inc, must never move.
+//   AppTable      $2000  App Table segment (apptable.asm)
 
-.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData"]
+.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData,AppTable"]
 
 .segmentdef Main [start=$0801]
 .segmentdef Utils [start=$0820]
@@ -37,6 +38,7 @@
 .segmentdef CommandTable [startAfter="Petsci"]
 .segmentdef CommandShell [startAfter="CommandTable"]
 .segmentdef VmmData [start=$1FA0]
+.segmentdef AppTable [start=$2000]
 
 // Api, Utils, Loader, Path, Vmm, and File get their segment contents from the
 // imported source files; ApiStub keeps its own fixed start=$1000 declared
@@ -51,6 +53,7 @@
 #import "command64/path.asm"
 #import "command64/vmm.asm"
 #import "command64/file.asm"
+#import "command64/apptable.asm"
 #import "command64/shell.asm"
 
 

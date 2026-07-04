@@ -14,7 +14,7 @@
 .const VERSION_STAGE = "0"
 #import "build_test_apitest.inc"
 
-* = $2000 "ApiTest"
+* = $2200 "ApiTest"
     cld                     // Ensure binary mode
     lda #$0E                // Switch to lowercase mode
     jsr $FFD2               // CHROUT

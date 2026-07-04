@@ -14,7 +14,7 @@
 .const VERSION_STAGE = "0"
 #import "build_test_banktest.inc"
 
-* = $2000 "BankTest"
+* = $2200 "BankTest"
     cld                     // Binary mode
     lda #$0e                // Lowercase mode
     jsr $ffd2               // CHROUT
