@@ -35,16 +35,16 @@ Implement the remaining MS-DOS DEBUG parity features for the Command 64 OS `DEBU
 
 ### Phase 3: Software Breakpoint Debugger (`T`, `P`)
 
-- [ ] Implement C64 CBINV interrupt vector hijacking and restoration routines.
-- [ ] Implement 6502 instruction decoder determining execution length and potential targets.
-- [ ] Implement dynamic software breakpoint insertion and original code backup.
-- [ ] Implement CPU register context recovery before jumping to target code.
-- [ ] Implement breakpoint intercept logic (saving state, removing breakpoints, printing registers and next disassembly).
+- [x] Implement C64 CBINV interrupt vector hijacking and restoration routines.
+- [x] Implement 6502 instruction decoder determining execution length and potential targets.
+- [x] Implement dynamic software breakpoint insertion and original code backup.
+- [x] Implement CPU register context recovery before jumping to target code.
+- [x] Implement breakpoint intercept logic (saving state, removing breakpoints, printing registers and next disassembly).
 
 ### Verification and Documentation
 
 - [x] Verify Phase 1 register editing and load/save operations.
 - [x] Create and document a full feature test plan for `debug` (maintained continuously).
 - [x] Verify Phase 2 assembly of simple loops and comparison with disassemble output.
-- [ ] Verify Phase 3 step-into and step-over tracing operations.
-- [ ] Update user documentation and `CHANGELOG.md` to reflect new commands.
+- [x] Verify Phase 3 step-into and step-over tracing operations.
+- [x] Update user documentation and `CHANGELOG.md` to reflect new commands.
