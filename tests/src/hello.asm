@@ -7,7 +7,8 @@
 .const VERSION_STAGE = "0"
 #import "build_test_hello.inc"
 
-* = $2200 "Hello"
+#import "build_config.inc"
+* = UserProgStart "Hello"
     lda #<msg
     ldy #>msg
     jsr printString

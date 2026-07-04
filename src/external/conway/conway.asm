@@ -97,7 +97,7 @@
 // ---------------------------------------------------------------------------
 // Entry point
 // ---------------------------------------------------------------------------
-* = $2200 "ConwayEntry"
+* = UserProgStart "ConwayEntry"
 
 start:
     // Seed the LFSR from volatile hardware so each run differs.

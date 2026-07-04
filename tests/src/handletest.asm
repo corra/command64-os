@@ -21,7 +21,8 @@
 .const VERSION_STAGE = "0"
 #import "build_test_handletest.inc"
 
-* = $2200 "HandleTest"
+#import "build_config.inc"
+* = UserProgStart "HandleTest"
     cld                     // Binary mode
     lda #$0e                // Lowercase mode
     jsr $ffd2               // CHROUT

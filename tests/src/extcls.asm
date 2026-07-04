@@ -11,7 +11,8 @@
 .const VERSION_STAGE = "0"
 #import "build_test_extcls.inc"
 
-* = $2200 "Cls"
+#import "build_config.inc"
+* = UserProgStart "Cls"
     cld
     lda #$0e
     jsr $ffd2

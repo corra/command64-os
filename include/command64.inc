@@ -104,8 +104,7 @@
 
 // --- User Program Space ---
 // External commands are loaded here. 
-// Shifted from $2000 to $2200 to make room for the AppTable segment ($2000-$21FF).
-.label UserProgStart = $2200
+#import "build_config.inc"
 .label UserProgEnd   = $CFFF // Allocated all remaining RAM (BASIC ROM banked out)
 
 // --- VMM / REU ---

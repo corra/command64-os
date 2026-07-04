@@ -11,7 +11,8 @@
 .const VERSION_STAGE = "0"
 #import "build_test_color.inc"
 
-* = $2200 "Color"
+#import "build_config.inc"
+* = UserProgStart "Color"
     cld
     lda #$0e
     jsr $ffd2

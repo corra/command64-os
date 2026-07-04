@@ -46,7 +46,7 @@
                             // BAM occupies T18/S0 bytes 4..143 (35 tracks x 4).
                             // Volume name follows immediately at bytes 144..159.
 
-* = $2200 "LabelEntry"
+* = UserProgStart "LabelEntry"
 
 // ---------------------------------------------------------------------------
 // Entry point

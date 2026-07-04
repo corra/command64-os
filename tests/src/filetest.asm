@@ -23,7 +23,8 @@
 .const VERSION_STAGE = "0"
 #import "build_test_filetest.inc"
 
-* = $2200 "FileTest"
+#import "build_config.inc"
+* = UserProgStart "FileTest"
     cld
     lda #$0E
     jsr $FFD2

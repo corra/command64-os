@@ -20,7 +20,8 @@
 .const VERSION_STAGE = "0"
 #import "build_test_devtest.inc"
 
-* = $2200 "DevTest"
+#import "build_config.inc"
+* = UserProgStart "DevTest"
     cld                     // Binary mode
     lda #$0e                // Lowercase mode
     jsr $ffd2               // CHROUT

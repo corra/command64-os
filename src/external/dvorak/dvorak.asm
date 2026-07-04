@@ -79,7 +79,7 @@
 .label dvorakRoutine  = DvorakResident        // 26 bytes — resident patch code
 .label dvorakTable    = DvorakResident + 26   // 128 bytes — backed-up + patched keytab
 
-* = $2200 "DvorakEntry"
+* = UserProgStart "DvorakEntry"
 
 // ---------------------------------------------------------------------------
 // Entry point (installer — runs once, does not stay resident itself)
