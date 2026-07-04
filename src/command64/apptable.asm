@@ -441,8 +441,144 @@ arFull:
     rts
 
 // -----------------------------------------------------------------------
+// aptPrintHex8 — print A as two hex digits to screen
+// Clobbers: A, X
+// Preserves: Y
+// -----------------------------------------------------------------------
+aptPrintHex8:
+    pha                     // save full byte
+    lsr
+    lsr
+    lsr
+    lsr                     // high nibble → A
+    tax
+    lda aptHexChars, x
+    jsr KernalChROUT
+    pla                     // restore full byte
+    and #$0F                // low nibble
+    tax
+    lda aptHexChars, x
+    jsr KernalChROUT
+    rts
+
+// -----------------------------------------------------------------------
+// aptList — print all SLOT_USED entries to screen
+// Output format (40-column):
+//   name             addr  size
+//   hello            2200   1a4
+//   N app(s) loaded
+// Input:  none
+// Clobbers: A, X, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi
+// -----------------------------------------------------------------------
+aptList:
+    // Read UsedSlots; print "no apps loaded" if zero
+    lda AptSegLo
+    sta VmmSegLo
+    lda AptSegHi
+    sta VmmSegHi
+    lda #1
+    sta VmmOffLo
+    lda #0
+    sta VmmOffHi
+    jsr vmmReadByte         // A = UsedSlots
+    sta aptUsedSlots
+    bne alHasApps
+    lda #<aptNoAppsMsg
+    ldy #>aptNoAppsMsg
+    jsr petPrintString
+    rts
+
+alHasApps:
+    lda #<aptListHeader
+    ldy #>aptListHeader
+    jsr petPrintString
+
+    ldx #0                  // slot counter (preserved by vmmReadByte)
+alScanLoop:
+    cpx #APT_MAX_SLOTS
+    bcs alFooter
+    jsr aptSlotBase         // VmmOff = entry base; X preserved; DstHandle = 0
+    jsr vmmReadByte         // A = Flags
+    and #APT_FLAG_USED
+    beq alNextSlot          // X is still the current slot index here
+    stx DstHandle           // save slot index before aptPrintHex8 clobbers X
+    // --- Print 16-char name field (null bytes print as space) ---
+    inc VmmOffLo            // → APT_OFF_NAME (base + 1)
+    lda #16
+    sta aptNameIndex        // loop 16 times
+alNameLoop:
+    lda aptNameIndex
+    beq alNameDone
+    jsr vmmReadByte         // A = name byte; Y clobbered
+    cmp #0
+    beq alNamePad
+    jsr KernalChROUT
+    jmp alNameCont
+alNamePad:
+    lda #' '
+    jsr KernalChROUT
+alNameCont:
+    inc VmmOffLo
+    dec aptNameIndex
+    jmp alNameLoop
+alNameDone:
+    // VmmOffLo = base + 17 = APT_OFF_ADDR
+    lda #' '
+    jsr KernalChROUT
+    // --- Print LoadAddr: hi byte then lo byte (4 hex digits) ---
+    jsr vmmReadByte         // A = LoadAddr lo
+    pha
+    inc VmmOffLo
+    jsr vmmReadByte         // A = LoadAddr hi; X clobbered below
+    jsr aptPrintHex8        // print hi (X clobbered)
+    pla
+    jsr aptPrintHex8        // print lo (X clobbered)
+    lda #' '
+    jsr KernalChROUT
+    // --- Print Size: hi byte then lo byte ---
+    inc VmmOffLo            // → APT_OFF_SIZE (base + 19)
+    jsr vmmReadByte         // A = Size lo
+    pha
+    inc VmmOffLo
+    jsr vmmReadByte         // A = Size hi
+    jsr aptPrintHex8
+    pla
+    jsr aptPrintHex8
+    lda #PetCr
+    jsr KernalChROUT
+    ldx DstHandle           // restore slot index
+
+alNextSlot:
+    inx
+    jmp alScanLoop
+
+alFooter:
+    ldx aptUsedSlots
+    ldy #0
+    jsr printDecimal16
+    lda #<aptAppsMsg
+    ldy #>aptAppsMsg
+    jsr petPrintString
+    rts
+
+// -----------------------------------------------------------------------
 // Data area (remainder of tasks append stubs here)
 // -----------------------------------------------------------------------
 aptSearchMode:  .byte 0    // 0 = name search, 1 = address search
 aptNameIndex:   .byte 0    // byte index used in aptNameMatch and aptRegister name copy
 aptUsedSlots:   .byte 0    // saved UsedSlots count for aptList footer
+
+aptHexChars:
+    .text "0123456789abcdef"
+
+aptListHeader:
+    .text "name             addr  size"
+    .byte PetCr, 0
+
+aptNoAppsMsg:
+    .text "no apps loaded"
+    .byte PetCr, 0
+
+aptAppsMsg:
+    .text " app(s) loaded"
+    .byte PetCr, 0
