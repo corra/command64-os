@@ -39,24 +39,25 @@ This file serves as the shared repository for architectural decisions, technical
 | Phase 3: File System Integration (Handles) | ✅ Done |
 | Phase 4: External System Utilities (DEBUG) | ✅ Done |
 | Phase 5: Env & Multi-Device Support | ⏳ In-Progress (Taskwarrior & Wiki setup done) |
-| Phase 6A: App Manager (Phase A) | 📋 Plan ready — `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md` |
+| Phase 6A: App Manager (Phase A) | ✅ Done |
 
 ## Architectural Decisions & Constraints
 
 ### Absolute vs. Relocatable Binaries
-- **Constraint**: External programs are currently **Absolute Binaries** compiled for `$2200` (was `$2000` before Phase 6A shifts `UserProgStart`).
+- **Constraint**: External programs are currently **Absolute Binaries** compiled for `$2600` (was `$2200` before memory layout optimization).
 - **Impact**: Loading a program at an arbitrary address and running it will crash if the program contains absolute jumps or data references.
 - **Exceptions**: Very simple position-independent code (like `inc $d020; rts`) will work anywhere.
 - **Future Resolution**: A **Binary Relocator** is planned for Phase 6B to patch absolute addresses in memory during `LOAD`.
 
-### App Table (Phase 6A — plan ready, not yet executed)
-- **Segment**: `AppTable` at `$2000`–`$21FF` (512 bytes). `UserProgStart` shifts from `$2000` → `$2200` when Phase 6A is implemented.
+### App Table (Phase 6A — Completed)
+- **Segment**: `AppTable` at `$2000`–`$235C`. Consecutively followed by `ShellExt` segment at `$235D`–`$24ED` (storing help/version string blocks).
+- **UserProgStart**: Shifted from `$2000` → `$2600` to leave memory headroom for OS expansion.
 - **Storage**: VMM-allocated 4 KB page (one `vmmAlloc` call at shell startup). Segment number saved in `AptSegLo/Hi` at `$03F2`–`$03F3` (cassette buffer free area).
 - **Layout**: 4-byte header (MaxSlots=16, UsedSlots, reserved×2) + 16 entries × 40 bytes = 644 bytes total.
 - **Entry offsets**: Flags=0, Name=1 (16 bytes PETSCII null-padded), LoadAddr=17 (lo/hi), Size=19 (lo/hi). Offsets 21–39 reserved for Phase B/C (ReuAddr, saved CPU state).
-- **Protected ranges for LOAD**: Reject if address < `$2200` or >= `$C000`.
-- **API**: Internal 6502 labels only in Phase A (`aptInit`, `aptFind`, `aptRegister`, `aptRemove`, `aptList`). Service bus opcodes added in Phase C.
-- **Phase progression**: A = fixed `$2200` entry; B = Binary Relocator patches binary at arbitrary address; C = REU-resident with DMA swap on RUN.
+- **Protected ranges for LOAD**: Reject if address < `UserProgStart` or >= `$C000`.
+- **API**: Internal 6502 labels (`aptInit`, `aptFind`, `aptRegister`, `aptRemove`, `aptList`, `aptPrintHex8`).
+- **Phase progression**: A = fixed `$2600` entry; B = Binary Relocator patches binary at arbitrary address; C = REU-resident with DMA swap on RUN.
 - **Design spec**: `docs/superpowers/specs/2026-05-13-app-manager-design.md`.
 
 ### Master Environment Block

@@ -25,20 +25,21 @@
 //                        addresses in command64.inc, must never move.
 //   AppTable      $2000  App Table segment (apptable.asm)
 
-.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData,AppTable"]
+.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData,AppTable,ShellExt"]
 
 .segmentdef Main [start=$0801]
 .segmentdef Utils [start=$0820]
-.segmentdef Api [start=$09C0]
-.segmentdef Loader [start=$0A50]
-.segmentdef Path [start=$0AA0]
-.segmentdef Vmm [start=$0B30]
-.segmentdef File [start=$0CE0]
+.segmentdef Api [startAfter="Utils"]
+.segmentdef Loader [startAfter="Api"]
+.segmentdef Path [startAfter="Loader"]
+.segmentdef Vmm [startAfter="Path"]
+.segmentdef File [startAfter="Vmm"]
 .segmentdef Petsci [startAfter="ApiStub"]
 .segmentdef CommandTable [startAfter="Petsci"]
 .segmentdef CommandShell [startAfter="CommandTable"]
 .segmentdef VmmData [start=$1FA0]
 .segmentdef AppTable [start=$2000]
+.segmentdef ShellExt [startAfter="AppTable"]
 
 // Api, Utils, Loader, Path, Vmm, and File get their segment contents from the
 // imported source files; ApiStub keeps its own fixed start=$1000 declared

@@ -92,7 +92,7 @@ aiDone:
 // -----------------------------------------------------------------------
 aptProtectedCheck:
     lda HexValHi
-    cmp #$22                // addr < $2200?
+    cmp #>UserProgStart       // addr < UserProgStart?
     bcc apcProtected
     cmp #$C0                // addr >= $C000?
     bcs apcProtected

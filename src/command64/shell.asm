@@ -65,6 +65,12 @@ tableCmd:
     .word cmdVol
     .text "path  "
     .word cmdPath
+    .text "apps  "
+    .word cmdApps
+    .text "ps    "
+    .word cmdApps
+    .text "free  "
+    .word cmdFree
 
 tableEnd:
 
@@ -465,8 +471,9 @@ echoDone:
 cmdLoad:
     ldy ParsePos
     lda CommandBuffer, y
-    beq clNoArgs
-    
+    bne clHasArgs
+    jmp clNoArgs
+clHasArgs:
     // Save start position of name
     sty TempLo
 clScanName:
@@ -524,31 +531,79 @@ clCountLen:
 clGotLen:
     tya
     sta TempLo              // Save length in TempLo
+    bne clNameOk
+    jmp clErrorClean
+clNameOk:
+    
+    // --- App Table Integration ---
+    // Protected check only for relocated loads (where address is known in HexVal)
+    lda SpecificLoad
+    bne clCheckFull
+    jsr aptProtectedCheck
+    bcc clNotProtected
+    jmp clProtected
+clNotProtected:
+    
+clCheckFull:
+    // Table-full check (skip if no REU/AppTable initialized)
+    lda AptSegLo
+    ora AptSegHi
+    beq clDoLoad
+    lda AptSegLo
+    sta VmmSegLo
+    lda AptSegHi
+    sta VmmSegHi
+    lda #1
+    sta VmmOffLo
+    lda #0
+    sta VmmOffHi
+    jsr vmmReadByte         // A = UsedSlots
+    cmp #APT_MAX_SLOTS
+    bcs clTableFull
     
 clDoLoad:
     lda NamePtrLo
     ldy NamePtrHi
     ldx TempLo              // Restore length in X
+    stx SrcHandle           // Save for aptRegister
     jsr findFile            // Normalize, append .prg, check disk
     bcs clFindErr           // Device missing/not ready, or file not found
-
+    
     // findFile returns updated length in X
+    stx SrcHandle
     lda NamePtrLo
     ldy NamePtrHi
-    jsr shellLoadPrg
+    jsr shellLoadPrg        // X = end_addr+1 lo, Y = end_addr+1 hi on success
     bcs clLoadErr
-
-    // Success: restore device and return
+    
+    // Register in app table (skip if no REU)
+    lda AptSegLo
+    ora AptSegHi
+    beq clDone
+    
+    // For header loads, LoadAddr is not in HexValLo/Hi — use UserProgStart
+    lda SpecificLoad
+    beq clGotAddr
+    lda #<UserProgStart
+    sta HexValLo
+    lda #>UserProgStart
+    sta HexValHi
+clGotAddr:
+    stx TempLo              // end_addr+1 lo (X/Y from KernalLOAD return)
+    sty TempHi              // end_addr+1 hi
+    jsr aptRegister         // carry clear on success (table-full already checked)
+    
+clDone:
     lda SavedDevice
     sta CurrentDevice
     rts
-
+    
 clNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg
     jsr petPrintString
     rts
-
+    
 clFindErr:
     pha                     // Save findFile's status code across the device restore
     lda SavedDevice
@@ -558,12 +613,12 @@ clFindErr:
     lda #PetCr
     jsr KernalChROUT
     rts
-
+    
 clLoadErr:
     lda SavedDevice
     sta CurrentDevice
     // fall through to clError
-
+    
 clError:
     lda #<loadErrMsg
     ldy #>loadErrMsg
@@ -571,41 +626,95 @@ clError:
     lda #PetCr
     jsr KernalChROUT
     rts
+    
+clErrorClean:
+    lda SavedDevice
+    sta CurrentDevice
+    jmp clError
+    
+clProtected:
+    lda SavedDevice
+    sta CurrentDevice
+    lda #<aptProtectedMsg
+    ldy #>aptProtectedMsg
+    jsr petPrintString
+    rts
+    
+clTableFull:
+    lda SavedDevice
+    sta CurrentDevice
+    lda #<aptTableFullMsg
+    ldy #>aptTableFullMsg
+    jsr petPrintString
+    rts
 
-// RUN [address] — execute a program in memory
+// RUN [name|addr] / GO [name|addr] — execute a registered app
+// Phase A: looks up entry in app table; executes via JSR to LoadAddr.
+// No arg: searches table for entry at UserProgStart.
+// Hex arg: address search. Alpha arg: name search.
+// Prints "not loaded" if not found in table.
 cmdRun:
     ldy ParsePos
     jsr shellSkipSpaces
     lda CommandBuffer, y
-    beq crDefault
-    
-    jsr parseHex
-    bcs crError
-    
-    lda HexValLo
-    sta HandlerVecLo
-    lda HexValHi
-    sta HandlerVecHi
-    jmp crExecute
+    beq crDefault           // no argument: search for UserProgStart
+
+    sty TempLo              // save arg start index
+    jsr parseHex            // try to parse as hex address
+    bcs crNameSearch        // not valid hex → treat as name
+
+    // Hex address search
+    sec                     // address mode
+    jsr aptFind
+    bcs crNotLoaded
+    jmp crExecute           // HandlerVecLo/Hi set by aptFind
+
+crNameSearch:
+    ldy TempLo              // restore arg start (parseHex advanced Y)
+crScanName:
+    lda CommandBuffer, y
+    beq crNameEnd
+    cmp #' '
+    beq crNameEnd
+    iny
+    jmp crScanName
+crNameEnd:
+    tya
+    sec
+    sbc TempLo              // name length
+    sta SrcHandle
+    beq crNotLoaded         // zero-length arg
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    sta NamePtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta NamePtrHi
+    clc                     // name mode
+    jsr aptFind
+    bcs crNotLoaded
+    jmp crExecute           // HandlerVecLo/Hi set by aptFind
 
 crDefault:
     lda #<UserProgStart
-    sta HandlerVecLo
+    sta HexValLo
     lda #>UserProgStart
-    sta HandlerVecHi
+    sta HexValHi
+    sec                     // address mode
+    jsr aptFind
+    bcs crNotLoaded
 
 crExecute:
-    // Execute via JSR. If the program RTS, we return to mainLoop.
-    // If it uses DOS_EXIT, it resets stack and JMPs to mainLoop.
     jsr crJump
     rts
 
 crJump:
     jmp (HandlerVecLo)
 
-crError:
-    lda #<badAddrMsg
-    ldy #>badAddrMsg
+crNotLoaded:
+    lda #<aptNotLoadedMsg
+    ldy #>aptNotLoadedMsg
     jsr petPrintString
     rts
 
@@ -1929,6 +2038,65 @@ cpNotFound:
     jsr petPrintString
     rts
 
+// APPS / PS — list loaded apps from app table
+cmdApps:
+    jsr aptList
+    rts
+
+// FREE <name> — remove an app from the app table (does not zero RAM)
+// Refuses if APP_RUNNING flag is set.
+cmdFree:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    lda CommandBuffer, y
+    beq cfNoArg
+    sty TempLo              // name start
+cfScanName:
+    lda CommandBuffer, y
+    beq cfEnd
+    cmp #' '
+    beq cfEnd
+    iny
+    jmp cfScanName
+cfEnd:
+    tya
+    sec
+    sbc TempLo              // name length
+    sta SrcHandle
+    beq cfNoArg
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    sta NamePtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta NamePtrHi
+    clc                     // name search mode
+    jsr aptFind
+    bcs cfNotFound
+    // X = slot index; check APP_RUNNING before removing
+    jsr aptSlotBase
+    jsr vmmReadByte         // A = Flags
+    and #APT_FLAG_RUNNING
+    bne cfRunning
+    jsr aptRemove           // X = slot index (aptSlotBase re-enters with X)
+    rts
+cfNoArg:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+cfNotFound:
+    lda #<aptNotFoundMsg
+    ldy #>aptNotFoundMsg
+    jsr petPrintString
+    rts
+cfRunning:
+    lda #<aptRunningMsg
+    ldy #>aptRunningMsg
+    jsr petPrintString
+    rts
+
 // VOL — display disk volume label
 cmdVol:
     ldy ParsePos
@@ -2183,6 +2351,7 @@ printPrompt:
 // ---------------------------------------------------------------------------
 // String literals
 // ---------------------------------------------------------------------------
+.segment CommandShell
 promptPrefixMsg:
     .text "C64["
     .byte 0
@@ -2191,6 +2360,7 @@ promptSuffixMsg:
     .text "]:> "
     .byte 0
 
+.segment ShellExt
 verMsg:
     .text "Command 64-DOS Version " + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
     .text "." + BUILD_NUMBER
@@ -2229,11 +2399,18 @@ helpMsg:
     .byte $0D
     .text "VOL    - SHOW DISK LABEL"
     .byte $0D
-    .text "RUN    - EXECUTE [ADDR]"
+    .text "RUN    - EXECUTE [NAME|ADDR]"
     .byte $0D
     .text "VER    - SHOW VERSION"
+    .byte $0D
+    .text "APPS   - LIST LOADED APPS"
+    .byte $0D
+    .text "PS     - ALIAS FOR APPS"
+    .byte $0D
+    .text "FREE   - FREE APP [NAME]"
     .byte $0D, 0
 
+.segment CommandShell
 badCmdMsg:
     .text "Bad command or file name"
     .byte 0
@@ -2269,6 +2446,26 @@ badAddrMsg:
 noDeviceMsg:
     .text "Device not present"
     .byte 0
+
+aptProtectedMsg:
+    .text "protected address"
+    .byte PetCr, 0
+
+aptTableFullMsg:
+    .text "app table full"
+    .byte PetCr, 0
+
+aptNotLoadedMsg:
+    .text "not loaded"
+    .byte PetCr, 0
+
+aptNotFoundMsg:
+    .text "not found"
+    .byte PetCr, 0
+
+aptRunningMsg:
+    .text "app is running"
+    .byte PetCr, 0
 
 noDiskMsg:
     .text "No disk in drive"

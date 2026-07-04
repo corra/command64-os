@@ -52,12 +52,12 @@ cdrPresent:
     sta CdrRetried
 
 cdrQueryStatus:
-    ldx CdrDevice           // Device number for SETLFS
     lda #0                  // No filename — just open the status channel
     ldy #0
     jsr KernalSETNAM
 
     lda #15                 // LFN 15 = command/error channel
+    ldx CdrDevice           // Device number for SETLFS
     ldy #15                 // Secondary address 15
     jsr KernalSETLFS
     jsr KernalOPEN

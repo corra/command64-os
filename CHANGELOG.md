@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **App Manager Phase A — Program Registry (`APPS`, `PS`, `FREE`)**:
+  - Implemented a resident program registry table supporting up to 16 concurrent loaded programs.
+  - Implemented `aptInit` (idempotent VMM allocation), `aptFind` (bidirectional search by name or address), `aptRegister` (checks and evicts memory-address range overlaps, then registers name, address, and size), and `aptRemove` (evicts entry).
+  - Integrated `aptList` and `aptPrintHex8` routines to display the registry table via the `APPS` / `PS` commands.
+  - Integrated the program registry into `LOAD` and `RUN` commands in the command shell, requiring registered membership before execution, performing protected range checking against `UserProgStart`, and resolving name or address arguments dynamically.
+  - Added the `FREE <name>` command to evict active applications from the registry.
+
+### Changed
+
+- **Memory Layout & Program Relocation**:
+  - Chained all pre-API OS segments (`Utils, Api, Loader, Path, Vmm, File`) consecutively using `startAfter` definitions to eliminate all unused padding gap bytes.
+  - Defined a new segment `ShellExt` at `$2200` and moved long help/version string blocks (`verMsg`, `helpMsg`) there to free up contiguous space in `CommandShell`.
+  - Shifted `USER_PROG_START_ADDR` to `$2600` in CMake and refactored the OS address checks (`aptProtectedCheck`) to dynamically use `>UserProgStart` to prevent runtime overlap collisions.
+
+### Fixed
+
+- **Device Presence Check Registry Bug**: Fixed a bug in `checkDeviceReady` (`src/command64/file.asm`) where `ldx CdrDevice` was called prior to `KernalSETNAM`. Because the KERNAL `SETNAM` routine can modify/clobber the `X` register, the device number was lost or corrupted before `KernalSETLFS` was called, causing disk presence status checks to fail or check wrong devices. Moved `ldx CdrDevice` to immediately after the `KernalSETNAM` call.
+
+### Added
+
 - **DEBUG Status Flags Editing (`R P` / `R`)**: Extended the `R` command to display CPU status register flags on a second line in the format `P=XX: N=x V=x * B=x D=x I=x Z=x C=x` (with bit 5 reserved and displaying as `*`). Supported editing the status register `P` either as a whole 8-bit hex number or by modifying individual flags via case-insensitive, space-separated equations (e.g. `n=1 c=0`), with validation checking.
 - **DEBUG Phase 3 - Software Breakpoint Debugger (`T`, `P`)**: Implemented single-step instruction tracing (`T`) and proceed step-over (`P`) using software breakpoints (`BRK`). Added context-restoring launcher (`launchProgram`) framing PC, registers, and flags onto the stack for launch via `RTI`, and interrupt hijack handler (`myBrkHandler`) intercepting the `CBINV` vector (`$0316/$0317`), restoring vectors/memory, printing virtual registers and disassembling the next instruction. Includes branch target calculations (taken/not-taken), indirect jumps with NMOS page-wrap emulation, call step-overs, and ROM safety guards.
 - **BASIC ROM Banking**: Integrated memory banking on boot (`start:`) to disable BASIC ROM (`$A000-$BFFF`), exposing 8KB of RAM and expanding contiguous User Program Space to `$2000-$CFFF` (44KB). Restores BASIC ROM on `cmdExit` (`ora #$07` on `$0001`) before returning to BASIC prompt (`jmp $E37B`).
