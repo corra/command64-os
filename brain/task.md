@@ -114,6 +114,7 @@
   - [x] Remediate environment hang and PATH bugs (2026-05-14) — `brain/plans/2026-05-14-env-var-remediation.md`
 
 - [ ] Phase 6: Advanced OS Features
+  - [x] Phase 6A: App Manager Phase A (Program registry APPS/PS/FREE) (Completed 2026-07-04)
   - [ ] Implement Binary Relocator (to support `RUN` at arbitrary addresses)
   - [ ] Add Oscar64 C-Language runtime support
 

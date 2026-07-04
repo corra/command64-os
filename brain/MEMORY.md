@@ -11,15 +11,16 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-06-28)
+## Current State (2026-07-04)
 
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, including Phase 1 Peer Review corrections, prefix parsing, and custom SEQ/USR loaders).
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
+- Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE) complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.2.22 (command64 Build 2471, Stage 15) / DEBUG 0.1.4 (Build 1040).
+- **Version**: 0.3.0 (command64 Build 2542, Stage 0) / DEBUG 0.1.8 (Build 1075).
 - **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte. All Phase 1 I/O verification test cases have passed.
 
 ## Phase 6A — App Manager (next up)

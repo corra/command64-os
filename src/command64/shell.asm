@@ -6,8 +6,8 @@
 
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
-.const VERSION_MINOR = "2"
-.const VERSION_STAGE = "15" // Build 2414 Remediation
+.const VERSION_MINOR = "3"
+.const VERSION_STAGE = "0" // Release 0.3.0 (with App Manager Phase A)
 #import "build_os.inc"
 
 

@@ -12,8 +12,8 @@ Develop a centralized Application Table manager to track loaded external program
 - Implement shell commands `APPS`/`PS` and `FREE`.
 
 ## Sub-tasks
-- [/] Implement `apptable.asm` routines and integrate with system boot.
+- [x] Implement `apptable.asm` routines and integrate with system boot.
 - [x] Relocate external utility build addresses from `$2000` to `$2200`.
-- [ ] Implement protective bounds checks in the DOS loader.
-- [ ] Implement `APPS` and `FREE` shell handlers.
-- [ ] Perform integration tests on App Table registration and safety limits.
+- [x] Implement protective bounds checks in the DOS loader.
+- [x] Implement `APPS` and `FREE` shell handlers.
+- [x] Perform integration tests on App Table registration and safety limits.

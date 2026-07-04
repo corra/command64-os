@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-07-04
+
 ### Added
 
 - **App Manager Phase A — Program Registry (`APPS`, `PS`, `FREE`)**:
@@ -15,21 +17,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Integrated `aptList` and `aptPrintHex8` routines to display the registry table via the `APPS` / `PS` commands.
   - Integrated the program registry into `LOAD` and `RUN` commands in the command shell, requiring registered membership before execution, performing protected range checking against `UserProgStart`, and resolving name or address arguments dynamically.
   - Added the `FREE <name>` command to evict active applications from the registry.
-
-### Changed
-
-- **Memory Layout & Program Relocation**:
-  - Chained all pre-API OS segments (`Utils, Api, Loader, Path, Vmm, File`) consecutively using `startAfter` definitions to eliminate all unused padding gap bytes.
-  - Defined a new segment `ShellExt` at `$2200` and moved long help/version string blocks (`verMsg`, `helpMsg`) there to free up contiguous space in `CommandShell`.
-  - Shifted `USER_PROG_START_ADDR` to `$2600` in CMake and refactored the OS address checks (`aptProtectedCheck`) to dynamically use `>UserProgStart` to prevent runtime overlap collisions.
-
-### Fixed
-
-- **Device Presence Check Registry Bug**: Fixed a bug in `checkDeviceReady` (`src/command64/file.asm`) where `ldx CdrDevice` was called prior to `KernalSETNAM`. Because the KERNAL `SETNAM` routine can modify/clobber the `X` register, the device number was lost or corrupted before `KernalSETLFS` was called, causing disk presence status checks to fail or check wrong devices. Moved `ldx CdrDevice` to immediately after the `KernalSETNAM` call.
-- **App Table Garbage Memory Bug**: Added a page-zeroing loop to `aptInit` (`src/command64/apptable.asm`) to clear the newly allocated 4KB App Table virtual memory segment in the REU. This prevents random power-on RAM/REU garbage data from corrupting active slots and the `UsedSlots` counter, which previously caused the shell commands to display phantom active programs and erroneously report `app table full` on `LOAD`.
-
-### Added
-
 - **DEBUG Status Flags Editing (`R P` / `R`)**: Extended the `R` command to display CPU status register flags on a second line in the format `P=XX: N=x V=x * B=x D=x I=x Z=x C=x` (with bit 5 reserved and displaying as `*`). Supported editing the status register `P` either as a whole 8-bit hex number or by modifying individual flags via case-insensitive, space-separated equations (e.g. `n=1 c=0`), with validation checking.
 - **DEBUG Phase 3 - Software Breakpoint Debugger (`T`, `P`)**: Implemented single-step instruction tracing (`T`) and proceed step-over (`P`) using software breakpoints (`BRK`). Added context-restoring launcher (`launchProgram`) framing PC, registers, and flags onto the stack for launch via `RTI`, and interrupt hijack handler (`myBrkHandler`) intercepting the `CBINV` vector (`$0316/$0317`), restoring vectors/memory, printing virtual registers and disassembling the next instruction. Includes branch target calculations (taken/not-taken), indirect jumps with NMOS page-wrap emulation, call step-overs, and ROM safety guards.
 - **BASIC ROM Banking**: Integrated memory banking on boot (`start:`) to disable BASIC ROM (`$A000-$BFFF`), exposing 8KB of RAM and expanding contiguous User Program Space to `$2000-$CFFF` (44KB). Restores BASIC ROM on `cmdExit` (`ora #$07` on `$0001`) before returning to BASIC prompt (`jmp $E37B`).
@@ -39,31 +26,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **DEBUG Load SEQ and USR Files**: Added support for loading sequential (`SEQ`) and user (`USR`) files into memory via custom byte-by-byte file streaming. Added optional type prefix parsing (`L [P/S/U] [addr]`) matching the `W` command syntax.
 - **DEBUG Interactive Registers**: Added interactive register modification support (`R [register]`) to the `DEBUG` utility, enabling viewing and modifying individual CPU registers (`A`, `X`, `Y`, `P`, `S`) with 8-bit hex validation and far branch condition correction.
 - **DEBUG Utility Feature Parity Plans**: Documented complete implementation roadmaps and blueprints for achieving parity with MS-DOS `DEBUG`: Phase 1 (Interactive registers `R` and File I/O `N`/`L`/`W`), Phase 2 (Interactive 6502 assembler `A`), and Phase 3 (Software breakpoint tracer `T`/`P`). Added individual phase plan documents to `brain/plans/`, registered a new meta-task and sub-tasks in Task Warrior, and updated the Code Wiki user guide.
+- **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
+- **Drive Switch Shortcut**: Added support for typing `<device_number>:` (e.g. `9:`) directly at the command prompt to permanently switch the active drive, equivalent to `drive <device_number>`.
+- **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
+- **LABEL Build Tracking**: Added build counter and automated build tracking to the external `LABEL` utility, matching the behavior of `COMMAND64` and `DEBUG`. The version header (e.g. `LABEL v0.1.0.1001`) is displayed on utility execution.
+- **CMake Build System Migration**:
+  - Replaced the legacy single GNU Makefile with a modular, cross-platform CMake build system configured via root `CMakeLists.txt`.
+  - Implemented custom CMake Find modules (`FindKickAss.cmake`, `Findcc1541.cmake`, `FindOscar64.cmake`) and target helpers (`KickAssembler.cmake`, `cc1541.cmake`, `Oscar64.cmake`) to manage toolchain paths and discovery natively.
+  - Created a cross-platform build-time counter script (`IncrementBuildNumber.cmake`) and release packager (`PackRelease.cmake`) executing via `cmake -P` to replace shell-dependent cat/tar/zip commands.
+  - Configured a Makefile wrapper proxy to forward standard commands (`all`, `image`, `testimage`, `test`, `release`, `clean`) to CMake for backward compatibility.
+  - Updated all build system documentation, including `README.md` and `CLAUDE.md`.
+- **Project Infrastructure**:
+  - Initialized Codebase Memory knowledge graph for `command64-os`.
+  - Configured Taskwarrior with 5 active and pending milestones under the `command64-os` project.
+  - Created a structured Code Wiki under the `wiki/` directory including Home, User Manual, Debug Utility, API Reference, Programmer's Reference, VMM Specs, PETSCII Library, and C64 Hardware Gotchas.
+  - Added individual task spec files under `wiki/tasks/` to track milestone requirements.
+  - Registered `VOL/LABEL` (Task #17), `TIME` (Task #18), and `DATE` (Task #19) commands in Taskwarrior and `brain/task.md`.
+  - Corrected path mismatches in root `AGENTS.md` child DOX index and established missing child contracts (`src/AGENTS.md`, `tests/AGENTS.md`, `wiki/AGENTS.md`, `wiki/tasks/AGENTS.md`).
+- **Phase 5: Environment Support**:
+  - Implemented Master Environment Block (4KB) in the REU.
+  - Added `SET` internal command to display environment variables.
+  - Added `PATH` internal command placeholder for future executable search logic.
+- **Program Execution**:
+  - Implemented `RUN` and `GO` internal commands to execute programs at arbitrary memory addresses (defaults to `$2000`).
+- **Multi-Device Support**:
+  - Implemented `DRIVE` command (with `DEVICE` and `DEV` aliases) to switch active C64 device (8-11).
+  - Replaced hardcoded device #8 references with dynamic `CurrentDevice` workspace variable.
+  - Enhanced `DRIVE` command to report current device if called without arguments.
+
+### Changed
+
+- **Memory Layout & Program Relocation**:
+  - Chained all pre-API OS segments (`Utils, Api, Loader, Path, Vmm, File`) consecutively using `startAfter` definitions to eliminate all unused padding gap bytes.
+  - Defined a new segment `ShellExt` at `$2200` and moved long help/version string blocks (`verMsg`, `helpMsg`) there to free up contiguous space in `CommandShell`.
+  - Shifted `USER_PROG_START_ADDR` to `$2600` in CMake and refactored the OS address checks (`aptProtectedCheck`) to dynamically use `>UserProgStart` to prevent runtime overlap collisions.
+- **VmmData Segment Relocation**: Shifted `VmmData` segment start to `$1FA0` and reduced `fileScratch` to 90 bytes. This prevents memory link overlap with the expanded `CommandShell` segment.
+- **Refactored Device Routing**: Centralized target device prefix routing (`8:`, `9:`, etc.) from individual shell commands and external utilities into the core filesystem primitives (`fileOpen`, `fileDelete`, `fileRename`) and a new API function `DOS_PARSE_PREFIX` ($57). This eliminates duplicate parsing code, reduces side-effect risks (no longer overriding `CurrentDevice` in shell commands), and reclaims resident shell memory.
+- **Centralized Segment Packing**: Relocated the memory start addresses of all core OS segments (`Utils`, `Api`, `Loader`, `Path`, `Vmm`, `File`) in `src/command64.asm` to allow optimized packing and eliminate memory overlap issues as segments grow.
+- **DEBUG Utility Range Refactoring**: Refactored the range-checking logic in `debug.asm` to reduce duplication. Extracted a centralized `checkRangeLimit` subroutine for single-byte step checks, simplified the length specifier case-masking check in `parseRange` to a single instruction, and optimized inclusive boundary address checks in `cmdUnassemble` and `cmdDump` by reversing comparisons.
+- **Assembly Imports Refactoring**:
+  - Removed hardcoded relative build directory prefixes from `src/command64/shell.asm` and `src/external/debug/debug.asm`.
+  - Configured KickAssembler's `-libdir` search path to find build-time generated counters dynamically.
+- **Memory Layout Consolidation**:
+  - Relocated OS segments (`Api`, `Loader`, `Path`) to the `$0D00-$0FFF` range.
+  - Realigned `CommandTable` ($1080) and `CommandShell` ($1180), providing over 2.5KB of growth space for the shell.
+- **System Automation**:
+  - Implemented persistent build number tracking (`BUILD_OS`, `BUILD_DEBUG`) in the Makefile.
+  - Automated `.inc` generation for injecting build numbers into assembly without manual source edits.
+- **Disk Image Format**:
+  - Stripped `.prg` extensions from disk directory entries for cleaner command resolution.
+  - Centralized PETSCII encoding and improved `normalizeName` to correctly map shifted characters for disk matching.
 
 ### Fixed
 
+- **Device Presence Check Registry Bug**: Fixed a bug in `checkDeviceReady` (`src/command64/file.asm`) where `ldx CdrDevice` was called prior to `KernalSETNAM`. Because the KERNAL `SETNAM` routine can modify/clobber the `X` register, the device number was lost or corrupted before `KernalSETLFS` was called, causing disk presence status checks to fail or check wrong devices. Moved `ldx CdrDevice` to immediately after the `KernalSETNAM` call.
+- **App Table Garbage Memory Bug**: Added a page-zeroing loop to `aptInit` (`src/command64/apptable.asm`) to clear the newly allocated 4KB App Table virtual memory segment in the REU. This prevents random power-on RAM/REU garbage data from corrupting active slots and the `UsedSlots` counter, which previously caused the shell commands to display phantom active programs and erroneously report `app table full` on `LOAD`.
 - **VMM Bank Register Mapping (S1)**: Corrected `vmmComputeAddress` to combine `VmmBank` (the 1MB block index) with the bank offset `(VmmSegHi >> 4)` into the final `REU_REU_BANK` register, allowing memory reads/writes to span the full 16MB REU space without wrapping into Bank 0.
 - **Shell Environment Bank Tracking (S2)**: Fixed `shell.asm` to preserve `VmmBank` into `EnvBank` on environment initialization and load it back before environment variable VMM read/write operations.
 - **Segment Overlap & String Cleanup**: Removed the unused `notImplMsg` string from `shell.asm` to reclaim 36 bytes of memory and prevent `CommandShell` from overlapping `VmmData` at `$1FA0`.
 - **DEBUG Parser Backtracking Bug**: Fixed a register name parsing bug where looking ahead for register `PC` (when `'p'` was typed) and backtracking via `dey` clobbered the register name character in accumulator `A`. Added logic to reload and normalize the character from `inputBuf, y` before parsing as a single-character register, allowing both `r p` and single-character register edits (`r a`, `r x`, etc.) to execute correctly.
 - **DEBUG printBitA Calling Convention**: Standardized the `printBitA` helper subroutine to use clean subroutine returns (`jsr KernalChROUT` + `rts`) instead of tail-call jumps (`jmp KernalChROUT`).
-
-### Changed
-
-- **VmmData Segment Relocation**: Shifted `VmmData` segment start to `$1FA0` and reduced `fileScratch` to 90 bytes. This prevents memory link overlap with the expanded `CommandShell` segment.
-- **Refactored Device Routing**: Centralized target device prefix routing (`8:`, `9:`, etc.) from individual shell commands and external utilities into the core filesystem primitives (`fileOpen`, `fileDelete`, `fileRename`) and a new API function `DOS_PARSE_PREFIX` ($57). This eliminates duplicate parsing code, reduces side-effect risks (no longer overriding `CurrentDevice` in shell commands), and reclaims resident shell memory.
-- **Centralized Segment Packing**: Relocated the memory start addresses of all core OS segments (`Utils`, `Api`, `Loader`, `Path`, `Vmm`, `File`) in `src/command64.asm` to allow optimized packing and eliminate memory overlap issues as segments grow.
-- **DEBUG Utility Range Refactoring**: Refactored the range-checking logic in `debug.asm` to reduce duplication. Extracted a centralized `checkRangeLimit` subroutine for single-byte step checks, simplified the length specifier case-masking check in `parseRange` to a single instruction, and optimized inclusive boundary address checks in `cmdUnassemble` and `cmdDump` by reversing comparisons.
-
-### Added
-
-- **Target Device Routing**: Added support for mapping prefixes `8:`, `9:`, `10:`, `11:` to devices for all disk access commands: `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and the external `LABEL` utility. Supports independent device routing for source and destination in `COPY` (e.g. `COPY 9:FILE 8:FILE`). Omitting device prefixes correctly defaults to the active device at command invocation.
-- **Drive Switch Shortcut**: Added support for typing `<device_number>:` (e.g. `9:`) directly at the command prompt to permanently switch the active drive, equivalent to `drive <device_number>`.
-- **COPY Command Improvements**: Enabled defaulting destination filename to the source filename when copying to a device prefix (e.g. `COPY 9:FILE 8:`).
-- **LABEL Build Tracking**: Added build counter and automated build tracking to the external `LABEL` utility, matching the behavior of `COMMAND64` and `DEBUG`. The version header (e.g. `LABEL v0.1.0.1001`) is displayed on utility execution.
-
-### Fixed
-
 - **DEBUG Filename Buffer Corruption**: Implemented length pre-scanning inside the name (`N`) command to reject too-long input strings ($>32$ characters) before modifying the internal filename buffer, preventing filename corruption.
 - **DEBUG Load Custom Channel Secondary Address**: Corrected the KERNAL secondary address from `0` (which is reserved by Commodore DOS for `LOAD` operations) to `2` inside the custom byte-by-byte loader, restoring proper file reading for non-program file streams.
 - **DEBUG Case Normalization**: Fixed register name case-normalization in `cmdRegs` (`R` command) to use `and #$7F` instead of `ora #$20`, ensuring compatibility with `petscii_mixed` character encoding and resolving `error` outputs for both uppercase and lowercase inputs.
@@ -81,51 +103,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **LOAD Command Address Parsing**: Restructured `cmdLoad` to parse optional target addresses before parsing zero-page pointers, preventing `TempHi` from being clobbered by `parsePointerDevice`. This fixes a critical bug where `LOAD` either relocated programs to page zero ($000D) or corrupted hex arguments.
 - **LOAD Command Filename Length Restoration**: Fixed register `X` (filename length) clobbering in `cmdLoad` by preserving the stripped length in `TempLo` and loading it back into `X` immediately before calling `findFile`.
 - **External LABEL Utility**: Relocated the drive initialization command (`I`) to execute *before* the data channel is opened. This resolves the `"70,no channel"` error by avoiding resetting buffers after they have been allocated for the data channel. Updated the U1, B-P, and U2 command strings to use standard colons (`U1:`, `B-P:`, `U2:`) to ensure correct parsing across drive firmware. Also, implemented a BAM cache flush by sending the `"I"` command again *after* a successful block write, forcing the drive to synchronize its internal BAM cache with the disk so the new label takes effect immediately.
-
-### Added
-
-- **CMake Build System Migration**:
-  - Replaced the legacy single GNU Makefile with a modular, cross-platform CMake build system configured via root `CMakeLists.txt`.
-  - Implemented custom CMake Find modules (`FindKickAss.cmake`, `Findcc1541.cmake`, `FindOscar64.cmake`) and target helpers (`KickAssembler.cmake`, `cc1541.cmake`, `Oscar64.cmake`) to manage toolchain paths and discovery natively.
-  - Created a cross-platform build-time counter script (`IncrementBuildNumber.cmake`) and release packager (`PackRelease.cmake`) executing via `cmake -P` to replace shell-dependent cat/tar/zip commands.
-  - Configured a Makefile wrapper proxy to forward standard commands (`all`, `image`, `testimage`, `test`, `release`, `clean`) to CMake for backward compatibility.
-  - Updated all build system documentation, including `README.md` and `CLAUDE.md`.
-- **Project Infrastructure**:
-  - Initialized Codebase Memory knowledge graph for `command64-os`.
-  - Configured Taskwarrior with 5 active and pending milestones under the `command64-os` project.
-  - Created a structured Code Wiki under the `wiki/` directory including Home, User Manual, Debug Utility, API Reference, Programmer's Reference, VMM Specs, PETSCII Library, and C64 Hardware Gotchas.
-  - Added individual task spec files under `wiki/tasks/` to track milestone requirements.
-  - Registered `VOL/LABEL` (Task #17), `TIME` (Task #18), and `DATE` (Task #19) commands in Taskwarrior and `brain/task.md`.
-  - Corrected path mismatches in root `AGENTS.md` child DOX index and established missing child contracts (`src/AGENTS.md`, `tests/AGENTS.md`, `wiki/AGENTS.md`, `wiki/tasks/AGENTS.md`).
-
-- **Phase 5: Environment Support**:
-  - Implemented Master Environment Block (4KB) in the REU.
-  - Added `SET` internal command to display environment variables.
-  - Added `PATH` internal command placeholder for future executable search logic.
-- **Program Execution**:
-  - Implemented `RUN` and `GO` internal commands to execute programs at arbitrary memory addresses (defaults to `$2000`).
-- **Multi-Device Support**:
-  - Implemented `DRIVE` command (with `DEVICE` and `DEV` aliases) to switch active C64 device (8-11).
-  - Replaced hardcoded device #8 references with dynamic `CurrentDevice` workspace variable.
-  - Enhanced `DRIVE` command to report current device if called without arguments.
-
-### Changed
-
-- **Assembly Imports Refactoring**:
-  - Removed hardcoded relative build directory prefixes from `src/command64/shell.asm` and `src/external/debug/debug.asm`.
-  - Configured KickAssembler's `-libdir` search path to find build-time generated counters dynamically.
-- **Memory Layout Consolidation**:
-  - Relocated OS segments (`Api`, `Loader`, `Path`) to the `$0D00-$0FFF` range.
-  - Realigned `CommandTable` ($1080) and `CommandShell` ($1180), providing over 2.5KB of growth space for the shell.
-- **System Automation**:
-  - Implemented persistent build number tracking (`BUILD_OS`, `BUILD_DEBUG`) in the Makefile.
-  - Automated `.inc` generation for injecting build numbers into assembly without manual source edits.
-- **Disk Image Format**:
-  - Stripped `.prg` extensions from disk directory entries for cleaner command resolution.
-  - Centralized PETSCII encoding and improved `normalizeName` to correctly map shifted characters for disk matching.
-
-### Fixed
-
 - **Parsing Robustness**: Centralized argument parsing via `shellSkipSpaces` to prevent label-reuse bugs.
 - **Filename Match**: Resolved issue where lowercase disk entries failed to match normalized uppercase shell input.
 - **Volume Name & Label**: Fixed the `31,syntax error` in `cmdLabel` by using raw binary parameters (`U1:`, `B-P:`, `U2:`) sent byte-by-byte instead of ASCII string representation. Fixed a data channel LFN clobbering bug by storing it in a persistent RAM variable `labelLfn` rather than zero-page `NamePtrLo`.
