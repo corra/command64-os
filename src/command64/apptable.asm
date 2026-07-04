@@ -95,6 +95,116 @@ apcProtected:
     rts
 
 // -----------------------------------------------------------------------
+// aptNameMatch — compare SrcHandle bytes from NamePtrLo/Hi against VMM name field
+// Entry name starts at current VmmOffLo/Hi. Null-padded to 16 bytes.
+// Input:  VmmSegLo/Hi and VmmOffLo/Hi set to name field start
+//         SrcHandle = search name byte count
+//         NamePtrLo/Hi = pointer to search name (NOT modified)
+// Output: carry clear = full match; carry set = no match
+// Clobbers: A, Y, DstHandle, VmmOffLo (advanced SrcHandle+1 bytes on any path)
+// Preserves: X, NamePtrLo/Hi
+// -----------------------------------------------------------------------
+aptNameMatch:
+    lda #0
+    sta aptNameIndex        // byte index 0..SrcHandle-1
+    lda SrcHandle
+    sta DstHandle           // byte countdown
+anmLoop:
+    lda DstHandle
+    beq anmCheckEnd
+    jsr vmmReadByte         // A = entry name byte; Y clobbered
+    ldy aptNameIndex        // reload index (Y clobbered by vmmReadByte)
+    cmp (NamePtrLo), y      // compare against search name[aptNameIndex]
+    bne anmMiss
+    inc VmmOffLo            // advance VMM name position
+    inc aptNameIndex        // advance search index
+    dec DstHandle
+    jmp anmLoop
+anmCheckEnd:
+    // All bytes matched; verify entry name is not longer (next byte must be $00)
+    jsr vmmReadByte
+    inc VmmOffLo
+    cmp #0
+    bne anmMiss             // entry name is longer → no match
+    clc
+    rts
+anmMiss:
+    sec
+    rts
+
+// -----------------------------------------------------------------------
+// aptFind — scan app table for a matching name or address
+// Input:  carry clear = name mode: NamePtrLo/Hi = name ptr, SrcHandle = name length
+//         carry set   = address mode: HexValLo/Hi = load address to match
+// Output: carry clear + X = slot index on found; carry set = not found
+//         On found: HandlerVecLo/Hi = LoadAddr from the matched entry
+// Clobbers: A, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi
+// Preserves: SrcHandle, NamePtrLo/Hi, HexValLo/Hi
+// -----------------------------------------------------------------------
+aptFind:
+    bcs afSetAddrMode
+    lda #0                  // name mode
+    .byte $2C               // BIT $xxxx — skip next lda #1
+afSetAddrMode:
+    lda #1                  // address mode
+    sta aptSearchMode
+    ldx #0                  // slot counter
+afScanLoop:
+    cpx #APT_MAX_SLOTS
+    bcs afNotFound
+    jsr aptSlotBase         // VmmSeg/Off = entry base; X preserved; DstHandle = 0
+    jsr vmmReadByte         // A = Flags
+    and #APT_FLAG_USED
+    beq afNextSlot          // skip unused slots
+    lda aptSearchMode
+    bne afCheckAddr
+    // --- Name search ---
+    inc VmmOffLo            // advance to APT_OFF_NAME (base + 1)
+    jsr aptNameMatch        // carry clear = match
+    bcc afFound
+    jmp afNextSlot
+afCheckAddr:
+    // --- Address search: advance to APT_OFF_ADDR (base + 17) ---
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR       // = 17
+    sta VmmOffLo
+    bcc afAddrRead
+    inc VmmOffHi
+afAddrRead:
+    jsr vmmReadByte         // A = LoadAddr lo
+    cmp HexValLo
+    bne afNextSlot
+    inc VmmOffLo
+    jsr vmmReadByte         // A = LoadAddr hi
+    cmp HexValHi
+    bne afNextSlot
+    // Address match — fall through to afFound
+afFound:
+    // Load HandlerVecLo/Hi from LoadAddr field (reset VmmOff to base + APT_OFF_ADDR)
+    jsr aptSlotBase
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR
+    sta VmmOffLo
+    bcc afReadLo
+    inc VmmOffHi
+afReadLo:
+    jsr vmmReadByte
+    sta HandlerVecLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta HandlerVecHi
+    clc
+    rts
+afNextSlot:
+    inx
+    jmp afScanLoop
+afNotFound:
+    sec
+    rts
+
+// -----------------------------------------------------------------------
 // Data area (remainder of tasks append stubs here)
 // -----------------------------------------------------------------------
 aptSearchMode:  .byte 0    // 0 = name search, 1 = address search
