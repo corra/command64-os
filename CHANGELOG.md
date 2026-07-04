@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Device Presence Check Registry Bug**: Fixed a bug in `checkDeviceReady` (`src/command64/file.asm`) where `ldx CdrDevice` was called prior to `KernalSETNAM`. Because the KERNAL `SETNAM` routine can modify/clobber the `X` register, the device number was lost or corrupted before `KernalSETLFS` was called, causing disk presence status checks to fail or check wrong devices. Moved `ldx CdrDevice` to immediately after the `KernalSETNAM` call.
+- **App Table Garbage Memory Bug**: Added a page-zeroing loop to `aptInit` (`src/command64/apptable.asm`) to clear the newly allocated 4KB App Table virtual memory segment in the REU. This prevents random power-on RAM/REU garbage data from corrupting active slots and the `UsedSlots` counter, which previously caused the shell commands to display phantom active programs and erroneously report `app table full` on `LOAD`.
 
 ### Added
 

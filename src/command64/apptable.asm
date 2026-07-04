@@ -63,11 +63,27 @@ aptInit:
     sta AptSegLo
     lda VmmSegHi
     sta AptSegHi
+
+    // Zero the entire 4KB app table segment to prevent random memory garbage from corrupting slots
+    lda #0
+    sta VmmOffLo
+    sta VmmOffHi
+    ldx #16                 // 16 pages of 256 bytes = 4096 bytes
+aiZeroOuter:
+aiZeroByte:
+    lda #0
+    jsr vmmWriteByte        // clobbers A and Y, preserves X
+    inc VmmOffLo
+    bne aiZeroByte          // loop until VmmOffLo wraps (256 bytes = 1 page)
+    inc VmmOffHi            // next page
+    dex
+    bne aiZeroOuter         // repeat for all 16 pages
+
     // Write header at VMM offset 0: MaxSlots, UsedSlots=0, reserved×2
     lda AptSegLo
     sta VmmSegLo
     lda AptSegHi
-    sta AptSegHi
+    sta VmmSegHi
     lda #0
     sta VmmOffLo
     sta VmmOffHi
