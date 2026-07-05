@@ -15,70 +15,70 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 ### Base RAM Layout
 
 ```text
-  Address |    Region Size / Description                          | Access / State         |
-+---------+-------------------------------------------------------+------------------------+
-|  $FFFF  |  Interrupt Vectors ($FFFA-$FFFF)                      |  KERNAL ROM (Active)   |
-|         |  KERNAL ROM Jump Table ($FF00-$FFF9)                  |                        |
-|  $E000  |  C64 KERNAL ROM Code Space                            |                        |
-+---------+-------------------------------------------------------+------------------------+
-|  $DFFF  |  REU Hardware Registers ($DF00-$DF0A)                 |  Hardware Registers
-|  $D000  |  I/O Registers (VIC-II, SID, CIA-1, CIA-2)            |  (CHAREN = 1)
-+---------+-------------------------------------------------------+------------------------+
-|  $CFFF  |  VMM Memory Control Table (MCT)                       |  OS Reserved RAM
-|  $C000  |  Tracks 4096 pages (4KB each) over 16MB REU space     |  (4KB Base RAM)
-+---------+-------------------------------------------------------+------------------------+
-|  $BFFF  |                                                       |  
-|         |  User Program Space (RAM)                             |  User Application Area
-|         |  (Note: BASIC ROM banked out at $A000-$BFFF to        |  (RAM replacing ROM)
-|         |   provide contiguous program RAM)                     |
-|  $2600  |                                                       |  
-+---------+-------------------------------------------------------+------------------------+
-|  $25FF  |  Unallocated Padding / Alignment Room                 |  Free RAM (approx. 274B)
-|  $24EE  |                                                       |
-+---------+-------------------------------------------------------+
-|  $24ED  |  ShellExt Segment                                     |  OS Shell Data
-|  $235D  |  Contains help strings, version info, utility text    |  (RAM)
-+---------+-------------------------------------------------------+
-|  $235C  |  AppTable Segment                                     |  OS Resident Registry
-|  $2000  |  Application Registry Management API                  |  (RAM)
-+---------+-------------------------------------------------------+
-|  $1FFF  |  VMM Data Segment                                     |  OS VMM Data
-|         |  vmmInitialized ($1FA0), vmmTempByte ($1FA1)          |  (RAM)
-|  $1FA0  |  fileScratch ($1FA2-$1FFC)                            |
-+---------+-------------------------------------------------------+
-|  $1F9F  |  Command Shell                                        |  OS Shell Code
-|  $1180  |  Command parser, command tables, built-in handlers    |  (RAM)
-+---------+-------------------------------------------------------+
-|  $117F  |  Command Table / System Tables                        |  OS Data
-|  $1080  |  Command name listings and dispatcher mapping         |  (RAM)
-+---------+-------------------------------------------------------+
-|  $107F  |  PETSCII Library                                      |  OS Library
-|  $1040  |  Print character / print string utilities             |  (RAM)
-+---------+-------------------------------------------------------+
-|  $103F  |  ApiStub (OS Stable Jump Table Entry Point)           |  OS Entry Point
-|  $1000  |  Jump to apiHandler (jmp $1200+); JSR $1000 target    |  (RAM)
-+---------+-------------------------------------------------------+
-|  $0FFF  |  OS Core Code Space                                   |  OS Kernel Code
-|         |  $0D00-$0FFF: OS Core (Loader, Path, File System)     |  (RAM)
-|  $0820  |  $0820-$0CFF: OS Utils (Hex parsing, Decimal printer) |
-+---------+-------------------------------------------------------+
-|  $081F  |  Main BASIC SYS Launcher                              |  BASIC Stub
-|  $0801  |  Contains 10 SYS 4608 / sys 4096 (Upstart launcher)   |  (RAM)
-+---------+-------------------------------------------------------+
-|  $0800  |  Unused / BASIC Start Marker                          |  RAM
-+---------+-------------------------------------------------------+
-|  $07FF  |  C64 Screen Memory                                    |  Standard Screen RAM
-|  $0400  |  1000 character matrices (40x25 character display)    |  (RAM)
-+---------+-------------------------------------------------------+
-|  $03FF  |  C64 KERNAL & OS Workspace / Buffers                  |  System / Tape Buffer
-|  $0200  |  Includes keyboard buffer and Cassette Buffer ($033C)  |  (RAM)
-+---------+-------------------------------------------------------+
-|  $01FF  |  C64 System Stack                                     |  Standard 6502 Stack
-|  $0100  |  Used for JSR returns and PHA/PHP storage             |  (RAM)
-+---------+-------------------------------------------------------+
-|  $00FF  |  Zero Page RAM                                        |  Processor Workspace
-|  $0000  |  OS scratch pointers, VMM registers, KERNAL system ZP |  (RAM)
-+---------+-------------------------------------------------------+
+  Address |    Region Size / Description                          | Access / State          |
++---------+-------------------------------------------------------+------------------------ +
+|  $FFFF  |  Interrupt Vectors ($FFFA-$FFFF)                      |  KERNAL ROM (Active)    |
+|         |  KERNAL ROM Jump Table ($FF00-$FFF9)                  |                         |
+|  $E000  |  C64 KERNAL ROM Code Space                            |                         |
++---------+-------------------------------------------------------+------------------------ +
+|  $DFFF  |  REU Hardware Registers ($DF00-$DF0A)                 |  Hardware Registers     |
+|  $D000  |  I/O Registers (VIC-II, SID, CIA-1, CIA-2)            |  (CHAREN = 1)           |
++---------+-------------------------------------------------------+------------------------ +
+|  $CFFF  |  VMM Memory Control Table (MCT)                       |  OS Reserved RAM        |
+|  $C000  |  Tracks 4096 pages (4KB each) over 16MB REU space     |  (4KB Base RAM)         |
++---------+-------------------------------------------------------+------------------------ +
+|  $BFFF  |                                                       |                         |
+|         |  User Program Space (RAM)                             |  User Application Area  |
+|         |  (Note: BASIC ROM banked out at $A000-$BFFF to        |  (RAM replacing ROM)    |
+|         |   provide contiguous program RAM)                     |                         |
+|  $2600  |                                                       |                         |
++---------+-------------------------------------------------------+------------------------ +
+|  $25FF  |  Unallocated Padding / Alignment Room                 |  Free RAM (approx. 274B)|
+|  $24EE  |                                                       |                         |
++---------+-------------------------------------------------------+------------------------ +
+|  $24ED  |  ShellExt Segment                                     |  OS Shell Data          |
+|  $235D  |  Contains help strings, version info, utility text    |  (RAM)                  | 
++---------+-------------------------------------------------------+------------------------ +
+|  $235C  |  AppTable Segment                                     |  OS Resident Registry   |
+|  $2000  |  Application Registry Management API                  |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +        
+|  $1FFF  |  VMM Data Segment                                     |  OS VMM Data            |
+|         |  vmmInitialized ($1FA0), vmmTempByte ($1FA1)          |  (RAM)                  |
+|  $1FA0  |  fileScratch ($1FA2-$1FFC)                            |                         |
++---------+-------------------------------------------------------+------------------------ +
+|  $1F9F  |  Command Shell                                        |  OS Shell Code          |
+|  $1180  |  Command parser, command tables, built-in handlers    |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $117F  |  Command Table / System Tables                        |  OS Data                |
+|  $1080  |  Command name listings and dispatcher mapping         |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $107F  |  PETSCII Library                                      |  OS Library             |
+|  $1040  |  Print character / print string utilities             |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $103F  |  ApiStub (OS Stable Jump Table Entry Point)           |  OS Entry Point         |
+|  $1000  |  Jump to apiHandler (jmp $1200+); JSR $1000 target    |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $0FFF  |  OS Core Code Space                                   |  OS Kernel Code         |
+|         |  $0D00-$0FFF: OS Core (Loader, Path, File System)     |  (RAM)                  |
+|  $0820  |  $0820-$0CFF: OS Utils (Hex parsing, Decimal printer) |                         |
++---------+-------------------------------------------------------+------------------------ +
+|  $081F  |  Main BASIC SYS Launcher                              |  BASIC Stub             |
+|  $0801  |  Contains 10 SYS 4608 / sys 4096 (Upstart launcher)   |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $0800  |  Unused / BASIC Start Marker                          |  RAM                    |
++---------+-------------------------------------------------------+------------------------ +
+|  $07FF  |  C64 Screen Memory                                    |  Standard Screen RAM    |
+|  $0400  |  1000 character matrices (40x25 character display)    |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $03FF  |  C64 KERNAL & OS Workspace / Buffers                  |  System / Tape Buffer   |
+|  $0200  |  Includes keyboard buffer and Cassette Buffer ($033C)  |  (RAM)                 |
++---------+-------------------------------------------------------+------------------------ +
+|  $01FF  |  C64 System Stack                                     |  Standard 6502 Stack    |
+|  $0100  |  Used for JSR returns and PHA/PHP storage             |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
+|  $00FF  |  Zero Page RAM                                        |  Processor Workspace    |
+|  $0000  |  OS scratch pointers, VMM registers, KERNAL system ZP |  (RAM)                  |
++---------+-------------------------------------------------------+------------------------ +
 ```
 
 ---
