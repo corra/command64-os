@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Binary Relocator register restoration**: Fixed a bug in `aptRelocate` (`src/command64/loader.asm`) where `TempLo/Hi` (the end address + 1) was not restored when the relocation magic check failed. This previously caused standard non-relocatable programs loaded from the shell to be registered in the app table with a size 6 bytes smaller than their actual size.
+
 ## [0.3.0] - 2026-07-04
 
 ### Added

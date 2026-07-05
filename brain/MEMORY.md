@@ -119,3 +119,5 @@
 | DEBUG remediation plan | `docs/superpowers/plans/2026-05-13-debug-asm-zp-alias-and-listbuf-overflow.md` |
 | Unified build system design | `docs/superpowers/specs/2026-05-13-unified-build-system-design.md` |
 | Unified build system plan | `docs/superpowers/plans/2026-05-13-unified-build-system.md` |
+| Binary Relocator plan | `docs/superpowers/plans/2026-07-04-binary-relocator-phase-b.md` |
+| Staged ca65 rewrite plan | `docs/superpowers/plans/2026-07-04-staged-rewrite-ca65.md` |

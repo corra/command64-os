@@ -28,6 +28,7 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
   - [Phase 6A: App Manager](tasks/phase-6a-app-manager.md)
   - [Phase 6B: Binary Relocator](tasks/phase-6b-binary-relocator.md)
   - [Phase 6C: Oscar64 Runtime Support](tasks/phase-6c-oscar64-support.md)
+  - [In Tandem: Staged ca65 Toolset Migration](tasks/toolset-migration-ca65.md)
 
 - **Time, Date & Disk Label Support**
   - [VOL / LABEL Command Implementation](tasks/vol-label.md)

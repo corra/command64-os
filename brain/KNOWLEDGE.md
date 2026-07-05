@@ -40,14 +40,14 @@ This file serves as the shared repository for architectural decisions, technical
 | Phase 4: External System Utilities (DEBUG) | ✅ Done |
 | Phase 5: Env & Multi-Device Support | ⏳ In-Progress (Taskwarrior & Wiki setup done) |
 | Phase 6A: App Manager (Phase A) | ✅ Done |
+| Phase 6B: Binary Relocator | ✅ Done |
 
 ## Architectural Decisions & Constraints
 
 ### Absolute vs. Relocatable Binaries
-- **Constraint**: External programs are currently **Absolute Binaries** compiled for `$2600` (was `$2200` before memory layout optimization).
-- **Impact**: Loading a program at an arbitrary address and running it will crash if the program contains absolute jumps or data references.
-- **Exceptions**: Very simple position-independent code (like `inc $d020; rts`) will work anywhere.
-- **Future Resolution**: A **Binary Relocator** is planned for Phase 6B to patch absolute addresses in memory during `LOAD`.
+- **Constraint**: External programs are compiled for `$2600` (UserProgStart) by default.
+- **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
+- **Execution**: The OS loader automatically detects this footer, patches all absolute high-bytes in-place to run at the target load page (e.g. `LOAD debug $4000`), and truncates the registered size to exclude the table. Non-relocatable binaries fall back to being registered as-is with original bounds preserved.
 
 ### App Table (Phase 6A — Completed)
 - **Segment**: `AppTable` at `$2000`–`$235C`. Consecutively followed by `ShellExt` segment at `$235D`–`$24ED` (storing help/version string blocks).

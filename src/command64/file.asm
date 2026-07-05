@@ -296,6 +296,8 @@ foError:
     ldx TempLo
     lda HandleTable + 1, x  // A = LFN
     jsr KernalCLOSE
+    lda TargetDevice        // Drain the leftover error latch (see readErrorChannel)
+    jsr readErrorChannel
     sec
     lda #$FF
     rts
@@ -539,10 +541,25 @@ fdCopyDone:
     // 6. OPEN and CLOSE
     jsr KernalOPEN
     bcs fdError
-    
+
+    // The Scratch command's result (e.g. "01,FILES SCRATCHED,00,00") is only
+    // available by reading LFN 15 after OPEN — OPEN's own carry only reports
+    // the KERNAL-level handshake, not the DOS command result. Read it before
+    // closing so it can't linger and confuse the next checkDeviceReady call.
+    ldx #15
+    jsr KernalCHKIN
+    bcs fdCloseErr
+    jsr drainOpenErrorChannel
     lda #15
     jsr KernalCLOSE
     clc
+    rts
+
+fdCloseErr:
+    lda #15
+    jsr KernalCLOSE
+    lda #3
+    sec
     rts
 
 fdError:
@@ -640,10 +657,23 @@ frGotOld:
     // 8. OPEN and CLOSE
     jsr KernalOPEN
     bcs frenError
-    
+
+    // Read the Rename command's result before closing — see the matching
+    // comment in fileDelete above for why this can't be skipped.
+    ldx #15
+    jsr KernalCHKIN
+    bcs frenCloseErr
+    jsr drainOpenErrorChannel
     lda #15
     jsr KernalCLOSE
     clc
+    rts
+
+frenCloseErr:
+    lda #15
+    jsr KernalCLOSE
+    lda #3
+    sec
     rts
 
 frenError:
@@ -664,3 +694,82 @@ CdrDevice:
     .byte 0
 CdrRetried:
     .byte 0
+
+// File's fixed $0D00 window (packed tightly against the fixed $1000 ApiStub
+// jump table) has no slack left, so these live in ShellExt instead — same
+// reasoning as aptRelocate in loader.asm. JSR works fine across segments.
+.segment ShellExt
+
+// --- readErrorChannel ---
+// Reads and clears the device's command/error channel (LFN 15). The 1541
+// (and compatible drives) latch the result of the last DOS operation there
+// until it is read; if nothing ever reads it, the *next* unrelated
+// checkDeviceReady preflight reads this stale message instead of a fresh
+// status, misreports it as "other drive error", and blocks an otherwise
+// healthy device. Call this right after any operation that can leave a
+// fresh error/result on the channel (a failed OPEN of a data file, or a
+// completed S0:/R0: command) so nothing is left for the next caller to trip
+// over. Opens LFN 15 itself — do not call this when 15 is already open
+// (e.g. mid S0:/R0: — see drainOpenErrorChannel for that case).
+// Input:  A = device number
+// Output: SourceBuf = null-terminated status string (up to 39 chars)
+//         Carry: 0 = read ok, 1 = device didn't respond to OPEN
+// Clobbers: A, X, Y
+readErrorChannel:
+    sta TempLo              // stash device number (SETNAM below clobbers A/X/Y only)
+
+    lda #0                  // No filename — just open the status channel
+    ldy #0
+    jsr KernalSETNAM
+
+    lda #15
+    ldx TempLo
+    ldy #15
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    bcs recError
+
+    ldx #15
+    jsr KernalCHKIN
+    bcs recCloseError
+
+    jsr drainOpenErrorChannel
+    lda #15
+    jsr KernalCLOSE
+    clc
+    rts
+
+recCloseError:
+    lda #15
+    jsr KernalCLOSE
+recError:
+    lda #0
+    sta SourceBuf
+    lda #1                  // Matches checkDeviceReady's "no device" code
+    sec
+    rts
+
+// --- drainOpenErrorChannel ---
+// Reads the status string from an *already open and CHKIN'd* LFN 15 into
+// SourceBuf, then CLRCHNs. Does not OPEN or CLOSE 15 — used by fileDelete/
+// fileRename, which already have 15 open to issue the S0:/R0: command
+// itself and just need to read its result before closing it.
+// Output: SourceBuf = null-terminated status string (up to 39 chars)
+// Clobbers: A, Y
+drainOpenErrorChannel:
+    ldy #0
+docLoop:
+    jsr KernalREADST
+    bne docDone              // EOI or error — nothing more to read
+    jsr KernalChRIN
+    cmp #PetCr
+    beq docDone
+    sta SourceBuf, y
+    iny
+    cpy #39
+    bne docLoop
+docDone:
+    lda #0
+    sta SourceBuf, y
+    jsr KernalCLRCHN
+    rts

@@ -71,6 +71,8 @@ tableCmd:
     .word cmdApps
     .text "free  "
     .word cmdFree
+    .text "flush "
+    .word cmdFlush
 
 tableEnd:
 
@@ -559,8 +561,9 @@ clCheckFull:
     sta VmmOffHi
     jsr vmmReadByte         // A = UsedSlots
     cmp #APT_MAX_SLOTS
-    bcs clTableFull
-    
+    bcc clDoLoad
+    jmp clTableFull
+
 clDoLoad:
     lda NamePtrLo
     ldy NamePtrHi
@@ -591,6 +594,7 @@ clDoLoad:
 clGotAddr:
     stx TempLo              // end_addr+1 lo (X/Y from KernalLOAD return)
     sty TempHi              // end_addr+1 hi
+    jsr aptRelocate         // run the binary relocator to patch in-place
     jsr aptRegister         // carry clear on success (table-full already checked)
     
 clDone:
@@ -615,6 +619,8 @@ clFindErr:
     rts
     
 clLoadErr:
+    lda CurrentDevice       // Drain the leftover error latch (see readErrorChannel
+    jsr readErrorChannel    // in file.asm) before restoring the caller's device.
     lda SavedDevice
     sta CurrentDevice
     // fall through to clError
@@ -2307,6 +2313,61 @@ volDevError:
 volExit:
     jmp dirExit                // Same SavedDevice-restore logic as cmdDir
 
+// FLUSH [device] — manually read and clear a drive's command/error channel
+// (LFN 15). Most commands now drain this themselves right after an error
+// (see readErrorChannel in file.asm), but this gives a manual escape hatch
+// to inspect/clear it directly — e.g. after using external tools or if a
+// stale status is ever suspected of blocking otherwise-healthy commands.
+cmdFlush:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    sty ParsePos
+
+    lda #<CommandBuffer
+    clc
+    adc ParsePos
+    sta PrintPtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta PrintPtrHi
+
+    lda CurrentDevice
+    sta SavedDevice
+
+    ldx #PrintPtrLo
+    jsr parsePointerDevice
+    sta CurrentDevice
+                             // A still holds the device number (STA doesn't clobber it)
+    jsr readErrorChannel
+    bcs cflDevError
+
+    lda #<flushMsg
+    ldy #>flushMsg
+    jsr petPrintString
+
+    lda CurrentDevice
+    tax
+    ldy #0
+    jsr printDecimal16
+
+    lda #<flushColonMsg
+    ldy #>flushColonMsg
+    jsr petPrintString
+
+    lda #<SourceBuf
+    ldy #>SourceBuf
+    jsr petPrintString
+
+    lda #PetCr
+    jsr KernalChROUT
+    jmp dirExit
+
+cflDevError:
+    jsr printDeviceStatusMsg
+    lda #PetCr
+    jsr KernalChROUT
+    jmp dirExit
+
 
 noEnvMsg:
     .text "Environment variable not defined"
@@ -2486,4 +2547,12 @@ volIdMsg:
 volParseErrMsg:
     .text "Error reading volume label"
     .byte $0D, 0
+
+flushMsg:
+    .text "Drive "
+    .byte 0
+
+flushColonMsg:
+    .text " status: "
+    .byte 0
 

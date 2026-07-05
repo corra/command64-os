@@ -85,6 +85,8 @@ checkExistence:
 
     plp                     // Restore status (restore Carry)
     bcc ceOk
+    lda CurrentDevice       // Drain the leftover "file not found" latch so it
+    jsr readErrorChannel    // doesn't poison the next checkDeviceReady call.
     lda #3                  // Device was ready; the file itself wasn't found
     sec
 ceOk:

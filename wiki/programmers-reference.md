@@ -7,6 +7,7 @@ This document provides technical details for developing applications for the com
 When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `$2600` up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
 
 ### C64 RAM Banking Control ($0001 CPU Port)
+
 * **Bit 0 (`LORAM`) = 0**: Banks out BASIC ROM, exposing RAM at `$A000-$BFFF`.
 * **Bit 1 (`HIRAM`) = 1**: Keeps KERNAL ROM active at `$E000-$FFFF`.
 * **Bit 2 (`CHAREN`) = 1**: Keeps I/O registers mapped at `$D000-$DFFF`.
@@ -14,24 +15,24 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 ### Base RAM Layout
 
 ```text
-  Address      Region Size / Description                            Access / State
-+---------+-------------------------------------------------------+
-|  $FFFF  |  Interrupt Vectors ($FFFA-$FFFF)                      |  KERNAL ROM (Active)
-|         |  KERNAL ROM Jump Table ($FF00-$FFF9)                  |
-|  $E000  |  C64 KERNAL ROM Code Space                            |
-+---------+-------------------------------------------------------+
+  Address |    Region Size / Description                          | Access / State         |
++---------+-------------------------------------------------------+------------------------+
+|  $FFFF  |  Interrupt Vectors ($FFFA-$FFFF)                      |  KERNAL ROM (Active)   |
+|         |  KERNAL ROM Jump Table ($FF00-$FFF9)                  |                        |
+|  $E000  |  C64 KERNAL ROM Code Space                            |                        |
++---------+-------------------------------------------------------+------------------------+
 |  $DFFF  |  REU Hardware Registers ($DF00-$DF0A)                 |  Hardware Registers
 |  $D000  |  I/O Registers (VIC-II, SID, CIA-1, CIA-2)            |  (CHAREN = 1)
-+---------+-------------------------------------------------------+
++---------+-------------------------------------------------------+------------------------+
 |  $CFFF  |  VMM Memory Control Table (MCT)                       |  OS Reserved RAM
 |  $C000  |  Tracks 4096 pages (4KB each) over 16MB REU space     |  (4KB Base RAM)
-+---------+-------------------------------------------------------+
++---------+-------------------------------------------------------+------------------------+
 |  $BFFF  |                                                       |  
 |         |  User Program Space (RAM)                             |  User Application Area
 |         |  (Note: BASIC ROM banked out at $A000-$BFFF to        |  (RAM replacing ROM)
 |         |   provide contiguous program RAM)                     |
 |  $2600  |                                                       |  
-+---------+-------------------------------------------------------+
++---------+-------------------------------------------------------+------------------------+
 |  $25FF  |  Unallocated Padding / Alignment Room                 |  Free RAM (approx. 274B)
 |  $24EE  |                                                       |
 +---------+-------------------------------------------------------+
@@ -102,7 +103,7 @@ Applications MUST respect the following zero page allocations to prevent corrupt
 | `$6E` | `SrcHandle` | Source file handle scratch for utility routines (`cmdCopy`) | OS Shell |
 | `$6F` | `DstHandle` | Destination file handle scratch for utility routines (`cmdCopy`) | OS Shell |
 | `$70 - $8F` | - | **Safe for User Application use** (Note: `DEBUG.PRG` uses `$70-$7F`) | User Apps |
-| `$90 - `$FA` | - | Standard C64 KERNAL I/O and hardware vectors | KERNAL |
+| `$90 -`$FA` | - | Standard C64 KERNAL I/O and hardware vectors | KERNAL |
 | `$FB - $FC` | `PrintPtrLo/Hi` | String print pointer workspace (`petPrintString`) | OS Core |
 | `$FD - $FE` | `NamePtrLo/Hi` | File loader wrapper filename pointer | OS Core |
 | `$FF` | - | KERNAL keyboard scan tracker / Stack boundary marker | KERNAL |
@@ -168,6 +169,7 @@ The 192-byte cassette buffer region (`$033C-$03FB`) is reused as the persistent 
 The Virtual Memory Manager (VMM) virtualizes up to 16MB of Ram Expansion Unit (REU) memory into 4KB pages. Page allocation is tracked using a 4096-byte **Memory Control Table (MCT)** located in base RAM at `$C000-$CFFF`.
 
 ### VMM Page Allocation Logic
+
 * **MCT Position `$C000 + i`**: Represents the status of REU Page `i` (representing 4KB).
 * **MCT Status Codes**:
   * `$00` (`PAGE_FREE`): Page is unallocated.
@@ -175,7 +177,9 @@ The Virtual Memory Manager (VMM) virtualizes up to 16MB of Ram Expansion Unit (R
   * `$02` (`PAGE_TAIL`): Page is a continuation block of a multi-page allocation.
 
 ### System Allocated Pages in REU
+
 Upon boot, the OS initializes two structures in REU space:
+
 1. **Master Environment Block (Page 0)**: Located at VMM segment pointer stored in `EnvSegment` ($039F-$03A0). Allocates a 4KB page. Stores shell environment variables configured by `SET` and `PATH` as double-null terminated strings (`VAR=VAL\0VAR=VAL\0\0`).
 2. **Application Table Block (Page 1)**: Located at VMM segment pointer stored in `AptSegment` ($03F2-$03F3). Allocates a 4KB page. Manages a 16-slot registered application index (40 bytes per entry stride, 4-byte header at offset 0).
 
@@ -186,6 +190,7 @@ Upon boot, the OS initializes two structures in REU space:
 To read or write bytes located in virtual memory, user applications pass a 16-bit logical Segment (`VmmSegLo/Hi`), 16-bit logical Offset (`VmmOffLo/Hi`), and 1MB Bank index (`VmmBank`). The VMM routine translates this logical format into the C64 REU hardware DMA register layout.
 
 ### Translation Formula
+
 A logical segment pointer represents a block of 16-byte paragraphs. The physical address is derived by:
 
 $$\text{Physical Address (24-bit)} = (\text{VmmSeg} \times 16) + \text{VmmOff}$$
@@ -240,9 +245,9 @@ Always use the stable entry point at **`$1000`** for OS services. Never jump dir
 
 ### 6.2 Compatibility
 
-- **Binary Mode:** Always start your program with `CLD` to ensure binary arithmetic mode.
-- **Character Set:** The OS starts in lowercase/mixed mode. Use PETSCII mixed-case encoding for strings.
-- **Exit Strategy:** Always terminate your program via `DOS_EXIT ($4C)` to ensure the shell state is correctly reset.
+* **Binary Mode:** Always start your program with `CLD` to ensure binary arithmetic mode.
+* **Character Set:** The OS starts in lowercase/mixed mode. Use PETSCII mixed-case encoding for strings.
+* **Exit Strategy:** Always terminate your program via `DOS_EXIT ($4C)` to ensure the shell state is correctly reset.
 
 ### 6.3 Memory Management
 
@@ -252,10 +257,10 @@ Use the VMM API (`DOS_ALLOC_MEM`, `DOS_FREE_MEM`) to manage memory in the REU. D
 
 The project is built using a cross-platform **CMake** build system (minimum version 3.20) and **Kick Assembler v5.25**.
 
-- **Main Entry Point**: `src/command64.asm`
-- **CMake Configuration**: Run `cmake -B build` followed by `cmake --build build` to compile the operating system, utilities, and test suites.
-- **GNU Make Wrapper**: A `Makefile` proxy is provided at the repository root for convenience. You can run standard targets like `make all`, `make image`, or `make clean` which are forwarded directly to CMake.
-- **Output**: Output binaries (`command64.prg`, `debug.prg`, etc.) are placed under the `build/` directory.
+* **Main Entry Point**: `src/command64.asm`
+* **CMake Configuration**: Run `cmake -B build` followed by `cmake --build build` to compile the operating system, utilities, and test suites.
+* **GNU Make Wrapper**: A `Makefile` proxy is provided at the repository root for convenience. You can run standard targets like `make all`, `make image`, or `make clean` which are forwarded directly to CMake.
+* **Output**: Output binaries (`command64.prg`, `debug.prg`, etc.) are placed under the `build/` directory.
 
 ### 7.1 External Application Versioning Workflow
 
@@ -264,7 +269,7 @@ External user-space applications (located in `src/external/`) must follow a stri
 1. **Subdirectory**: Place the application sources in a new folder `src/external/<appname>/` with a main entry assembler file (e.g., `<appname>.asm`).
 2. **Persistent Build Counter File**: Create a file named `BUILD_<APPNAME_UPPER>` at the repository root containing the initial build number (usually `1000`).
 3. **Assembly Integration**:
-   - Define version major, minor, and stage in the main assembly file:
+   * Define version major, minor, and stage in the main assembly file:
 
      ```assembly
      .const VERSION_MAJOR = "0"
@@ -273,7 +278,7 @@ External user-space applications (located in `src/external/`) must follow a stri
      #import "build_<appname>.inc"
      ```
 
-   - Embed the version and build number in the application startup/identification text using `BUILD_NUMBER`:
+   * Embed the version and build number in the application startup/identification text using `BUILD_NUMBER`:
 
      ```assembly
      .text "MYAPP v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE + "." + BUILD_NUMBER

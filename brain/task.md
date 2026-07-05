@@ -115,7 +115,7 @@
 
 - [ ] Phase 6: Advanced OS Features
   - [x] Phase 6A: App Manager Phase A (Program registry APPS/PS/FREE) (Completed 2026-07-04)
-  - [ ] Implement Binary Relocator (to support `RUN` at arbitrary addresses)
+  - [x] Implement Binary Relocator (to support `RUN` at arbitrary addresses) (Completed 2026-07-05)
   - [ ] Add Oscar64 C-Language runtime support
 
 - [ ] Time, Date & Disk Label Support

@@ -123,7 +123,74 @@ checkNullPostPrefix:
     bne labelNoPrefix
     
 labelNoArg:
-    jmp noArgErr
+    // Initialize labelBuf with $A0 (shifted space)
+    ldx #15
+    lda #$A0
+initLabelBuf:
+    sta labelBuf, x
+    dex
+    bpl initLabelBuf
+
+    // Print prompt
+    ldx #<promptMsg
+    ldy #>promptMsg
+    lda #DOS_PRINT_STR
+    jsr $1000
+
+    // Read loop
+    ldy #0
+readLoop:
+    tya
+    pha                     // KernalGetIn clobbers Y
+pollKey:
+    jsr KernalGetIn
+    beq pollKey
+    tax                     // save character to X
+    pla
+    tay                     // restore Y
+    txa                     // restore character to A
+    
+    cmp #PetCr
+    beq doneInput
+    
+    cmp #PetDel
+    bne handleChar
+    
+    // DEL key pressed: check if buffer is empty
+    tya
+    beq readLoop            // empty -> ignore
+    dey                     // decrement buffer index
+    lda #PetDel
+    jsr KernalChROUT        // destructive backspace on screen
+    jmp readLoop
+    
+handleChar:
+    // Check if we already have 16 characters
+    cpy #16
+    bcs readLoop            // if Y >= 16, ignore new character (only accept DEL/CR)
+    
+    // Echo character
+    jsr KernalChROUT
+    
+    // Store in labelBuf
+    sta labelBuf, y
+    iny
+    jmp readLoop
+
+doneInput:
+    // Print a newline (carriage return)
+    lda #PetCr
+    jsr KernalChROUT
+    
+    // Check if any characters were entered
+    tya
+    beq cancelExit          // Y == 0 -> cancel cleanly
+    
+    // Y > 0 -> proceed to open channels and write label
+    jmp openChannels
+
+cancelExit:
+    jmp labelExit
 
 labelNoPrefix:
     // -----------------------------------------------------------------------
@@ -433,6 +500,10 @@ lenMsg:
 reqMsg:
     .text "Label name required"
     .byte $0D, $00
+
+promptMsg:
+    .text "Volume label (16 chars max)? "
+    .byte 0
 
 devMsg:
     .text "Device not present"
