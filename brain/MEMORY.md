@@ -101,7 +101,7 @@
 - [x] Implement `DEBUG` Unassemble (U) command (Disassembler)
 - [x] DEBUG code review + remediation (Build 1012 — cuOpRel ZP alias, parseList overflow)
 - [x] **Execute App Manager Phase A** — plan at `docs/superpowers/plans/2026-05-13-app-manager-phase-a.md`
-- [ ] Binary Relocator (Phase 6B prerequisite)
+- [x] Binary Relocator (Phase 6B prerequisite)
 - [x] Implement `DRIVE` command
 - [x] Add support for multiple devices (8, 9, 10, 11)
 - [ ] Support subdirectories (1581 / SD2IEC)
@@ -109,6 +109,8 @@
 - [x] Implement `VOL` and `LABEL` commands (disk directory header editing)
 - [ ] Implement `TIME` command using CIA 1 TOD clock
 - [ ] Implement `DATE` command (software calendar + REU storage)
+- [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety
+
 
 ## Superpowers Docs Index
 
