@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **DIR byte-size reporting**: Added file size reporting in bytes to the directory listing (`DIR` command) using a highly optimized, loop-free 6502 math routine (`calcFileSize`) computing `Size = Blocks * 254 = (Blocks * 256) - (Blocks * 2)`. Added `printDecimal24` supporting 24-bit decimal printing with leading-zero suppression.
+- **UserProgStart memory shift**: Shifted the user program origin (`UserProgStart`) from `$2600` to `$2A00` to accommodate resident OS memory growth. Updated the CMake build scripts to dynamically pass program start and relocation base addresses (`$2A00` and `$2B00`) to KickAssembler builds.
+
 ### Fixed
 
 - **Binary Relocator register restoration**: Fixed a bug in `aptRelocate` (`src/command64/loader.asm`) where `TempLo/Hi` (the end address + 1) was not restored when the relocation magic check failed. This previously caused standard non-relocatable programs loaded from the shell to be registered in the app table with a size 6 bytes smaller than their actual size.

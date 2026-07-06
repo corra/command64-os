@@ -50,7 +50,7 @@
 - `aptFind` calling convention: carry clear = name mode (`NamePtrLo/Hi`, `SrcHandle`); carry set = address mode (`HexValLo/Hi`). Returns X = slot index, `HandlerVecLo/Hi` = LoadAddr on found.
 - Phases B and C extend `apptable.asm` without changing the API surface.
 
-## Memory Map (current — as of Build 2410)
+## Memory Map (current — as of Build 2565)
 
 | Region | Purpose |
 | -------- | --------- |
@@ -64,17 +64,17 @@
 | `$03A2-$03C9` | SourceBuf (40 bytes, COPY command) |
 | `$03CA-$03F1` | DestBuf (40 bytes, COPY command) |
 | `$0801` | BASIC SYS launcher (Main segment) |
-| `$0820-$0F91` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
+| `$0820-$0FC3` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1003-$1018` | Petsci (petPrintString) |
-| `$1019-$10D8` | CommandTable (8-byte fixed-width entries) |
-| `$10D9-$1DB9` | CommandShell (main loop, dispatcher, built-ins) |
+| `$1019-$10E0` | CommandTable (8-byte fixed-width entries) |
+| `$10E1-$1F9E` | CommandShell (main loop, dispatcher, built-ins) |
 | `$1FA0-$1FFF` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
 | `$03F4-$03F9` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi) |
-| `$2000-$235C` | AppTable segment (apptable.asm) |
-| `$235D-$24ED` | ShellExt segment (version and help string blocks) |
-| `$2600+` | UserProgStart (External commands loaded here — shifted from $2200 by Phase 6A memory layout optimization) |
+| `$2000-$23C7` | AppTable segment (apptable.asm) |
+| `$23C8-$28FD` | ShellExt segment (version, help, dir size routines, and shifted messages) |
+| `$2A00+` | UserProgStart (External commands loaded here — shifted from $2600 to accommodate segment growth) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
 | `$61–$6C` | Zero-page: HandlerVec, ParsePos, Temp, HexVal, VmmSeg/Off/Bank (FAC1) |

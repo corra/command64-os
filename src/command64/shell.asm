@@ -750,7 +750,9 @@ cmdDir:
     sta CurrentDevice
                              // A still holds the device number (STA doesn't clobber it)
     jsr checkDeviceReady
-    bcs cdDevError
+    bcc cdDevNoErr
+    jmp cdDevError
+cdDevNoErr:
 
     lda PrintPtrLo
     sec
@@ -771,7 +773,9 @@ cmdDir:
     jsr KernalSETLFS
 
     jsr KernalOPEN
-    bcs cdDevError            // Preflight passed but the real OPEN still failed —
+    bcc cdOpenNoErr
+    jmp cdDevError
+cdOpenNoErr:            // Preflight passed but the real OPEN still failed —
                                // a rare race, not a classified device status, so A
                                // falls through to printDeviceStatusMsg's generic
                                // message rather than being forced to "device not
@@ -779,6 +783,9 @@ cmdDir:
 
     ldx #13
     jsr KernalCHKIN
+
+    lda #1
+    sta dirIsHeader
 
     // Skip 2-byte load address
     jsr KernalGetIn
@@ -791,31 +798,39 @@ cmdDir:
     // is all that matters — it just needs to be bounded, not exact.
 cdLineLoop:
     inc CmpBase
-    beq cdDone                // Wrapped past 255 entries — far more than any
+    bne cdNotDone
+    jmp cdDone                // Wrapped past 255 entries — far more than any
                                // real disk holds; bail out.
+cdNotDone:
 
     // Read link bytes
     jsr KernalGetIn
     sta TempLo              // Link Lo
     jsr KernalGetIn
     ora TempLo              // Link Hi
-    beq cdDone              // EOF
+    bne cdLinkOk
+    jmp cdDone              // EOF
+cdLinkOk:
     
     // Read block count
     jsr KernalGetIn
-    pha                     // Save Count Lo on stack
+    sta dirSavedBlockLo
     jsr KernalGetIn
-    tay                     // Count Hi
-    pla
-    tax                     // Restore Count Lo
+    sta dirSavedBlockHi
     
-    // Clear TempHi (used by decimal printer for leading zero suppression)
+    // Print block count
+    ldx dirSavedBlockLo
+    ldy dirSavedBlockHi
     lda #0
     sta TempHi
     jsr printDecimal16
     
     lda #' '
     jsr KernalChROUT
+
+    lda #0
+    sta dirSawQuote
+    sta dirPendingSpaces
 
     // Safety net for the name itself, not just the entry count: a single
     // non-terminating "filename" would otherwise loop here forever, before
@@ -828,15 +843,70 @@ cdReadName:
     beq cdLineDone             // Wrapped past 255 chars in one name — bail
     jsr KernalGetIn
     beq cdLineDone
+    
+    // Check if space ($20) or shifted space ($A0)
+    cmp #$20
+    beq _isSpaceChar
+    cmp #$A0
+    beq _isSpaceChar
+    
+    // Non-space character.
+    // First, flush any pending spaces we buffered.
+    pha                     // Save the non-space character
+    ldx dirPendingSpaces
+    beq _noFlush
+    lda #$20                // Print standard space for formatting
+_flushLoop:
     jsr KernalChROUT
+    dex
+    bne _flushLoop
+    lda #0
+    sta dirPendingSpaces
+_noFlush:
+    pla                     // Restore non-space character
+    
+    // Check if double quote (")
+    cmp #$22
+    bne _notQuote
+    inc dirSawQuote
+_notQuote:
+    jsr KernalChROUT
+    jmp cdReadName
+
+_isSpaceChar:
+    inc dirPendingSpaces
     jmp cdReadName
     
 cdLineDone:
+    lda dirIsHeader
+    bne _skipSize             // If header line, skip size
+    lda dirSawQuote
+    beq _skipSize             // If no quotes (e.g. Blocks Free), skip size
+
+    // Print size: " (" + size + " bytes)"
+    lda #<dirSizeOpen
+    ldy #>dirSizeOpen
+    jsr petPrintString
+
+    ldx dirSavedBlockLo
+    ldy dirSavedBlockHi
+    jsr calcFileSize
+    jsr printDecimal24
+
+    lda #<dirSizeClose
+    ldy #>dirSizeClose
+    jsr petPrintString
+
+_skipSize:
+    lda #0
+    sta dirIsHeader          // Done with header line
+
     lda #PetCr
     jsr KernalChROUT
     
     jsr KernalREADST
-    beq cdLineLoop           // No error/EOF yet — keep reading entries
+    bne cdDone
+    jmp cdLineLoop
 
 cdDone:
     jsr KernalCLRCHN
@@ -1567,6 +1637,7 @@ cdError:
     rts
 
 dirFname: .text "$"
+
 
 // SET [VAR=VAL] — display or set environment variables
 cmdSet:
@@ -2475,7 +2546,7 @@ helpMsg:
     .text "FREE   - FREE APP [NAME]"
     .byte $0D, 0
 
-.segment CommandShell
+.segment ShellExt
 badCmdMsg:
     .text "Bad command or file name"
     .byte 0
@@ -2496,6 +2567,7 @@ noReuMsg:
     .text "Warning: No REU detected. VMM disabled."
     .byte $0D, 0
 
+.segment CommandShell
 badDeviceMsg:
     .text "Invalid device"
     .byte $0D, 0
@@ -2559,4 +2631,266 @@ flushMsg:
 flushColonMsg:
     .text " status: "
     .byte 0
+
+.segment ShellExt
+
+// Directory state variables and formatting strings
+dirIsHeader:      .byte 0
+dirSawQuote:      .byte 0
+dirSavedBlockLo:  .byte 0
+dirSavedBlockHi:  .byte 0
+dirPendingSpaces: .byte 0
+dirSizeOpen:      .text " ("
+                  .byte 0
+dirSizeClose:     .text "b)"
+                  .byte 0
+
+// --- calcFileSize ---
+// Calculates file size in bytes from block count.
+// Formula: Size = Blocks * 254 = (Blocks * 256) - (Blocks * 2)
+// Input:  X = Block count Low byte
+//         Y = Block count High byte
+// Output: A = Size byte 0 (Lo, $0000FF)
+//         X = Size byte 1 (Mid, $00FF00)
+//         Y = Size byte 2 (Hi, $FF0000)
+// Clobbers: None (registers hold return values)
+calcFileSize:
+    stx TempLo              // Store Block count Lo
+    sty TempHi              // Store Block count Hi
+
+    // 1. Calculate B * 2
+    lda TempLo
+    asl                     // TempLo << 1
+    sta HexValLo            // HexValLo = B_Lo * 2
+    lda TempHi
+    rol                     // TempHi << 1 + Carry
+    sta HexValHi            // HexValHi = B_Hi * 2
+    lda #0
+    rol                     // Carry from B_Hi << 1
+    pha                     // Save Temp2 (17th bit) on stack
+
+    // 2. Subtract B * 2 from B * 256
+    // B * 256 = (TempHi:TempLo:0)
+    // B * 2   = (Temp2:HexValHi:HexValLo)
+    
+    // Byte 0 subtraction: 0 - HexValLo
+    lda #0
+    sec                     // Set carry for subtraction
+    sbc HexValLo
+    sta HexValLo            // Size byte 0 (Lo)
+
+    // Byte 1 subtraction: TempLo - HexValHi - borrow
+    lda TempLo
+    sbc HexValHi
+    sta HexValHi            // Size byte 1 (Mid)
+
+    // Byte 2 subtraction: TempHi - Temp2 - borrow
+    pla                     // Pull Temp2 (17th bit)
+    sta TempLo              // Store in TempLo (scratch)
+    lda TempHi
+    sbc TempLo              // Subtract Temp2 and borrow
+    tay                     // Y = Size byte 2 (Hi)
+
+    lda HexValLo            // A = Size byte 0 (Lo)
+    ldx HexValHi            // X = Size byte 1 (Mid)
+    rts
+
+// --- printDecimal24 ---
+// Prints a 24-bit value in decimal to standard output.
+// Input:  A = Low byte, X = Mid byte, Y = High byte
+// Clobbers: A, X, Y
+printDecimal24:
+    sta dirSizeLo
+    stx dirSizeMid
+    sty dirSizeHi
+    
+    lda #0
+    sta dirLeadZero         // Initialize leading-zero suppression flag
+    
+    // Check for zero
+    lda dirSizeLo
+    ora dirSizeMid
+    ora dirSizeHi
+    bne pd24Start
+    lda #'0'
+    jsr KernalChROUT
+    rts
+
+pd24Start:
+    // 10,000,000s
+    ldx #0
+pd10M:
+    lda dirSizeLo
+    sec
+    sbc #$80
+    sta TempLo
+    lda dirSizeMid
+    sbc #$96
+    sta TempHi
+    lda dirSizeHi
+    sbc #$98
+    bcc pdDone10M
+    sta dirSizeHi
+    lda TempHi
+    sta dirSizeMid
+    lda TempLo
+    sta dirSizeLo
+    inx
+    jmp pd10M
+pdDone10M:
+    jsr pd24PrintDigit
+
+    // 1,000,000s
+    ldx #0
+pd1M:
+    lda dirSizeLo
+    sec
+    sbc #$40
+    sta TempLo
+    lda dirSizeMid
+    sbc #$42
+    sta TempHi
+    lda dirSizeHi
+    sbc #$0F
+    bcc pdDone1M
+    sta dirSizeHi
+    lda TempHi
+    sta dirSizeMid
+    lda TempLo
+    sta dirSizeLo
+    inx
+    jmp pd1M
+pdDone1M:
+    jsr pd24PrintDigit
+
+    // 100,000s
+    ldx #0
+pd100k:
+    lda dirSizeLo
+    sec
+    sbc #$A0
+    sta TempLo
+    lda dirSizeMid
+    sbc #$86
+    sta TempHi
+    lda dirSizeHi
+    sbc #$01
+    bcc pdDone100k
+    sta dirSizeHi
+    lda TempHi
+    sta dirSizeMid
+    lda TempLo
+    sta dirSizeLo
+    inx
+    jmp pd100k
+pdDone100k:
+    jsr pd24PrintDigit
+
+    // 10,000s
+    ldx #0
+pd10k:
+    lda dirSizeLo
+    sec
+    sbc #$10
+    sta TempLo
+    lda dirSizeMid
+    sbc #$27
+    sta TempHi
+    lda dirSizeHi
+    sbc #0
+    bcc pdDone10k
+    sta dirSizeHi
+    lda TempHi
+    sta dirSizeMid
+    lda TempLo
+    sta dirSizeLo
+    inx
+    jmp pd10k
+pdDone10k:
+    jsr pd24PrintDigit
+
+    // 1,000s
+    ldx #0
+pd1k:
+    lda dirSizeLo
+    sec
+    sbc #$E8
+    sta TempLo
+    lda dirSizeMid
+    sbc #$03
+    sta TempHi
+    lda dirSizeHi
+    sbc #0
+    bcc pdDone1k
+    sta dirSizeHi
+    lda TempHi
+    sta dirSizeMid
+    lda TempLo
+    sta dirSizeLo
+    inx
+    jmp pd1k
+pdDone1k:
+    jsr pd24PrintDigit
+
+    // 100s
+    ldx #0
+pd24_100:
+    lda dirSizeLo
+    sec
+    sbc #100
+    tay
+    lda dirSizeMid
+    sbc #0
+    bcc pd24_Done100
+    sta dirSizeMid
+    sty dirSizeLo
+    inx
+    jmp pd24_100
+pd24_Done100:
+    jsr pd24PrintDigit
+
+    // 10s
+    ldx #0
+pd24_10:
+    lda dirSizeLo
+    sec
+    sbc #10
+    bcc pd24_Done10
+    sta dirSizeLo
+    inx
+    jmp pd24_10
+pd24_Done10:
+    jsr pd24PrintDigit
+
+    // 1s
+    lda dirSizeLo
+    clc
+    adc #'0'
+    jsr KernalChROUT
+    rts
+
+// Helper to print digit in X and suppress leading zeros
+pd24PrintDigit:
+    txa
+    beq pd24Zero
+    clc
+    adc #'0'
+    jsr KernalChROUT
+    lda #1
+    sta dirLeadZero
+    rts
+pd24Zero:
+    lda dirLeadZero
+    beq pd24NoPrint
+    lda #'0'
+    jsr KernalChROUT
+pd24NoPrint:
+    rts
+
+// Local variables for 24-bit decimal printing
+dirSizeLo:   .byte 0
+dirSizeMid:  .byte 0
+dirSizeHi:   .byte 0
+dirLeadZero: .byte 0
+
 
