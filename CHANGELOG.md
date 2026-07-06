@@ -10,11 +10,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **DIR byte-size reporting**: Added file size reporting in bytes to the directory listing (`DIR` command) using a highly optimized, loop-free 6502 math routine (`calcFileSize`) computing `Size = Blocks * 254 = (Blocks * 256) - (Blocks * 2)`. Added `printDecimal24` supporting 24-bit decimal printing with leading-zero suppression.
-- **UserProgStart memory shift**: Shifted the user program origin (`UserProgStart`) from `$2600` to `$2A00` to accommodate resident OS memory growth. Updated the CMake build scripts to dynamically pass program start and relocation base addresses (`$2A00` and `$2B00`) to KickAssembler builds.
+- **UserProgStart memory shift**: Shifted the user program origin (`UserProgStart`) from `$2600` to `$2C00` to accommodate resident OS memory growth (specifically the `ShellExt` segment growing to `$2A52`). Updated the CMake build scripts to dynamically pass program start and relocation base addresses (`$2C00` and `$2D00`) to KickAssembler builds.
+- **Global free-all Command**: Added support for invoking the `free` command without arguments to deregister all loaded, inactive programs in the App Table. Prints the names of freed apps during the sweep.
 
 ### Fixed
 
 - **Binary Relocator register restoration**: Fixed a bug in `aptRelocate` (`src/command64/loader.asm`) where `TempLo/Hi` (the end address + 1) was not restored when the relocation magic check failed. This previously caused standard non-relocatable programs loaded from the shell to be registered in the app table with a size 6 bytes smaller than their actual size.
+- **CMake config rebuild dependency**: Added `build_config.inc` as an explicit dependency for `command64` so that changing `UserProgStart` or other cache variables triggers an automatic reassembly of the shell.
+- **Directory size printing corruption**: Resolved a corruption issue where `fileInit` would overwrite the end of the `ShellExt` segment (where directory sizes are calculated/printed) at boot.
 
 ## [0.3.0] - 2026-07-04
 
