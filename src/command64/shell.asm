@@ -578,12 +578,10 @@ clDoLoad:
     ldy NamePtrHi
     jsr shellLoadPrg        // X = end_addr+1 lo, Y = end_addr+1 hi on success
     bcs clLoadErr
-    
-    // Register in app table (skip if no REU)
-    lda AptSegLo
-    ora AptSegHi
-    beq clDone
-    
+
+    stx TempLo              // end_addr+1 lo (X/Y from KernalLOAD return)
+    sty TempHi              // end_addr+1 hi
+
     // For header loads, LoadAddr is not in HexValLo/Hi — use UserProgStart
     lda SpecificLoad
     beq clGotAddr
@@ -592,16 +590,22 @@ clDoLoad:
     lda #>UserProgStart
     sta HexValHi
 clGotAddr:
-    stx TempLo              // end_addr+1 lo (X/Y from KernalLOAD return)
-    sty TempHi              // end_addr+1 hi
+
+    // Register in app table (skip if no REU)
+    lda AptSegLo
+    ora AptSegHi
+    beq clSkipRegister
     jsr aptRelocate         // run the binary relocator to patch in-place
     jsr aptRegister         // carry clear on success (table-full already checked)
-    
+
+clSkipRegister:
+    jsr aptPrintLoadInfo    // print name/addr/size row, ps-style
+
 clDone:
     lda SavedDevice
     sta CurrentDevice
     rts
-    
+
 clNoArgs:
     lda #<noFileMsg
     ldy #>noFileMsg

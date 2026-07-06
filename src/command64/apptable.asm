@@ -478,6 +478,59 @@ aptPrintHex8:
     rts
 
 // -----------------------------------------------------------------------
+// aptPrintLoadInfo — print load address and size after a successful LOAD,
+// in the same "name / addr / size" column style as aptList (APPS/PS).
+// Input:  NamePtrLo/Hi + SrcHandle = loaded file name (as typed, unpadded),
+//         HexValLo/Hi = load address, TempLo/Hi = end address + 1
+// Clobbers: A, X, Y
+// -----------------------------------------------------------------------
+aptPrintLoadInfo:
+    lda #<aptListHeader
+    ldy #>aptListHeader
+    jsr petPrintString
+
+    lda #16
+    sta aptNameIndex        // remaining name-field columns
+    ldy #0                  // source index into (NamePtrLo),y
+pliNameLoop:
+    lda aptNameIndex
+    beq pliNameDone
+    cpy SrcHandle
+    bcs pliNamePad          // past end of typed name -> pad with spaces
+    lda (NamePtrLo), y
+    jsr KernalChROUT
+    iny
+    jmp pliNameCont
+pliNamePad:
+    lda #' '
+    jsr KernalChROUT
+pliNameCont:
+    dec aptNameIndex
+    jmp pliNameLoop
+pliNameDone:
+
+    lda #' '
+    jsr KernalChROUT
+    lda HexValHi
+    jsr aptPrintHex8
+    lda HexValLo
+    jsr aptPrintHex8
+    lda #' '
+    jsr KernalChROUT
+    sec
+    lda TempLo
+    sbc HexValLo
+    pha                     // size lo
+    lda TempHi
+    sbc HexValHi            // size hi
+    jsr aptPrintHex8
+    pla
+    jsr aptPrintHex8
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+// -----------------------------------------------------------------------
 // aptList — print all SLOT_USED entries to screen
 // Output format (40-column):
 //   name             addr  size
