@@ -259,6 +259,77 @@ aptRemove:
     rts
 
 // -----------------------------------------------------------------------
+// aptRemoveAll — deregister all inactive apps from the table (without APT_FLAG_RUNNING)
+// Input:  None
+// Output: carry clear always
+// Clobbers: A, X, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi
+// -----------------------------------------------------------------------
+aptRemoveAll:
+    ldx #0
+araLoop:
+    cpx #APT_MAX_SLOTS
+    bcs araDone
+    
+    jsr aptSlotBase         // VmmSeg/Off = entry base; X preserved
+    jsr vmmReadByte         // A = Flags
+    sta aptTempFlags        // Save Flags in our temp byte
+    and #APT_FLAG_USED
+    beq araNext             // Unused -> skip
+    
+    lda aptTempFlags
+    and #APT_FLAG_RUNNING
+    bne araNext             // Running -> skip
+    
+    // It is used and NOT running, so print its name and remove it!
+    // aptPrintFreedName and aptRemove preserve X
+    jsr aptPrintFreedName
+    jsr aptRemove
+    
+araNext:
+    inx
+    jmp araLoop
+araDone:
+    clc
+    rts
+
+// -----------------------------------------------------------------------
+// aptPrintFreedName — print the name of the app in slot X prefixed by "freed "
+// Input:  X = slot index
+// Output: none
+// Clobbers: A, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi
+// Preserves: X
+// -----------------------------------------------------------------------
+aptPrintFreedName:
+    lda #<aptFreedPrefix
+    ldy #>aptFreedPrefix
+    jsr petPrintString
+    
+    jsr aptSlotBase         // VmmSeg/Off = entry base; X preserved
+    inc VmmOffLo            // VmmOff = base + 1 (APT_OFF_NAME)
+    bne apfnNoCarry1
+    inc VmmOffHi
+apfnNoCarry1:
+    lda #16
+    sta aptNameIndex        // max 16 chars
+apfnLoop:
+    lda aptNameIndex
+    beq apfnDone
+    jsr vmmReadByte         // A = character; Y clobbered
+    cmp #0
+    beq apfnDone            // stop at null terminator
+    jsr KernalChROUT
+    inc VmmOffLo
+    bne apfnNoCarry2
+    inc VmmOffHi
+apfnNoCarry2:
+    dec aptNameIndex
+    jmp apfnLoop
+apfnDone:
+    lda #PetCr
+    jsr KernalChROUT
+    rts
+
+// -----------------------------------------------------------------------
 // aptRegister — add or overwrite an app table entry
 // If an entry with the same name already exists, it is overwritten (re-LOAD).
 // Otherwise, the first free slot is used and UsedSlots is incremented.
@@ -636,6 +707,11 @@ alFooter:
 aptSearchMode:  .byte 0    // 0 = name search, 1 = address search
 aptNameIndex:   .byte 0    // byte index used in aptNameMatch and aptRegister name copy
 aptUsedSlots:   .byte 0    // saved UsedSlots count for aptList footer
+aptTempFlags:   .byte 0    // temp space for aptRemoveAll flags check
+
+aptFreedPrefix:
+    .text "freed "
+    .byte 0
 
 aptHexChars:
     .text "0123456789abcdef"

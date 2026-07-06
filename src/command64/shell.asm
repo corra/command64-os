@@ -2130,7 +2130,7 @@ cmdFree:
     ldy ParsePos
     jsr shellSkipSpaces
     lda CommandBuffer, y
-    beq cfNoArg
+    beq cfFreeAll
     sty TempLo              // name start
 cfScanName:
     lda CommandBuffer, y
@@ -2144,7 +2144,7 @@ cfEnd:
     sec
     sbc TempLo              // name length
     sta SrcHandle
-    beq cfNoArg
+    beq cfFreeAll
     lda #<CommandBuffer
     clc
     adc TempLo
@@ -2160,7 +2160,11 @@ cfEnd:
     jsr vmmReadByte         // A = Flags
     and #APT_FLAG_RUNNING
     bne cfRunning
+    jsr aptPrintFreedName
     jsr aptRemove           // X = slot index (aptSlotBase re-enters with X)
+    rts
+cfFreeAll:
+    jsr aptRemoveAll
     rts
 cfNoArg:
     lda #<noFileMsg
@@ -2567,7 +2571,7 @@ noReuMsg:
     .text "Warning: No REU detected. VMM disabled."
     .byte $0D, 0
 
-.segment CommandShell
+.segment ShellExt
 badDeviceMsg:
     .text "Invalid device"
     .byte $0D, 0

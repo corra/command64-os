@@ -14,8 +14,8 @@ Develop dynamic memory allocation on `LOAD` (finding next available slot of memo
 - [ ] Define Cassette Buffer registers in `include/command64.inc`
 - [ ] Write `aptCheckRange` range overlap routine in `apptable.asm`
 - [ ] Write `aptFindFreeRegion` allocator in `apptable.asm`
-- [ ] Write `aptRemoveAll` global free routine in `apptable.asm`
+- [x] Write `aptRemoveAll` global free routine in `apptable.asm`
 - [ ] Implement LFN 13 directory read `getFileSize` in `shell.asm`
 - [ ] Integrate safety check and allocator into `cmdLoad` in `shell.asm`
-- [ ] Integrate bare `free` command handler in `shell.asm`
+- [x] Integrate bare `free` command handler in `shell.asm`
 - [ ] Compile and verify safety boundaries and dynamic allocation under VICE
