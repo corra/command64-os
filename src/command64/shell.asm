@@ -574,8 +574,29 @@ clDoLoad:
     
     // findFile returns updated length in X
     stx SrcHandle
+
+    // Pre-flight check (only for relocated loads)
+    lda SpecificLoad
+    bne clDoRealLoad        // skip pre-flight if absolute load (SpecificLoad = 1)
+
+    // Call getFileSize
+    jsr getFileSize
+    bcs clLoadErr           // getFileSize returned error/not found
+
+    // Call aptCheckRange
+    // Input: HexValLo/Hi = candidate load address, TempLo/Hi = size in bytes
+    jsr aptCheckRange
+    bcc clDoRealLoad        // carry clear = safe, proceed with load
+
+    // Range check failed!
+    cpx #$FF
+    beq clProtected         // Protected region collision
+    jmp clOverlap           // Registered app overlap
+
+clDoRealLoad:
     lda NamePtrLo
     ldy NamePtrHi
+    ldx SrcHandle           // Restore length in X (clobbered by checks)
     jsr shellLoadPrg        // X = end_addr+1 lo, Y = end_addr+1 hi on success
     bcs clLoadErr
 
@@ -647,6 +668,14 @@ clProtected:
     sta CurrentDevice
     lda #<aptProtectedMsg
     ldy #>aptProtectedMsg
+    jsr petPrintString
+    rts
+
+clOverlap:
+    lda SavedDevice
+    sta CurrentDevice
+    lda #<aptOverlapMsg
+    ldy #>aptOverlapMsg
     jsr petPrintString
     rts
     
@@ -864,7 +893,7 @@ _flushLoop:
     sta dirPendingSpaces
 _noFlush:
     pla                     // Restore non-space character
-    
+
     // Check if double quote (")
     cmp #$22
     bne _notQuote
@@ -2648,6 +2677,170 @@ dirSizeOpen:      .text " ("
                   .byte 0
 dirSizeClose:     .text "b)"
                   .byte 0
+
+aptOverlapMsg:    .text "address overlap"
+                  .byte PetCr, 0
+
+// --- getFileSize ---
+// Pre-resolves a file's byte size WITHOUT loading it, via a filtered
+// directory read ("$0:filename") + calcFileSize. Used by the memory-safe
+// LOAD pre-flight check so aptCheckRange has a size before any bytes are
+// transferred.
+// Input:  NamePtrLo/Hi = pointer to filename (as resolved by findFile)
+//         SrcHandle = filename byte length
+//         CurrentDevice = target device
+// Output: carry clear = found; TempLo/Hi = file size in bytes (16-bit —
+//           PRGs never approach the 24-bit range calcFileSize supports)
+//         carry set = error; A = status (1=no device, 2=no disk, 3=not found)
+// Clobbers: A, X, Y, TempLo/Hi, FileScratch buffer contents
+// Preserves: HexValLo/Hi, NamePtrLo/Hi, SrcHandle
+getFileSize:
+    lda CurrentDevice
+    jsr checkDeviceReady
+    bcc gfsDeviceOk
+    jmp gfsDeviceErr
+gfsDeviceOk:
+
+    // Preserve HexVal — calcFileSize uses it as scratch below
+    lda HexValLo
+    pha
+    lda HexValHi
+    pha
+
+    // Build "$0:" + filename in FileScratch
+    lda #'$'
+    sta FileScratch
+    lda #'0'
+    sta FileScratch + 1
+    lda #':'
+    sta FileScratch + 2
+    ldy #0
+gfsCopyLoop:
+    cpy SrcHandle
+    beq gfsCopyDone
+    lda (NamePtrLo), y
+    sta FileScratch + 3, y
+    iny
+    jmp gfsCopyLoop
+gfsCopyDone:
+    tya
+    clc
+    adc #3
+    tax                     // X = total length
+
+    txa
+    ldx #<FileScratch
+    ldy #>FileScratch
+    jsr KernalSETNAM
+
+    lda #13                 // LFN 13 — clear of handle table (2-9), checkExistence (14), command channel (15)
+    ldx CurrentDevice
+    ldy #0                  // Secondary 0
+    jsr KernalSETLFS
+
+    jsr KernalOPEN
+    bcs gfsOpenErr
+
+    ldx #13
+    jsr KernalCHKIN
+
+    // Skip 2-byte load address (BASIC-style header of the "$" pseudo-file)
+    jsr KernalChRIN
+    jsr KernalChRIN
+
+    // --- Line 1 (Header Line) ---
+    // Read link bytes; zero link = EOF = no matching directory entry
+    jsr KernalChRIN
+    sta TempLo
+    jsr KernalChRIN
+    ora TempLo
+    beq gfsNotFound
+
+    // Read and discard line number (block count of header)
+    jsr KernalChRIN
+    jsr KernalChRIN
+
+gfsSkipHeader:
+    jsr KernalChRIN
+    bne gfsSkipHeader        // loop until end of line ($00)
+
+    // --- Line 2 (File Entry or BLOCKS FREE) ---
+    // Read link bytes; zero link = EOF = no matching directory entry
+    jsr KernalChRIN
+    sta TempLo
+    jsr KernalChRIN
+    ora TempLo
+    beq gfsNotFound
+
+    // Read block count of the file entry
+    jsr KernalChRIN
+    sta TempLo              // block count lo
+    jsr KernalChRIN
+    sta TempHi              // block count hi
+
+    // Scan rest of line and count quotes to ensure it is a file entry
+    ldy #0                  // Y = quote count
+gfsScanEntry:
+    jsr KernalChRIN
+    beq gfsScanEntryDone
+    cmp #$22                // double quote
+    bne gfsScanEntry
+    iny
+    jmp gfsScanEntry
+
+gfsScanEntryDone:
+    cpy #0
+    beq gfsNotFound          // no quotes found -> this was the BLOCKS FREE line
+
+    // Success! Calculate size from blocks in TempLo/Hi
+    jsr gfsCloseChannel
+
+    ldx TempLo
+    ldy TempHi
+    jsr calcFileSize        // A=size lo, X=size mid, Y=size hi
+    sta TempLo
+    stx TempHi              // 16 bits is enough — PRGs never near 64K
+
+    pla
+    sta HexValHi
+    pla
+    sta HexValLo
+    clc
+    rts
+
+gfsNotFound:
+    jsr gfsCloseChannel
+    pla
+    sta HexValHi
+    pla
+    sta HexValLo
+    lda #3
+    sec
+    rts
+
+gfsOpenErr:
+    // Closing LFN13 is a harmless no-op if OPEN itself failed before the
+    // channel was ever established. Preflight already passed, so treat this
+    // the same as "not found" rather than "no device", per checkExistence's
+    // convention for an OPEN failure after a successful device check.
+    lda #13
+    jsr KernalCLOSE
+    pla
+    sta HexValHi
+    pla
+    sta HexValLo
+    lda #3
+    sec
+    rts
+
+gfsDeviceErr:
+    rts                     // A already holds the checkDeviceReady status code
+
+gfsCloseChannel:
+    jsr KernalCLRCHN
+    lda #13
+    jsr KernalCLOSE
+    rts
 
 // --- calcFileSize ---
 // Calculates file size in bytes from block count.

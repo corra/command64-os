@@ -5,13 +5,9 @@
 
 .segment AppTable
 
-// Overlap check temporary variables (stored in safe Cassette Buffer workspace)
-.label AptTempLoadLo = $03F4
-.label AptTempLoadHi = $03F5
-.label AptTempSizeLo = $03F6
-.label AptTempSizeHi = $03F7
-.label AptTempEndLo  = $03F8
-.label AptTempEndHi  = $03F9
+// Overlap check temporary variables: AptTempLoadLo/Hi, AptTempSizeLo/Hi,
+// AptTempEndLo/Hi, AptCandEndLo/Hi are declared in command64.inc (Cassette
+// Buffer workspace, $03F4-$03FB).
 
 // -----------------------------------------------------------------------
 // aptSlotBase — set VmmSeg/Off to the base of slot X's entry
@@ -330,6 +326,124 @@ apfnDone:
     rts
 
 // -----------------------------------------------------------------------
+// aptCheckRange — validate a candidate [addr, addr+size) load range
+// before any bytes are transferred. Does NOT evict or modify anything —
+// pure read-only validation for the memory-safe-loading pre-flight check.
+// Input:  HexValLo/Hi = candidate load address (start)
+//         TempLo/Hi = candidate size in bytes (byte count, not end address)
+// Output: carry clear = range is safe
+//         carry set   = range is unsafe:
+//           X = conflicting slot index, or X = $FF if the conflict is with
+//           a protected region ($0000-UserProgStart, or $C000-$FFFF)
+// Clobbers: A, X, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi,
+//           AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi,
+//           AptCandEndLo/Hi
+// Preserves: HexValLo/Hi, TempLo/Hi, NamePtrLo/Hi, SrcHandle
+// -----------------------------------------------------------------------
+aptCheckRange:
+    // CandEnd = HexVal + Temp(size)
+    clc
+    lda HexValLo
+    adc TempLo
+    sta AptCandEndLo
+    lda HexValHi
+    adc TempHi
+    sta AptCandEndHi
+    bcc acrNoOverflow
+    jmp acrProtected
+acrNoOverflow:
+
+    // Reject if HexVal < UserProgStart (low protected region)
+    sec
+    lda HexValLo
+    sbc #<UserProgStart
+    lda HexValHi
+    sbc #>UserProgStart
+    bcc acrProtected        // borrow -> HexVal < UserProgStart
+
+    // Reject if CandEnd > $C000 (high protected region: KERNAL/IO/VMM MCT)
+    sec
+    lda #<$C000
+    sbc AptCandEndLo
+    lda #>$C000
+    sbc AptCandEndHi
+    bcc acrProtected        // borrow -> $C000 < CandEnd
+
+    // --- Scan all registered apps for an overlap ---
+    ldx #0
+acrScanLoop:
+    cpx #APT_MAX_SLOTS
+    bcs acrSafe
+    jsr aptSlotBase         // VmmSeg/Off = entry base; X preserved
+    jsr vmmReadByte         // A = Flags
+    and #APT_FLAG_USED
+    beq acrNextSlot         // unused slot -> skip
+
+    // Read CurrLoadAddr (offset 17)
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR
+    sta VmmOffLo
+    bcc acrReadLoadLo
+    inc VmmOffHi
+acrReadLoadLo:
+    jsr vmmReadByte
+    sta AptTempLoadLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempLoadHi
+
+    // Read CurrSize (offset 19)
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeHi
+
+    // CurrEnd = CurrLoadAddr + CurrSize
+    clc
+    lda AptTempLoadLo
+    adc AptTempSizeLo
+    sta AptTempEndLo
+    lda AptTempLoadHi
+    adc AptTempSizeHi
+    sta AptTempEndHi
+
+    // No overlap if CurrLoadAddr >= CandEnd
+    sec
+    lda AptTempLoadLo
+    sbc AptCandEndLo
+    lda AptTempLoadHi
+    sbc AptCandEndHi
+    bcs acrNextSlot
+
+    // No overlap if HexVal (candidate start) >= CurrEnd
+    sec
+    lda HexValLo
+    sbc AptTempEndLo
+    lda HexValHi
+    sbc AptTempEndHi
+    bcs acrNextSlot
+
+    // Overlap detected — reject, X already holds the conflicting slot index
+    sec
+    rts
+
+acrNextSlot:
+    inx
+    jmp acrScanLoop
+
+acrSafe:
+    clc
+    rts
+
+acrProtected:
+    ldx #$FF
+    sec
+    rts
+
+// -----------------------------------------------------------------------
 // aptRegister — add or overwrite an app table entry
 // If an entry with the same name already exists, it is overwritten (re-LOAD).
 // Otherwise, the first free slot is used and UsedSlots is incremented.
@@ -347,75 +461,6 @@ aptRegister:
     pha
     lda TempLo
     pha
-
-    // --- Overlap Eviction Scan ---
-    ldx #0                  // slot loop index
-arOverlapLoop:
-    cpx #APT_MAX_SLOTS
-    bcs arOverlapDone
-    jsr aptSlotBase         // VmmSeg/Off = entry base
-    jsr vmmReadByte         // A = Flags
-    and #APT_FLAG_USED
-    beq arNextOverlap       // unused slot -> skip
-
-    // Read CurrLoadAddr (offset 17)
-    clc
-    lda VmmOffLo
-    adc #APT_OFF_ADDR
-    sta VmmOffLo
-    bcc arReadLoadLo
-    inc VmmOffHi
-arReadLoadLo:
-    jsr vmmReadByte
-    sta AptTempLoadLo
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempLoadHi
-
-    // Read CurrSize (offset 19)
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempSizeLo
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempSizeHi
-
-    // Compute CurrEndAddr = CurrLoadAddr + CurrSize
-    clc
-    lda AptTempLoadLo
-    adc AptTempSizeLo
-    sta AptTempEndLo
-    lda AptTempLoadHi
-    adc AptTempSizeHi
-    sta AptTempEndHi
-
-    // Compare CurrLoadAddr >= Temp (B)
-    // If true (Carry set) -> no overlap
-    sec
-    lda AptTempLoadLo
-    sbc TempLo
-    lda AptTempLoadHi
-    sbc TempHi
-    bcs arNextOverlap
-
-    // Compare HexVal (A) >= CurrEndAddr (B)
-    // If true (Carry set) -> no overlap
-    sec
-    lda HexValLo
-    sbc AptTempEndLo
-    lda HexValHi
-    sbc AptTempEndHi
-    bcs arNextOverlap
-
-    // Overlap detected! Remove the entry at slot X
-    // aptRemove preserves X
-    jsr aptRemove
-
-arNextOverlap:
-    inx
-    jmp arOverlapLoop
-arOverlapDone:
-
     // --- Search / Overwrite Check ---
     clc                     // name mode
     jsr aptFind

@@ -60,6 +60,14 @@ This file serves as the shared repository for architectural decisions, technical
 - **Phase progression**: A = fixed `$2600` entry; B = Binary Relocator patches binary at arbitrary address; C = REU-resident with DMA swap on RUN.
 - **Design spec**: `docs/superpowers/specs/2026-05-13-app-manager-design.md`.
 
+### Memory-Safe Loading (Pre-flight Validation)
+- **Concept**: Before any bytes of a `.PRG` are loaded from disk, the OS pre-resolves the file's size and validates the destination range against protected system areas and registered app slots.
+- **Directory Size Resolution**: Implemented `getFileSize` which queries `"$0:filename"` using secondary address 0 (read directory pseudo-file). It skips the disk header line, parses the second line (which is either the file entry or `BLOCKS FREE`), counts quote characters to verify it is a valid file entry, and uses `calcFileSize` to convert blocks to bytes.
+- **Pre-flight Checks**: Relocated loads (`SpecificLoad=0`) invoke `getFileSize` and `aptCheckRange`. The range `[HexVal, HexVal+size)` is validated:
+  - Reject (protected address) if it wraps around 16 bits or falls under `UserProgStart` or above `$C000`.
+  - Reject (address overlap) if it intersects with any active app table slot's `[LoadAddr, LoadAddr+Size)` range.
+- **Safety Rejection**: On failure, the KERNAL load is aborted before memory transfer begins, keeping memory intact. The obsolete post-load eviction logic in `aptRegister` has been deleted.
+
 ### Master Environment Block
 - **Storage**: Allocated in the REU via `vmmAlloc` (4KB / 1 page) during shell initialization.
 - **Format**: MS-DOS standard double-null terminated strings (`VAR1=VAL1\0VAR2=VAL2\0\0`).

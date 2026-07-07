@@ -102,6 +102,17 @@
 .label AptSegLo         = $03F2    // persistent: APT VMM segment lo (0 = not yet allocated)
 .label AptSegHi         = $03F3    // persistent: APT VMM segment hi
 
+// Overlap-check scratch (aptRegister, aptCheckRange) — fills the remaining
+// cassette buffer workspace bytes through $03FB.
+.label AptTempLoadLo    = $03F4    // scanned slot's CurrLoadAddr lo
+.label AptTempLoadHi    = $03F5    // scanned slot's CurrLoadAddr hi
+.label AptTempSizeLo    = $03F6    // scanned slot's CurrSize lo
+.label AptTempSizeHi    = $03F7    // scanned slot's CurrSize hi
+.label AptTempEndLo     = $03F8    // scanned slot's CurrEndAddr lo (CurrLoadAddr+CurrSize)
+.label AptTempEndHi     = $03F9    // scanned slot's CurrEndAddr hi
+.label AptCandEndLo     = $03FA    // aptCheckRange: candidate end addr lo (HexVal+size)
+.label AptCandEndHi     = $03FB    // aptCheckRange: candidate end addr hi
+
 // --- User Program Space ---
 // External commands are loaded here. 
 #import "build_config.inc"

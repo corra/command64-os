@@ -1,5 +1,11 @@
 # Task Spec: Dynamic Memory safety & Allocation
 
+> **Split notice:** The safety-check/validation portion of this spec
+> (`aptCheckRange`, `getFileSize`, aborting unsafe `cmdLoad`s) is now tracked
+> in detail in [`memory-safe-loading.md`](memory-safe-loading.md), which is
+> in scope now. The `aptFindFreeRegion` sliding-window allocator (auto-slotting
+> on `LOAD`) remains deferred and stays tracked here only.
+
 ## Description
 Develop dynamic memory allocation on `LOAD` (finding next available slot of memory without overwriting existing registered programs), explicit address loading safety validation (blocking loads that overlap with existing programs or protected regions), and global `free` command execution (unloading all loaded programs).
 

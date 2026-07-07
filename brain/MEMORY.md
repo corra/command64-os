@@ -11,17 +11,17 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-07-04)
+## Current State (2026-07-06)
 
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, including Phase 1 Peer Review corrections, prefix parsing, and custom SEQ/USR loaders).
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
-- Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE) complete.
+- Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE) and **Memory-Safe Loading (Pre-flight Validation)** complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.3.0 (command64 Build 2542, Stage 0) / DEBUG 0.1.8 (Build 1075).
-- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte. All Phase 1 I/O verification test cases have passed.
+- **Version**: 0.3.1 (command64 Build 2581, Stage 0) / DEBUG 0.1.8 (Build 1075).
+- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte. Pre-flight ranges and size checks verified compiles.
 
 ## Phase 6A — App Manager (next up)
 
@@ -71,7 +71,7 @@
 | `$10E1-$1EB4` | CommandShell (main loop, dispatcher, built-ins) |
 | `$1FA0-$1FFF` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
-| `$03F4-$03F9` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi) |
+| `$03F4-$03FB` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi, AptCandEndLo/Hi) |
 | `$2000-$242B` | AppTable segment (apptable.asm) |
 | `$242C-$2A52` | ShellExt segment (version, help, dir size routines, and shifted messages) |
 | `$2C00+` | UserProgStart (External commands loaded here — shifted from $2A00 to accommodate segment growth) |
@@ -95,6 +95,7 @@
 - **DEBUG Case Normalization**: Shifted letters in `petscii_mixed` are `$C1`–`$DA` whereas unshifted are `$41`–`$5A`. Use `and #$7F` to strip bit 7 and map shifted to unshifted, NOT `ora #$20`.
 - **C64 Custom Byte I/O Channels**: When opening a file for byte-by-byte custom read/write using `CHKIN`/`CHKOUT` and `CHRIN`/`ChROUT`, you must use a secondary address (SA) between 2 and 14 in `KernalSETLFS`. Secondary address 0 is hardcoded for KERNAL `LOAD` and 1 for `SAVE` and cannot be used for standard custom I/O streams.
 - **ahExit stack discipline**: Each program run orphans 4 bytes (jsr UserProgStart + jsr $1000). Always reset SP=`#$FF` in `ahExit` before `jmp mainLoop`.
+- **6502 Relative Branch limit (127 bytes)**: Standard relative branches like `bcs`/`bcc` will trigger assembler errors if the target is further than +127/-128 bytes. Use a conditional branch to skip an absolute `jmp` trampoline (e.g. `bcc no_overflow; jmp target; no_overflow:`) for long distances.
 
 ## Pending Tasks
 
