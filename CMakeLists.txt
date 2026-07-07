@@ -8,7 +8,7 @@ if(CMAKE_BINARY_DIR EQUAL CMAKE_SOURCE_DIR)
     message(FATAL_ERROR "In-source builds are not allowed. Please create a separate build directory and run cmake from there.")
 endif()
 
-project(command64-os VERSION 0.3.0 LANGUAGES NONE)
+project(command64-os VERSION 0.3.1 LANGUAGES NONE)
 
 # Include custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")

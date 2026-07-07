@@ -7,7 +7,7 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "3"
-.const VERSION_STAGE = "0" // Release 0.3.0 (with App Manager Phase A)
+.const VERSION_STAGE = "1" // Release 0.3.1 (with App Manager Phase A)
 #import "build_os.inc"
 
 
