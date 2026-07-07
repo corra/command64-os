@@ -68,6 +68,15 @@ This file serves as the shared repository for architectural decisions, technical
   - Reject (address overlap) if it intersects with any active app table slot's `[LoadAddr, LoadAddr+Size)` range.
 - **Safety Rejection**: On failure, the KERNAL load is aborted before memory transfer begins, keeping memory intact. The obsolete post-load eviction logic in `aptRegister` has been deleted.
 
+### Dynamic Memory Allocation (Auto-Slotting)
+- **Concept**: If the user does not specify a load address (e.g. `LOAD "PROGRAM"`), the system automatically allocates the first available page-aligned free memory gap large enough to hold the program.
+- **Allocator Algorithm**: Implemented `aptFindFreeRegion` using a sliding-window scan:
+  - Candidates are scanned ascending starting from `P = >UserProgStart` page-aligned address.
+  - Calls `aptCheckRange` to validate candidate range. If safe (carry clear), the range is allocated (`HexValHi = P`, success).
+  - If unsafe (carry set), and the conflict is with a registered slot `X` (`X != $FF`), it retrieves slot `X`'s bounds, computes its end page (`(EndAddr+255)/256`), updates the candidate search window `P` to that end page, and repeats.
+  - If the conflict is with a protected region (`X == $FF`), the candidate range has hit or exceeded the `$C000` upper bound, returning an `out of memory` error.
+- **Integration**: Wired into `cmdLoad` to execute dynamically when no address is specified.
+
 ### Master Environment Block
 - **Storage**: Allocated in the REU via `vmmAlloc` (4KB / 1 page) during shell initialization.
 - **Format**: MS-DOS standard double-null terminated strings (`VAR1=VAL1\0VAR2=VAL2\0\0`).

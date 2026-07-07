@@ -17,10 +17,10 @@
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, including Phase 1 Peer Review corrections, prefix parsing, and custom SEQ/USR loaders).
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
-- Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE) and **Memory-Safe Loading (Pre-flight Validation)** complete.
+- Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE), **Memory-Safe Loading (Pre-flight Validation)**, and **Dynamic Memory Allocation (Auto-Slotting)** complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.3.1 (command64 Build 2581, Stage 0) / DEBUG 0.1.8 (Build 1075).
+- **Version**: 0.3.2 (command64 Build 2582, Stage 0) / DEBUG 0.1.8 (Build 1075).
 - **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte. Pre-flight ranges and size checks verified compiles.
 
 ## Phase 6A — App Manager (next up)

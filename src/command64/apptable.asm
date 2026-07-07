@@ -444,6 +444,88 @@ acrProtected:
     rts
 
 // -----------------------------------------------------------------------
+// aptFindFreeRegion — dynamically locate the first free page-aligned
+// address large enough to fit a candidate range of size Temp.
+// Input:  TempLo/Hi = requested size in bytes
+// Output: carry clear = success; HexValLo/Hi = allocated address (HexValLo=0)
+//         carry set   = out of memory (no gap large enough found below $C000)
+// Clobbers: A, X, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi,
+//           AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi,
+//           AptCandEndLo/Hi
+// Preserves: TempLo/Hi, NamePtrLo/Hi, SrcHandle
+// -----------------------------------------------------------------------
+aptFindFreeRegion:
+    lda #>UserProgStart
+    ldx #<UserProgStart
+    beq affAligned
+    clc
+    adc #1
+affAligned:
+    sta HexValHi
+    lda #0
+    sta HexValLo
+
+affScanLoop:
+    jsr aptCheckRange
+    bcc affFound            // carry clear -> safe! We found the free region
+
+    // Collision! Check if it's a protected region
+    cpx #$FF
+    beq affFail             // X = $FF -> protected region collision, can't fit
+
+    // Collided with registered slot X. Find its end address and round up to next page.
+    jsr aptSlotBase         // VmmSeg/Off = slot X entry base; X preserved
+    
+    // Read CurrLoadAddr (offset 17)
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR
+    sta VmmOffLo
+    bcc affReadLoadLo
+    inc VmmOffHi
+affReadLoadLo:
+    jsr vmmReadByte
+    sta AptTempLoadLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempLoadHi
+
+    // Read CurrSize (offset 19)
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeHi
+
+    // Compute EndAddr = CurrLoadAddr + CurrSize
+    clc
+    lda AptTempLoadLo
+    adc AptTempSizeLo
+    sta AptTempEndLo
+    lda AptTempLoadHi
+    adc AptTempSizeHi
+    sta AptTempEndHi
+
+    // Round up EndAddr to the next page: Page = EndHi + (EndLo != 0 ? 1 : 0)
+    lda AptTempEndHi
+    ldy AptTempEndLo
+    beq affPageAligned
+    clc
+    adc #1
+affPageAligned:
+    sta HexValHi
+    jmp affScanLoop         // check this new candidate page
+
+affFound:
+    clc
+    rts
+
+affFail:
+    sec
+    rts
+
+// -----------------------------------------------------------------------
 // aptRegister — add or overwrite an app table entry
 // If an entry with the same name already exists, it is overwritten (re-LOAD).
 // Otherwise, the first free slot is used and UsedSlots is incremented.

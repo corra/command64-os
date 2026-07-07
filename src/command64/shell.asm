@@ -492,16 +492,21 @@ clDoneScan:
     ldy TempHi
     jsr shellSkipSpaces
     lda CommandBuffer, y
-    beq clHeaderLoad
+    beq clNoAddrGiven
     
     jsr parseHex
-    bcs clHeaderLoad        // Invalid hex -> use header
+    bcs clNoAddrGiven        // Invalid hex -> treat as no address (allocate)
     lda #0                  // 0 = Relocated (uses HexVal)
     sta SpecificLoad
+    lda #0
+    sta clNeedAlloc
     jmp clPostAddr
-clHeaderLoad:
-    lda #1                  // 1 = Absolute (uses Header)
+
+clNoAddrGiven:
+    lda #0                  // Relocated (uses HexVal allocated below)
     sta SpecificLoad
+    lda #1
+    sta clNeedAlloc
     
 clPostAddr:
     // Calculate pointer: CommandBuffer + TempLo
@@ -536,15 +541,6 @@ clGotLen:
     bne clNameOk
     jmp clErrorClean
 clNameOk:
-    
-    // --- App Table Integration ---
-    // Protected check only for relocated loads (where address is known in HexVal)
-    lda SpecificLoad
-    bne clCheckFull
-    jsr aptProtectedCheck
-    bcc clNotProtected
-    jmp clProtected
-clNotProtected:
     
 clCheckFull:
     // Table-full check (skip if no REU/AppTable initialized)
@@ -583,6 +579,18 @@ clDoLoad:
     jsr getFileSize
     bcs clLoadErr           // getFileSize returned error/not found
 
+    // Check if we need to allocate
+    lda clNeedAlloc
+    beq clNoAllocNeeded
+
+    // Call allocator
+    jsr aptFindFreeRegion
+    bcc clDoRealLoad        // success -> HexVal holds allocated address
+
+    // Out of memory!
+    jmp clNoRoom
+
+clNoAllocNeeded:
     // Call aptCheckRange
     // Input: HexValLo/Hi = candidate load address, TempLo/Hi = size in bytes
     jsr aptCheckRange
@@ -676,6 +684,14 @@ clOverlap:
     sta CurrentDevice
     lda #<aptOverlapMsg
     ldy #>aptOverlapMsg
+    jsr petPrintString
+    rts
+
+clNoRoom:
+    lda SavedDevice
+    sta CurrentDevice
+    lda #<aptNoRoomMsg
+    ldy #>aptNoRoomMsg
     jsr petPrintString
     rts
     
@@ -2673,12 +2689,15 @@ dirSawQuote:      .byte 0
 dirSavedBlockLo:  .byte 0
 dirSavedBlockHi:  .byte 0
 dirPendingSpaces: .byte 0
+clNeedAlloc:       .byte 0
 dirSizeOpen:      .text " ("
                   .byte 0
 dirSizeClose:     .text "b)"
                   .byte 0
 
 aptOverlapMsg:    .text "address overlap"
+                  .byte PetCr, 0
+aptNoRoomMsg:     .text "out of memory"
                   .byte PetCr, 0
 
 // --- getFileSize ---
