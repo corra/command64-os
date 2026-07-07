@@ -14,7 +14,9 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 - **Virtual Memory:** 4KB page-based allocation in the REU (up to 16MB).
 - **Handle-based I/O:** Modern file management system mapping handles to C64 channels.
 - **Multi-Device Support:** Seamlessly switch between C64 devices 8-11.
-- **External Utilities:** Support for external applications (e.g., `DEBUG`).
+- **External Utilities:** Support for external applications (e.g., `DEBUG`, `LABEL`, `CONWAY`).
+- **App Manager:** Resident registry of loaded programs (`APPS`/`PS`, `FREE`) with memory-safe pre-flight validation and dynamic auto-slotting on `LOAD`.
+- **Binary Relocator:** Load relocatable binaries at arbitrary memory addresses.
 
 ## Getting Started
 
@@ -71,7 +73,11 @@ The project is built using **CMake**. A `Makefile` wrapper is also provided at t
 | `DRIVE` | Switch active device (8, 9, 10, 11). Aliases: `DEVICE`, `DEV`. |
 | `SET`   | Display or set environment variables. |
 | `PATH`  | Display or set the executable search path. |
-| `RUN`   | Execute a program at a memory address (defaults to $2000). Alias: `GO`. |
+| `LOAD`  | Load a program by name, optionally at an address; auto-picks a free memory region if omitted. |
+| `RUN`   | Execute a program by name or address; with no argument, runs the program already loaded at the base of user program space. Alias: `GO`. |
+| `APPS`  | List currently loaded/registered programs (name, address, size). Alias: `PS`. |
+| `FREE`  | Deregister a named program, or all loaded programs if no name is given. |
+| `VOL`   | Display the disk name/ID. |
 | `VER`   | Show OS version and build information. |
 | `HELP`  | Display available commands. |
 | `EXIT`  | Return to BASIC. |

@@ -1,7 +1,7 @@
 # command64 OS LABEL Utility Manual
 
 **File Name:** `label.prg`
-**Target Address:** `$2200` (Standard User Program Space)
+**Target Address:** `UserProgStart` (currently `$2C00`, Standard User Program Space)
 
 ## Overview
 

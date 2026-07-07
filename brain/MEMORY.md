@@ -74,7 +74,7 @@
 | `$03F4-$03FB` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi, AptCandEndLo/Hi) |
 | `$2000-$242B` | AppTable segment (apptable.asm) |
 | `$242C-$2A52` | ShellExt segment (version, help, dir size routines, and shifted messages) |
-| `$2C00+` | UserProgStart (External commands loaded here — shifted from $2A00 to accommodate segment growth) |
+| `$2C00+` | UserProgStart (External commands loaded here — shifted from $2600 to accommodate ShellExt segment growth to $2A52) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
 | `$61–$6C` | Zero-page: HandlerVec, ParsePos, Temp, HexVal, VmmSeg/Off/Bank (FAC1) |

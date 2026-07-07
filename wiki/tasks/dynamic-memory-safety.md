@@ -17,11 +17,15 @@ Develop dynamic memory allocation on `LOAD` (finding next available slot of memo
 - Harden `cmdLoad` to check address bounds, enforce relocation checks for dynamic loads, and prevent program memory clobbering.
 
 ## Sub-tasks
-- [ ] Define Cassette Buffer registers in `include/command64.inc`
-- [ ] Write `aptCheckRange` range overlap routine in `apptable.asm`
-- [ ] Write `aptFindFreeRegion` allocator in `apptable.asm`
+- [x] Define Cassette Buffer registers in `include/command64.inc`
+- [x] Write `aptCheckRange` range overlap routine in `apptable.asm`
+- [x] Write `aptFindFreeRegion` allocator in `apptable.asm`
 - [x] Write `aptRemoveAll` global free routine in `apptable.asm`
-- [ ] Implement LFN 13 directory read `getFileSize` in `shell.asm`
-- [ ] Integrate safety check and allocator into `cmdLoad` in `shell.asm`
+- [x] Implement LFN 13 directory read `getFileSize` in `shell.asm`
+- [x] Integrate safety check and allocator into `cmdLoad` in `shell.asm`
 - [x] Integrate bare `free` command handler in `shell.asm`
-- [ ] Compile and verify safety boundaries and dynamic allocation under VICE
+- [x] Compile and verify safety boundaries and dynamic allocation under VICE
+
+> **Status: Shipped.** All sub-tasks complete — see `CHANGELOG.md`
+> "Dynamic Memory Allocation (Auto-Slotting)" and
+> [`memory-safe-loading.md`](memory-safe-loading.md) for the validation half.

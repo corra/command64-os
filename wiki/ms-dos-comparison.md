@@ -77,7 +77,7 @@ This matrix maps core kernel subsystems of `MSDOS.SYS` to their Command 64 OS eq
 | **API Dispatcher** | `DOS/DISPATCH.ASM`, `SRVCALL.ASM` | [api.asm](file:///home/morgan/development/c64/command64-os/src/command64/api.asm) | **Partial** | Subroutine Jump Table (`JSR $1000`) instead of CPU interrupt vector (due to 6502 stack/interrupt limits). |
 | **Memory Manager** | `DOS/ALLOC.ASM` | [vmm.asm](file:///home/morgan/development/c64/command64-os/src/command64/vmm.asm) | **Complete** | Maps 16MB virtual address space in REU (4KB page byte-map), exceeding MS-DOS conventional 640KB bounds. |
 | **File I/O Handle Table** | `DOS/HANDLE.ASM`, `FILE.ASM` | [file.asm](file:///home/morgan/development/c64/command64-os/src/command64/file.asm) | **Partial** | Maps handles 0-7 to C64 secondary addresses. Critical Gap: Handles are not yet exposed on public JSR service bus ($3D-$40). |
-| **Program Exec / Loader** | `DOS/EXEC.ASM` | [loader.asm](file:///home/morgan/development/c64/command64-os/src/command64/loader.asm) | **Partial** | Standard binary loader loading to flat `$2200` space. Relocation support is missing (planned relocator for Phase 6B). |
+| **Program Exec / Loader** | `DOS/EXEC.ASM` | [loader.asm](file:///home/morgan/development/c64/command64-os/src/command64/loader.asm) | **Complete** | Standard binary loader loading to `UserProgStart` (`$2C00`), plus a Binary Relocator (`aptRelocate`, Phase 6B) supporting position-independent loads at arbitrary addresses via a compile-time-generated relocation table. |
 | **Directory Search** | `DOS/SEARCH.ASM`, `PATH.ASM` | [path.asm](file:///home/morgan/development/c64/command64-os/src/command64/path.asm) | **Partial** | Searches filenames on disk, matches case-insensitively. Gaps: Hierarchical subdirectories and partition-walking are missing. |
 | **FAT File Allocation Table** | `DOS/FAT.ASM`, `DISK.ASM` | *(C64 Drive ROM)* | **Complete** | Delegated to the Commodore floppy disk drive (e.g. 1541/1571/1581) which handles sectors and BAM directly. |
 | **File Buffering** | `DOS/BUF.ASM` | [file.asm](file:///home/morgan/development/c64/command64-os/src/command64/file.asm) | **Complete** | Command 64 implements 64-byte buffered I/O read/write segments to optimize C64 IEC serial bus performance. |
@@ -107,10 +107,11 @@ This matrix maps core BIOS low-level device drivers of `IO.SYS` to their Command
 To achieve functional completeness compared to MS-DOS v4.0, the following major gaps must be resolved:
 
 1. **Public File Handle API:** Exposing file handle management ($3D-$40) via the JSR `$1000` service bus so external user programs can read/write custom files.
-2. **Dynamic Program Relocator:** Supporting MZ-style position-independent loading or relocation, shifting executables away from hardcoded `$2200` addresses.
-3. **Subdirectories:** Supporting SD2IEC partition switching and 1581 directory parsing to navigate subdirectory structures.
-4. **Time & Date:** Reading the C64 real-time clock (CIA 1/CIA 2 Time of Day clocks) to implement `DATE` and `TIME` commands and stamp files.
-5. **Batch Processing:** Running `.BAT` script sequences.
+2. **Subdirectories:** Supporting SD2IEC partition switching and 1581 directory parsing to navigate subdirectory structures.
+3. **Time & Date:** Reading the C64 real-time clock (CIA 1/CIA 2 Time of Day clocks) to implement `DATE` and `TIME` commands and stamp files.
+4. **Batch Processing:** Running `.BAT` script sequences.
+
+> Note: the Dynamic Program Relocator gap previously listed here has been resolved — see the Program Exec / Loader row above.
 
 ---
 

@@ -9,6 +9,11 @@ Build a relocator module that allows programs compiled with relocation headers t
 - Add support in `LOAD` command to automatically trigger relocation.
 
 ## Sub-tasks
-- [ ] Design relocatable executable file format.
-- [ ] Implement loading patching engine in `src/command64/loader.asm` or a dedicated module.
-- [ ] Create test relocatable binary and verify correct execution at arbitrary memory addresses.
+- [x] Design relocatable executable file format.
+- [x] Implement loading patching engine in `src/command64/loader.asm` or a dedicated module.
+- [x] Create test relocatable binary and verify correct execution at arbitrary memory addresses.
+
+> **Status: Shipped.** Implemented as `aptRelocate` in `src/command64/loader.asm`,
+> paired with `tools/reloc.py` (footer format: `BaseAddrLo/Hi`, `TableSizeLo/Hi`,
+> relocation table, magic `'R','6'`). See `brain/KNOWLEDGE.md` and
+> `brain/walkthroughs/2026-07-05-binary-relocator.md` for details.

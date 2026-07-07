@@ -4,7 +4,9 @@ This document provides technical details for developing applications for the com
 
 ## 1. Memory Map
 
-When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `$2600` up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
+When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `UserProgStart` (currently `$2C00`, configurable via the CMake cache variable `USER_PROG_START_HEX`) up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
+
+> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → current `$2C00`). Applications should never hardcode `$2600` or any other prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
 
 ### C64 RAM Banking Control ($0001 CPU Port)
 
@@ -31,16 +33,18 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 |         |  User Program Space (RAM)                             |  User Application Area
 |         |  (Note: BASIC ROM banked out at $A000-$BFFF to        |  (RAM replacing ROM)
 |         |   provide contiguous program RAM)                     |
-|  $2600  |                                                       |  
+|UserProgStart|  (`$2C00` in the default build; grows over time  |
+|         |   as OS segments below it expand — see note above)    |
 +---------+-------------------------------------------------------+------------------------+
-|  $25FF  |  Unallocated Padding / Alignment Room                 |  Free RAM (approx. 274B)
-|  $24EE  |                                                       |
+|  $2BFF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
+|  $2A53  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
 +---------+-------------------------------------------------------+
-|  $24ED  |  ShellExt Segment                                     |  OS Shell Data
-|  $235D  |  Contains help strings, version info, utility text    |  (RAM)
+|  $2A52  |  ShellExt Segment                                     |  OS Shell Data
+|  $242C  |  Version, help strings, and DIR size-calc routines    |  (RAM)
 +---------+-------------------------------------------------------+
-|  $235C  |  AppTable Segment                                     |  OS Resident Registry
-|  $2000  |  Application Registry Management API                  |  (RAM)
+|  $242B  |  AppTable Segment                                     |  OS Resident Registry
+|  $2000  |  Application Registry Management API (aptInit/Find/   |  (RAM)
+|         |  Register/Remove/List/FindFreeRegion/CheckRange/etc.) |
 +---------+-------------------------------------------------------+
 |  $1FFF  |  VMM Data Segment                                     |  OS VMM Data
 |         |  vmmInitialized ($1FA0), vmmTempByte ($1FA1)          |  (RAM)
@@ -252,6 +256,21 @@ Always use the stable entry point at **`$1000`** for OS services. Never jump dir
 ### 6.3 Memory Management
 
 Use the VMM API (`DOS_ALLOC_MEM`, `DOS_FREE_MEM`) to manage memory in the REU. Do not write directly to REU registers unless you are managing your own banked memory and are certain it does not conflict with the OS MCT.
+
+### 6.4 Memory-Safe Loading
+
+`LOAD` performs pre-flight validation before any bytes are transferred from disk:
+
+* **Protected ranges**: any destination `< UserProgStart` or `>= $C000` is always rejected (`protected address`).
+* **Address overlap**: for relocated loads (no explicit address given, or `SpecificLoad = 0`), the OS resolves the file's size ahead of time (`getFileSize`, via a directory-only read of the target file) and checks the full `[address, address + size)` range — including 16-bit wraparound — against every currently registered app's `[LoadAddr, LoadAddr + Size)` range (`aptCheckRange`). A collision is rejected (`address overlap`) before the KERNAL `LOAD` call begins, so memory is never partially clobbered.
+* **Auto-slotting**: if `LOAD` is invoked with no address at all, `aptFindFreeRegion` scans page-aligned candidates upward from `UserProgStart`, skipping past any colliding registered app or protected region, and picks the first range large enough to hold the file. If no region fits below `$C000`, `LOAD` reports `out of memory`.
+* On success, `LOAD` prints a `name / addr / size` report (same format as `APPS`/`PS`) for the newly registered program.
+
+### 6.5 Binary Relocator
+
+Programs do not have to be compiled exactly for the current `UserProgStart` to be loadable at an arbitrary address. A relocatable binary is produced by compiling the same source twice at a one-page (`$100`) offset and post-processing both outputs with `tools/reloc.py`, which diffs the two builds to find every absolute high-byte reference and appends a footer to the binary: `BaseAddrLo/Hi` (compile-time origin), `TableSizeLo/Hi` (number of patch offsets), a relocation table (16-bit code offsets, one per patch site), and a 2-byte magic marker (`'R'`, `'6'`).
+
+At load time, `aptRelocate` checks for this magic footer. If present, it computes `PageOffset = (actual load page) - BaseAddrHi` and adds it to the high byte at every patch offset, then registers the program using only the code size (excluding the appended table/footer). If the magic is absent, the file is treated as an ordinary non-relocatable `.PRG` and registered as-is at its full loaded size.
 
 ## 7. Build System
 

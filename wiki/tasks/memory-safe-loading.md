@@ -13,6 +13,13 @@ This is validation-only. **No auto-slotting.** If a given explicit address
 isn't safe, the user must free memory or pick a different address themselves;
 we do not search for or suggest an alternative slot.
 
+> **Status: Shipped.** All sub-tasks below are complete (see `CHANGELOG.md`
+> "Memory-Safe Loading (Pre-flight Validation)"). The auto-slotting allocator
+> described as out-of-scope here has *also* since shipped — see
+> [`dynamic-memory-safety.md`](dynamic-memory-safety.md) — so `LOAD` with no
+> address now does pick a free slot automatically, layered on top of this
+> spec's validation.
+
 ## Scope
 - `getFileSize`: resolve the target file's byte size before `LOAD`, via LFN 13
   directory read (`"$:filename"`) + `calcFileSize` (see `shell.asm:2661`),
@@ -50,19 +57,19 @@ cmdLoad"). That spec's `aptFindFreeRegion` allocator sub-task remains
 deferred and out of scope here.
 
 ## Sub-tasks
-- [ ] Confirm/extend Cassette Buffer temp register layout in
+- [x] Confirm/extend Cassette Buffer temp register layout in
       `include/command64.inc` for range-check scratch space (reuse
       `AptTempLoadLo/Hi`, `AptTempSizeLo/Hi`, `AptTempEndLo/Hi`, currently
       declared ad hoc in `apptable.asm`)
-- [ ] Implement `getFileSize` in `shell.asm` (LFN 13 directory read for
+- [x] Implement `getFileSize` in `shell.asm` (LFN 13 directory read for
       `"$:filename"` + `calcFileSize`, no load performed)
-- [ ] Implement `aptCheckRange` in `apptable.asm` (protected-region +
+- [x] Implement `aptCheckRange` in `apptable.asm` (protected-region +
       all-slots overlap check over an arbitrary `[addr, size)` range)
-- [ ] Wire `cmdLoad` to call `getFileSize` + `aptCheckRange` before
+- [x] Wire `cmdLoad` to call `getFileSize` + `aptCheckRange` before
       `shellLoadPrg`, aborting with a message on failure
-- [ ] Delete `aptRegister`'s overlap-eviction scan now that unsafe loads are
+- [x] Delete `aptRegister`'s overlap-eviction scan now that unsafe loads are
       rejected pre-flight
-- [ ] Compile and verify under VICE:
+- [x] Compile and verify under VICE:
       - Loading into a range occupied by another app aborts with a message
         and the occupied program's memory is untouched.
       - Loading a file too large for the gap before the next program/

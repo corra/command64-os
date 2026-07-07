@@ -202,11 +202,11 @@ $1130        CommandShell             start (OS entry), mainLoop, shellReadLine,
 $1F90        VmmData                  vmmInitialized (1), vmmTempByte (1),
                                      fileScratch (96 bytes)
 ──────────── ──────────────────────── ────────────────────────────────────────────
-$2000–$CFFF  User Program Space       External programs load and execute here (BASIC ROM banked out)
+UserProgStart–$CFFF  User Program Space   External programs load and execute here (BASIC ROM banked out); currently `$2C00`
 $C000–$CFFF  VMM MCT                  Memory Control Table (4096 bytes for 16MB REU)
 ```
 
-> **Note**: The addresses shown for OS segments (`$0820`–`$0CE0`) are compile-time constants in `src/command64.asm`; they may drift slightly between builds as code grows. The *stable* entry point for external programs is always exactly `$1000`.
+> **Note**: The addresses shown for OS segments (`$0820`–`$0CE0`) are compile-time constants in `src/command64.asm`; they may drift slightly between builds as code grows. The *stable* entry point for external programs is always exactly `$1000`. `UserProgStart` (the `AppTable`/`ShellExt` boundary that follows it) has shifted upward several times as OS-resident segments grew — from `$2000` to `$2200` to `$2600` to the current `$2C00` — and is configured via the CMake cache variable `USER_PROG_START_HEX`. Never hardcode a prior value; always compile external programs against the current build's constant.
 
 ---
 
@@ -931,7 +931,7 @@ Clobbers: A, X, Y, HandlerVecLo/Hi, ParsePos
 2. Reject names starting with `$` (prevents loading the directory listing as a program).
 3. Call `parsePointerDevice` to resolve optional device prefix.
 4. Call `findFile` to probe the disk for the program.
-5. If found: set `SpecificLoad = 0` (relocated), `HexValLo/Hi = UserProgStart ($2000)`.
+5. If found: set `SpecificLoad = 0` (relocated), `HexValLo/Hi = UserProgStart` (currently `$2C00`).
 6. Call `shellLoadPrg`.
 7. On success: `JSR UserProgStart`. The external program runs; when it returns (via `RTS` or `DOS_EXIT`), control returns here.
 
@@ -974,20 +974,25 @@ Prints `CommandBuffer[ParsePos..]` then CR. Trivially echoes the argument text.
 2. Check for optional hex address argument → `SpecificLoad = 0` (relocated) or `1` (header).
 3. Parse device prefix via `parsePointerDevice`.
 4. Count filename length.
-5. `findFile` → `shellLoadPrg`.
-6. Restore `CurrentDevice` on both success and error.
+5. **Address given, explicitly protected**: `aptProtectedCheck` rejects the request immediately (`protected address`) before touching the disk (fast path, added alongside the pre-flight validation below).
+6. **No address given**: `aptFindFreeRegion` (a page-aligned sliding-window scan starting at `UserProgStart`, skipping past protected regions and any registered app's range) picks the first free region large enough for the file, using the size resolved by `getFileSize` (see below).
+7. **Relocated loads (`SpecificLoad = 0`)**: `getFileSize` resolves the file's byte size ahead of time via a directory-only read (`"$0:filename"`, secondary address 0 — skips the header line, parses the next line's block count, converts to bytes with `calcFileSize`). `aptCheckRange` then validates `[address, address + size)` against protected ranges (`< UserProgStart` or `>= $C000`, including 16-bit wraparound) and every other registered app's range. Any collision aborts the load before the KERNAL `LOAD` call runs (`protected address` / `address overlap`) — memory is never partially transferred.
+8. `findFile` → `shellLoadPrg` → `aptRelocate` (patches a relocatable binary's absolute high bytes if the file has the `'R','6'` magic footer; otherwise treated as a plain non-relocatable PRG) → `aptRegister`.
+9. On success: `aptPrintLoadInfo` prints a `name / addr / size` hex report (same layout as `APPS`/`PS`).
+10. Restore `CurrentDevice` on both success and error.
 
 **`cmdRun`** — Execute program in memory  
-Without argument: `JSR UserProgStart`.  
-With hex address argument: parse via `parseHex`, store in `HandlerVecLo/Hi`, `JSR` through it.  
-The inner `crJump` label using `JMP (HandlerVecLo)` allows the `JSR crJump` to be a normal subroutine call; the program's `RTS` returns here, and then a final `RTS` returns to `mainLoop`.
+Without argument: searches the App Table for a program registered at `UserProgStart` (`aptFind`, address mode) and jumps to it if found; otherwise reports not loaded.  
+With a name argument: `aptFind` (name mode) resolves the registered load address.  
+With a hex address argument: parse via `parseHex`, either resolved directly via `aptFind` (address mode) or, if not registered, treated as a raw jump target.  
+The inner `crJump`/`crExecute` path using `JMP (HandlerVecLo)` allows the `JSR` to be a normal subroutine call; the program's `RTS` returns here, and then a final `RTS` returns to `mainLoop`.
 
 **`cmdDir`** — Directory listing  
 Opens LFN 13 with filename `$` (directory) and secondary address 0 (read). The C64 CBM DOS responds to opening `$` with a BASIC-tokenized directory stream. The shell:
 
 1. Skips the 2-byte load address.
 2. For each "BASIC line": reads 2-byte link pointer, 2-byte block count, then the name until null.
-3. Prints block count (decimal via `printDecimal16`) then the name.
+3. Prints block count (decimal via `printDecimal16`), the name, and — for real file entries (lines containing a quoted name, as opposed to the header or the trailing `BLOCKS FREE` line) — the byte size in parentheses, e.g. `"FILENAME" (508 bytes)`. The byte size is computed by `calcFileSize` (`Size = Blocks*254 = Blocks*256 - Blocks*2`, avoiding a multiply loop) and printed via `printDecimal24` (24-bit decimal with leading-zero suppression).
 4. Stops when the link pointer is `$0000` (EOF).
 
 **`cmdType`** — Display file contents  
@@ -1078,12 +1083,12 @@ loop:
 
 ## 9. Module Reference — External Commands
 
-External commands are standalone PRG files that live at `$2000` (`UserProgStart`). They use the OS API via `JSR $1000` and terminate with `DOS_EXIT`. They share `CommandBuffer`, `ParsePos`, and `CurrentDevice` with the shell (these are at fixed RAM addresses).
+External commands are standalone PRG files that live at `UserProgStart` (currently `$2C00`). They use the OS API via `JSR $1000` and terminate with `DOS_EXIT`. They share `CommandBuffer`, `ParsePos`, and `CurrentDevice` with the shell (these are at fixed RAM addresses). Non-relocatable binaries compiled for a prior `UserProgStart` value can still run via the Binary Relocator (§13.1).
 
 ### 9.1 `debug.asm` — Interactive Memory Monitor
 
 **File**: [src/external/debug/debug.asm](src/external/debug/debug.asm)  
-**Load address**: `$2000`  
+**Load address**: `UserProgStart` (currently `$2C00`)  
 **Version**: 0.1.x (auto-incremented build number from `BUILD_DEBUG`)
 
 DEBUG is a port of the MS-DOS `DEBUG.COM` interactive memory/register tool.
@@ -1170,7 +1175,7 @@ API_EXIT:
 ### 9.2 `label.asm` — Disk Volume Label Writer
 
 **File**: [src/external/label/label.asm](src/external/label/label.asm)  
-**Load address**: `$2000`
+**Load address**: `UserProgStart` (currently `$2C00`)
 
 LABEL directly edits the CBM DOS directory structure on disk (Track 18, Sector 0, byte offset 144) to set the 16-byte volume name field.
 
@@ -1219,7 +1224,7 @@ Under `.encoding "petscii_mixed"`, uppercase character literals assemble to shif
 ### 9.3 `conway.asm` — Conway's Game of Life
 
 **File**: [src/external/conway/conway.asm](src/external/conway/conway.asm)  
-**Load address**: `$2000`
+**Load address**: `UserProgStart` (currently `$2C00`)
 
 Full-screen cellular automaton. The 40×25 text screen is used 1:1 as the simulation grid (1000 cells). Rules: B3/S23 with toroidal wrapping on all four edges.
 
@@ -1354,7 +1359,7 @@ shellDispatch (table miss)
       petPrintString "loading..."
       KernalLOAD (A=0, X/Y=target)
   bcs sdExtError (load error)
-  → JSR UserProgStart ($2000)
+  → JSR UserProgStart (currently $2C00)
       [program executes; may call DOS_EXIT → resets SP → JMP mainLoop]
       [or: program RTS → return here]
   rts → mainLoop
@@ -1516,12 +1521,14 @@ debug.prg / label.prg / user.prg
 | `ECHO` | — | `echo [text]` | Print text to screen |
 | `EXIT` | — | `exit` | Return to BASIC warm start |
 | `HELP` | — | `help` | Display command list |
-| `LOAD` | — | `load <file> [addr]` | Load PRG; optional hex address overrides header |
+| `LOAD` | — | `load <file> [addr]` | Load PRG; optional hex address overrides header. Without an address, `aptFindFreeRegion` auto-picks a free page-aligned region. Pre-flight-validates the destination range before touching disk and prints a name/addr/size report on success. |
 | `TYPE` | — | `type <file>` | Display file contents |
 | `COPY` | — | `copy <src> <dst>` | Copy file (cross-device supported) |
 | `DEL` | `ERASE` | `del <file>` | Delete file |
 | `REN` | `RENAME` | `ren <old> <new>` | Rename file |
-| `RUN` | `GO` | `run [addr]` | Execute at address (default `$2000`) |
+| `RUN` | `GO` | `run [name\|addr]` | Execute a registered program by name or address; with no argument, runs whatever is registered at `UserProgStart` |
+| `APPS` | `PS` | `apps` | List registered programs (name, address, size) |
+| `FREE` | — | `free [name]` | Deregister a named program, or all non-running registered programs if no name is given |
 | `SET` | — | `set [VAR[=VAL]]` | Show all / query / set environment variable |
 | `PATH` | — | `path [value]` | Show or set `PATH` environment variable |
 | `VOL` | — | `vol [device:]` | Show disk volume label and ID |
@@ -1541,7 +1548,7 @@ debug.prg / label.prg / user.prg
 
 .encoding "petscii_mixed"
 
-* = UserProgStart   ; $2000
+* = UserProgStart   ; currently $2C00 — never hardcode; always compile against the current build's constant
 
 start:
     cld             ; always clear decimal mode
@@ -1584,6 +1591,14 @@ Example: if the user typed `MYPROG foo bar`, then `ParsePos` points past `"mypro
 | `lda #DOS_EXIT; jsr $1000` | Normal program exit — recommended. Resets stack, returns to shell. |
 | `RTS` | Simple programs. The shell called you via `JSR UserProgStart`, so `RTS` returns to the shell's dispatch code. However, the stack has the return address from the calling shell on it, so this is safe for programs that don't corrupt the stack. |
 | `JMP $E37B` | Return to BASIC (bypasses shell entirely). |
+
+### 13.1 Making a Program Relocatable
+
+By default, an external program is compiled for a fixed `UserProgStart` and can only be `LOAD`ed at that address (or explicitly relocated by editing high bytes yourself). To support loading at an arbitrary address (auto-slotting, or an explicit user-chosen address), build a relocatable binary:
+
+1. Compile the same source twice, once at the normal `UserProgStart` origin and once at `UserProgStart + $0100` (one page later) — this is exactly the diff that `USER_PROG_START_HEX_NEXT` in `CMakeLists.txt` exists to produce.
+2. Run `tools/reloc.py` on the two resulting `.prg` files. It diffs them to find every absolute high-byte reference that shifted by exactly one page, and appends a footer to the PRG: `BaseAddrLo/Hi` (the first build's origin), `TableSizeLo/Hi`, a table of 16-bit code offsets (one per patch site), and the 2-byte magic marker `'R','6'`.
+3. At load time, `aptRelocate` (`src/command64/loader.asm`) detects the magic footer, computes `PageOffset = (actual load page) - BaseAddrHi`, and patches the high byte at each recorded offset by that amount. The registered program size excludes the appended table/footer. If the magic footer is absent, the loader falls back to registering the file as an ordinary non-relocatable PRG at its full loaded size.
 
 ### File I/O Example
 

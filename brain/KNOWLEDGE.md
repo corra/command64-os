@@ -51,7 +51,7 @@ This file serves as the shared repository for architectural decisions, technical
 
 ### App Table (Phase 6A — Completed)
 - **Segment**: `AppTable` at `$2000`–`$235C`. Consecutively followed by `ShellExt` segment at `$235D`–`$24ED` (storing help/version string blocks).
-- **UserProgStart**: Shifted from `$2000` → `$2600` to leave memory headroom for OS expansion.
+- **UserProgStart**: Shifted from `$2000` → `$2600` to leave memory headroom for OS expansion, then later `$2600` → `$2C00` (see CHANGELOG `[Unreleased]`) as the `ShellExt` segment grew further. Configured via the CMake cache variable `USER_PROG_START_HEX`; external programs must always compile against the current value rather than a hardcoded address.
 - **Storage**: VMM-allocated 4 KB page (one `vmmAlloc` call at shell startup). Segment number saved in `AptSegLo/Hi` at `$03F2`–`$03F3` (cassette buffer free area).
 - **Layout**: 4-byte header (MaxSlots=16, UsedSlots, reserved×2) + 16 entries × 40 bytes = 644 bytes total.
 - **Entry offsets**: Flags=0, Name=1 (16 bytes PETSCII null-padded), LoadAddr=17 (lo/hi), Size=19 (lo/hi). Offsets 21–39 reserved for Phase B/C (ReuAddr, saved CPU state).

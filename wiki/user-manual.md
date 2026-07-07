@@ -69,8 +69,20 @@ The command64 shell is the primary interface for the OS.
 
 ### DIR
 
-**Description:** Lists the files on the currently active disk.
+**Description:** Lists the files on the currently active disk, including each file's size in bytes.
 **Syntax:** `DIR`
+**Example output:** `"MYPROG" (2032 bytes)`
+
+### APPS / PS
+
+**Description:** Lists currently loaded/registered programs, showing each one's name, load address, and size.
+**Syntax:** `APPS` or `PS`
+
+### FREE
+
+**Description:** Deregisters a loaded program, freeing its App Table slot so its memory can be reused by a future `LOAD`. With no name given, deregisters every loaded program that isn't currently running.
+**Syntax:** `FREE [name]`
+**Examples:** `FREE MYPROG` (frees just `MYPROG`), `FREE` (frees everything loaded).
 
 ### ECHO
 
@@ -191,15 +203,14 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 
 ### LOAD
 
-**Description:** Loads a program from disk into memory without running it.
+**Description:** Loads a program from disk into memory without running it. Before any data is transferred, the OS validates that the destination memory range doesn't collide with protected system memory or another loaded program, rejecting the load with `protected address` or `address overlap` if it would. If no address is given, the OS automatically picks the first free memory region large enough for the file (reporting `out of memory` if none fits). On success, it prints the program's name, load address, and size.
 **Syntax:** `LOAD [filename] [address]`
-**Example:** `LOAD MYPROG 4000` (Loads `MYPROG` to address `$4000`).
+**Example:** `LOAD MYPROG 4000` (Loads `MYPROG` to address `$4000`). `LOAD MYPROG` (Loads `MYPROG` at an automatically chosen free address).
 
 ### RUN / GO
 
-**Description:** Executes a program already resident in memory.
-**Syntax:** `RUN [address]` or `GO [address]`
-**Default:** If no address is provided, it defaults to `$2200` (Standard User Program Space, shifted from $2000 in Phase 6A).
+**Description:** Executes a program by name or address. With no argument, it runs whatever program is currently loaded at the base of User Program Space.
+**Syntax:** `RUN [name|address]` or `GO [name|address]`
 
 ### LABEL
 
@@ -232,7 +243,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **$2200 - $CFFF:** **User Program Space.** Most external utilities should be compiled for `$2200` (expanded by banking out BASIC ROM).
+- **User Program Space (`UserProgStart` - $CFFF):** currently `$2C00` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity
@@ -265,4 +276,4 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 
 ### Program Crashes after `RUN`
 
-- Ensure the program was compiled for the address you are running it from. Most programs are designed for `$2200`. Running a program from a non-native address will cause a crash unless it is specifically designed to be position-independent.
+- Ensure the program was compiled for the address you are running it from (the current `UserProgStart`, by default). Running a program from a non-native address will cause a crash unless it was built as a relocatable binary (see the Programmer's Reference).
