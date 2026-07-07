@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Fast Path for Protected Addresses**: Restored the early `aptProtectedCheck` check in `cmdLoad` for user-specified address loads, instantly rejecting explicitly protected destinations (like `LOAD "PROGRAM" $1000`) before accessing the disk.
 - **Dynamic Memory Allocation (Auto-Slotting)**: Implemented `aptFindFreeRegion` in `apptable.asm`, a sliding-window page allocator that dynamically finds the first free, page-aligned region large enough to fit a candidate program between `UserProgStart` and `$C000`. Wired the allocator into `cmdLoad` to execute when no address is specified on `LOAD`. Reports `out of memory` if no fitting space is found.
 - **Memory-Safe Loading (Pre-flight Validation)**: Implemented pre-flight range checks for relocated programs (`SpecificLoad=0`). Added `getFileSize` (using secondary address 0 filtered directory read to skip the header and parse file block counts) and `aptCheckRange` (checks memory collisions against protected OS space `$0000–$29FF`, `$C000–$FFFF` with 16-bit wrap-around detection and active app table registry slots). If any check fails, the KERNAL load is aborted before memory transfer and displays `protected address` or `address overlap`.
 - **DIR byte-size reporting**: Added file size reporting in bytes to the directory listing (`DIR` command) using a highly optimized, loop-free 6502 math routine (`calcFileSize`) computing `Size = Blocks * 254 = (Blocks * 256) - (Blocks * 2)`. Added `printDecimal24` supporting 24-bit decimal printing with leading-zero suppression.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Bounds Checking Code Refactor**: Factored out duplicate VMM slot boundary parsing and end-address calculations in `apptable.asm` into a shared `aptGetSlotRange` helper, reducing code size and saving 53 bytes of RAM in the `AppTable` segment.
 - **App Table Eviction Refactor**: Deleted the obsolete overlap-eviction check in `aptRegister` to prevent silent program deletion after memory clobbering, enforcing pre-flight validation rejection instead.
 - **Directory Parser and Smoke Test Cleanup**: Reverted all temporary directory capture buffers, quote mirroring logic, and printout smoke tests left in `cmdDir` (`shell.asm`) during development.
 - **Binary Relocator register restoration**: Fixed a bug in `aptRelocate` (`src/command64/loader.asm`) where `TempLo/Hi` (the end address + 1) was not restored when the relocation magic check failed. This previously caused standard non-relocatable programs loaded from the shell to be registered in the app table with a size 6 bytes smaller than their actual size.

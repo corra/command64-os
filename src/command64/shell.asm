@@ -541,7 +541,13 @@ clGotLen:
     bne clNameOk
     jmp clErrorClean
 clNameOk:
-    
+    // Fast path: if user specified an address (clNeedAlloc=0), run early protected check
+    lda clNeedAlloc
+    bne clCheckFull
+    jsr aptProtectedCheck
+    bcc clCheckFull
+    jmp clProtected
+
 clCheckFull:
     // Table-full check (skip if no REU/AppTable initialized)
     lda AptSegLo

@@ -326,6 +326,47 @@ apfnDone:
     rts
 
 // -----------------------------------------------------------------------
+// aptGetSlotRange — read slot X's LoadAddr and Size from VMM, and
+// calculate its EndAddr = LoadAddr + Size.
+// Input:  X = slot index
+// Output: AptTempLoadLo/Hi = CurrLoadAddr
+//         AptTempSizeLo/Hi = CurrSize
+//         AptTempEndLo/Hi  = CurrEndAddr
+// Clobbers: A, VmmSegLo/Hi, VmmOffLo/Hi, DstHandle
+// Preserves: X, TempLo/Hi, HexValLo/Hi
+// -----------------------------------------------------------------------
+aptGetSlotRange:
+    jsr aptSlotBase         // VmmSeg/Off = entry base for slot X; X preserved
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR
+    sta VmmOffLo
+    bcc agsrReadLoadLo
+    inc VmmOffHi
+agsrReadLoadLo:
+    jsr vmmReadByte
+    sta AptTempLoadLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempLoadHi
+
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeLo
+    inc VmmOffLo
+    jsr vmmReadByte
+    sta AptTempSizeHi
+
+    clc
+    lda AptTempLoadLo
+    adc AptTempSizeLo
+    sta AptTempEndLo
+    lda AptTempLoadHi
+    adc AptTempSizeHi
+    sta AptTempEndHi
+    rts
+
+// -----------------------------------------------------------------------
 // aptCheckRange — validate a candidate [addr, addr+size) load range
 // before any bytes are transferred. Does NOT evict or modify anything —
 // pure read-only validation for the memory-safe-loading pre-flight check.
@@ -379,36 +420,7 @@ acrScanLoop:
     and #APT_FLAG_USED
     beq acrNextSlot         // unused slot -> skip
 
-    // Read CurrLoadAddr (offset 17)
-    clc
-    lda VmmOffLo
-    adc #APT_OFF_ADDR
-    sta VmmOffLo
-    bcc acrReadLoadLo
-    inc VmmOffHi
-acrReadLoadLo:
-    jsr vmmReadByte
-    sta AptTempLoadLo
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempLoadHi
-
-    // Read CurrSize (offset 19)
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempSizeLo
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempSizeHi
-
-    // CurrEnd = CurrLoadAddr + CurrSize
-    clc
-    lda AptTempLoadLo
-    adc AptTempSizeLo
-    sta AptTempEndLo
-    lda AptTempLoadHi
-    adc AptTempSizeHi
-    sta AptTempEndHi
+    jsr aptGetSlotRange     // read slot range (LoadAddr, Size, EndAddr)
 
     // No overlap if CurrLoadAddr >= CandEnd
     sec
@@ -474,38 +486,7 @@ affScanLoop:
     beq affFail             // X = $FF -> protected region collision, can't fit
 
     // Collided with registered slot X. Find its end address and round up to next page.
-    jsr aptSlotBase         // VmmSeg/Off = slot X entry base; X preserved
-    
-    // Read CurrLoadAddr (offset 17)
-    clc
-    lda VmmOffLo
-    adc #APT_OFF_ADDR
-    sta VmmOffLo
-    bcc affReadLoadLo
-    inc VmmOffHi
-affReadLoadLo:
-    jsr vmmReadByte
-    sta AptTempLoadLo
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempLoadHi
-
-    // Read CurrSize (offset 19)
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempSizeLo
-    inc VmmOffLo
-    jsr vmmReadByte
-    sta AptTempSizeHi
-
-    // Compute EndAddr = CurrLoadAddr + CurrSize
-    clc
-    lda AptTempLoadLo
-    adc AptTempSizeLo
-    sta AptTempEndLo
-    lda AptTempLoadHi
-    adc AptTempSizeHi
-    sta AptTempEndHi
+    jsr aptGetSlotRange     // X = conflicting slot index; reads slots bounds to AptTempEnd
 
     // Round up EndAddr to the next page: Page = EndHi + (EndLo != 0 ? 1 : 0)
     lda AptTempEndHi

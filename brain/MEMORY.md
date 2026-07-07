@@ -20,8 +20,8 @@
 - Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE), **Memory-Safe Loading (Pre-flight Validation)**, and **Dynamic Memory Allocation (Auto-Slotting)** complete.
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.3.2 (command64 Build 2582, Stage 0) / DEBUG 0.1.8 (Build 1075).
-- **Verification**: Both `build/command64.prg` and `build/debug.prg` assemble cleanly via CMake and match Makefile output byte-for-byte. Pre-flight ranges and size checks verified compiles.
+- **Version**: 0.3.3 (command64 Build 2584, Stage 0) / DEBUG 0.1.8 (Build 1075).
+- **Verification**: Refactored `apptable.asm` to use `aptGetSlotRange` shared helper, reducing duplication and saving 53 bytes of RAM. Restored early `aptProtectedCheck` performance fast path in `cmdLoad` for explicitly protected addresses. Pre-flight ranges and size checks verified compiles.
 
 ## Phase 6A — App Manager (next up)
 
