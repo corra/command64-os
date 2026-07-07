@@ -232,6 +232,19 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 | `C` | Clear grid (all cells dead) |
 | `Q` or RUN/STOP | Quit and return to shell |
 
+### PACMAN
+
+**Description:** Pac64 — a character-grid Pac-Man clone. Pac-Man and four ghosts (Blinky, Pinky, Inky, Clyde) move one tile at a time through a 40×24 maze; ghosts run the full authentic scatter/chase/frightened/eaten state machine with all four classic personalities.
+**Syntax:** `PACMAN`
+
+**Controls (during play):**
+
+| Key | Action |
+| --- | --- |
+| `W`/`A`/`S`/`D` | Move up / left / down / right (buffered) |
+| `P` or `SPACE` | Pause / resume |
+| `Q` or RUN/STOP | Quit and return to shell |
+
 ---
 
 <a name="technical-limits"></a>

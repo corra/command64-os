@@ -57,6 +57,9 @@ set(LABEL_ENTRY "src/external/label/label.asm")
 file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.asm" "include/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway.asm")
 
+file(GLOB_RECURSE PACMAN_SRCS CONFIGURE_DEPENDS "src/external/pacman/*.asm" "include/*.inc")
+set(PACMAN_ENTRY "src/external/pacman/pacman.asm")
+
 # NOTE: dvorak (src/external/dvorak/dvorak.asm) is deliberately not wired up
 # as a build target — it has known fundamental problems (see header comment
 # in the source) and is parked for a future rework before it's built/bundled.
@@ -91,6 +94,9 @@ add_external_app(label "${LABEL_ENTRY}" LABEL_SRCS 1000)
 
 # 4. CONWAY Game of Life
 add_external_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1000)
+
+# 4b. PACMAN — character-grid Pac-Man clone
+add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 
 # 5. Test PRGs (one per tests/src/*.asm, automatically registered via glob with version tracking)
 file(GLOB TEST_SRCS "tests/src/*.asm")
@@ -147,7 +153,7 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug label conway ${C_TARGETS})
+set(IMAGE_PRG_TARGETS command64 debug label conway pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS})
 
 add_c64_disk_image(image_d64

@@ -14,7 +14,7 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 - **Virtual Memory:** 4KB page-based allocation in the REU (up to 16MB).
 - **Handle-based I/O:** Modern file management system mapping handles to C64 channels.
 - **Multi-Device Support:** Seamlessly switch between C64 devices 8-11.
-- **External Utilities:** Support for external applications (e.g., `DEBUG`, `LABEL`, `CONWAY`).
+- **External Utilities:** Support for external applications (e.g., `DEBUG`, `LABEL`, `CONWAY`, `PACMAN`).
 - **App Manager:** Resident registry of loaded programs (`APPS`/`PS`, `FREE`) with memory-safe pre-flight validation and dynamic auto-slotting on `LOAD`.
 - **Binary Relocator:** Load relocatable binaries at arbitrary memory addresses.
 
