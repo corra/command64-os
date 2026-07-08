@@ -57,8 +57,9 @@ endfunction()
 # non-default page.
 function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
     string(TOUPPER "${TARGET_NAME}" TARGET_NAME_UPPER)
-    get_filename_component(ENTRY_FILE_DIR "${ENTRY_FILE}" ABSOLUTE)
-    get_filename_component(ENTRY_FILE_DIR "${ENTRY_FILE_DIR}" DIRECTORY)
+    get_filename_component(ENTRY_FILE_ABS "${ENTRY_FILE}" ABSOLUTE)
+    get_filename_component(ENTRY_FILE_DIR "${ENTRY_FILE_ABS}" DIRECTORY)
+    get_filename_component(ENTRY_FILE_NAME "${ENTRY_FILE_ABS}" NAME_WE)
     set(BUILD_FILE "${ENTRY_FILE_DIR}/BUILD_${TARGET_NAME_UPPER}")
     set(INC_FILE "${CMAKE_BINARY_DIR}/build_${TARGET_NAME}.inc")
 
@@ -76,8 +77,23 @@ function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
         )
     endif()
 
+    # List of files whose content is hashed to decide whether the build number
+    # actually needs to bump (see cmake/IncrementBuildNumber.cmake). Written to
+    # a manifest file rather than passed as a -D command-line list, since an
+    # unescaped CMake list embedded in a COMMAND argument gets silently split
+    # into separate arguments by its semicolons.
+    set(HASH_SOURCES "${ENTRY_FILE_ABS}" ${${SOURCES_VAR}})
+    list(REMOVE_DUPLICATES HASH_SOURCES)
+    list(SORT HASH_SOURCES)
+    set(HASH_SOURCES_FILE "${CMAKE_BINARY_DIR}/build_${TARGET_NAME}_sources.txt")
+    string(REPLACE ";" "\n" HASH_SOURCES_CONTENT "${HASH_SOURCES}")
+    file(WRITE "${HASH_SOURCES_FILE}" "${HASH_SOURCES_CONTENT}\n")
+
     # Dynamic build numbers custom command
-    # Triggers the increment script only when dependency files change
+    # Re-runs the increment script whenever a dependency's mtime changes, but
+    # the script itself only bumps BUILD_FILE when the sources' content hash
+    # actually differs from the last recorded one -- a touch/reformat/no-op
+    # save no longer burns a build number.
     add_custom_command(
         OUTPUT "${INC_FILE}"
         COMMAND "${CMAKE_COMMAND}"
@@ -85,13 +101,11 @@ function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
             -DINC_FILE="${INC_FILE}"
             -DDEFAULT_VERSION=${DEFAULT_VERSION}
             -DVAR_NAME="BUILD_NUMBER"
+            -DSOURCES_LIST_FILE="${HASH_SOURCES_FILE}"
             -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
-        DEPENDS ${${SOURCES_VAR}}
+        DEPENDS ${${SOURCES_VAR}} "${ENTRY_FILE_ABS}"
         COMMENT "Checking/Incrementing ${TARGET_NAME_UPPER} build counter"
     )
-
-    get_filename_component(ENTRY_FILE_ABS "${ENTRY_FILE}" ABSOLUTE)
-    get_filename_component(ENTRY_FILE_NAME "${ENTRY_FILE_ABS}" NAME_WE)
 
     # Per-config build directories, each carrying its own build_config.inc
     # that shadows the global one (verified: KickAssembler's -libdir is

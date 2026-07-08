@@ -78,20 +78,35 @@ Staged and reviewed one at a time rather than as a single pass.
 - Note: `tests/src/bin/*.prg` is a pre-existing, unrelated set of checked-in
   binary fixtures — left untouched, not part of this restructure.
 
-### Stage 3 — Hash-based increment trigger
-- [ ] Update `cmake/IncrementBuildNumber.cmake` to compute a hash (e.g.
-      SHA-256 via `file(SHA256 ...)`) over the concatenated dependency
-      sources for a target.
-- [ ] Store the last-recorded hash alongside (or within) each `BUILD_<NAME>`
-      file so it persists across builds.
-- [ ] Only increment and rewrite `BUILD_<NAME>` (and the generated `.inc`)
-      when the computed hash differs from the stored one.
-- [ ] Verify: touching a source file with a no-op edit (e.g. re-save,
-      whitespace-only change that Kick Assembler would still treat as
-      identical output) does *not* bump the build number, while an actual
-      content change does.
-- [ ] Verify across all target types (OS, external apps, tests) — no
-      type-specific exceptions.
+### Stage 3 — Hash-based increment trigger — DONE (2026-07-08)
+- [x] `cmake/IncrementBuildNumber.cmake` now computes a combined SHA-256
+      hash across all tracked source files (via per-file `file(SHA256 ...)`
+      then `string(SHA256 ...)` over the concatenation).
+- [x] `BUILD_<NAME>` format extended to two lines: line 1 = build number,
+      line 2 = the content hash as of the last recorded state. Rewritten
+      unconditionally each run, but bytes are identical when nothing
+      changed, so git sees no diff.
+- [x] Only increments (and regenerates the `.inc`) when the computed hash
+      differs from the stored one. A missing/legacy hash line (first run
+      after this change) adopts the current hash as a baseline *without*
+      bumping, so migrating existing counters was a no-op.
+- [x] Source lists are passed via a generated manifest file
+      (`build_<target>_sources.txt` per external app, `build_os_sources.txt`
+      for the OS target) rather than a `-D` command-line list, since an
+      unescaped CMake list embedded in a `COMMAND` argument silently splits
+      on semicolons.
+- [x] Applied uniformly: `add_external_app` (covers external apps and all
+      test targets) and the OS target's standalone custom command in
+      `CMakeLists.txt` both route through the same hash logic. The OS
+      target's hash inputs now also explicitly include `CMD64_ENTRY`
+      (`src/command64.asm`), which sat outside the `src/command64/*` glob
+      and was previously missing from its own dependency list.
+- [x] Verified: fresh clean build establishes hash baselines with zero
+      bumps; a no-op `touch` on a tracked source re-runs the check but
+      leaves the counter unchanged; an actual content edit bumps the
+      counter (confirmed on `tests/src/hello/hello.asm`: 1012 → 1013);
+      full `cmake -B build && cmake --build build` still produces both
+      disk images correctly end to end.
 
 ## Notes
 

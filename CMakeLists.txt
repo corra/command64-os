@@ -68,7 +68,17 @@ set(VI_ENTRY "src/external/vi/vi.asm")
 # in the source) and is parked for a future rework before it's built/bundled.
 
 # Dynamic build numbers custom commands
-# These trigger the increment script only when dependency files change
+# Re-runs the increment script whenever a dependency's mtime changes, but the
+# script itself only bumps BUILD_OS when the sources' content hash actually
+# differs from the last recorded one (see cmake/IncrementBuildNumber.cmake).
+get_filename_component(CMD64_ENTRY_ABS "${CMD64_ENTRY}" ABSOLUTE)
+set(OS_HASH_SOURCES "${CMD64_ENTRY_ABS}" ${CMD64_SRCS})
+list(REMOVE_DUPLICATES OS_HASH_SOURCES)
+list(SORT OS_HASH_SOURCES)
+set(OS_HASH_SOURCES_FILE "${CMAKE_BINARY_DIR}/build_os_sources.txt")
+string(REPLACE ";" "\n" OS_HASH_SOURCES_CONTENT "${OS_HASH_SOURCES}")
+file(WRITE "${OS_HASH_SOURCES_FILE}" "${OS_HASH_SOURCES_CONTENT}\n")
+
 add_custom_command(
     OUTPUT "${CMAKE_BINARY_DIR}/build_os.inc"
     COMMAND "${CMAKE_COMMAND}"
@@ -76,8 +86,9 @@ add_custom_command(
         -DINC_FILE="${CMAKE_BINARY_DIR}/build_os.inc"
         -DDEFAULT_VERSION=2417
         -DVAR_NAME="BUILD_NUMBER"
+        -DSOURCES_LIST_FILE="${OS_HASH_SOURCES_FILE}"
         -P "${CMAKE_SOURCE_DIR}/cmake/IncrementBuildNumber.cmake"
-    DEPENDS ${CMD64_SRCS}
+    DEPENDS ${CMD64_SRCS} "${CMD64_ENTRY_ABS}"
     COMMENT "Checking/Incrementing OS build counter"
 )
 
