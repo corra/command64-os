@@ -104,8 +104,8 @@ add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 # 4c. VI — vi-like visual text editor
 add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
 
-# 5. Test PRGs (one per tests/src/*.asm, automatically registered via glob with version tracking)
-file(GLOB TEST_SRCS "tests/src/*.asm")
+# 5. Test PRGs (one per tests/src/<name>/<name>.asm, automatically registered via glob with version tracking)
+file(GLOB TEST_SRCS "tests/src/*/*.asm")
 set(TEST_TARGETS "")
 foreach(TEST_SRC ${TEST_SRCS})
     get_filename_component(TEST_NAME "${TEST_SRC}" NAME_WE)

@@ -60,15 +60,23 @@ Staged and reviewed one at a time rather than as a single pass.
       `image_d64`/`test_image_d64` still assemble all PRGs onto their disk
       images.
 
-### Stage 2 — Restructure tests into per-test subdirectories
-- [ ] Move each `tests/src/<name>.asm` into `tests/src/<name>/<name>.asm`.
-- [ ] Create `tests/src/common/` (empty/reserved, for future shared includes).
-- [ ] Update the `file(GLOB TEST_SRCS ...)` logic in `CMakeLists.txt` to
-      discover tests under the new subdirectory layout.
-- [ ] Move each `BUILD_TEST_<NAME>` into its corresponding
-      `tests/src/<name>/` directory (following Stage 1's convention).
-- [ ] Verify `cmake --build build --target test_image_d64` still builds all
-      test PRGs and registers them on the test disk image.
+### Stage 2 — Restructure tests into per-test subdirectories — DONE (2026-07-08)
+- [x] Move each `tests/src/<name>.asm` into `tests/src/<name>/<name>.asm`
+      (all 10 tests: apitest, banktest, color, devtest, extcls, filetest,
+      handletest, hello, reloc, vmmtest).
+- [x] Create `tests/src/common/` (reserved, `.gitkeep` placeholder — no
+      shared test code exists yet).
+- [x] Update `file(GLOB TEST_SRCS "tests/src/*.asm")` to
+      `file(GLOB TEST_SRCS "tests/src/*/*.asm")` in `CMakeLists.txt`.
+- [x] Move each `BUILD_TEST_<NAME>` into its corresponding
+      `tests/src/<name>/` directory — no further CMake change needed since
+      Stage 1 already made `add_external_app` resolve `BUILD_FILE` from the
+      entry file's own directory.
+- [x] Verify `cmake --build build --target test_image_d64` still builds all
+      10 test PRGs and registers them on the test disk image; build counters
+      confirmed incrementing at their new colocated paths.
+- Note: `tests/src/bin/*.prg` is a pre-existing, unrelated set of checked-in
+  binary fixtures — left untouched, not part of this restructure.
 
 ### Stage 3 — Hash-based increment trigger
 - [ ] Update `cmake/IncrementBuildNumber.cmake` to compute a hash (e.g.
