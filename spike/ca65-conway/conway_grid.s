@@ -367,23 +367,23 @@ setDstRowPtr:
 getCurrBase:
     lda zpBufSel
     bne gcbGrid1
-    lda #GRID0_LO
-    ldx #GRID0_HI
+    lda #<grid0
+    ldx #>grid0
     rts
 gcbGrid1:
-    lda #GRID1_LO
-    ldx #GRID1_HI
+    lda #<grid1
+    ldx #>grid1
     rts
 
 getNextBase:
     lda zpBufSel
     beq gnbGrid1
-    lda #GRID0_LO
-    ldx #GRID0_HI
+    lda #<grid0
+    ldx #>grid0
     rts
 gnbGrid1:
-    lda #GRID1_LO
-    ldx #GRID1_HI
+    lda #<grid1
+    ldx #>grid1
     rts
 
 ; ---------------------------------------------------------------------------
@@ -440,3 +440,13 @@ statusText:
     .byte $0C, $05, $01, $12, $20, $20, $11, $3D, $11, $15, $09, $14
 statusTextEnd:
 STATUS_TEXT_LEN = statusTextEnd - statusText
+
+; ---------------------------------------------------------------------------
+; Runtime buffers (relocatable, page-aligned)
+; ---------------------------------------------------------------------------
+.align 256
+grid0:
+    .res 960, 0
+.align 256
+grid1:
+    .res 960, 0

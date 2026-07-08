@@ -11,17 +11,20 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-07-06)
+## Current State (2026-07-08)
 
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, including Phase 1 Peer Review corrections, prefix parsing, and custom SEQ/USR loaders).
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
-- Phase 6A: App Manager Phase A (Program registry table APPS/PS/FREE), **Memory-Safe Loading (Pre-flight Validation)**, and **Dynamic Memory Allocation (Auto-Slotting)** complete.
+- Phase 6A: App Manager Phase A complete.
+- Phase 6B: Binary Relocator complete.
+- Phase 6C: External Editor (VI) complete.
+- **Conway memory safety & relocation crash fix**: Resolved memory collisions between code and double buffers by embedding the grid buffers as relocatable, page-aligned data tables inside the binaries. Both Kick and ca65 builds generate identical size-bounded relocatable binaries (3008 bytes, 59 relocation entries).
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.3.1 (command64 Build 2584, Stage 1) / DEBUG 0.1.8 (Build 1075).
-- **Verification**: Refactored `apptable.asm` to use `aptGetSlotRange` shared helper, reducing duplication and saving 53 bytes of RAM. Restored early `aptProtectedCheck` performance fast path in `cmdLoad` for explicitly protected addresses. Pre-flight ranges and size checks verified compiles.
+- **Version**: 0.3.1 (command64 OS Build 2584, VI Build 1013) / DEBUG 0.1.8 (Build 1075).
+- **Verification**: VI editor compiled relocatable, verified buffer layout, scrolling, insertions, deletions, yanking, pasting, and save/load file routines.
 
 ## Phase 6A — App Manager (next up)
 
@@ -77,6 +80,7 @@
 | `$2C00+` | UserProgStart (External commands loaded here — shifted from $2600 to accommodate ShellExt segment growth to $2A52) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
+| `$30-$4F` | Zero-page: VI Pointers and State (External Utility) |
 | `$61–$6C` | Zero-page: HandlerVec, ParsePos, Temp, HexVal, VmmSeg/Off/Bank (FAC1) |
 | `$6D` | Zero-page: FileHandle (Active API Handle) |
 | `$6E-$6F` | Zero-page: SrcHandle, DstHandle (Shell Scratch) |
@@ -96,6 +100,7 @@
 - **C64 Custom Byte I/O Channels**: When opening a file for byte-by-byte custom read/write using `CHKIN`/`CHKOUT` and `CHRIN`/`ChROUT`, you must use a secondary address (SA) between 2 and 14 in `KernalSETLFS`. Secondary address 0 is hardcoded for KERNAL `LOAD` and 1 for `SAVE` and cannot be used for standard custom I/O streams.
 - **ahExit stack discipline**: Each program run orphans 4 bytes (jsr UserProgStart + jsr $1000). Always reset SP=`#$FF` in `ahExit` before `jmp mainLoop`.
 - **6502 Relative Branch limit (127 bytes)**: Standard relative branches like `bcs`/`bcc` will trigger assembler errors if the target is further than +127/-128 bytes. Use a conditional branch to skip an absolute `jmp` trampoline (e.g. `bcc no_overflow; jmp target; no_overflow:`) for long distances.
+- **KickAssembler Named Anonymous Labels**: KickAssembler anonymous labels must be exactly `!:` (without any name). Putting a name like `!name+:` triggers a token syntax error. Use standard local labels like `_name:` instead.
 
 ## Pending Tasks
 
@@ -108,6 +113,7 @@
 - [ ] Support subdirectories (1581 / SD2IEC)
 - [x] Environment variable storage (`SET`, `PATH`) in REU
 - [x] Implement `VOL` and `LABEL` commands (disk directory header editing)
+- [x] Develop external `vi` alike editor (Phase 6C)
 - [ ] Implement `TIME` command using CIA 1 TOD clock
 - [ ] Implement `DATE` command (software calendar + REU storage)
 - [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety

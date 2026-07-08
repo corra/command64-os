@@ -54,22 +54,39 @@ patches itself.
 
 ## Build wiring
 
-`cmake/Ca65.cmake` (`add_ca65_spike_app`) assembles + links this into
-`conway_ca65`, a target with the same `C64_PRG_PATH` property convention as
-the real Kick targets. It's `Ca65_FOUND`-gated (mirrors `Oscar64.cmake` —
-absence of cc65 must not break the real build) and is only added to
-`TEST_IMAGE_PRG_TARGETS`, never `IMAGE_PRG_TARGETS` — it does not ship on
-the release disk. Output filename on disk is `conwayca` (deliberately
-distinct from the real `conway` target) so both can coexist on `test.d64`
-and be exercised independently in VICE.
+`cmake/Ca65.cmake` (`add_ca65_spike_app`) assembles this once, links it
+**twice** (against `conway_2c00.cfg` and `conway_2d00.cfg`), then runs
+`tools/reloc.py` — the same diff tool Kick's `add_external_app` uses — on
+the two link outputs. That produces `conwayca.prg` with a real high-byte
+patch table and `'R','6'` footer, exactly like the Kick-built `conway.prg`,
+so the shell's `aptRelocate` (`src/command64/loader.asm`) can correctly
+patch it if it gets loaded away from `$2C00`. It's `Ca65_FOUND`-gated
+(mirrors `Oscar64.cmake` — absence of cc65 must not break the real build)
+and is only added to `TEST_IMAGE_PRG_TARGETS`, never `IMAGE_PRG_TARGETS` —
+it does not ship on the release disk. Output filename on disk is
+`conwayca` (deliberately distinct from the real `conway` target) so both
+can coexist on `test.d64` and be exercised independently in VICE.
+
+## Why relocation isn't optional here
+
+Earlier revisions of this spike shipped a single, non-relocatable link
+(no footer/patch table). That turned out to be actively unsafe on this
+OS: `cmdLoad` (`src/command64/shell.asm`) always ignores a `.prg`'s own
+embedded load-address header and auto-allocates a free page instead
+(`aptFindFreeRegion` in `src/command64/apptable.asm`) when no explicit
+address is given. If `conway` (Kick-built, relocatable) was already
+resident at `$2C00` and `conwayca` (non-relocatable) got auto-allocated to
+the next free page, `conwayca`'s hardcoded-at-link-time absolute
+`JSR`/`JMP` targets still pointed at `$2C00` — the first internal jump
+would land inside whatever was actually there, producing a crash on `RUN`,
+not on `LOAD`. Running every spike app through the same diff-and-patch
+pipeline Kick already relies on closes that gap, and it turned out to
+need zero new relocator code: ld65's output diffs exactly like Kick's
+(see "What this proves" above), so `tools/reloc.py` works on it unmodified.
 
 ## What's deliberately NOT covered
 
-- No true runtime/PIE-style relocation: this is a static linker, not a
-  self-relocating loader like Kick's `aptRelocate` + `'R','6'` footer
-  scheme. The comparison is "reassemble twice" (Kick) vs. "assemble once,
-  relink twice" (ca65/ld65) — not "one binary that relocates itself at load
-  time."
-- The `$2D00` link output isn't shipped anywhere; it exists purely as
-  evidence for the relocation claim (see `cmake/Ca65.cmake` — only the
-  `$2C00` variant, `conway_ca65`, becomes a CMake target).
+- This reuses Kick's existing relocation *tooling* (`reloc.py`'s diff
+  algorithm, `aptRelocate`'s patch-time logic) rather than building
+  anything new. The spike's contribution is proving ld65's output is
+  diffable the same way Kick's is — not a new relocation mechanism.

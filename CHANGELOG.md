@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **VI Alike External Editor**: Developed a user-space external editor (`vi.prg`) running in RAM from `UserProgStart` up to `$C000`. Features:
+  - **Memory Management**: Utilizes an efficient O(1) Gap Buffer in RAM, supporting document sizes up to ~35KB.
+  - **Editing Modes**: Implements Command Mode (movement, deletions, yanking, pasting), Insert Mode (interactive text insertion, carriage returns, destructive backspace/DEL), and Last-Line Mode (prompts on row 24 for file save/exit and editor configuration).
+  - **Movement Features**: Character-based movement (`h`, `j`, `k`, `l` and arrow keys), word-based movement (`w`, `b`), and line boundary movement (`0`, `$`). Vertical movement preserves original target columns across different line lengths.
+  - **Editing Features**: Supports single-character delete (`x`), word delete (`dw`), line delete (`dd`), line yanking (`yy`), and paste (`p`/`P` for character/word or whole line pasting).
+  - **Line Number Mode**: Implements a togglable line number mode (`:set nu` / `:set nonu`) rendering a 5-column line number margin on the left with tilde (`~`) fillers past the end of the file.
+  - **File I/O**: Loads file from command line argument (e.g. `VI test.txt`) on startup and saves file (with overwrite protection via early delete) using stable DOS API calls.
+  - **Horizontal Scrolling**: Automatically scrolls text horizontally (`leftCol` tracking) and vertically (`topLine` tracking) to keep the cursor visible.
 - **Fast Path for Protected Addresses**: Restored the early `aptProtectedCheck` check in `cmdLoad` for user-specified address loads, instantly rejecting explicitly protected destinations (like `LOAD "PROGRAM" $1000`) before accessing the disk.
 - **Dynamic Memory Allocation (Auto-Slotting)**: Implemented `aptFindFreeRegion` in `apptable.asm`, a sliding-window page allocator that dynamically finds the first free, page-aligned region large enough to fit a candidate program between `UserProgStart` and `$C000`. Wired the allocator into `cmdLoad` to execute when no address is specified on `LOAD`. Reports `out of memory` if no fitting space is found.
 - **Memory-Safe Loading (Pre-flight Validation)**: Implemented pre-flight range checks for relocated programs (`SpecificLoad=0`). Added `getFileSize` (using secondary address 0 filtered directory read to skip the header and parse file block counts) and `aptCheckRange` (checks memory collisions against protected OS space `$0000–$29FF`, `$C000–$FFFF` with 16-bit wrap-around detection and active app table registry slots). If any check fails, the KERNAL load is aborted before memory transfer and displays `protected address` or `address overlap`.
@@ -23,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Bounds Checking Code Refactor**: Factored out duplicate VMM slot boundary parsing and end-address calculations in `apptable.asm` into a shared `aptGetSlotRange` helper, reducing code size and saving 53 bytes of RAM in the `AppTable` segment.
+- **Conway memory safety & relocation crash**: Modified both Kick Assembler `conway` and ca65 `conwayca` to define their double grid buffers as page-aligned, relocatable data tables inside the binary (`.align 256` in ca65 and `.align $100` in Kick). This increases the registered program size to 3008 bytes, allowing the OS memory manager to reserve the buffer space and prevent auto-allocation collisions, while allowing the relocator to patch the buffer pointers dynamically.
 - **App Table Eviction Refactor**: Deleted the obsolete overlap-eviction check in `aptRegister` to prevent silent program deletion after memory clobbering, enforcing pre-flight validation rejection instead.
 - **Directory Parser and Smoke Test Cleanup**: Reverted all temporary directory capture buffers, quote mirroring logic, and printout smoke tests left in `cmdDir` (`shell.asm`) during development.
 - **Binary Relocator register restoration**: Fixed a bug in `aptRelocate` (`src/command64/loader.asm`) where `TempLo/Hi` (the end address + 1) was not restored when the relocation magic check failed. This previously caused standard non-relocatable programs loaded from the shell to be registered in the app table with a size 6 bytes smaller than their actual size.

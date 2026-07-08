@@ -53,15 +53,8 @@
 .const JIFFY_CLK = $A2          // KERNAL jiffy counter lo (increments ~60 Hz)
 
 // ---------------------------------------------------------------------------
-// Buffer base addresses (page-aligned; low byte is always $00)
-//   grid0: $3000-$33BF  (960 cells; remainder of page is harmless padding)
-//   grid1: $3400-$37BF  (same layout, second buffer)
-// Code fits comfortably below $3000 (~600 bytes from $2000).
+// Buffer base addresses (relocatable, page-aligned data segments)
 // ---------------------------------------------------------------------------
-.const GRID0_LO  = $00
-.const GRID0_HI  = $30
-.const GRID1_LO  = $00
-.const GRID1_HI  = $34
 
 // ---------------------------------------------------------------------------
 // Display
@@ -637,12 +630,12 @@ setDstRowPtr:
 getCurrBase:
     lda zpBufSel
     bne gcbGrid1
-    lda #GRID0_LO
-    ldx #GRID0_HI
+    lda #<grid0
+    ldx #>grid0
     rts
 gcbGrid1:
-    lda #GRID1_LO
-    ldx #GRID1_HI
+    lda #<grid1
+    ldx #>grid1
     rts
 
 // ---------------------------------------------------------------------------
@@ -652,12 +645,12 @@ gcbGrid1:
 getNextBase:
     lda zpBufSel
     beq gnbGrid1
-    lda #GRID0_LO
-    ldx #GRID0_HI
+    lda #<grid0
+    ldx #>grid0
     rts
 gnbGrid1:
-    lda #GRID1_LO
-    ldx #GRID1_HI
+    lda #<grid1
+    ldx #>grid1
     rts
 
 // ---------------------------------------------------------------------------
@@ -736,3 +729,13 @@ dslLoop:
     cpx #STATUS_TEXT_LEN
     bne dslLoop
     rts
+
+// ---------------------------------------------------------------------------
+// Runtime buffers (relocatable, page-aligned)
+// ---------------------------------------------------------------------------
+.align $100
+grid0:
+    .fill 960, 0
+.align $100
+grid1:
+    .fill 960, 0

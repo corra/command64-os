@@ -116,6 +116,7 @@
 - [ ] Phase 6: Advanced OS Features
   - [x] Phase 6A: App Manager Phase A (Program registry APPS/PS/FREE) (Completed 2026-07-04)
   - [x] Implement Binary Relocator (to support `RUN` at arbitrary addresses) (Completed 2026-07-05)
+  - [x] Conway & conwayca memory Safety & Relocation Crash Remediation (Completed 2026-07-08)
   - [ ] Add Oscar64 C-Language runtime support
   - [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety
 

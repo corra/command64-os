@@ -13,6 +13,7 @@ This file serves as the shared repository for architectural decisions, technical
 | 2026-05-01 | Kick Assembler | Selected for 6502 assembly support. | Active |
 | 2026-05-01 | Oscar64 | Selected as the C compiler for C64 target. | Active |
 | 2026-06-25 | Code Wiki & Project Tooling | Created structured code wiki under wiki/, corrected child DOX index paths, and initialized Taskwarrior + Codebase Memory. | Active |
+| 2026-07-08 | Gap-Buffer VI Editor | Implemented a user-space vi-alike text editor using a Gap Buffer for O(1) edits, supporting line numbering, word/line operations, and horizontal/vertical scrolling. | Active |
 
 ## Technical Findings
 
@@ -41,13 +42,19 @@ This file serves as the shared repository for architectural decisions, technical
 | Phase 5: Env & Multi-Device Support | ⏳ In-Progress (Taskwarrior & Wiki setup done) |
 | Phase 6A: App Manager (Phase A) | ✅ Done |
 | Phase 6B: Binary Relocator | ✅ Done |
+| Phase 6C: External Editor (VI) | ✅ Done |
 
 ## Architectural Decisions & Constraints
 
 ### Absolute vs. Relocatable Binaries
-- **Constraint**: External programs are compiled for `$2600` (UserProgStart) by default.
+- **Constraint**: External programs are compiled for `$2C00` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
 - **Execution**: The OS loader automatically detects this footer, patches all absolute high-bytes in-place to run at the target load page (e.g. `LOAD debug $4000`), and truncates the registered size to exclude the table. Non-relocatable binaries fall back to being registered as-is with original bounds preserved.
+- **Memory Safety & Runtime Buffers (Conway Case Study)**: Programs that utilize large uninitialized RAM buffers (such as Conway's 960-byte double grid buffers) must not hardcode fixed buffer pages (e.g. `$3000` / `$3400`). Hardcoded buffers lead to silent memory corruption if another program is auto-allocated to the buffer address space by the OS page allocator. Instead:
+  - Buffers are defined in-binary as page-aligned data allocations (`.align 256` / `.align $100` with `.res` or `.fill`).
+  - This embeds them in the `.prg` file size, forcing the OS memory manager to reserve the entire memory range (`[LoadAddr, LoadAddr + Size)`) and prevent allocation overlaps.
+  - Buffer base addresses are retrieved dynamically via relocatable pointer references (`#<grid0` / `#>grid0`), allowing the relocator to patch them correctly when shifted.
+  - Linking configurations (`conway_2c00.cfg`, `conway_2d00.cfg`) must have segment alignment enabled (`align = 256`) and memory boundaries increased to cover the buffers.
 
 ### App Table (Phase 6A — Completed)
 - **Segment**: `AppTable` at `$2000`–`$235C`. Consecutively followed by `ShellExt` segment at `$235D`–`$24ED` (storing help/version string blocks).
@@ -76,6 +83,12 @@ This file serves as the shared repository for architectural decisions, technical
   - If unsafe (carry set), and the conflict is with a registered slot `X` (`X != $FF`), it retrieves slot `X`'s bounds, computes its end page (`(EndAddr+255)/256`), updates the candidate search window `P` to that end page, and repeats.
   - If the conflict is with a protected region (`X == $FF`), the candidate range has hit or exceeded the `$C000` upper bound, returning an `out of memory` error.
 - **Integration**: Wired into `cmdLoad` to execute dynamically when no address is specified.
+
+### VI Alike External Editor (Phase 6C)
+- **Buffer Design**: Uses a Gap Buffer split into two parts: text before cursor (`[textBufferStart, ptrGapStart)`) and text after cursor (`[ptrGapEnd, ptrBufEnd)`). This allows insertion and deletion of characters/lines in O(1) time without massive shifts.
+- **Line numbering margin**: Line number mode (`lineNumMode = 1`) shifts the text viewport horizontally by 5 characters, drawing space-padded line numbers on the left (e.g. `   1 |`) and tilde `~` markers past the end of the file.
+- **Horizontal & Vertical Scrolling**: Automatically tracks `topLine` and `leftCol` to align with the cursor's coordinate index. Viewport transitions happen dynamically inside `checkScrollBounds` on cursor motion.
+- **Yank and Clipboard**: Implements a dedicated 2KB fixed clipboard `yankBuf` supporting line-yank (`yy`) and character-yank. Pasting (`p`/`P`) recalculates text indices to ensure stability.
 
 ### Master Environment Block
 - **Storage**: Allocated in the REU via `vmmAlloc` (4KB / 1 page) during shell initialization.
