@@ -46,8 +46,9 @@ function(add_kickass_target TARGET_NAME)
 endfunction()
  
 # Helper function to define an external C64 application target with enforced versioning.
-# It checks for a persistent build number file (BUILD_<NAME_UPPER>) in the source root
-# and fails at configure time if it is missing, ensuring strict version enforcement.
+# It checks for a persistent build number file (BUILD_<NAME_UPPER>) alongside the
+# target's entry source file, and fails at configure time if it is missing,
+# ensuring strict version enforcement.
 #
 # Phase 6B (Binary Relocator): the app is compiled twice, one page apart
 # ($2600 and $2700), and tools/reloc.py diffs the two builds to produce a
@@ -56,7 +57,9 @@ endfunction()
 # non-default page.
 function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
     string(TOUPPER "${TARGET_NAME}" TARGET_NAME_UPPER)
-    set(BUILD_FILE "${CMAKE_SOURCE_DIR}/BUILD_${TARGET_NAME_UPPER}")
+    get_filename_component(ENTRY_FILE_DIR "${ENTRY_FILE}" ABSOLUTE)
+    get_filename_component(ENTRY_FILE_DIR "${ENTRY_FILE_DIR}" DIRECTORY)
+    set(BUILD_FILE "${ENTRY_FILE_DIR}/BUILD_${TARGET_NAME_UPPER}")
     set(INC_FILE "${CMAKE_BINARY_DIR}/build_${TARGET_NAME}.inc")
 
     # Enforce that the BUILD_<APP> file exists in the source directory
@@ -67,8 +70,8 @@ function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
             " VERSIONING VIOLATION:\n"
             " External application target '${TARGET_NAME}' requires a persistent build\n"
             " counter file at: '${BUILD_FILE}'.\n"
-            " Please create this file containing the starting build number (e.g. 1000)\n"
-            " before configuring.\n"
+            " Please create this file (alongside the target's entry source file)\n"
+            " containing the starting build number (e.g. 1000) before configuring.\n"
             "========================================================================"
         )
     endif()
