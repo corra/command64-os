@@ -1,0 +1,152 @@
+; spike/ca65-conway/conway_main.s
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Command64 project contributors
+;
+; ca65/ld65 relocation spike -- ported from src/external/conway/conway.asm.
+; See spike/ca65-conway/README.md for what this is proving and why.
+;
+; The two-byte CBM load-address header is emitted from __MAIN_START__, a
+; symbol the linker config (conway_2c00.cfg / conway_2d00.cfg) exports for
+; the "MAIN" memory area. That means this object file (and conway_grid.o)
+; assemble exactly once; only the ld65 link step differs between the two
+; target addresses -- no reassembly of source needed to relocate.
+
+.include "common.inc"
+
+.import randomizeGrid
+.import drawGrid
+.import drawStatusLine
+.import computeNext
+.import clearGrid
+.import clearScreen
+
+.import __MAIN_START__
+
+.segment "HEADER"
+    .word __MAIN_START__
+
+.segment "CODE"
+
+; ---------------------------------------------------------------------------
+; Entry point
+; ---------------------------------------------------------------------------
+start:
+    lda $D012
+    eor JIFFY_CLK
+    eor $0314
+    ora #1
+    sta zpLfsr
+
+    lda #0
+    sta zpPaused
+    sta zpBufSel
+
+    sta VIC_BORD
+    sta VIC_BGND
+
+    lda #CLR_LIVE
+    ldx #0
+fillColorPages:
+    sta COLORRAM,     x
+    sta COLORRAM+256, x
+    sta COLORRAM+512, x
+    inx
+    bne fillColorPages
+    ldy #0
+fillColorTail:
+    sta COLORRAM+768, y
+    iny
+    cpy #232
+    bne fillColorTail
+
+    jsr randomizeGrid
+    jsr drawGrid
+    jsr drawStatusLine
+
+; ---------------------------------------------------------------------------
+; Main loop
+; ---------------------------------------------------------------------------
+mainLoop:
+    jsr handleKeys
+
+    lda zpPaused
+    bne mainLoop
+
+    jsr waitDelay
+    jsr computeNext
+    jsr swapBufs
+    jsr drawGrid
+    jmp mainLoop
+
+; ---------------------------------------------------------------------------
+; handleKeys -- non-blocking keyboard poll; act on recognised keys.
+; ---------------------------------------------------------------------------
+handleKeys:
+    jsr KernalGetIn
+    beq hkNone
+
+    cmp #$51                    ; Q
+    beq hkQuit
+    cmp #3                      ; RUN/STOP
+    beq hkQuit
+    cmp #$20                    ; SPACE
+    beq hkPause
+    cmp #$52                    ; R
+    beq hkRandom
+    cmp #$43                    ; C
+    beq hkClear
+hkNone:
+    rts
+
+hkQuit:
+    ; Discard mainLoop's return address before RTS so control returns to
+    ; the shell that JSR'd into this program's entry point, not mainLoop.
+    lda #0
+    sta VIC_BORD
+    sta VIC_BGND
+    jsr clearScreen
+    pla
+    pla
+    rts
+
+hkPause:
+    lda zpPaused
+    eor #$FF
+    sta zpPaused
+    rts
+
+hkRandom:
+    jsr randomizeGrid
+    jsr drawGrid
+    rts
+
+hkClear:
+    jsr clearGrid
+    jsr drawGrid
+    rts
+
+; ---------------------------------------------------------------------------
+; waitDelay -- busy-wait for GEN_DELAY jiffy-clock increments.
+; ---------------------------------------------------------------------------
+waitDelay:
+    lda #GEN_DELAY
+wdOuter:
+    pha
+    lda JIFFY_CLK
+wdPoll:
+    cmp JIFFY_CLK
+    beq wdPoll
+    pla
+    sec
+    sbc #1
+    bne wdOuter
+    rts
+
+; ---------------------------------------------------------------------------
+; swapBufs -- toggle zpBufSel; roles of grid0 and grid1 exchange.
+; ---------------------------------------------------------------------------
+swapBufs:
+    lda zpBufSel
+    eor #1
+    sta zpBufSel
+    rts

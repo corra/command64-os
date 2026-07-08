@@ -24,6 +24,7 @@ find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff 
 include(KickAssembler)
 include(cc1541)
 include(Oscar64)
+include(Ca65)
 
 # Set disk metadata
 set(DISK_NAME "Command 64")
@@ -115,6 +116,28 @@ add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 # 4c. VI — vi-like visual text editor
 add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
 
+# 4d. Exploratory ca65/ld65 spike — ported conway, split across two object
+# files (conway_main.s / conway_grid.s) so ld65 has to resolve cross-module
+# symbols and relocate the CBM load-address header itself. Deliberately NOT
+# added to IMAGE_PRG_TARGETS (the real release disk) — see
+# spike/ca65-conway/README.md. cc65 is optional, mirroring Oscar64's pattern:
+# its absence must not break the Kick build.
+set(CONWAY_CA65_TARGET "")
+if(Ca65_FOUND)
+    set(CONWAY_CA65_SRCS
+        "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_main.s"
+        "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_grid.s"
+    )
+    add_ca65_spike_app(conway_ca65
+        SOURCES ${CONWAY_CA65_SRCS}
+        CONFIG "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_2c00.cfg"
+        OUTPUT_NAME "conwayca"
+    )
+    set(CONWAY_CA65_TARGET conway_ca65)
+else()
+    message(STATUS "ca65/ld65 not found on PATH — skipping spike/ca65-conway target")
+endif()
+
 # 5. Test PRGs (one per tests/src/<name>/<name>.asm, automatically registered via glob with version tracking)
 file(GLOB TEST_SRCS "tests/src/*/*.asm")
 set(TEST_TARGETS "")
@@ -171,7 +194,7 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
 set(IMAGE_PRG_TARGETS command64 debug label conway pacman vi ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS})
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CONWAY_CA65_TARGET})
 
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"
