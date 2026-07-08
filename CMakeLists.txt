@@ -138,6 +138,22 @@ else()
     message(STATUS "ca65/ld65 not found on PATH — skipping spike/ca65-conway target")
 endif()
 
+# 4e. Exploratory ca65/ld65 spike — ported label. Single-file (no natural
+# split point like conway had), but stresses a different part of the
+# toolchain: calling Command64's own jump table (jsr $1000, function
+# selector in A) and reading OS globals (CommandBuffer/ParsePos/
+# CurrentDevice), not just raw KERNAL vectors. See
+# spike/ca65-label/label.s header comment for the PETSCII-encoding caveat.
+set(LABEL_CA65_TARGET "")
+if(Ca65_FOUND)
+    add_ca65_spike_app(label_ca65
+        SOURCES "${CMAKE_SOURCE_DIR}/spike/ca65-label/label.s"
+        CONFIG "${CMAKE_SOURCE_DIR}/spike/ca65-label/label_2c00.cfg"
+        OUTPUT_NAME "labelca"
+    )
+    set(LABEL_CA65_TARGET label_ca65)
+endif()
+
 # 5. Test PRGs (one per tests/src/<name>/<name>.asm, automatically registered via glob with version tracking)
 file(GLOB TEST_SRCS "tests/src/*/*.asm")
 set(TEST_TARGETS "")
@@ -194,7 +210,7 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
 set(IMAGE_PRG_TARGETS command64 debug label conway pacman vi ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CONWAY_CA65_TARGET})
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CONWAY_CA65_TARGET} ${LABEL_CA65_TARGET})
 
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"
