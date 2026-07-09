@@ -1,5 +1,48 @@
 # Adopt ca65/ld65 for new development; migrate spike apps to mainline
 
+**Update 2026-07-09 (Phase 6 detail):** Phase 6 was re-planned in detail
+against every candidate policy/doc file (read in full, not assumed from
+this document's own wording) before implementation. Key findings:
+- The master plan's file list needs two corrections. It says both root
+  `AGENTS.md` and `src/AGENTS.md` contain the phrase "designed for
+  assembly using Kick Assembler" — verified by grep, only
+  `src/AGENTS.md:12` actually has it; root `AGENTS.md` doesn't mention any
+  specific assembler and needs no edit. Conversely, `CLAUDE.md` (not
+  mentioned in the master plan at all) has the same stale claim, and since
+  it's injected into the assistant's own system prompt every session,
+  leaving it stale is a live risk to future behavior, not just a doc gap —
+  added to scope.
+- `src/AGENTS.md`'s Local Contracts are phrased as a blanket "All source
+  files" rule, but its own Purpose section scopes it to core OS files —
+  the blanket phrasing predates `src/external/AGENTS.md` existing as a
+  child doc with its own contracts. Reworded to scope the Kick
+  requirement to core OS specifically.
+- `src/external/AGENTS.md` is entirely Kick-only today (its
+  `add_external_app`/`BUILD_<NAME>`/`IMAGE_PRG_TARGETS` workflow section
+  has no ca65 equivalent) — needs a parallel ca65 workflow section
+  pointing at `add_ca65_app` (Phase 3), plus the two zero-page policy
+  items deferred from Phase 2's plan (`.importzp`/`.exportzp` cross-module
+  guidance, and the `$70-$8F` app-private convention — `conway`/`label`
+  already collide on `$70`/`$71`, accepted only because they're never
+  concurrently resident). Also fixes a pre-existing, unrelated inaccuracy:
+  `BUILD_<APPNAME_UPPER>` files live in the app's own directory, not the
+  repository root as currently claimed.
+- `docs/codebase-reference.md` has the toolchain claim in two places: a
+  blanket "The assembler is KickAssembler v5.25" in §1 Project Overview,
+  and needs a toolchain-split note near §13/§13.1 (confirmed §13.1's
+  relocation mechanism description is already toolchain-agnostic, so it
+  needs a clarifying note, not a rewrite). No ca65 program template is
+  added to §13's Kick-only "Minimal Program Template" — that belongs in
+  `src/external/AGENTS.md`'s new workflow section, not duplicated here.
+- `tests/AGENTS.md` verified to need no edit — already toolchain-agnostic.
+
+Full stage-by-stage breakdown (edit `CLAUDE.md`, `src/AGENTS.md`,
+`src/external/AGENTS.md`, `docs/codebase-reference.md`; no changes to root
+`AGENTS.md` or `tests/AGENTS.md`) lives in the Phase 6 planning session —
+see the git history around this update for the full working plan if
+needed. This documentation-only phase closes out the plan entirely once
+implemented (all 6 phases complete).
+
 **Update 2026-07-08 (Phase 5 detail):** Phase 5 was re-planned in detail
 against every spike test file (read in full), the exact `CMakeLists.txt`
 test-loop wiring, and the existing built `.prg` sizes, before
@@ -392,17 +435,19 @@ the stage-by-stage breakdown.
 
 ## Phase 6 — Policy documentation
 
-- `AGENTS.md` (root) and `src/AGENTS.md`: change "designed for assembly using
-  Kick Assembler" to state ca65/ld65 is the required toolchain for **new**
-  external apps; Kick Assembler remains required for `src/command64/*` (core
-  OS) until the deferred core-OS migration plan lands.
-- `src/external/AGENTS.md`: add a ca65-equivalent workflow section next to the
-  existing `add_external_app` contract description (BUILD_<NAME> file,
-  versioning, `IMAGE_PRG_TARGETS`), pointing at `add_ca65_app`.
-- `docs/codebase-reference.md`: note the toolchain split (core OS = Kick,
-  external apps = ca65 going forward) near the existing §13.1 relocation
-  section (`docs/codebase-reference.md:1682-1688`), since that section's
-  described mechanism is now explicitly shared across both toolchains.
+**Superseded by the "Phase 6 detail" update note at the top of this
+document** (added 2026-07-09, after re-planning against every candidate
+file rather than assumptions). Summary of what changed and why: root
+`AGENTS.md` doesn't actually contain the stale Kick-Assembler phrase this
+section assumed (no edit needed there), while `CLAUDE.md` — not
+mentioned here at all originally — does, and matters more since it's
+injected into the assistant's own system prompt every session;
+`src/external/AGENTS.md`'s new ca65 workflow section also picks up the
+two zero-page policy items deferred from Phase 2 (`.importzp`/
+`.exportzp`, the `$70-$8F` app-private convention) and fixes a
+pre-existing, unrelated `BUILD_<NAME>`-location inaccuracy found along
+the way. See the top-of-file update note for the full rationale and the
+per-file edit breakdown.
 
 ## Verification
 
