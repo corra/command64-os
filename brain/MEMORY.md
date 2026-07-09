@@ -25,6 +25,8 @@
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
 - **Version**: 0.3.1 (command64 OS Build 2584, VI Build 1013) / DEBUG 0.1.8 (Build 1075).
 - **Verification**: VI editor compiled relocatable, verified buffer layout, scrolling, insertions, deletions, yanking, pasting, and save/load file routines.
+- **Conway Multiverse Research**: Saved video transcript to `brain/research/conway_multiverse_transcript.txt` and completed implementation plan for adding main menu, preset/custom rules, and generation counter.
+
 
 ## Phase 6A — App Manager (next up)
 
@@ -117,6 +119,8 @@
 - [ ] Implement `TIME` command using CIA 1 TOD clock
 - [ ] Implement `DATE` command (software calendar + REU storage)
 - [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety
+- [/] Conway Multiverse Generalization, Menu and Counter (Plan written, transcript saved)
+
 
 
 ## Superpowers Docs Index

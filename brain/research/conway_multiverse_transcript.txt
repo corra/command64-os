@@ -1,0 +1,177 @@
+0:00Welcome to Conway's Game of Life. We start with a grid of cells that are either alive or dead. Are you a dead
+0:077 secondscell, but have exactly three living neighbors? Congratulations, [music] you will be born in the next generation.
+0:1414 secondsAre you a living cell and have either two or three living neighbors?
+0:1818 secondsCongratulations, you will survive into the next generation. Otherwise, you'll die. If you have at least four neighbors, you'll die from overcrowding.
+0:2727 secondsAnd if you have zero or one neighbors, you'll die from loneliness. And that's it. Those are all the rules you need to know to understand Conway's game of life.
+0:4040 secondsOne cosmetic variation I like to add is a small indicator in the center of each cell that shows what will happen to it next generation. So, a dead cell that's
+0:4848 secondsabout to be born looks like a small seed, and a living cell that's about to die looks like a donut.
+0:5555 secondsAnyway, this game of life simulation was devised by mathematician John Conway in 1970, and it's fun to explore simple
+1:021 minute, 2 secondsstructures within it, such as still lives like the block. Notice that each of its living cells has three neighbors,
+1:101 minute, 10 secondswhich means they get to survive. And all nearby dead cells have no more than two living neighbors, so they don't get to be born. So, this formation never
+1:171 minute, 17 secondschanges. In addition to the block, other still lives include the beehive, the aircraft carrier, the loaf, the boaf,
+1:261 minute, 26 secondsand this formation called yeast, named by James Harford in 1971, will evolve into a bakery, a constellation of four loaves.
+1:351 minute, 35 secondsIn [music] addition to still lives, we can also explore life's oscillators, like the blinker, the pulser, which is somehow the most common oscillator of period 3 despite being so large.
+1:481 minute, 48 secondsthe clock and the more aesthetic clock.
+1:531 minute, 53 secondsAnd in addition to oscillators, we can also take a look at spaceships that translate across the board, like the famous glider,
+2:022 minutes, 2 secondsthe lightweight spaceship, the middleweight spaceship, the heavyweight spaceship, the overweight. Well, you get the point. Here's what it looks like
+2:092 minutes, 9 secondswhen we start from random noise and run Game of Life at a larger scale. This is a 70x70 board that loops over. We'll color the cells based on how long
+2:182 minutes, 18 secondsthey've been alive, with young cells being white, orange, and then yellow, and older cells turning green, and then blue. At some point, the simulation is
+2:272 minutes, 27 secondsbound to stabilize, meaning it reaches a state it's already been in before, so it'll just loop forever onward.
+2:352 minutes, 35 secondsYou might be wondering, when we do reach stability, how often does each type of still life and oscillator appear? Well, the block is by far the most common
+2:442 minutes, 44 secondsstill life in Conway's universe, appearing twice as often as second place beehive and six times as often as third place loaf. Wait a minute. We're in a
+2:522 minutes, 52 secondssituation where the nth most common occurrence is about 1 overn as frequent as the number one most common occurrence. Some of you may know where
+3:003 minutesthis is heading. That's right. Still lives in Conway's Game of Life follow the infamous ze distribution. just like baby names, pin numbers, and the number
+3:093 minutes, 9 secondsof times relevant XKCD comics are mentioned on Reddit. Vsauce made a whole video about why the ZIF distribution shows up so often. Anyway, back to the
+3:183 minutes, 18 secondsgame of life. This simulation is a great example of the butterfly effect. Let's take a look at these two five cell shapes, which only differ by the
+3:263 minutes, 26 secondsplacement of one cell, and see how they both evolve.
+3:313 minutes, 31 secondsWell, the P pentamino lasted only four generations before dying out completely.
+3:363 minutes, 36 secondsBut what about its fraternal twin? Uh, okay, pause right here because this shape on the left is called a hersel because it looks like a lowercase H. And
+3:433 minutes, 43 secondspretty soon it releases a natural glider. Let's speed up the playback to 10 times. And there will actually be six gliders that escape to infinity when all
+3:523 minutes, 52 secondsis said and done. These formations that take a long time to settle are called Methuselas, named after the biblical figure who lived the longest life at 969
+4:004 minutesyears. That number is actually pretty close to how long the arpentamino Methusela takes to finally stabilize, which it does after 1,13 [music]
+4:084 minutes, 8 secondsgenerations. Final population, 116 cells. So, the moral of the story seems to be Game of Life is totally unpredictable and impossible to glean
+4:174 minutes, 17 secondsuseful patterns from. But that's not entirely true. On the structured side of things, life enthusiasts have used [music] this playground to construct
+4:254 minutes, 25 secondswever more intricate machinery. From spaceship factories to printers
+4:324 minutes, 32 secondsto prime number calculators to famously a computer that simulates
+4:394 minutes, 39 secondsgame of life in Game of Life, just 248 times larger and 35,328 times slower. Game of Life is Turing
+4:484 minutes, 48 secondscomplete after all. So it can simulate any program.
+5:005 minutesWhat's crazy about these constructions is that although they work perfectly, if you alter a single cell within them, they will quickly devolve into chaos.
+5:165 minutes, 16 secondsSo, that's fun. Have we finally seen all Game of Life has to offer? Not quite.
+5:215 minutes, 21 secondsSee, the rules of a lielike universe are defined by a rule string. And the rule string for Conway's Game of Life is B3
+5:295 minutes, 29 secondsS23, where the digits after the B tell us how many living neighbors allow at birth, and the digits after the S tell us how many living neighbors allow
+5:385 minutes, 38 secondssurvival. But aren't those rules kind of arbitrary? If the rules were slightly different, like say cells were also able
+5:465 minutes, 46 secondsto survive with four living neighbors, what different patterns would we see? To answer that question, it's time we
+5:535 minutes, 53 secondsteleport from the familiar Conways Game of Life universe, to B3S234, which I've named the ant colony
+6:016 minutes, 1 seconduniverse. I gave it that name because of how the leading edge of growth is teeming with activity like builder ants busy at work, but the inner parts of the
+6:106 minutes, 10 secondsstructure settle down into maze-like corridors like what you see in ant farms.
+6:166 minutes, 16 secondsSo why do corridors arise in ant colony life but not Conway's life? Well, a common formation in corridors is the
+6:256 minutes, 25 secondsdead end. Here I've isolated four dead ends for analysis. Boom, boom, boom, boom. What happens if we apply Conway's
+6:326 minutes, 32 secondsrules? Well, take a look at the living cell directly ahead of any dead end. It is required to have at least four living neighbors, two to the right and two to
+6:416 minutes, 41 secondsthe left. So, applying B3 S23 rules means that cell will die, making this whole structure unstable.
+6:506 minutes, 50 secondsWhereas, following ant colony rules of B3 S234, this survives just fine. The cells pulsating in green are the ones
+6:586 minutes, 58 secondswho would have died from overpopulation in Conway's life but survive here, giving us an ant colony still life. I
+7:057 minutes, 5 secondsalso find ant colony oscillators so cute because they're all housed within the walls of the colony. This one has period 4 and basically cycles around a punet
+7:147 minutes, 14 secondssquare and this one is period 5 featuring the dreaded arpentamino as its rotor. If ant colony life is what we get
+7:227 minutes, 22 secondswhen we expand the survival conditions up by one, then what happens if we expand the birth conditions up by one,
+7:287 minutes, 28 secondsmeaning B34 S23? Well, welcome to a world on fire.
+7:377 minutes, 37 secondsThanks, Bo. Life in this universe expands at about the same rate as the ant colony, but this time it just cannot
+7:447 minutes, 44 secondssettle down. To see why, recall the loaf, that still life from Conway's universe we looked at. It would be just
+7:527 minutes, 52 secondsfine here in a world on fire with all living cells still staying comfortably alive. But the previously overpop populated interior is now right in the
+8:008 minutesbirthing range for neighbors. And so the loaf is eaten up from the inside like a fungal parasite taking control of its host.
+8:158 minutes, 15 secondsThis is terrifying. I wouldn't blame you if such a breadless universe makes you tremble. But even in such an alien
+8:228 minutes, 22 secondsworld, there is a glimmer of familiarity, and that's tea. See, in Conway's universe, this tetramino is a
+8:308 minutes, 30 secondscommon predecessor of the traffic light, which is a formation of four blinkers.
+8:358 minutes, 35 secondsRemember when we watched the Arpentamino's thousand generation lifespan? Along the way, it produced and destroyed multiple traffic lights, which just shows how common this Tetramino is.
+8:468 minutes, 46 secondsBut what does the same tetramino evolve into in a world on fire? Well, their trajectories start pretty similar. And
+8:548 minutes, 54 secondssurprisingly, even though it takes 11 generations longer, the tetramino also evolves into a traffic light in AWF,
+9:039 minutes, 3 secondsalthough it's two tiles more spread apart. And I took advantage of the world border preventing these cells from being born. But still, when we travel to alien
+9:129 minutes, 12 secondsworlds, we have to take solace in whatever similarities we can find. So now we've seen one universe that stabilizes to a reasonable population
+9:229 minutes, 22 secondsand two universes that explode into runaway growth, albeit in very different ways. Are there universes in a third
+9:299 minutes, 29 secondscategory that dwindle away? Why yes, there are. Say hello to B345S2,
+9:369 minutes, 36 secondsaka Blinkers, a universe documented in Adam P. Goucher's catalog. When started from random noise, this universe can keep a random sizzle going for a while.
+9:469 minutes, 46 secondsBut half the time it'll eventually dwindle to just a handful of lonely blinkers, hence the namesake. And the other half of the time it will dwindle
+9:549 minutes, 54 secondsto nothing, at least for the board size I'm using. Why does this happen? Well, the block is by far the most common still life in Conway's universe, but
+10:0310 minutes, 3 secondsevery cell of the block has three living neighbors, which can't survive in Blinkers. So, every time an amalgamation settles into a block, it actually dies
+10:1110 minutes, 11 secondscompletely. Fates are even worse for its sibling universes to the south. Slow fizzle out and life light. Ignoring
+10:1910 minutes, 19 secondsremnant blinkers, these universes die out even faster. But hey, at least this little oscillator survived. Back in the Blinkerverse, people have discovered
+10:2810 minutes, 28 secondssurprisingly large spaceships that move one quarter and 1/5 the speed of light, respectively. By the way, the speed of
+10:3510 minutes, 35 secondslight is a term used to describe the speed of one tile per generation, which is the fastest any information can travel in a lielike universe. When
+10:4310 minutes, 43 secondsyou're trying to build things, the larger the structure, the less likely it is to produce an exact translated copy of itself multiple generations later.
+10:5210 minutes, 52 secondsAlso, while editing this video, I discovered that this equal symbol becomes a whopping period 16 oscillator,
+10:5910 minutes, 59 secondswhich is like shockingly high for such a desolate universe. Okay, we've explored six universes now, but how many total
+11:0711 minutes, 7 secondslielike universes are out there in the cosmos? And what do they all look like? Well, why don't I just show you?
+11:1511 minutes, 15 secondsWelcome to the Conway multiverse.
+11:1911 minutes, 19 secondsHere are all the possible lielike rule
+11:2911 minutes, 29 secondsstrings running at once. From this vantage point, we can see thousands of rule strings orchestrating millions of
+11:3711 minutes, 37 secondscells. Many worlds struggle to stay alive for even 10 generations, quickly becoming empty voids of lost potential.
+11:4511 minutes, 45 secondsWhile many others can't keep themselves from greedily multiplying to infinity, becoming hot, meaningless frenzies of
+11:5311 minutes, 53 secondsflashing random noise, there might not actually be that many universes in the Goldilock zone between the two, delicately balanced between order and chaos.
+12:0612 minutes, 6 secondsOkay, that's great and all, but you got something wrong. What? No, I didn't.
+12:0912 minutes, 9 secondsYou got something wrong. When you zoomed out, you said that was all the possible rule strings. But how many is that? I don't know. Why is that relevant?
+12:1512 minutes, 15 secondsWell, look at the TV I conveniently placed behind us. In each universe, you could be birthed with zero neighbors or one neighbor or two neighbors, etc. up to eight. You could also survive with
+12:2412 minutes, 24 secondszero neighbors or one or two, etc. up to eight. So, you see, there's 18 possible neighbor conditions, each with two possible choices. That gives us a grand
+12:3112 minutes, 31 secondstotal of 2 to the^ of 18 or 262,144 lielike universes. In your zoomed out view, we only saw 2,116. That's less
+12:4012 minutes, 40 secondsthan 1% of what you promised. Care to explain?
+12:4312 minutes, 43 secondsUm, not really. What I do care to explain is puzzles and how much I loved them as a kid. Cross word sudokus, especially mazes, I'm a connoisseur at
+12:5012 minutes, 50 secondsthose. Remember how we talked about the ant colonies corridors? It feels like we're this close to generating good mazes. But there's something about those
+12:5912 minutes, 59 secondspaths that doesn't feel right. They're just not clean, branching, or rectangular enough to resemble true mazes. To fix this, let's take a trip to
+13:0813 minutes, 8 secondsB3S12345, also known as Maze, and its sister universe, B3S1234, also known as MazeCtric.
+13:1813 minutes, 18 secondsAnd wow, those really are satisfying mazes that would make any puzzle expert give their stamp of approval. Maze is
+13:2513 minutes, 25 secondsknown to have shorter straightaways, whereas Maze Trick is known to have longer ones, just like their names. But why do they do such a better job at
+13:3313 minutes, 33 secondsmaking mazes than Ant Colony? Well, to answer that, let's look at a classic formation within mazes known as the
+13:3913 minutes, 39 secondshairpin turn. If you try drawing a maze right now, you'll find it's basically impossible to avoid including hairpins everywhere.
+13:4813 minutes, 48 secondsWhen a hairpin turn appears in a lielike universe, it features this cell at the end of a wall known as a dangler, dingleberry, or inverted dead end.
+13:5813 minutes, 58 secondsFollowing ant colonies rules, with one neighbor, the dangler dies and instead of a stable maze, we get a humiliating oscillator.
+14:0714 minutes, 7 secondsBut instead, following Mazectric's more lenient survival rules of S1 234, the dangler lives, giving us a maze still life.
+14:1814 minutes, 18 secondsBy the way, when you see a universe's name in quotation marks, that means someone else named it, like perhaps Johan Bontes or Alan Henzel. And when
+14:2614 minutes, 26 secondsyou see a universe's name in parenthesis, that means I named it. I know it's really hard to tell the difference sometimes, but I hope that clears things up. While I'm at it, why
+14:3414 minutes, 34 secondsdon't I address Cyan Car's complaint to Yellow Carrie that 99% of lifelike rule strings aren't included in my visualization. What gives? For this
+14:4314 minutes, 43 secondsproject, I only included rule strings whose birth and survival conditions are connected. So, these are included and these aren't. In my head, connected rule
+14:5114 minutes, 51 secondsstrings just make more sense in the natural world. I mean, what kind of organism feels just fine with four or six living neighbors, but dies at five?
+14:5914 minutes, 59 secondsWas it too lonely or too crowded? Pick a struggle, bro. So, limiting the pool to just connected rule strings lowers our count from 262,144
+15:0715 minutes, 7 secondsto 2,116. We lose some iconic rule strings like high life and day and night, which are not connected. But hey,
+15:1515 minutes, 15 secondssome sacrifices have to be made. But how do we lay out those 2000 universes in the grid? Well, births correspond to the
+15:2215 minutes, 22 secondsy-axis and survivals correspond to the x-axis. All universe families in this row have their birth ranges start at zero neighbors, which can be thought of
+15:3015 minutes, 30 secondsas 0 plus. All universes in this row have their birth ranges start at one neighbor, which can be thought of as 1
+15:3715 minutes, 37 secondsplus. And then we have 2 plus, 3 plus, and so on up to 8 plus. And the null birth. Switching the dimension, all
+15:4415 minutes, 44 secondsuniverse families in this column have their survival ranges start at zero plus neighbors. Likewise, these universe families have survival ranges starting
+15:5215 minutes, 52 secondsat one plus neighbors. And then we have 2 plus, 3 plus, and so on up to 8 plus. And the null survival.
+15:5915 minutes, 59 secondsSo the universes in each family have the same birth and survival start points.
+16:0416 minutes, 4 secondsThe X and Y locations within a family tells you how high the end points of the ranges [music] go. So that's why life light in the lower left corner is just
+16:1216 minutes, 12 secondsB3S2. But then moving rightward increases the survival endpoint to B3S23 and then moving upward increases the
+16:1916 minutes, 19 secondsbirth end point to B34 S23. And then if you keep doing that you eventually reach the upper right corner which as expected is B3 456 78 the max S2345 678 the max.
+16:3116 minutes, 31 secondsAnd that's basically it. Now you know how my Conway multiverse is laid out and can carry can sleep peacefully. With that explanation out of the way, let's take a look at some more maze universes.
+16:4116 minutes, 41 secondsI got to give a shout out to Maze Trick with mice, a rule string that adds birth at seven to the mix.
+16:4916 minutes, 49 secondsEmpty cells in long straight corridors typically have six living neighbors. But add a mouse to the mix and neighboring
+16:5616 minutes, 56 secondsempty cells go from six to seven neighbors. So, they get born and become the next generation's mouse, making it
+17:0417 minutes, 4 secondslook like it's crawling around. By the way, the behavior of these mice in an infinite corridor exactly matches rule 18, one of those 1D elementary cellular
+17:1317 minutes, 13 secondsautomatons. And that's a rule that when started from just a single cell creates the Serpinsky triangle. Fun stuff.
+17:2117 minutes, 21 secondsI'm glad we covered mazes. It just goes to show puzzles are a great way to kill time.
+17:2517 minutes, 25 secondsBut Carrie, what? I'm not ready to die.
+17:2817 minutes, 28 secondsAnd I'm not either. So that's why we should travel to the land of immortality, known in the business as life without death. This features the
+17:3717 minutes, 37 secondssame birth conditions as Conway's life at three neighbors. [music] But survival happens at 0 1 2 all the way up to eight neighbors. In other
+17:4517 minutes, 45 secondswords, once a cell is born, it is impossible to die. Small holes dot the Swiss cheese at about 19% density.
+17:5317 minutes, 53 secondsBecause birth at 8 isn't allowed, they'll never be filled in, just like the potholes in American city streets.
+17:5917 minutes, 59 secondsLarger holes are definitely rarer, but can occur when there are no breeding sites on the border of the hole.
+18:0618 minutes, 6 secondsOscillators and spaceships, which require old cells to disappear, can't exist here. So then, what can exist in this universe besides that Swiss cheese with 19% holes? Wait, I just remembered.
+18:1818 minutes, 18 secondsThere's a famous ladder that appears frequently in Life Without Death, which looks like a vine that grows orthogonally at 1/3 the speed of light.
+18:2618 minutes, 26 secondsIn larger starting simulations, ladders appear everywhere and cannot be outpaced, usually proving that this universe grows
+18:3518 minutes, 35 secondsindefinitely, albeit in a more manageable way than chaotic rules like a world on fire. The famous ladder even comes with a ladder runner that goes
+18:4318 minutes, 43 secondstwo/3s the speed of light, like a student overtaking his mentor. But even with all those vines, maybe you find this world too safe for your tastes. No
+18:5218 minutes, 52 secondsrisk of death also means no thrill, no exhilarating new changes. Then let's take a trip to the aquatic family of universes where cells are dying all the
+19:0119 minutes, 1 secondtime. Their shimmering borders will make you feel like you're underwater. So of these aquatic universes, let's first zoom into coral B3S45678
+19:1019 minutes, 10 secondslisted on David Epstein's most wanted list. It's definitely the most similar to Life Without Death, but no survival below four neighbors gives it a dynamic
+19:1919 minutes, 19 secondsbreathing border that tingles with life as it slowly grows. Also in the aquatic family is assimilation, a rule that forms diamond patterns with an
+19:2819 minutes, 28 secondsalternating border that reminds me of electric current. I call the universe to the left slow assimilation since it basically arrives at the same end point,
+19:3619 minutes, 36 secondsbut it takes a lot longer to fend off the chaos before getting there. After that, we have rotten egg, which lies between healthy egg and bacteria. Now,
+19:4419 minutes, 44 secondsthe bacteria universe was named decades ago, but I decided to give the other universes those egg names just today
+19:5219 minutes, 52 secondsbecause they both create egg-like shapes as they're expanding. The only difference is that healthy egg is almost entirely solid with no cavities, whereas
+19:5919 minutes, 59 secondsrotten egg has a ton of cavities and well, bacteria is just squirming everywhere. Lastly, in the aquatic family, we have lifeguard 2. This
+20:0820 minutes, 8 secondsuniverse's rule string only differs from Coral's rule string by survival at eight. But that turns out to make a huge
+20:1520 minutes, 15 secondsdifference, allowing Coral to have large solid swads of living cells, whereas Lifeguard 2 can't have that, leading to Coral conquering the globe while
+20:2320 minutes, 23 secondsLifeguard 2 slowly shrivels and dies. I can only imagine David Epste named it that because the creatures look like they're drowning into the abyss as the
+20:3120 minutes, 31 secondslifeguards too busy to go save them. But also, I want to point out one last thing I noticed about coral versus life without death while editing. So, as a
+20:4020 minutes, 40 secondsrefresher, orange cells are young at about four generations old, and blue cells are old at about 128 generations
+20:4720 minutes, 47 secondsold. See how the color gradient from orange to blue can span 30 plus cells in Life Without Death, but only perhaps
+20:5420 minutes, 54 secondsfive cells in coral. That just shows that coral grows about six times slower than Life Without Death. And well, I just think it's nifty that a cosmetic
+21:0221 minutes, 2 secondschange I added actually ended up providing insight on how these universes evolve. Anyway, there's so much more I could say about this Conway's multiverse
+21:1021 minutes, 10 secondsproject from other weird families of universes to the decisions I made to organize the universes in this way, but I don't want this video to run on
+21:1721 minutes, 17 secondsforever. So, let me know what your favorite universe was. Also, I can already hear people saying that this field of math is not as real world
+21:2521 minutes, 25 secondsuseful as other math videos I made a decade ago, like the AI or evolution ones. And that may be true. But Conway's
+21:3321 minutes, 33 secondsgame of life is an obsession I've had for over half my life. Here's evidence I created a life wiki account, Blunzio, in 2011, the same year I created this
+21:4221 minutes, 42 secondsYouTube channel. So, it just feels gratifying to finally make a video about that obsession for you all. Now, I want to give a huge thank you to the Life
+21:4921 minutes, 49 secondsWiki, a resource for cellular automata enthusiasts, which was the source of perhaps half of the information in this video. Also, thanks to Adam P. Goucher's
+21:5821 minutes, 58 secondscatalog, Acham Flamman's top 100 game of life ash objects website, and the many other sites I browsed while researching, some of which being over 20 years old.
+22:0622 minutes, 6 secondsYou guys are the best. Oh, and I have some IRL news. I'll be going to VidCon 2026 this weekend in Anaheim. So, if you
+22:1422 minutes, 14 secondswant to see me and my brother Michael there, well, you're in luck. We're scheduled for four events, including two Crown the Creator tournaments. I'm
+22:2122 minutes, 21 secondsexcited. Also, I'm going to OpenSauce 2026 in San Francisco in mid July. But unlike last year, I'm not a featured
+22:2822 minutes, 28 secondscreator anymore. Probably because I haven't uploaded any STEM videos since December. The dust is starting to settle on a handful of travel/corporate/logistical
+22:3722 minutes, 37 secondstroubles that have plagued me for a bit that I'm not legally allowed to talk about. So, hopefully more STEM videos soon. Lastly, as some of you know, I got
+22:4522 minutes, 45 secondsa bachelor's degree in compsai from Stanford in 2020. Then I started a master's but dropped out when COVID hit.
+22:5122 minutes, 51 secondsLately, in my head, I've been toying around with the idea of going back to Stanford to finish that masters. One, because while BFDI has been successful
+23:0023 minutesbeyond my wildest dreams, and I'm so grateful that it's at this place, it doesn't quite scratch that academic itch I think I still have. and two, the world
+23:0823 minutes, 8 secondsof computer science and AI has changed so much since 2021, for better or for definitely worse. I think educating
+23:1523 minutes, 15 secondsmyself on how this force is evolving and changing the world we're all going to have to live in. It's just something that's really important to me and maybe a way that I could try to make the world
+23:2323 minutes, 23 secondsa better place. I don't know. I don't really know what direction I'm going with this life, but I do really like making videos and I'm in such a lucky position that there's still so many
+23:3223 minutes, 32 secondspeople who want to watch after 15 or 18 years. Uh, and if you want to know more what I'm doing more frequently, maybe you can check out Lazy KH because I do
+23:3923 minutes, 39 secondswant to upload more just personal videos there. And that's it. So, goodbye. Bye-bye.

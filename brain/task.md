@@ -117,6 +117,14 @@
   - [x] Phase 6A: App Manager Phase A (Program registry APPS/PS/FREE) (Completed 2026-07-04)
   - [x] Implement Binary Relocator (to support `RUN` at arbitrary addresses) (Completed 2026-07-05)
   - [x] Conway & conwayca memory Safety & Relocation Crash Remediation (Completed 2026-07-08)
+  - [/] Conway Multiverse Generalization, Menu and Counter
+    - [x] Gather transcript research and document Conway Multiverse rules
+    - [/] Write implementation plan and obtain approval
+    - [ ] Implement Main Menu screen with preset selections
+    - [ ] Implement Custom Rule editing mode (Birth/Survival toggling)
+    - [ ] Implement 16-bit binary-to-decimal generation counter
+    - [ ] Optimize neighborhood solver with RAM lookup tables
+    - [ ] Verify functionality in VICE emulator
   - [ ] Add Oscar64 C-Language runtime support
   - [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety
 

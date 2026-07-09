@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Conway Multiverse Research**: Saved video transcript to `brain/research/conway_multiverse_transcript.txt` and completed implementation plan `brain/plans/conway-multiverse-rules-and-menu.md` for adding main menu, preset/custom rules, and generation counter.
+
 ### Documentation
 
 - **Documentation Audit & Sync**: Brought `README.md`, `docs/programmers-reference.md`, `docs/codebase-reference.md`, `docs/user-manual.md` (and their `wiki/` mirrors) up to date with the shipped Binary Relocator, `LOAD` name/addr/size reporting, `DIR` byte-size reporting, global no-args `FREE`, dynamic memory allocation (auto-slotting), and memory-safe pre-flight `LOAD` validation. Corrected stale `UserProgStart` address references (`$2000`/`$2200`/`$2600`) to the current `$2C00` across all docs, and reconciled `wiki/tasks/memory-safe-loading.md`, `wiki/tasks/dynamic-memory-safety.md`, and `wiki/tasks/phase-6b-binary-relocator.md` checkboxes with shipped status. Fixed a `UserProgStart` shift-history inconsistency between `brain/MEMORY.md` and `brain/KNOWLEDGE.md`.
