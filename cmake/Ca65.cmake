@@ -211,13 +211,17 @@ SEGMENTS {
     file(WRITE "${CFG_NEXT}" "${CFG_NEXT_CONTENT}")
 
     # Assemble once (shared object set), link twice (base/next page).
-    # ca65 has no #import-style flattening (unlike Kick), so every source
-    # -- including the entry file -- is its own translation unit; dedupe
-    # before compiling in case a caller lists the entry file in both
-    # ENTRY_FILE and SOURCES_VAR (matching HASH_SOURCES's existing
-    # dedupe above).
+    # ca65 has no #import-style flattening (unlike Kick), so every .s
+    # source -- including the entry file -- is its own translation unit;
+    # dedupe before compiling in case a caller lists the entry file in
+    # both ENTRY_FILE and SOURCES_VAR (matching HASH_SOURCES's existing
+    # dedupe above). SOURCES_VAR may also carry non-source dependency
+    # files (app-local/shared .inc headers, tracked for the hash gate and
+    # rebuild-on-change via HASH_SOURCES/DEPENDS above) -- filter to only
+    # .s files here, since those aren't independently assemblable.
     set(ALL_SOURCES "${ENTRY_FILE_ABS}" ${${SOURCES_VAR}})
     list(REMOVE_DUPLICATES ALL_SOURCES)
+    list(FILTER ALL_SOURCES INCLUDE REGEX "\\.s$")
     set(OUT_DIR "${CMAKE_BINARY_DIR}/out_${TARGET_NAME}")
     file(MAKE_DIRECTORY "${OUT_DIR}")
     set(OBJS "")
@@ -231,7 +235,15 @@ SEGMENTS {
             COMMAND "${CA65_EXECUTABLE}" "${SRC_ABS}"
                 -I "${SRC_DIR}" -I "${CMAKE_SOURCE_DIR}/include/ca65" -I "${INC_DIR}"
                 -t c64 -o "${OBJ}"
-            DEPENDS "${SRC_ABS}" "${INC_FILE}"
+            # DEPENDS the full source/include set (via HASH_SOURCES, which
+            # -- like add_external_app's SOURCES_VAR convention -- should
+            # glob any app-local .inc files alongside the .s sources), not
+            # just this one translation unit: unlike Kick's single-pass
+            # assembly, each source here gets its own object file, so a
+            # change to a shared .include'd file (app-local common.inc or
+            # include/ca65/*.inc) must invalidate every object, not just
+            # whichever one happens to .include it directly.
+            DEPENDS "${SRC_ABS}" "${INC_FILE}" ${HASH_SOURCES}
             COMMENT "ca65: assembling ${SRC_NAME}.s"
             VERBATIM
         )

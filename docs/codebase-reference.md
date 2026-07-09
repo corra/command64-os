@@ -1224,14 +1224,14 @@ Under `.encoding "petscii_mixed"`, uppercase character literals assemble to shif
 
 ### 9.3 `conway.asm` — Conway's Game of Life
 
-**File**: [src/external/conway/conway.asm](src/external/conway/conway.asm)  
+**Files**: [src/external/conway/conway_main.s](src/external/conway/conway_main.s), [conway_grid.s](src/external/conway/conway_grid.s) (built with ca65/ld65, not KickAssembler — see `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` Phase 4)  
 **Load address**: `UserProgStart` (currently `$2C00`)
 
 Full-screen cellular automaton. The 40×25 text screen is used 1:1 as the simulation grid (1000 cells). Rules: B3/S23 with toroidal wrapping on all four edges.
 
 #### Double-Buffer Design
 
-Two 1024-byte page-aligned buffers at `$3000` and `$3400` alternate roles each generation. `computeNext` reads from the active buffer via `zpPrev/Curr/Next` row pointers and writes results to the inactive buffer via `zpDst`. `swapBufs` toggles `zpBufSel` (0↔1) to exchange roles. Page-alignment allows multi-page iteration with a plain `INC zpHi` rather than a full 16-bit pointer increment.
+Two 960-byte page-aligned buffers (`grid0`/`grid1`, embedded in-binary via a source-level `.align 256`, not fixed addresses) alternate roles each generation. `computeNext` reads from the active buffer via `zpPrev/Curr/Next` row pointers and writes results to the inactive buffer via `zpDst`. `swapBufs` toggles `zpBufSel` (0↔1) to exchange roles. Page-alignment allows multi-page iteration with a plain `INC zpHi` rather than a full 16-bit pointer increment. (Buffers were relocatable-address embedded, not hardcoded to `$3000`/`$3400`, after a relocation-crash fix — see `getCurrBase`/`getNextBase` below.)
 
 #### Row Pointer Setup (`setThreeRowPtrs`)
 
@@ -1258,7 +1258,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `zpCount` | `$7A` | Accumulated neighbour count |
 | `zpLfsr` | `$7B` | 8-bit Galois LFSR state (RNG) |
 | `zpPaused` | `$7C` | Pause flag: 0 = running, $FF = paused |
-| `zpBufSel` | `$7D` | Active buffer: 0 = grid0 (`$3000`), 1 = grid1 (`$3400`) |
+| `zpBufSel` | `$7D` | Active buffer: 0 = `grid0`, 1 = `grid1` (relocatable page-aligned labels) |
 | `rowOffLo/Hi` | in PRG | 25-entry row-offset table (N×40, lo and hi bytes) |
 | `cellCharTbl` | in PRG | 2-byte display map: `[0]=$20` (space), `[1]=$A0` (solid block) |
 | `stpBLo/Hi` | in PRG | Scratch: buffer base address saved across `setThreeRowPtrs` calls |

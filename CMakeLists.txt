@@ -56,8 +56,8 @@ set(DEBUG_ENTRY "src/external/debug/debug.asm")
 file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.asm" "include/*.inc")
 set(LABEL_ENTRY "src/external/label/label.asm")
 
-file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.asm" "include/*.inc")
-set(CONWAY_ENTRY "src/external/conway/conway.asm")
+file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.s" "src/external/conway/*.inc" "include/ca65/*.inc")
+set(CONWAY_ENTRY "src/external/conway/conway_main.s")
 
 file(GLOB_RECURSE PACMAN_SRCS CONFIGURE_DEPENDS "src/external/pacman/*.asm" "include/*.inc")
 set(PACMAN_ENTRY "src/external/pacman/pacman.asm")
@@ -108,37 +108,28 @@ add_external_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012)
 # 3. LABEL External Command PRG Target
 add_external_app(label "${LABEL_ENTRY}" LABEL_SRCS 1000)
 
-# 4. CONWAY Game of Life
-add_external_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1000)
+# 4. CONWAY Game of Life — built with ca65/ld65 (migrated off the
+# spike/ca65-conway/ branch; see
+# brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
+# Two object files (conway_main.s / conway_grid.s) linked together by
+# ld65; CODE_ALIGN=256 because conway_grid.s embeds two page-aligned grid
+# buffers directly in CODE. Requires ca65/ld65 (Ca65_FOUND) -- mirrors
+# Oscar64's "inert if the tool isn't present" pattern; absence of cc65
+# means no conway target, matching how absence of Oscar64 means no C
+# targets, rather than silently falling back to a Kick build.
+set(CONWAY_TARGET "")
+if(Ca65_FOUND)
+    add_ca65_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1040 "0C00" "256")
+    set(CONWAY_TARGET conway)
+else()
+    message(STATUS "ca65/ld65 not found on PATH — skipping conway target")
+endif()
 
 # 4b. PACMAN — character-grid Pac-Man clone
 add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 
 # 4c. VI — vi-like visual text editor
 add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
-
-# 4d. Exploratory ca65/ld65 spike — ported conway, split across two object
-# files (conway_main.s / conway_grid.s) so ld65 has to resolve cross-module
-# symbols and relocate the CBM load-address header itself. Deliberately NOT
-# added to IMAGE_PRG_TARGETS (the real release disk) — see
-# spike/ca65-conway/README.md. cc65 is optional, mirroring Oscar64's pattern:
-# its absence must not break the Kick build.
-set(CONWAY_CA65_TARGET "")
-if(Ca65_FOUND)
-    set(CONWAY_CA65_SRCS
-        "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_main.s"
-        "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_grid.s"
-    )
-    add_ca65_spike_app(conway_ca65
-        SOURCES ${CONWAY_CA65_SRCS}
-        CONFIG "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_2c00.cfg"
-        CONFIG_NEXT "${CMAKE_SOURCE_DIR}/spike/ca65-conway/conway_2d00.cfg"
-        OUTPUT_NAME "conwayca"
-    )
-    set(CONWAY_CA65_TARGET conway_ca65)
-else()
-    message(STATUS "ca65/ld65 not found on PATH — skipping spike/ca65-conway target")
-endif()
 
 # 4e. Exploratory ca65/ld65 spike — ported label. Single-file (no natural
 # split point like conway had), but stresses a different part of the
@@ -251,8 +242,8 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug label conway pacman vi ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CONWAY_CA65_TARGET} ${LABEL_CA65_TARGET} ${TESTS_CA65_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
+set(IMAGE_PRG_TARGETS command64 debug label ${CONWAY_TARGET} pacman vi ${C_TARGETS})
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${LABEL_CA65_TARGET} ${TESTS_CA65_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"

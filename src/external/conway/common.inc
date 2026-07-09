@@ -1,16 +1,12 @@
-; spike/ca65-conway/common.inc
+; src/external/conway/common.inc
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; Shared constants/equates for the ca65 port of the Conway spike.
-; ca65 has no import/export machinery for plain equates -- both
-; conway_main.s and conway_grid.s just .include this file, exactly like
-; a C header shared between translation units.
-
-; ---------------------------------------------------------------------------
-; OS entry points this app relies on (see include/command64.inc)
-; ---------------------------------------------------------------------------
-KernalGetIn = $FFE4             ; raw keyboard input (bypasses screen editor)
+; App-private constants for conway, not covered by the shared
+; include/ca65/command64.inc (KernalGetIn and everything OS-level now
+; comes from there, resolved via add_ca65_app's -I include/ca65). Both
+; conway_main.s and conway_grid.s .include this file directly, exactly
+; like a C header shared between translation units.
 
 ; ---------------------------------------------------------------------------
 ; Grid dimensions
@@ -28,7 +24,6 @@ VIC_BGND  = $D021
 SCREEN    = $0400
 COLORRAM  = $D800
 JIFFY_CLK = $A2
-
 
 ; ---------------------------------------------------------------------------
 ; Display
