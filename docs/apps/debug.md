@@ -1,6 +1,6 @@
 # DEBUG Utility User Guide
 
-**Version:** 0.1.8 (C64 Command64 OS Port: Build 1049)
+**Version:** 0.4.0 (C64 Command64 OS Port: Build 1101)
 **Origin:** MS-DOS 4.0 / C64 Port
 **Target Address:** $2000
 
@@ -95,7 +95,7 @@ This section provides exhaustive examples demonstrating every command and syntax
 
     ```text
     -V
-    DEBUG v0.1.8.1027
+    DEBUG v0.4.0.1101
     ```
 
 * **Quit Utility (`Q`)**:

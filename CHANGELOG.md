@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-07-09
+
 ### Added
 
 - **Conway Multiverse Research**: Saved video transcript to `brain/research/conway_multiverse_transcript.txt` and completed implementation plan `brain/plans/conway-multiverse-rules-and-menu.md` for adding main menu, preset/custom rules, and generation counter.
@@ -14,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **conway/label migrated to ca65/ld65**: Replaced the KickAssembler-built `conway.prg`/`label.prg` with ca65/ld65 builds (`src/external/conway/conway_main.s`+`conway_grid.s`, `src/external/label/label.s`), verified functionally identical (matching relocation-table byte counts against the pre-migration reference, VICE-tested) and continuing each app's existing `BUILD_CONWAY`/`BUILD_LABEL` build-number sequence.
 - **DEBUG migrated to ca65/ld65**: Replaced the KickAssembler-built `debug.prg` with `src/external/debug/debug.s` built through `add_ca65_app`, after proving a temporary `debug_ca65` target byte-for-byte identical to the previous Kick output. The shipping target name and disk entry remain `debug.prg`; build 1100 is the first ca65/ld65 DEBUG build.
 - **ca65 test suite migrated**: Promoted the 9 ca65-ported test programs (`apitest`/`banktest`/`color`/`devtest`/`extcls`/`filetest`/`handletest`/`hello`/`vmmtest`) to the primary `test_<name>` targets in `tests/src/<name>/`. Retired the duplicate Kick sources and `test_ca65_<name>` targets; `reloc` remains KickAssembler-based because it specifically exercises the Kick/reloc.py relocation path.
+- **Migrated app versions bumped to 0.4.0**: Updated the ca65-migrated `debug.prg` and `label.prg` version banners to match the 0.4.0 minor release (`DEBUG v0.4.0.1101`, `LABEL v0.4.0.1034`) and added a `CONWAY v0.4.0.1042` exit banner before `conway.prg` returns to the shell.
 
 ### Fixed
 

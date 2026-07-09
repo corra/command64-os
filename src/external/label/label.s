@@ -25,7 +25,7 @@
 .include "common.inc"
 
 VERSION_MAJOR = '0'
-VERSION_MINOR = '1'
+VERSION_MINOR = '4'
 VERSION_STAGE = '0'
 .include "build_label.inc"
 

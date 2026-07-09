@@ -6,8 +6,8 @@
 
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
-.const VERSION_MINOR = "3"
-.const VERSION_STAGE = "1" // Release 0.3.1 (with App Manager Phase A)
+.const VERSION_MINOR = "4"
+.const VERSION_STAGE = "0" // Release 0.4.0 (ca65 migration release)
 #import "build_os.inc"
 
 
@@ -3114,5 +3114,4 @@ dirSizeLo:   .byte 0
 dirSizeMid:  .byte 0
 dirSizeHi:   .byte 0
 dirLeadZero: .byte 0
-
 

@@ -20,7 +20,7 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
    C64:> debug
    ```
 
-4. Verify the startup message displays (e.g., `DEBUG v0.1.8.1027`) followed by the prompt:
+4. Verify the startup message displays (e.g., `DEBUG v0.4.0.1101`) followed by the prompt:
 
    ```bash
    -

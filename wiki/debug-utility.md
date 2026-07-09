@@ -1,6 +1,6 @@
 # DEBUG Utility User Guide
 
-**Version:** 0.1.8 (C64 Command64 OS Port: Build 1049)
+**Version:** 0.4.0 (C64 Command64 OS Port: Build 1101)
 **Origin:** MS-DOS 4.0
 **Target Address:** $2000
 

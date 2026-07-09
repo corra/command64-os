@@ -8,8 +8,8 @@
 
 ; --- Version Information ---
 VERSION_MAJOR = '0'
-VERSION_MINOR = '1'
-VERSION_STAGE = '8' ; Build 1027 Y-register fix
+VERSION_MINOR = '4'
+VERSION_STAGE = '0' ; Release 0.4.0 ca65 migration
 .include "build_debug.inc"
 
 ; --- Zero Page Pointers ($70-$7F) ---

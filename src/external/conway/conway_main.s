@@ -16,6 +16,11 @@
 .include "command64.inc"
 .include "common.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '4'
+VERSION_STAGE = '0'
+.include "build_conway.inc"
+
 .import randomizeGrid
 .import drawGrid
 .import drawStatusLine
@@ -108,6 +113,11 @@ hkQuit:
     sta VIC_BORD
     sta VIC_BGND
     jsr clearScreen
+    lda #$13                    ; HOME cursor before printing exit banner
+    jsr KernalChROUT
+    lda #<exitBanner
+    ldy #>exitBanner
+    jsr printString
     pla
     pla
     rts
@@ -153,3 +163,23 @@ swapBufs:
     eor #1
     sta zpBufSel
     rts
+
+; ---------------------------------------------------------------------------
+; printString -- print a null-terminated PETSCII string via CHROUT.
+; ---------------------------------------------------------------------------
+printString:
+    sta zpDstLo
+    sty zpDstHi
+    ldy #0
+psLoop:
+    lda (zpDstLo), y
+    beq psDone
+    jsr KernalChROUT
+    iny
+    jmp psLoop
+psDone:
+    rts
+
+exitBanner:
+    .byte "CONWAY v", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE
+    .byte ".", BUILD_NUMBER, PetCr, 0

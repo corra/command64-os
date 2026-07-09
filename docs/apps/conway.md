@@ -1,6 +1,6 @@
 # CONWAY — Game of Life
 
-**Version:** 0.1.0  
+**Version:** 0.4.0 (Build 1042)  
 **File:** `conway.prg`  
 **Load address:** `$2000`
 
@@ -24,6 +24,9 @@ No arguments. Starts immediately with ~25% random live cells.
 | `R` | Re-randomize |
 | `C` | Clear (all dead) |
 | `Q` / RUN-STOP | Quit to shell |
+
+On quit, the screen is cleared and Conway prints its version banner
+(`CONWAY v0.4.0.1042`) before returning to the shell.
 
 ## Architecture
 
