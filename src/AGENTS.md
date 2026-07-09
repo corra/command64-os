@@ -9,7 +9,7 @@ The purpose of the `src` directory is to contain the core assembly files of the 
 
 # Local Contracts
 
-- All source files must be in 6502/6510 Assembly, designed for assembly using Kick Assembler.
+- Core OS source files must be in 6502/6510 Assembly, designed for assembly using Kick Assembler. External applications are governed by `src/external/AGENTS.md`.
 - Code must adhere to technical standards: zero-page layout safety, non-reentrancy awareness, stack discipline, and registers/flags preservation.
 - All code modifications must update the memory map in `brain/MEMORY.md` if memory regions shift.
 

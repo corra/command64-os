@@ -25,7 +25,7 @@
    - 8.8 [file.asm — Handle-Based File I/O](#88-fileasm--handle-based-file-io)
    - 8.9 [shell.asm — Command Shell and Built-in Commands](#89-shellasm--command-shell-and-built-in-commands)
 9. [Module Reference — External Commands](#9-module-reference--external-commands)
-   - 9.1 [debug.asm — Interactive Memory Monitor](#91-debugasm--interactive-memory-monitor)
+   - 9.1 [debug.s — Interactive Memory Monitor](#91debugs--interactive-memory-monitor)
    - 9.2 [label.asm — Disk Volume Label Writer](#92-labelasm--disk-volume-label-writer)
    - 9.3 [conway.asm — Conway's Game of Life](#93-conwayasm--conways-game-of-life)
    - 9.4 [pacman.asm — Pac64](#94-pacmanasm--pac64)
@@ -47,7 +47,7 @@ Command 64 OS is a CP/M-and-MS-DOS–inspired operating system shell for the Com
 - A handle-based file I/O subsystem over the C64 KERNAL.
 - Two shipped external programs: `debug.prg` (memory monitor / assembler) and `label.prg` (disk volume label editor).
 
-The assembler is **KickAssembler v5.25**.  The project is built with **CMake ≥ 3.20** and targets a standard NTSC/PAL C64 with an attached 1541/1571/1581 disk drive (device 8–11) and optionally a 1750/1764 REU.
+The core OS still builds with **KickAssembler v5.25**. New external applications are built with **ca65/ld65**, while existing KickAssembler external apps may remain on their current toolchain until migrated. The project is built with **CMake ≥ 3.20** and targets a standard NTSC/PAL C64 with an attached 1541/1571/1581 disk drive (device 8–11) and optionally a 1750/1764 REU.
 
 ---
 
@@ -85,7 +85,7 @@ command64-os/
 │
 ├── src/external/
 │   ├── debug/
-│   │   └── debug.asm           DEBUG utility (memory monitor, assembler)
+│   │   └── debug.s             DEBUG utility (memory monitor, assembler; ca65/ld65)
 │   └── label/
 │       └── label.asm           LABEL disk volume-name writer
 │
@@ -147,7 +147,7 @@ cmake --build build --target image_d64
 
 **What happens during a build:**
 
-1. `IncrementBuildNumber.cmake` checks if any source files (`src/command64/*.asm`) changed; if so, it increments `BUILD_OS` and writes `build/build_os.inc` containing `.const BUILD_NUMBER = "NNNN"`.  External apps have analogous `BUILD_DEBUG` / `BUILD_LABEL` counters.
+1. `IncrementBuildNumber.cmake` checks if any tracked target source files changed; if so, it increments the target's colocated `BUILD_<NAME>` file and writes a generated `build_<name>.inc`. KickAssembler targets receive `.const BUILD_NUMBER = "NNNN"` syntax; ca65/ld65 targets receive `.define BUILD_NUMBER "NNNN"` syntax.
 2. `KickAssembler.cmake` invokes `java -jar tools/KickAss.jar` with `-includeDir build/` so the generated `build_os.inc` is found by `#import "build_os.inc"`.
 3. `cc1541.cmake` invokes `tools/cc1541` to create a `.d64` CBM disk image.
 4. `sync_docs` target copies changed markdown files from `wiki/` → `docs/`.
@@ -156,11 +156,11 @@ cmake --build build --target image_d64
 
 Each program in `src/external/<name>/` must have:
 
-- `BUILD_<NAME_UPPER>` at the repo root — initial value typically `1000`.
-- `#import "build_<name>.inc"` in the assembly source.
-- A `add_external_app(<name> ...)` call in `CMakeLists.txt`.
+- `BUILD_<NAME_UPPER>` in the app's own source directory — initial value typically `1000`.
+- The generated build include imported by the app source (`#import` for KickAssembler, `.include` for ca65).
+- A CMake app-helper call in `CMakeLists.txt`: `add_external_app(<name> ...)` for KickAssembler or `add_ca65_app(<name> ...)` for ca65/ld65.
 
-`add_external_app` is a thin wrapper around `add_kickass_target` that also schedules `IncrementBuildNumber.cmake` with the correct counter file.
+Both helpers schedule `IncrementBuildNumber.cmake` with the correct counter file and produce relocatable PRGs through the base/next-page diff pipeline.
 
 ---
 
@@ -1086,9 +1086,10 @@ loop:
 
 External commands are standalone PRG files that live at `UserProgStart` (currently `$2C00`). They use the OS API via `JSR $1000` and terminate with `DOS_EXIT`. They share `CommandBuffer`, `ParsePos`, and `CurrentDevice` with the shell (these are at fixed RAM addresses). Non-relocatable binaries compiled for a prior `UserProgStart` value can still run via the Binary Relocator (§13.1).
 
-### 9.1 `debug.asm` — Interactive Memory Monitor
+### 9.1 `debug.s` — Interactive Memory Monitor
 
-**File**: [src/external/debug/debug.asm](src/external/debug/debug.asm)  
+**File**: [src/external/debug/debug.s](src/external/debug/debug.s)  
+**Toolchain**: ca65/ld65 via `add_ca65_app`  
 **Load address**: `UserProgStart` (currently `$2C00`)  
 **Version**: 0.1.x (auto-incremented build number from `BUILD_DEBUG`)
 
@@ -1156,18 +1157,18 @@ Single-character command lookup. Normalizes shifted to unshifted (`AND #$7F`). C
 
 **`cmdUnassemble`**: Disassembles memory from `currentAddr` (or a specified range) using the same mnemonic and mode tables as the assembler.
 
-#### API Wrappers (in debug.asm)
+#### API Wrappers (in debug.s)
 
 ```asm
 API_PRINT_STR:
     tax           // Move X=lo into correct position
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
     rts
 
 API_EXIT:
     lda #DOS_EXIT
-    jsr $1000
+    jsr OS_API
     rts
 ```
 
@@ -1627,6 +1628,8 @@ debug.prg / label.prg / user.prg
 ---
 
 ## 13. Writing External Programs
+
+New external applications should use the ca65/ld65 workflow documented in `src/external/AGENTS.md`. The KickAssembler template below remains useful for existing Kick-built apps and for the OS API calling convention; the relocation mechanism in §13.1 applies to both KickAssembler and ca65/ld65 PRG output.
 
 ### Minimal Program Template
 
