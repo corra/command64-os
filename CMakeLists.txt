@@ -18,7 +18,7 @@ find_package(Java REQUIRED)
 find_package(KickAss REQUIRED)
 find_package(cc1541 REQUIRED)
 find_package(Oscar64) # Optional compiler for C files
-find_package(Ca65) # Optional ca65/ld65 toolchain for external apps
+find_package(Ca65) # Required for DEBUG/LABEL/CONWAY (shipping targets); optional for tests-only ca65 targets below
 find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff build tool
 
 # Load helper functions
@@ -50,8 +50,8 @@ endif()
 file(GLOB_RECURSE CMD64_SRCS CONFIGURE_DEPENDS "src/command64/*.asm" "include/*.inc")
 set(CMD64_ENTRY "src/command64.asm")
 
-file(GLOB_RECURSE DEBUG_SRCS CONFIGURE_DEPENDS "src/external/debug/*.asm" "include/*.inc")
-set(DEBUG_ENTRY "src/external/debug/debug.asm")
+file(GLOB_RECURSE DEBUG_SRCS CONFIGURE_DEPENDS "src/external/debug/*.s" "src/external/debug/*.inc" "include/ca65/*.inc")
+set(DEBUG_ENTRY "src/external/debug/debug.s")
 
 file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.s" "src/external/label/*.inc" "include/ca65/*.inc")
 set(LABEL_ENTRY "src/external/label/label.s")
@@ -102,38 +102,44 @@ add_kickass_target(command64
     INCLUDE_DIRS "${CMAKE_BINARY_DIR}/build_config_default" "${CMAKE_BINARY_DIR}"
 )
 
-# 2. DEBUG Utility PRG Target
-add_external_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012)
+# 2. DEBUG Utility PRG Target — built with ca65/ld65 after byte-for-byte
+# parity verification against the previous KickAssembler build. Ships
+# unconditionally in IMAGE_PRG_TARGETS (like LABEL/CONWAY below), so a
+# missing ca65/ld65 toolchain fails the entire configure rather than
+# silently skipping this target.
+if(Ca65_FOUND)
+    add_ca65_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012 "2000")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for DEBUG target")
+endif()
 
 # 3. LABEL External Command PRG Target — built with ca65/ld65 (migrated
 # off the spike/ca65-label/ branch; see
 # brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
-# Requires ca65/ld65 (Ca65_FOUND) -- same "inert if the tool isn't
-# present" gating as conway.
-set(LABEL_TARGET "")
+# Ships unconditionally in IMAGE_PRG_TARGETS, so — like DEBUG — a missing
+# ca65/ld65 toolchain fails the entire configure rather than silently
+# skipping this target.
 if(Ca65_FOUND)
     add_ca65_app(label "${LABEL_ENTRY}" LABEL_SRCS 1032 "0700")
-    set(LABEL_TARGET label)
 else()
-    message(STATUS "ca65/ld65 not found on PATH — skipping label target")
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for LABEL target")
 endif()
+set(LABEL_TARGET label)
 
 # 4. CONWAY Game of Life — built with ca65/ld65 (migrated off the
 # spike/ca65-conway/ branch; see
 # brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
 # Two object files (conway_main.s / conway_grid.s) linked together by
 # ld65; CODE_ALIGN=256 because conway_grid.s embeds two page-aligned grid
-# buffers directly in CODE. Requires ca65/ld65 (Ca65_FOUND) -- mirrors
-# Oscar64's "inert if the tool isn't present" pattern; absence of cc65
-# means no conway target, matching how absence of Oscar64 means no C
-# targets, rather than silently falling back to a Kick build.
-set(CONWAY_TARGET "")
+# buffers directly in CODE. Ships unconditionally in IMAGE_PRG_TARGETS, so
+# — like DEBUG/LABEL — a missing ca65/ld65 toolchain fails the entire
+# configure rather than silently skipping this target.
 if(Ca65_FOUND)
     add_ca65_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1040 "0C00" "256")
-    set(CONWAY_TARGET conway)
 else()
-    message(STATUS "ca65/ld65 not found on PATH — skipping conway target")
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CONWAY target")
 endif()
+set(CONWAY_TARGET conway)
 
 # 4b. PACMAN — character-grid Pac-Man clone
 add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
