@@ -10,6 +10,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **Conway Multiverse Research**: Saved video transcript to `brain/research/conway_multiverse_transcript.txt` and completed implementation plan `brain/plans/conway-multiverse-rules-and-menu.md` for adding main menu, preset/custom rules, and generation counter.
+- **ca65/ld65 toolchain adoption**: Established ca65/ld65 as the build toolchain for new external apps, alongside the existing KickAssembler-based core OS build. Added `include/ca65/` (equate-for-equate mirror of `include/command64.inc`/`vmm.inc`, plus `macros.inc` and a `screencode.inc` PETSCII/screencode charmap toggle mirroring Kick's `.encoding` idiom), `cmake/FindCa65.cmake`, and `cmake/Ca65.cmake`'s production `add_ca65_app` function — versioned via a persistent `BUILD_<NAME>` counter, hash-gated build-number bumps through `cmake/IncrementBuildNumber.cmake`'s new `ASM_DIALECT` parameter, templated per-app `.cfg` generation, and the same base/next-page relocation build (`tools/reloc.py`) every other app-defining CMake function uses. See `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` for the full phased plan.
+- **conway/label migrated to ca65/ld65**: Replaced the KickAssembler-built `conway.prg`/`label.prg` with ca65/ld65 builds (`src/external/conway/conway_main.s`+`conway_grid.s`, `src/external/label/label.s`), verified functionally identical (matching relocation-table byte counts against the pre-migration reference, VICE-tested) and continuing each app's existing `BUILD_CONWAY`/`BUILD_LABEL` build-number sequence.
+- **ca65 test suite migrated**: Moved the 9 ca65-ported test programs (`apitest`/`banktest`/`color`/`devtest`/`extcls`/`filetest`/`handletest`/`hello`/`vmmtest`) from an exploratory spike into `tests/src/<name>/`, built alongside (not replacing) their existing KickAssembler counterparts for dual-toolchain regression coverage.
+
+### Fixed
+
+- **ca65 test version banners**: Each of the 9 migrated ca65 tests printed a hardcoded placeholder banner (`"... V0.1.0 (CA65 SPIKE) - ..."`) left over from the exploratory spike port. Now prints its real `VERSION_MAJOR.MINOR.STAGE.BUILD_NUMBER`, matching the version-banner convention already used by `label.prg`.
+- **VI Editor Safety & Correctness**: Remediated critical correctness, safety, and coordinate bugs in the visual text editor (`vi.asm`):
+  - Upgraded the `readBlockLoop` overflow guard to a robust 16-bit memory bounds check preventing VMM memory control table corruption at `$C000`.
+  - Reordered the `saveFile` routine to implement transactional staging via `vi.tmp` and `DOS_RENAME_FILE`, preventing file loss on write errors.
+  - Restricted line yanking to 2047 characters to prevent clipboard length corruption and buffer overflow in `yankBuf`.
+  - Added strict capacity checks in `insertChar` and `doPasteInsert` to abort and warn the user when the gap buffer is full.
+  - Aligned logical cursor coordinates with physical gap buffers on line inserts (`o`/`O` commands).
+  - Upgraded horizontal scroll checks (`checkHorizontal` / `checkHorizontalMax`) to perform 16-bit cursor column comparisons and safe scroll offset capping.
 
 ### Documentation
 
