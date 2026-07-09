@@ -240,7 +240,13 @@ SEGMENTS {
         VERBATIM
     )
 
-    set(OUTPUT_PRG "${CMAKE_BINARY_DIR}/${ENTRY_FILE_NAME}.prg")
+    # Named after TARGET_NAME, not ENTRY_FILE_NAME: this file lands directly
+    # in the shared CMAKE_BINARY_DIR (unlike the per-target OUT_DIR above),
+    # and TARGET_NAME is the only one of the two CMake guarantees is unique
+    # across the whole build -- ENTRY_FILE_NAME can collide with an
+    # unrelated target that happens to reuse the same source basename (e.g.
+    # a smoke-test target reusing an existing test's entry file).
+    set(OUTPUT_PRG "${CMAKE_BINARY_DIR}/${TARGET_NAME}.prg")
     add_custom_command(
         OUTPUT "${OUTPUT_PRG}"
         COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/reloc.py" "${PRG_BASE}" "${PRG_NEXT}" "${OUTPUT_PRG}"

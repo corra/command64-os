@@ -178,6 +178,24 @@ if(Ca65_FOUND)
     endforeach()
 endif()
 
+# 4g. Phase 3 smoke test for add_ca65_app (cmake/Ca65.cmake) -- proves the
+# production ca65 build pipeline (BUILD_<NAME> versioning, hash-gated
+# build-number bump, templated .cfg generation, -I include/ca65 + -t c64,
+# base/next-page relocation build) end-to-end before Phase 4 depends on it
+# for real external apps. Reuses the pre-existing, unmodified
+# spike/ca65-tests/hello.s (no dependencies beyond its own common.inc) --
+# deliberately NOT added to IMAGE_PRG_TARGETS, since it isn't a real app.
+set(CA65_APP_SMOKETEST_TARGET "")
+if(Ca65_FOUND)
+    add_ca65_app(ca65_app_smoketest
+        "${CMAKE_SOURCE_DIR}/spike/ca65-tests/hello.s"
+        CA65_APP_SMOKETEST_SRCS
+        1000
+        "0700"
+    )
+    set(CA65_APP_SMOKETEST_TARGET ca65_app_smoketest)
+endif()
+
 # 5. Test PRGs (one per tests/src/<name>/<name>.asm, automatically registered via glob with version tracking)
 file(GLOB TEST_SRCS "tests/src/*/*.asm")
 set(TEST_TARGETS "")
@@ -234,7 +252,7 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
 set(IMAGE_PRG_TARGETS command64 debug label conway pacman vi ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CONWAY_CA65_TARGET} ${LABEL_CA65_TARGET} ${TESTS_CA65_TARGETS})
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CONWAY_CA65_TARGET} ${LABEL_CA65_TARGET} ${TESTS_CA65_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"
