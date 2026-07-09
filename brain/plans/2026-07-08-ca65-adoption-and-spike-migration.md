@@ -1,5 +1,50 @@
 # Adopt ca65/ld65 for new development; migrate spike apps to mainline
 
+**Update 2026-07-08 (Phase 3 detail):** Phase 3 was re-planned in detail
+against the actual `cmake/*.cmake` files and `CMakeLists.txt` (all read in
+full, not assumed) before implementation. Key findings:
+- The master plan's Phase 3 wording ("replace `add_ca65_spike_app`") needs a
+  correction: `add_ca65_spike_app` is still called 3x in `CMakeLists.txt`
+  (`conway_ca65`, `label_ca65`, the `spike/ca65-tests/*.s` loop) — those are
+  Phase 4/5's job to retire, not Phase 3's. Deleting the spike function now
+  would break configure immediately, so Phase 3 **adds** `add_ca65_app`
+  alongside it instead of replacing it.
+- ca65 assembles each source once; only `ld65` links twice (once per
+  `.cfg`) — confirmed in the existing `add_ca65_spike_app`
+  (`cmake/Ca65.cmake:52-86`). `add_ca65_app` keeps this shape.
+- The `.cfg`-templating decision point from the original Phase 2 sketch is
+  resolved here: `.cfg` `MAIN` size genuinely varies per app (`conway`
+  uses `$0C00`, `label`/tests use `$0700`), so `add_ca65_app` takes a
+  `PRG_SIZE_HEX` argument and generates both per-config `.cfg` files from a
+  template instead of checking in more static pairs — the `MEMORY`/
+  `SEGMENTS` structure is otherwise identical across all 6 existing files.
+- ca65's `-D name=value` command-line flag only defines a *numeric* symbol
+  (confirmed via `brain/ca65/ca65.md`), so it can't carry `BUILD_NUMBER` as
+  the literal ASCII digit text a version-banner `.byte` list needs. Instead
+  `add_ca65_app` generates a `build_<name>.inc` containing `.define
+  BUILD_NUMBER "<n>"` and passes its directory via `-I`, the same
+  `#import "build_<name>.inc"` shape Kick apps already use
+  (`src/external/AGENTS.md`).
+- `cmake/IncrementBuildNumber.cmake`'s only dialect-specific line is its
+  final `file(WRITE ...)` (line 89) — an `ASM_DIALECT` parameter (default
+  `"kick"`, preserving every existing Kick target's output byte-for-byte)
+  branches only that line: `.const NAME = "value"` for Kick,
+  `.define NAME "value"` for ca65.
+- `tools/reloc.py` needs no changes — confirmed assembler-agnostic (pure
+  byte-diff of two `.prg` files).
+- `cmake/FindKickAss.cmake` is the direct template for a new
+  `cmake/FindCa65.cmake`, replacing the inline `find_program`/`if()` block
+  currently in `cmake/Ca65.cmake:9-16`, mirroring the `Oscar64_FOUND`
+  "inert if absent" pattern already used identically elsewhere.
+
+Full stage-by-stage breakdown (`cmake/FindCa65.cmake`,
+`cmake/IncrementBuildNumber.cmake`'s `ASM_DIALECT` param,
+`cmake/Ca65.cmake`'s `add_ca65_app(...)`, and a throwaway
+`ca65_app_smoketest` target proving the pipeline via `spike/ca65-tests/
+hello.s` before Phase 4 depends on it for real apps) lives in the Phase 3
+planning session, not duplicated here — see the git history around this
+update for the full working plan if needed.
+
 **Update 2026-07-08 (Phase 2 detail):** Phase 2 was re-planned in detail
 against the actual tree (not assumptions) before implementation. Key
 findings that reshape it from the original sketch below:
@@ -181,41 +226,19 @@ screencode}.inc` stage-by-stage breakdown.
 
 ## Phase 3 — Permanent (non-spike) CMake module
 
-Replace `cmake/Ca65.cmake`'s `add_ca65_spike_app` with a production
-`add_ca65_app(TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION ...)` that
-mirrors `cmake/KickAssembler.cmake`'s `add_external_app` (`cmake/KickAssembler.cmake:47-140`)
-feature-for-feature:
-
-- Enforce a persistent `BUILD_<NAME>` counter file next to the entry source
-  (same `IncrementBuildNumber.cmake` reuse, content-hash gated).
-- **Fix `cmake/IncrementBuildNumber.cmake:89`** before wiring it into any ca65
-  target: it currently unconditionally writes Kick syntax
-  (`.const ${VAR_NAME} = "${NEW_VAL}"\n`), which ca65 cannot parse (no
-  `.const` directive; ca65 doesn't do quoted-string `=` equates that way).
-  Add an `ASM_DIALECT` (or similarly named) argument to the script, defaulting
-  to the current Kick output, with a `ca65` branch that writes
-  `.define ${VAR_NAME} "${NEW_VAL}"` instead — `.define` is ca65's macro-style
-  text substitution, which is what the version-banner `.CONCAT()`/`.SPRINTF()`
-  call from Phase 2 needs. Confirmed by reading the script directly; this is
-  a real gap, not a hypothetical.
-- Generate a per-config `build_config.inc`-equivalent (`.inc` with `BUILD_NUMBER`
-  equate, using the fixed `.define` form above) fed into the version-banner
-  macro from Phase 2.
-- Keep the existing base/next-page double-link + `tools/reloc.py` diff step
-  (this part of `add_ca65_spike_app` already works and needs no change).
-- **Decision point, not mandated**: consider generating each app's `.cfg`
-  file from a CMake template (`MEMORY`/`SEGMENTS` blocks parameterized by
-  `USER_PROG_START_HEX`/`_NEXT` and a per-app size) instead of checking in a
-  static `_2c00.cfg`/`_2d00.cfg` pair per app, to cut duplication as more apps
-  migrate (currently 3 apps × 2 near-identical files). Weigh against static
-  `.cfg` files being directly inspectable/diffable when a link fails — revisit
-  once ca65 app count grows enough that the duplication is actually painful,
-  rather than deciding it up front.
-- Split tool discovery into `cmake/FindCa65.cmake` (mirroring
-  `cmake/FindKickAss.cmake`'s pattern) separate from the build-function module,
-  for consistency with the rest of `cmake/`.
-- Targets built with `add_ca65_app` go straight into `IMAGE_PRG_TARGETS`
-  (the real `image_d64`), not just `TEST_IMAGE_PRG_TARGETS`.
+**Superseded by the "Phase 3 detail" update note at the top of this
+document** (added 2026-07-08, after re-planning against the actual
+`cmake/*.cmake` files rather than assumptions). Summary of what changed and
+why: `add_ca65_spike_app` is **added alongside**, not replaced in place —
+it's still called 3x for the not-yet-migrated spike targets, and deleting
+it now would break configure; the `.cfg`-templating "decision point" below
+is resolved in favor of templating (via a `PRG_SIZE_HEX` argument), since
+`.cfg` `MAIN` size genuinely varies per app; and `BUILD_NUMBER` is wired via
+a generated `.define`-based `.inc` (not ca65's `-D` flag, which is numeric-
+only and can't carry the literal digit text a version banner needs). See
+the top-of-file update note for the full rationale and the
+`cmake/FindCa65.cmake` / `IncrementBuildNumber.cmake` `ASM_DIALECT` /
+`add_ca65_app(...)` / smoke-test stage-by-stage breakdown.
 
 `Ca65_FOUND`-gating stays (mirrors `Oscar64_FOUND`'s "inert if absent" pattern)
 so the Kick-only build path still works on machines without cc65 installed —
