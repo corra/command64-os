@@ -1,5 +1,68 @@
 # Adopt ca65/ld65 for new development; migrate spike apps to mainline
 
+**Update 2026-07-08 (Phase 4 detail):** Phase 4 was re-planned in detail
+against every spike/Kick source file (read in full) plus the git history
+behind the recent conway relocation fix, before implementation. Key
+findings:
+- Zero-page layout is already byte-identical between the spike and
+  currently-shipping Kick versions for both apps (`conway`'s `$70-$7D`,
+  `label`'s `$70`/`$71`) — no address changes needed. The `$70`/`$71`
+  overlap between conway and label already exists in the shipping Kick
+  apps today; it's a pre-existing, accepted risk (apps aren't concurrently
+  resident), not something migration introduces or must fix.
+- The `.importzp`/`.exportzp` risk flagged during Phase 2 planning doesn't
+  apply: neither spike file shares a zp symbol across the object-file
+  boundary — both get their equates via a plain `.include`, not a
+  linker-level `.import`.
+- Real, previously-undiscovered gap: `add_ca65_app` (Phase 3) can't build
+  conway as-is. The most recent commit on this branch (`3c736e7`, "resolve
+  relocation crash by embedding buffers as page-aligned data") added
+  `align = 256` to the `CODE` segment in conway's `.cfg` files, required
+  because `conway_grid.s` embeds two 960-byte page-aligned buffers
+  directly in `CODE`. Phase 3's `.cfg` template has no `align` attribute.
+  Phase 4 extends `add_ca65_app` with a minimal, backward-compatible
+  optional trailing argument for this (via `${ARGN}`, so label and the
+  Phase 3 smoke test's existing 5-arg calls need no change) rather than
+  reopening Phase 3's design.
+- conway's `statusText` screencode block predates Phase 2 and should
+  switch to the `screencode_mixed`/`petscii_mixed` macros — confirmed
+  Phase 2's `include/ca65/screencode.inc` was built and verified
+  specifically against these exact hand-encoded bytes.
+- label's hex-encoded drive-protocol strings (`cmdInit`/`cmdU1`/`cmdBP`/
+  `cmdU2`) must stay exactly as they are: this isn't a ca65 tooling gap,
+  it's that any correct uppercase-shifted PETSCII translation (Kick's or
+  ca65's) produces bytes the 1541 command parser rejects. Migration keeps
+  every existing hex table byte-for-byte, touching only what's actually
+  incomplete: label's `verMsg` is a hardcoded "V0.1.0 (CA65 SPIKE)"
+  placeholder (explicitly out of scope per the spike's own header
+  comment) and needs wiring to the real `VERSION_MAJOR`/`_MINOR`/`_STAGE`
+  + `BUILD_NUMBER`, matching the shipping Kick banner format exactly.
+- conway's Kick version never prints a version banner at all (defines the
+  version consts but never references them) — migration preserves this
+  exactly, no banner added, since the goal is parity, not new features.
+- `BUILD_CONWAY` (1040) / `BUILD_LABEL` (1032) already exist at the paths
+  `add_ca65_app` expects, already in the 2-line counter+hash format —
+  reused as-is. The hash gate will see a genuinely different source list
+  on the first ca65 build and bump each by exactly 1 — expected, not a
+  bug.
+- `docs/codebase-reference.md` §9.2 (label) and §9.3 (conway) have direct
+  file-path links and Kick-`.encoding`-specific phrasing that go stale;
+  fixed narrowly. The rest of that doc's pre-existing staleness (missing
+  conway/pacman/vi from the repo-structure tree, etc.) is out of scope.
+- VICE MCP verification must respect an established gotcha from prior
+  debugging history in this repo: monitor-protocol calls
+  (`vice_read_registers`/`vice_screenshot`/`vice_read_memory`/`vice_run`)
+  halt the CPU to service the request, and interleaving them during an
+  in-flight KERNAL `LOAD` can desync the software-timed IEC handshake.
+  Let `vice_load_program`'s own load complete before any other monitor
+  call.
+
+Full stage-by-stage breakdown (extend `add_ca65_app` for conway's
+page-aligned buffers, migrate conway with VICE verification incl. a
+non-default-page relocation check, migrate label with the same, final
+verification pass) lives in the Phase 4 planning session — see the git
+history around this update for the full working plan if needed.
+
 **Update 2026-07-08 (Phase 3 detail):** Phase 3 was re-planned in detail
 against the actual `cmake/*.cmake` files and `CMakeLists.txt` (all read in
 full, not assumed) before implementation. Key findings:
@@ -248,28 +311,22 @@ their Kick versions.
 
 ## Phase 4 — Migrate conway and label off the spike branch
 
-For each of `conway` and `label`:
-
-1. Move sources from `spike/ca65-conway/` / `spike/ca65-label/` into
-   `src/external/conway/` / `src/external/label/` (replacing the existing
-   Kick `.asm` files), switching their `common.inc`/local includes over to
-   the shared `include/ca65/*.inc` from Phase 2.
-2. Add a `BUILD_CONWAY` / `BUILD_LABEL` counter file (continue the existing
-   Kick build-number sequence rather than resetting to satisfy the versioning
-   contract external apps already follow, per `src/external/AGENTS.md`).
-3. Wire the version banner (Phase 2) in place of the spike's hardcoded
-   `"LABEL V0.1.0 (CA65 SPIKE)"`-style literal (`spike/ca65-label/label.s:426-429`).
-4. Update `CMakeLists.txt`: remove the old `add_external_app(conway ...)` /
-   `add_external_app(label ...)` Kick calls and the spike's `conway_ca65`/
-   `label_ca65`/`CONWAY_CA65_TARGET`/`LABEL_CA65_TARGET` blocks
-   (`CMakeLists.txt:119-157`); replace both with `add_ca65_app(...)` calls
-   feeding `IMAGE_PRG_TARGETS`.
-5. Delete the superseded Kick sources (`src/external/conway/conway.asm`,
-   `src/external/label/label.asm`) once the ca65 build is confirmed at parity
-   in VICE (load, run, exercise the app's core interaction, confirm relocation
-   at a non-default page still works via `aptRelocate`).
-6. Update any docs referencing these apps as Kick-built (`docs/codebase-reference.md`,
-   `wiki/` app pages if present).
+**Superseded by the "Phase 4 detail" update note at the top of this
+document** (added 2026-07-08, after re-planning against every spike/Kick
+source file rather than assumptions). Summary of what changed and why:
+`add_ca65_app` needs a small extension first (an optional `align`
+passthrough for conway's page-aligned grid buffers — a real gap the
+original sketch below didn't anticipate); label's hex-encoded
+drive-protocol strings stay untouched (not a tooling gap, a protocol
+constraint) while only its incomplete `verMsg` placeholder gets wired to
+the real version/build number; conway's Kick version never prints a
+banner today and migration preserves that (parity, not new features); and
+conway's `statusText` screencode block switches to Phase 2's
+`screencode_mixed`/`petscii_mixed` macros, closing the loop those macros
+were built to close. See the top-of-file update note for the full
+rationale and the stage-by-stage breakdown (extend `add_ca65_app`, migrate
+conway with VICE verification including a non-default-page relocation
+check, migrate label with the same, final verification pass).
 
 ## Phase 5 — Migrate the test spike
 
