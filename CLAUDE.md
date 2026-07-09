@@ -4,7 +4,7 @@
 
 - **Platform**: C64 (6502/6510) Target
 - **Host**: Cross-Platform
-- **Assembler**: Use Kick Assember contained in `tools/` for building assembly
+- **Assemblers**: Use Kick Assembler from `tools/` for the core OS assembly. Use ca65/ld65 for new external applications under `src/external/`; follow `src/external/AGENTS.md` for the external-app workflow.
 - **C Language**: Oscar64 will be build and installed in `tools/oscar64` and will be the *C Compiler* available for
                Commodore 64 C lanugage conversion.
 - **Source Control**: Git will be used exlusively in a local capacity. No pushes/pull requests will be performed at this time.

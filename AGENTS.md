@@ -105,9 +105,9 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
 ### Testing
 
 1.
-    + Do: Test code using `c64-testing` MCP server when available.
-    + Don't: **DO NOT** Use a web based emulator as a fall back.
-    + Do: Ask user to perform tests when an MCP server is unavailable.
+    + Don't: **NEVER** Test code using `c64-testing` MCP server when available **IT IS BROKEN**.
+    + Don't: **NEVER** Use a web based emulator as a fall back.
+    + Do: **ALWAYS**  Ask user to perform tests when an MCP server is unavailable.
 
 `codebase-memory-mcp` is installed and **MUST BE** prefered as the first-line
 option for searching the codebase. Do not waste tokens unnecesarily by `find`ing and
