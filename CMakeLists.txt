@@ -141,23 +141,24 @@ add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 # 4c. VI — vi-like visual text editor
 add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
 
-# 4f. Exploratory ca65/ld65 spike — ported test programs (tests/src/*,
-# excluding reloc.asm, whose entire premise is Kick's aptRelocate/reloc.py
-# patch mechanism, which doesn't exist in ca65/ld65 output). One shared
-# common.inc + one shared linker config covers all of them, since only one
-# test is memory-resident at a time — see spike/ca65-tests/test_2c00.cfg.
+# 4f. ca65/ld65 test programs (tests/src/<name>/<name>.s, migrated off the
+# spike branch; see
+# brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 5).
+# Excludes reloc, whose entire premise is Kick's aptRelocate/reloc.py
+# patch mechanism, which doesn't exist in ca65/ld65 output -- excluded
+# implicitly, since tests/src/reloc/ has no .s file for the glob to match.
+# Kept dual with the Kick tests/src/*/*.asm counterparts (not replaced):
+# ongoing regression coverage for both toolchains, not a shipping
+# duplicate to eliminate.
 set(TESTS_CA65_TARGETS "")
 if(Ca65_FOUND)
-    file(GLOB TESTS_CA65_SRCS "spike/ca65-tests/*.s")
+    file(GLOB CA65_SHARED_INCLUDES "include/ca65/*.inc")
+    file(GLOB TESTS_CA65_SRCS "tests/src/*/*.s")
     foreach(TEST_CA65_SRC ${TESTS_CA65_SRCS})
         get_filename_component(TEST_CA65_NAME "${TEST_CA65_SRC}" NAME_WE)
         set(TEST_CA65_TARGET "test_ca65_${TEST_CA65_NAME}")
-        add_ca65_spike_app(${TEST_CA65_TARGET}
-            SOURCES "${TEST_CA65_SRC}"
-            CONFIG "${CMAKE_SOURCE_DIR}/spike/ca65-tests/test_2c00.cfg"
-            CONFIG_NEXT "${CMAKE_SOURCE_DIR}/spike/ca65-tests/test_2d00.cfg"
-            OUTPUT_NAME "${TEST_CA65_NAME}ca"
-        )
+        set(TMP_CA65_SRCS_${TEST_CA65_NAME} "${CA65_SHARED_INCLUDES}")
+        add_ca65_app(${TEST_CA65_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_CA65_NAME} 1000 "0700")
         list(APPEND TESTS_CA65_TARGETS ${TEST_CA65_TARGET})
     endforeach()
 endif()
@@ -165,14 +166,14 @@ endif()
 # 4g. Phase 3 smoke test for add_ca65_app (cmake/Ca65.cmake) -- proves the
 # production ca65 build pipeline (BUILD_<NAME> versioning, hash-gated
 # build-number bump, templated .cfg generation, -I include/ca65 + -t c64,
-# base/next-page relocation build) end-to-end before Phase 4 depends on it
-# for real external apps. Reuses the pre-existing, unmodified
-# spike/ca65-tests/hello.s (no dependencies beyond its own common.inc) --
-# deliberately NOT added to IMAGE_PRG_TARGETS, since it isn't a real app.
+# base/next-page relocation build) end-to-end, independent of any real
+# test/app target. Reuses tests/src/hello/hello.s (the Phase 5 migration
+# target above) -- deliberately NOT added to IMAGE_PRG_TARGETS, since it
+# isn't a real app.
 set(CA65_APP_SMOKETEST_TARGET "")
 if(Ca65_FOUND)
     add_ca65_app(ca65_app_smoketest
-        "${CMAKE_SOURCE_DIR}/spike/ca65-tests/hello.s"
+        "${CMAKE_SOURCE_DIR}/tests/src/hello/hello.s"
         CA65_APP_SMOKETEST_SRCS
         1000
         "0700"
