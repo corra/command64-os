@@ -18,6 +18,7 @@ find_package(Java REQUIRED)
 find_package(KickAss REQUIRED)
 find_package(cc1541 REQUIRED)
 find_package(Oscar64) # Optional compiler for C files
+find_package(Ca65) # Optional ca65/ld65 toolchain for external apps
 find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff build tool
 
 # Load helper functions

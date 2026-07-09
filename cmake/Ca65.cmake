@@ -2,18 +2,22 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Command64 project contributors
 #
-# Optional ca65/ld65 toolchain support for the exploratory relocation spike
-# in spike/ca65-conway/. Mirrors Oscar64.cmake's "inert if the tool isn't
-# present" pattern -- absence of cc65 must not break the real Kick build.
-
-find_program(CA65_EXECUTABLE ca65)
-find_program(LD65_EXECUTABLE ld65)
-
-if(CA65_EXECUTABLE AND LD65_EXECUTABLE)
-    set(Ca65_FOUND TRUE)
-else()
-    set(Ca65_FOUND FALSE)
-endif()
+# ca65/ld65 build functions for this project. Tool discovery lives in
+# cmake/FindCa65.cmake (find_package(Ca65), called from the root
+# CMakeLists.txt before this file is include()'d) -- mirrors Oscar64's
+# "inert if the tool isn't present" pattern, so absence of cc65 must not
+# break the real Kick build.
+#
+# Hosts two functions:
+#   - add_ca65_spike_app: the original exploratory-spike function (still
+#     used by the not-yet-migrated conway_ca65/label_ca65/ca65-tests
+#     targets in the root CMakeLists.txt). Retired once Phase 4/5 of
+#     brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md migrate
+#     its last caller.
+#   - add_ca65_app: the production path (Phase 3), mirroring
+#     cmake/KickAssembler.cmake's add_external_app -- versioned,
+#     -t c64/include/ca65-aware, .cfg-templated. This is what Phase 4
+#     apps use going forward.
 
 # Assembles SOURCES with ca65 (once each) and links them with ld65 against
 # CONFIG into OUTPUT_NAME.prg, exposing it the same way add_kickass_target/
