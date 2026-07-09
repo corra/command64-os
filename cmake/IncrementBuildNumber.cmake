@@ -16,6 +16,10 @@
 #                        this script still re-runs on any dependency mtime change
 #                        (that's normal build-system behavior); the hash check is
 #                        what stops a no-op touch/reformat from burning a number.
+#   ASM_DIALECT        - "kick" (default) or "ca65". Selects the syntax written
+#                        to INC_FILE: KickAssembler has no equivalent of ca65's
+#                        .define text-substitution macro, so the two dialects
+#                        need different output syntax for the same value.
 
 if(NOT DEFINED BUILD_FILE)
     message(FATAL_ERROR "BUILD_FILE is not defined")
@@ -31,6 +35,9 @@ if(NOT DEFINED VAR_NAME)
 endif()
 if(NOT DEFINED SOURCES_LIST_FILE)
     message(FATAL_ERROR "SOURCES_LIST_FILE is not defined")
+endif()
+if(NOT DEFINED ASM_DIALECT)
+    set(ASM_DIALECT "kick")
 endif()
 
 # Compute a combined content hash across every tracked source file.
@@ -85,5 +92,12 @@ endif()
 # identical to what's already on disk, so git sees no diff.
 file(WRITE "${BUILD_FILE}" "${NEW_VAL}\n${NEW_HASH}\n")
 
-# Write the assembly include file
-file(WRITE "${INC_FILE}" ".const ${VAR_NAME} = \"${NEW_VAL}\"\n")
+# Write the assembly include file, in the target dialect's syntax.
+if(ASM_DIALECT STREQUAL "ca65")
+    # ca65 has no quoted-string "=" equate; .define is text substitution,
+    # which is what the version-banner .byte-list convention needs
+    # (include/ca65/macros.inc).
+    file(WRITE "${INC_FILE}" ".define ${VAR_NAME} \"${NEW_VAL}\"\n")
+else()
+    file(WRITE "${INC_FILE}" ".const ${VAR_NAME} = \"${NEW_VAL}\"\n")
+endif()
