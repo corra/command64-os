@@ -53,8 +53,8 @@ set(CMD64_ENTRY "src/command64.asm")
 file(GLOB_RECURSE DEBUG_SRCS CONFIGURE_DEPENDS "src/external/debug/*.asm" "include/*.inc")
 set(DEBUG_ENTRY "src/external/debug/debug.asm")
 
-file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.asm" "include/*.inc")
-set(LABEL_ENTRY "src/external/label/label.asm")
+file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.s" "src/external/label/*.inc" "include/ca65/*.inc")
+set(LABEL_ENTRY "src/external/label/label.s")
 
 file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.s" "src/external/conway/*.inc" "include/ca65/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway_main.s")
@@ -105,8 +105,18 @@ add_kickass_target(command64
 # 2. DEBUG Utility PRG Target
 add_external_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012)
 
-# 3. LABEL External Command PRG Target
-add_external_app(label "${LABEL_ENTRY}" LABEL_SRCS 1000)
+# 3. LABEL External Command PRG Target — built with ca65/ld65 (migrated
+# off the spike/ca65-label/ branch; see
+# brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
+# Requires ca65/ld65 (Ca65_FOUND) -- same "inert if the tool isn't
+# present" gating as conway.
+set(LABEL_TARGET "")
+if(Ca65_FOUND)
+    add_ca65_app(label "${LABEL_ENTRY}" LABEL_SRCS 1032 "0700")
+    set(LABEL_TARGET label)
+else()
+    message(STATUS "ca65/ld65 not found on PATH — skipping label target")
+endif()
 
 # 4. CONWAY Game of Life — built with ca65/ld65 (migrated off the
 # spike/ca65-conway/ branch; see
@@ -130,23 +140,6 @@ add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 
 # 4c. VI — vi-like visual text editor
 add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
-
-# 4e. Exploratory ca65/ld65 spike — ported label. Single-file (no natural
-# split point like conway had), but stresses a different part of the
-# toolchain: calling Command64's own jump table (jsr $1000, function
-# selector in A) and reading OS globals (CommandBuffer/ParsePos/
-# CurrentDevice), not just raw KERNAL vectors. See
-# spike/ca65-label/label.s header comment for the PETSCII-encoding caveat.
-set(LABEL_CA65_TARGET "")
-if(Ca65_FOUND)
-    add_ca65_spike_app(label_ca65
-        SOURCES "${CMAKE_SOURCE_DIR}/spike/ca65-label/label.s"
-        CONFIG "${CMAKE_SOURCE_DIR}/spike/ca65-label/label_2c00.cfg"
-        CONFIG_NEXT "${CMAKE_SOURCE_DIR}/spike/ca65-label/label_2d00.cfg"
-        OUTPUT_NAME "labelca"
-    )
-    set(LABEL_CA65_TARGET label_ca65)
-endif()
 
 # 4f. Exploratory ca65/ld65 spike — ported test programs (tests/src/*,
 # excluding reloc.asm, whose entire premise is Kick's aptRelocate/reloc.py
@@ -242,8 +235,8 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug label ${CONWAY_TARGET} pacman vi ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${LABEL_CA65_TARGET} ${TESTS_CA65_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
+set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${CONWAY_TARGET} pacman vi ${C_TARGETS})
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${TESTS_CA65_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"

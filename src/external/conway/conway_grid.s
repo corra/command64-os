@@ -1,14 +1,16 @@
-; spike/ca65-conway/conway_grid.s
+; src/external/conway/conway_grid.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; ca65 port of conway.asm's grid/drawing half. Split out from conway_main.s
-; on purpose: this is the multi-object-file half of the ca65/ld65 spike --
-; it .exports the routines conway_main.s calls, so ld65 has to resolve
-; cross-module references instead of everything living in one flat file
-; the way Kick Assembler's conway.asm does.
+; conway's grid/drawing half. Split out from conway_main.s on purpose: it
+; .exports the routines conway_main.s calls, so ld65 resolves cross-module
+; references instead of everything living in one flat file (this is a
+; genuine multi-object-file ca65 app, unlike Kick Assembler's single-file
+; conway.asm).
 
+.include "command64.inc"
 .include "common.inc"
+.include "screencode.inc"
 
 .export randomizeGrid
 .export drawGrid
@@ -419,10 +421,10 @@ rowOffHi:
 
 ; ---------------------------------------------------------------------------
 ; drawStatusLine -- write the keybinding reminder to screen row 24.
-; Bytes below are precomputed C64 screencodes for the string
-; "space=pause  r=random  c=clear  q=quit" (ca65 has no direct equivalent
-; of Kick's .encoding "screencode_mixed" pragma, so the conversion is done
-; once, offline, instead of at assemble time).
+; Uses include/ca65/screencode.inc's screencode_mixed/petscii_mixed
+; macros, mirroring Kick's ".encoding "screencode_mixed"" toggle idiom
+; (conway.asm:711/715) -- these macros were built and verified specifically
+; against this string's previous hand-encoded bytes.
 ; ---------------------------------------------------------------------------
 drawStatusLine:
     ldx #0
@@ -434,11 +436,11 @@ dslLoop:
     bne dslLoop
     rts
 
+screencode_mixed
 statusText:
-    .byte $13, $10, $01, $03, $05, $3D, $10, $01, $15, $13, $05, $20, $20
-    .byte $12, $3D, $12, $01, $0E, $04, $0F, $0D, $20, $20, $03, $3D, $03
-    .byte $0C, $05, $01, $12, $20, $20, $11, $3D, $11, $15, $09, $14
+    .byte "space=pause  r=random  c=clear  q=quit"
 statusTextEnd:
+petscii_mixed
 STATUS_TEXT_LEN = statusTextEnd - statusText
 
 ; ---------------------------------------------------------------------------

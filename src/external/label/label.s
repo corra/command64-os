@@ -1,12 +1,14 @@
-; spike/ca65-label/label.s
+; src/external/label/label.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; ca65/ld65 relocation spike -- ported from src/external/label/label.asm.
-; See spike/ca65-conway/README.md for the general spike rationale; this one
-; adds a different stress test: calling into Command64's own jump table
-; ($1000, function-selector-in-A convention) and reading OS globals
-; (CommandBuffer/ParsePos/CurrentDevice), not just raw KERNAL vectors.
+; LABEL disk volume-name writer, built with ca65/ld65 (migrated from the
+; spike/ca65-label/ relocation spike; see
+; brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
+; Calls into Command64's own jump table (OS_API = $1000,
+; function-selector-in-A convention, include/ca65/command64.inc) and
+; reads OS globals (CommandBuffer/ParsePos/CurrentDevice), not just raw
+; KERNAL vectors.
 ;
 ; PETSCII note: Kick's ".encoding petscii_mixed" auto-translates mixed-case
 ; source text so it displays correctly via CHROUT regardless of letter
@@ -14,13 +16,18 @@
 ; uppercase glyph in this OS's default charset). ca65 has no equivalent
 ; pragma, so all message strings below are precomputed: every letter maps
 ; to its uppercase ASCII/PETSCII code ($41-$5A), non-letters pass through
-; unchanged.
-;
-; The version banner is a fixed "ca65 spike" string rather than wired into
-; the Kick build's BUILD_NUMBER counter (cmake/IncrementBuildNumber.cmake)
-; -- that machinery is Kick-build-specific and out of scope for the spike.
+; unchanged. This is NOT a ca65 tooling gap -- the drive command strings
+; (cmdInit/cmdU1/cmdBP/cmdU2) specifically MUST stay unshifted-uppercase
+; hex, since any correctly-shifted PETSCII translation (Kick's or ca65's)
+; produces bytes the 1541 command parser rejects.
 
+.include "command64.inc"
 .include "common.inc"
+
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_label.inc"
 
 .import __MAIN_START__
 
@@ -36,7 +43,7 @@ start:
     ldx #<verMsg
     ldy #>verMsg
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
 
     lda CurrentDevice
     sta SavedDevice
@@ -73,7 +80,7 @@ endSpaces:
 
     ldx #PrintPtrLo
     lda #DOS_PARSE_PREFIX
-    jsr $1000
+    jsr OS_API
     sta CurrentDevice
 
     lda PrintPtrLo
@@ -102,7 +109,7 @@ initLabelBuf:
     ldx #<promptMsg
     ldy #>promptMsg
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
 
     ldy #0
 readLoop:
@@ -329,7 +336,7 @@ closeCommandChannel:
     ldx #<okMsg
     ldy #>okMsg
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
     jmp labelExit
 
 printDriveError:
@@ -349,21 +356,21 @@ noArgErr:
     ldx #<reqMsg
     ldy #>reqMsg
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
     jmp labelExit
 
 tooLongErr:
     ldx #<lenMsg
     ldy #>lenMsg
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
     jmp labelExit
 
 openErr:
     ldx #<devMsg
     ldy #>devMsg
     lda #DOS_PRINT_STR
-    jsr $1000
+    jsr OS_API
     jmp labelExit
 
 labelExit:
@@ -423,9 +430,15 @@ devMsg:
     .byte $45, $53, $45, $4E, $54
     .byte $0D, $00
 
+; "LABEL V" prefix is the same proven-correct hex as the other message
+; strings above; VERSION_MAJOR/MINOR/STAGE and BUILD_NUMBER are real
+; equates (see file header), matching the shipping Kick label.asm's
+; "LABEL v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER banner format exactly.
 verMsg:
-    .byte $4C, $41, $42, $45, $4C, $20, $56, $30, $2E, $31, $2E, $30, $20
-    .byte $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B, $45, $29
+    .byte $4C, $41, $42, $45, $4C, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
     .byte $0D, $00
 
 ; Runtime buffers (initialized at load time)

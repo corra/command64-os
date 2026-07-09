@@ -1175,7 +1175,7 @@ API_EXIT:
 
 ### 9.2 `label.asm` — Disk Volume Label Writer
 
-**File**: [src/external/label/label.asm](src/external/label/label.asm)  
+**File**: [src/external/label/label.s](src/external/label/label.s) (built with ca65/ld65, not KickAssembler — see `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` Phase 4)  
 **Load address**: `UserProgStart` (currently `$2C00`)
 
 LABEL directly edits the CBM DOS directory structure on disk (Track 18, Sector 0, byte offset 144) to set the 16-byte volume name field.
@@ -1202,7 +1202,7 @@ All CBM DOS command string bytes are written as explicit hex literals:
 
 - `$49` = `I`, `$55` = `U`, `$42` = `B`, `$50` = `P`, `$52` = `R` (not `'I'`, `'U'`, etc.)
 
-Under `.encoding "petscii_mixed"`, uppercase character literals assemble to shifted PETSCII (`$C9`, `$D5`, etc.), which the 1541 command parser rejects with error code 31 (syntax error). Explicit bytes bypass the encoding directive entirely.
+Uppercase character literals under either assembler's default PETSCII translation (Kick's `.encoding "petscii_mixed"`, or ca65's `-t c64` target) assemble to shifted PETSCII (`$C9`, `$D5`, etc.), which the 1541 command parser rejects with error code 31 (syntax error). Explicit bytes bypass any such translation entirely — this isn't an assembler-specific workaround, it's a genuine 1541 protocol constraint, so `label.s`'s ca65 port keeps every one of these tables byte-for-byte identical to the original.
 
 #### Key Labels / Buffers
 
