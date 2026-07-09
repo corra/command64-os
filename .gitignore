@@ -22,3 +22,7 @@ tools/cc1541-git/
 package-lock.json
 package.json
 node_modules/
+
+# Local tool state (Claude Code settings, MCP index cache)
+.claude/
+.codebase-memory.json
