@@ -1,5 +1,52 @@
 # Adopt ca65/ld65 for new development; migrate spike apps to mainline
 
+**Update 2026-07-08 (Phase 5 detail):** Phase 5 was re-planned in detail
+against every spike test file (read in full), the exact `CMakeLists.txt`
+test-loop wiring, and the existing built `.prg` sizes, before
+implementation. Key findings:
+- Unlike conway/label (Phase 4, which replaced the Kick apps), the 9
+  migrated tests stay **dual** with their Kick counterparts — dev-only
+  test programs where keeping both toolchains' builds of the same test
+  gives ongoing regression coverage for both, not a shipping duplicate to
+  eliminate. `tests/src/reloc/` needs no special-casing: a glob for
+  `tests/src/*/*.s` naturally skips it since it has no `.s` file.
+- The only real gap between `spike/ca65-tests/common.inc` and the shared
+  `include/ca65/{command64,vmm}.inc` is a naming mismatch: the spike names
+  the OS dispatch address `API`, the shared library (Phase 2's deliberate
+  improvement) calls it `OS_API`. Every other constant already matches
+  exactly. Migration renames every `jsr API` call site to `jsr OS_API`
+  (same mechanical rename Phase 4 did for `label.s`), then deletes
+  `common.inc` outright.
+- `$0700` (already used for `label`) is generously sufficient for all 9
+  tests — the largest (`devtest`, 570 bytes) is under a third of that
+  budget. None needs `CODE_ALIGN`.
+- The existing `test_ca65_<name>` target-naming convention (from the spike
+  loop) already avoids collision with the Kick `test_<name>` targets —
+  confirmed via the exact class of bug Phase 4 hit and fixed
+  (`add_ca65_app`'s `.prg` is named after `TARGET_NAME`, not
+  `ENTRY_FILE_NAME`). Only the on-disk `.prg` basename changes
+  (`helloca.prg` → `test_ca65_hello.prg`), since `add_ca65_app` has no
+  `OUTPUT_NAME` param the way the spike function did.
+- The Phase 3 smoke test (`ca65_app_smoketest`) points at
+  `spike/ca65-tests/hello.s` directly — its `ENTRY_FILE` (and
+  `BUILD_CA65_APP_SMOKETEST`) must move to `tests/src/hello/` in the same
+  commit that deletes the spike copy, or the build breaks. Kept as a
+  separate target from the migrated `test_ca65_hello` (different purpose).
+- New `BUILD_TEST_CA65_<NAME>` counter files are needed (not reuse of the
+  Kick `BUILD_TEST_<NAME>` files) — `add_ca65_app` computes
+  `BUILD_<TARGET_NAME_UPPER>`, a distinct file per distinct target name.
+  `DEFAULT_VERSION=1000` for all 9, matching the Kick loop's own
+  hardcoded default.
+- This is the last of `add_ca65_spike_app`'s three call sites (conway and
+  label were migrated in Phase 4) — once this lands, the spike function
+  itself is deleted, closing out the "spike" branch entirely.
+
+Full stage-by-stage breakdown (move the 9 `.s` files + rename `API`→
+`OS_API`, rewire the CMake test loop via `add_ca65_app`, retire
+`add_ca65_spike_app` and the empty `spike/ca65-tests/` directory, final
+verification) lives in the Phase 5 planning session — see the git history
+around this update for the full working plan if needed.
+
 **Update 2026-07-08 (Phase 4 detail):** Phase 4 was re-planned in detail
 against every spike/Kick source file (read in full) plus the git history
 behind the recent conway relocation fix, before implementation. Key
@@ -330,13 +377,18 @@ check, migrate label with the same, final verification pass).
 
 ## Phase 5 — Migrate the test spike
 
-Move `spike/ca65-tests/*.s` into `tests/src/<name>/` alongside (or replacing,
-per app-by-app confirmation) their Kick `tests/src/<name>/*.asm` counterparts,
-using the same `add_ca65_app`-style wiring but into `TEST_IMAGE_PRG_TARGETS`
-(tests are dev-only, not release artifacts, so no need to touch `IMAGE_PRG_TARGETS`
-here). `tests/src/reloc/reloc.asm` stays Kick-only — it tests the OS's
-relocation mechanism itself, not assembler-specific behavior, and has no ca65
-port per the existing spike scope note (`CMakeLists.txt:159-163`).
+**Superseded by the "Phase 5 detail" update note at the top of this
+document** (added 2026-07-08, after re-planning against every spike test
+file rather than assumptions). Summary of what changed and why: the 9
+tests stay **dual** with their Kick counterparts (not replaced — ongoing
+regression coverage for both toolchains, unlike conway/label's shipping-
+duplicate elimination); the only real `common.inc` gap is an `API`→
+`OS_API` naming mismatch, closed by a mechanical rename before deleting
+`common.inc`; the existing `test_ca65_<name>` naming already avoids
+collision with Kick's `test_<name>` targets; and the Phase 3 smoke test's
+entry file/`BUILD_CA65_APP_SMOKETEST` must move alongside `hello.s` in the
+same commit. See the top-of-file update note for the full rationale and
+the stage-by-stage breakdown.
 
 ## Phase 6 — Policy documentation
 
