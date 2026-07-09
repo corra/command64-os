@@ -119,7 +119,17 @@ endfunction()
 #     SEGMENTS structure is identical across every existing spike .cfg
 #     pair; only `start` (USER_PROG_START_HEX/_NEXT, already a global
 #     cache var) and `size` (this function's PRG_SIZE_HEX arg) vary.
+#
+# Optional 6th positional argument (via ARGN, not a named param, so the
+# existing 5-arg call sites need no change): CODE_ALIGN. If given, adds
+# ", align = <value>" to the generated .cfg's CODE segment line -- needed
+# by apps (e.g. conway) that embed page-aligned data buffers directly in
+# CODE via a source-level ".align" directive.
 function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZE_HEX)
+    set(CODE_ALIGN "")
+    if(ARGC GREATER 5)
+        list(GET ARGN 0 CODE_ALIGN)
+    endif()
     string(TOUPPER "${TARGET_NAME}" TARGET_NAME_UPPER)
     get_filename_component(ENTRY_FILE_ABS "${ENTRY_FILE}" ABSOLUTE)
     get_filename_component(ENTRY_FILE_DIR "${ENTRY_FILE_ABS}" DIRECTORY)
@@ -174,6 +184,10 @@ function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZ
     file(MAKE_DIRECTORY "${CFG_DIR}")
     set(CFG_BASE "${CFG_DIR}/${TARGET_NAME}_${USER_PROG_START_HEX}.cfg")
     set(CFG_NEXT "${CFG_DIR}/${TARGET_NAME}_${USER_PROG_START_HEX_NEXT}.cfg")
+    set(CODE_SEGMENT_LINE "    CODE:   load = MAIN,   type = ro;")
+    if(CODE_ALIGN)
+        set(CODE_SEGMENT_LINE "    CODE:   load = MAIN,   type = ro, align = ${CODE_ALIGN};")
+    endif()
     set(CFG_TEMPLATE
 "MEMORY {
     HEADER: start = $9000, size = $2,    file = %O;
@@ -182,12 +196,13 @@ function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZ
 
 SEGMENTS {
     HEADER: load = HEADER, type = ro;
-    CODE:   load = MAIN,   type = ro;
+@CODE_SEGMENT@
     RODATA: load = MAIN,   type = ro;
     DATA:   load = MAIN,   type = rw;
     BSS:    load = MAIN,   type = bss;
 }
 ")
+    string(REPLACE "@CODE_SEGMENT@" "${CODE_SEGMENT_LINE}" CFG_TEMPLATE "${CFG_TEMPLATE}")
     string(REPLACE "@START@" "${USER_PROG_START_HEX}" CFG_BASE_CONTENT "${CFG_TEMPLATE}")
     string(REPLACE "@SIZE@" "${PRG_SIZE_HEX}" CFG_BASE_CONTENT "${CFG_BASE_CONTENT}")
     string(REPLACE "@START@" "${USER_PROG_START_HEX_NEXT}" CFG_NEXT_CONTENT "${CFG_TEMPLATE}")
