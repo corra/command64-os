@@ -25,6 +25,7 @@
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
 - **Version**: 0.3.1 (command64 OS Build 2584, VI Build 1013) / DEBUG 0.1.8 (Build 1075).
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
+- **ca65 primary test migration**: The 9 already-ported tests (`apitest`, `banktest`, `color`, `devtest`, `extcls`, `filetest`, `handletest`, `hello`, `vmmtest`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
 - **Verification**: VI editor compiled relocatable, verified buffer layout, scrolling, insertions, deletions, yanking, pasting, and save/load file routines.
 - **Conway Multiverse Research**: Saved video transcript to `brain/research/conway_multiverse_transcript.txt` and completed implementation plan for adding main menu, preset/custom rules, and generation counter.
 - **VI Code Review**: Completed comprehensive correctness and architectural code review of `vi.asm` detailing critical VMM, yank buffer, horizontal scrolling, and data loss issues.
@@ -47,7 +48,7 @@
 - `LOAD` gated: protected-address check ($0000–$21FF, $C000–$FFFF) + table-full check before disk I/O; registers entry on success.
 - `RUN`/`GO` gated: requires app table membership; supports `RUN <name>` and `RUN <addr>`.
 - New commands: `APPS`/`PS` (list loaded programs), `FREE` (remove entry, guards APP_RUNNING).
-- `debug.asm` and all `tests/src/*.asm` compile address moved from `$2000` → `$2200`.
+- Historical Kick test/debug sources previously compiled at `$2200`; current external programs and ca65-migrated tests build at `UserProgStart` (`$2C00`) through the CMake app helpers.
 
 ### Key implementation details
 

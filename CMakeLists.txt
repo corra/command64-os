@@ -18,7 +18,7 @@ find_package(Java REQUIRED)
 find_package(KickAss REQUIRED)
 find_package(cc1541 REQUIRED)
 find_package(Oscar64) # Optional compiler for C files
-find_package(Ca65) # Required for DEBUG/LABEL/CONWAY (shipping targets); optional for tests-only ca65 targets below
+find_package(Ca65) # Required for DEBUG/LABEL/CONWAY and ca65-migrated test targets
 find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff build tool
 
 # Load helper functions
@@ -147,39 +147,16 @@ add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
 # 4c. VI — vi-like visual text editor
 add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
 
-# 4f. ca65/ld65 test programs (tests/src/<name>/<name>.s, migrated off the
-# spike branch; see
-# brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 5).
-# Excludes reloc, whose entire premise is Kick's aptRelocate/reloc.py
-# patch mechanism, which doesn't exist in ca65/ld65 output -- excluded
-# implicitly, since tests/src/reloc/ has no .s file for the glob to match.
-# Kept dual with the Kick tests/src/*/*.asm counterparts (not replaced):
-# ongoing regression coverage for both toolchains, not a shipping
-# duplicate to eliminate.
-set(TESTS_CA65_TARGETS "")
-if(Ca65_FOUND)
-    file(GLOB CA65_SHARED_INCLUDES "include/ca65/*.inc")
-    file(GLOB TESTS_CA65_SRCS "tests/src/*/*.s")
-    foreach(TEST_CA65_SRC ${TESTS_CA65_SRCS})
-        get_filename_component(TEST_CA65_NAME "${TEST_CA65_SRC}" NAME_WE)
-        set(TEST_CA65_TARGET "test_ca65_${TEST_CA65_NAME}")
-        set(TMP_CA65_SRCS_${TEST_CA65_NAME} "${CA65_SHARED_INCLUDES}")
-        add_ca65_app(${TEST_CA65_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_CA65_NAME} 1000 "0700")
-        list(APPEND TESTS_CA65_TARGETS ${TEST_CA65_TARGET})
-    endforeach()
-endif()
-
-# 4g. Phase 3 smoke test for add_ca65_app (cmake/Ca65.cmake) -- proves the
+# 4f. Phase 3 smoke test for add_ca65_app (cmake/Ca65.cmake) -- proves the
 # production ca65 build pipeline (BUILD_<NAME> versioning, hash-gated
 # build-number bump, templated .cfg generation, -I include/ca65 + -t c64,
 # base/next-page relocation build) end-to-end, independent of any real
-# test/app target. Reuses tests/src/hello/hello.s (the Phase 5 migration
-# target above) -- deliberately NOT added to IMAGE_PRG_TARGETS, since it
+# test/app target. Deliberately NOT added to IMAGE_PRG_TARGETS, since it
 # isn't a real app.
 set(CA65_APP_SMOKETEST_TARGET "")
 if(Ca65_FOUND)
     add_ca65_app(ca65_app_smoketest
-        "${CMAKE_SOURCE_DIR}/tests/src/hello/hello.s"
+        "${CMAKE_SOURCE_DIR}/tests/smoke/ca65_app_smoketest.s"
         CA65_APP_SMOKETEST_SRCS
         1000
         "0700"
@@ -187,19 +164,34 @@ if(Ca65_FOUND)
     set(CA65_APP_SMOKETEST_TARGET ca65_app_smoketest)
 endif()
 
-# 5. Test PRGs (one per tests/src/<name>/<name>.asm, automatically registered via glob with version tracking)
-file(GLOB TEST_SRCS "tests/src/*/*.asm")
+# 5. Test PRGs. ca65-ported tests are the primary test targets and keep the
+# public test_<name> target/PRG names. KickAssembler remains only for tests
+# without a ca65 port, such as reloc's Kick-specific relocation coverage.
 set(TEST_TARGETS "")
-foreach(TEST_SRC ${TEST_SRCS})
+if(Ca65_FOUND)
+    file(GLOB CA65_SHARED_INCLUDES "include/ca65/*.inc")
+    file(GLOB TEST_CA65_SRCS "tests/src/*/*.s")
+    foreach(TEST_CA65_SRC ${TEST_CA65_SRCS})
+        get_filename_component(TEST_NAME "${TEST_CA65_SRC}" NAME_WE)
+        set(TEST_TARGET "test_${TEST_NAME}")
+        set(TMP_CA65_SRCS_${TEST_NAME} "${CA65_SHARED_INCLUDES}")
+        add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "0700")
+        list(APPEND TEST_TARGETS ${TEST_TARGET})
+    endforeach()
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for migrated test targets")
+endif()
+
+file(GLOB TEST_KICK_SRCS "tests/src/*/*.asm")
+foreach(TEST_SRC ${TEST_KICK_SRCS})
     get_filename_component(TEST_NAME "${TEST_SRC}" NAME_WE)
+    if(EXISTS "${CMAKE_SOURCE_DIR}/tests/src/${TEST_NAME}/${TEST_NAME}.s")
+        continue()
+    endif()
+
     set(TEST_TARGET "test_${TEST_NAME}")
-    
-    # Create sources variable dynamically for the external app macro
     set(TMP_SRCS_${TEST_NAME} "${TEST_SRC}")
-    
-    # Register as external application with version/build tracking
     add_external_app(${TEST_TARGET} "${TEST_SRC}" TMP_SRCS_${TEST_NAME} 1000)
-    
     list(APPEND TEST_TARGETS ${TEST_TARGET})
 endforeach()
 
@@ -243,7 +235,7 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
 set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${CONWAY_TARGET} pacman vi ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${TESTS_CA65_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"

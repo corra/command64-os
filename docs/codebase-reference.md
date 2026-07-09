@@ -90,13 +90,16 @@ command64-os/
 │       └── label.asm           LABEL disk volume-name writer
 │
 ├── tests/
-│   └── src/
-│       ├── hello.asm           Minimal "hello world" test program
-│       ├── color.asm           Colour attribute test
-│       ├── extcls.asm          External CLS test
-│       ├── apitest.asm         API function exerciser
-│       ├── filetest.asm        File open/read/write/close exerciser
-│       └── vmmtest.asm         VMM alloc/free/read/write exerciser
+│   ├── src/
+│       ├── hello.s             Minimal "hello world" test program (ca65/ld65)
+│       ├── color.s             Colour attribute test (ca65/ld65)
+│       ├── extcls.s            External CLS test (ca65/ld65)
+│       ├── apitest.s           API function exerciser (ca65/ld65)
+│       ├── filetest.s          File open/read/write/close exerciser (ca65/ld65)
+│       ├── vmmtest.s           VMM alloc/free/read/write exerciser (ca65/ld65)
+│       └── reloc.asm           Kick-specific relocation pipeline test
+│   └── smoke/
+│       └── ca65_app_smoketest.s  Minimal add_ca65_app pipeline smoke source
 │
 ├── cmake/
 │   ├── FindKickAss.cmake       Locates KickAss.jar
@@ -161,6 +164,14 @@ Each program in `src/external/<name>/` must have:
 - A CMake app-helper call in `CMakeLists.txt`: `add_external_app(<name> ...)` for KickAssembler or `add_ca65_app(<name> ...)` for ca65/ld65.
 
 Both helpers schedule `IncrementBuildNumber.cmake` with the correct counter file and produce relocatable PRGs through the base/next-page diff pipeline.
+
+### 3.4 Test Program Versioning
+
+Ported tests in `tests/src/<name>/<name>.s` build with ca65/ld65 as the
+primary `test_<name>` targets and use `BUILD_TEST_<NAME>` counters in the
+same directory. KickAssembler remains available for tests without a ca65
+port; currently `tests/src/reloc/reloc.asm` stays on that path because it
+exercises the Kick/reloc.py relocation pipeline directly.
 
 ---
 

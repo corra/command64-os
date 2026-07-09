@@ -43,16 +43,24 @@ see the git history around this update for the full working plan if
 needed. This documentation-only phase closes out the plan entirely once
 implemented (all 6 phases complete).
 
-**Update 2026-07-08 (Phase 5 detail):** Phase 5 was re-planned in detail
+**Update 2026-07-09 (test target follow-up):** The Phase 5 dual-test
+decision has been superseded. The 9 tests that already have ca65 ports now
+build as the primary `test_<name>` targets, using their existing
+`BUILD_TEST_<NAME>` counters and `build_test_<name>.inc` includes. The
+temporary `test_ca65_<name>` targets, `BUILD_TEST_CA65_<NAME>` counters,
+and duplicate Kick sources were retired. `tests/src/reloc/reloc.asm`
+remains KickAssembler-based because it specifically covers the Kick/
+reloc.py relocation path and has no ca65 port.
+
+**Update 2026-07-08 (Phase 5 detail, superseded 2026-07-09):** Phase 5 was re-planned in detail
 against every spike test file (read in full), the exact `CMakeLists.txt`
 test-loop wiring, and the existing built `.prg` sizes, before
 implementation. Key findings:
-- Unlike conway/label (Phase 4, which replaced the Kick apps), the 9
-  migrated tests stay **dual** with their Kick counterparts — dev-only
-  test programs where keeping both toolchains' builds of the same test
-  gives ongoing regression coverage for both, not a shipping duplicate to
-  eliminate. `tests/src/reloc/` needs no special-casing: a glob for
-  `tests/src/*/*.s` naturally skips it since it has no `.s` file.
+- The original Phase 5 decision kept the 9 migrated tests dual with their
+  Kick counterparts. The 2026-07-09 follow-up supersedes that: the ca65
+  ports are now the primary `test_<name>` targets, while `tests/src/reloc/`
+  stays KickAssembler-only because it covers Kick/reloc.py behavior and has
+  no `.s` port.
 - The only real gap between `spike/ca65-tests/common.inc` and the shared
   `include/ca65/{command64,vmm}.inc` is a naming mismatch: the spike names
   the OS dispatch address `API`, the shared library (Phase 2's deliberate
@@ -63,23 +71,15 @@ implementation. Key findings:
 - `$0700` (already used for `label`) is generously sufficient for all 9
   tests — the largest (`devtest`, 570 bytes) is under a third of that
   budget. None needs `CODE_ALIGN`.
-- The existing `test_ca65_<name>` target-naming convention (from the spike
-  loop) already avoids collision with the Kick `test_<name>` targets —
-  confirmed via the exact class of bug Phase 4 hit and fixed
-  (`add_ca65_app`'s `.prg` is named after `TARGET_NAME`, not
-  `ENTRY_FILE_NAME`). Only the on-disk `.prg` basename changes
-  (`helloca.prg` → `test_ca65_hello.prg`), since `add_ca65_app` has no
-  `OUTPUT_NAME` param the way the spike function did.
-- The Phase 3 smoke test (`ca65_app_smoketest`) points at
-  `spike/ca65-tests/hello.s` directly — its `ENTRY_FILE` (and
-  `BUILD_CA65_APP_SMOKETEST`) must move to `tests/src/hello/` in the same
-  commit that deletes the spike copy, or the build breaks. Kept as a
-  separate target from the migrated `test_ca65_hello` (different purpose).
-- New `BUILD_TEST_CA65_<NAME>` counter files are needed (not reuse of the
-  Kick `BUILD_TEST_<NAME>` files) — `add_ca65_app` computes
-  `BUILD_<TARGET_NAME_UPPER>`, a distinct file per distinct target name.
-  `DEFAULT_VERSION=1000` for all 9, matching the Kick loop's own
-  hardcoded default.
+- The intermediate `test_ca65_<name>` target-naming convention avoided
+  collision during the parallel phase. It is now retired; the ca65 ports
+  keep the public `test_<name>` target and PRG names.
+- The Phase 3 smoke test (`ca65_app_smoketest`) still points at
+  `tests/src/hello/hello.s`, but remains a separate target with its own
+  `BUILD_CA65_APP_SMOKETEST` counter because it verifies the helper
+  pipeline rather than the user-facing hello test.
+- The primary migrated tests use the existing `BUILD_TEST_<NAME>` counter
+  files and `build_test_<name>.inc` generated includes.
 - This is the last of `add_ca65_spike_app`'s three call sites (conway and
   label were migrated in Phase 4) — once this lands, the spike function
   itself is deleted, closing out the "spike" branch entirely.
@@ -420,18 +420,15 @@ check, migrate label with the same, final verification pass).
 
 ## Phase 5 — Migrate the test spike
 
-**Superseded by the "Phase 5 detail" update note at the top of this
-document** (added 2026-07-08, after re-planning against every spike test
-file rather than assumptions). Summary of what changed and why: the 9
-tests stay **dual** with their Kick counterparts (not replaced — ongoing
-regression coverage for both toolchains, unlike conway/label's shipping-
-duplicate elimination); the only real `common.inc` gap is an `API`→
-`OS_API` naming mismatch, closed by a mechanical rename before deleting
-`common.inc`; the existing `test_ca65_<name>` naming already avoids
-collision with Kick's `test_<name>` targets; and the Phase 3 smoke test's
-entry file/`BUILD_CA65_APP_SMOKETEST` must move alongside `hello.s` in the
-same commit. See the top-of-file update note for the full rationale and
-the stage-by-stage breakdown.
+**Superseded by the Phase 5 and 2026-07-09 test target update notes at the
+top of this document.** Summary of what changed and why: the 9 ca65 test
+ports first moved out of the spike area, then were promoted from temporary
+parallel targets to the primary `test_<name>` targets. `reloc` remains
+KickAssembler-only because it has no ca65 port and directly tests the
+Kick/reloc.py relocation path. The `common.inc` gap was an `API`→`OS_API`
+naming mismatch, closed by a mechanical rename before deleting the spike
+copy. The Phase 3 smoke test remains separate and continues to use
+`tests/src/hello/hello.s`.
 
 ## Phase 6 — Policy documentation
 

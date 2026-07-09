@@ -8,7 +8,7 @@
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_ca65_banktest.inc"
+.include "build_test_banktest.inc"
 
 .import __MAIN_START__
 

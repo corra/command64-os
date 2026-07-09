@@ -8,7 +8,7 @@
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_ca65_vmmtest.inc"
+.include "build_test_vmmtest.inc"
 
 .import __MAIN_START__
 

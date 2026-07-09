@@ -8,7 +8,7 @@
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_ca65_color.inc"
+.include "build_test_color.inc"
 
 .import __MAIN_START__
 

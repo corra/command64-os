@@ -15,12 +15,18 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 
 ## Work Guidance
 
-- Use the compiled shell load commands or custom load addresses ($2200+) to run test programs.
+- Use ca65/ld65 for tests that have `.s` ports; they build as the primary
+  `test_<name>` targets through `add_ca65_app`.
+- Keep KickAssembler tests only when no ca65 port exists or when the test is
+  explicitly covering Kick-specific behavior such as the relocation pipeline.
+- Use the compiled shell load commands or CMake-built test PRGs to run test programs.
 - Log success/failure of each test case.
 
 ## Verification
 
-- Run tests regularly to verify core dispatcher, loader, VMM, and file system functionality.
+- Build `test_image_d64` regularly to verify the full test disk still
+  includes all primary test programs, plus any intentional Kick-specific
+  tests.
 
 ## Child DOX Index
 
