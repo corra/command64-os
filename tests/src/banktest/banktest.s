@@ -1,0 +1,94 @@
+; tests/src/banktest/banktest.s
+; SPDX-License-Identifier: MIT
+; Copyright (c) 2026 Command64 project contributors
+; ca65 port of tests/src/banktest/banktest.asm.
+
+.include "command64.inc"
+
+.import __MAIN_START__
+
+.segment "HEADER"
+    .word __MAIN_START__
+
+.segment "CODE"
+
+start:
+    cld
+    lda #$0E
+    jsr KernalChROUT
+
+    lda #DOS_PRINT_STR
+    ldx #<msgStart
+    ldy #>msgStart
+    jsr OS_API
+
+    ldx #0
+write_loop_a:
+    txa
+    sta $A000, x
+    inx
+    bne write_loop_a
+
+    ldx #0
+verify_loop_a:
+    txa
+    cmp $A000, x
+    bne test_fail
+    inx
+    bne verify_loop_a
+
+    ldx #0
+write_loop_b:
+    txa
+    eor #$FF
+    sta $B000, x
+    inx
+    bne write_loop_b
+
+    ldx #0
+verify_loop_b:
+    txa
+    eor #$FF
+    cmp $B000, x
+    bne test_fail
+    inx
+    bne verify_loop_b
+
+    lda #DOS_PRINT_STR
+    ldx #<msgPass
+    ldy #>msgPass
+    jsr OS_API
+    jmp exit
+
+test_fail:
+    lda #DOS_PRINT_STR
+    ldx #<msgFail
+    ldy #>msgFail
+    jsr OS_API
+
+exit:
+    lda #DOS_EXIT
+    jsr OS_API
+
+; "BANKTEST v0.1.0 (ca65 spike) - Testing BASIC ROM Banking RAM access..."
+msgStart:
+    .byte $42, $41, $4E, $4B, $54, $45, $53, $54, $20, $56, $30, $2E, $31
+    .byte $2E, $30, $20, $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B
+    .byte $45, $29, $20, $2D, $20, $54, $45, $53, $54, $49, $4E, $47, $20
+    .byte $42, $41, $53, $49, $43, $20, $52, $4F, $4D, $20, $42, $41, $4E
+    .byte $4B, $49, $4E, $47, $20, $52, $41, $4D, $20, $41, $43, $43, $45
+    .byte $53, $53, $2E, $2E, $2E, $0D, $00
+
+; "RAM under BASIC ROM fully writable: PASS"
+msgPass:
+    .byte $52, $41, $4D, $20, $55, $4E, $44, $45, $52, $20, $42, $41, $53
+    .byte $49, $43, $20, $52, $4F, $4D, $20, $46, $55, $4C, $4C, $59, $20
+    .byte $57, $52, $49, $54, $41, $42, $4C, $45, $3A, $20, $50, $41, $53
+    .byte $53, $0D, $00
+
+; "Error: RAM under BASIC ROM not writable: FAIL"
+msgFail:
+    .byte $45, $52, $52, $4F, $52, $3A, $20, $52, $41, $4D, $20, $55, $4E
+    .byte $44, $45, $52, $20, $42, $41, $53, $49, $43, $20, $52, $4F, $4D
+    .byte $20, $4E, $4F, $54, $20, $57, $52, $49, $54, $41, $42, $4C, $45
+    .byte $3A, $20, $46, $41, $49, $4C, $0D, $00
