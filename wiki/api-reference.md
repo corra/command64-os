@@ -98,6 +98,25 @@ Renames a file on disk.
 - **Output:** `Carry` = 0.
 - **Error:** `Carry` = 1.
 
+### DOS_SEND_COMMAND ($58)
+
+Sends an arbitrary command-channel string to a drive unmodified (no
+`,<type>,W` wrapping like `DOS_OPEN_FILE` does) and returns the drive's
+actual response text. Generalizes the open-SA15/write/read-result pattern
+`DOS_DELETE_FILE`/`DOS_RENAME_FILE` use internally, for callers (e.g.
+`format`'s `N:name,id`) that need the raw drive response.
+
+- **Input:**
+  - `X/Y`: Pointer to null-terminated command string (Lo/Hi), optionally
+    prefixed with `<dev>:` per the `DOS_PARSE_PREFIX` convention (defaults
+    to the current device if absent).
+  - `PrintPtrLo/Hi` ($FB-$FC): Pointer to caller-supplied output buffer
+    (at least 40 bytes).
+- **Output:** Caller's buffer = null-terminated drive response string;
+  `Carry` = 0.
+- **Error:** `Carry` = 1. Transport-level failure only (IEC/OPEN/CHKIN) —
+  a drive-reported error in the response text still returns `Carry` = 0.
+
 ### DOS_ALLOC_MEM ($48)
 
 Allocates memory in the REU.

@@ -47,7 +47,9 @@ apiHandler:
     beq ahExit
     cmp #DOS_PARSE_PREFIX
     beq ahParsePrefix
-    
+    cmp #DOS_SEND_COMMAND
+    beq ahSendCommand
+
     // Unknown function — return with error (C=1)
     sec
     rts
@@ -151,4 +153,13 @@ ahParsePrefix:
     // Output: A = resolved device number (8-11 or CurrentDevice)
     //         Carry: 1 = prefix found, 0 = no prefix
     jsr parsePointerDevice
+    rts
+
+ahSendCommand:
+    // Input: X/Y = Pointer to command string (null-terminated), optionally
+    //              prefixed with "<dev>:" (defaults to CurrentDevice)
+    //        PrintPtrLo/Hi = Pointer to caller-supplied output buffer
+    // Output: Caller's buffer = null-terminated drive response string
+    //         Carry = status
+    jsr dosSendCommand
     rts

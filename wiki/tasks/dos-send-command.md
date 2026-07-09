@@ -48,16 +48,16 @@ application code.
 
 ## Sub-tasks
 
-- [ ] Extract the shared open-SA15/write/read-result logic out of
+- [x] Extract the shared open-SA15/write/read-result logic out of
       `fileDelete`/`fileRename` in `src/command64/file.asm` into a reusable
       internal routine.
-- [ ] Add `DOS_SEND_COMMAND = $58` to `include/command64.inc` and
+- [x] Add `DOS_SEND_COMMAND = $58` to `include/command64.inc` and
       `include/ca65/command64.inc`.
-- [ ] Add `ahSendCommand` dispatch entry in `src/command64/api.asm`.
-- [ ] Wire the internal routine's status response into a caller-supplied
+- [x] Add `ahSendCommand` dispatch entry in `src/command64/api.asm`.
+- [x] Wire the internal routine's status response into a caller-supplied
       buffer, returned via the API ABI.
-- [ ] Document `DOS_SEND_COMMAND` in `wiki/api-reference.md` following the
+- [x] Document `DOS_SEND_COMMAND` in `wiki/api-reference.md` following the
       existing per-function format.
-- [ ] Verify via VICE: a test call sends a harmless command (e.g. `"I0"` /
+- [x] Verify via VICE: a test call sends a harmless command (e.g. `"I0"` /
       initialize) to a mounted drive and the response buffer contains the
       drive's actual status string.
