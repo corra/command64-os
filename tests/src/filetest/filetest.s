@@ -5,6 +5,11 @@
 
 .include "command64.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_test_ca65_filetest.inc"
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -145,10 +150,12 @@ msgWriteErr:
     .byte $45, $52, $52, $4F, $52, $20, $57, $52, $49, $54, $49, $4E, $47
     .byte $20, $46, $49, $4C, $45, $0D, $00
 
-; "FILETEST v0.1.0 (ca65 spike) - Testing file read/write"
+; "FILETEST V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER + " - Testing file read/write"
 msgStart:
-    .byte $46, $49, $4C, $45, $54, $45, $53, $54, $20, $56, $30, $2E, $31
-    .byte $2E, $30, $20, $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B
-    .byte $45, $29, $20, $2D, $20, $54, $45, $53, $54, $49, $4E, $47, $20
+    .byte $46, $49, $4C, $45, $54, $45, $53, $54, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
+    .byte $20, $2D, $20, $54, $45, $53, $54, $49, $4E, $47, $20
     .byte $46, $49, $4C, $45, $20, $52, $45, $41, $44, $2F, $57, $52, $49
     .byte $54, $45, $0D, $00

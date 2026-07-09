@@ -5,6 +5,11 @@
 
 .include "command64.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_test_ca65_handletest.inc"
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -142,11 +147,13 @@ fname_digit:
 fname8:
     .byte $54, $38, $2E, $50, $52, $47, $00
 
-; "HANDLETEST v0.1.0 (ca65 spike) - Testing file handle stress and limits..."
+; "HANDLETEST V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER + " - Testing file handle stress and limits..."
 msgStart:
-    .byte $48, $41, $4E, $44, $4C, $45, $54, $45, $53, $54, $20, $56, $30
-    .byte $2E, $31, $2E, $30, $20, $28, $43, $41, $36, $35, $20, $53, $50
-    .byte $49, $4B, $45, $29, $20, $2D, $20, $54, $45, $53, $54, $49, $4E
+    .byte $48, $41, $4E, $44, $4C, $45, $54, $45, $53, $54, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
+    .byte $20, $2D, $20, $54, $45, $53, $54, $49, $4E
     .byte $47, $20, $46, $49, $4C, $45, $20, $48, $41, $4E, $44, $4C, $45
     .byte $20, $53, $54, $52, $45, $53, $53, $20, $41, $4E, $44, $20, $4C
     .byte $49, $4D, $49, $54, $53, $2E, $2E, $2E, $0D, $00

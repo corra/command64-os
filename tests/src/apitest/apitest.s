@@ -5,6 +5,11 @@
 
 .include "command64.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_test_ca65_apitest.inc"
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -25,9 +30,11 @@ start:
     lda #DOS_EXIT
     jsr OS_API
 
-; "APITEST v0.1.0 (ca65 spike) - String output works!"
+; "APITEST V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER + " - String output works!"
 msg:
-    .byte $41, $50, $49, $54, $45, $53, $54, $20, $56, $30, $2E, $31, $2E
-    .byte $30, $20, $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B, $45
-    .byte $29, $20, $2D, $20, $53, $54, $52, $49, $4E, $47, $20, $4F, $55
+    .byte $41, $50, $49, $54, $45, $53, $54, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
+    .byte $20, $2D, $20, $53, $54, $52, $49, $4E, $47, $20, $4F, $55
     .byte $54, $50, $55, $54, $20, $57, $4F, $52, $4B, $53, $21, $0D, $00

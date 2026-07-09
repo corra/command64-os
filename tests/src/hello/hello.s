@@ -5,6 +5,11 @@
 
 .include "command64.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_test_ca65_hello.inc"
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -31,10 +36,12 @@ loop:
 done:
     rts
 
-; "HELLO v0.1.0 (ca65 spike) - Hello from the C64 Disk!"
+; "HELLO V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER + " - Hello from the C64 Disk!"
 msg:
-    .byte $48, $45, $4C, $4C, $4F, $20, $56, $30, $2E, $31, $2E, $30, $20
-    .byte $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B, $45, $29, $20
-    .byte $2D, $20, $48, $45, $4C, $4C, $4F, $20, $46, $52, $4F, $4D, $20
+    .byte $48, $45, $4C, $4C, $4F, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
+    .byte $20, $2D, $20, $48, $45, $4C, $4C, $4F, $20, $46, $52, $4F, $4D, $20
     .byte $54, $48, $45, $20, $43, $36, $34, $20, $44, $49, $53, $4B, $21
     .byte $0D, $00

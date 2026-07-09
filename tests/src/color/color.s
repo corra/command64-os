@@ -5,6 +5,11 @@
 
 .include "command64.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_test_ca65_color.inc"
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -25,9 +30,11 @@ start:
     inc $D020
     rts
 
-; "COLOR v0.1.0 (ca65 spike) - Cycling border color"
+; "COLOR V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER + " - Cycling border color"
 msgStart:
-    .byte $43, $4F, $4C, $4F, $52, $20, $56, $30, $2E, $31, $2E, $30, $20
-    .byte $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B, $45, $29, $20
-    .byte $2D, $20, $43, $59, $43, $4C, $49, $4E, $47, $20, $42, $4F, $52
+    .byte $43, $4F, $4C, $4F, $52, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
+    .byte $20, $2D, $20, $43, $59, $43, $4C, $49, $4E, $47, $20, $42, $4F, $52
     .byte $44, $45, $52, $20, $43, $4F, $4C, $4F, $52, $0D, $00

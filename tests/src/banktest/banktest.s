@@ -5,6 +5,11 @@
 
 .include "command64.inc"
 
+VERSION_MAJOR = '0'
+VERSION_MINOR = '1'
+VERSION_STAGE = '0'
+.include "build_test_ca65_banktest.inc"
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -70,11 +75,13 @@ exit:
     lda #DOS_EXIT
     jsr OS_API
 
-; "BANKTEST v0.1.0 (ca65 spike) - Testing BASIC ROM Banking RAM access..."
+; "BANKTEST V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
+; + "." + BUILD_NUMBER + " - Testing BASIC ROM Banking RAM access..."
 msgStart:
-    .byte $42, $41, $4E, $4B, $54, $45, $53, $54, $20, $56, $30, $2E, $31
-    .byte $2E, $30, $20, $28, $43, $41, $36, $35, $20, $53, $50, $49, $4B
-    .byte $45, $29, $20, $2D, $20, $54, $45, $53, $54, $49, $4E, $47, $20
+    .byte $42, $41, $4E, $4B, $54, $45, $53, $54, $20, $56
+    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte BUILD_NUMBER
+    .byte $20, $2D, $20, $54, $45, $53, $54, $49, $4E, $47, $20
     .byte $42, $41, $53, $49, $43, $20, $52, $4F, $4D, $20, $42, $41, $4E
     .byte $4B, $49, $4E, $47, $20, $52, $41, $4D, $20, $41, $43, $43, $45
     .byte $53, $53, $2E, $2E, $2E, $0D, $00
