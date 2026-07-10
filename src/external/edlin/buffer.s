@@ -15,6 +15,9 @@
 .export bufInit
 .export bufLoadFile
 .export findLine
+.export bufReadWindow
+.export scanWindow
+.export fallbackBuf
 
 .segment "CODE"
 

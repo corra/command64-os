@@ -9,11 +9,11 @@
 ; Command64's own jump table (OS_API = $1000, function-selector-in-A
 ; convention, include/ca65/command64.inc).
 ;
-; Phase 1: loads a filename given on the command line into the buffer
-; (buffer.s) and prints a temporary debug dump (line count + first two
-; line offsets) so correctness can be eyeballed before List/Page (Phase 2)
-; exist. printDec16 and the debug-dump call site are temporary and must be
-; deleted once Phase 2 lands real output commands.
+; Phase 2: loads a filename given on the command line into the buffer
+; (buffer.s, Phase 1), then runs an interactive command loop (own
+; GETIN-poll line-input, mirroring src/command64/shell.asm's
+; shellReadLine) dispatching to List/Page (cmds.s). "Q" is a bare-exit
+; placeholder only -- real Quit-with-confirmation is Phase 3.
 ;
 ; PETSCII note: mirrors src/external/label/label.s -- ca65 has no
 ; equivalent to Kick's ".encoding petscii_mixed" auto-translation, so
@@ -25,11 +25,14 @@
 
 .import bufInit
 .import bufLoadFile
-.import findLine
+.import cmdList
+.import cmdPage
+
+.export EditBuf
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '1'
+VERSION_STAGE = '2'
 .include "build_edlin.inc"
 
 .import __MAIN_START__
@@ -100,99 +103,69 @@ startLoad:
     ldx FilenamePtrLo
     ldy FilenamePtrHi
     jsr bufLoadFile
-    bcc dumpLineCount
+    bcc loadOk
     ldx #<msgOpenErr
     ldy #>msgOpenErr
     lda #DOS_PRINT_STR
     jsr OS_API
     jmp exit
 
-; --- Temporary Phase 1 debug dump (delete before Phase 2) ---
-dumpLineCount:
-    ldx #<msgIsVmm
-    ldy #>msgIsVmm
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    lda BufIsVmm
-    clc
-    adc #'0'
-    jsr KernalChROUT
-    lda #PetCr
-    jsr KernalChROUT
-
-    ldx #<msgBufEnd
-    ldy #>msgBufEnd
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    lda BufEndLo
-    sta ScanPtrLo
-    lda BufEndHi
-    sta ScanPtrHi
-    jsr printDec16
-    lda #PetCr
-    jsr KernalChROUT
-
-    ldx #<msgLineCount
-    ldy #>msgLineCount
-    lda #DOS_PRINT_STR
-    jsr OS_API
-
-    lda #$FF
-    sta FindTargetLo
-    sta FindTargetHi
-    jsr findLine              ; scans whole buffer; CurLineLo/Hi = last+1
-
-    ; findLine's "last+1" result (DOS EDLIN's own "#" convention -- the
-    ; insertion point one past the last real line) is what later phases
-    ; actually need. For this human-readable debug dump only, subtract 1
-    ; to show the true line count.
-    lda CurLineLo
-    sec
-    sbc #1
-    sta ScanPtrLo              ; printDec16 borrows ScanPtrLo/Hi as PdValLo/Hi
-    lda CurLineHi
-    sbc #0
-    sta ScanPtrHi
-    jsr printDec16
-
-    lda #PetCr
-    jsr KernalChROUT
-
-    ldx #<msgLine1Off
-    ldy #>msgLine1Off
-    lda #DOS_PRINT_STR
-    jsr OS_API
+loadOk:
     lda #1
-    sta FindTargetLo
+    sta EdCurrentLineLo
     lda #0
-    sta FindTargetHi
-    jsr findLine
-    lda CurPtrLo
-    sta ScanPtrLo
-    lda CurPtrHi
-    sta ScanPtrHi
-    jsr printDec16
-    lda #PetCr
-    jsr KernalChROUT
+    sta EdCurrentLineHi
 
-    ldx #<msgLine2Off
-    ldy #>msgLine2Off
+; ---------------------------------------------------------------------------
+; commandLoop — prompt "*", read a command line, dispatch on the command
+; letter following an optional [line1][,line2] range.
+; ---------------------------------------------------------------------------
+commandLoop:
+    lda #'*'
+    jsr KernalChROUT
+    jsr ownLineInput
+
+    ldy #0
+clSkipSpaces:
+    lda EditBuf, y
+    cmp #' '
+    bne clHaveCmdOrRange
+    iny
+    jmp clSkipSpaces
+clHaveCmdOrRange:
+
+    ; List/Page each call parseRange themselves (they need the range
+    ; parsed fresh against their own defaults), so here we only need to
+    ; peek at the eventual command letter to dispatch -- but parseRange
+    ; is the only routine that knows how to skip past a range to find it,
+    ; so cmdList/cmdPage each re-parse from the same start index. To
+    ; decide *which* command to call in the first place, scan forward
+    ; past any range ourselves using the same skip rules (digits, '.',
+    ; '#', comma, spaces) without touching Line1/Line2 state.
+    jsr peekCommandByte
+    tax
+
+    cpx #'L'
+    bne clNotList
+    jsr cmdList
+    jmp commandLoop
+clNotList:
+    cpx #'P'
+    bne clNotPage
+    jsr cmdPage
+    jmp commandLoop
+clNotPage:
+    cpx #'Q'
+    bne clNotQuit
+    jmp exit                 ; PLACEHOLDER: bare exit, no confirmation (Phase 3 replaces this)
+clNotQuit:
+    cpx #0
+    beq commandLoop           ; blank line -- just reprompt
+    ldx #<msgUnknownCmd
+    ldy #>msgUnknownCmd
     lda #DOS_PRINT_STR
     jsr OS_API
-    lda #2
-    sta FindTargetLo
-    lda #0
-    sta FindTargetHi
-    jsr findLine
-    lda CurPtrLo
-    sta ScanPtrLo
-    lda CurPtrHi
-    sta ScanPtrHi
-    jsr printDec16
-    lda #PetCr
-    jsr KernalChROUT
-
-    jmp exit
+    jmp commandLoop
 
 noArgErr:
     ldx #<msgNoArg
@@ -205,57 +178,103 @@ exit:
     jsr OS_API
 
 ; ---------------------------------------------------------------------------
-; printDec16 — prints a 16-bit value as fixed 5-digit decimal (leading
-; zeros included; this is throwaway debug-dump code, not worth trimming).
-; Input: ScanPtrLo/ScanPtrHi (reused here as PdValLo/PdValHi — safe, this
-; only ever runs after buffer/findLine work for the call has completed).
-; Reuses TmpLenLo/TmpLenHi as PdPlaceLo/PdPlaceHi scratch for the same
-; reason. Temporary: delete alongside the debug dump before Phase 2.
+; peekCommandByte — scan past an optional [line1][,line2] range in EditBuf
+; starting at index Y (same token shapes parseLineNum accepts: a digit
+; run, '.', or '#'), without touching Line1/Line2/FindTarget state, and
+; return the command-letter byte found after it.
+; Output: A = the command byte (0 if the line is empty at that point).
 ; ---------------------------------------------------------------------------
-printDec16:
-    lda #0
-    sta PdTableIdx
-pd16Digit:
-    lda #0
-    sta PdDigit
-    ldx PdTableIdx
-pd16SubLoop:
-    lda placeValues+1, x
-    sta TmpLenHi
-    lda placeValues, x
-    sta TmpLenLo
+peekCommandByte:
+    jsr pcbSkipNumber
+    jsr pcbSkipSpaces
+    lda EditBuf, y
+    cmp #','
+    bne pcbDone
+    iny
+    jsr pcbSkipSpaces
+    jsr pcbSkipNumber
+    jsr pcbSkipSpaces
+pcbDone:
+    lda EditBuf, y
+    rts
 
-    lda ScanPtrHi
-    cmp TmpLenHi
-    bcc pd16NoSub
-    bne pd16DoSub
-    lda ScanPtrLo
-    cmp TmpLenLo
-    bcc pd16NoSub
-pd16DoSub:
-    lda ScanPtrLo
-    sec
-    sbc TmpLenLo
-    sta ScanPtrLo
-    lda ScanPtrHi
-    sbc TmpLenHi
-    sta ScanPtrHi
-    inc PdDigit
-    jmp pd16SubLoop
-pd16NoSub:
-    lda PdDigit
-    clc
-    adc #'0'
+pcbSkipNumber:
+    lda EditBuf, y
+    cmp #'.'
+    beq pcbConsumeOne
+    cmp #'#'
+    beq pcbConsumeOne
+    cmp #'0'
+    bcc pcbSkipNumberDone
+    cmp #'9'+1
+    bcs pcbSkipNumberDone
+pcbDigitLoop:
+    lda EditBuf, y
+    cmp #'0'
+    bcc pcbSkipNumberDone
+    cmp #'9'+1
+    bcs pcbSkipNumberDone
+    iny
+    jmp pcbDigitLoop
+pcbConsumeOne:
+    iny
+pcbSkipNumberDone:
+    rts
+
+pcbSkipSpaces:
+    lda EditBuf, y
+    cmp #' '
+    bne pcbSkipSpacesDone
+    iny
+    jmp pcbSkipSpaces
+pcbSkipSpacesDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; ownLineInput — read one CR-terminated line into EditBuf. Copies
+; src/command64/shell.asm's shellReadLine pattern verbatim in structure
+; (that routine is shell-internal, not reachable via OS_API, so this is a
+; deliberate duplicate, not a call-out): KernalGetIn poll, PetDel
+; destructive backspace, null-terminated (not CR) on completion.
+; ---------------------------------------------------------------------------
+ownLineInput:
+    ldy #0
+oliReadLoop:
+    tya
+    pha
+oliPoll:
+    jsr KernalGetIn
+    beq oliPoll
+
     tax
-    lda #DOS_PRINT_CHAR
-    jsr OS_API
+    pla
+    tay
+    txa
 
-    lda PdTableIdx
-    clc
-    adc #2
-    sta PdTableIdx
-    cmp #10
-    bne pd16Digit
+    cmp #PetCr
+    beq oliDoneRead
+
+    cmp #PetDel
+    bne oliStoreChar
+    tya
+    beq oliReadLoop
+    dey
+    lda #PetDel
+    jsr KernalChROUT
+    jmp oliReadLoop
+
+oliStoreChar:
+    jsr KernalChROUT
+    txa
+    sta EditBuf, y
+    iny
+    cpy #79
+    bne oliReadLoop
+oliDoneRead:
+    lda #0
+    sta EditBuf, y
+    lda #PetCr
+    jsr KernalChROUT
     rts
 
 .segment "RODATA"
@@ -276,29 +295,12 @@ msgOpenErr:
     .byte $45, $52, $52, $4F, $52, $3A, $20, $43, $4F, $55, $4C, $44, $20
     .byte $4E, $4F, $54, $20, $4F, $50, $45, $4E, $20, $46, $49, $4C, $45
     .byte $2E, $0D, $00
-; "BUFISVMM: " (temporary diagnostic, delete before Phase 2)
-msgIsVmm:
-    .byte $42, $55, $46, $49, $53, $56, $4D, $4D, $3A, $20, $00
-; "BUFEND: " (temporary diagnostic, delete before Phase 2)
-msgBufEnd:
-    .byte $42, $55, $46, $45, $4E, $44, $3A, $20, $00
-; "LINE COUNT: "
-msgLineCount:
-    .byte $4C, $49, $4E, $45, $20, $43, $4F, $55, $4E, $54, $3A, $20, $00
-; "LINE 1 OFFSET: "
-msgLine1Off:
-    .byte $4C, $49, $4E, $45, $20, $31, $20, $4F, $46, $46, $53, $45, $54
-    .byte $3A, $20, $00
-; "LINE 2 OFFSET: "
-msgLine2Off:
-    .byte $4C, $49, $4E, $45, $20, $32, $20, $4F, $46, $46, $53, $45, $54
-    .byte $3A, $20, $00
-
-; Place-value table for printDec16 (10000, 1000, 100, 10, 1), little-endian words.
-placeValues:
-    .word 10000, 1000, 100, 10, 1
+; "?"
+msgUnknownCmd:
+    .byte $3F, $0D, $00
 
 .segment "BSS"
 FilenameIdx:   .res 1
 FilenamePtrLo: .res 1
 FilenamePtrHi: .res 1
+EditBuf:       .res 80

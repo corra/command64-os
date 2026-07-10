@@ -270,15 +270,248 @@ built yet.
    counting still works against the bounded RAM buffer — best-effort if
    awkward to set up, not a hard blocker for the phase.
 
-## Phase 2 — Core read/navigate commands (`0.1.2`)
+## Phase 2 — Core read/navigate commands (`0.1.2`) — complete, verified
 
-- [ ] `cmds.s`: `L`ist and `P`age (hardcoded 40x25 paging, no dynamic IOCTL
+- [x] `cmds.s`: `L`ist and `P`age (hardcoded 40x25 paging, no dynamic IOCTL
       geometry per feasibility plan).
-- [ ] Line-number argument parsing: decimal, `.` (current), `#` (last+1).
-- [ ] Own line-input loop (GETIN-poll pattern copied from `shellReadLine`,
+- [x] Line-number argument parsing: decimal, `.` (current), `#` (last+1).
+- [x] Own line-input loop (GETIN-poll pattern copied from `shellReadLine`,
       not called into it — it's shell-internal).
 - **Exit criteria**: `L`/`P` correctly display ranges and page at 24 lines;
-  manual VICE pass against a multi-page test file.
+  manual VICE pass against a multi-page test file — **met**. User verified
+  in VICE against the 30-line `edlintest` fixture: bare `L` shows lines
+  1-24; `1,5L` shows exactly lines 1-5; bare `P` shows lines 1-24 and
+  repositions the current line to 24; a second bare `P` continues from
+  25-30 with no overlap (confirms repositioning); `<N>,<N>P` used as a
+  "jump to line N" workaround (documented below, since a dedicated jump
+  command is Phase 3 scope). A real bug was found and fixed during this
+  verification — see Progress below.
+
+### Phase 2 detail
+
+Ground truth for List/Page defaults comes straight from the real source —
+read directly this session: `ms-dos/v4.0/src/CMD/EDLIN/EDLCMD1.ASM`,
+`LIST` (line 569) and `PAGER` (line 499). Summarized below in terms of our
+windowed-scan `findLine`, not the original's byte-pointer `FINDLIN`.
+
+#### New file: `src/external/edlin/cmds.s`
+
+Holds: line-number/range parsing, `L`ist, `P`age, the shared line-display
+routine, and (new, see below) the interactive command loop's dispatch
+table. `edlin.s`'s `start` shrinks to: load the buffer (Phase 1 logic,
+unchanged), delete the Phase 1 temporary debug-dump block entirely (its
+job is superseded by real `L`ist), then hand off to `cmds.s`'s command
+loop.
+
+**`printDec16` is promoted, not deleted.** The original phase note said
+"temporary... delete before Phase 2" — that was about the *debug-dump
+call site*, not the decimal-printing routine itself, which List/Page
+need for line-number prefixes. Move it from `edlin.s` into `cmds.s`
+(it's app-shared, not buffer-internal) and drop the "temporary" framing
+from its header comment. (Also worth knowing for next time: there's
+already a `printDecimal16` in `src/command64/utils.asm:117` — but that's
+kernel-internal, not reachable via `OS_API` from an external `.prg`, so
+`edlin`'s own copy was never actually redundant; the earlier "duplicate
+work" note in Phase 1's Progress log was a false alarm.)
+
+#### Persistent vs. transient zero-page — a needed distinction
+
+Phase 1's `CurPtrLo/Hi`/`CurLineLo/Hi` were documented as EDLIN's
+`POINTER`/`CURRENT` globals, but the Phase 1 implementation actually
+treats them as `findLine`'s *transient per-call output* — fine for the
+debug dump (one `findLine` call, read the result, done), but wrong now:
+`List` must call `findLine` internally (to locate its start line) *without*
+disturbing the editor's actual "current line," so a real persistent
+"current line" needs to be a separate field `findLine` never touches.
+
+- **New persistent field**: `EdCurrentLineLo`/`EdCurrentLineHi` (16-bit,
+  1-based) — the editor's actual current line, initialized to `1` after
+  `bufLoadFile` succeeds. Only commands documented as moving the current
+  line (`Page` here; `edit-line`/`Insert`/`Delete`/`Quit` in Phase 3) ever
+  write it, and only by explicitly copying `findLine`'s result into it
+  after the fact. `List` never touches it.
+- **Everything else stays transient/reusable scratch** — `CurPtr*`/
+  `CurLine*` (raw `findLine` output), `WindowBaseOff*`/`WindowValidLen`,
+  `TmpLen*`, `FindTarget*`, `ScanPtr*`/`EndPtr*`, `LineCount*`,
+  `PdTableIdx`/`PdDigit`. None of these need to survive across a command
+  boundary (the command loop is strictly sequential, never re-entrant),
+  so new phases should default to **reusing** an existing transient field
+  over claiming a fresh byte. The `$70-$8F` app-private range is getting
+  tight (Phase 2 brings total usage to `$70-$8E`, 31 of 32 bytes) — worth
+  flagging explicitly for Phase 3 planning rather than discovering it
+  mid-implementation the way the VMM gap was discovered mid-Phase-1.
+
+**New ZP for Phase 2** (documented in `common.inc` when implemented):
+
+- `$88/$89` — `Line1Lo`/`Line1Hi`: holds the parsed line1 value while
+  line2 is being parsed (transient, command-scratch category).
+- `$8A` — `Line1Given`: 1 = a value was present for line1, 0 = defaulted.
+- `$8B` — `Line2Given`: same, for line2.
+- `$8C` — `PageRowCount`: rows printed since the last "Continue (Y/N)?"
+  prompt, reset each screen (transient, command-scratch category).
+- `$8D/$8E` — `EdCurrentLineLo`/`EdCurrentLineHi`: the one genuinely new
+  **persistent** field this phase adds.
+
+#### Line-number/range parsing
+
+`parseLineNum` — input: index into the current input line buffer
+(`EditBuf`, see below); output: parsed value in `FindTargetLo/Hi` (reused
+directly — it's already "a line number destined for `findLine`"), a
+1-byte "was anything present" flag, and the advanced buffer index.
+
+- `.` → consume one char, value = `EdCurrentLineLo/Hi`.
+- `#` → consume one char, value = call `findLine` with target `$FFFF`
+  (full-buffer scan), then use `CurLineLo/Hi` (that's the real "last+1"
+  meaning of a full scan's result, per the Phase 1 fix/finding).
+- digit → accumulate a run of digits into a 16-bit value (`×10`, add
+  digit, standard loop; no overflow checking — not worth it for a
+  40-column screen's realistic line-count range).
+- anything else → nothing present; flag = 0, `FindTargetLo/Hi` untouched
+  (caller must not read it).
+
+`parseRange` — parses `[line1][,line2]`, called with the input index
+sitting right after the command's leading spaces are skipped:
+
+1. `parseLineNum` → if present, copy `FindTargetLo/Hi` into `Line1Lo/Hi`,
+   set `Line1Given=1`; else `Line1Given=0`.
+2. Skip spaces; if next char is `,`, consume it, then `parseLineNum`
+   again for line2 → if present, leave the value in `FindTargetLo/Hi`
+   (that's exactly where the caller needs it next) and set
+   `Line2Given=1`; else `Line2Given=0`.
+3. Skip spaces; the next non-space byte is the command letter — return
+   its buffer index for the dispatcher.
+No `ParamCt`-style "too many params" error in this phase (original
+EDLIN's `CMP ParamCt,2 / JA ComErr`) — with only `[line1][,line2]` legal
+syntax and no third number possible, a malformed extra token just gets
+treated as an unrecognized command letter and falls into the existing
+"unrecognized command" error path. Revisit if a real need for a sharper
+error message shows up.
+
+#### `List` (command byte `$4C`, `'L'`)
+
+1. `parseRange`.
+2. line1: if `Line1Given`, use `Line1Lo/Hi`; else default =
+   `max(1, EdCurrentLine - 11)` (mirrors `LIST`'s `SUB BX,11 / JA CHKP2 /
+   MOV BX,1` exactly).
+3. `findLine(line1)` → start offset in `CurPtrLo/Hi`. If `line1` is past
+   EOF (`CurLineLo/Hi` from the call didn't reach the requested target —
+   i.e. `findLine` hit its own EOF path), print nothing and return to the
+   command loop (mirrors `LIST`'s `retnz` bail-out).
+4. line count to print: if `Line2Given`, `count = Line2 - line1 + 1`
+   (must be `> 0`, else fall into the unrecognized-command-style error
+   path — no backwards listing, mirrors `LIST`/`PAGER`'s `comerr` on
+   `param2 < param1`); else default `count = SCREEN_LINES - 1` (24, one
+   screen minus a row for the prompt — mirrors the real source's
+   `disp_len - 1`).
+5. Call the shared display routine (below) with `(start offset, count)`.
+6. Does **not** touch `EdCurrentLine*` — `List` is read-only positioning,
+   confirmed by the real `LIST` routine never writing `[CURRENT]`.
+
+#### `Page` (command byte `$50`, `'P'`)
+
+1. `parseRange`.
+2. line1: if `Line1Given`, use it; else default = `EdCurrentLine + 1`,
+   unless `EdCurrentLine` is `1`, in which case default = `1` (mirrors
+   `PAGER`'s `CMP BX,1 / JE frstok`).
+3. line2: if `Line2Given`, use it; else default = `line1 + (SCREEN_LINES
+   - 2)` (mirrors `PAGER`'s `disp_len - 2` end-line math), clamped to the
+   real last line (call `findLine($FFFF)` once to get it if needed).
+4. Validate `line2 >= line1` (else error, no backwards paging).
+5. `findLine(line1)` → start offset. Call the shared display routine
+   with `(start offset, line2 - line1 + 1)`.
+6. **Reposition the current line**: `findLine(line2)` again → copy its
+   `CurLineLo/Hi`/`CurPtrLo/Hi` result into `EdCurrentLineLo/Hi` (only the
+   line number is actually needed persistently, per the ZP-budget note
+   above — no persistent pointer field). This is `Page`'s distinguishing
+   behavior vs. `List`, straight from `PAGER`'s own `MOV [CURRENT],DX`.
+
+#### Shared display routine: `displayLines(startOffsetLo/Hi, countLo/Hi)`
+
+Not a reuse of `findLine`'s internals (different job — printing, not
+counting — and trying to share control flow between the two would cost
+more clarity than it saves in 6502 asm). Structure, mirroring
+`findLine`'s existing `BufIsVmm` branch:
+
+1. `CurPtrLo/Hi = startOffsetLo/Hi`; line-number-being-printed counter =
+   `EdCurrentLine`-independent — actually the line *number* of the first
+   printed line must be tracked separately for the `NNNNN:` prefix; reuse
+   `CurLineLo/Hi` for this (set from whatever `findLine(line1)` returned
+   just before the call).
+2. Loop `count` times:
+   - Copy the current line number into `ScanPtrLo/Hi`, `jsr printDec16`
+     (this destroys `ScanPtrLo/Hi`/`TmpLenLo/Hi` — expected, they're
+     transient scratch, not needed again until the next line), then print
+     `:` and a space via `DOS_PRINT_CHAR`.
+   - Print line text: scan forward from `CurPtrLo/Hi` (VMM: through
+     `scanWindow`/`bufReadWindow`, refilling as needed, exactly like
+     `findLine`'s inner scan loop; RAM fallback: direct indexed byte
+     read) printing each byte via `DOS_PRINT_CHAR` until hitting `$0A`
+     (don't print it) or `BufEnd` (stop the whole routine — ran out of
+     buffer before `count` was reached, not an error). Advance
+     `CurPtrLo/Hi` past the terminator; increment `CurLineLo/Hi`.
+   - Print `PetCr` (end the screen line).
+   - `inc PageRowCount`; if it hits `SCREEN_LINES - 1` (24): print the
+     `"Continue (Y/N)?"` prompt (own line-input-style single-keypress
+     read via `KernalGetIn` poll, not a full `EditBuf` line), reset
+     `PageRowCount = 0`; if the answer isn't `Y`/`y` ($59/$79), stop the
+     whole display routine early and return to the command loop (this is
+     a genuine early-abort, distinct from the "ran out of buffer" case
+     above, but both just return to the command loop the same way, so no
+     separate status needed by the caller for this phase).
+
+#### Own line-input loop
+
+New routine in `edlin.s` (entry-point-local, not `cmds.s` — it's the
+outermost interactive loop, not a command implementation), copying
+`shellReadLine`'s pattern (`src/command64/shell.asm:178`) verbatim in
+structure: `KernalGetIn` poll, `PetDel` destructive backspace, `PetCr`
+terminates, writes into a new `EditBuf` (80 bytes, `.res` in `BSS`,
+mirroring `CommandBuffer`'s size) with a null terminator (not the CR) at
+the end, tracked length not needed beyond the null terminator itself
+since all parsing here is null/space/comma-delimited scanning, same as
+`CommandBuffer` parsing elsewhere in the codebase.
+
+#### Command loop (in `edlin.s`, replaces the deleted Phase 1 debug dump)
+
+```text
+commandLoop:
+    print "*" prompt (DOS_PRINT_CHAR)
+    call ownLineInput          ; fills EditBuf
+    skip leading spaces in EditBuf
+    call parseRange            ; -> Line1/Line2/Given flags, index of command letter
+    lda EditBuf,y               ; the command letter
+    cmp #'L' ($4C) -> jsr cmdList
+    cmp #'P' ($50) -> jsr cmdPage
+    cmp #'Q' ($51) -> jmp exit  ; PLACEHOLDER ONLY -- see note below
+    else -> print "?" error message
+    jmp commandLoop
+```
+
+**`Q` is a deliberate, explicitly-scoped-down placeholder.** Phase 2's
+stated scope is List/Page only, and real `Quit` (with its "Abort edit
+(Y/N)?" confirmation) is Phase 3 work — but the command loop needs *some*
+way to exit for this phase to be testable at all in VICE. Bare `Q` →
+`DOS_EXIT` with no confirmation is the minimum needed; Phase 3 replaces
+this dispatch entry with the real thing, it's not additive scope.
+
+#### Verification steps for this phase
+
+1. `cmake --build build --target test_image_d64` clean.
+2. Extend `tests/edlin_test.txt` (or add a second fixture) to have more
+   than 24 lines, so `List`/`Page`'s default screen-full behavior and the
+   `"Continue (Y/N)?"` pagination both get exercised — the current
+   4-line fixture can't exercise pagination at all.
+3. Manual VICE pass: `edlin <multi-line file>`, then at the `*` prompt:
+   - Bare `L` → shows a screen starting near the top, line numbers correct.
+   - `1,5L` → shows exactly lines 1-5, no pagination prompt.
+   - Bare `P` repeated a few times → each call advances through the file
+     in screen-sized chunks (confirms `EdCurrentLine` repositioning).
+   - A range large enough to trigger `"Continue (Y/N)?"` → confirm `Y`
+     continues and `N` stops cleanly, back at the `*` prompt either way.
+   - An out-of-range line number (e.g. `9999L`) → confirm it fails
+     quietly (per `LIST`'s `retnz` bail) rather than crashing or printing
+     garbage.
+   - `Q` → exits cleanly back to the shell prompt.
 
 ## Phase 3 — Edit commands (`0.1.3`)
 
@@ -420,3 +653,95 @@ plan's Verification Plan section, run in full.
     checks used only to confirm the fix once ready, not to iteratively
     hunt for the bug.
   - **Phase 1 is complete.**
+- 2026-07-09: Phase 2 detail written, grounded directly in the real
+  `LIST`/`PAGER` source (`ms-dos/v4.0/src/CMD/EDLIN/EDLCMD1.ASM`) rather
+  than re-deriving defaults from memory. Key design decision: split
+  zero-page into a small persistent-state category (now includes the new
+  `EdCurrentLineLo/Hi`, decoupled from `findLine`'s transient
+  `CurLine*`/`CurPtr*` output, since `List` must call `findLine` without
+  disturbing the editor's actual current line) versus a reusable
+  transient command-scratch category, and flagged that the `$70-$8F`
+  budget will be down to 1 free byte after this phase — Phase 3 planning
+  needs to either reuse transient fields or reconsider the range. Also
+  corrected a Phase 1 Progress note: `printDec16` was never actually
+  redundant with the kernel's `printDecimal16` (kernel-internal, not
+  reachable from an external `.prg`) — it's promoted to permanent
+  (moved into `cmds.s`) rather than deleted. No implementation started.
+- 2026-07-10: Phase 2 implemented and verified.
+  - `src/external/edlin/cmds.s` created: `parseLineNum`/`parseRange`,
+    `cmdList`/`cmdPage`, shared `displayLines`/`displayLineText`,
+    `promptContinue` (mirrors `format.s`'s `confirmDestructive` — checks
+    both `$59` and `$79` for 'y', since some keyboard mapping modes
+    deliver the shifted byte), and `printDec16` (moved from `edlin.s`,
+    promoted from temporary to permanent per the Phase 2 detail note).
+  - `edlin.s` rewritten: Phase 1's temporary debug dump deleted; added
+    `EdCurrentLineLo/Hi` init (`=1`) after a successful load,
+    `ownLineInput` (copies `shellReadLine`'s structure), `peekCommandByte`
+    (scans past a range without touching `Line1`/`Line2`/`FindTarget`
+    state, just to find the dispatch letter), and `commandLoop` (`*`
+    prompt, dispatch on `L`/`P`/bare-placeholder `Q`/unknown-command `?`).
+  - `common.inc` updated with the full Phase 2 ZP layout (`Line1Lo/Hi`,
+    `Line1Given`, `Line2Given`, `PageRowCount`, and the new persistent
+    `EdCurrentLineLo/Hi`) and the persistent-vs-transient documentation
+    split. Budget now sits at `$70-$8E`, 31 of 32 bytes used.
+  - `buffer.s` gained three new exports (`bufReadWindow`, `scanWindow`,
+    `fallbackBuf`) so `cmds.s` can drive its own windowed line-text scan.
+  - Test fixture (`tests/edlin_test.txt`) regenerated from 4 lines to 30
+    numbered lines, specifically to exercise the `"Continue (Y/N)?"`
+    pagination path the old fixture was too short to reach.
+  - **Caught two bugs before ever touching VICE**, both by re-reading the
+    code after ca65 assembled it clean: (1) `cmdList`/`cmdPage` never
+    reset `Y` to `0` before calling `parseRange`, so it would've inherited
+    whatever index `peekCommandByte` left it at instead of re-scanning
+    the range from the start of `EditBuf` — fixed by adding `ldy #0`
+    before each call. (2) `cmdList`'s range-validity check tested the
+    sign of `LineCountHi` *after* adding 1 for the inclusive count,
+    which isn't a reliable "line2 < line1" test — fixed to check the
+    subtraction's own borrow (`bcc`) before the `+1`, matching the
+    (correct) pattern `cmdPage` already used.
+  - **A third bug only surfaced during live testing**: bare `P` right
+    after `1,5L` only showed line 1 instead of a full screen. Root cause:
+    `parseRange` only cleared `Line2Given` inside the "comma present but
+    no number follows" branch — when there's no comma at all, it fell
+    through without ever resetting the flag, so a stale `Line2Given=1`
+    (and stale `FindTargetLo/Hi=1`) from the *previous* command's
+    execution leaked into the next one, since `Line1Given`/`Line2Given`
+    are zero-page scratch that persist across command-loop iterations,
+    not per-call locals. Fixed by resetting `Line2Given` on the no-comma
+    path too (`bne prNoLine2` instead of `bne prSkipSpaces2`). This is
+    the kind of bug static review alone likely wouldn't have caught
+    without deliberately tracing a *sequence* of commands, not just one
+    in isolation — worth remembering for Phase 3, which has even more
+    persistent state (`EdCurrentLine*`) that later commands must not
+    assume is freshly initialized.
+  - Also picked up mid-session: a stray VICE checkpoint left armed from
+    Phase 1 debugging (never deleted, only disconnected-from) kept
+    interrupting the user's manual testing by popping the monitor open
+    on every file load. Deleted once identified. Lesson for future
+    sessions: always delete checkpoints (not just disconnect) before
+    handing control back for manual testing.
+  - User-verified in VICE against the 30-line `edlintest` fixture: bare
+    `L` (lines 1-24), `1,5L` (exact range), bare `P` (lines 1-24,
+    current line -> 24), a second bare `P` (lines 25-30, no overlap,
+    confirming the reposition), `<N>,<N>P` as a "jump to line N"
+    workaround (no dedicated jump command exists yet — that's Phase 3's
+    `NOCOM`/edit-line territory), and both special line-number tokens,
+    `.` (current line) and `#` (last+1). `9999L` (out-of-range) and `Q`
+    (exit) were not explicitly re-confirmed after the bug fixes, though
+    their code paths are unchanged from what static review already
+    covered.
+  - `.`/`#` verification surfaced a user-education point worth recording,
+    not a bug: `#` alone or as line1 (`#L`, `#P`) correctly displays
+    nothing, since `#` means "one past the last line" — there's nothing
+    to show *at* the insertion point after a file's real content. `#P`
+    still has a real side effect even when it displays nothing, though:
+    `Page` always repositions the current line to the end of its range,
+    so `#P` silently moves the current line to `last+1`. That combination
+    (a command that visibly does nothing but silently changes state) is
+    exactly the kind of thing worth calling out to a user testing this,
+    and worth remembering as real EDLIN-inherited behavior when Phase 3
+    builds edit-line/Insert/Delete on top of the current-line concept.
+    `#`'s actually-useful role is as line2 (e.g. `1,#L`/`.,#L`, "to the
+    end of the file"), confirmed working once tried that way.
+  - `VERSION_STAGE` bumped to `2` (`0.1.2`) in `edlin.s`.
+  - **Phase 2 is complete.**

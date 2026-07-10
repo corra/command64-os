@@ -25,8 +25,14 @@ live in `brain/plans/2026-07-09-edlin-port-feasibility.md` and
       side (`buffer.s`) verified against a 4-line test file: correct line
       count and byte offsets. REU-absent fallback path is implemented but
       not yet exercised against a no-REU config — carried forward.
-- [ ] Phase 2 — Core read/navigate (`0.1.2`): List/Page, line-number args,
-      own line-input loop.
+- [x] Phase 2 — Core read/navigate (`0.1.2`): List/Page, line-number args,
+      own line-input loop — complete. User-verified in VICE against a
+      30-line fixture: `L`, `1,5L`, `P` (twice, confirming current-line
+      repositioning), `<N>,<N>P` as a jump-to-line workaround. Three real
+      bugs found and fixed (two via static re-read before ever touching
+      VICE, one — a stale-flag bug only a *sequence* of commands could
+      surface — during live testing). Detail/fixes:
+      `brain/plans/2026-07-09-edlin-implementation-phases.md`.
 - [ ] Phase 3 — Edit commands (`0.1.3`): edit-line, Insert, Delete, Quit.
 - [ ] Phase 4 — Save/streaming (`0.1.4`): Write, Append, exit-drain save.
 - [ ] Phase 5 — Search/Replace (`0.1.5`): simplified, no quote-char escaping.
