@@ -274,92 +274,8 @@ doConfirmAndFormat:
     jsr sendFormatCommand
 
 doExit:
-    jsr printDiag
     lda #DOS_EXIT
     jsr OS_API
-
-; --- TEMP DIAGNOSTIC: dump suspect shared-scratch ZP state before exit,
-; to isolate what (if anything) format leaves behind that breaks a
-; subsequent shell `dir`. Remove once root-caused.
-printDiag:
-    ldx #<msgDiag
-    ldy #>msgDiag
-    jsr printStr
-
-    ldx #<msgDiagTL
-    ldy #>msgDiagTL
-    jsr printStr
-    lda TempLo
-    jsr printHexByte
-    ldx #<msgDiagTH
-    ldy #>msgDiagTH
-    jsr printStr
-    lda TempHi
-    jsr printHexByte
-    ldx #<msgDiagHL
-    ldy #>msgDiagHL
-    jsr printStr
-    lda HexValLo
-    jsr printHexByte
-    ldx #<msgDiagHH
-    ldy #>msgDiagHH
-    jsr printStr
-    lda HexValHi
-    jsr printHexByte
-    ldx #<msgDiagCB
-    ldy #>msgDiagCB
-    jsr printStr
-    lda CmpBase
-    jsr printHexByte
-    ldx #<msgDiagPL
-    ldy #>msgDiagPL
-    jsr printStr
-    lda PrintPtrLo
-    jsr printHexByte
-    ldx #<msgDiagPH
-    ldy #>msgDiagPH
-    jsr printStr
-    lda PrintPtrHi
-    jsr printHexByte
-    ldx #<msgDiagNL
-    ldy #>msgDiagNL
-    jsr printStr
-    lda NamePtrLo
-    jsr printHexByte
-    ldx #<msgDiagNH
-    ldy #>msgDiagNH
-    jsr printStr
-    lda NamePtrHi
-    jsr printHexByte
-    ldx #<msgDiagSP
-    ldy #>msgDiagSP
-    jsr printStr
-    tsx
-    txa
-    jsr printHexByte
-    jsr printCrlf
-    rts
-
-; printHexByte: prints A as two hex digits.
-printHexByte:
-    pha
-    lsr a
-    lsr a
-    lsr a
-    lsr a
-    jsr printHexNybble
-    pla
-    and #$0F
-printHexNybble:
-    cmp #10
-    bcc phnDigit
-    clc
-    adc #('A' - 10 - '0')
-phnDigit:
-    clc
-    adc #'0'
-    jsr KernalChROUT
-    rts
 
 confirmDestructive:
     ldx #<msgConfirmPart1
@@ -821,29 +737,6 @@ msgResult:
     .byte "RESULT: ", 0
 msgTransportErr:
     .byte "FORMAT FAILED (TRANSPORT ERROR).", $0D, 0
-
-msgDiag:
-    .byte "DBG: ", 0
-msgDiagTL:
-    .byte "TL=", 0
-msgDiagTH:
-    .byte " TH=", 0
-msgDiagHL:
-    .byte " HL=", 0
-msgDiagHH:
-    .byte " HH=", 0
-msgDiagCB:
-    .byte " CB=", 0
-msgDiagPL:
-    .byte " PL=", 0
-msgDiagPH:
-    .byte " PH=", 0
-msgDiagNL:
-    .byte " NL=", 0
-msgDiagNH:
-    .byte " NH=", 0
-msgDiagSP:
-    .byte " SP=", 0
 
 litNColon:
     .byte ":N:", 0
