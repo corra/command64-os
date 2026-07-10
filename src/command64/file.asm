@@ -526,47 +526,14 @@ fdCopyDone:
     ldy #>FileScratch
     jsr normalizeName
     
-    // 4. SETNAM: A=length, X/Y=pointer
-    txa                     // Length was in X
-    ldx #<FileScratch
-    ldy #>FileScratch
-    jsr KernalSETNAM
-    
-    // 5. SETLFS: A=LFN(15), X=Device(TargetDevice), Y=Secondary(15)
-    lda #15                 // LFN 15 is standard for command channel
-    ldx TargetDevice
-    ldy #15                 // Secondary 15 is command channel
-    jsr KernalSETLFS
-    
-    // 6. OPEN and CLOSE
-    jsr KernalOPEN
-    bcs fdError
-
+    // 4. SETNAM+SETLFS+OPEN+CHKIN+drain+CLOSE: A=length (from X above).
     // The Scratch command's result (e.g. "01,FILES SCRATCHED,00,00") is only
     // available by reading LFN 15 after OPEN — OPEN's own carry only reports
-    // the KERNAL-level handshake, not the DOS command result. Read it before
-    // closing so it can't linger and confuse the next checkDeviceReady call.
-    ldx #15
-    jsr KernalCHKIN
-    bcs fdCloseErr
-    jsr drainOpenErrorChannel
-    lda #15
-    jsr KernalCLOSE
-    clc
-    rts
-
-fdCloseErr:
-    lda #15
-    jsr KernalCLOSE
-    lda #3
-    sec
-    rts
-
-fdError:
-    lda #15
-    jsr KernalCLOSE         // Ensure channel is closed even on error
-    lda #3                  // Device was ready; some other drive error occurred
-    sec
+    // the KERNAL-level handshake, not the DOS command result. sendSA15Command
+    // reads it before closing so it can't linger and confuse the next
+    // checkDeviceReady call.
+    txa                     // Length was in X
+    jsr sendSA15Command
     rts
 
 fdDeviceErr:
@@ -642,45 +609,11 @@ frGotOld:
     ldy #>FileScratch
     jsr normalizeName
     
-    // 6. SETNAM: A=length, X/Y=pointer
-    txa                     // Length was in X
-    ldx #<FileScratch
-    ldy #>FileScratch
-    jsr KernalSETNAM
-    
-    // 7. SETLFS: A=LFN(15), X=Device(TargetDevice), Y=Secondary(15)
-    lda #15                 // LFN 15 is standard for command channel
-    ldx TargetDevice
-    ldy #15                 // Secondary 15 is command channel
-    jsr KernalSETLFS
-    
-    // 8. OPEN and CLOSE
-    jsr KernalOPEN
-    bcs frenError
-
-    // Read the Rename command's result before closing — see the matching
+    // 6. SETNAM+SETLFS+OPEN+CHKIN+drain+CLOSE: A=length (from X above).
+    // Reads the Rename command's result before closing — see the matching
     // comment in fileDelete above for why this can't be skipped.
-    ldx #15
-    jsr KernalCHKIN
-    bcs frenCloseErr
-    jsr drainOpenErrorChannel
-    lda #15
-    jsr KernalCLOSE
-    clc
-    rts
-
-frenCloseErr:
-    lda #15
-    jsr KernalCLOSE
-    lda #3
-    sec
-    rts
-
-frenError:
-    lda #15
-    jsr KernalCLOSE         // Ensure channel is closed even on error
-    lda #3                  // Device was ready; some other drive error occurred
-    sec
+    txa                     // Length was in X
+    jsr sendSA15Command
     rts
 
 frDeviceErr:
@@ -772,4 +705,143 @@ docDone:
     lda #0
     sta SourceBuf, y
     jsr KernalCLRCHN
+    rts
+
+// --- sendSA15Command ---
+// Shared tail for any command-channel operation: SETNAM the command already
+// staged in FileScratch, SETLFS to LFN/SA 15 on TargetDevice, OPEN, read the
+// drive's response via drainOpenErrorChannel (see its header for why this
+// can't be skipped), then CLOSE. Used by fileDelete/fileRename (which stage
+// "S0:"/"R0:" commands) and dosSendCommand (which stages the caller's raw
+// command string) so the open/write/read-result pattern lives in one place.
+// Input:  A = command length in FileScratch
+//         TargetDevice = device number
+// Output: SourceBuf = null-terminated drive response string
+//         Carry: 0 = success, 1 = error (A = status code, 3 = other drive error)
+// Clobbers: A, X, Y
+sendSA15Command:
+    ldx #<FileScratch
+    ldy #>FileScratch
+    jsr KernalSETNAM
+
+    lda #15                 // LFN 15 is standard for command channel
+    ldx TargetDevice
+    ldy #15                 // Secondary 15 is command channel
+    jsr KernalSETLFS
+
+    jsr KernalOPEN
+    bcs sscError
+
+    ldx #15
+    jsr KernalCHKIN
+    bcs sscCloseErr
+    jsr drainOpenErrorChannel
+    lda #15
+    jsr KernalCLOSE
+    clc
+    rts
+
+sscCloseErr:
+    lda #15
+    jsr KernalCLOSE
+    lda #3
+    sec
+    rts
+
+sscError:
+    lda #15
+    jsr KernalCLOSE         // Ensure channel is closed even on error
+    lda #3                  // Device was ready; some other drive error occurred
+    sec
+    rts
+
+// --- dosSendCommand ---
+// DOS_SEND_COMMAND primitive: sends an arbitrary command-channel string to a
+// drive unmodified (no ",<type>,W" style wrapping/mangling, unlike fileOpen)
+// and returns the drive's actual response text to the caller. This is the
+// general-purpose sibling of fileDelete/fileRename's S0:/R0: commands —
+// intended for callers like format's "N:name,id" that need the raw drive
+// response rather than a generic pass/fail.
+// Input:  X/Y = Pointer to command string (null-terminated), optionally
+//               prefixed with "<dev>:" per the parsePointerDevice convention
+//               (defaults to CurrentDevice if absent)
+//         PrintPtrLo/Hi = Pointer to caller-supplied output buffer (must
+//               hold at least 40 bytes, matching SourceBuf's max length)
+// Output: Caller's buffer = null-terminated drive response string
+//         Carry: 0 = success (transport-level; the drive may still have
+//               reported an error in the response text), 1 = error
+// Clobbers: A, X, Y, TargetDevice, NamePtrLo/Hi, TempLo/Hi, FileScratch,
+//           SourceBuf
+dosSendCommand:
+    stx NamePtrLo
+    sty NamePtrHi
+
+    // The caller's output-buffer pointer arrives in PrintPtrLo/Hi, but
+    // normalizeName below uses PrintPtrLo/Hi as its own working pointer and
+    // will clobber it — stash it in HexValLo/Hi (untouched by everything
+    // else in this call chain) and restore it before the response is
+    // copied out.
+    lda PrintPtrLo
+    sta HexValLo
+    lda PrintPtrHi
+    sta HexValHi
+
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta TargetDevice
+
+    lda TargetDevice
+    jsr checkDeviceReady
+    bcs dscDeviceErr
+
+    // Stage the caller's command string in FileScratch, unmodified apart
+    // from the same shifted->unshifted normalization S0:/R0: get.
+    ldy #0
+dscCopyLoop:
+    lda (NamePtrLo), y
+    beq dscCopyDone
+    sta FileScratch, y
+    iny
+    jmp dscCopyLoop
+dscCopyDone:
+    tya
+    tax                     // X = command length
+    lda #<FileScratch
+    ldy #>FileScratch
+    jsr normalizeName
+
+    txa                     // Length was in X
+    jsr sendSA15Command
+
+    // Restore the caller's output-buffer pointer clobbered by normalizeName
+    // above, needed by both the success and error paths below.
+    lda HexValLo
+    sta PrintPtrLo
+    lda HexValHi
+    sta PrintPtrHi
+    bcs dscError
+
+    // Copy the drive's response from SourceBuf into the caller's buffer.
+    ldy #0
+dscCopyOut:
+    lda SourceBuf, y
+    sta (PrintPtrLo), y
+    beq dscCopyOutDone
+    iny
+    jmp dscCopyOut
+dscCopyOutDone:
+    clc
+    rts
+
+dscError:
+    pha                     // Preserve sendSA15Command's status code
+    ldy #0
+    lda #0
+    sta (PrintPtrLo), y     // No response text on a transport-level failure
+    pla
+    sec
+    rts
+
+dscDeviceErr:
+    sec                     // A already holds the checkDeviceReady status code
     rts

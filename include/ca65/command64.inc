@@ -59,6 +59,7 @@ DOS_ALLOC_MEM    = $48 ; Allocate memory (VMM)
 DOS_FREE_MEM     = $49 ; Free memory (VMM)
 DOS_EXIT         = $4C ; Terminate program (Return to Shell)
 DOS_PARSE_PREFIX = $57 ; Parse target device prefix from ZP pointer
+DOS_SEND_COMMAND = $58 ; Send raw command-channel string, read drive response
 
 ; --- PETSCII Control Characters ---
 PetCr   = $0D ; Carriage return

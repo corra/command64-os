@@ -256,7 +256,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **User Program Space (`UserProgStart` - $CFFF):** currently `$2C00` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
+- **User Program Space (`UserProgStart` - $CFFF):** currently `$2E00` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity
