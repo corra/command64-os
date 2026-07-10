@@ -4,9 +4,9 @@ This document provides technical details for developing applications for the com
 
 ## 1. Memory Map
 
-When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `UserProgStart` (currently `$2C00`, configurable via the CMake cache variable `USER_PROG_START_HEX`) up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
+When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `UserProgStart` (currently `$2E00`, configurable via the CMake cache variable `USER_PROG_START_HEX`) up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
 
-> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → current `$2C00`). Applications should never hardcode `$2600` or any other prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
+> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → $2C00 → current `$2E00`). Applications should never hardcode `$2600` or any other prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
 
 ### C64 RAM Banking Control ($0001 CPU Port)
 
@@ -33,16 +33,16 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 |         |  User Program Space (RAM)                             |  User Application Area
 |         |  (Note: BASIC ROM banked out at $A000-$BFFF to        |  (RAM replacing ROM)
 |         |   provide contiguous program RAM)                     |
-|UserProgStart|  (`$2C00` in the default build; grows over time  |
+|UserProgStart|  (`$2E00` in the default build; grows over time  |
 |         |   as OS segments below it expand — see note above)    |
 +---------+-------------------------------------------------------+------------------------+
-|  $2BFF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
-|  $2A53  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
+|  $2DFF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
+|  $2C43  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
 +---------+-------------------------------------------------------+
-|  $2A52  |  ShellExt Segment                                     |  OS Shell Data
-|  $242C  |  Version, help strings, and DIR size-calc routines    |  (RAM)
+|  $2C42  |  ShellExt Segment                                     |  OS Shell Data
+|  $2495  |  Version, help strings, and DIR size-calc routines    |  (RAM)
 +---------+-------------------------------------------------------+
-|  $242B  |  AppTable Segment                                     |  OS Resident Registry
+|  $2494  |  AppTable Segment                                     |  OS Resident Registry
 |  $2000  |  Application Registry Management API (aptInit/Find/   |  (RAM)
 |         |  Register/Remove/List/FindFreeRegion/CheckRange/etc.) |
 +---------+-------------------------------------------------------+
