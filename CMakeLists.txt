@@ -56,6 +56,9 @@ set(DEBUG_ENTRY "src/external/debug/debug.s")
 file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.s" "src/external/label/*.inc" "include/ca65/*.inc")
 set(LABEL_ENTRY "src/external/label/label.s")
 
+file(GLOB_RECURSE EDLIN_SRCS CONFIGURE_DEPENDS "src/external/edlin/*.s" "src/external/edlin/*.inc" "include/ca65/*.inc")
+set(EDLIN_ENTRY "src/external/edlin/edlin.s")
+
 file(GLOB_RECURSE FORMAT_SRCS CONFIGURE_DEPENDS "src/external/format/*.s" "src/external/format/*.inc" "include/ca65/*.inc")
 set(FORMAT_ENTRY "src/external/format/format.s")
 
@@ -128,6 +131,22 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for LABEL target")
 endif()
 set(LABEL_TARGET label)
+
+# 3c. EDLIN External Command PRG Target — ported from MS-DOS 4.00 EDLIN
+# (ms-dos/v4.0/src/CMD/EDLIN/); see
+# brain/plans/2026-07-09-edlin-port-feasibility.md and
+# brain/plans/2026-07-09-edlin-implementation-phases.md. Phase 0 is a
+# scaffold (version banner only); PRG_SIZE_HEX will need to grow in later
+# phases as the VMM-backed buffer and command dispatch land. Ships
+# unconditionally in IMAGE_PRG_TARGETS, so — like LABEL — a missing
+# ca65/ld65 toolchain fails the entire configure rather than silently
+# skipping this target.
+if(Ca65_FOUND)
+    add_ca65_app(edlin "${EDLIN_ENTRY}" EDLIN_SRCS 1000 "0700")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for EDLIN target")
+endif()
+set(EDLIN_TARGET edlin)
 
 # 3b. FORMAT External Command PRG Target — sends CBM DOS's native N:name,id
 # command to a drive's command channel via the DOS_SEND_COMMAND kernel
@@ -250,7 +269,7 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
+set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
