@@ -142,7 +142,7 @@ set(LABEL_TARGET label)
 # ca65/ld65 toolchain fails the entire configure rather than silently
 # skipping this target.
 if(Ca65_FOUND)
-    add_ca65_app(edlin "${EDLIN_ENTRY}" EDLIN_SRCS 1000 "0700")
+    add_ca65_app(edlin "${EDLIN_ENTRY}" EDLIN_SRCS 1000 "1800")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for EDLIN target")
 endif()
@@ -291,6 +291,14 @@ add_custom_command(
     TARGET test_image_d64 POST_BUILD
     COMMAND "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending SEQ test file to test.d64"
+)
+
+# Add EDLIN Phase 1 test file (4 short lines) to test.d64 — see
+# brain/plans/2026-07-09-edlin-implementation-phases.md Phase 1.
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending EDLIN test SEQ file to test.d64"
 )
 
 # 6. Release Target

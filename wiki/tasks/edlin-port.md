@@ -19,7 +19,12 @@ live in `brain/plans/2026-07-09-edlin-port-feasibility.md` and
 
 - [x] Phase 0 — Scaffold (`0.1.0`): app builds, appears in disk image, and
       boots/prints version banner in VICE — verified by user.
-- [ ] Phase 1 — Buffer core (`0.1.1`): VMM-backed buffer, file load, line scan.
+- [x] Phase 1 — Buffer core (`0.1.1`): VMM-backed buffer, file load, line
+      scan — complete. Kernel prerequisite (`DOS_VMM_READ`/`DOS_VMM_WRITE`,
+      `wiki/tasks/vmm-block-io.md`) landed and verified in VICE first. App
+      side (`buffer.s`) verified against a 4-line test file: correct line
+      count and byte offsets. REU-absent fallback path is implemented but
+      not yet exercised against a no-REU config — carried forward.
 - [ ] Phase 2 — Core read/navigate (`0.1.2`): List/Page, line-number args,
       own line-input loop.
 - [ ] Phase 3 — Edit commands (`0.1.3`): edit-line, Insert, Delete, Quit.

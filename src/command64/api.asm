@@ -49,6 +49,10 @@ apiHandler:
     beq ahParsePrefix
     cmp #DOS_SEND_COMMAND
     beq ahSendCommand
+    cmp #DOS_VMM_READ
+    beq ahVmmRead
+    cmp #DOS_VMM_WRITE
+    beq ahVmmWrite
 
     // Unknown function — return with error (C=1)
     sec
@@ -162,4 +166,32 @@ ahSendCommand:
     // Output: Caller's buffer = null-terminated drive response string
     //         Carry = status
     jsr dosSendCommand
+    rts
+
+ahVmmRead:
+    // Input: VmmSegLo/Hi, VmmOffLo/Hi, VmmBank = source Seg:Off:Bank
+    //        X/Y = destination buffer pointer
+    //        HexValLo/Hi = byte count
+    // Output: destination buffer filled; Carry = status
+    jsr vmmReadBlock
+    cmp #VMM_SUCCESS
+    beq _avrOk
+    sec
+    rts
+_avrOk:
+    clc
+    rts
+
+ahVmmWrite:
+    // Input: VmmSegLo/Hi, VmmOffLo/Hi, VmmBank = destination Seg:Off:Bank
+    //        X/Y = source buffer pointer
+    //        HexValLo/Hi = byte count
+    // Output: Carry = status
+    jsr vmmWriteBlock
+    cmp #VMM_SUCCESS
+    beq _avwOk
+    sec
+    rts
+_avwOk:
+    clc
     rts

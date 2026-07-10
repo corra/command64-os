@@ -39,6 +39,8 @@
 .label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
 .label DOS_PARSE_PREFIX = $57  // Parse target device prefix from ZP pointer
 .label DOS_SEND_COMMAND = $58  // Send raw command-channel string, read drive response
+.label DOS_VMM_READ    = $59  // Block-read bytes from a DOS_ALLOC_MEM'd REU segment
+.label DOS_VMM_WRITE   = $5A  // Block-write bytes to a DOS_ALLOC_MEM'd REU segment
 
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return
