@@ -59,8 +59,18 @@ biVmmOk:
 ; ---------------------------------------------------------------------------
 ; bufLoadFile — open and stream a file into the buffer from offset 0.
 ; Input:  X/Y = pointer to null-terminated filename
-; Output: Carry = 0 on success (including a 0-byte file); Carry = 1 if the
-;         file could not be opened. BufEndLo/Hi = total bytes loaded.
+; Output: Carry = 0 on success (including a 0-byte file); Carry = 1 on
+;         failure, with A distinguishing why (edlin.s picks the message
+;         and, for a startup load, whether to treat it as "new file"):
+;         A=$FE (a value fileOpen never produces) means the file doesn't
+;         fit within the buffer's allocation ceiling (BUF_ALLOC_BYTES for
+;         VMM, FALLBACK_BUF_SIZE for RAM fallback) -- the file is closed
+;         and BufEndLo/Hi left at whatever fit, but this must be treated
+;         as a load failure, not a partial success. Any other A is passed
+;         straight through from DOS_OPEN_FILE's own failure code ($FF =
+;         generic open failure, almost always "file not found" -- the
+;         common case for a brand-new file; 1/2/3 = no device/no disk/
+;         other drive error, a real device-level problem).
 ; ---------------------------------------------------------------------------
 bufLoadFile:
     lda #0
@@ -68,7 +78,7 @@ bufLoadFile:
     lda #DOS_OPEN_FILE
     jsr OS_API
     bcc blfOpened
-    rts                      ; Carry already 1 — propagate open failure
+    rts                      ; Carry=1, A = fileOpen's own failure code
 
 blfOpened:
     sta FileHandle
@@ -88,8 +98,41 @@ blfLoop:
 
     lda HexValLo
     ora HexValHi
-    beq blfEof               ; 0 bytes read — nothing left, nothing to write
+    bne blfHaveData           ; nonzero — fall through and process the chunk
+    jmp blfEof                ; 0 bytes read — nothing left, nothing to write
+blfHaveData:
 
+    ; Prospective new BufEnd = BufEnd + bytes just read -- computed once,
+    ; used both for the ceiling check below and (if it passes) as the
+    ; actual post-write BufEnd, so blfAdvance doesn't need to re-add.
+    lda BufEndLo
+    clc
+    adc HexValLo
+    sta TmpLenLo
+    lda BufEndHi
+    adc HexValHi
+    sta TmpLenHi
+
+    ; Reject only when TmpLen (prospective BufEnd) is strictly greater than
+    ; the ceiling -- compare against ceiling+1 with the usual "bcs = no
+    ; borrow = TmpLen >= X" idiom, so a load that exactly fills the buffer
+    ; (TmpLen == ceiling) is still allowed, not rejected as an off-by-one.
+    lda BufIsVmm
+    bne blfCeilVmm
+    lda TmpLenLo
+    cmp #<(FALLBACK_BUF_SIZE+1)
+    lda TmpLenHi
+    sbc #>(FALLBACK_BUF_SIZE+1)
+    bcs blfTooLarge
+    jmp blfWrite
+blfCeilVmm:
+    lda TmpLenLo
+    cmp #<(BUF_ALLOC_BYTES+1)
+    lda TmpLenHi
+    sbc #>(BUF_ALLOC_BYTES+1)
+    bcs blfTooLarge
+
+blfWrite:
     lda BufIsVmm
     beq blfRamWrite
 
@@ -129,20 +172,25 @@ blfCopyLoop:
     jmp blfCopyLoop
 
 blfAdvance:
-    lda BufEndLo
-    clc
-    adc HexValLo
+    lda TmpLenLo
     sta BufEndLo
-    lda BufEndHi
-    adc HexValHi
+    lda TmpLenHi
     sta BufEndHi
 
     lda HexValHi
-    bne blfLoop               ; actual >= 256, definitely a full chunk
+    bne blfLoopBack            ; actual >= 256, definitely a full chunk
     lda HexValLo
     cmp #WINDOW_SIZE
-    bcc blfEof                ; actual < WINDOW_SIZE — that was the last chunk
+    bcc blfEof                 ; actual < WINDOW_SIZE — that was the last chunk
+blfLoopBack:
     jmp blfLoop
+
+blfTooLarge:
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    lda #$FE                  ; sentinel: fileOpen never returns this value
+    sec
+    rts
 
 blfEof:
     lda #DOS_CLOSE_FILE
@@ -497,19 +545,22 @@ bufOpenHole:
     adc HoleSizeHi
     sta TmpLenHi
 
+    ; Allow TmpLen (prospective BufEnd) == ceiling exactly (a hole that
+    ; exactly fills the buffer is not an overflow); compare against
+    ; ceiling+1 so only strictly-greater is rejected.
     lda BufIsVmm
     bne bohVmmCeil
     lda TmpLenLo
-    cmp #<FALLBACK_BUF_SIZE
+    cmp #<(FALLBACK_BUF_SIZE+1)
     lda TmpLenHi
-    sbc #>FALLBACK_BUF_SIZE
+    sbc #>(FALLBACK_BUF_SIZE+1)
     bcc bohProceed
     jmp bohFull
 bohVmmCeil:
     lda TmpLenLo
-    cmp #<BUF_ALLOC_BYTES
+    cmp #<(BUF_ALLOC_BYTES+1)
     lda TmpLenHi
-    sbc #>BUF_ALLOC_BYTES
+    sbc #>(BUF_ALLOC_BYTES+1)
     bcc bohProceed
     jmp bohFull
 

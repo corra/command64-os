@@ -836,14 +836,188 @@ through to `jmp commandLoop` on N).
 
 ## Phase 4 — Save/streaming (`0.1.4`)
 
-- [ ] `W`rite command and auto-drain-on-exit (`ENDED` equivalent): stream
-      buffer to output file via `DOS_WRITE_FILE`, direct overwrite (no
-      `.BAK`/`.$$$` rename dance — deferred per feasibility plan decision 4).
-- [ ] `A`ppend streaming for files larger than the VMM allocation, mirroring
-      DOS EDLIN's fill-to-3/4 / flush-to-1/4 buffer thresholds.
-- **Exit criteria**: create file → insert/delete → save → reload → `L`ist
-  matches expected content; a file larger than a single VMM allocation
-  round-trips correctly (streaming exercised, not just small-file save).
+- [x] **Prerequisite bug fix** (found while planning this phase, landed
+      ahead of it): `bufLoadFile` had no ceiling check against the
+      buffer's allocation — loading a file bigger than 16KB (or 2KB in
+      RAM-fallback) silently wrote past the VMM segment's bounds into
+      whatever REU segment sits next (the REU is carved into fixed
+      per-purpose segments shared with other apps/the OS's own App
+      Table, not free space — this is what actually corrupted the App
+      Table during earlier testing, not a Phase 4-specific issue). Fixed
+      with the same Carry=1 "reject cleanly" convention `bufOpenHole`
+      already established in Phase 3. An identical off-by-one in
+      `bufOpenHole`'s own ceiling check (rejected a hole that would
+      exactly fill the buffer, instead of only rejecting when it would
+      exceed it) was caught and fixed alongside it. See Progress.
+- [x] **New-file creation support** (found while planning this phase — the
+      feasibility plan's own verification workflow, "create a file with
+      `edlin newfile.txt`," was never actually possible: a missing file
+      made `edlin.s` treat *any* open failure as fatal and exit
+      immediately). `edlin.s`'s startup now distinguishes a device-level
+      open failure (no device/no disk/other drive error — still fatal)
+      from a generic KERNAL open failure (in practice, "file not found")
+      — the latter now starts an empty buffer instead of exiting, printing
+      `"NEW FILE."` rather than an error.
+- [ ] `W`rite command: stream the whole buffer to disk in one pass, direct
+      overwrite (`DOS_DELETE_FILE` then `DOS_OPEN_FILE` mode=1 — no
+      `.BAK`/`.$$$` rename dance, per feasibility plan decision 4).
+- **Scope note — `A`ppend is deferred, not part of this phase.** The
+  original bullet here committed to DOS EDLIN's sliding-window Append/Write
+  (fill-to-3/4, flush-to-1/4) for files bigger than one VMM allocation.
+  That scheme exists specifically to work around the 8086's 64KB
+  conventional-memory segment ceiling — growing the VMM allocation instead
+  looked like the obvious fix (REU capacity is generous, 1MB+ per
+  `vmm.inc`), but **the REU is a shared, segmented resource other apps and
+  the OS's own App Table also live in — it is not free space `edlin` can
+  just claim more of.** Given that constraint, real sliding-window
+  streaming (keeping the 16KB buffer fixed, paging file content in/out
+  through it, DOS-style) is the only way to support files bigger than one
+  allocation — and that's a substantial addition (window-relative line
+  numbering, two more commands, large-file test fixtures) deliberately
+  **deferred to a v2 item, tracked as `task 23`** (`command64.edlin`
+  project, `+v2 +deferred`). This phase's `W` only ever writes what
+  Phase 1's `bufLoadFile` was able to load in one shot — which, per the
+  ceiling-check fix above, is now a clean, safe failure rather than silent
+  corruption for anything that doesn't fit.
+- **Exit criteria**: create file (`edlin newfile.txt` on a nonexistent
+  name) → insert/delete → `W`rite → reload → `L`ist matches expected
+  content. A file larger than the 16KB buffer is rejected cleanly at load
+  (already verified via the prerequisite fix) rather than round-tripped —
+  that case is `task 23`'s job, not this phase's.
+
+### Phase 4 detail
+
+Ground truth for the file-write ABI came from reading `src/command64/
+file.asm` directly (`fileOpen`, `fileWrite`, `fileDelete`) rather than
+assuming generic C64 KERNAL behavior — a Task agent was used for this
+lookup and its findings were spot-checked against the actual source
+(`file.asm:183-303` for `fileOpen`, `:407-481` for `fileWrite`, `:483-541`
+for `fileDelete`) before being relied on, per
+[[feedback-verify-agent-hardware-claims]].
+
+#### File-write ABI (new to this port — Phases 1-3 only ever read)
+
+- **`DOS_OPEN_FILE` write mode**: `HexValLo = 1` (vs. `0` for read, already
+  used by `bufLoadFile`). `HexValHi` — if nonzero — sets the file type
+  character appended after the filename (`fileOpen` defaults to unshifted
+  `'P'`/PRG otherwise, `file.asm:251-254`); since a text file must stay a
+  SEQ file, Phase 4's write path must explicitly set `HexValHi = $53`
+  (unshifted `'S'`) before opening. Output is the same as read mode: `A` =
+  handle, Carry 0/1.
+- **No automatic overwrite.** `fileOpen`'s write branch is a plain KERNAL
+  `SETNAM`+`,W`+`SETLFS`+`OPEN` with no `@0:` prefix and no delete-first
+  logic (`file.asm:243-289`, confirmed against the one existing write
+  caller, the shell's `COPY` command at `shell.asm:1347-1358`, which has
+  the same gap). On real 1541 DOS, opening an existing filename for write
+  fails with error 63 (FILE EXISTS). **`cmdWrite` must `DOS_DELETE_FILE`
+  the target before opening it for write.**
+- **`DOS_DELETE_FILE`** (`fileDelete`, `file.asm:483-541`): `X/Y` = filename
+  pointer, Carry 0/1 output only. Issues a 1541 `S0:<name>` SCRATCH command.
+  Confirmed this is safe to call unconditionally, even when the target
+  doesn't exist yet (the fresh-save / brand-new-file case) — 1541 DOS's
+  SCRATCH reports "0 files scratched" as success, not an error, so no
+  existence check is needed before calling it.
+- **`DOS_WRITE_FILE`** (`fileWrite`, `file.asm:407-481`): unlike open, the
+  handle goes in the `FileHandle` ZP location ($6D, same field
+  `bufLoadFile` already uses for read), not a register — `X/Y` = source
+  pointer, `HexValLo/Hi` = byte count in, `HexValLo/Hi` = bytes actually
+  written out, Carry 0/1. Working example: `tests/src/filetest/
+  filetest.s:40-51`.
+- **`DOS_CLOSE_FILE`**: same as the read-side close `bufLoadFile` already
+  uses.
+- No end-of-file marker byte needs writing (unlike DOS's `$1A`) — 1541 SEQ
+  files are read until the KERNAL hits the physical end of the block
+  chain, no explicit terminator required.
+
+#### `cmdWrite` (command byte `$57`, `'W'`) — new in `cmds.s`
+
+Takes no arguments (unlike DOS's `EWRITE`/`WRT`, which accept an optional
+line count for partial sliding-window flushes — not applicable here, the
+whole buffer is always already resident). `commandLoop`'s dispatch never
+even parses a range for it, matching `Quit`'s zero-argument shape.
+
+1. `DOS_DELETE_FILE` on `FilenamePtrLo/Hi` (the same pointer `edlin.s`'s
+   startup already resolved and null-terminated in `CommandBuffer` for the
+   initial load — `edlin.s` exports it, `cmds.s` imports it). Ignore the
+   Carry result entirely (see ABI note above — a missing target isn't an
+   error, and a genuine delete failure will simply surface again as an
+   open failure next).
+2. `DOS_OPEN_FILE` mode=1, `HexValHi = $53` ('S'), target = the same
+   `FilenamePtrLo/Hi`. Carry=1 → print `"ERROR: COULD NOT WRITE FILE."`,
+   `rts` back to the command loop (not a hard exit — matches this port's
+   established preference for recoverable errors to return to the prompt
+   rather than kill the session, e.g. `bufOpenHole`'s buffer-full path).
+3. `sta FileHandle`.
+4. Stream `[0, BufEnd)` out in `WINDOW_SIZE` chunks, reusing Phase 1's
+   `bufReadWindow` directly (already `BufIsVmm`-branching and
+   auto-clamping its length to `BufEnd` — no new read logic needed, only a
+   write side):
+
+   ```text
+   WindowBaseOff = 0
+   loop:
+       if WindowBaseOff >= BufEnd: goto done
+       bufReadWindow                    ; fills scanWindow, sets WindowValidLen
+       DOS_WRITE_FILE(X/Y=scanWindow, HexValLo=WindowValidLen, HexValHi=0)
+       if Carry=1: goto writeErr
+       WindowBaseOff += WindowValidLen
+       jmp loop
+   ```
+
+5. `done:` → `DOS_CLOSE_FILE`, `rts`. No "SAVED" confirmation message —
+   matches this port's existing terse convention (List/Page/Insert/Delete
+   don't print success confirmations either; DOS EDLIN itself doesn't for
+   a plain `W`).
+6. `writeErr:` → `DOS_CLOSE_FILE`, print `"ERROR: WRITE FAILED - DISK
+   FULL?"`, `rts`.
+
+No new persistent state needed — `WindowBaseOffLo/Hi`/`WindowValidLen`/
+`scanWindow` are exactly the fields `bufReadWindow` already expects as its
+own working state, so `cmdWrite` reuses them directly rather than adding
+anything to the already-tight `BSS` scratch area.
+
+**Divergence from DOS worth noting explicitly**: real `WRT` resets
+`[CURRENT]` to line 1 after a write, because DOS's sliding buffer window
+shifts after a flush. Our buffer never shifts in v1 (the whole file stays
+resident the entire session, per the Append deferral above), so
+`EdCurrentLineLo/Hi` is intentionally left untouched by `cmdWrite` — there's
+nothing to reposition relative to.
+
+#### `edlin.s` changes
+
+- `.export FilenamePtrLo` / `.export FilenamePtrHi` (new — `cmds.s` needs
+  them for `cmdWrite`'s save target).
+- `.import cmdWrite`; dispatch table gains `cpx #'W' / bne clNotWrite / jsr
+  cmdWrite / jmp commandLoop`, alongside the existing `D`/`I`/blank/`Q`
+  entries.
+- The new-file-creation and ceiling-check changes from the prerequisite
+  fixes above (already landed, see Progress).
+
+#### Phase 4 verification steps
+
+1. `cmake --build build --target test_image_d64` clean.
+2. New-file creation: `edlin brandnew` (a filename with no existing file)
+   → confirm `"NEW FILE."` prints, not an error, and the command loop
+   starts normally with an empty buffer (`L` shows nothing, `#` reports
+   line 1).
+3. Insert a few lines (Phase 3's `I`), `W`, then exit and reload the same
+   file — `L` output matches what was inserted.
+4. Modify an existing fixture (`edlintst2`: insert/delete a line or two),
+   `W`, reload, confirm the changes persisted and nothing else was
+   corrupted.
+5. Write, then immediately `L` again in the same session — confirm the
+   in-memory buffer is unaffected by the save (no truncation, no pointer
+   corruption from the streamout loop).
+6. Attempt a write to a read-only or write-protected target (if easily
+   arranged in VICE) to exercise `writeErr`'s path — best-effort, not a
+   hard blocker.
+7. Regression: confirm `edlinfull` (Phase 3's near-ceiling fixture) still
+   loads correctly post-fix (150 bytes under the ceiling, should still
+   succeed) and that a file *larger* than 16384 bytes now fails cleanly at
+   load with `"ERROR: FILE TOO LARGE FOR BUFFER."` instead of silently
+   corrupting anything — this is the regression test for the prerequisite
+   bug fix itself, not new Phase 4 behavior, but must be confirmed before
+   `VERSION_STAGE` bumps.
 
 ## Phase 5 — Search/Replace, simplified (`0.1.5`)
 
@@ -1145,3 +1319,44 @@ plan's Verification Plan section, run in full.
   `VERSION_STAGE` bumped to `'3'` (`0.1.3`) in `edlin.s`.
   - **Phase 3 is complete** (test section 10 deferred, tracked in
     `task 22`, not a blocker for this phase).
+- 2026-07-10: Phase 4 planning session. Started from the original terse
+  bullets ("W`rite + auto-drain-on-exit, `A`ppend streaming mirroring
+  DOS's fill-to-3/4/flush-to-1/4"). A Task agent researched the file-write
+  ABI directly from `src/command64/file.asm` (spot-checked, not trusted
+  blindly, per [[feedback-verify-agent-hardware-claims]]) since Phases 1-3
+  only ever read files.
+  - User flagged a real production incident during this discussion: REU
+    memory is segmented across apps and the OS's own App Table (not free
+    space), and an earlier EDLIN test run had already silently corrupted
+    the App Table via a buffer overflow. Investigated and confirmed the
+    root cause: `bufLoadFile` (Phase 1) had no ceiling check against the
+    buffer's allocation, so loading an oversized file wrote straight past
+    the VMM segment into whatever sits next. Fixed immediately (Carry=1 +
+    a distinguishing sentinel in A, mirroring `bufOpenHole`'s convention)
+    — this fix stands alone regardless of Phase 4's scope and was landed
+    before continuing. Found and fixed the identical off-by-one in
+    `bufOpenHole`'s own ceiling check at the same time (rejected an
+    exactly-full buffer, not just an overflowing one).
+  - This forced a real re-scope: growing the VMM allocation to sidestep
+    DOS's Append/sliding-window complexity (my first instinct) was
+    explicitly ruled out by the user for the REU-segmentation reason
+    above. User chose Write-only for Phase 4, deferring real sliding-window
+    Append/Write streaming to a v2 item — tracked as `task 23`
+    (`command64.edlin` project, `+v2 +deferred`).
+  - Also discovered, while grounding `cmdWrite`'s "create a new file"
+    requirement against the feasibility plan's own verification workflow:
+    `edlin.s` currently treats *any* file-open failure at startup as
+    fatal, meaning `edlin newfile.txt` (a file that doesn't exist yet) has
+    never actually worked — the feasibility plan's own stated verification
+    step was unreachable since Phase 0. Fixed as part of this phase's
+    prerequisites: a device-level open failure (no device/no disk/other
+    drive error) stays fatal, but a generic open failure (in practice,
+    file-not-found) now starts an empty buffer and prints `"NEW FILE."`
+    instead of exiting.
+  - Both prerequisite fixes are implemented and build clean
+    (`cmake --build build --target test_image_d64`); not yet VICE-verified
+    this session. `cmdWrite` itself (the actual Phase 4 command) is
+    detailed above but **not yet implemented** — this was a planning
+    session, the two prerequisite bugs were fixed opportunistically because
+    they blocked reasoning about Phase 4's own design, not because
+    implementation of Phase 4 itself has started.

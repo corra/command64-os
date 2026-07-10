@@ -109,8 +109,35 @@ startLoad:
     ldy FilenamePtrHi
     jsr bufLoadFile
     bcc loadOk
+    cmp #$FE
+    beq loadTooLarge
+    cmp #1                    ; 1/2/3 = no device / no disk / other drive
+    beq loadDeviceErr         ; error -- a real device-level problem, fatal.
+    cmp #2
+    beq loadDeviceErr
+    cmp #3
+    beq loadDeviceErr
+    ; Any other failure code (in practice $FF) is a generic KERNAL open
+    ; failure -- almost always "file not found." Treat it as a new file:
+    ; bufInit already left BufEndLo/Hi at 0, so there's nothing more to
+    ; set up, just proceed with an empty buffer (per the feasibility
+    ; plan's "edlin newfile.txt" create-a-new-file workflow, which Phases
+    ; 1-3 never actually exercised since every test used a fixture that
+    ; already existed).
+    ldx #<msgNewFile
+    ldy #>msgNewFile
+    lda #DOS_PRINT_STR
+    jsr OS_API
+    jmp loadOk
+loadDeviceErr:
     ldx #<msgOpenErr
     ldy #>msgOpenErr
+    lda #DOS_PRINT_STR
+    jsr OS_API
+    jmp exit
+loadTooLarge:
+    ldx #<msgFileTooLarge
+    ldy #>msgFileTooLarge
     lda #DOS_PRINT_STR
     jsr OS_API
     jmp exit
@@ -316,6 +343,14 @@ msgOpenErr:
     .byte $45, $52, $52, $4F, $52, $3A, $20, $43, $4F, $55, $4C, $44, $20
     .byte $4E, $4F, $54, $20, $4F, $50, $45, $4E, $20, $46, $49, $4C, $45
     .byte $2E, $0D, $00
+; "ERROR: FILE TOO LARGE FOR BUFFER."
+msgFileTooLarge:
+    .byte $45, $52, $52, $4F, $52, $3A, $20, $46, $49, $4C, $45, $20, $54
+    .byte $4F, $4F, $20, $4C, $41, $52, $47, $45, $20, $46, $4F, $52, $20
+    .byte $42, $55, $46, $46, $45, $52, $2E, $0D, $00
+; "NEW FILE."
+msgNewFile:
+    .byte $4E, $45, $57, $20, $46, $49, $4C, $45, $2E, $0D, $00
 ; "?"
 msgUnknownCmd:
     .byte $3F, $0D, $00
