@@ -18,6 +18,11 @@
 .export bufReadWindow
 .export scanWindow
 .export fallbackBuf
+.export bufWriteBytes
+.export bufOpenHole
+.export bufCloseHole
+.export HoleSizeLo
+.export HoleSizeHi
 
 .segment "CODE"
 
@@ -300,7 +305,8 @@ flRamLoop:
     bne flRamCont
     lda ScanPtrHi
     cmp EndPtrHi
-    beq flSetEof
+    bne flRamCont
+    jmp flSetEof
 flRamCont:
     ldy #0
     lda (ScanPtrLo), y
@@ -336,6 +342,337 @@ flRamNotLf:
     bne flRamLoop
     inc ScanPtrHi
     jmp flRamLoop
+
+; ---------------------------------------------------------------------------
+; bufWriteBytes — write A bytes from a C64-RAM source into the buffer at
+; CurPtrLo/Hi (VMM or RAM fallback). Does NOT touch BufEnd/CurPtr -- callers
+; (Insert/edit-line) manage those themselves.
+; Input:  A = byte count (<=128); X/Y = pointer to source bytes.
+; ---------------------------------------------------------------------------
+bufWriteBytes:
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    stx ScanPtrLo
+    sty ScanPtrHi
+
+    lda BufIsVmm
+    bne bwbVmm
+    lda #<fallbackBuf
+    clc
+    adc CurPtrLo
+    sta EndPtrLo
+    lda #>fallbackBuf
+    adc CurPtrHi
+    sta EndPtrHi
+    ldy #0
+bwbRamLoop:
+    cpy HexValLo
+    beq bwbDone
+    lda (ScanPtrLo), y
+    sta (EndPtrLo), y
+    iny
+    jmp bwbRamLoop
+bwbVmm:
+    lda #0
+    sta VmmSegLo
+    lda BufBaseSegHi
+    sta VmmSegHi
+    lda BufBaseBank
+    sta VmmBank
+    lda CurPtrLo
+    sta VmmOffLo
+    lda CurPtrHi
+    sta VmmOffHi
+    ldx ScanPtrLo
+    ldy ScanPtrHi
+    lda #DOS_VMM_WRITE
+    jsr OS_API
+bwbDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; bufReadChunkRaw / bufWriteChunkRaw — internal to bufOpenHole/bufCloseHole.
+; Move exactly WindowValidLen bytes (<=WINDOW_SIZE) between scanWindow and
+; the buffer at WindowBaseOffLo/Hi -- no BufEnd-relative clamping (unlike
+; bufReadWindow), since bufOpenHole/bufCloseHole always compute the exact
+; chunk length themselves.
+; ---------------------------------------------------------------------------
+bufReadChunkRaw:
+    lda BufIsVmm
+    bne brcVmm
+    lda #<fallbackBuf
+    clc
+    adc WindowBaseOffLo
+    sta EndPtrLo
+    lda #>fallbackBuf
+    adc WindowBaseOffHi
+    sta EndPtrHi
+    ldy #0
+brcRamLoop:
+    cpy WindowValidLen
+    beq brcDone
+    lda (EndPtrLo), y
+    sta scanWindow, y
+    iny
+    jmp brcRamLoop
+brcVmm:
+    lda #0
+    sta VmmSegLo
+    lda BufBaseSegHi
+    sta VmmSegHi
+    lda BufBaseBank
+    sta VmmBank
+    lda WindowBaseOffLo
+    sta VmmOffLo
+    lda WindowBaseOffHi
+    sta VmmOffHi
+    ldx #<scanWindow
+    ldy #>scanWindow
+    lda WindowValidLen
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    lda #DOS_VMM_READ
+    jsr OS_API
+brcDone:
+    rts
+
+bufWriteChunkRaw:
+    lda BufIsVmm
+    bne bwcVmm
+    lda #<fallbackBuf
+    clc
+    adc WindowBaseOffLo
+    sta EndPtrLo
+    lda #>fallbackBuf
+    adc WindowBaseOffHi
+    sta EndPtrHi
+    ldy #0
+bwcRamLoop:
+    cpy WindowValidLen
+    beq bwcDone
+    lda scanWindow, y
+    sta (EndPtrLo), y
+    iny
+    jmp bwcRamLoop
+bwcVmm:
+    lda #0
+    sta VmmSegLo
+    lda BufBaseSegHi
+    sta VmmSegHi
+    lda BufBaseBank
+    sta VmmBank
+    lda WindowBaseOffLo
+    sta VmmOffLo
+    lda WindowBaseOffHi
+    sta VmmOffHi
+    ldx #<scanWindow
+    ldy #>scanWindow
+    lda WindowValidLen
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    lda #DOS_VMM_WRITE
+    jsr OS_API
+bwcDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; bufOpenHole — shift [CurPtr, BufEnd) up to [CurPtr+HoleSize, BufEnd+
+; HoleSize), working from the end backward in WINDOW_SIZE chunks so a chunk
+; is always read before the (higher, not-yet-relocated) memory it will be
+; written into is touched. BufEnd += HoleSize on success.
+; Input:  CurPtrLo/Hi = offset to open the hole at; HoleSizeLo/Hi = size.
+; Output: Carry=0 on success; Carry=1 (no changes made) if BufEnd+HoleSize
+;         would exceed the buffer's allocation ceiling ("buffer full").
+;         CurPtrLo/Hi unchanged.
+; ---------------------------------------------------------------------------
+bufOpenHole:
+    lda BufEndLo
+    clc
+    adc HoleSizeLo
+    sta TmpLenLo
+    lda BufEndHi
+    adc HoleSizeHi
+    sta TmpLenHi
+
+    lda BufIsVmm
+    bne bohVmmCeil
+    lda TmpLenLo
+    cmp #<FALLBACK_BUF_SIZE
+    lda TmpLenHi
+    sbc #>FALLBACK_BUF_SIZE
+    bcc bohProceed
+    jmp bohFull
+bohVmmCeil:
+    lda TmpLenLo
+    cmp #<BUF_ALLOC_BYTES
+    lda TmpLenHi
+    sbc #>BUF_ALLOC_BYTES
+    bcc bohProceed
+    jmp bohFull
+
+bohProceed:
+    lda BufEndLo
+    sec
+    sbc CurPtrLo
+    sta ShiftRemainLo
+    lda BufEndHi
+    sbc CurPtrHi
+    sta ShiftRemainHi
+
+    lda BufEndLo
+    sta ShiftSrcLo
+    lda BufEndHi
+    sta ShiftSrcHi
+
+bohLoop:
+    lda ShiftRemainLo
+    ora ShiftRemainHi
+    bne bohChunk
+    lda TmpLenLo
+    sta BufEndLo
+    lda TmpLenHi
+    sta BufEndHi
+    clc
+    rts
+
+bohChunk:
+    lda ShiftRemainHi
+    bne bohChunkFull
+    lda ShiftRemainLo
+    cmp #(WINDOW_SIZE+1)
+    bcc bohChunkPartial
+bohChunkFull:
+    lda #WINDOW_SIZE
+    jmp bohChunkSet
+bohChunkPartial:
+    lda ShiftRemainLo
+bohChunkSet:
+    sta WindowValidLen
+
+    lda ShiftSrcLo
+    sec
+    sbc WindowValidLen
+    sta ShiftSrcLo
+    lda ShiftSrcHi
+    sbc #0
+    sta ShiftSrcHi
+
+    lda ShiftSrcLo
+    sta WindowBaseOffLo
+    lda ShiftSrcHi
+    sta WindowBaseOffHi
+    jsr bufReadChunkRaw
+
+    lda ShiftSrcLo
+    clc
+    adc HoleSizeLo
+    sta WindowBaseOffLo
+    lda ShiftSrcHi
+    adc HoleSizeHi
+    sta WindowBaseOffHi
+    jsr bufWriteChunkRaw
+
+    lda ShiftRemainLo
+    sec
+    sbc WindowValidLen
+    sta ShiftRemainLo
+    lda ShiftRemainHi
+    sbc #0
+    sta ShiftRemainHi
+
+    jmp bohLoop
+
+bohFull:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; bufCloseHole — shift [CurPtr+HoleSize, BufEnd) down to [CurPtr, BufEnd-
+; HoleSize), working forward (low to high), since the destination is always
+; lower than the source here (no overlap risk copying in that order).
+; BufEnd -= HoleSize. No failure mode -- callers must have already
+; validated CurPtr+HoleSize <= BufEnd via findLine.
+; Input:  CurPtrLo/Hi = hole start offset; HoleSizeLo/Hi = size to remove.
+; ---------------------------------------------------------------------------
+bufCloseHole:
+    lda CurPtrLo
+    clc
+    adc HoleSizeLo
+    sta ShiftSrcLo
+    lda CurPtrHi
+    adc HoleSizeHi
+    sta ShiftSrcHi
+
+    lda BufEndLo
+    sec
+    sbc ShiftSrcLo
+    sta ShiftRemainLo
+    lda BufEndHi
+    sbc ShiftSrcHi
+    sta ShiftRemainHi
+
+bchLoop:
+    lda ShiftRemainLo
+    ora ShiftRemainHi
+    bne bchChunk
+    lda BufEndLo
+    sec
+    sbc HoleSizeLo
+    sta BufEndLo
+    lda BufEndHi
+    sbc HoleSizeHi
+    sta BufEndHi
+    rts
+
+bchChunk:
+    lda ShiftRemainHi
+    bne bchChunkFull
+    lda ShiftRemainLo
+    cmp #(WINDOW_SIZE+1)
+    bcc bchChunkPartial
+bchChunkFull:
+    lda #WINDOW_SIZE
+    jmp bchChunkSet
+bchChunkPartial:
+    lda ShiftRemainLo
+bchChunkSet:
+    sta WindowValidLen
+
+    lda ShiftSrcLo
+    sta WindowBaseOffLo
+    lda ShiftSrcHi
+    sta WindowBaseOffHi
+    jsr bufReadChunkRaw
+
+    lda ShiftSrcLo
+    sec
+    sbc HoleSizeLo
+    sta WindowBaseOffLo
+    lda ShiftSrcHi
+    sbc HoleSizeHi
+    sta WindowBaseOffHi
+    jsr bufWriteChunkRaw
+
+    lda ShiftSrcLo
+    clc
+    adc WindowValidLen
+    sta ShiftSrcLo
+    lda ShiftSrcHi
+    adc #0
+    sta ShiftSrcHi
+
+    lda ShiftRemainLo
+    sec
+    sbc WindowValidLen
+    sta ShiftRemainLo
+    lda ShiftRemainHi
+    sbc #0
+    sta ShiftRemainHi
+
+    jmp bchLoop
 
 flSetEof:
     ; Only count a trailing partial line if CurPtr (the offset right after
@@ -373,3 +710,14 @@ msgNoReu:
 .segment "BSS"
 scanWindow:  .res WINDOW_SIZE
 fallbackBuf: .res FALLBACK_BUF_SIZE
+
+; Phase 3 hole-shift scratch. Plain BSS, not zero page -- the app-private
+; ZP range ($70-$8F, see common.inc) is exhausted after Phase 2, and none
+; of this needs (zp),Y indirect addressing (only direct compare/add), so
+; there's no reason to fight over the last ZP byte.
+ShiftSrcLo:    .res 1
+ShiftSrcHi:    .res 1
+ShiftRemainLo: .res 1
+ShiftRemainHi: .res 1
+HoleSizeLo:    .res 1  ; set by callers (cmds.s) before bufOpenHole/bufCloseHole
+HoleSizeHi:    .res 1

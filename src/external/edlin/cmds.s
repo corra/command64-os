@@ -15,10 +15,20 @@
 .import bufReadWindow
 .import scanWindow
 .import fallbackBuf
+.import bufWriteBytes
+.import bufOpenHole
+.import bufCloseHole
+.import HoleSizeLo
+.import HoleSizeHi
 .import EditBuf
+.import ownLineInput
 
 .export cmdList
 .export cmdPage
+.export cmdDelete
+.export cmdInsert
+.export cmdEditLine
+.export cmdQuit
 .export printDec16
 
 .segment "CODE"
@@ -404,7 +414,9 @@ dlDecLo:
     lda PageRowCount
     cmp #(SCREEN_LINES - 1)
     bne dlLoop
-    jsr promptContinue
+    ldx #<msgContinue
+    ldy #>msgContinue
+    jsr promptYN
     cmp #0
     beq dlStop
     lda #0
@@ -535,19 +547,22 @@ dltRamEof:
     rts
 
 ; ---------------------------------------------------------------------------
-; promptContinue — "Continue (Y/N)?" gate. Output: A = 1 for yes, 0 for no.
-; Checks both $59 and $79 for 'y' -- mirrors format.s's confirmDestructive
-; (some keyboard mapping modes deliver the shifted byte instead).
+; promptYN — print the message at X/Y, then poll for a Y/N keypress.
+; Output: A = 1 for yes, 0 for no. Checks both $59 and $79 for 'y' --
+; mirrors format.s's confirmDestructive (some keyboard mapping modes
+; deliver the shifted byte instead). Generalized from Phase 2's
+; promptContinue (which only ever printed msgContinue) so Phase 3's Quit
+; can reuse the same poll logic with its own prompt string.
 ; ---------------------------------------------------------------------------
-promptContinue:
-    ldx #<msgContinue
-    ldy #>msgContinue
+promptYN:
     lda #DOS_PRINT_STR
     jsr OS_API
 pcPoll:
     jsr KernalGetIn
     beq pcPoll
     pha
+    jsr KernalChROUT
+    lda #PetCr
     jsr KernalChROUT
     pla
     cmp #$59
@@ -613,6 +628,366 @@ pd16NoSub:
     bne pd16Digit
     rts
 
+; ---------------------------------------------------------------------------
+; cmdDelete — "D" command. [line1][,line2]D, defaults to current line.
+; Ground truth: EDLCMD1.ASM DELETE (line 448) -- Current becomes line1
+; after deletion (POP Current in the original).
+; ---------------------------------------------------------------------------
+cmdDelete:
+    ldy #0
+    jsr parseRange
+
+    lda Line1Given
+    bne cdHaveLine1
+    lda EdCurrentLineLo
+    sta Line1Lo
+    lda EdCurrentLineHi
+    sta Line1Hi
+cdHaveLine1:
+
+    lda Line2Given
+    bne cdHaveLine2
+    lda Line1Lo
+    sta Line2ValLo
+    lda Line1Hi
+    sta Line2ValHi
+    jmp cdRangeCheck
+cdHaveLine2:
+    lda FindTargetLo
+    sta Line2ValLo
+    lda FindTargetHi
+    sta Line2ValHi
+cdRangeCheck:
+    lda Line2ValLo
+    sec
+    sbc Line1Lo
+    lda Line2ValHi
+    sbc Line1Hi
+    bcc cdBadRange
+
+    lda Line1Lo
+    sta FindTargetLo
+    lda Line1Hi
+    sta FindTargetHi
+    jsr findLine
+    lda CurLineLo
+    cmp FindTargetLo
+    bne cdOutOfRange
+    lda CurLineHi
+    cmp FindTargetHi
+    bne cdOutOfRange
+
+    lda CurPtrLo
+    sta DelStartLo
+    lda CurPtrHi
+    sta DelStartHi
+    lda Line1Lo
+    sta DelLineLo
+    lda Line1Hi
+    sta DelLineHi
+
+    lda Line2ValLo
+    clc
+    adc #1
+    sta FindTargetLo
+    lda Line2ValHi
+    adc #0
+    sta FindTargetHi
+    jsr findLine            ; CurPtrLo/Hi = one past the deleted range
+
+    lda CurPtrLo
+    sec
+    sbc DelStartLo
+    sta HoleSizeLo
+    lda CurPtrHi
+    sbc DelStartHi
+    sta HoleSizeHi
+
+    lda DelStartLo
+    sta CurPtrLo
+    lda DelStartHi
+    sta CurPtrHi
+    jsr bufCloseHole
+
+    lda DelLineLo
+    sta EdCurrentLineLo
+    lda DelLineHi
+    sta EdCurrentLineHi
+    rts
+
+cdBadRange:
+cdOutOfRange:
+    rts
+
+; ---------------------------------------------------------------------------
+; cmdInsert — "I" command. [line]I, opens a hole per typed line, reads
+; lines until a blank line is entered. Ground truth: EDLIN.ASM INSERT
+; (line 1366) -- blank-line-terminates is a deliberate scope cut from the
+; original's Ctrl-Z/EOF termination (see Phase 3 detail in the phases plan).
+; ---------------------------------------------------------------------------
+cmdInsert:
+    ldy #0
+    jsr parseRange
+    lda Line2Given
+    beq ciOk
+    rts
+ciOk:
+    lda Line1Given
+    bne ciHaveLine1
+    lda EdCurrentLineLo
+    sta Line1Lo
+    lda EdCurrentLineHi
+    sta Line1Hi
+ciHaveLine1:
+    lda Line1Lo
+    sta FindTargetLo
+    lda Line1Hi
+    sta FindTargetHi
+    jsr findLine
+    lda CurLineLo
+    cmp FindTargetLo
+    beq ciRangeOk
+    jmp ciOutOfRange
+ciRangeOk:
+    lda CurLineHi
+    cmp FindTargetHi
+    beq ciLoop
+    jmp ciOutOfRange
+
+ciLoop:
+    lda Line1Lo
+    sta ScanPtrLo
+    lda Line1Hi
+    sta ScanPtrHi
+    jsr printDec16
+    ldx #':'
+    lda #DOS_PRINT_CHAR
+    jsr OS_API
+    ldx #' '
+    lda #DOS_PRINT_CHAR
+    jsr OS_API
+
+    jsr ownLineInput
+
+    ldy #0
+ciLenLoop:
+    lda EditBuf, y
+    beq ciLenDone
+    iny
+    jmp ciLenLoop
+ciLenDone:
+    sty InsLineLen
+    lda InsLineLen
+    bne ciHaveText
+    jmp ciEnd
+
+ciHaveText:
+    ldy InsLineLen
+    lda #$0A
+    sta EditBuf, y
+    lda InsLineLen
+    clc
+    adc #1
+    sta HoleSizeLo
+    lda #0
+    adc #0
+    sta HoleSizeHi
+
+    jsr bufOpenHole
+    bcc ciWriteOk
+    ldx #<msgBufferFull
+    ldy #>msgBufferFull
+    lda #DOS_PRINT_STR
+    jsr OS_API
+    jmp ciEnd
+
+ciWriteOk:
+    ldx #<EditBuf
+    ldy #>EditBuf
+    lda HoleSizeLo
+    jsr bufWriteBytes
+
+    lda CurPtrLo
+    clc
+    adc HoleSizeLo
+    sta CurPtrLo
+    lda CurPtrHi
+    adc #0
+    sta CurPtrHi
+
+    inc Line1Lo
+    bne ciLoop
+    inc Line1Hi
+    jmp ciLoop
+
+ciEnd:
+    lda Line1Lo
+    sta EdCurrentLineLo
+    lda Line1Hi
+    sta EdCurrentLineHi
+    rts
+
+ciOutOfRange:
+    rts
+
+; ---------------------------------------------------------------------------
+; cmdEditLine — blank command letter (DOS EDLIN's NOCOM). Positions the
+; current line and, if a non-blank replacement is typed, replaces it via
+; close-hole/open-hole. Ground truth: EDLCMD1.ASM NOCOM (line 618).
+; ---------------------------------------------------------------------------
+cmdEditLine:
+    ldy #0
+    jsr parseRange
+    lda Line2Given
+    beq ceParamsOk
+    rts
+ceParamsOk:
+    lda Line1Given
+    bne ceUseLine1
+    lda EdCurrentLineLo
+    clc
+    adc #1
+    sta Line1Lo
+    lda EdCurrentLineHi
+    adc #0
+    sta Line1Hi
+ceUseLine1:
+    lda Line1Lo
+    sta FindTargetLo
+    lda Line1Hi
+    sta FindTargetHi
+    jsr findLine
+
+    lda CurLineLo
+    sta EdCurrentLineLo
+    lda CurLineHi
+    sta EdCurrentLineHi
+
+    lda CurPtrHi
+    cmp BufEndHi
+    bne ceHaveData
+    lda CurPtrLo
+    cmp BufEndLo
+    bne ceHaveData
+    rts                      ; target is at/past EOF -- nothing to show/edit
+
+ceHaveData:
+    lda CurPtrLo
+    sta SavedOffsetLo
+    lda CurPtrHi
+    sta SavedOffsetHi
+
+    lda CurLineLo
+    sta ScanPtrLo
+    lda CurLineHi
+    sta ScanPtrHi
+    jsr printDec16
+    ldx #':'
+    lda #DOS_PRINT_CHAR
+    jsr OS_API
+    ldx #' '
+    lda #DOS_PRINT_CHAR
+    jsr OS_API
+
+    jsr displayLineText      ; echoes old text, advances CurPtrLo/Hi
+    lda #PetCr
+    jsr KernalChROUT
+
+    lda CurPtrLo
+    sec
+    sbc SavedOffsetLo
+    sta OldLineLenLo
+    lda CurPtrHi
+    sbc SavedOffsetHi
+    sta OldLineLenHi
+
+    ; if displayLineText stopped at BufEnd (unterminated last line, no LF
+    ; consumed), OldLineLen is already correct as-is -- only subtract 1
+    ; when it actually stopped on an LF.
+    lda CurPtrLo
+    cmp BufEndLo
+    bne ceHadLf
+    lda CurPtrHi
+    cmp BufEndHi
+    beq ceLenDone
+ceHadLf:
+    lda OldLineLenLo
+    sec
+    sbc #1
+    sta OldLineLenLo
+    lda OldLineLenHi
+    sbc #0
+    sta OldLineLenHi
+ceLenDone:
+
+    jsr ownLineInput
+    ldy #0
+ceLenLoop:
+    lda EditBuf, y
+    beq ceLenLoopDone
+    iny
+    jmp ceLenLoop
+ceLenLoopDone:
+    sty InsLineLen
+    lda InsLineLen
+    bne ceReplace
+    rts                      ; blank -- no change, EdCurrentLine already set
+
+ceReplace:
+    lda SavedOffsetLo
+    sta CurPtrLo
+    lda SavedOffsetHi
+    sta CurPtrHi
+    lda OldLineLenLo
+    clc
+    adc #1
+    sta HoleSizeLo
+    lda OldLineLenHi
+    adc #0
+    sta HoleSizeHi
+    jsr bufCloseHole
+
+    ldy InsLineLen
+    lda #$0A
+    sta EditBuf, y
+    lda SavedOffsetLo
+    sta CurPtrLo
+    lda SavedOffsetHi
+    sta CurPtrHi
+    lda InsLineLen
+    clc
+    adc #1
+    sta HoleSizeLo
+    lda #0
+    adc #0
+    sta HoleSizeHi
+    jsr bufOpenHole
+    bcc ceWriteOk
+    ldx #<msgBufferFull
+    ldy #>msgBufferFull
+    lda #DOS_PRINT_STR
+    jsr OS_API
+    rts                      ; old line already removed -- see Phase 3 detail
+ceWriteOk:
+    ldx #<EditBuf
+    ldy #>EditBuf
+    lda HoleSizeLo
+    jsr bufWriteBytes
+    rts
+
+; ---------------------------------------------------------------------------
+; cmdQuit — "Q" command. Prompts "Abort edit (Y/N)?"; the caller (edlin.s)
+; decides whether to exit based on the returned A (1 = yes, 0 = no), same
+; convention promptYN already uses. Ground truth: EDLCMD2.ASM QUIT (line
+; 876) -- simplified to one prompt/one answer rather than DOS's
+; reprompt-forever loop, matching promptYN's existing convention.
+; ---------------------------------------------------------------------------
+cmdQuit:
+    ldx #<msgAbortEdit
+    ldy #>msgAbortEdit
+    jsr promptYN
+    rts
+
 .segment "RODATA"
 
 placeValues:
@@ -623,6 +998,25 @@ msgContinue:
     .byte $43, $4F, $4E, $54, $49, $4E, $55, $45, $20, $28, $59, $2F, $4E
     .byte $29, $3F, $20, $00
 
+; "ABORT EDIT (Y/N)? "
+msgAbortEdit:
+    .byte $41, $42, $4F, $52, $54, $20, $45, $44, $49, $54, $20, $28, $59
+    .byte $2F, $4E, $29, $3F, $20, $00
+
+; "ERROR: BUFFER FULL."
+msgBufferFull:
+    .byte $45, $52, $52, $4F, $52, $3A, $20, $42, $55, $46, $46, $45, $52
+    .byte $20, $46, $55, $4C, $4C, $2E, $0D, $00
+
 .segment "BSS"
-Line2ValLo: .res 1
-Line2ValHi: .res 1
+Line2ValLo:    .res 1
+Line2ValHi:    .res 1
+DelStartLo:    .res 1
+DelStartHi:    .res 1
+DelLineLo:     .res 1
+DelLineHi:     .res 1
+InsLineLen:    .res 1
+OldLineLenLo:  .res 1
+OldLineLenHi:  .res 1
+SavedOffsetLo: .res 1
+SavedOffsetHi: .res 1

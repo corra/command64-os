@@ -515,13 +515,324 @@ this dispatch entry with the real thing, it's not additive scope.
 
 ## Phase 3 — Edit commands (`0.1.3`)
 
-- [ ] Blank-line **edit-line** command (default `current+1`) and `I`nsert
-      (open-hole via byte-wise VMM shift, read lines until blank/EOF).
-- [ ] `D`elete (`[line1][,line2]D`, defaults to current), closes the hole.
-- [ ] `Q`uit with "Abort edit (Y/N)?" confirmation, discards buffer.
+- [x] `buffer.s`: `bufOpenHole`/`bufCloseHole` byte-wise VMM/RAM shift
+      primitives, plus a `bufWriteBytes` helper (see detail below).
+- [x] Blank-line **edit-line** command (default `current+1`), echoes the
+      existing line then replaces it via close-hole/open-hole.
+- [x] `I`nsert (`[line]I`, open-hole per typed line, read lines until blank).
+- [x] `D`elete (`[line1][,line2]D`, defaults to current), closes the hole.
+- [x] `Q`uit with "Abort edit (Y/N)?" confirmation, discards buffer
+      (replaces the Phase 2 bare-exit placeholder).
 - **Exit criteria**: insert/delete/edit-line round-trip correctly against
   `L`ist output in VICE; no buffer corruption across repeated hole
-  open/close.
+  open/close; `Q` prompts and only exits on Y. **Code complete, builds
+  clean — VICE verification not yet run** (see Progress). `VERSION_STAGE`
+  deliberately left at `'2'` (not bumped to `'3'`) until that verification
+  passes, per this plan's own convention.
+
+### Phase 3 detail
+
+Ground truth for Delete/NOCOM(edit-line)/Insert/Replace/Quit comes from the
+real source, read directly this session: `ms-dos/v4.0/src/CMD/EDLIN/
+EDLCMD1.ASM` (`DELETE` line 448, `NOCOM` line 618), `EDLIN.ASM` (`INSERT`
+line 1366), `EDLCMD2.ASM` (`REPLACE` line 524, `QUIT` line 876). Summarized
+below in terms of our windowed-scan/VMM-block model, not the original's
+`REP MOVSB` byte-block moves or its `.$$$`/abort-vector machinery (both
+already cut per the feasibility plan).
+
+#### ZP budget is exhausted — new scratch goes in plain BSS, not `$70-$8F`
+
+`common.inc:20` already flags the app-private ZP range at 31/32 bytes used
+after Phase 2 (`$8F` is the only byte left). Hole-shift bookkeeping needs
+more than one byte, and — critically — **none of it needs `(zp),Y` indirect
+addressing**: every new field here is either compared/added directly or
+used to populate `VmmOffLo/Hi`/`WindowBaseOffLo/Hi` before a call, never
+dereferenced as a 6502 zero-page pointer itself. So Phase 3's new state is
+plain absolute-addressed `BSS` in `buffer.s`/`cmds.s`, not a claim on
+`$70-$8F`. This sidesteps the budget problem entirely rather than fighting
+over the last byte or expanding the shared range (which would need an
+`AGENTS.md` update apps beyond `edlin` would have to account for).
+
+Also a deliberate departure from Phase 1/2's "reuse transient ZP fields
+aggressively" pattern: Delete/Insert/edit-line each thread a value (a byte
+offset, a numeric line number, a length) across *several* nested `findLine`
+calls within one command body. Phase 2's one real post-implementation bug
+(`Line2Given` leaking stale state across command-loop iterations, see that
+phase's Progress entry) came from exactly this kind of implicit
+cross-call lifetime tracking. Phase 3 commands are long enough, and the
+`BSS`-not-`ZP` decision above removes the scarcity pressure that motivated
+aggressive reuse in the first place — so each command below gets its own
+clearly-named field instead of overloading e.g. `Line1Lo/Hi` to silently
+switch meaning mid-routine.
+
+**New `BSS` fields** (documented alongside `scanWindow`/`fallbackBuf` in
+`buffer.s`, and alongside `Line2ValLo/Hi` in `cmds.s`):
+
+- `buffer.s`: `ShiftSrcLo/Hi`, `ShiftRemainLo/Hi`, `HoleSizeLo/Hi` (6 bytes
+  — `bufOpenHole`/`bufCloseHole`'s own loop bookkeeping, see below).
+- `cmds.s`: `DelStartLo/Hi` (Delete's saved range-start byte offset),
+  `DelLineLo/Hi` (Delete's saved line1 *number*, for repositioning
+  `EdCurrentLine` after the shift), `InsLineLen` (1 byte — Insert/edit-line's
+  typed-line length, capped at 79 by `EditBuf`'s size so one byte is
+  enough), `OldLineLenLo/Hi` (edit-line's saved old-line byte length),
+  `SavedOffsetLo/Hi` (edit-line's saved line-start offset, snapshotted
+  before `displayLineText` advances `CurPtrLo/Hi`). 13 bytes total, all
+  plain `BSS`.
+
+#### New `buffer.s` primitives
+
+**`bufWriteBytes`** — Input: `CurPtrLo/Hi` = destination buffer offset;
+`X/Y` = pointer to source bytes in C64 RAM; `A` = byte count (≤128, safe
+since callers are always writing at most a 79-byte `EditBuf` line + 1 LF
+byte, well under `WINDOW_SIZE`). Output: bytes written at that offset
+(VMM: one `DOS_VMM_WRITE` with `VmmOffLo/Hi = CurPtr`; RAM fallback: direct
+indexed copy into `fallbackBuf + CurPtr`). Does **not** touch `BufEnd` or
+advance `CurPtr` — callers manage that themselves, since `bufOpenHole`
+already adjusts `BufEnd` on its own and Insert needs to advance `CurPtr` in
+a per-typed-line loop. Exported for `cmds.s` to call directly.
+
+**`bufOpenHole`** — Input: `CurPtrLo/Hi` = offset to open the hole at;
+`HoleSizeLo/Hi` = hole size in bytes. Output: Carry=0 and `BufEnd` increased
+by `HoleSizeLo/Hi` on success; Carry=1 (no changes made) if `BufEnd +
+HoleSize` would exceed the buffer's allocation ceiling (`BUF_ALLOC_PARAGRAPHS`
+worth of bytes for VMM, `FALLBACK_BUF_SIZE` for RAM) — this is Phase 3's
+"buffer full" error path, there is no growth-on-demand until Phase 4.
+`CurPtrLo/Hi` itself is left unchanged (still the hole's start, ready for
+the caller to write into via `bufWriteBytes`).
+
+Algorithm (VMM path) — shifts `[CurPtr, BufEnd)` up to `[CurPtr+HoleSize,
+BufEnd+HoleSize)`, working from the **end backward** in `WINDOW_SIZE`
+chunks so a chunk is always read before the (higher, not-yet-relocated)
+memory it will be written into is touched:
+
+```text
+ShiftRemain = BufEnd - CurPtr
+ShiftSrc    = BufEnd
+loop:
+    if ShiftRemain == 0: BufEnd += HoleSize; clc; rts
+    chunkLen = min(WINDOW_SIZE, ShiftRemain)
+    ShiftSrc -= chunkLen                  ; this chunk's start
+    read chunkLen bytes at ShiftSrc into scanWindow   ; raw VMM_READ,
+                                                       ; no bufReadWindow
+                                                       ; auto-clamp (exact
+                                                       ; caller-known length)
+    write chunkLen bytes to (ShiftSrc + HoleSize)     ; raw VMM_WRITE
+    ShiftRemain -= chunkLen
+    jmp loop
+```
+
+RAM fallback: same shape, but no windowing needed — a plain backward
+byte-copy loop within `fallbackBuf` using `ScanPtrLo/Hi`/`EndPtrLo/Hi` as
+source/dest pointers and `TmpLenLo/Hi` as the remaining-byte counter
+(reusing these three existing transient names is safe here: fallback-path
+shifts don't call anything else that clobbers them mid-loop, unlike the
+VMM path's nested nested `bufReadWindow`-shaped calls).
+
+**`bufCloseHole`** — same signature, opposite direction and reason: shifts
+`[CurPtr+HoleSize, BufEnd)` **down** to `[CurPtr, BufEnd-HoleSize)`,
+working **forward** (low to high) since the destination is always lower
+than the source here, so no overlap risk copying in that order. `BufEnd -=
+HoleSize` on completion. No failure mode (closing a hole never grows the
+buffer), so no Carry-based error path — callers are expected to have
+already validated `CurPtr + HoleSize <= BufEnd` via `findLine`.
+
+#### `Delete` (command byte `$44`, `'D'`)
+
+1. `ldy #0; jsr parseRange`.
+2. `line1` = `Line1Given` ? `Line1Lo/Hi` : `EdCurrentLineLo/Hi`. `line2` =
+   `Line2Given` ? the value `parseRange` left in `FindTargetLo/Hi` : `line1`
+   (mirrors `DELETE`'s `DelParm2` default-to-`Param1`) — **capture this into
+   `DelLineLo/Hi` immediately**, before any `findLine` call clobbers
+   `FindTargetLo/Hi`.
+3. Validate `line2 >= line1` via the subtraction-borrow check (same pattern
+   as `cmdList`'s `clBadRange`) — else return, no error message needed
+   beyond the existing silent-bail convention Phase 2 already established
+   for bad ranges.
+4. `FindTargetLo/Hi = line1; jsr findLine`. If `CurLineLo/Hi != line1`
+   (out of range) → return, nothing deleted. Else stash `CurPtrLo/Hi` into
+   `DelStartLo/Hi` (the range's start byte offset) and stash `line1`
+   itself into `DelLineLo/Hi` (needed again in step 7, after `DelLineLo/Hi`
+   is repurposed... — no, keep this in a second field; see the "new BSS
+   fields" list above, `DelLineLo/Hi` holds the *numeric* line1 value
+   specifically so step 4's offset stash in `DelStartLo/Hi` doesn't have to
+   double as both a byte offset and a line number across the rest of the
+   routine).
+5. `FindTargetLo/Hi = line2 + 1; jsr findLine` → `CurPtrLo/Hi` = one past
+   the deleted range (or `BufEnd`, if `line2` was the last line).
+6. `HoleSizeLo/Hi = CurPtrLo/Hi - DelStartLo/Hi`.
+7. `jsr bufCloseHole` with `CurPtrLo/Hi` temporarily reset to
+   `DelStartLo/Hi` (the hole's start) before the call.
+8. `EdCurrentLineLo/Hi = DelLineLo/Hi` (mirrors `DELETE`'s `POP Current` —
+   current becomes the deleted range's starting line number, since
+   whatever used to be the next line now occupies that number; if the
+   deletion reached EOF this naturally becomes a "last+1"-style value,
+   same as after an end-of-buffer `Insert`, which is expected/consistent).
+
+#### `Insert` (command byte `$49`, `'I'`)
+
+1. `ldy #0; jsr parseRange`. If `Line2Given` → return (mirrors `INSERT`'s
+   `CMP ParamCt,1 / JBE OKIns` — at most one param is legal here, a real
+   EDLIN would `ComErr` on `n,mI`; Phase 3 reuses the established silent-bail
+   convention rather than adding a distinct error message).
+2. Target line = `Line1Given` ? `Line1Lo/Hi` : `EdCurrentLineLo/Hi`. Keep
+   running in `Line1Lo/Hi` itself (its job as "the parsed line1 value" is
+   done once copied out; reusing it as the loop's insert-line counter is
+   safe and intentional here — unlike Delete/edit-line, Insert's loop body
+   never calls anything that reinterprets `Line1Lo/Hi`, so this one reuse
+   doesn't reintroduce the Phase 2 stale-state risk).
+3. `FindTargetLo/Hi = Line1Lo/Hi; jsr findLine` → `CurPtrLo/Hi` = insertion
+   byte offset. If `CurLineLo/Hi != Line1Lo/Hi` (out of range, and not the
+   legitimate "append at EOF" case, which `findLine`'s own EOF path already
+   returns as an exact match against `last+1`) → return.
+4. Loop:
+   a. Copy `Line1Lo/Hi` into `ScanPtrLo/Hi` (non-destructively — `Line1Lo/Hi`
+      keeps counting), `jsr printDec16`, print `":"` + `" "` (same prefix
+      style as `displayLines`).
+   b. `jsr ownLineInput` → fills `EditBuf`.
+   c. Compute typed length into `InsLineLen` (scan `EditBuf` for the null
+      terminator; ≤79 so one byte suffices).
+   d. If `InsLineLen == 0` → blank line typed, insertion ends: go to step 5.
+   e. `EditBuf[InsLineLen] = $0A` (append the line terminator in place —
+      turns one `bufWriteBytes` call into "text + LF" together).
+      `HoleSizeLo/Hi = InsLineLen + 1`.
+   f. `jsr bufOpenHole`. If Carry=1 (buffer full): print `"ERROR: BUFFER
+      FULL."`, go to step 5 (mirrors `INSERT`'s `MEMERR` path — abort the
+      insert and return to the command loop, no attempt to grow the
+      allocation this phase).
+   g. `jsr bufWriteBytes` with `X/Y = <EditBuf,>EditBuf`, `A = InsLineLen+1`.
+   h. `CurPtrLo/Hi += (InsLineLen + 1)` (16-bit add, next insertion point).
+   i. Increment `Line1Lo/Hi` (next line number). Loop to (a).
+5. `EdCurrentLineLo/Hi = Line1Lo/Hi` (positions current at the line after
+   the last one actually inserted — or the original target, unchanged, if
+   the very first prompt was answered with a blank line: a legitimate
+   no-op insert).
+
+**Known limitation, worth calling out explicitly**: this makes a truly
+blank *inserted* line unreachable (blank always means "stop"), unlike real
+DOS EDLIN where insertion only ends on Ctrl-Z/EOF and a bare CR inserts an
+empty line. This was already the implied tradeoff in this phase's original
+checklist wording ("read lines until blank/EOF") — recorded here as a
+conscious scope cut, not an oversight, since there's no easy C64-keyboard
+equivalent of DOS's Ctrl-Z-terminated stdin.
+
+#### `edit-line` (blank command letter — dispatch changes in `edlin.s`)
+
+Phase 2's `commandLoop` currently treats a blank command letter
+(`cpx #0 / beq commandLoop`) as a silent reprompt. **This changes in Phase
+3**: `cpx #0 / bne clNotBlank` → `jsr cmdEditLine` → `jmp commandLoop`. A
+bare `[line]` + Enter (DOS EDLIN's `NOCOM`) now positions and optionally
+edits a line, rather than being a no-op — flagging this since it's an easy
+behavior change to miss when touching the dispatch table.
+
+1. `ldy #0; jsr parseRange`. If `Line2Given` → return (mirrors `NOCOM`'s
+   `CMP ParamCt,2 / JB NoComOK` — at most one param legal).
+2. Target = `Line1Given` ? `Line1Lo/Hi` : `EdCurrentLineLo/Hi + 1` (no
+   overflow clamp — not a realistic concern at this buffer's line-count
+   range, same pragmatism already used in `parseLineNum`'s digit parsing).
+3. `FindTargetLo/Hi = target; jsr findLine` → `CurPtrLo/Hi`, `CurLineLo/Hi`.
+4. `EdCurrentLineLo/Hi = CurLineLo/Hi` **unconditionally**, before checking
+   anything else (mirrors `NOCOM`'s unconditional `MOV [CURRENT],DX` ahead
+   of its EOF check — this is what makes bare-CR "walk through the file"
+   navigation work even when nothing gets edited).
+5. If `CurPtrLo/Hi == BufEndLo/Hi` (target at/past EOF, nothing there) →
+   return (mirrors `NOCOM`'s `CMP SI,[ENDTXT] / retz`).
+6. Snapshot `CurPtrLo/Hi` into `SavedOffsetLo/Hi` (the line's start —
+   needed again after the echo/edit steps below advance `CurPtr`). Echo the
+   existing line: print the line-number prefix (same `printDec16` + `": "`
+   pattern as `displayLines`), then `jsr displayLineText` (prints the text
+   and advances `CurPtrLo/Hi` past the terminator — a convenient, deliberate
+   reuse: it also tells us the old line's length). `OldLineLenLo/Hi =
+   CurPtrLo/Hi - SavedOffsetLo/Hi - 1` if `displayLineText` stopped on an
+   `$0A` (the common case), or `CurPtrLo/Hi - SavedOffsetLo/Hi` if it
+   stopped by hitting `BufEnd` with no terminating LF (the file's last,
+   unterminated line). Print `PetCr` to end the echoed line before
+   prompting for the replacement.
+7. `jsr ownLineInput` → `EditBuf`. Compute typed length into `InsLineLen`
+   (same strlen loop Insert uses — the two commands never run concurrently,
+   sharing the field is safe).
+8. If `InsLineLen == 0` → no change, return (mirrors `NOCOM`'s `JCXZ RET12`
+   — `EdCurrentLineLo/Hi` was already set in step 4, so repeated bare CRs
+   walk the file one line at a time with no edits, matching real EDLIN's
+   documented "quick lister" use of this command).
+9. Otherwise, replace — a close-then-open pair rather than DOS `REPLACE`'s
+   single signed-delta shift (simpler to build on the two primitives above;
+   costs an extra shift pass when the line's length changes, an acceptable
+   tradeoff on a 1541-class machine, consistent with the feasibility plan's
+   existing "byte-wise VMM shift over `REP MOVSB`" tradeoff call):
+   a. `CurPtrLo/Hi = SavedOffsetLo/Hi; HoleSizeLo/Hi = OldLineLenLo/Hi + 1`;
+      `jsr bufCloseHole` (deletes the old line + its LF entirely).
+   b. `EditBuf[InsLineLen] = $0A`; `CurPtrLo/Hi = SavedOffsetLo/Hi;
+      HoleSizeLo/Hi = InsLineLen + 1`; `jsr bufOpenHole` (Carry=1 possible
+      here too — print the same `"ERROR: BUFFER FULL."` message and return
+      without writing if so, leaving the old line already-deleted; a real
+      but narrow edge case — a replace that fails to reopen its own freed
+      space would need the freed space back for the message alone, and the
+      close in (a) already shrank `BufEnd`, so this can only fail if the
+      *new* text is longer than the old and the buffer was already nearly
+      full — acceptable to leave as a data-loss edge case for v1 rather
+      than adding rollback machinery, matching the "no `.BAK`/crash-safety"
+      scope cut already made for saves).
+   c. `jsr bufWriteBytes` with `X/Y = <EditBuf,>EditBuf`, `A = InsLineLen+1`.
+
+#### `Quit` (command byte `$51`, `'Q'`, replaces the Phase 2 placeholder)
+
+`promptContinue` (`cmds.s`) is generalized to `promptYN(X/Y = message
+pointer)` — a legitimate, non-speculative factor-out: Quit needs the exact
+same Y/N-poll logic (`KernalGetIn` poll, checks both `$59`/`$79`) with a
+different prompt string, so this is two real call sites sharing identical
+logic, not a hypothetical future need. `cmdList`/`cmdPage`'s existing calls
+update to `ldx #<msgContinue; ldy #>msgContinue; jsr promptYN`.
+
+`cmdQuit`:
+
+1. `ldx #<msgAbortEdit; ldy #>msgAbortEdit; jsr promptYN` (new string,
+   `"ABORT EDIT (Y/N)? "`, in `cmds.s`'s `RODATA`).
+2. If `A == 1` (yes) → `jmp exit` (the existing `DOS_EXIT` path in
+   `edlin.s` — buffer is simply discarded, no save; matches the "skip
+   `.BAK`/rename dance" scope cut, since Quit never had a save step to
+   begin with).
+3. Else → `rts` (back to the command loop). Unlike real `QUIT`'s
+   reprompt-forever loop on an unrecognized answer, one prompt/one answer
+   is enough here, consistent with `promptContinue`'s existing simpler
+   convention from Phase 2 (any non-Y answer is treated as "no").
+
+`edlin.s`'s dispatch: `cpx #'Q' / bne clNotQuit / jsr cmdQuit / jmp
+commandLoop` (replaces the Phase 2 `jmp exit` placeholder — `cmdQuit`
+itself jumps to `exit` internally on a Y answer, so it only ever falls
+through to `jmp commandLoop` on N).
+
+#### Phase 3 verification steps
+
+1. `cmake --build build --target test_image_d64` clean.
+2. Manual VICE pass against `tests/edlin_test.txt` (or a fresh scratch
+   file so saves aren't needed yet — Write is Phase 4):
+   - `I` at a target line, type several lines, blank line to end — `L`ist
+     confirms the new lines appear in the right place with correct
+     numbering, and later original lines shifted down correctly.
+   - `[line1],[line2]D` — `L`ist confirms the range is gone and later lines
+     renumbered down with no corruption at the hole's old boundary.
+   - Bare CR (`edit-line`) repeated a few times — confirms it walks the
+     file one line at a time with no edits when answered blank each time.
+   - `edit-line` with an actual replacement typed — confirms the line's
+     text changed and neighboring lines are intact, both when the new
+     text is shorter and when it's longer than the original (exercises
+     both `bufCloseHole`+`bufOpenHole` size directions).
+   - Insert/delete repeated several times in sequence (not just once each)
+     to catch any hole-shift-introduced buffer corruption that only shows
+     up after repeated open/close cycles.
+   - `Q` → confirms the `"ABORT EDIT (Y/N)?"` prompt appears; `N` returns
+     to the `*` prompt with the buffer intact (confirm via `L`ist); `Y`
+     exits cleanly back to the shell prompt.
+   - Attempt to fill the 16KB allocation via repeated large inserts (or a
+     large pasted-in test file) to confirm `bufOpenHole`'s Carry=1
+     "buffer full" path prints its message and aborts the insert cleanly
+     rather than corrupting state.
+3. If feasible, exercise the same insert/delete/edit-line/quit sequence
+   against the RAM-fallback path (no-REU VICE config) — best-effort, same
+   caveat as Phase 1's fallback verification. **Deferred** — see
+   `task 22` (`command64.edlin` project, `+phase3 +deferred`): "EDLIN
+   Phase 3: exercise REU-absent fallback path (test section 10) against
+   no-REU VICE config."
 
 ## Phase 4 — Save/streaming (`0.1.4`)
 
@@ -745,3 +1056,92 @@ plan's Verification Plan section, run in full.
     end of the file"), confirmed working once tried that way.
   - `VERSION_STAGE` bumped to `2` (`0.1.2`) in `edlin.s`.
   - **Phase 2 is complete.**
+- 2026-07-10: Phase 3 detail written, grounded in the real `DELETE`/`NOCOM`/
+  `INSERT`/`REPLACE`/`QUIT` source (`EDLCMD1.ASM`, `EDLIN.ASM`,
+  `EDLCMD2.ASM`). Key finding while planning: the app-private ZP range
+  (`$70-$8F`) is exhausted (31/32 bytes used per `common.inc`), so Phase 3
+  breaks from Phase 1/2's "reuse transient ZP fields" pattern — new
+  hole-shift/command bookkeeping (13 bytes across `buffer.s`/`cmds.s`) goes
+  in plain `BSS` instead, since none of it needs `(zp),Y` indirect
+  addressing. Also deliberately gives Delete/Insert/edit-line their own
+  named fields rather than aggressively overloading `Line1Lo/Hi`-style
+  transients across multi-`findLine`-call command bodies, per the lesson
+  from Phase 2's one real bug (stale `Line2Given` leaking across command
+  iterations). Two new `buffer.s` primitives designed: `bufOpenHole`/
+  `bufCloseHole` (backward/forward chunked VMM-or-RAM shift, mirroring
+  `bufReadWindow`'s existing `BufIsVmm` branch pattern) and `bufWriteBytes`.
+  Insert/edit-line's blank-line-terminates-insert scope cut (already implied
+  by the original phase checklist wording) is called out explicitly as a
+  conscious tradeoff. `edlin.s`'s `commandLoop` gains a real dispatch change:
+  a blank command letter now invokes `cmdEditLine` instead of silently
+  reprompting. No implementation started.
+- 2026-07-10: Phase 3 implemented per the detail above.
+  - `buffer.s`: `bufWriteBytes`, `bufOpenHole`/`bufCloseHole`, and their
+    internal `bufReadChunkRaw`/`bufWriteChunkRaw` helpers added, matching
+    the design (chunked backward/forward shift, `BufIsVmm`-branching raw
+    read/write). One implementation simplification vs. the written plan:
+    the RAM-fallback shift path was specced as a separate unwindowed
+    byte-copy loop, but `bufReadChunkRaw`/`bufWriteChunkRaw` turned out
+    cleaner shared across both `BufIsVmm` states (RAM just stages through
+    `scanWindow` too, an extra hop but far simpler than two independent
+    shift implementations) — noted here since it's a real deviation from
+    the recorded design, not a silent one.
+  - `cmds.s`: `promptContinue` generalized to `promptYN(X/Y = message
+    pointer)`; `cmdDelete`, `cmdInsert`, `cmdEditLine`, `cmdQuit`
+    implemented per the detail above, with their new `BSS` scratch fields
+    (`DelStartLo/Hi`, `DelLineLo/Hi`, `InsLineLen`, `OldLineLenLo/Hi`,
+    `SavedOffsetLo/Hi`) and two new message strings (`msgAbortEdit`,
+    `msgBufferFull`).
+  - `edlin.s`: dispatch table extended (`D`/`I`/blank-letter/`Q`),
+    `ownLineInput` exported so `cmds.s` can call it directly.
+  - **Two long-branch assembler errors surfaced on first build** (`ca65`
+    "Range error" — a `beq`/`bne` target more than 127 bytes away), in
+    `findLine`'s RAM-fallback EOF check and `bufOpenHole`'s two buffer-full
+    ceiling checks, plus one more in `cmdInsert`'s out-of-range check —
+    all from inserting large new code blocks between an existing branch
+    and its target. Fixed by inverting each branch and following it with
+    an unconditional `jmp` (no range limit), the standard 6502 long-branch
+    idiom. Caught entirely by the assembler at build time, not a logic bug.
+  - Per this plan's "don't bump the version until VICE-verified" rule,
+    `VERSION_STAGE` was deliberately **left at `'2'`**, not bumped to `'3'`,
+    since no VICE pass has happened yet this session — `cmake --build
+    build --target test_image_d64` is clean and `edlin.prg` (15 blocks,
+    up from Phase 2's smaller size) is on `test.d64`, but that's "builds"
+    not "verified," and the plan explicitly distinguishes the two.
+  - **Phase 3 is code-complete but not yet VICE-verified.** A full testing
+    plan for this phase was written up (given directly to the user, not
+    duplicated into this doc) covering: `Insert`/`Delete`/edit-line
+    round-trips against `List` output, repeated insert/delete cycles
+    (hole-shift corruption stress), edit-line's shorter/longer-replacement
+    cases, the `bufOpenHole` "buffer full" path, `Quit`'s Y/N prompt, and
+    (best-effort) the REU-absent fallback path. Per
+    [[feedback-vice-testing]], VICE execution itself is the user's to
+    drive (or explicitly hand to the assistant) — not run automatically
+    here.
+- 2026-07-10: User-verified in VICE against `edlinfull` (Phase 3's
+  buffer-full fixture): the boundary behaves exactly as designed — small
+  inserts succeed until the 150-byte headroom is exhausted, then
+  `bufOpenHole`'s Carry=1 path prints `"ERROR: BUFFER FULL."` and aborts
+  cleanly with no corruption. `Quit`'s `"ABORT EDIT (Y/N)?"` prompt also
+  confirmed working (tests 8/9 in the testing plan).
+  - **Real bug found during that pass**: `promptYN` (`cmds.s:557`, the
+    routine generalized from Phase 2's `promptContinue` this phase) echoes
+    the typed Y/N keypress via `KernalChROUT` but never followed it with a
+    carriage return, so the next output (`*` back at the command loop, or
+    the shell prompt after a confirmed `Quit`) printed immediately after
+    the echoed letter on the same screen line instead of starting a new
+    one. Fixed by adding `lda #PetCr / jsr KernalChROUT` right after the
+    echo, before the Y/N branch, so both answers get the newline
+    unconditionally. Rebuilt clean.
+- 2026-07-10: Testing plan sections 1-9 verified in VICE (List/Page
+  interaction, Insert/Delete/edit-line round-trips, buffer-full boundary
+  via `edlinfull`, Quit's Y/N prompt, no regressions in Phase 1/2
+  behavior). Section 10 (REU-absent fallback path) explicitly deferred —
+  recorded as `task 22` (`command64.edlin` project, `+phase3 +deferred`)
+  via the `task` CLI, since the Task Warrior MCP wasn't available this
+  session — per `CLAUDE.md`'s missing-MCP rule, the user was asked and
+  directed to use the `task` CLI directly as a fallback rather than
+  blocking on MCP activation.
+  `VERSION_STAGE` bumped to `'3'` (`0.1.3`) in `edlin.s`.
+  - **Phase 3 is complete** (test section 10 deferred, tracked in
+    `task 22`, not a blocker for this phase).

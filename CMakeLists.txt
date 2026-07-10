@@ -293,12 +293,40 @@ add_custom_command(
     COMMENT "Appending SEQ test file to test.d64"
 )
 
-# Add EDLIN Phase 1 test file (4 short lines) to test.d64 — see
-# brain/plans/2026-07-09-edlin-implementation-phases.md Phase 1.
+# Add EDLIN test file (30 numbered lines, exercises List/Page pagination) to
+# test.d64 — see brain/plans/2026-07-09-edlin-implementation-phases.md
+# Phase 1/2.
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
     COMMAND "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending EDLIN test SEQ file to test.d64"
+)
+
+# Add a second, shorter EDLIN test file (10 lines, mixed short/long content)
+# to test.d64 — purpose-built for Phase 3 buffer testing: short enough for
+# quick manual insert/delete iteration without scrolling through the 30-line
+# fixture, with embedded original-position numbers (so post-delete/insert
+# renumbering is visually obvious) and a deliberately long line (04) plus
+# deliberately short ones (03/07) to exercise edit-line's shrink/grow hole
+# resize paths. See brain/plans/2026-07-09-edlin-implementation-phases.md
+# Phase 3.
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "edlintst2" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test2.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending second EDLIN test SEQ file (Phase 3 buffer testing) to test.d64"
+)
+
+# Add a third EDLIN test file, pre-filled to within 150 bytes of the 16KB
+# VMM buffer ceiling (BUF_ALLOC_BYTES, common.inc), so the "7. Buffer-full
+# path" test in Phase 3's testing plan doesn't require typing thousands of
+# characters by hand in VICE -- load this file, then a couple of small `I`
+# inserts is enough to cross the ceiling and exercise bufOpenHole's
+# Carry=1 path. See brain/plans/2026-07-09-edlin-implementation-phases.md
+# Phase 3.
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "edlinfull" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test_full.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending EDLIN buffer-full test SEQ file (Phase 3) to test.d64"
 )
 
 # 6. Release Target

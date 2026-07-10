@@ -60,6 +60,8 @@ PageRowCount     = $8C ; displayLines: rows printed since the last Continue (Y/N
 
 ; --- Buffer sizing ---
 BUF_ALLOC_PARAGRAPHS = $0400 ; 1024 paragraphs = exactly 4 VMM pages = 16KB
+BUF_ALLOC_BYTES       = $4000 ; BUF_ALLOC_PARAGRAPHS * 16 -- bufOpenHole's
+                               ; VMM-path "buffer full" ceiling (Phase 3)
 WINDOW_SIZE           = 128  ; scanWindow / file-load chunk size, bytes
 FALLBACK_BUF_SIZE     = 2048 ; base-RAM buffer size when no REU is present
 

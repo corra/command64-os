@@ -27,12 +27,17 @@
 .import bufLoadFile
 .import cmdList
 .import cmdPage
+.import cmdDelete
+.import cmdInsert
+.import cmdEditLine
+.import cmdQuit
 
 .export EditBuf
+.export ownLineInput
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '2'
+VERSION_STAGE = '3'  ; Phase 3 verified in VICE (test section 10 deferred, task 22)
 .include "build_edlin.inc"
 
 .import __MAIN_START__
@@ -155,12 +160,28 @@ clNotList:
     jsr cmdPage
     jmp commandLoop
 clNotPage:
+    cpx #'D'
+    bne clNotDelete
+    jsr cmdDelete
+    jmp commandLoop
+clNotDelete:
+    cpx #'I'
+    bne clNotInsert
+    jsr cmdInsert
+    jmp commandLoop
+clNotInsert:
     cpx #'Q'
     bne clNotQuit
-    jmp exit                 ; PLACEHOLDER: bare exit, no confirmation (Phase 3 replaces this)
+    jsr cmdQuit
+    cmp #1
+    beq exit
+    jmp commandLoop
 clNotQuit:
     cpx #0
-    beq commandLoop           ; blank line -- just reprompt
+    bne clNotBlank
+    jsr cmdEditLine           ; blank command letter -- edit-line (Phase 3)
+    jmp commandLoop
+clNotBlank:
     ldx #<msgUnknownCmd
     ldy #>msgUnknownCmd
     lda #DOS_PRINT_STR
