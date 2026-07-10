@@ -9,8 +9,8 @@ Promote all already-ported ca65 test programs from parallel
 ## Scope
 
 - Migrate the 9 tests with existing ca65 ports:
-  `apitest`, `banktest`, `color`, `devtest`, `extcls`, `filetest`,
-  `handletest`, `hello`, and `vmmtest`.
+  `api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, and
+  `vmm`.
 - Preserve `reloc` as a KickAssembler test because its purpose is to cover
   Kick/reloc.py relocation behavior and no ca65 port exists.
 - Keep public test target names and disk entries as `test_<name>`.

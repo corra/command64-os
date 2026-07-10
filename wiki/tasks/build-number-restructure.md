@@ -62,8 +62,8 @@ Staged and reviewed one at a time rather than as a single pass.
 
 ### Stage 2 — Restructure tests into per-test subdirectories — DONE (2026-07-08)
 - [x] Move each `tests/src/<name>.asm` into `tests/src/<name>/<name>.asm`
-      (all 10 tests: apitest, banktest, color, devtest, extcls, filetest,
-      handletest, hello, reloc, vmmtest).
+      (all 10 tests: api, bank, color, dev, extcls, file, handle, hello,
+      reloc, vmm).
 - [x] Create `tests/src/common/` (reserved, `.gitkeep` placeholder — no
       shared test code exists yet).
 - [x] Update `file(GLOB TEST_SRCS "tests/src/*.asm")` to

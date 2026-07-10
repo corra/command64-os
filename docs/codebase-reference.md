@@ -94,9 +94,9 @@ command64-os/
 │       ├── hello.s             Minimal "hello world" test program (ca65/ld65)
 │       ├── color.s             Colour attribute test (ca65/ld65)
 │       ├── extcls.s            External CLS test (ca65/ld65)
-│       ├── apitest.s           API function exerciser (ca65/ld65)
-│       ├── filetest.s          File open/read/write/close exerciser (ca65/ld65)
-│       ├── vmmtest.s           VMM alloc/free/read/write exerciser (ca65/ld65)
+│       ├── api.s               API function exerciser (ca65/ld65)
+│       ├── file.s              File open/read/write/close exerciser (ca65/ld65)
+│       ├── vmm.s               VMM alloc/free/read/write exerciser (ca65/ld65)
 │       └── reloc.asm           Kick-specific relocation pipeline test
 │   └── smoke/
 │       └── ca65_app_smoketest.s  Minimal add_ca65_app pipeline smoke source

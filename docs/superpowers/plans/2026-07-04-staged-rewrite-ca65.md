@@ -118,7 +118,7 @@ To prevent address drifts where KickAssembler references outdated function locat
 
 ### 3. Call-Boundary Unit Tests (Regression Testing)
 Before migrating any module (e.g., `vmm.asm`):
-*   **Safety Rule:** Run the existing automated test suite (e.g., `build_test_vmmtest`) and document the exact expected output/registers.
+*   **Safety Rule:** Run the existing automated test suite (e.g., `build_test_vmm`) and document the exact expected output/registers.
 *   **Enforcement:** After translating to `ca65`, compile and re-run the exact same test target. The test suite must pass with no functional deviations or side effects.
 
 ### 4. Zero-Page Area Segmentation & Clobber Protection

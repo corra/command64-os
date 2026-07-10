@@ -1,4 +1,4 @@
-; tests/src/sendcmdtest/sendcmdtest.s
+; tests/src/sendcmd/sendcmd.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ; Verifies DOS_SEND_COMMAND ($58): sends a harmless "8:I0" (initialize)
@@ -9,7 +9,7 @@
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_sendcmdtest.inc"
+.include "build_test_sendcmd.inc"
 
 .import __MAIN_START__
 

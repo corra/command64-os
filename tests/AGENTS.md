@@ -17,6 +17,8 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 
 - Use ca65/ld65 for tests that have `.s` ports; they build as the primary
   `test_<name>` targets through `add_ca65_app`.
+- Name test apps for the feature under test, without a redundant `test`
+  suffix; for example, use `tests/src/api/api.s` for target `test_api`.
 - Keep KickAssembler tests only when no ca65 port exists or when the test is
   explicitly covering Kick-specific behavior such as the relocation pipeline.
 - Use the compiled shell load commands or CMake-built test PRGs to run test programs.

@@ -1,14 +1,14 @@
-; tests/src/handletest/handletest.s
+; tests/src/handle/handle.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
-; ca65 port of tests/src/handletest/handletest.asm.
+; ca65 file handle allocation test.
 
 .include "command64.inc"
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_handletest.inc"
+.include "build_test_handle.inc"
 
 .import __MAIN_START__
 

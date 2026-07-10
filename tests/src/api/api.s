@@ -1,14 +1,14 @@
-; tests/src/apitest/apitest.s
+; tests/src/api/api.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
-; ca65 port of tests/src/apitest/apitest.asm.
+; ca65 API test.
 
 .include "command64.inc"
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_apitest.inc"
+.include "build_test_api.inc"
 
 .import __MAIN_START__
 

@@ -1,7 +1,7 @@
-; tests/src/devtest/devtest.s
+; tests/src/dev/dev.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
-; ca65 port of tests/src/devtest/devtest.asm.
+; ca65 device-prefix parser test.
 ;
 ; The strCaseN data strings and their #'t'/#'d'/#'m' comparison literals
 ; both went through Kick's .encoding petscii_mixed in the original, so both
@@ -15,7 +15,7 @@
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_devtest.inc"
+.include "build_test_dev.inc"
 
 .import __MAIN_START__
 

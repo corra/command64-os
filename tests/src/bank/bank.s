@@ -1,14 +1,14 @@
-; tests/src/banktest/banktest.s
+; tests/src/bank/bank.s
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
-; ca65 port of tests/src/banktest/banktest.asm.
+; ca65 RAM banking test.
 
 .include "command64.inc"
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
 VERSION_STAGE = '0'
-.include "build_test_banktest.inc"
+.include "build_test_bank.inc"
 
 .import __MAIN_START__
 

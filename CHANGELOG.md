@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- **Test target names normalized**: Renamed ca65 test apps with redundant
+  `<name>test` source names to feature-only names (`test_api`, `test_bank`,
+  `test_dev`, `test_file`, `test_handle`, `test_sendcmd`, `test_vmm`) and
+  made CMake watch test source/include globs with `CONFIGURE_DEPENDS`.
+
 ## [0.4.0] - 2026-07-09
 
 ### Added
@@ -15,7 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **ca65/ld65 toolchain adoption**: Established ca65/ld65 as the build toolchain for new external apps, alongside the existing KickAssembler-based core OS build. Added `include/ca65/` (equate-for-equate mirror of `include/command64.inc`/`vmm.inc`, plus `macros.inc` and a `screencode.inc` PETSCII/screencode charmap toggle mirroring Kick's `.encoding` idiom), `cmake/FindCa65.cmake`, and `cmake/Ca65.cmake`'s production `add_ca65_app` function — versioned via a persistent `BUILD_<NAME>` counter, hash-gated build-number bumps through `cmake/IncrementBuildNumber.cmake`'s new `ASM_DIALECT` parameter, templated per-app `.cfg` generation, and the same base/next-page relocation build (`tools/reloc.py`) every other app-defining CMake function uses. See `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` for the full phased plan.
 - **conway/label migrated to ca65/ld65**: Replaced the KickAssembler-built `conway.prg`/`label.prg` with ca65/ld65 builds (`src/external/conway/conway_main.s`+`conway_grid.s`, `src/external/label/label.s`), verified functionally identical (matching relocation-table byte counts against the pre-migration reference, VICE-tested) and continuing each app's existing `BUILD_CONWAY`/`BUILD_LABEL` build-number sequence.
 - **DEBUG migrated to ca65/ld65**: Replaced the KickAssembler-built `debug.prg` with `src/external/debug/debug.s` built through `add_ca65_app`, after proving a temporary `debug_ca65` target byte-for-byte identical to the previous Kick output. The shipping target name and disk entry remain `debug.prg`; build 1100 is the first ca65/ld65 DEBUG build.
-- **ca65 test suite migrated**: Promoted the 9 ca65-ported test programs (`apitest`/`banktest`/`color`/`devtest`/`extcls`/`filetest`/`handletest`/`hello`/`vmmtest`) to the primary `test_<name>` targets in `tests/src/<name>/`. Retired the duplicate Kick sources and `test_ca65_<name>` targets; `reloc` remains KickAssembler-based because it specifically exercises the Kick/reloc.py relocation path.
+- **ca65 test suite migrated**: Promoted the 9 ca65-ported test programs (`api`/`bank`/`color`/`dev`/`extcls`/`file`/`handle`/`hello`/`vmm`) to the primary `test_<name>` targets in `tests/src/<name>/`. Retired the duplicate Kick sources and `test_ca65_<name>` targets; `reloc` remains KickAssembler-based because it specifically exercises the Kick/reloc.py relocation path.
 - **Migrated app versions bumped to 0.4.0**: Updated the ca65-migrated `debug.prg` and `label.prg` version banners to match the 0.4.0 minor release (`DEBUG v0.4.0.1101`, `LABEL v0.4.0.1034`) and added a `CONWAY v0.4.0.1042` exit banner before `conway.prg` returns to the shell.
 
 ### Fixed
