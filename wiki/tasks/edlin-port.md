@@ -33,8 +33,8 @@ live in `brain/plans/2026-07-09-edlin-port-feasibility.md` and
       VICE, one — a stale-flag bug only a *sequence* of commands could
       surface — during live testing). Detail/fixes:
       `brain/plans/2026-07-09-edlin-implementation-phases.md`.
-- [ ] Phase 3 — Edit commands (`0.1.3`): edit-line, Insert, Delete, Quit.
-- [ ] Phase 4 — Save/streaming (`0.1.4`): Write, Append, exit-drain save.
+- [x] Phase 3 — Edit commands (`0.1.3`): edit-line, Insert, Delete, Quit.
+- [x] Phase 4 — Save/streaming (`0.1.4`): Write, Append, exit-drain save.
 - [ ] Phase 5 — Search/Replace (`0.1.5`): simplified, no quote-char escaping.
 - [ ] Phase 6 — Hardening/tests/docs (`0.1.6`): `tests/src/edlin/`, REU-absent
       fallback test, `docs/apps/edlin.md`, CHANGELOG entry.

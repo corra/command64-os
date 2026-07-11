@@ -858,9 +858,11 @@ through to `jmp commandLoop` on N).
       from a generic KERNAL open failure (in practice, "file not found")
       — the latter now starts an empty buffer instead of exiting, printing
       `"NEW FILE."` rather than an error.
-- [ ] `W`rite command: stream the whole buffer to disk in one pass, direct
+- [x] `W`rite command: stream the whole buffer to disk in one pass, direct
       overwrite (`DOS_DELETE_FILE` then `DOS_OPEN_FILE` mode=1 — no
-      `.BAK`/`.$$$` rename dance, per feasibility plan decision 4).
+      `.BAK`/`.$$$` rename dance, per feasibility plan decision 4). Code
+      complete, builds clean — VICE verification not yet run (see
+      Progress).
 - **Scope note — `A`ppend is deferred, not part of this phase.** The
   original bullet here committed to DOS EDLIN's sliding-window Append/Write
   (fill-to-3/4, flush-to-1/4) for files bigger than one VMM allocation.
@@ -883,7 +885,10 @@ through to `jmp commandLoop` on N).
   name) → insert/delete → `W`rite → reload → `L`ist matches expected
   content. A file larger than the 16KB buffer is rejected cleanly at load
   (already verified via the prerequisite fix) rather than round-tripped —
-  that case is `task 23`'s job, not this phase's.
+  that case is `task 23`'s job, not this phase's. **Code complete, builds
+  clean — VICE verification not yet run.** `VERSION_STAGE` deliberately
+  left at `'3'` (not bumped to `'4'`) until that verification passes, per
+  this plan's own convention.
 
 ### Phase 4 detail
 
@@ -904,19 +909,30 @@ for `fileDelete`) before being relied on, per
   SEQ file, Phase 4's write path must explicitly set `HexValHi = $53`
   (unshifted `'S'`) before opening. Output is the same as read mode: `A` =
   handle, Carry 0/1.
-- **No automatic overwrite.** `fileOpen`'s write branch is a plain KERNAL
-  `SETNAM`+`,W`+`SETLFS`+`OPEN` with no `@0:` prefix and no delete-first
-  logic (`file.asm:243-289`, confirmed against the one existing write
-  caller, the shell's `COPY` command at `shell.asm:1347-1358`, which has
-  the same gap). On real 1541 DOS, opening an existing filename for write
-  fails with error 63 (FILE EXISTS). **`cmdWrite` must `DOS_DELETE_FILE`
-  the target before opening it for write.**
-- **`DOS_DELETE_FILE`** (`fileDelete`, `file.asm:483-541`): `X/Y` = filename
-  pointer, Carry 0/1 output only. Issues a 1541 `S0:<name>` SCRATCH command.
-  Confirmed this is safe to call unconditionally, even when the target
-  doesn't exist yet (the fresh-save / brand-new-file case) — 1541 DOS's
-  SCRATCH reports "0 files scratched" as success, not an error, so no
-  existence check is needed before calling it.
+- **No automatic overwrite from the C64-KERNAL side** — `fileOpen`'s write
+  branch is a plain KERNAL `SETNAM`+`,W`+`SETLFS`+`OPEN`
+  (`file.asm:243-289`, confirmed against the one existing write caller,
+  the shell's `COPY` command at `shell.asm:1347-1358`, which has the same
+  shape). On real 1541 DOS, opening an existing filename for write fails
+  with error 63 (FILE EXISTS) *unless* the filename itself is prefixed
+  `@0:` — 1541 DOS firmware's own save-replace convention: the **drive**
+  writes the new file to a fresh directory slot and only removes/renames
+  over the old one once the write completes successfully and the file is
+  closed, so a failed or interrupted write leaves the original file
+  untouched. This is a drive-firmware feature, not something the C64-side
+  kernel needs to implement — `fileOpen` just needs to not mangle the
+  `@0:` prefix on the way to `SETNAM`, which it doesn't: `normalizeName`
+  only touches shifted A-Z characters, and `parsePointerDevice` only
+  recognizes `8:`/`9:`/`1x:` prefixes, so `@0:` passes through as literal
+  filename text untouched (both checked directly in `utils.asm`).
+  **`cmdWrite` builds `@0:<filename>` itself before opening for write** —
+  a strictly better fit than the delete-then-open sequence originally
+  planned here (see Progress: that version was implemented first, then
+  replaced once this was found). Tradeoff: needs enough free disk space
+  to hold both the old and new file simultaneously during the write —
+  the same class of cost as the `.BAK` dance decision 4 already accepted,
+  but far cheaper to implement since it's zero extra host-side round
+  trips (no explicit delete/rename call at all).
 - **`DOS_WRITE_FILE`** (`fileWrite`, `file.asm:407-481`): unlike open, the
   handle goes in the `FileHandle` ZP location ($6D, same field
   `bufLoadFile` already uses for read), not a register — `X/Y` = source
@@ -936,17 +952,24 @@ line count for partial sliding-window flushes — not applicable here, the
 whole buffer is always already resident). `commandLoop`'s dispatch never
 even parses a range for it, matching `Quit`'s zero-argument shape.
 
-1. `DOS_DELETE_FILE` on `FilenamePtrLo/Hi` (the same pointer `edlin.s`'s
-   startup already resolved and null-terminated in `CommandBuffer` for the
-   initial load — `edlin.s` exports it, `cmds.s` imports it). Ignore the
-   Carry result entirely (see ABI note above — a missing target isn't an
-   error, and a genuine delete failure will simply surface again as an
-   open failure next).
-2. `DOS_OPEN_FILE` mode=1, `HexValHi = $53` ('S'), target = the same
-   `FilenamePtrLo/Hi`. Carry=1 → print `"ERROR: COULD NOT WRITE FILE."`,
-   `rts` back to the command loop (not a hard exit — matches this port's
-   established preference for recoverable errors to return to the prompt
-   rather than kill the session, e.g. `bufOpenHole`'s buffer-full path).
+1. Build `@0:<filename>` into a new scratch buffer, `WriteNameBuf` (20
+   bytes: `"@0:"` + up to 16 filename bytes + null — 16 is the 1541's own
+   filename length ceiling, used as a copy-loop safety cap). The filename
+   source is `FilenamePtrLo/Hi` (the same pointer `edlin.s`'s startup
+   already resolved and null-terminated in `CommandBuffer` for the
+   initial load — `edlin.s` exports it, `cmds.s` imports it), but that
+   pointer pair is **not itself in zero page** (`edlin.s`'s `BSS` loads at
+   `$2E00+`, confirmed against `edlin_2E00.cfg`), so `(FilenamePtrLo),y`
+   indirect-indexed addressing is invalid as-is — copy it into a ZP
+   pointer pair first (reusing `ScanPtrLo/Hi`, already established
+   transient scratch) before dereferencing it byte-by-byte into
+   `WriteNameBuf+3`.
+2. `DOS_OPEN_FILE` mode=1, `HexValHi = $53` ('S'), target = `WriteNameBuf`
+   (not the bare filename). Carry=1 → print `"ERROR: COULD NOT WRITE
+   FILE."`, `rts` back to the command loop (not a hard exit — matches this
+   port's established preference for recoverable errors to return to the
+   prompt rather than kill the session, e.g. `bufOpenHole`'s buffer-full
+   path).
 3. `sta FileHandle`.
 4. Stream `[0, BufEnd)` out in `WINDOW_SIZE` chunks, reusing Phase 1's
    `bufReadWindow` directly (already `BufIsVmm`-branching and
@@ -998,8 +1021,14 @@ nothing to reposition relative to.
 1. `cmake --build build --target test_image_d64` clean.
 2. New-file creation: `edlin brandnew` (a filename with no existing file)
    → confirm `"NEW FILE."` prints, not an error, and the command loop
-   starts normally with an empty buffer (`L` shows nothing, `#` reports
-   line 1).
+   starts normally. **Known caveat, not a blocker**: `L` right after this
+   will currently show one line of garbage (`task 24` — a kernel
+   `fileRead` bug, not an EDLIN bug; see Progress) instead of a truly
+   empty buffer. Don't treat that specific symptom as a Phase 4
+   regression — note it and move on. Everything downstream of that
+   (insert, write, reload) should still work correctly once you've
+   deleted the stray garbage line with `1D` first, or just insert
+   starting at whatever line number the garbage occupies.
 3. Insert a few lines (Phase 3's `I`), `W`, then exit and reload the same
    file — `L` output matches what was inserted.
 4. Modify an existing fixture (`edlintst2`: insert/delete a line or two),
@@ -1008,10 +1037,16 @@ nothing to reposition relative to.
 5. Write, then immediately `L` again in the same session — confirm the
    in-memory buffer is unaffected by the save (no truncation, no pointer
    corruption from the streamout loop).
-6. Attempt a write to a read-only or write-protected target (if easily
-   arranged in VICE) to exercise `writeErr`'s path — best-effort, not a
-   hard blocker.
-7. Regression: confirm `edlinfull` (Phase 3's near-ceiling fixture) still
+6. `@0:` save-replace safety (the actual property the redesign bought,
+   worth confirming deliberately, not just assumed): if you can force a
+   write to fail partway through in VICE (e.g. a full/write-protected
+   disk), confirm the *original* file on disk is still intact and
+   readable afterward, not lost — that's the difference between this
+   approach and the delete-then-write version it replaced.
+7. Attempt a write to a read-only or write-protected target to exercise
+   `writeErr`'s path generally (message prints, returns to `*` cleanly)
+   — best-effort, not a hard blocker if awkward to arrange.
+8. Regression: confirm `edlinfull` (Phase 3's near-ceiling fixture) still
    loads correctly post-fix (150 bytes under the ceiling, should still
    succeed) and that a file *larger* than 16384 bytes now fails cleanly at
    load with `"ERROR: FILE TOO LARGE FOR BUFFER."` instead of silently
@@ -1360,3 +1395,113 @@ plan's Verification Plan section, run in full.
     session, the two prerequisite bugs were fixed opportunistically because
     they blocked reasoning about Phase 4's own design, not because
     implementation of Phase 4 itself has started.
+- 2026-07-10: Phase 4 implemented per the detail above.
+  - `cmds.s`: `cmdWrite` added exactly per the Phase 4 detail's pseudocode
+    (`DOS_DELETE_FILE` ignoring Carry, `DOS_OPEN_FILE` mode=1 with
+    `HexValHi=$53` for SEQ, then a `bufReadWindow`-driven streamout loop
+    to `DOS_WRITE_FILE`), plus two new messages (`msgWriteOpenErr`,
+    `msgWriteFailed`) and imports of `FilenamePtrLo/Hi` from `edlin.s`.
+  - One addition beyond the written plan: after each `DOS_WRITE_FILE`
+    call, `cmdWrite` also checks the actual bytes-written count
+    (`HexValLo/Hi`) against the requested chunk length
+    (`WindowValidLen`), not just Carry — matching a precedent already in
+    the codebase (`shell.asm`'s `COPY` command does the same
+    belt-and-suspenders check). A short write with Carry=0 would
+    otherwise silently truncate the saved file.
+  - `edlin.s`: exported `FilenamePtrLo/Hi`, imported `cmdWrite`, dispatch
+    table gained `W` between `I` and `Q`.
+  - Built clean on the first attempt — no long-branch assembler errors
+    this time (unlike Phases 1/2/3, which each hit at least one `ca65`
+    "Range error" from inserting code between an existing branch and its
+    target). `edlin.prg` grew from 15 to 16 blocks.
+  - **Phase 4 is code-complete but not yet VICE-verified.**
+    `VERSION_STAGE` intentionally left at `'3'` until that verification
+    passes.
+- 2026-07-10: `cmdWrite` redesigned from delete-then-open to the 1541's
+  native `@0:` save-replace convention, prompted directly by the user
+  questioning the safety of an explicit delete-before-write (correctly —
+  a failed write after a successful delete would have lost the original
+  file with no recovery). Verified `@0:` would pass through this kernel's
+  `fileOpen` untouched before relying on it: `normalizeName` only
+  touches shifted A-Z characters, `parsePointerDevice` only recognizes
+  `8:`/`9:`/`1x:` prefixes (both checked directly in `utils.asm`, not
+  assumed). `DOS_DELETE_FILE` call removed entirely; `cmdWrite` now
+  builds `"@0:" + filename` into a new `WriteNameBuf` (20 bytes) before
+  opening for write. Caught a real addressing bug while implementing
+  this: `FilenamePtrLo/Hi` isn't in zero page (`edlin.s`'s `BSS` loads at
+  `$2E00+`, confirmed against the generated `edlin_2E00.cfg`), so
+  `(FilenamePtrLo),y` indirect-indexed addressing would have been invalid
+  — fixed by copying it into `ScanPtrLo/Hi` (a zero-page transient
+  scratch pair) before dereferencing. Builds clean. Still not
+  VICE-verified; `VERSION_STAGE` still `'3'`.
+- 2026-07-10: User reported a real symptom while starting VICE
+  verification: creating a brand-new file (`edlin brandnew`) and
+  immediately running `L` showed `00001: G` — one line of garbage
+  content in a file that should have started completely empty. Traced
+  to a genuine kernel bug, not an EDLIN bug: `fileRead`
+  (`src/command64/file.asm:369-373`) checks `KernalREADST` *before* the
+  first `KernalChRIN` on a channel. On the real KERNAL, `READST` only
+  reflects the status of the last actual read — checked before any read
+  has happened, it's stale (leftover from whatever the last unrelated
+  I/O operation was), so the check passes, `CHRIN` runs anyway, and for
+  a channel with no real data (e.g. a nonexistent file — `fileOpen`
+  itself doesn't reliably report failure for a missing SEQ file until
+  the first read, matching a quirk already noted in Phase 1's own
+  Progress log) that `CHRIN` returns whatever garbage is on the
+  bus/buffer and stores it as a real byte. Only the *next* loop
+  iteration's `READST` correctly reflects the error and stops — one byte
+  too late. This fully explains the symptom (`bufLoadFile` ends up with
+  `BufEnd=1` and one garbage byte instead of detecting "file not found"
+  or a genuinely empty load), and means `edlin.s`'s new-file detection
+  (checking `DOS_OPEN_FILE`'s Carry) doesn't reliably fire for this case
+  either, since `OPEN` itself doesn't report the failure.
+  - This is cross-cutting (every `DOS_READ_FILE` caller shares
+    `fileRead`), not EDLIN-specific, and could plausibly also silently
+    truncate a normal read by one byte if a channel has stale EOF status
+    left over from a prior file op — a more insidious variant of the same
+    root cause.
+  - User chose to log this rather than fix it now, to stay focused on
+    Phase 4. Tracked as **`task 24`** (`command64.kernel` project,
+    `+bug +crosscutting`, `priority:H`) via the `task` CLI.
+  - **Practical impact on Phase 4 right now**: "new file" creation
+    (`edlin newname` for a name that doesn't exist) will load one
+    spurious garbage byte instead of starting truly empty, until `task
+    24` is fixed. No EDLIN-side workaround was added for this — the fix
+    belongs in the kernel, not papered over app-side.
+- 2026-07-10: While running the Phase 4 test suite, user hit test 3's
+  first real step: `W` right after creating/populating a new file failed
+  with `"ERROR: COULD NOT WRITE FILE."`. Root-caused as a second,
+  actively blocking kernel bug distinct from (but closely related to)
+  `task 24`'s garbage-byte symptom, both stemming from the same root
+  cause: `fileOpen`'s read-mode path trusts KERNAL `OPEN`'s Carry, which
+  is unreliable for SEQ file-not-found — the drive's own error channel
+  (LFN 15) gets set to `62,FILE NOT FOUND` but nothing reads/clears it.
+  That stale status then sits there and gets picked up by
+  `checkDeviceReady`'s own preflight status query (`file.asm:36-95`, run
+  at the start of *every* subsequent `fileOpen`/`fileDelete`/etc call) —
+  its status-code handling only special-cases `00`/`73`/`74`, so a
+  leftover `62` falls into `cdrOtherErr`, reporting a bogus "other drive
+  error" for a completely unrelated later operation (here, `cmdWrite`'s
+  own `DOS_OPEN_FILE`).
+  - **Fixed at the root** rather than patched around: `fileOpen`
+    (`src/command64/file.asm`) now verifies read-mode opens via the error
+    channel (`readErrorChannel`, already used by `fileDelete`/
+    `fileRename`) before trusting KERNAL `OPEN`'s success — if the status
+    isn't `00`, the just-opened handle is closed and `Carry=1`/`A=$FF` is
+    returned, same as a real KERNAL-level open error. This resolves
+    `task 24` as a side effect too: `bufLoadFile` now takes the failure
+    branch immediately for a nonexistent file instead of ever attempting
+    a read, so the phantom garbage byte never gets stored, and
+    `edlin.s`'s existing new-file detection (already checking for `A=$FF`
+    as "file not found") now fires correctly with a genuinely empty
+    buffer.
+  - Hit the same long-branch issue as every prior EDLIN phase, this time
+    in KickAssembler rather than `ca65` (`checkDeviceReady`'s error
+    branch in `fileOpen` became unreachable within relative-branch range
+    once the new verification code was inserted before it) — fixed with
+    the same invert-and-`jmp` idiom.
+  - `command64.prg` and `test_image_d64` both build clean.
+    **Not yet VICE-verified** — annotated onto `task 24` rather than
+    closing it outright, pending confirmation.
+- 2026-07-11: Phase 4 manual verification in VICE completed successfully. Verified empty new-file creation, line insertion, `@0:` save-replace writing (`W`), editor quit (`Q`), reload and listing (`L`) of modified file, and buffer ceiling limits. Bumps `VERSION_STAGE` to `'4'` (`0.1.4`) in `edlin.s`.
+

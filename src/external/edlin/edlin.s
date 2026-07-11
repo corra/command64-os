@@ -31,13 +31,16 @@
 .import cmdInsert
 .import cmdEditLine
 .import cmdQuit
+.import cmdWrite
 
 .export EditBuf
 .export ownLineInput
+.export FilenamePtrLo
+.export FilenamePtrHi
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '3'  ; Phase 3 verified in VICE (test section 10 deferred, task 22)
+VERSION_STAGE = '4'  ; Phase 4 verified in VICE
 .include "build_edlin.inc"
 
 .import __MAIN_START__
@@ -197,6 +200,11 @@ clNotDelete:
     jsr cmdInsert
     jmp commandLoop
 clNotInsert:
+    cpx #'W'
+    bne clNotWrite
+    jsr cmdWrite
+    jmp commandLoop
+clNotWrite:
     cpx #'Q'
     bne clNotQuit
     jsr cmdQuit

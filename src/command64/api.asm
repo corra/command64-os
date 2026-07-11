@@ -107,6 +107,12 @@ ahRead:
     // Input: FileHandle (ZP $6D) = Handle
     //        X/Y = Destination buffer pointer
     //        HexValLo/Hi = Byte count
+    // Save HexValLo/Hi before KERNAL calls inside fileRead clobber it
+    lda HexValLo
+    sta FileLenLo
+    lda HexValHi
+    sta FileLenHi
+
     lda FileHandle
     jsr fileRead
     rts
@@ -115,6 +121,12 @@ ahWrite:
     // Input: FileHandle (ZP $6D) = Handle
     //        X/Y = Source buffer pointer
     //        HexValLo/Hi = Byte count
+    // Save HexValLo/Hi before KERNAL calls inside fileWrite clobber it
+    lda HexValLo
+    sta FileLenLo
+    lda HexValHi
+    sta FileLenHi
+
     lda FileHandle
     jsr fileWrite
     rts

@@ -22,6 +22,8 @@
 .import HoleSizeHi
 .import EditBuf
 .import ownLineInput
+.import FilenamePtrLo
+.import FilenamePtrHi
 
 .export cmdList
 .export cmdPage
@@ -29,6 +31,7 @@
 .export cmdInsert
 .export cmdEditLine
 .export cmdQuit
+.export cmdWrite
 .export printDec16
 
 .segment "CODE"
@@ -988,6 +991,219 @@ cmdQuit:
     jsr promptYN
     rts
 
+; ---------------------------------------------------------------------------
+; cmdWrite — "W" command. Takes no arguments (unlike DOS's EWRITE/WRT,
+; which accept an optional line count for a partial sliding-window flush
+; -- not applicable here, the whole buffer is always already resident;
+; see Phase 4 detail in the phases plan for why real Append/streaming is
+; deferred rather than built here). Streams [0, BufEnd) to the same
+; filename the buffer was loaded from, overwriting it via 1541 DOS's
+; native "@0:" save-replace convention (see Phase 4 detail) rather than
+; an explicit DOS_DELETE_FILE + open: the drive writes the new file to a
+; fresh directory slot and only removes/renames over the old one once the
+; write completes successfully, so a failed or interrupted write leaves
+; the original file intact. Costs temporary double disk space during the
+; write, same tradeoff as any replace-save.
+; ---------------------------------------------------------------------------
+cmdWrite:
+    ; First, check if the file exists by trying to open it for reading.
+    ; We need the bare filename (as-is, including any device prefix).
+    lda #0
+    sta HexValLo             ; mode = 0 (read)
+    ldx FilenamePtrLo
+    ldy FilenamePtrHi
+    lda #DOS_OPEN_FILE
+    jsr OS_API
+    bcs cwFileNotExist
+    
+    ; File exists! Close it.
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    lda #1
+    sta WriteExistsFlag
+    jmp cwStartBuild
+    
+cwFileNotExist:
+    lda #0
+    sta WriteExistsFlag
+
+cwStartBuild:
+    lda FilenamePtrLo
+    sta ScanPtrLo
+    lda FilenamePtrHi
+    sta ScanPtrHi
+
+    ; Parse device prefix from ScanPtr to separate it
+    ldy #0
+    lda (ScanPtrLo), y
+    cmp #'1'
+    bne cwNotDoubleDigit
+    
+    ; Check for 10: or 11:
+    iny
+    lda (ScanPtrLo), y
+    cmp #'0'
+    beq cwMaybeDoubleDigit
+    cmp #'1'
+    beq cwMaybeDoubleDigit
+    jmp cwNoPrefixLoc
+    
+cwMaybeDoubleDigit:
+    iny
+    lda (ScanPtrLo), y
+    cmp #':'
+    beq cwDoubleDigitLoc
+    jmp cwNoPrefixLoc
+
+cwNotDoubleDigit:
+    cmp #'8'
+    beq cwMaybeSingleDigit
+    cmp #'9'
+    beq cwMaybeSingleDigit
+    jmp cwNoPrefixLoc
+
+cwMaybeSingleDigit:
+    iny
+    lda (ScanPtrLo), y
+    cmp #':'
+    beq cwSingleDigitLoc
+    jmp cwNoPrefixLoc
+
+cwDoubleDigitLoc:
+    ; Double digit prefix (3 bytes: e.g. "10:")
+    ldy #0
+    lda (ScanPtrLo), y
+    sta WriteNameBuf
+    iny
+    lda (ScanPtrLo), y
+    sta WriteNameBuf+1
+    iny
+    lda (ScanPtrLo), y
+    sta WriteNameBuf+2
+    ldx #3                   ; X = write index
+    ldy #3                   ; Y = read index
+    jmp cwCopyMiddle
+
+cwSingleDigitLoc:
+    ; Single digit prefix (2 bytes: e.g. "8:")
+    ldy #0
+    lda (ScanPtrLo), y
+    sta WriteNameBuf
+    iny
+    lda (ScanPtrLo), y
+    sta WriteNameBuf+1
+    ldx #2                   ; X = write index
+    ldy #2                   ; Y = read index
+    jmp cwCopyMiddle
+
+cwNoPrefixLoc:
+    ldx #0                   ; X = write index
+    ldy #0                   ; Y = read index
+
+cwCopyMiddle:
+    ; Now, if the file exists, insert "@0:"
+    lda WriteExistsFlag
+    beq cwCopyRest
+    
+    lda #'@'
+    sta WriteNameBuf, x
+    inx
+    lda #'0'
+    sta WriteNameBuf, x
+    inx
+    lda #':'
+    sta WriteNameBuf, x
+    inx
+
+cwCopyRest:
+    ; Copy the rest of the name from Y to X
+    lda (ScanPtrLo), y
+    sta WriteNameBuf, x
+    beq cwBuildDone
+    iny
+    inx
+    cpx #23                  ; safety cap (WriteNameBuf is 24 bytes)
+    bne cwCopyRest
+    lda #0
+    sta WriteNameBuf, x      ; force terminate
+cwBuildDone:
+
+    lda #1
+    sta HexValLo             ; mode = 1 (write)
+    lda #$53
+    sta HexValHi              ; file type = 'S' (SEQ), unshifted
+    ldx #<WriteNameBuf
+    ldy #>WriteNameBuf
+    lda #DOS_OPEN_FILE
+    jsr OS_API
+    bcc cwOpened
+    ldx #<msgWriteOpenErr
+    ldy #>msgWriteOpenErr
+    lda #DOS_PRINT_STR
+    jsr OS_API
+    rts
+
+cwOpened:
+    sta FileHandle
+
+    lda #0
+    sta WindowBaseOffLo
+    sta WindowBaseOffHi
+cwLoop:
+    lda WindowBaseOffHi
+    cmp BufEndHi
+    bcc cwHaveMore
+    bne cwDone
+    lda WindowBaseOffLo
+    cmp BufEndLo
+    bcs cwDone
+cwHaveMore:
+    jsr bufReadWindow         ; fills scanWindow, sets WindowValidLen
+    lda WindowValidLen
+    bne cwHaveChunk
+    jmp cwDone                ; defensive -- loop guard above should prevent this
+cwHaveChunk:
+    lda WindowValidLen
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    ldx #<scanWindow
+    ldy #>scanWindow
+    lda #DOS_WRITE_FILE
+    jsr OS_API
+    bcs cwWriteErr
+    lda HexValHi
+    bne cwWriteErr           ; wrote >=256 bytes for a <=128-byte chunk?!
+    lda HexValLo
+    cmp WindowValidLen
+    bne cwWriteErr            ; short write (e.g. disk full) -- treat as failure,
+                               ; matching shell.asm's COPY loop precedent of
+                               ; checking the actual count, not just Carry
+
+    lda WindowBaseOffLo
+    clc
+    adc WindowValidLen
+    sta WindowBaseOffLo
+    lda WindowBaseOffHi
+    adc #0
+    sta WindowBaseOffHi
+    jmp cwLoop
+
+cwDone:
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    rts
+
+cwWriteErr:
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    ldx #<msgWriteFailed
+    ldy #>msgWriteFailed
+    lda #DOS_PRINT_STR
+    jsr OS_API
+    rts
+
 .segment "RODATA"
 
 placeValues:
@@ -1008,6 +1224,18 @@ msgBufferFull:
     .byte $45, $52, $52, $4F, $52, $3A, $20, $42, $55, $46, $46, $45, $52
     .byte $20, $46, $55, $4C, $4C, $2E, $0D, $00
 
+; "ERROR: COULD NOT WRITE FILE."
+msgWriteOpenErr:
+    .byte $45, $52, $52, $4F, $52, $3A, $20, $43, $4F, $55, $4C, $44, $20
+    .byte $4E, $4F, $54, $20, $57, $52, $49, $54, $45, $20, $46, $49, $4C
+    .byte $45, $2E, $0D, $00
+
+; "ERROR: WRITE FAILED - DISK FULL?"
+msgWriteFailed:
+    .byte $45, $52, $52, $4F, $52, $3A, $20, $57, $52, $49, $54, $45, $20
+    .byte $46, $41, $49, $4C, $45, $44, $20, $2D, $20, $44, $49, $53, $4B
+    .byte $20, $46, $55, $4C, $4C, $3F, $0D, $00
+
 .segment "BSS"
 Line2ValLo:    .res 1
 Line2ValHi:    .res 1
@@ -1020,3 +1248,5 @@ OldLineLenLo:  .res 1
 OldLineLenHi:  .res 1
 SavedOffsetLo: .res 1
 SavedOffsetHi: .res 1
+WriteExistsFlag: .res 1
+WriteNameBuf:  .res 24  ; prefix (<=3) + "@0:" (3) + filename (<=16) + null
