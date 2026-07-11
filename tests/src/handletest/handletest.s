@@ -37,6 +37,8 @@ open_loop:
     jsr get_filename_ptr
     lda #1
     sta HexValLo
+    lda #'P'                ; type='P' (PRG)
+    sta HexValHi
     lda #DOS_OPEN_FILE
     jsr OS_API
     bcs open_err
@@ -54,6 +56,8 @@ open_loop:
     ldy #>fname8
     lda #1
     sta HexValLo
+    lda #'P'                ; type='P' (PRG)
+    sta HexValHi
     lda #DOS_OPEN_FILE
     jsr OS_API
     bcc limit_failed
