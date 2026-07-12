@@ -35,6 +35,7 @@ KernalSAVE      = $FFD8 ; Save memory range to file
 KernalOPEN      = $FFC0 ; Open a logical file
 KernalCLOSE     = $FFC3 ; Close a logical file
 KernalREADST    = $FFB7 ; Read status byte
+KernalStatus    = $90   ; KERNAL I/O status byte
 KernalCHKIN     = $FFC6 ; Set input channel
 KernalCHKOUT    = $FFC9 ; Set output channel
 KernalCLRCHN    = $FFCC ; Clear I/O channels
