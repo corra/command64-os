@@ -114,3 +114,9 @@ vi (if ever attempted) reuses the line-input/paging plumbing this produces.
 
 - 2026-07-09: EDLIN source reviewed in full; COMMAND64OS external-app/file/VMM
   APIs reviewed; this feasibility plan drafted. No implementation started.
+
+- 2026-07-11: EDLIN Functional complete *not* Feature Complete.
+  TODO: *Save Mechanics*, Create back-up file for write faliure/crash protection
+  TODO: *Search and Replace*, Limited search and replace on the road-map
+  BUGS: *Case sensitivity*, Commands are currently case sensitive which is a
+        significant non-blocking UX flaw.
