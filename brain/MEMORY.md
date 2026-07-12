@@ -66,7 +66,7 @@
 - `aptFind` calling convention: carry clear = name mode (`NamePtrLo/Hi`, `SrcHandle`); carry set = address mode (`HexValLo/Hi`). Returns X = slot index, `HandlerVecLo/Hi` = LoadAddr on found.
 - Phases B and C extend `apptable.asm` without changing the API surface.
 
-## Memory Map (current — as of Build 2574)
+## Memory Map (current — as of Build 2619)
 
 | Region | Purpose |
 | -------- | --------- |
@@ -80,17 +80,17 @@
 | `$03A2-$03C9` | SourceBuf (40 bytes, COPY command) |
 | `$03CA-$03F1` | DestBuf (40 bytes, COPY command) |
 | `$0801` | BASIC SYS launcher (Main segment) |
-| `$0820-$0FC3` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
+| `$0820-$0FEC` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1003-$1018` | Petsci (petPrintString) |
 | `$1019-$10E0` | CommandTable (8-byte fixed-width entries) |
-| `$10E1-$1EB4` | CommandShell (main loop, dispatcher, built-ins) |
+| `$10E1-$1F1E` | CommandShell (main loop, dispatcher, built-ins) |
 | `$1FA0-$1FFF` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
 | `$03F4-$03FB` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi, AptCandEndLo/Hi) |
-| `$2000-$242B` | AppTable segment (apptable.asm) |
-| `$242C-$2A52` | ShellExt segment (version, help, dir size routines, and shifted messages) |
-| `$2C00+` | UserProgStart (External commands loaded here — shifted from $2600 to accommodate ShellExt segment growth to $2A52) |
+| `$2000-$2494` | AppTable segment (apptable.asm) |
+| `$2495-$2CE3` | ShellExt segment (version, help, dir size routines, and shifted messages) |
+| `$2E00+` | UserProgStart (External commands loaded here — shifted from $2C00 to accommodate ShellExt segment growth) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
 | `$30-$4F` | Zero-page: VI Pointers and State (External Utility) |

@@ -987,7 +987,9 @@ cmdType:
     ldy ParsePos
     jsr shellSkipSpaces
     lda CommandBuffer, y
-    beq ctNoArgs
+    bne ctHaveArgs
+    jmp ctNoArgs
+ctHaveArgs:
     
     // Extract filename (token until space or null)
     sty TempLo              // Start index
@@ -1041,7 +1043,25 @@ ctReadLoop:
     ldy #0
 ctPrintLoop:
     lda CommandBuffer, y
+    cmp #PetLl
+    beq ctPrintLf
+    tya
+    pha
+    lda CommandBuffer, y
     jsr KernalChROUT
+    pla
+    tay
+    jmp ctPrintNext
+ctPrintLf:
+    tya
+    pha
+    lda #PetCr
+    jsr KernalChROUT
+    lda #PetLl
+    jsr KernalChROUT
+    pla
+    tay
+ctPrintNext:
     iny
     cpy HexValLo
     bne ctPrintLoop
@@ -3114,4 +3134,3 @@ dirSizeLo:   .byte 0
 dirSizeMid:  .byte 0
 dirSizeHi:   .byte 0
 dirLeadZero: .byte 0
-

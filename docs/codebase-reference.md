@@ -182,16 +182,16 @@ This is the compiled segment layout for `command64.prg` plus the surrounding RAM
 ```
 Address     Segment / Region         Contents
 ─────────── ──────────────────────── ─────────────────────────────────────────────
-$0801       Main                     BASIC SYS $1130 launcher (BasicUpstart2)
-$0820       Utils                    parseHex, normalizeName, printDecimal16,
+$0801-$080C Main                     BASIC SYS launcher (BasicUpstart2)
+$0820-$09B5 Utils                    parseHex, normalizeName, printDecimal16,
                                      parsePointerDevice, hexDigitToVal
-$09C0       Api                      apiHandler (INT 21h dispatcher)
-$0A50       Loader                   shellLoadPrg
-$0AA0       Path                     findFile, checkExistence
-$0B30       Vmm                      vmmInit, vmmAlloc, vmmFree,
+$09B6-$0A78 Api                      apiHandler (INT 21h dispatcher)
+$0A79-$0AB8 Loader                   shellLoadPrg
+$0AB9-$0B10 Path                     findFile, checkExistence
+$0B11-$0D02 Vmm                      vmmInit, vmmAlloc, vmmFree,
                                      vmmReadByte, vmmWriteByte,
                                      vmmComputeAddress
-$0CE0       File                     fileInit, fileOpen, fileClose,
+$0D03-$0FEC File                     fileInit, fileOpen, fileClose,
                                      fileRead, fileWrite,
                                      fileDelete, fileRename
 ──────────── ──────────────────────── ────────────────────────────────────────────
@@ -204,14 +204,14 @@ $039F–$03A0  EnvSegmentLo/Hi         Segment address of Master Environment Blo
 $03A2–$03C9  SourceBuf                40-byte scratch buffer (copy src / env var name)
 $03CA–$03F1  DestBuf                  40-byte scratch buffer (copy dest)
 ──────────── ──────────────────────── ────────────────────────────────────────────
-$1000        ApiStub                  Stable JMP to apiHandler — never moves
-$1040        Petsci                   petPrintString, petPrintChar macro
-$1080        CommandTable             Fixed-width 8-byte command dispatch table
-$1130        CommandShell             start (OS entry), mainLoop, shellReadLine,
+$1000-$1002  ApiStub                  Stable JMP to apiHandler — never moves
+$1003-$1018  Petsci                   petPrintString, petPrintChar macro
+$1019-$10E0  CommandTable             Fixed-width 8-byte command dispatch table
+$10E1-$1F1E  CommandShell             start (OS entry), mainLoop, shellReadLine,
                                      shellDispatch, cmdCompare, all built-ins,
                                      environment subroutines, string literals
 ──────────── ──────────────────────── ────────────────────────────────────────────
-$1F90        VmmData                  vmmInitialized (1), vmmTempByte (1),
+$1FA0-$1FFB  VmmData                  vmmInitialized (1), vmmTempByte (1),
                                      fileScratch (96 bytes)
 ──────────── ──────────────────────── ────────────────────────────────────────────
 UserProgStart–$CFFF  User Program Space   External programs load and execute here (BASIC ROM banked out); currently `$2E00`
@@ -1009,7 +1009,7 @@ Opens LFN 13 with filename `$` (directory) and secondary address 0 (read). The C
 4. Stops when the link pointer is `$0000` (EOF).
 
 **`cmdType`** — Display file contents  
-Uses the API layer (`DOS_OPEN_FILE`, `DOS_READ_FILE` 64 bytes at a time into `CommandBuffer`, `DOS_CLOSE_FILE`). Prints raw bytes to screen — no translation.
+Uses the API layer (`DOS_OPEN_FILE`, `DOS_READ_FILE` 64 bytes at a time into `CommandBuffer`, `DOS_CLOSE_FILE`). Prints bytes to screen, translating line-feed bytes (`$0A`) into a displayed CR/LF pair while leaving file contents and other file APIs unchanged.
 
 **`cmdDel` / `cmdErase`** — Delete file  
 Calls `DOS_DELETE_FILE` via `apiHandler`.

@@ -37,9 +37,9 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 |         |   as OS segments below it expand — see note above)    |
 +---------+-------------------------------------------------------+------------------------+
 |  $2DFF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
-|  $2C43  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
+|  $2CE4  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
 +---------+-------------------------------------------------------+
-|  $2C42  |  ShellExt Segment                                     |  OS Shell Data
+|  $2CE3  |  ShellExt Segment                                     |  OS Shell Data
 |  $2495  |  Version, help strings, DIR size-calc routines, and   |  (RAM)
 |         |  file I/O internal state (see note below)             |
 +---------+-------------------------------------------------------+

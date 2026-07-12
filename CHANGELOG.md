@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TYPE LF newline display**: `TYPE` now treats line-feed bytes (`$0A`) as text newlines by emitting a CR/LF pair during screen output, without changing file contents or the byte-preserving file APIs.
 - **Stale KERNAL I/O Status Clearing**: Fixed a bug where the KERNAL status byte (`$90`) was not cleared at the start of `DOS_READ_FILE` (`fileRead`) and `DOS_WRITE_FILE` (`fileWrite`) loops, causing stale status (such as EOF/EOI leftover from previous file reads or error channel checks) to prematurely terminate operations. This resolves the issue where EDLIN's `W` (write) command failed to write out the buffer and reported `ERROR: WRITE FAILED - DISK FULL?`. Defined the `KernalStatus = $90` constant in both KickAssembler and ca65 include files.
 
 ## [0.4.0] - 2026-07-09

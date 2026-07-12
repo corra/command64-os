@@ -92,7 +92,7 @@ The command64 shell is the primary interface for the OS.
 
 ### TYPE
 
-**Description:** Displays the contents of a sequential or program file to the screen.
+**Description:** Displays the contents of a sequential or program file to the screen. Line-feed bytes (`$0A`) are displayed as CR/LF newlines.
 **Syntax:** `TYPE [filename]`
 **Example:** `TYPE README`
 
