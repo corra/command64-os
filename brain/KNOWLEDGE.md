@@ -50,18 +50,18 @@ This file serves as the shared repository for architectural decisions, technical
 ## Architectural Decisions & Constraints
 
 ### Absolute vs. Relocatable Binaries
-- **Constraint**: External programs are compiled for `$2C00` (UserProgStart) by default.
+- **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
 - **Execution**: The OS loader automatically detects this footer, patches all absolute high-bytes in-place to run at the target load page (e.g. `LOAD debug $4000`), and truncates the registered size to exclude the table. Non-relocatable binaries fall back to being registered as-is with original bounds preserved.
 - **Memory Safety & Runtime Buffers (Conway Case Study)**: Programs that utilize large uninitialized RAM buffers (such as Conway's 960-byte double grid buffers) must not hardcode fixed buffer pages (e.g. `$3000` / `$3400`). Hardcoded buffers lead to silent memory corruption if another program is auto-allocated to the buffer address space by the OS page allocator. Instead:
   - Buffers are defined in-binary as page-aligned data allocations (`.align 256` / `.align $100` with `.res` or `.fill`).
   - This embeds them in the `.prg` file size, forcing the OS memory manager to reserve the entire memory range (`[LoadAddr, LoadAddr + Size)`) and prevent allocation overlaps.
   - Buffer base addresses are retrieved dynamically via relocatable pointer references (`#<grid0` / `#>grid0`), allowing the relocator to patch them correctly when shifted.
-  - Linking configurations (`conway_2c00.cfg`, `conway_2d00.cfg`) must have segment alignment enabled (`align = 256`) and memory boundaries increased to cover the buffers.
+  - Linking configurations generated from `USER_PROG_START_HEX` and `USER_PROG_START_HEX_NEXT` must have segment alignment enabled (`align = 256`) and memory boundaries increased to cover the buffers.
 
 ### App Table (Phase 6A — Completed)
-- **Segment**: `AppTable` at `$2000`–`$235C`. Consecutively followed by `ShellExt` segment at `$235D`–`$24ED` (storing help/version string blocks).
-- **UserProgStart**: Shifted from `$2000` → `$2600` to leave memory headroom for OS expansion, then later `$2600` → `$2C00` (see CHANGELOG `[Unreleased]`) as the `ShellExt` segment grew further. Configured via the CMake cache variable `USER_PROG_START_HEX`; external programs must always compile against the current value rather than a hardcoded address.
+- **Segment**: `AppTable` at `$2000`–`$2494`. Consecutively followed by `ShellExt` segment at `$2495`–`$311A` (storing help/version string blocks plus extended shell/date-time/file helpers).
+- **UserProgStart**: Shifted from `$2000` → `$2600` → `$2C00` → `$3200` as resident OS segments grew. Configured via the CMake cache variable `USER_PROG_START_HEX`; external programs must always compile against the current value rather than a hardcoded address.
 - **Storage**: VMM-allocated 4 KB page (one `vmmAlloc` call at shell startup). Segment number saved in `AptSegLo/Hi` at `$03F2`–`$03F3` (cassette buffer free area).
 - **Layout**: 4-byte header (MaxSlots=16, UsedSlots, reserved×2) + 16 entries × 40 bytes = 644 bytes total.
 - **Entry offsets**: Flags=0, Name=1 (16 bytes PETSCII null-padded), LoadAddr=17 (lo/hi), Size=19 (lo/hi). Offsets 21–39 reserved for Phase B/C (ReuAddr, saved CPU state).

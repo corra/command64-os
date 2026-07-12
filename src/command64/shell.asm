@@ -73,6 +73,10 @@ tableCmd:
     .word cmdFree
     .text "flush "
     .word cmdFlush
+    .text "date  "
+    .word cmdDate
+    .text "time  "
+    .word cmdTime
 
 tableEnd:
 
@@ -91,6 +95,7 @@ start:
     sta CurrentDevice       // Default to device 8
     jsr vmmInit             // Initialize VMM and check for REU
     jsr fileInit            // Initialize File System (Handle Table)
+    jsr clockInit           // Initialize CIA #1 TOD clock and default date
     
     lda vmmInitialized
     bne siInitOk
@@ -308,7 +313,7 @@ sdExtGotLen:
     jsr findFile
     bcs sdExtError
 
-    // Found it! Load to UserProgStart ($2000)
+    // Found it! Load to UserProgStart
     lda #0                  // 0 = Relocated (uses HexVal)
     sta SpecificLoad
     lda #<UserProgStart
@@ -2527,6 +2532,139 @@ envFullMsg:
     .text "Environment space full"
     .byte $0D, 0
 
+// cmdDate/cmdTime live in ShellExt (not CommandShell) — CommandShell must
+// fit in the fixed $1000ish-$1FA0 window before VmmData; there is no room
+// left in that budget for these two multi-branch handlers.
+.segment ShellExt
+
+// ---------------------------------------------------------------------------
+// cmdDate
+// No argument: print current date, then prompt for a new one (RETURN keeps
+// current value; invalid input re-prompts).
+// With argument: parse it directly as YYYY-MM-DD, print an error on failure.
+// ---------------------------------------------------------------------------
+cmdDate:
+    jsr checkDateRollover
+
+    ldy ParsePos
+    jsr shellSkipSpaces
+    sty ParsePos
+    lda CommandBuffer, y
+    bne cdHasArg
+
+    jsr printCurrentDate
+    lda #PetCr
+    jsr KernalChROUT
+
+cdPromptLoop:
+    lda #<dateNewPrompt
+    ldy #>dateNewPrompt
+    jsr petPrintString
+    jsr shellReadLine
+
+    lda CommandLen
+    beq cmdDateDone              // empty line (RETURN only) -> keep current date
+
+    lda #0
+    sta ParsePos
+    jsr parseDateArg
+    bcs cdInvalid
+
+    stx SysDateYear
+    lda TempLo
+    sta SysDateMonth
+    lda TempHi
+    sta SysDateDay
+cmdDateDone:
+    rts
+
+cdInvalid:
+    lda #<dateTimeInvalidMsg
+    ldy #>dateTimeInvalidMsg
+    jsr petPrintString
+    jmp cdPromptLoop
+
+cdHasArg:
+    jsr parseDateArg
+    bcs cdArgInvalid
+
+    stx SysDateYear
+    lda TempLo
+    sta SysDateMonth
+    lda TempHi
+    sta SysDateDay
+    rts
+
+cdArgInvalid:
+    lda #<dateTimeInvalidMsg
+    ldy #>dateTimeInvalidMsg
+    jsr petPrintString
+    rts
+
+// ---------------------------------------------------------------------------
+// cmdTime
+// No argument: print current time, then prompt for a new one (RETURN keeps
+// current value; invalid input re-prompts).
+// With argument: parse it directly as HH:MM:SS, print an error on failure.
+// ---------------------------------------------------------------------------
+cmdTime:
+    jsr checkDateRollover
+
+    ldy ParsePos
+    jsr shellSkipSpaces
+    sty ParsePos
+    lda CommandBuffer, y
+    bne ctHasArg
+
+    jsr printCurrentTime
+    lda #PetCr
+    jsr KernalChROUT
+
+ctPromptLoop:
+    lda #<timeNewPrompt
+    ldy #>timeNewPrompt
+    jsr petPrintString
+    jsr shellReadLine
+
+    lda CommandLen
+    beq cmdTimeDone              // empty line (RETURN only) -> keep current time
+
+    lda #0
+    sta ParsePos
+    jsr parseTimeArg
+    bcs ctInvalid
+
+    txa                     // A = Hour
+    ldx TempLo              // X = Minute
+    ldy TempHi              // Y = Second
+    jsr writeTimeToCIA
+cmdTimeDone:
+    rts
+
+ctInvalid:
+    lda #<dateTimeInvalidMsg
+    ldy #>dateTimeInvalidMsg
+    jsr petPrintString
+    jmp ctPromptLoop
+
+ctHasArg:
+    jsr parseTimeArg
+    bcs ctArgInvalid
+
+    txa                     // A = Hour
+    ldx TempLo              // X = Minute
+    ldy TempHi              // Y = Second
+    jsr writeTimeToCIA
+    rts
+
+ctArgInvalid:
+    lda #<dateTimeInvalidMsg
+    ldy #>dateTimeInvalidMsg
+    jsr petPrintString
+    rts
+
+.segment CommandShell
+
 cmdVer:
     lda #<verMsg
     ldy #>verMsg
@@ -2619,6 +2757,10 @@ helpMsg:
     .text "PS     - ALIAS FOR APPS"
     .byte $0D
     .text "FREE   - FREE APP [NAME]"
+    .byte $0D
+    .text "DATE   - SHOW/SET SYSTEM DATE"
+    .byte $0D
+    .text "TIME   - SHOW/SET SYSTEM TIME"
     .byte $0D, 0
 
 .segment ShellExt
@@ -2706,6 +2848,18 @@ flushMsg:
 flushColonMsg:
     .text " status: "
     .byte 0
+
+dateNewPrompt:
+    .text "New date (YYYY-MM-DD), RETURN to keep: "
+    .byte 0
+
+timeNewPrompt:
+    .text "New time (HH:MM:SS), RETURN to keep: "
+    .byte 0
+
+dateTimeInvalidMsg:
+    .text "Invalid format"
+    .byte $0D, 0
 
 .segment ShellExt
 

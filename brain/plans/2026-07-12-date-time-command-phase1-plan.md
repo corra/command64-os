@@ -2,6 +2,10 @@
 
 This plan details the implementation of Phase 1 for the built-in `DATE` and `TIME` commands. This phase focuses on a self-contained, CIA-TOD-backed clock system with no external hardware-RTC dependencies, setting the foundations for subsequent RTC phases.
 
+## Status
+
+Complete as of 2026-07-12. Build verification passed with `make all`; user runtime testing confirmed direct/interactive date and time entry, midnight rollover, and month rollover.
+
 ## User Review Required
 
 > [!IMPORTANT]
@@ -36,6 +40,7 @@ We extend the `VmmData` segment (defined at `$1FA0` in `src/command64/vmm.asm`) 
 We will add the following subroutines to `src/command64/utils.asm` (or a dedicated clock assembly block):
 
 ### 1. `clockInit`
+
 - **Purpose:** Initializes the CIA #1 TOD clock standard at system boot.
 - **Logic:**
   1. Read KERNAL video standard flag at `$02A6`.
@@ -47,6 +52,7 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
 - **Registers Clobbered:** `A`, `X`
 
 ### 2. `readTimeFromCIA`
+
 - **Purpose:** Reads time from CIA #1 registers, unlatches them, and converts it to 24-hour decimal.
 - **Register Interface:**
   - **Inputs:** None.
@@ -72,6 +78,7 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
        - If AM, Hour = `decHour`.
 
 ### 3. `writeTimeToCIA`
+
 - **Purpose:** Converts 24-hour decimal time to 12-hour BCD + AM/PM format and writes it to CIA #1 registers.
 - **Register Interface:**
   - **Inputs:**
@@ -95,9 +102,11 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
      - Write 0 to `$DC08` (Tenths register, restarts clock at top of 0th tenth).
 
 ### 4. `bcdToDec`
+
 - **Purpose:** Converts a BCD byte to decimal.
 - **Logic:** `Decimal = (BCD & $F0) >> 4 * 10 + (BCD & $0F)`.
 - **Implementation:**
+
   ```kickass
   bcdToDec:
       tay                     // Y = BCD value
@@ -117,9 +126,11 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
   ```
 
 ### 5. `decToBcd`
+
 - **Purpose:** Converts a decimal byte (0-99) to BCD.
 - **Logic:** Subtract 10 repeatedly to determine tens digit and units remainder.
 - **Implementation:**
+
   ```kickass
   decToBcd:
       ldx #0
@@ -139,9 +150,11 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
   ```
 
 ### 6. `isLeapYear`
+
 - **Purpose:** Determines if a year offset is a leap year.
 - **Formula:** A year offset from 1980 is a leap year if `(offset & 3) == 0`, unless `offset == 120` (2100) or `offset == 220` (2200).
 - **Implementation:**
+
   ```kickass
   isLeapYear:
       tay
@@ -159,12 +172,14 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
   ```
 
 ### 7. `getDaysInMonth`
+
 - **Purpose:** Returns the maximum number of days in a month.
 - **Inputs:** `A` = Month (1-12), `X` = Year offset (0-255).
 - **Outputs:** `A` = max days.
 - **Logic:** Query month lookup table. If February (Month = 2), perform leap year check.
 
 ### 8. `checkDateRollover`
+
 - **Purpose:** Automatically increments date if a midnight hour-wrap has occurred.
 - **Execution Steps:**
   1. Call `readTimeFromCIA` (returns Hour in `A`).
@@ -174,6 +189,7 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
   4. Write `A` to `SysDateLastHour`.
 
 ### 9. `incrementDate`
+
 - **Purpose:** Increments current date with carry processing for month and leap-year.
 - **Logic:** `SysDateDay = SysDateDay + 1`. If `SysDateDay > getDaysInMonth(SysDateMonth, SysDateYear)`, then `SysDateDay = 1`, `SysDateMonth = SysDateMonth + 1`. If `SysDateMonth > 12`, then `SysDateMonth = 1`, `SysDateYear = SysDateYear + 1`.
 
@@ -182,17 +198,20 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
 ## Input Parsing Subroutines
 
 ### 1. `parseNum2`
+
 - **Purpose:** Parses a 2-digit decimal number.
 - **Inputs:** `Y` = current parse position in `CommandBuffer`.
 - **Outputs:** `A` = numeric value (0-99), `Y` advanced by 2. `C` = 0 on success, `C` = 1 on invalid characters.
 
 ### 2. `parseNum4`
+
 - **Purpose:** Parses a 4-digit decimal number.
 - **Inputs:** `Y` = current parse position in `CommandBuffer`.
 - **Outputs:** `HexValLo`/`HexValHi` = numeric value (0-9999), `Y` advanced by 4. `C` = 0 on success.
 - **Logic:** Parses two 2-digit pairs, multiplies the first pair by 100, and adds the second pair.
 
 ### 3. `parseDateArg`
+
 - **Purpose:** Parses a date string matching `YYYY-MM-DD`.
 - **Inputs:** `ParsePos` in zero-page.
 - **Outputs:** `X` = year offset (0-255), `TempLo` = month (1-12), `TempHi` = day. `C` = 0 on success.
@@ -205,6 +224,7 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
   6. Check that only spaces follow.
 
 ### 4. `parseTimeArg`
+
 - **Purpose:** Parses a time string matching `HH:MM:SS`.
 - **Inputs:** `ParsePos` in zero-page.
 - **Outputs:** `X` = Hour (0-23), `TempLo` = Minute (0-59), `TempHi` = Second (0-59). `C` = 0 on success.
@@ -221,14 +241,17 @@ We will add the following subroutines to `src/command64/utils.asm` (or a dedicat
 ## Output Print Subroutines
 
 ### 1. `printDec2`
+
 - **Purpose:** Prints a 1-byte value in decimal, ensuring a minimum width of 2 by prefixing with a leading zero if necessary.
 - **Input:** `A` = value (0-99).
 
 ### 2. `printCurrentDate`
+
 - **Purpose:** Prints the current date matching the format `YYYY-MM-DD`.
 - **Logic:** Prints `SysDateYear + 1980` using `printDecimal16`, prints `-`, prints `SysDateMonth` using `printDec2`, prints `-`, prints `SysDateDay` using `printDec2`.
 
 ### 3. `printCurrentTime`
+
 - **Purpose:** Prints the current time matching the format `HH:MM:SS`.
 - **Logic:** Calls `readTimeFromCIA` and prints each component using `printDec2` separated by `:`.
 
@@ -267,13 +290,15 @@ graph TD
 ---
 
 #### [MODIFY] [shell.asm](../../src/command64/shell.asm)
-- Add `date  ` and `time  ` command definitions to `tableCmd`.
+
+- Add `date` and `time` command definitions to `tableCmd`.
 - Implement `cmdDate` and `cmdTime` dispatch and handler routines.
 - Implement the interactive sub-prompt loops for both commands when called without arguments. If input is invalid, display an error message and re-prompt; if empty (RETURN only), exit without change.
 - Modify the shell boot sequence (`start`) to call `jsr clockInit`.
 - Place command-related strings in the `ShellExt` segment.
 
 #### [MODIFY] [vmm.asm](../../src/command64/vmm.asm)
+
 - Append the 4-byte date-state variables to the `VmmData` segment immediately after `fileScratch`:
   - `SysDateYear: .byte 0` (Offset from 1980, fits at `$1FFC`)
   - `SysDateMonth: .byte 0` (Fits at `$1FFD`)
@@ -282,6 +307,7 @@ graph TD
 - This fits exactly up to the `$2000` boundary where `AppTable` starts.
 
 #### [MODIFY] [utils.asm](../../src/command64/utils.asm)
+
 - Implement CIA #1 TOD read/write routines conforming to the 6526 latching and atomic-write protocols (reading Hours latches, reading Tenths unlatches; writing Hours stops, writing Tenths restarts).
 - Implement conversions between 24-hour decimal time and 12-hour BCD + AM/PM bit 7 (used by the CIA hardware).
 - Implement general parser helpers for 2-digit and 4-digit decimal numbers.
@@ -289,6 +315,7 @@ graph TD
 - Implement date-rollover logic that checks if the hour has wrapped, increments the date with carry (leap-year-aware February 29 check), and updates `SysDateLastHour`.
 
 #### [MODIFY] [command64.inc](../../include/command64.inc)
+
 - Add absolute labels for the new `VmmData` allocations:
   - `SysDateYear = $1FFC`
   - `SysDateMonth = $1FFD`
@@ -296,6 +323,7 @@ graph TD
   - `SysDateLastHour = $1FFF`
 
 #### [MODIFY] [command64.inc](../../include/ca65/command64.inc)
+
 - Add matching definitions for the ca65 equate mirror.
 
 ### Documentation and Manuals
@@ -303,10 +331,12 @@ graph TD
 ---
 
 #### [MODIFY] [user-manual.md](../../docs/user-manual.md)
+
 - Document the syntax and behavior of the new `DATE` and `TIME` built-in commands under §4 Internal Command Reference.
 - Detail the interactive sub-prompt behavior and lazy midnight rollover limitation.
 
 #### [MODIFY] [COMMANDS.md](../COMMANDS.md)
+
 - Refresh the command list and move `DATE` and `TIME` from the Backlog to the Implemented section.
 
 ---
@@ -314,9 +344,11 @@ graph TD
 ## Verification Plan
 
 ### Automated Tests
+
 - Build verification: Run `make` to compile the OS with zero errors and warnings.
 
 ### Manual Verification
+
 - **Boot Default Check:** Launch the built image in VICE. Verify that `DATE` prints `1980-01-01` and `TIME` prints `00:00:00`.
 - **Set & Query Check:** Set the date using `DATE 2026-07-12` and time using `TIME 15:30:00`. Query them to verify correct setting and formatting.
 - **Interactive Check:** Enter `DATE` with no argument. Verify the sub-prompt displays, input validation works (e.g. rejecting `2026-02-29` but accepting `2024-02-29`), and hitting RETURN preserves the value.

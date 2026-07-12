@@ -35,6 +35,7 @@
 - **VI Code Review**: Completed comprehensive correctness and architectural code review of `vi.asm` detailing critical VMM, yank buffer, horizontal scrolling, and data loss issues.
 - **FileOpen PRG Default & Read/Write Peer Review**: Completed peer review of the proposed fileopen default fix and read/write status sequencing plan ([2026-07-10_fileopen_prg_type_default_fix_peer_review.md](file:///home/morgan/development/c64/command64-os/brain/reviews/2026-07-10_fileopen_prg_type_default_fix_peer_review.md)), identifying critical logic omissions in the proposed `fileRead` assembly refactoring and specifying appropriate remediations.
 - **EDLIN Port Phase 4 (Save/streaming)**: Completed and verified in VICE. Verified empty new-file creation, line insertion, `@0:` save-replace writing (`W`), editor quit (`Q`), reload and listing (`L`) of modified file, and buffer ceiling limits. Bumps `VERSION_STAGE` to `'4'` (`0.1.4`).
+- **DATE/TIME Phase 1**: Completed CIA #1 TOD-backed internal `DATE` and `TIME` commands. User verified direct and interactive set/display round-trips, midnight rollover, and month rollover. Phase 1 uses resident kernel date bytes at `$1FFC-$1FFF` and remains intentionally non-persistent until RTC hardware phases.
 
 
 
@@ -55,7 +56,7 @@
 - `LOAD` gated: protected-address check ($0000–$21FF, $C000–$FFFF) + table-full check before disk I/O; registers entry on success.
 - `RUN`/`GO` gated: requires app table membership; supports `RUN <name>` and `RUN <addr>`.
 - New commands: `APPS`/`PS` (list loaded programs), `FREE` (remove entry, guards APP_RUNNING).
-- Historical Kick test/debug sources previously compiled at `$2200`; current external programs and ca65-migrated tests build at `UserProgStart` (`$2C00`) through the CMake app helpers.
+- Historical Kick test/debug sources previously compiled at `$2200`; current external programs and ca65-migrated tests build at `UserProgStart` (`$3200`) through the CMake app helpers.
 
 ### Key implementation details
 
@@ -83,14 +84,14 @@
 | `$0820-$0FEC` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1003-$1018` | Petsci (petPrintString) |
-| `$1019-$10E0` | CommandTable (8-byte fixed-width entries) |
-| `$10E1-$1F1E` | CommandShell (main loop, dispatcher, built-ins) |
-| `$1FA0-$1FFF` | VmmData (vmmInitialized, vmmTempByte, fileScratch) |
+| `$1019-$10F0` | CommandTable (8-byte fixed-width entries) |
+| `$10F1-$1F31` | CommandShell (main loop, dispatcher, built-ins) |
+| `$1FA0-$1FFF` | VmmData (vmmInitialized, vmmTempByte, fileScratch, SysDateYear/Month/Day/LastHour) |
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
 | `$03F4-$03FB` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi, AptCandEndLo/Hi) |
 | `$2000-$2494` | AppTable segment (apptable.asm) |
-| `$2495-$2CE3` | ShellExt segment (version, help, dir size routines, and shifted messages) |
-| `$2E00+` | UserProgStart (External commands loaded here — shifted from $2C00 to accommodate ShellExt segment growth) |
+| `$2495-$311A` | ShellExt segment (version, help, dir size routines, date/time routines, and shifted messages) |
+| `$3200+` | UserProgStart (External commands loaded here — shifted from $2E00 to accommodate ShellExt segment growth) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
 | `$30-$4F` | Zero-page: VI Pointers and State (External Utility) |
@@ -127,8 +128,8 @@
 - [x] Environment variable storage (`SET`, `PATH`) in REU
 - [x] Implement `VOL` and `LABEL` commands (disk directory header editing)
 - [x] Develop external `vi` alike editor (Phase 6C) (Code review completed; remediation pending)
-- [ ] Implement `TIME` command using CIA 1 TOD clock
-- [ ] Implement `DATE` command (software calendar + REU storage)
+- [x] Implement `TIME` command using CIA 1 TOD clock
+- [x] Implement `DATE` command (software calendar in resident kernel RAM)
 - [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety
 - [/] Conway Multiverse Generalization, Menu and Counter (Plan written, transcript saved)
 

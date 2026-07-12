@@ -14,7 +14,7 @@
 //   Maze: two 960-byte tables mirror conway's grid-buffer idea but are NOT
 //         pinned to fixed addresses ($3000/$3400): conway's own code fits in
 //         under 1KB, leaving headroom before $3000, but a full ghost-AI game
-//         does not reliably fit in the ~1KB gap between UserProgStart ($2C00)
+//         does not reliably fit in the historical gap below UserProgStart
 //         and $3000. Both tables are therefore ordinary labelled data, placed
 //         wherever the assembler naturally lays them out — no collision risk
 //         regardless of code size.

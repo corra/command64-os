@@ -2,7 +2,7 @@
 
 **File Name:** `label.prg`
 **Version:** `0.4.0.1034`
-**Target Address:** `UserProgStart` (currently `$2E00`, Standard User Program Space)
+**Target Address:** `UserProgStart` (currently `$3200`, Standard User Program Space)
 
 ## Overview
 

@@ -2,7 +2,7 @@
 
 This document tracks the status and priority of internal commands planned for the `command64` shell. Commands are derived from the original MS-DOS 4.0 `COMTAB` specification and C64-specific requirements.
 
-## 1. Implemented (Phase 2A - 3)
+## 1. Implemented
 | Command | Description | Status | Priority | Origin |
 |:---|:---|:---|:---|:---|
 | `CLS` | Clear screen using PETSCII $93 | ✅ Done | High | DOS 4.0 |
@@ -19,6 +19,9 @@ This document tracks the status and priority of internal commands planned for th
 | `RUN` / `G` | Execute program at [address] | ✅ Done | High | DOS 4.0 |
 | `SET` | Set environment variables | ✅ Done | Medium | DOS 4.0 |
 | `PATH` | Set executable search path | ✅ Done | High | DOS 4.0 |
+| `VOL` | Display volume label | ✅ Done | Low | DOS 4.0 |
+| `DATE` | Display or set system date (`YYYY-MM-DD`) | ✅ Done | Low | DOS 4.0 |
+| `TIME` | Display or set system time (`HH:MM:SS`) | ✅ Done | Low | DOS 4.0 |
 
 ## 2. High Priority (Phase 5)
 | Command | Description | Status | Priority | Origin |
@@ -31,9 +34,6 @@ This document tracks the status and priority of internal commands planned for th
 ## 3. Backlog (MS-DOS 4.0 Standards)
 | Command | Description | Status | Priority | Origin |
 |:---|:---|:---|:---|:---|
-| `VOL` | Display volume label | 💤 Backlog | Low | DOS 4.0 |
-| `DATE` | Display or set system date | 💤 Backlog | Low | DOS 4.0 |
-| `TIME` | Display or set system time | 💤 Backlog | Low | DOS 4.0 |
 | `PROMPT` | Change the command prompt | 💤 Backlog | Low | DOS 4.0 |
 | `BREAK` | Enable/Disable CTRL-C checking | 💤 Backlog | Low | DOS 4.0 |
 | `VERIFY` | Enable/Disable disk write verification | 💤 Backlog | Low | DOS 4.0 |

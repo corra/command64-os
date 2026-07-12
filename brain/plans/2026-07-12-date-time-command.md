@@ -1,7 +1,7 @@
 ---
 feature: date-time-command
 created: 2026-07-12
-status: planned
+status: phase-1-complete
 ---
 
 # Plan: DATE / TIME Built-in Commands
@@ -32,6 +32,9 @@ interfaces so they don't need to be reworked later.
 ## Phase 1 — Core CIA-TOD-backed DATE/TIME (no persistence, no RTC)
 
 See [Detailed Implementation Plan (Phase 1)](2026-07-12-date-time-command-phase1-plan.md) for granular subroutine, memory, and register design.
+
+**Status 2026-07-12:** Complete. User verified direct and interactive `DATE`/`TIME`
+setting, display round-trips, midnight rollover, and month rollover.
 
 ### Scope
 
