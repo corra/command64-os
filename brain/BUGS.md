@@ -5,6 +5,7 @@ Bugs found during investigation but not yet triaged/fixed. Each entry needs a de
 ## OPEN
 
 ### BUG-001: `load` silently no-ops app-table registration when no REU is present
+
 - **Status**: Investigated, needs remediation decision
 - **Found**: 2026-07-06
 - **Area**: `src/command64/shell.asm` (`cmdLoad`), `src/command64/apptable.asm` (`aptList`, `aptPrintLoadInfo`), `src/command64/vmm.asm` (`vmmInit`, `vmmReadByte`)
@@ -16,6 +17,7 @@ The only diagnostic surfaced to the user is a one-time `"Warning: No REU detecte
 **Net effect**: `load` looks like it fully succeeded (file loads, prints success row) but silently omits app-table bookkeeping with no per-call error or warning. User has no way to tell, from `load`'s output alone, whether the app was actually tracked.
 
 **Needs a decision on**:
+
 1. Should `cmdLoad` check `vmmInitialized` and print an explicit warning/error at load time (vs. relying solely on the boot-time message)?
 2. Should the success line distinguish "loaded and tracked" vs. "loaded, untracked (no REU)"?
 3. Should `load` refuse to proceed / require a flag to load without tracking, or is untracked-load-without-REU acceptable intended behavior for REU-less systems?

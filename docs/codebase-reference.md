@@ -25,7 +25,7 @@
    - 8.8 [file.asm — Handle-Based File I/O](#88-fileasm--handle-based-file-io)
    - 8.9 [shell.asm — Command Shell and Built-in Commands](#89-shellasm--command-shell-and-built-in-commands)
 9. [Module Reference — External Commands](#9-module-reference--external-commands)
-   - 9.1 [debug.s — Interactive Memory Monitor](#91debugs--interactive-memory-monitor)
+   - 9.1 [debug.s — Interactive Memory Monitor] (#91debugs--interactive-memory-monitor)
    - 9.2 [label.asm — Disk Volume Label Writer](#92-labelasm--disk-volume-label-writer)
    - 9.3 [conway.asm — Conway's Game of Life](#93-conwayasm--conways-game-of-life)
    - 9.4 [pacman.asm — Pac64](#94-pacmanasm--pac64)
@@ -53,7 +53,7 @@ The core OS still builds with **KickAssembler v5.25**. New external applications
 
 ## 2. Repository Structure
 
-```
+```directory
 command64-os/
 ├── CMakeLists.txt              Root CMake build definition
 ├── Makefile                    Convenience proxy to cmake --build build
@@ -227,14 +227,14 @@ $C000–$CFFF  VMM MCT                  Memory Control Table (4096 bytes for 16M
 The 6510 zero page is a scarce resource. The OS carves it as follows:
 
 | ZP Address | Label         | Owner            | Purpose |
-|-----------|---------------|------------------|---------|
+| ----------- | --------------- | ------------------ | --------- |
 | `$02`     | `CmpBase`     | Shell/Dispatcher | Saved table-entry base offset in `cmdCompare` |
 | `$22`–`$23` | *(implicit)* | KERNAL           | KERNAL uses these internally; OS avoids them |
 | `$61`     | `HandlerVecLo` | Shell            | Indirect jump target low byte |
 | `$62`     | `HandlerVecHi` | Shell            | Indirect jump target high byte |
-| `$63`     | `ParsePos`    | Shell            | Buffer index of first argument after command name |
-| `$64`     | `TempLo`      | OS-wide scratch  | General low-byte scratch (clobbered freely) |
-| `$65`     | `TempHi`      | OS-wide scratch  | General high-byte scratch |
+| `$63`     | `ParsePos`     | Shell            | Buffer index of first argument after command name |
+| `$64`     | `TempLo`       | OS-wide scratch  | General low-byte scratch (clobbered freely) |
+| `$65`     | `TempHi`       | OS-wide scratch  | General high-byte scratch |
 | `$66`     | `HexValLo`    | Utils / API      | `parseHex` result low byte; file I/O byte counts |
 | `$67`     | `HexValHi`    | Utils / API      | `parseHex` result high byte; file I/O byte counts |
 | `$68`     | `VmmSegLo`    | VMM              | Logical segment low byte |
@@ -263,7 +263,7 @@ The 6510 zero page is a scarce resource. The OS carves it as follows:
 All KERNAL calls go through the official `$FF00+` jump table, never raw ROM body addresses.
 
 | Label             | Address  | Function |
-|-------------------|----------|---------|
+|-------------------|----------|--------- |
 | `KernalChROUT`    | `$FFD2`  | Output one character to the current output channel |
 | `KernalGetIn`     | `$FFE4`  | Non-blocking raw keyboard read (returns 0 if no key) |
 | `KernalChRIN`     | `$FFCF`  | Blocking read from current input channel |
@@ -289,7 +289,7 @@ The BASIC warm-start (`$E37B`) is used by `cmdExit` to return to BASIC.
 These are modeled after PC MS-DOS INT 21h function numbers. External programs invoke them via `JSR $1000` with `A` = function number.
 
 | Constant         | Value | Description |
-|-----------------|-------|-------------|
+| -----------------|-------|-------------|
 | `DOS_PRINT_CHAR` | `$02` | Print PETSCII character. Input: `X` = character. |
 | `DOS_PRINT_STR`  | `$09` | Print null-terminated string. Input: `X`/`Y` = pointer lo/hi. |
 | `DOS_OPEN_FILE`  | `$3D` | Open file. Input: `X`/`Y` = filename pointer, `HexValLo` = mode (0=read, 1=write). Output: `A` = handle, `C` = status. |
@@ -787,7 +787,7 @@ Output: HexValLo/Hi = actual bytes read
 
 #### `fileWrite`
 
-```
+```text
 Input:  A = handle
         X/Y = source buffer pointer
         HexValLo/Hi = byte count to write
@@ -897,7 +897,7 @@ mainLoop:
 
 #### 8.9.3 `shellReadLine`
 
-```
+```text
 Input:  (none) — reads from keyboard
 Output: CommandBuffer contains null-terminated input
         CommandLen = number of characters read
@@ -906,7 +906,7 @@ Clobbers: A, Y
 
 Raw input loop using `KernalGetIn` (non-blocking, `$FFE4`). The loop is:
 
-```
+```python
 Y = 0
 loop:
   push Y; poll KernalGetIn until non-zero; pop Y; restore A
@@ -927,7 +927,7 @@ echo CR
 
 #### 8.9.4 `shellDispatch`
 
-```
+```text
 Input:  CommandBuffer (null-terminated), CommandLen
 Clobbers: A, X, Y, HandlerVecLo/Hi, ParsePos
 ```
@@ -952,7 +952,7 @@ Clobbers: A, X, Y, HandlerVecLo/Hi, ParsePos
 
 The table-walk comparison subroutine. Critical invariant: **X always holds the entry base offset**; it is never incremented inside `cmdCompare`.
 
-```
+```text
 Input:  X = entry base offset in tableCmd
         ParsePos = first non-space char index in CommandBuffer
 Output: Z=1 (match): ParsePos updated to first arg char; X = entry_base + TABLE_NAME_LEN
@@ -1062,7 +1062,7 @@ Prints the `helpMsg` string — a fixed multi-line help listing.
 All operate on the Master Environment Block at `EnvSegmentLo/Hi` via `vmmReadByte` / `vmmWriteByte`.
 
 | Subroutine | Description |
-|-----------|-------------|
+| ----------- | ------------- |
 | `envSearch` | Scans for `SourceBuf=...` entry. Returns `C=0` + `VmmOff` at start of match, or `C=1` + `VmmOff` at end of block. |
 | `envDelete` | Removes the string at `VmmOff` by byte-shifting the remaining data left. Writes the new double-null at the end. |
 | `envFindEnd` | Positions `VmmOff` at the correct write offset for appending (the byte before the trailing double-null). |
@@ -1071,7 +1071,7 @@ All operate on the Master Environment Block at `EnvSegmentLo/Hi` via `vmmReadByt
 
 **`envSearch` algorithm:**  
 
-```
+```text
 VmmOff = 0; VmmSeg = EnvSegment
 loop:
   save VmmOff as "start of current string"
@@ -1140,7 +1140,7 @@ JMP mainLoop
 Single-character command lookup. Normalizes shifted to unshifted (`AND #$7F`). Chain of `CMP / BNE`:
 
 | Char | Command | Description |
-|------|---------|-------------|
+| ------ | --------- | ------------- |
 | `a` | `cmdAssemble` | Interactive 6502 assembler |
 | `?` | `cmdHelp` | Show help |
 | `q` | `cmdQuit` | Exit (calls `DOS_EXIT`) |
@@ -1195,7 +1195,6 @@ LABEL directly edits the CBM DOS directory structure on disk (Track 18, Sector 0
 
 #### Protocol (CBM DOS Direct Access)
 
-```
 1. Open command channel (LFN 15, SA 15, no filename)
 2. Send "I\r" — Initialize drive (clear stuck buffers)
 3. Open data buffer channel (LFN 2, SA 2, filename "#")
@@ -1207,7 +1206,6 @@ LABEL directly edits the CBM DOS directory structure on disk (Track 18, Sector 0
 9. Read drive status from command channel (check "00" = success)
 10. If success: send "I\r" again (force drive to re-read BAM cache)
 11. Close command channel
-```
 
 #### Encoding Note
 
@@ -1220,7 +1218,7 @@ Uppercase character literals under either assembler's default PETSCII translatio
 #### Key Labels / Buffers
 
 | Label | Purpose |
-|-------|---------|
+| ------- | --------- |
 | `ArgIdx` ($70) | CommandBuffer index of label text start |
 | `SavedDevice` ($71) | Saved `CurrentDevice` (restored on exit) |
 | `labelBuf` (in PRG) | 16-byte volume name buffer, pre-padded with `$A0` |
@@ -1438,7 +1436,7 @@ EXTERNAL PROGRAM
 
 ### Shell → Load External Command
 
-```
+```text
 shellDispatch (table miss)
   → sdExtScan: find token end
   → parsePointerDevice: resolve device
@@ -1467,7 +1465,7 @@ shellDispatch (table miss)
 
 ### VMM Allocate + Read/Write Cycle
 
-```
+```asm
 CALLER
   lda #<paragraphs_lo
   sta VmmSegLo
@@ -1507,7 +1505,7 @@ CALLER
 
 ### Environment Variable Set
 
-```
+```text
 cmdSet ("SET PATH=/programs")
   → envSearch (SourceBuf="path")
       VmmSeg = EnvSegment; VmmOff = 0
@@ -1534,7 +1532,7 @@ cmdSet ("SET PATH=/programs")
 
 ### Module Dependency Graph
 
-```
+```directory
 command64.asm (root)
 ├── command64.inc  ←── imported by all modules (constants, ZP labels)
 │   └── vmm.inc   ←── imported transitively
@@ -1577,7 +1575,7 @@ command64.asm (root)
 
 ### External Program → OS Interaction
 
-```
+```directory
 debug.prg / label.prg / user.prg
     ↓  JSR $1000  (stable stub)
     ↓  JMP apiHandler
@@ -1601,7 +1599,7 @@ debug.prg / label.prg / user.prg
 ### LFN Allocation Strategy
 
 | LFN | User | Purpose |
-|-----|------|---------|
+| ----- | ------ | --------- |
 | 1 | Loader | KERNAL LOAD (always closed after load) |
 | 2 | File handle 0 / label.asm | File I/O handle 0 / label direct-access channel |
 | 3–9 | File handles 1–7 | File I/O |
@@ -1614,7 +1612,7 @@ debug.prg / label.prg / user.prg
 ## 12. Shell Command Reference
 
 | Command | Aliases | Syntax | Description |
-|---------|---------|--------|-------------|
+| --------- | --------- | -------- | ------------- |
 | `CLS` | — | `cls` | Clear screen, restore lowercase charset |
 | `DIR` | — | `dir [device:]` | List directory; optional device prefix |
 | `DRIVE` | `DEVICE`, `DEV` | `drive [8-11]` | Show or set active device |
@@ -1678,7 +1676,7 @@ myMsg:
 When your program is launched from the shell, these OS RAM locations are valid:
 
 | Address | Label | Content |
-|---------|-------|---------|
+| --------- | ------- | --------- |
 | `$033C` | `CommandBuffer` | The complete typed command line (null-terminated) |
 | `$038C` | `CommandLen` | Number of characters in the command |
 | `$063` | `ParsePos` | Index in `CommandBuffer` of first character after the command name |
@@ -1689,7 +1687,7 @@ Example: if the user typed `MYPROG foo bar`, then `ParsePos` points past `"mypro
 ### Exit Strategies
 
 | Method | When to use |
-|--------|------------|
+| -------- | ------------ |
 | `lda #DOS_EXIT; jsr $1000` | Normal program exit — recommended. Resets stack, returns to shell. |
 | `RTS` | Simple programs. The shell called you via `JSR UserProgStart`, so `RTS` returns to the shell's dispatch code. However, the stack has the return address from the calling shell on it, so this is safe for programs that don't corrupt the stack. |
 | `JMP $E37B` | Return to BASIC (bypasses shell entirely). |
