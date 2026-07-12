@@ -20,9 +20,10 @@
 //   CommandShell  packed immediately after CommandTable  segments' addresses,
 //                        so they float to reclaim the padding that otherwise
 //                        went unused between fixed-address segments.
-//   VmmData       $1FA0  VMM temporary storage — fixed: FileScratch/
-//                        vmmInitialized/vmmTempByte are hardcoded absolute
-//                        addresses in command64.inc, must never move.
+//   VmmData       $1FA0  VMM/date temporary storage — fixed: FileScratch,
+//                        vmmInitialized/vmmTempByte, and SysDate* state are
+//                        hardcoded absolute addresses in command64.inc, must
+//                        never move.
 //   AppTable      $2000  App Table segment (apptable.asm)
 
 .file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData,AppTable,ShellExt"]

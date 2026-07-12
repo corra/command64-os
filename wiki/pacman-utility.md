@@ -1,7 +1,7 @@
 # command64 OS PACMAN Utility Manual
 
 **File Name:** `pacman.prg`
-**Target Address:** `UserProgStart` (currently `$2C00`)
+**Target Address:** `UserProgStart` (currently `$3200`)
 **Version:** 0.1.0
 
 ## Overview
@@ -41,11 +41,11 @@ No arguments. Starts immediately at level 1 with 3 lives.
 `mazeWalls` (read-only: 0=open, 1=wall, 2=ghost-only door) and `mazeItems`
 (mutable: 0=empty, 1=dot=10pts, 2=power pellet=50pts) are both 960-byte
 tables. Unlike CONWAY's grid buffers, neither is pinned to a fixed address:
-CONWAY's small code leaves headroom below its hardcoded `$3000`/`$3400`, but
-a full ghost-AI game does not reliably fit in the ~1KB gap between
-`UserProgStart` and `$3000`, so both tables are ordinary labelled data
-placed wherever the assembler lays them out. `mazeItems` starts as reserved
-zero bytes and is populated at runtime by `resetItems`.
+CONWAY's old small-code layout once left headroom below fixed buffer pages,
+but a full ghost-AI game cannot rely on a hardcoded gap below or above
+`UserProgStart`, so both tables are ordinary labelled data placed wherever
+the assembler lays them out. `mazeItems` starts as reserved zero bytes and
+is populated at runtime by `resetItems`.
 
 The ghost-only door (value 2) blocks Pac-Man's `canMovePac` check but not
 ghosts' `canMoveGhost` check, so Pac-Man cannot wander into the ghost house.
@@ -93,7 +93,7 @@ table of 24-bit powers of ten.
 
 | Address range | Contents |
 | --- | --- |
-| `UserProgStart` (`$2C00`) onward | Code, ghost/Pac-Man state, maze tables, read-only tables (~5.5KB total) |
+| `UserProgStart` (`$3200`) onward | Code, ghost/Pac-Man state, maze tables, read-only tables (~5.5KB total) |
 | `$70 – $75` | Zero-page scratch (subset of the `$70-$7F` external-program range) |
 
 ---

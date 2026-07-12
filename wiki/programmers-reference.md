@@ -4,9 +4,9 @@ This document provides technical details for developing applications for the com
 
 ## 1. Memory Map
 
-When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `UserProgStart` (currently `$2E00`, configurable via the CMake cache variable `USER_PROG_START_HEX`) up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
+When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `UserProgStart` (currently `$3200`, configurable via the CMake cache variable `USER_PROG_START_HEX`) up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
 
-> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → $2C00 → current `$2E00`). Applications should never hardcode `$2600` or any other prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
+> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → $2C00 → current `$3200`). Applications should never hardcode `$2600` or any other prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
 
 ### C64 RAM Banking Control ($0001 CPU Port)
 
@@ -33,15 +33,15 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 |         |  User Program Space (RAM)                             |  User Application Area
 |         |  (Note: BASIC ROM banked out at $A000-$BFFF to        |  (RAM replacing ROM)
 |         |   provide contiguous program RAM)                     |
-|UserProgStart|  (`$2E00` in the default build; grows over time  |
+|UserProgStart|  (`$3200` in the default build; grows over time  |
 |         |   as OS segments below it expand — see note above)    |
 +---------+-------------------------------------------------------+------------------------+
-|  $2DFF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
-|  $2CE4  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
+|  $31FF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
+|  $311B  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
 +---------+-------------------------------------------------------+
-|  $2CE3  |  ShellExt Segment                                     |  OS Shell Data
+|  $311A  |  ShellExt Segment                                     |  OS Shell Data
 |  $2495  |  Version, help strings, DIR size-calc routines, and   |  (RAM)
-|         |  file I/O internal state (see note below)             |
+|         |  file I/O/date-time internal state (see note below)   |
 +---------+-------------------------------------------------------+
 |  $2494  |  AppTable Segment                                     |  OS Resident Registry
 |  $2000  |  Application Registry Management API (aptInit/Find/   |  (RAM)
@@ -49,18 +49,19 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 +---------+-------------------------------------------------------+
 |  $1FFF  |  VMM Data Segment                                     |  OS VMM Data
 |         |  vmmInitialized ($1FA0), vmmTempByte ($1FA1)          |  (RAM)
-|  $1FA0  |  fileScratch ($1FA2-$1FFB, 90 bytes)                  |
+|  $1FA0  |  fileScratch ($1FA2-$1FFB, 90 bytes),                 |
+|         |  SysDateYear/Month/Day/LastHour ($1FFC-$1FFF)         |
 +---------+-------------------------------------------------------+
-|  $1F9F  |  Command Shell                                        |  OS Shell Code
-|  $1180  |  Command parser, command tables, built-in handlers    |  (RAM)
+|  $1F31  |  Command Shell                                        |  OS Shell Code
+|  $10F1  |  Command parser, command tables, built-in handlers    |  (RAM)
 +---------+-------------------------------------------------------+
-|  $117F  |  Command Table / System Tables                        |  OS Data
-|  $1080  |  Command name listings and dispatcher mapping         |  (RAM)
+|  $10F0  |  Command Table / System Tables                        |  OS Data
+|  $1019  |  Command name listings and dispatcher mapping         |  (RAM)
 +---------+-------------------------------------------------------+
-|  $107F  |  PETSCII Library                                      |  OS Library
-|  $1040  |  Print character / print string utilities             |  (RAM)
+|  $1018  |  PETSCII Library                                      |  OS Library
+|  $1003  |  Print character / print string utilities             |  (RAM)
 +---------+-------------------------------------------------------+
-|  $103F  |  ApiStub (OS Stable Jump Table Entry Point)           |  OS Entry Point
+|  $1002  |  ApiStub (OS Stable Jump Table Entry Point)           |  OS Entry Point
 |  $1000  |  Jump to apiHandler (jmp $1200+); JSR $1000 target    |  (RAM)
 +---------+-------------------------------------------------------+
 |  $0FFF  |  OS Core Code Space                                   |  OS Kernel Code

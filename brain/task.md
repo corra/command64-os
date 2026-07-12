@@ -138,13 +138,17 @@
     - [x] LABEL: Fix interaction inconsistencies (Task #21)
     - [x] LABEL: Implement syntax updates for quotes and spaces (Task #22)
     - [x] LABEL: Support target device parameter like 9:NEWLABEL (Task #23)
-  - [ ] TIME Command Implementation (Task #18)
-    - [ ] Implement TOD clock initialization routine at system boot
-    - [ ] Implement `cmdTime` handler in `shell.asm` to format and print time
-    - [ ] Implement CIA 1 TOD register write routines to allow user clock adjustments
-    - [ ] Register `TIME` in the command table and the `HELP` output
-  - [ ] DATE Command Implementation (Task #19)
-    - [ ] Define system date storage structures in kernel RAM and REU space
-    - [ ] Implement `cmdDate` handler in `shell.asm` to print and parse date inputs
-    - [ ] Register `DATE` in the command table and the `HELP` output
-    - [ ] Verify date persistence across warm starts
+  - [x] TIME Command Implementation (Taskwarrior #15)
+    - [x] Implement TOD clock initialization routine at system boot
+    - [x] Implement `cmdTime` handler in `shell.asm` to format and print time
+    - [x] Implement CIA 1 TOD register write routines to allow user clock adjustments
+    - [x] Register `TIME` in the command table and the `HELP` output
+    - [x] Verify direct and interactive setting/display round-trips
+    - [x] Verify midnight rollover advances the software date
+  - [x] DATE Command Implementation (Taskwarrior #16)
+    - [x] Define system date storage structures in resident kernel RAM
+    - [x] Implement `cmdDate` handler in `shell.asm` to print and parse date inputs
+    - [x] Register `DATE` in the command table and the `HELP` output
+    - [x] Verify direct and interactive setting/display round-trips
+    - [x] Verify leap-year validation
+    - [x] Verify midnight and month rollover

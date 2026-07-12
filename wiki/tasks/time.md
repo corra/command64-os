@@ -13,7 +13,9 @@ Implement the internal shell command `TIME` to display and modify the system tim
 
 ## Sub-tasks
 
-- [ ] Implement TOD clock initialization routine at system boot.
-- [ ] Implement `cmdTime` handler in `shell.asm` to format and print time.
-- [ ] Implement CIA 1 TOD register write routines to allow user clock adjustments.
-- [ ] Register `TIME` in the command table and the `HELP` output.
+- [x] Implement TOD clock initialization routine at system boot.
+- [x] Implement `cmdTime` handler in `shell.asm` to format and print time.
+- [x] Implement CIA 1 TOD register write routines to allow user clock adjustments.
+- [x] Register `TIME` in the command table and the `HELP` output.
+- [x] Verify direct and interactive setting/display round-trips.
+- [x] Verify midnight rollover advances the software date.

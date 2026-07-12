@@ -122,6 +122,18 @@ The command64 shell is the primary interface for the OS.
 **Description:** Displays the disk volume label and ID of the active drive.
 **Syntax:** `VOL`
 
+### DATE
+
+**Description:** Displays or sets the system date. Phase 1 stores the date in resident kernel RAM and resets to `1980-01-01` on cold boot or `RUN`; hardware RTC persistence is planned for a later phase. Date rollover is detected when `DATE` or `TIME` is queried.
+**Syntax:** `DATE [YYYY-MM-DD]`
+**Examples:** `DATE` (display current date and prompt for a new one), `DATE 2026-07-12` (set directly).
+
+### TIME
+
+**Description:** Displays or sets the system time using the CIA #1 Time-of-Day clock. Time is shown and entered in 24-hour format.
+**Syntax:** `TIME [HH:MM:SS]`
+**Examples:** `TIME` (display current time and prompt for a new one), `TIME 15:30:00` (set directly).
+
 ### HELP
 
 **Description:** Displays a list of available internal commands and brief descriptions.
@@ -265,7 +277,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **User Program Space (`UserProgStart` - $CFFF):** currently `$2E00` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
+- **User Program Space (`UserProgStart` - $CFFF):** currently `$3200` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity

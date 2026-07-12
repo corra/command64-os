@@ -460,3 +460,7 @@ vmmComputeAddress:
 vmmInitialized: .byte 0
 vmmTempByte: .byte 0
 fileScratch: .fill 90, 0    // 90 bytes: covers 79-char name + write suffix ",S,W" + rename "R:new=old" overhead
+sysDateYear: .byte 0        // Offset from 1980; fits exactly at $1FFC
+sysDateMonth: .byte 0       // Fits at $1FFD
+sysDateDay: .byte 0         // Fits at $1FFE
+sysDateLastHour: .byte 0    // Fits at $1FFF (page boundary before AppTable at $2000)

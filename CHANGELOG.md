@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DATE/TIME internal commands (Phase 1)**: Added CIA #1 TOD-backed `DATE` and `TIME` built-ins with direct and interactive `YYYY-MM-DD` / `HH:MM:SS` entry, boot-time TOD initialization, resident kernel date storage, leap-year-aware validation, and lazy midnight/month rollover.
 - **EDLIN External Utility Port (Phases 0-4)**: Ported MS-DOS 4.00 EDLIN to COMMAND64 OS as a ca65-built external app (`edlin.prg` v0.1.4):
   - **Phase 0 (Scaffold)**: Integrates into the CMake build system, increments build counter via `BUILD_EDLIN`, and exits cleanly via `DOS_EXIT`.
   - **Phase 1 (Buffer Core)**: Implements VMM-backed text buffers and page-based scanning for fast line-number resolution, with local RAM-fallback when REU is absent.
@@ -18,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **User program origin shifted to `$3200`**: Moved `UserProgStart` and the relocation companion origin to `$3200`/`$3300` so external apps cannot overlap the expanded resident `ShellExt` segment after the DATE/TIME implementation. Rebuilt external apps and tests against the new origin.
 - **Test target names normalized**: Renamed ca65 test apps with redundant
   `<name>test` source names to feature-only names (`test_api`, `test_bank`,
   `test_dev`, `test_file`, `test_handle`, `test_sendcmd`, `test_vmm`) and
@@ -25,6 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **DATE/TIME parser scratch preservation**: Fixed Date/Time scratch-register clobbering where parsing the day overwrote the parsed month, Date validation lost the parse cursor during month-length lookup, parsing seconds overwrote the parsed minute, and CIA TOD hour conversion overwrote the returned seconds value. Valid `DATE YYYY-MM-DD` and `TIME HH:MM:SS` inputs now preserve all parsed fields correctly.
 - **TYPE LF newline display**: `TYPE` now treats line-feed bytes (`$0A`) as text newlines by emitting a CR/LF pair during screen output, without changing file contents or the byte-preserving file APIs.
 - **Stale KERNAL I/O Status Clearing**: Fixed a bug where the KERNAL status byte (`$90`) was not cleared at the start of `DOS_READ_FILE` (`fileRead`) and `DOS_WRITE_FILE` (`fileWrite`) loops, causing stale status (such as EOF/EOI leftover from previous file reads or error channel checks) to prematurely terminate operations. This resolves the issue where EDLIN's `W` (write) command failed to write out the buffer and reported `ERROR: WRITE FAILED - DISK FULL?`. Defined the `KernalStatus = $90` constant in both KickAssembler and ca65 include files.
 

@@ -88,7 +88,20 @@
 .label MAX_HANDLES   = 8
 .label SourceBuf     = $03A2 // 40 bytes
 .label DestBuf       = $03CA // 40 bytes
-.label FileScratch   = $1FA2 // Filename scratch in VmmData: vmmInitialized($1FA0), vmmTempByte($1FA1), fileScratch($1FA2)
+.label FileScratch   = $1FA2 // Filename scratch in VmmData: vmmInitialized($1FA0), vmmTempByte($1FA1), fileScratch($1FA2-$1FFB), SysDate*($1FFC-$1FFF)
+.label SysDateYear     = $1FFC // Offset from 1980 (e.g. 46 = 2026), range 0-255
+.label SysDateMonth    = $1FFD // Month index, range 1-12
+.label SysDateDay      = $1FFE // Day of month, range 1-31
+.label SysDateLastHour = $1FFF // Last-seen 24-hour decimal value (0-23); lazy midnight rollover detection
+
+// --- CIA #1 TOD Clock Registers ---
+.label CIA1_CRA  = $DC0E // Control Register A: bit 7 = TOD input freq (0=60Hz/NTSC, 1=50Hz/PAL)
+.label CIA1_CRB  = $DC0F // Control Register B: bit 7 = TOD alarm/clock select (0=clock)
+.label CIA1_TOD_HR  = $DC0B // TOD Hours (BCD, bit 7 = PM); reading latches TOD registers
+.label CIA1_TOD_MIN = $DC0A // TOD Minutes (BCD)
+.label CIA1_TOD_SEC = $DC09 // TOD Seconds (BCD)
+.label CIA1_TOD_10THS = $DC08 // TOD Tenths of a second (BCD); reading unlatches, writing restarts clock
+.label KernalVideoStd = $02A6 // KERNAL video standard flag: 0 = NTSC, 1 = PAL
 
 // --- App Table: Phase A Constants ---
 .label APT_MAX_SLOTS    = 16       // compile-time max entries
