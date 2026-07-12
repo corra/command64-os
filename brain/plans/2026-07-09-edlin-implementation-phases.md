@@ -1062,6 +1062,101 @@ nothing to reposition relative to.
 - **Exit criteria**: search finds correct line on a known test file;
   replace mutates buffer correctly and is reflected in subsequent `L`ist`/W`rite.
 
+### Phase 5 detail
+
+This phase implements simplified Search/Replace commands, adding case-insensitive string matching, search history preservation, and in-place buffer manipulation for replacements.
+
+#### PETSCII Case Normalization (tolower)
+
+To support case-insensitive matching, comparisons convert letters to a standard lowercase format. Since C64 uses PETSCII (mixed case), we normalize letters with a `tolower` helper:
+- Strip bit 7 via `and #$7F` to normalize shifted letters (`$C1–$DA`) to unshifted uppercase (`$41–$5A`).
+- If the byte is in the range `$41–$5A` (inclusive), convert it to lowercase (`$61–$7A`) by performing `ora #$20`.
+- Otherwise, leave the byte as-is.
+
+#### ownLineInput Ctrl-Z Interception
+
+MS-DOS EDLIN separates the search and replace strings in the Replace command using `Ctrl-Z` (`$1A`). On the C64, pressing `Ctrl+Z` under the KERNAL's standard `GETIN` loop returns the byte value `$1A`. We will update `ownLineInput` to intercept `$1A`:
+- When `$1A` is input, print `^` (PETSCII `$5E`) and `Z` (PETSCII `$5A`) sequentially to provide the standard visual indicator.
+- Store `$1A` in `EditBuf` natively.
+
+#### Range Parsing and Query Flag in peekCommandByte
+
+- **`QueryFlag`**: Declared as a persistent 1-byte flag in BSS in `edlin.s`.
+- **`peekCommandByte`**: Modifies its scanning code to check for `?` immediately after range parsing. If `?` is present, it sets `QueryFlag = $FF`, advances the parsing index `Y`, skips spaces, and reads the command byte (`S` or `R`). Otherwise, it sets `QueryFlag = 0`.
+- **`parseRange`**: Stays range-only and stops when hitting `?` (which is treated as a command letter terminator for range parsing).
+- **Command Dispatcher**:
+  - `cmdSearch`/`cmdReplace` parse line numbers via `parseRange`.
+  - The index `Y` returned by `parseRange` will point to `?` (if `QueryFlag` is set) or the command letter `S` / `R`.
+  - The commands check if `EditBuf, y` is `?` and increment `Y` if so, then increment `Y` again to skip `S`/`R` to point directly to the string argument.
+
+#### String Extraction from EditBuf
+
+The search and replace strings are extracted starting from index `Y`:
+- **`cmdSearch`**:
+  - Copies all remaining characters in `EditBuf` until `$00` (null terminator) to `LastSearchStr`, tracking the length in `LastSearchLen`.
+  - If the input is empty (rest of line is empty): checks if `LastSearchLen` is 0. If so, aborts with an error; otherwise reuses the existing `LastSearchStr`.
+- **`cmdReplace`**:
+  - Copies characters to `LastSearchStr` until hitting `$1A` (Ctrl-Z) or `$00`.
+  - If `$1A` is encountered: updates `LastSearchLen`, advances past `$1A`, and copies the remaining string (until `$00`) to `LastReplaceStr` (updating `LastReplaceLen`).
+  - If `$00` is encountered (no `$1A` separator): updates `LastSearchLen` and sets `LastReplaceLen = 0` (meaning empty replacement).
+  - If the input is entirely empty: reuses both `LastSearchStr` and `LastReplaceStr` from history (aborts if history is empty).
+
+#### Search and Replace String Matching (findString)
+
+To avoid excessive VMM copies, `findString` uses a windowed-scanning matching algorithm:
+- **Inputs**: `ScanOffsetLo/Hi` (start offset), `EndOffsetLo/Hi` (end offset), `SearchStr`, and `SearchLen`.
+- **Outputs**: Carry=0 (match found, `ScanOffsetLo/Hi` points to match, `CurrentSearchLineLo/Hi` updated), Carry=1 (no match).
+- **VMM Window Scanning**:
+  - Loops from `ScanOffset` to `EndOffset`.
+  - Calls `bufReadWindow` at `ScanOffset`.
+  - Iterates `i` from `0` to `WindowValidLen - SearchLen`.
+  - For each `i`, checks if character-wise `tolower` comparison matches `SearchStr`.
+  - If a match is found: sets `ScanOffset += i` and returns `Carry=0`.
+  - As `i` increments (or if we advance the window by `i`), checks if `scanWindow[i] == $0A` (LF) and increments `CurrentSearchLineLo/Hi` and updates `LineStartOffsetLo/Hi` to track line positions in real-time.
+  - If the window finishes with no match: sets `ScanOffset += i` and refills.
+
+#### `cmdSearch` (command byte `$53`, `'S'`)
+
+1. Parses ranges (defaulting `line1 = EdCurrentLine + 1` if `Line1Given = 0` and `line2 = last line` if `Line2Given = 0`).
+2. Extracts search string and updates history.
+3. Initializes `CurrentSearchLine = line1`.
+4. Loops `findString`:
+   - Prints the matched line using `printDec16` for line numbers and `displayLineText`.
+   - If `QueryFlag` is set: prompts `O.K.? ` using `promptYN`. If `N`, advances `ScanOffset` past match and loops.
+   - If accepted (or `QueryFlag = 0`), sets `EdCurrentLine = CurrentSearchLine` and returns.
+5. If no matches found, prints `NOT FOUND`.
+
+#### `cmdReplace` (command byte `$52`, `'R'`)
+
+1. Parses ranges (same defaults as Search).
+2. Extracts search/replace strings and updates history.
+3. Loops `findString`:
+   - Prints the proposed modified line preview:
+     - Print line number prefix.
+     - Print bytes in `[LineStartOffset, MatchOffset)` from the buffer.
+     - Print `LastReplaceStr`.
+     - Print bytes in `[MatchOffset + LastSearchLen, NextLineStart)` from the buffer.
+     - Print Carriage Return.
+   - If `QueryFlag` is set: prompts `O.K.? `. If `N`, advances search past `LastSearchStr` and loops.
+   - If accepted (or `QueryFlag = 0`):
+     - If `LastReplaceLen == LastSearchLen`, overwrites `LastSearchStr` with `LastReplaceStr` in place via `bufWriteBytes`.
+     - If `LastReplaceLen > LastSearchLen`, opens a hole of size `LastReplaceLen - LastSearchLen` at `MatchOffset + LastSearchLen`, then writes `LastReplaceStr`. (Aborts if VMM returns Carry=1/buffer full).
+     - If `LastReplaceLen < LastSearchLen`, closes a hole of size `LastSearchLen - LastReplaceLen` at `MatchOffset + LastReplaceLen`, then writes `LastReplaceStr`.
+     - Adjusts `SearchEndOffset` by the size difference (`LastReplaceLen - LastSearchLen`).
+     - Resumes search starting at `MatchOffset + LastReplaceLen`.
+     - Increments replacement counter.
+4. If no matches found, prints `NOT FOUND`.
+
+#### Phase 5 verification steps
+
+1. `cmake --build build --target test_image_d64` clean compile.
+2. Manual VICE pass against `tests/edlin_test.txt`:
+   - Test Search with `S` (from `Current+1` to EOF), range search (e.g. `1,20S`), query search `?S`, and empty-string history reuse.
+   - Test Replace with `R` (e.g. `1,20Rfoo^Zbar`), query replace `?R`, replacement deletion `1,#Rfoo`, and history reuse.
+   - Verify `tolower` correctly matches shifted, unshifted, and lowercase letter variations.
+   - Verify empty-history calls print `ERROR: NO SEARCH STRING.` rather than crashing.
+
+
 ## Phase 6 — Hardening, tests, docs (`0.1.6`)
 
 - [ ] `tests/src/edlin/` app-level test: scripted load/insert/delete/list/save,
