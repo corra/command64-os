@@ -41,6 +41,7 @@ Opens a file on disk (CurrentDevice).
 - **Input:**
   - `X/Y`: Pointer to null-terminated filename (Lo/Hi).
   - `HexValLo` ($66): Access Mode (0 = Read, 1 = Write).
+  - `HexValHi` ($67): File Type for Write Mode (optional, e.g., 'S', 'P', 'U', 'R'). Omitted or invalid values default to 'S' (SEQ).
 - **Output:**
   - `A`: File Handle (0-7).
   - `Carry`: 0 (Success).

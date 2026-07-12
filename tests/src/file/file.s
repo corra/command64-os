@@ -30,6 +30,8 @@ start:
     ; 1. Open "TEST.TXT" for Write
     lda #1
     sta HexValLo            ; mode=1 (Write)
+    lda #'S'                ; type='S' (SEQ)
+    sta HexValHi
     ldx #<fname
     ldy #>fname
     lda #DOS_OPEN_FILE

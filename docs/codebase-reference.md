@@ -780,9 +780,10 @@ Output: HexValLo/Hi = actual bytes read
 
 1. Validates handle is open.
 2. `KernalCHKIN` with the LFN to redirect input to the file.
-3. Loop: checks `KernalREADST` (non-zero = EOF/error → stop), calls `KernalChRIN`, stores byte via `(PrintPtrLo),Y`, increments `PrintPtrLo/Hi` and byte count.
-4. `KernalCLRCHN` to restore keyboard input.
-5. Writes actual count back to `HexValLo/Hi`.
+3. Clears the KERNAL status byte (`$90`).
+4. Loop: checks `KernalREADST` (non-zero = EOF/error → stop), calls `KernalChRIN`, stores byte via `(PrintPtrLo),Y`, increments `PrintPtrLo/Hi` and byte count.
+5. `KernalCLRCHN` to restore keyboard input.
+6. Writes actual count back to `HexValLo/Hi`.
 
 #### `fileWrite`
 
@@ -794,7 +795,7 @@ Output: HexValLo/Hi = actual bytes written
         C = 0 success, C = 1 error
 ```
 
-Mirror of `fileRead` but uses `KernalCHKOUT` + `KernalChROUT`.
+Mirror of `fileRead` but uses `KernalCHKOUT` + `KernalChROUT`, clearing the KERNAL status byte (`$90`) before entering the write loop.
 
 #### `fileDelete`
 

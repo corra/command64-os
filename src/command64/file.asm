@@ -33,99 +33,7 @@
 // Output: A = 0 ready / 1 no device / 2 no disk / 3 other drive error
 //         Carry: 0 = ready, 1 = error (mirrors A<>0)
 // Clobbers: A, X, Y, TempLo, TempHi
-checkDeviceReady:
-    pha                     // Stash device number across the presence probe
-    jsr KernalLISTEN        // A = device number (still set from before the push)
-    jsr KernalUNLSN
-    jsr KernalREADST
-    and #$80                // Bit 7 = device did not respond to LISTEN
-    beq cdrPresent
-    pla                     // Discard the stashed device number
-    lda #1
-    sec
-    rts
-
-cdrPresent:
-    pla
-    sta CdrDevice           // Remember device number across the status re-query
-    lda #0
-    sta CdrRetried
-
-cdrQueryStatus:
-    lda #0                  // No filename — just open the status channel
-    ldy #0
-    jsr KernalSETNAM
-
-    lda #15                 // LFN 15 = command/error channel
-    ldx CdrDevice           // Device number for SETLFS
-    ldy #15                 // Secondary address 15
-    jsr KernalSETLFS
-    jsr KernalOPEN
-    bcs cdrNoDevice         // Device answered LISTEN but OPEN still failed
-
-    ldx #15
-    jsr KernalCHKIN
-    bcs cdrCloseNoDevice
-
-    jsr KernalChRIN         // Status digit 1 (tens)
-    sta TempLo
-    jsr KernalChRIN         // Status digit 2 (units)
-    sta TempHi
-
-    jsr KernalCLRCHN
-    lda #15
-    jsr KernalCLOSE
-
-    // "00" = OK
-    lda TempLo
-    cmp #'0'
-    bne cdrCheck73
-    lda TempHi
-    cmp #'0'
-    beq cdrOk
-
-cdrCheck73:
-    lda TempLo
-    cmp #'7'
-    bne cdrCheck74
-    lda TempHi
-    cmp #'3'
-    bne cdrCheck74
-    lda CdrRetried          // Power-on banner: re-query once for the real status
-    bne cdrOk               // already retried — trust it this time
-    inc CdrRetried
-    jmp cdrQueryStatus
-
-cdrCheck74:
-    lda TempLo
-    cmp #'7'
-    bne cdrOtherErr
-    lda TempHi
-    cmp #'4'
-    beq cdrNotReady
-
-cdrOtherErr:
-    lda #3
-    sec
-    rts
-
-cdrOk:
-    lda #0
-    clc
-    rts
-
-cdrNotReady:
-    lda #2
-    sec
-    rts
-
-cdrCloseNoDevice:
-    lda #15
-    jsr KernalCLOSE
-cdrNoDevice:
-    lda #1
-    sec
-    rts
+// (checkDeviceReady moved to ShellExt segment below to free up space in File segment)
 
 // --- printDeviceStatusMsg ---
 // Prints the message matching a checkDeviceReady/fileOpen/fileDelete/
@@ -187,6 +95,12 @@ fiLoop:
 // Output: A = Handle (0-7) or $FF on error
 //         Carry: 0=Success, 1=Error
 fileOpen:
+    // Stash HexValLo/Hi immediately before any clobbering calls (checkDeviceReady, etc.)
+    lda HexValLo
+    sta OpenMode
+    lda HexValHi
+    sta OpenType
+
     stx NamePtrLo
     sty NamePtrHi
 
@@ -198,7 +112,9 @@ fileOpen:
     // missing or has no disk, instead of opening a channel with no data.
     lda TargetDevice
     jsr checkDeviceReady
-    bcs foDeviceErr
+    bcc foDeviceOk
+    jmp foDeviceErr
+foDeviceOk:
 
     // 1. Find a free handle
     ldx #0
@@ -241,17 +157,36 @@ foCopyDone:
     // Note: normalizeName returns with Y = string length, which is required below.
 
     // Check mode
-    lda HexValLo
+    lda OpenMode
     beq foSkipMode          // Read mode (default)
     
     // Append ",<type>,W" for Write (using standard unshifted ASCII characters)
     lda #','
     sta FileScratch, y
     iny
-    lda HexValHi            // Check if caller specified a custom file type (e.g. 'P' or 'S')
-    bne foUseType
-    lda #$50                // Default to unshifted 'P' (PRG) if not specified
-foUseType:
+    lda OpenType            // Check if caller specified a custom file type (e.g. 'P' or 'S')
+    // Validate that it is a valid file type (P, p, S, s, U, u, R, r)
+    cmp #$50                // 'P'
+    beq foTypeOk
+    cmp #$70                // 'p'
+    beq foTypeOk
+    cmp #$53                // 'S'
+    beq foTypeOk
+    cmp #$73                // 's'
+    beq foTypeOk
+    cmp #$55                // 'U'
+    beq foTypeOk
+    cmp #$75                // 'u'
+    beq foTypeOk
+    cmp #$52                // 'R'
+    beq foTypeOk
+    cmp #$72                // 'r'
+    beq foTypeOk
+    
+    // Default to 'S' if not specified or invalid
+    lda #$53
+foTypeOk:
+    and #$DF                // Convert lowercase to uppercase (e.g. $73 -> $53)
     sta FileScratch, y
     iny
     lda #','
@@ -264,6 +199,7 @@ foUseType:
 foSkipMode:
     // 3. Prepare KERNAL SETNAM
     tya                     // Filename length
+    sta FileLenLo           // Stash for potential reopen
     ldx #<FileScratch
     ldy #>FileScratch
     jsr KernalSETNAM
@@ -276,12 +212,52 @@ foSkipMode:
     
     jsr KernalOPEN
     bcs foError             // KERNAL error (e.g., file not found)
+
+    // KERNAL OPEN's carry is NOT reliable for "file not found" on a SEQ
+    // read -- the 1541 drive only reports it via the error channel (LFN
+    // 15), which OPEN alone doesn't surface. Left unchecked, a read-mode
+    // open of a nonexistent file silently "succeeds" here, the caller's
+    // first fileRead then stores one garbage byte before the read loop's
+    // own status check catches the error one byte too late, AND the
+    // drive's error status (typically "62,FILE NOT FOUND") is left
+    // dangling on LFN 15 for a completely unrelated later operation to
+    // trip over (checkDeviceReady's own preflight, run at the start of
+    // the *next* fileOpen/fileDelete/etc call, sees the stale non-"00"
+    // status and reports a bogus "other drive error"). Verify via the
+    // Skip read verification for write-mode opens
+    lda OpenMode
+    bne foSkipReadVerify
+
+    lda TempLo               // save the handle table offset across the
+    pha                       // LFN 15 round trip (readErrorChannel reuses
+                               // TempLo itself for the device number)
+    lda TargetDevice
+    jsr readErrorChannel      // fills SourceBuf with the status string
+    pla
+    sta TempLo
+
+    lda SourceBuf
+    cmp #'0'
+    bne foReadNotFound
+    lda SourceBuf + 1
+    cmp #'0'
+    bne foReadNotFound       // Not "00" (e.g. "62") -> file not found or error
     
+    beq foSkipReadVerify      // "00" = OK, this open found real data
+foReadNotFound:
+    ldx TempLo
+    lda HandleTable + 1, x
+    jsr KernalCLOSE
+    sec
+    lda #$FF
+    rts
+
+foSkipReadVerify:
     // 4. Mark handle as open
     ldx TempLo
     lda #1                  // Status = Open
     sta HandleTable, x
-    
+
     // Return handle index (offset / 2)
     txa
     lsr
@@ -335,43 +311,65 @@ fcError:
 // Output: HexValLo/Hi = Number of bytes actually read
 //         Carry: 0=Success, 1=Error
 fileRead:
-    sta TempLo              // Save handle temporarily
-    stx PrintPtrLo          // Reuse PrintPtr for buffer
+    // 1. Validate handle
+    sta TempLo
+    stx PrintPtrLo
     sty PrintPtrHi
     
-    // 1. Validate handle
-    lda TempLo
     asl
     tax
     lda HandleTable, x
-    beq frError             // Not open
+    bne _handleOk
+    jmp frError             // Not open
+_handleOk:
     
     // 2. Set input channel
     lda HandleTable + 1, x  // Get LFN
     tax                     // X = LFN (Required by CHKIN)
     jsr KernalCHKIN
-    bcs frError
+    bcc _chkinOk
+    jmp frError
+_chkinOk:
     
     // 3. Read loop
     lda #0
-    sta TempLo              // Bytes read Lo
-    sta TempHi              // Bytes read Hi
+    sta KernalStatus        // Clear stale KERNAL status
+    sta ReadCountLo         // Bytes read Lo
+    sta ReadCountHi         // Bytes read Hi
     
 frLoop:
     // Check if we reached requested count
-    lda TempLo
-    cmp HexValLo
+    lda ReadCountLo
+    cmp FileLenLo
     bne frDoRead
-    lda TempHi
-    cmp HexValHi
-    beq frDone              // Finished all bytes requested
+    lda ReadCountHi
+    cmp FileLenHi
+    beq frDoneOK            // Finished all bytes requested
     
 frDoRead:
-    jsr KernalREADST
-    bne frDone              // Status non-zero? (EOF or Error)
-    
     jsr KernalChRIN         // Read char from channel
     
+    pha                     // Save the character read
+    jsr KernalREADST        // Check status immediately after read
+    sta TempHi              // Save status in TempHi
+    pla                     // Restore character
+    
+    ldy TempHi              // Look at status
+    beq frStore             // If status is 0, normal read: store and continue
+    
+    tya
+    and #$BF                // Mask out EOI bit (bit 6 = $40)
+    bne frReadError         // Any other error bits? If yes, exit with error
+    
+    // EOI case: store the final byte, increment count, and then exit successfully
+    ldy #0
+    sta (PrintPtrLo), y
+    inc ReadCountLo
+    bne frDoneOK
+    inc ReadCountHi
+    jmp frDoneOK
+
+frStore:
     ldy #0
     sta (PrintPtrLo), y     // Store in buffer
     
@@ -382,21 +380,33 @@ frDoRead:
 frSkipInc:
 
     // Increment count
-    inc TempLo
+    inc ReadCountLo
     bne frLoop
-    inc TempHi
+    inc ReadCountHi
     jmp frLoop
 
-frDone:
+frDoneOK:
     jsr KernalCLRCHN        // Reset to keyboard
     
     // Return actual bytes read
-    lda TempLo
+    lda ReadCountLo
     sta HexValLo
-    lda TempHi
+    lda ReadCountHi
     sta HexValHi
     
-    clc
+    clc                     // Success status
+    rts
+
+frReadError:
+    jsr KernalCLRCHN        // Reset to keyboard
+    
+    // Return actual bytes read so far
+    lda ReadCountLo
+    sta HexValLo
+    lda ReadCountHi
+    sta HexValHi
+    
+    sec                     // Error status
     rts
 
 frError:
@@ -412,12 +422,11 @@ frError:
 // Output: HexValLo/Hi = Number of bytes actually written
 //         Carry: 0=Success, 1=Error
 fileWrite:
-    sta TempLo              // Save handle temporarily
-    stx PrintPtrLo          // Reuse PrintPtr for buffer
+    // 1. Validate handle
+    sta TempLo
+    stx PrintPtrLo
     sty PrintPtrHi
     
-    // 1. Validate handle
-    lda TempLo
     asl
     tax
     lda HandleTable, x
@@ -431,25 +440,26 @@ fileWrite:
     
     // 3. Write loop
     lda #0
-    sta TempLo              // Bytes written Lo
-    sta TempHi              // Bytes written Hi
+    sta KernalStatus        // Clear stale KERNAL status
+    sta WriteCountLo         // Bytes written Lo
+    sta WriteCountHi         // Bytes written Hi
     
 fwLoop:
     // Check if we reached requested count
-    lda TempLo
-    cmp HexValLo
+    lda WriteCountLo
+    cmp FileLenLo
     bne fwDoWrite
-    lda TempHi
-    cmp HexValHi
+    lda WriteCountHi
+    cmp FileLenHi
     beq fwDone              // Finished all bytes requested
     
 fwDoWrite:
+    jsr KernalREADST
+    bne fwDone              // Status non-zero? (Error)
+    
     ldy #0
     lda (PrintPtrLo), y     // Get char from buffer
     jsr KernalChROUT        // Write char to channel
-    
-    jsr KernalREADST
-    bne fwDone              // Status non-zero? (Error)
     
     // Advance buffer
     inc PrintPtrLo
@@ -458,18 +468,18 @@ fwDoWrite:
 fwSkipInc:
 
     // Increment count
-    inc TempLo
+    inc WriteCountLo
     bne fwLoop
-    inc TempHi
+    inc WriteCountHi
     jmp fwLoop
 
 fwDone:
     jsr KernalCLRCHN        // Reset to screen
     
     // Return actual bytes written
-    lda TempLo
+    lda WriteCountLo
     sta HexValLo
-    lda TempHi
+    lda WriteCountHi
     sta HexValHi
     
     clc
@@ -623,15 +633,187 @@ frDeviceErr:
 TargetDevice:
     .byte 0
 
-CdrDevice:
-    .byte 0
-CdrRetried:
-    .byte 0
+// CdrDevice and CdrRetried moved to ShellExt segment below to free up space in File segment
 
 // File's fixed $0D00 window (packed tightly against the fixed $1000 ApiStub
 // jump table) has no slack left, so these live in ShellExt instead — same
 // reasoning as aptRelocate in loader.asm. JSR works fine across segments.
 .segment ShellExt
+
+CdrDevice:
+    .byte 0
+CdrRetried:
+    .byte 0
+
+FileLenLo:
+    .byte 0
+FileLenHi:
+    .byte 0
+
+ReadCountLo:
+    .byte 0
+ReadCountHi:
+    .byte 0
+WriteCountLo:
+    .byte 0
+WriteCountHi:
+    .byte 0
+IoBufPtrLo:
+    .byte 0
+IoBufPtrHi:
+    .byte 0
+
+SaveOffset:
+    .byte 0
+
+OpenMode:
+    .byte 0
+OpenType:
+    .byte 0
+
+L15Device:
+    .byte 0
+
+// --- ensureL15Open ---
+// Ensures LFN 15 is open on the specified device. If LFN 15 is already open
+// on a different device, it closes it first before reopening.
+// Input:  A = device number
+// Output: None (LFN 15 open on device)
+// Clobbers: None (Preserves A, X, Y)
+ensureL15Open:
+    cmp L15Device
+    beq el15Done
+    
+    pha
+    txa
+    pha
+    tya
+    pha
+    
+    lda L15Device
+    beq el15SkipClose
+    
+    lda #15
+    jsr KernalCLOSE
+    
+el15SkipClose:
+    // Update active device
+    tsx
+    lda $103, x             // Get stashed target device from stack (A is at offset $103 on stack after 3 pushes)
+    sta L15Device
+    
+    lda #0                  // No filename
+    ldy #0
+    jsr KernalSETNAM
+    
+    lda #15
+    ldx L15Device
+    ldy #15
+    jsr KernalSETLFS
+    jsr KernalOPEN
+    
+    pla
+    tay
+    pla
+    tax
+    pla
+el15Done:
+    rts
+
+// --- checkDeviceReady ---
+// Verifies a device is present on the IEC bus and has a disk ready.
+// Input:  A = device number to check
+// Output: A = 0 ready / 1 no device / 2 no disk / 3 other drive error
+//         Carry: 0 = ready, 1 = error (mirrors A<>0)
+// Clobbers: A, X, Y, TempLo, TempHi
+checkDeviceReady:
+    pha                     // Stash device number across the presence probe
+    jsr KernalLISTEN        // A = device number (still set from before the push)
+    jsr KernalUNLSN
+    jsr KernalREADST
+    and #$80                // Bit 7 = device did not respond to LISTEN
+    beq cdrPresent
+    pla                     // Discard the stashed device number
+    lda #1
+    sec
+    rts
+
+cdrPresent:
+    pla
+    sta CdrDevice           // Remember device number across the status re-query
+    lda #0
+    sta CdrRetried
+
+cdrQueryStatus:
+    lda CdrDevice
+    jsr ensureL15Open
+
+    ldx #15
+    jsr KernalCHKIN
+    bcs cdrNoDevice         // Device not present or not open
+
+    jsr KernalChRIN         // Status digit 1 (tens)
+    sta TempLo
+    jsr KernalChRIN         // Status digit 2 (units)
+    sta TempHi
+
+    // Drain remainder of the status channel line so no pending bytes block next queries
+cdrDrainLoop:
+    jsr KernalREADST
+    bne cdrDrainDone        // EOI or error -> nothing more to read
+    jsr KernalChRIN
+    cmp #$0D                // PETSCII Carriage Return
+    bne cdrDrainLoop
+cdrDrainDone:
+    jsr KernalCLRCHN
+
+    // "00" = OK
+    lda TempLo
+    cmp #'0'
+    bne cdrCheck73
+    lda TempHi
+    cmp #'0'
+    beq cdrOk
+
+cdrCheck73:
+    lda TempLo
+    cmp #'7'
+    bne cdrCheck74
+    lda TempHi
+    cmp #'3'
+    bne cdrCheck74
+    lda CdrRetried          // Power-on banner: re-query once for the real status
+    bne cdrOk               // already retried — trust it this time
+    inc CdrRetried
+    jmp cdrQueryStatus
+
+cdrCheck74:
+    lda TempLo
+    cmp #'7'
+    bne cdrOtherErr
+    lda TempHi
+    cmp #'4'
+    beq cdrNotReady
+
+cdrOtherErr:
+    lda #3
+    sec
+    rts
+
+cdrOk:
+    lda #0
+    clc
+    rts
+
+cdrNotReady:
+    lda #2
+    sec
+    rts
+
+cdrNoDevice:
+    lda #1
+    sec
+    rts
 
 // --- readErrorChannel ---
 // Reads and clears the device's command/error channel (LFN 15). The 1541
@@ -649,32 +831,16 @@ CdrRetried:
 //         Carry: 0 = read ok, 1 = device didn't respond to OPEN
 // Clobbers: A, X, Y
 readErrorChannel:
-    sta TempLo              // stash device number (SETNAM below clobbers A/X/Y only)
-
-    lda #0                  // No filename — just open the status channel
-    ldy #0
-    jsr KernalSETNAM
-
-    lda #15
-    ldx TempLo
-    ldy #15
-    jsr KernalSETLFS
-    jsr KernalOPEN
-    bcs recError
-
+    jsr ensureL15Open
+    
     ldx #15
     jsr KernalCHKIN
-    bcs recCloseError
-
+    bcs recError
+    
     jsr drainOpenErrorChannel
-    lda #15
-    jsr KernalCLOSE
     clc
     rts
 
-recCloseError:
-    lda #15
-    jsr KernalCLOSE
 recError:
     lda #0
     sta SourceBuf
@@ -720,38 +886,37 @@ docDone:
 //         Carry: 0 = success, 1 = error (A = status code, 3 = other drive error)
 // Clobbers: A, X, Y
 sendSA15Command:
-    ldx #<FileScratch
-    ldy #>FileScratch
-    jsr KernalSETNAM
-
-    lda #15                 // LFN 15 is standard for command channel
-    ldx TargetDevice
-    ldy #15                 // Secondary 15 is command channel
-    jsr KernalSETLFS
-
-    jsr KernalOPEN
+    sta SaveOffset          // Store command length
+    
+    lda TargetDevice
+    jsr ensureL15Open
+    
+    ldx #15
+    jsr KernalCHKOUT
     bcs sscError
-
+    
+    ldy #0
+sscWriteLoop:
+    cpy SaveOffset
+    beq sscWriteDone
+    lda FileScratch, y
+    jsr KernalChROUT
+    iny
+    jmp sscWriteLoop
+    
+sscWriteDone:
+    jsr KernalCLRCHN
+    
     ldx #15
     jsr KernalCHKIN
-    bcs sscCloseErr
+    bcs sscError
+    
     jsr drainOpenErrorChannel
-    lda #15
-    jsr KernalCLOSE
     clc
     rts
 
-sscCloseErr:
-    lda #15
-    jsr KernalCLOSE
-    lda #3
-    sec
-    rts
-
 sscError:
-    lda #15
-    jsr KernalCLOSE         // Ensure channel is closed even on error
-    lda #3                  // Device was ready; some other drive error occurred
+    lda #3
     sec
     rts
 

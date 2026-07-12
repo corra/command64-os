@@ -35,6 +35,7 @@ KernalSAVE      = $FFD8 ; Save memory range to file
 KernalOPEN      = $FFC0 ; Open a logical file
 KernalCLOSE     = $FFC3 ; Close a logical file
 KernalREADST    = $FFB7 ; Read status byte
+KernalStatus    = $90   ; KERNAL I/O status byte
 KernalCHKIN     = $FFC6 ; Set input channel
 KernalCHKOUT    = $FFC9 ; Set output channel
 KernalCLRCHN    = $FFCC ; Clear I/O channels
@@ -60,6 +61,8 @@ DOS_FREE_MEM     = $49 ; Free memory (VMM)
 DOS_EXIT         = $4C ; Terminate program (Return to Shell)
 DOS_PARSE_PREFIX = $57 ; Parse target device prefix from ZP pointer
 DOS_SEND_COMMAND = $58 ; Send raw command-channel string, read drive response
+DOS_VMM_READ     = $59 ; Block-read bytes from a DOS_ALLOC_MEM'd REU segment
+DOS_VMM_WRITE    = $5A ; Block-write bytes to a DOS_ALLOC_MEM'd REU segment
 
 ; --- PETSCII Control Characters ---
 PetCr   = $0D ; Carriage return

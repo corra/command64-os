@@ -7,10 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **EDLIN External Utility Port (Phases 0-4)**: Ported MS-DOS 4.00 EDLIN to COMMAND64 OS as a ca65-built external app (`edlin.prg` v0.1.4):
+  - **Phase 0 (Scaffold)**: Integrates into the CMake build system, increments build counter via `BUILD_EDLIN`, and exits cleanly via `DOS_EXIT`.
+  - **Phase 1 (Buffer Core)**: Implements VMM-backed text buffers and page-based scanning for fast line-number resolution, with local RAM-fallback when REU is absent.
+  - **Phase 2 (Read/Navigation)**: Adds `L`ist and `P`age commands supporting paging boundaries, decimals, current-line `.`, and last-line `#` tokens.
+  - **Phase 3 (Edit Commands)**: Implements line editing, `I`nsert (line shifts), `D`elete, and a Y/N prompted `Q`uit.
+  - **Phase 4 (Save/streaming)**: Implements `W`rite (`W`) using the native 1541 `@0:` save-replace convention for transaction safety, and adds safe nonexistent file initialization (`NEW FILE.`).
+
+### Changed
+
 - **Test target names normalized**: Renamed ca65 test apps with redundant
   `<name>test` source names to feature-only names (`test_api`, `test_bank`,
   `test_dev`, `test_file`, `test_handle`, `test_sendcmd`, `test_vmm`) and
   made CMake watch test source/include globs with `CONFIGURE_DEPENDS`.
+
+### Fixed
+
+- **Stale KERNAL I/O Status Clearing**: Fixed a bug where the KERNAL status byte (`$90`) was not cleared at the start of `DOS_READ_FILE` (`fileRead`) and `DOS_WRITE_FILE` (`fileWrite`) loops, causing stale status (such as EOF/EOI leftover from previous file reads or error channel checks) to prematurely terminate operations. This resolves the issue where EDLIN's `W` (write) command failed to write out the buffer and reported `ERROR: WRITE FAILED - DISK FULL?`. Defined the `KernalStatus = $90` constant in both KickAssembler and ca65 include files.
 
 ## [0.4.0] - 2026-07-09
 

@@ -41,8 +41,9 @@ Opens a file on disk (CurrentDevice).
 - **Input:**
   - `X/Y`: Pointer to null-terminated filename (Lo/Hi).
   - `HexValLo` ($66): Access Mode (0 = Read, 1 = Write).
+  - `HexValHi` ($67): File Type for Write Mode (optional, e.g., 'S', 'P', 'U', 'R'). Omitted or invalid values default to 'S' (SEQ).
 - **Output:**
-  - `A`: File Handle (0-7).
+  - **A**: File Handle (0-7).
   - `Carry`: 0 (Success).
 - **Error:** `Carry` = 1, `A` = $FF.
 
@@ -137,6 +138,36 @@ Frees previously allocated REU memory.
   - `Y` = Bank (VmmBank).
 - **Output:** `Carry` = 0.
 - **Error:** `Carry` = 1.
+
+### DOS_VMM_READ ($59)
+
+Reads a caller-specified byte range out of a previously `DOS_ALLOC_MEM`'d
+REU segment into C64 RAM, in a single REU DMA burst. `DOS_ALLOC_MEM`/
+`DOS_FREE_MEM` alone give no way to actually move data into/out of
+allocated REU memory — this and `DOS_VMM_WRITE` are the primitives that
+close that gap. Reuses the same `VmmSegLo/Hi`/`VmmOffLo/Hi`/`VmmBank` ZP
+convention the kernel's internal `vmmReadByte` uses, but transfers the
+whole requested range in one DMA call rather than one byte at a time.
+
+- **Input:**
+  - `VmmSegLo/Hi`, `VmmOffLo/Hi`, `VmmBank` ($68-$6C): Source Seg:Off:Bank.
+  - `X/Y`: Destination C64 buffer pointer (Lo/Hi).
+  - `HexValLo/Hi` ($66-$67): Byte count.
+- **Output:** Destination buffer filled; `Carry` = 0.
+- **Error:** `Carry` = 1 (REU/VMM not initialized).
+
+### DOS_VMM_WRITE ($5A)
+
+Writes a caller-specified byte range from C64 RAM into a previously
+`DOS_ALLOC_MEM`'d REU segment, in a single REU DMA burst. See
+`DOS_VMM_READ` above for rationale.
+
+- **Input:**
+  - `VmmSegLo/Hi`, `VmmOffLo/Hi`, `VmmBank` ($68-$6C): Destination Seg:Off:Bank.
+  - `X/Y`: Source C64 buffer pointer (Lo/Hi).
+  - `HexValLo/Hi` ($66-$67): Byte count.
+- **Output:** `Carry` = 0.
+- **Error:** `Carry` = 1 (REU/VMM not initialized).
 
 ### DOS_EXIT ($4C)
 

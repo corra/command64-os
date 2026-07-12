@@ -56,6 +56,9 @@ set(DEBUG_ENTRY "src/external/debug/debug.s")
 file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.s" "src/external/label/*.inc" "include/ca65/*.inc")
 set(LABEL_ENTRY "src/external/label/label.s")
 
+file(GLOB_RECURSE EDLIN_SRCS CONFIGURE_DEPENDS "src/external/edlin/*.s" "src/external/edlin/*.inc" "include/ca65/*.inc")
+set(EDLIN_ENTRY "src/external/edlin/edlin.s")
+
 file(GLOB_RECURSE FORMAT_SRCS CONFIGURE_DEPENDS "src/external/format/*.s" "src/external/format/*.inc" "include/ca65/*.inc")
 set(FORMAT_ENTRY "src/external/format/format.s")
 
@@ -128,6 +131,22 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for LABEL target")
 endif()
 set(LABEL_TARGET label)
+
+# 3c. EDLIN External Command PRG Target — ported from MS-DOS 4.00 EDLIN
+# (ms-dos/v4.0/src/CMD/EDLIN/); see
+# brain/plans/2026-07-09-edlin-port-feasibility.md and
+# brain/plans/2026-07-09-edlin-implementation-phases.md. Phase 0 is a
+# scaffold (version banner only); PRG_SIZE_HEX will need to grow in later
+# phases as the VMM-backed buffer and command dispatch land. Ships
+# unconditionally in IMAGE_PRG_TARGETS, so — like LABEL — a missing
+# ca65/ld65 toolchain fails the entire configure rather than silently
+# skipping this target.
+if(Ca65_FOUND)
+    add_ca65_app(edlin "${EDLIN_ENTRY}" EDLIN_SRCS 1000 "1800")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for EDLIN target")
+endif()
+set(EDLIN_TARGET edlin)
 
 # 3b. FORMAT External Command PRG Target — sends CBM DOS's native N:name,id
 # command to a drive's command channel via the DOS_SEND_COMMAND kernel
@@ -250,7 +269,7 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
+set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
@@ -272,6 +291,42 @@ add_custom_command(
     TARGET test_image_d64 POST_BUILD
     COMMAND "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending SEQ test file to test.d64"
+)
+
+# Add EDLIN test file (30 numbered lines, exercises List/Page pagination) to
+# test.d64 — see brain/plans/2026-07-09-edlin-implementation-phases.md
+# Phase 1/2.
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending EDLIN test SEQ file to test.d64"
+)
+
+# Add a second, shorter EDLIN test file (10 lines, mixed short/long content)
+# to test.d64 — purpose-built for Phase 3 buffer testing: short enough for
+# quick manual insert/delete iteration without scrolling through the 30-line
+# fixture, with embedded original-position numbers (so post-delete/insert
+# renumbering is visually obvious) and a deliberately long line (04) plus
+# deliberately short ones (03/07) to exercise edit-line's shrink/grow hole
+# resize paths. See brain/plans/2026-07-09-edlin-implementation-phases.md
+# Phase 3.
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "edlintst2" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test2.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending second EDLIN test SEQ file (Phase 3 buffer testing) to test.d64"
+)
+
+# Add a third EDLIN test file, pre-filled to within 150 bytes of the 16KB
+# VMM buffer ceiling (BUF_ALLOC_BYTES, common.inc), so the "7. Buffer-full
+# path" test in Phase 3's testing plan doesn't require typing thousands of
+# characters by hand in VICE -- load this file, then a couple of small `I`
+# inserts is enough to cross the ceiling and exercise bufOpenHole's
+# Carry=1 path. See brain/plans/2026-07-09-edlin-implementation-phases.md
+# Phase 3.
+add_custom_command(
+    TARGET test_image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "edlinfull" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test_full.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMENT "Appending EDLIN buffer-full test SEQ file (Phase 3) to test.d64"
 )
 
 # 6. Release Target

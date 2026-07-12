@@ -19,6 +19,7 @@
 .label KernalOPEN      = $FFC0  // Open a logical file
 .label KernalCLOSE     = $FFC3  // Close a logical file
 .label KernalREADST    = $FFB7  // Read status byte
+.label KernalStatus    = $90    // KERNAL I/O status byte
 .label KernalCHKIN     = $FFC6  // Set input channel
 .label KernalCHKOUT    = $FFC9  // Set output channel
 .label KernalCLRCHN    = $FFCC  // Clear I/O channels
@@ -39,6 +40,8 @@
 .label DOS_EXIT        = $4C  // Terminate program (Return to Shell)
 .label DOS_PARSE_PREFIX = $57  // Parse target device prefix from ZP pointer
 .label DOS_SEND_COMMAND = $58  // Send raw command-channel string, read drive response
+.label DOS_VMM_READ    = $59  // Block-read bytes from a DOS_ALLOC_MEM'd REU segment
+.label DOS_VMM_WRITE   = $5A  // Block-write bytes to a DOS_ALLOC_MEM'd REU segment
 
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return

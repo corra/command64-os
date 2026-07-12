@@ -310,9 +310,75 @@ vwbInitOk:
     sta REU_COMMAND
     rts
 
+// --- vmmReadBlock ---
+// Reads a caller-specified byte range from DOS Seg:Off in a single REU DMA
+// burst (unlike vmmReadByte, which sets up a fresh 1-byte DMA per call —
+// too slow for scanning more than a few bytes at a time).
+// Input:  VmmSegLo/Hi, VmmOffLo/Hi, VmmBank = source Seg:Off:Bank
+//         X/Y = destination C64 buffer pointer (Lo/Hi)
+//         HexValLo/Hi = byte count
+// Output: A = VMM_SUCCESS or VMM_ERR_INVALID; destination buffer filled on success
+vmmReadBlock:
+    cld
+    lda vmmInitialized
+    bne vrblkInitOk
+    lda #VMM_ERR_INVALID
+    rts
+vrblkInitOk:
+    jsr vmmComputeAddress   // Does not clobber X/Y (see vmmComputeAddress header)
+
+    stx REU_C64_ADDR_L
+    sty REU_C64_ADDR_H
+
+    lda HexValLo
+    sta REU_LEN_L
+    lda HexValHi
+    sta REU_LEN_H
+
+    // Execute Fetch (REU -> C64)
+    lda #REU_CMD_FETCH
+    sta REU_COMMAND
+
+    lda #VMM_SUCCESS
+    rts
+
+// --- vmmWriteBlock ---
+// Writes a caller-specified byte range to DOS Seg:Off in a single REU DMA
+// burst. Mirrors vmmReadBlock; see its header for the rationale.
+// Input:  VmmSegLo/Hi, VmmOffLo/Hi, VmmBank = destination Seg:Off:Bank
+//         X/Y = source C64 buffer pointer (Lo/Hi)
+//         HexValLo/Hi = byte count
+// Output: A = VMM_SUCCESS or VMM_ERR_INVALID
+vmmWriteBlock:
+    cld
+    lda vmmInitialized
+    bne vwblkInitOk
+    lda #VMM_ERR_INVALID
+    rts
+vwblkInitOk:
+    jsr vmmComputeAddress   // Does not clobber X/Y (see vmmComputeAddress header)
+
+    stx REU_C64_ADDR_L
+    sty REU_C64_ADDR_H
+
+    lda HexValLo
+    sta REU_LEN_L
+    lda HexValHi
+    sta REU_LEN_H
+
+    // Execute Stash (C64 -> REU)
+    lda #REU_CMD_STASH
+    sta REU_COMMAND
+
+    lda #VMM_SUCCESS
+    rts
+
 // --- vmmComputeAddress [Private] ---
 // Computes 20-bit REU address from 16-bit Seg and 16-bit Off.
 // Result: REU_REU_ADDR_L/H and REU_REU_BANK set.
+// X is untouched throughout; Y is saved/restored, so callers may stage
+// values in X/Y before calling and use them immediately after (see
+// vmmReadBlock/vmmWriteBlock, which pass a C64 buffer pointer this way).
 //
 // Calculation: Address = (Seg << 4) + Off
 vmmComputeAddress:
