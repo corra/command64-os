@@ -414,7 +414,7 @@ error message shows up.
    unless `EdCurrentLine` is `1`, in which case default = `1` (mirrors
    `PAGER`'s `CMP BX,1 / JE frstok`).
 3. line2: if `Line2Given`, use it; else default = `line1 + (SCREEN_LINES
-   - 2)` (mirrors `PAGER`'s `disp_len - 2` end-line math), clamped to the
+   - 2)` (mirrors `PAGER`'s`disp_len - 2` end-line math), clamped to the
    real last line (call `findLine($FFFF)` once to get it if needed).
 4. Validate `line2 >= line1` (else error, no backwards paging).
 5. `findLine(line1)` → start offset. Call the shared display routine
@@ -1069,6 +1069,7 @@ This phase implements simplified Search/Replace commands, adding case-insensitiv
 #### PETSCII Case Normalization (tolower)
 
 To support case-insensitive matching, comparisons convert letters to a standard lowercase format. Since C64 uses PETSCII (mixed case), we normalize letters with a `tolower` helper:
+
 - Strip bit 7 via `and #$7F` to normalize shifted letters (`$C1–$DA`) to unshifted uppercase (`$41–$5A`).
 - If the byte is in the range `$41–$5A` (inclusive), convert it to lowercase (`$61–$7A`) by performing `ora #$20`.
 - Otherwise, leave the byte as-is.
@@ -1076,6 +1077,7 @@ To support case-insensitive matching, comparisons convert letters to a standard 
 #### ownLineInput Ctrl-Z Interception
 
 MS-DOS EDLIN separates the search and replace strings in the Replace command using `Ctrl-Z` (`$1A`). On the C64, pressing `Ctrl+Z` under the KERNAL's standard `GETIN` loop returns the byte value `$1A`. We will update `ownLineInput` to intercept `$1A`:
+
 - When `$1A` is input, print `^` (PETSCII `$5E`) and `Z` (PETSCII `$5A`) sequentially to provide the standard visual indicator.
 - Store `$1A` in `EditBuf` natively.
 
@@ -1092,6 +1094,7 @@ MS-DOS EDLIN separates the search and replace strings in the Replace command usi
 #### String Extraction from EditBuf
 
 The search and replace strings are extracted starting from index `Y`:
+
 - **`cmdSearch`**:
   - Copies all remaining characters in `EditBuf` until `$00` (null terminator) to `LastSearchStr`, tracking the length in `LastSearchLen`.
   - If the input is empty (rest of line is empty): checks if `LastSearchLen` is 0. If so, aborts with an error; otherwise reuses the existing `LastSearchStr`.
@@ -1104,6 +1107,7 @@ The search and replace strings are extracted starting from index `Y`:
 #### Search and Replace String Matching (findString)
 
 To avoid excessive VMM copies, `findString` uses a windowed-scanning matching algorithm:
+
 - **Inputs**: `ScanOffsetLo/Hi` (start offset), `EndOffsetLo/Hi` (end offset), `SearchStr`, and `SearchLen`.
 - **Outputs**: Carry=0 (match found, `ScanOffsetLo/Hi` points to match, `CurrentSearchLineLo/Hi` updated), Carry=1 (no match).
 - **VMM Window Scanning**:
@@ -1122,7 +1126,7 @@ To avoid excessive VMM copies, `findString` uses a windowed-scanning matching al
 3. Initializes `CurrentSearchLine = line1`.
 4. Loops `findString`:
    - Prints the matched line using `printDec16` for line numbers and `displayLineText`.
-   - If `QueryFlag` is set: prompts `O.K.? ` using `promptYN`. If `N`, advances `ScanOffset` past match and loops.
+   - If `QueryFlag` is set: prompts `O.K.?` using `promptYN`. If `N`, advances `ScanOffset` past match and loops.
    - If accepted (or `QueryFlag = 0`), sets `EdCurrentLine = CurrentSearchLine` and returns.
 5. If no matches found, prints `NOT FOUND`.
 
@@ -1137,7 +1141,7 @@ To avoid excessive VMM copies, `findString` uses a windowed-scanning matching al
      - Print `LastReplaceStr`.
      - Print bytes in `[MatchOffset + LastSearchLen, NextLineStart)` from the buffer.
      - Print Carriage Return.
-   - If `QueryFlag` is set: prompts `O.K.? `. If `N`, advances search past `LastSearchStr` and loops.
+   - If `QueryFlag` is set: prompts `O.K.?`. If `N`, advances search past `LastSearchStr` and loops.
    - If accepted (or `QueryFlag = 0`):
      - If `LastReplaceLen == LastSearchLen`, overwrites `LastSearchStr` with `LastReplaceStr` in place via `bufWriteBytes`.
      - If `LastReplaceLen > LastSearchLen`, opens a hole of size `LastReplaceLen - LastSearchLen` at `MatchOffset + LastSearchLen`, then writes `LastReplaceStr`. (Aborts if VMM returns Carry=1/buffer full).
@@ -1156,14 +1160,13 @@ To avoid excessive VMM copies, `findString` uses a windowed-scanning matching al
    - Verify `tolower` correctly matches shifted, unshifted, and lowercase letter variations.
    - Verify empty-history calls print `ERROR: NO SEARCH STRING.` rather than crashing.
 
-
 ## Phase 6 — Hardening, tests, docs (`0.1.6`)
 
 - [ ] `tests/src/edlin/` app-level test: scripted load/insert/delete/list/save,
       VICE-driven diff against expected output, following `tests/src/file/`
       and `tests/src/vmm/` patterns.
 - [ ] Exercise the REU-absent fallback path explicitly in a test.
-- [ ] `docs/apps/edlin.md` user-facing command reference.
+- [ ] `wiki/edlin-utility.md` user-facing command reference.
 - [ ] `wiki/tasks/edlin-port.md` checklist closed out; `CHANGELOG.md` entry.
 - **Exit criteria**: `cmake --build build --target test_image_d64` clean;
   manual VICE pass covers full create/edit/save/reload cycle end to end.
@@ -1450,9 +1453,9 @@ plan's Verification Plan section, run in full.
   - **Phase 3 is complete** (test section 10 deferred, tracked in
     `task 22`, not a blocker for this phase).
 - 2026-07-10: Phase 4 planning session. Started from the original terse
-  bullets ("W`rite + auto-drain-on-exit, `A`ppend streaming mirroring
+  bullets ("W`rite + auto-drain-on-exit,`A`ppend streaming mirroring
   DOS's fill-to-3/4/flush-to-1/4"). A Task agent researched the file-write
-  ABI directly from `src/command64/file.asm` (spot-checked, not trusted
+  ABI directly from`src/command64/file.asm` (spot-checked, not trusted
   blindly, per [[feedback-verify-agent-hardware-claims]]) since Phases 1-3
   only ever read files.
   - User flagged a real production incident during this discussion: REU
@@ -1599,4 +1602,3 @@ plan's Verification Plan section, run in full.
     **Not yet VICE-verified** — annotated onto `task 24` rather than
     closing it outright, pending confirmation.
 - 2026-07-11: Phase 4 manual verification in VICE completed successfully. Verified empty new-file creation, line insertion, `@0:` save-replace writing (`W`), editor quit (`Q`), reload and listing (`L`) of modified file, and buffer ceiling limits. Bumps `VERSION_STAGE` to `'4'` (`0.1.4`) in `edlin.s`.
-

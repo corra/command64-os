@@ -85,7 +85,7 @@ The project is built using **CMake**. A `Makefile` wrapper is also provided at t
 ## For Users
 
 See the **[User Manual](docs/user-manual.md)** for a comprehensive guide to using command64.
-Details on external utilities like `DEBUG` can be found in the **[Applications Guide](docs/apps/debug.md)**.
+Details on external utilities like `DEBUG` can be found in the **[Applications Guide](wiki/debug-utility.md)**.
 
 ## For Developers
 

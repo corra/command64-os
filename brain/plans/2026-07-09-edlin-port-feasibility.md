@@ -20,6 +20,7 @@ vi (if ever attempted) reuses the line-input/paging plumbing this produces.
 ## Scope
 
 **In scope** (the commands that carry EDLIN's actual value and are cheap to port):
+
 - Line editing model: flat text buffer, virtual line numbers via linear scan.
 - Commands: `I`nsert, `D`elete, `L`ist, `P`age, blank-line **edit-line**, `Q`uit,
   `W`rite, and plain load/save (open file → buffer → save on exit).
@@ -28,6 +29,7 @@ vi (if ever attempted) reuses the line-input/paging plumbing this produces.
 - Simple decimal / `.` (current) / `#` (last+1) line-number argument syntax.
 
 **Explicitly out of scope** (drop, don't port):
+
 - DBCS/Kanji handling (`IF KANJI` blocks in EDLCMD2/EDLIN) — dead weight, no
   target hardware relevance.
 - `C`opy/`M`ove (`BLKMOVE`) — this is the module the DOS revision history calls
@@ -55,7 +57,7 @@ vi (if ever attempted) reuses the line-input/paging plumbing this produces.
 | `src/external/edlin/cmds.s` | Create | Insert, Delete, List, Page, edit-line, Quit, Write/Append streaming |
 | `src/external/edlin/BUILD_EDLIN` | Create | Build-number counter file, seeded `1000` per AGENTS.md convention |
 | `CMakeLists.txt` | Modify | `add_ca65_app(edlin ...)` target + append to `IMAGE_PRG_TARGETS` |
-| `docs/apps/edlin.md` | Create | User-facing command reference (mirrors `docs/apps/debug.md` pattern) |
+| `wiki/edlin-utility.md` | Create | User-facing command reference (mirrors `wiki/debug-utility.md` pattern) |
 | `wiki/tasks/edlin-port.md` | Create | Task tracker if this moves from plan to active work |
 
 ## Key Design Decisions

@@ -2,6 +2,7 @@
 
 **File Name:** `conway.prg`
 **Target Address:** `$2000` (Standard User Program Space)
+**Version:** 0.4.0 (Build 1042)
 
 ## Overview
 
@@ -15,7 +16,7 @@ The grid is **toroidal**: the left edge wraps to the right, and the top edge wra
 
 ## Command Syntax
 
-```
+```sh
 CONWAY
 ```
 
@@ -32,6 +33,9 @@ No arguments. The simulation starts immediately with a randomly seeded grid (~25
 | `C` | Clear the grid (all cells set to dead) |
 | `Q` | Quit and return to the command64 shell |
 | RUN/STOP | Quit and return to the command64 shell |
+
+On quit, the screen is cleared and CONWAY prints its version banner
+(`CONWAY v0.4.0.1042`) before returning to the shell.
 
 ---
 
@@ -53,9 +57,19 @@ Color RAM is filled with green (VIC-II color 5) at startup and is not modified p
 
 Each generation is computed using **double buffering**: a source buffer is read for neighbour counts while a separate destination buffer receives the new state. The buffers swap roles after every generation, so reads and writes never alias.
 
-- **Buffer addresses:** `$3000` (first buffer) and `$3400` (second buffer).
+- **Buffer addresses:** `$3000` (first buffer) and `$3400` (second buffer), each 1024 bytes, page-aligned (1000 cells used, 24 bytes of padding).
 - **Cell encoding:** 1 byte per cell — `0` = dead, `1` = alive.
-- **Buffer size:** 1024 bytes allocated per buffer (1000 used, 24 bytes of page-aligned padding).
+- **Swap mechanism:** `computeNext` reads from the active buffer and writes to the inactive one; `swapBufs` toggles `zpBufSel` to exchange them, guaranteeing neighbour reads always see the prior generation's state.
+
+To avoid multiplying a row index by 40 at runtime, a 25-entry precomputed
+offset table (split into `rowOffLo`/`rowOffHi`) is used instead.
+`setThreeRowPtrs` performs three 16-bit base+offset additions (carry
+propagates naturally from lo to hi) to set up `zpPrevLo/Hi`, `zpCurrLo/Hi`,
+and `zpNextLo/Hi` for the current row before the column loop starts.
+
+The column loop body (`cnColLoop`) is ~140 bytes — beyond the 6502's
+±127-byte relative branch limit. The loop back-edge uses `JMP cnColLoop`
+guarded by `BEQ cnColDone` to stay within the opcode set.
 
 ### Random Seeding
 
@@ -100,16 +114,25 @@ Animation speed is controlled by the KERNAL jiffy clock (`$A2`). The simulation 
 ## Practical Examples
 
 ### Start the simulation
-```
+
+```sh
 CONWAY
 ```
+
 The screen goes black and the simulation begins with a randomized grid.
 
 ### Pause, inspect, resume
+
 Press `SPACE` to freeze the display. Press `SPACE` again to continue.
 
 ### Try a different pattern
+
 Press `R` to discard the current state and seed a fresh random grid.
 
 ### Return to shell
+
 Press `Q` or the RUN/STOP key. The screen is cleared and the shell prompt returns.
+
+## Source
+
+[src/external/conway/conway_main.s](../src/external/conway/conway_main.s), [src/external/conway/conway_grid.s](../src/external/conway/conway_grid.s)

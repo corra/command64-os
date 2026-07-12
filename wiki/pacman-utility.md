@@ -1,25 +1,27 @@
-# PACMAN — Pac64
+# command64 OS PACMAN Utility Manual
 
-**Version:** 0.1.0  
-**File:** `pacman.prg`  
-**Load address:** `UserProgStart` (currently `$2C00`)
+**File Name:** `pacman.prg`
+**Target Address:** `UserProgStart` (currently `$2C00`)
+**Version:** 0.1.0
 
 ## Overview
 
-Pac64 is a character-grid Pac-Man clone for the 40×24 C64 text screen (row
-24 is a dynamic status line). Pac-Man and four ghosts — Blinky, Pinky, Inky,
-and Clyde — move one grid tile at a time, each on its own independently
-tunable jiffy-clock timer. Ghost behaviour is the full authentic
-scatter/chase/frightened/eaten state machine with all four classic
-personalities, not a simplified chase-only bot.
+`PACMAN` (internally "Pac64") is a character-grid Pac-Man clone for the
+40×24 C64 text screen (row 24 is a dynamic status line). Pac-Man and four
+ghosts — Blinky, Pinky, Inky, and Clyde — move one grid tile at a time, each
+on its own independently tunable jiffy-clock timer. Ghost behaviour is the
+full authentic scatter/chase/frightened/eaten state machine with all four
+classic personalities, not a simplified chase-only bot.
 
-## Usage
+## Command Syntax
 
-```bash
+```
 PACMAN
 ```
 
 No arguments. Starts immediately at level 1 with 3 lives.
+
+---
 
 ## Controls
 
@@ -27,16 +29,19 @@ No arguments. Starts immediately at level 1 with 3 lives.
 | --- | --- |
 | `W` / `A` / `S` / `D` | Move up / left / down / right (buffered: an early turn is taken the instant it becomes legal) |
 | `P` / `SPACE` | Pause / resume |
-| `Q` / RUN-STOP | Quit to shell |
+| `Q` | Quit and return to the command64 shell |
+| RUN/STOP | Quit and return to the command64 shell |
 
-## Architecture
+---
+
+## Technical Details
 
 ### Maze tables
 
 `mazeWalls` (read-only: 0=open, 1=wall, 2=ghost-only door) and `mazeItems`
 (mutable: 0=empty, 1=dot=10pts, 2=power pellet=50pts) are both 960-byte
-tables. Unlike conway's grid buffers, neither is pinned to a fixed address:
-conway's small code leaves headroom below its hardcoded `$3000`/`$3400`, but
+tables. Unlike CONWAY's grid buffers, neither is pinned to a fixed address:
+CONWAY's small code leaves headroom below its hardcoded `$3000`/`$3400`, but
 a full ghost-AI game does not reliably fit in the ~1KB gap between
 `UserProgStart` and `$3000`, so both tables are ordinary labelled data
 placed wherever the assembler lays them out. `mazeItems` starts as reserved
@@ -48,7 +53,7 @@ ghosts' `canMoveGhost` check, so Pac-Man cannot wander into the ghost house.
 ### Grid-locked, per-actor movement
 
 Movement is one tile per tick, where a tick fires when a per-actor
-jiffy-driven delay counter expires — unlike conway's single whole-grid
+jiffy-driven delay counter expires — unlike CONWAY's single whole-grid
 update per generation. This lets Pac-Man and all four ghosts move at
 independently tunable speeds without a raster IRQ.
 
@@ -84,13 +89,29 @@ The 3-byte binary score (a 16-bit counter would overflow before a real game
 ends) is expanded to 6 decimal digits via repeated subtraction against a
 table of 24-bit powers of ten.
 
-## Memory Map
+### Memory Usage
 
 | Address range | Contents |
 | --- | --- |
 | `UserProgStart` (`$2C00`) onward | Code, ghost/Pac-Man state, maze tables, read-only tables (~5.5KB total) |
 | `$70 – $75` | Zero-page scratch (subset of the `$70-$7F` external-program range) |
 
+---
+
+## Practical Examples
+
+### Start the game
+```
+PACMAN
+```
+The maze is drawn and the game begins at level 1 with 3 lives.
+
+### Pause, inspect, resume
+Press `P` or `SPACE` to freeze the display. Press it again to continue.
+
+### Return to shell
+Press `Q` or the RUN/STOP key to quit back to the shell prompt.
+
 ## Source
 
-[src/external/pacman/pacman.asm](../../src/external/pacman/pacman.asm)
+[src/external/pacman/pacman.asm](../src/external/pacman/pacman.asm)
