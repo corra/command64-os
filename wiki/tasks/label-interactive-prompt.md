@@ -18,6 +18,13 @@ Implement interactive prompt mode for the `LABEL` command when invoked with no a
 
 ## Sub-tasks
 
-- [ ] Add interactive input branch to `cmdLabel` when no argument is present.
-- [ ] Reuse existing BAM-write logic for the actual rename.
-- [ ] Handle empty input as a cancel/no-op.
+- [x] Add interactive input branch to `cmdLabel` when no argument is present.
+- [x] Reuse existing BAM-write logic for the actual rename.
+- [x] Handle empty input as a cancel/no-op.
+
+## Status
+
+Done. Implemented in `src/external/label/label.s` (`labelNoArg`/`readLoop`,
+prompt/backspace/cancel-on-empty behavior) since the first LABEL spike
+commit — this tracker just hadn't been checked off. Documented in
+[wiki/label-utility.md](../label-utility.md#interactive-prompt-mode).

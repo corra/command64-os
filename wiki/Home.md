@@ -9,6 +9,7 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
   - [DEBUG Utility Manual](debug-utility.md) - Learn how to use the built-in and external interactive assembly debugger.
   - [DEBUG Full Feature Test Plan](debug-test-plan.md) - Manual verification test suites for all interactive memory, register, and file commands.
   - [LABEL Utility Manual](label-utility.md) - Learn how to rename disk volume labels without losing data.
+  - [EDLIN Utility Manual](edlin-utility.md) - Learn how to use the ported MS-DOS line editor.
   - [CONWAY Utility Manual](conway-utility.md) - Learn how to run the Conway's Game of Life demo app.
   - [PACMAN Utility Manual](pacman-utility.md) - Learn how to run the Pac-Man demo app.
 
@@ -42,7 +43,6 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
 - **Time, Date & Shell Commands**
   - [TIME Command Implementation](tasks/time.md)
   - [DATE Command Implementation](tasks/date.md)
-  - [LABEL Interactive Prompt](tasks/label-interactive-prompt.md)
 - **Utilities**
   - [External FORMAT Utility](tasks/format.md)
 
@@ -53,6 +53,7 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
 - [DEBUG Utility Feature Completeness](tasks/debug-feature-completeness.md)
 - [DOS_SEND_COMMAND Kernel Primitive](tasks/dos-send-command.md)
 - [Dynamic Memory Safety & Allocation](tasks/dynamic-memory-safety.md)
+- [LABEL Interactive Prompt](tasks/label-interactive-prompt.md)
 - [Memory-Safe Loading (Pre-flight Validation)](tasks/memory-safe-loading.md)
 - [Phase 6A: App Manager](tasks/phase-6a-app-manager.md)
 - [Phase 6B: Binary Relocator](tasks/phase-6b-binary-relocator.md)

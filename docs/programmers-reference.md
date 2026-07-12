@@ -40,7 +40,8 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 |  $2C43  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
 +---------+-------------------------------------------------------+
 |  $2C42  |  ShellExt Segment                                     |  OS Shell Data
-|  $2495  |  Version, help strings, and DIR size-calc routines    |  (RAM)
+|  $2495  |  Version, help strings, DIR size-calc routines, and   |  (RAM)
+|         |  file I/O internal state (see note below)             |
 +---------+-------------------------------------------------------+
 |  $2494  |  AppTable Segment                                     |  OS Resident Registry
 |  $2000  |  Application Registry Management API (aptInit/Find/   |  (RAM)
@@ -48,7 +49,7 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 +---------+-------------------------------------------------------+
 |  $1FFF  |  VMM Data Segment                                     |  OS VMM Data
 |         |  vmmInitialized ($1FA0), vmmTempByte ($1FA1)          |  (RAM)
-|  $1FA0  |  fileScratch ($1FA2-$1FFC)                            |
+|  $1FA0  |  fileScratch ($1FA2-$1FFB, 90 bytes)                  |
 +---------+-------------------------------------------------------+
 |  $1F9F  |  Command Shell                                        |  OS Shell Code
 |  $1180  |  Command parser, command tables, built-in handlers    |  (RAM)
@@ -165,6 +166,26 @@ The 192-byte cassette buffer region (`$033C-$03FB`) is reused as the persistent 
 |  $033C  |  Active shell command line text buffer (80 bytes)     |
 +---------+-------------------------------------------------------+
 ```
+
+### File I/O Internal State (ShellExt Segment)
+
+`src/command64/file.asm` keeps `fileRead`/`fileWrite`/`fileOpen`'s working
+state as plain labelled bytes in the `ShellExt` segment (moved there because
+the `File` segment's fixed `$0D00` window has no slack left — same reasoning
+as `aptRelocate` in `loader.asm`). These are internal to the file subsystem,
+not part of the OS Service Bus API contract, and their absolute addresses
+shift between builds along with the rest of `ShellExt`/`AppTable`, so they
+are documented here by label rather than fixed address:
+
+| Label | Purpose |
+| --- | --- |
+| `CdrDevice` / `CdrRetried` | `checkDeviceReady`'s device number and power-on-banner retry flag. |
+| `FileLenLo`/`Hi` | Caller-requested byte count for the current `fileRead`/`fileWrite` call (copied from `HexValLo/Hi` by `ahRead`/`ahWrite` in `api.asm` before the call). |
+| `ReadCountLo`/`Hi`, `WriteCountLo`/`Hi` | Bytes actually transferred so far in the current `fileRead`/`fileWrite` loop; copied back into `HexValLo/Hi` on return. |
+| `IoBufPtrLo`/`Hi` | Caller's destination/source buffer pointer, advanced one byte per loop iteration. |
+| `SaveOffset` | Byte offset into the source range for `DOS_WRITE_FILE`-driven saves that stream in chunks. |
+| `OpenMode` | Stashed copy of `HexValLo` (0 = Read, 1 = Write) for the duration of `fileOpen`. |
+| `OpenType` | Stashed copy of `HexValHi` (file type character) for the duration of `fileOpen`; see `DOS_OPEN_FILE` in [OS Service Bus API Reference](api-reference.md) for the default-to-SEQ fallback behavior. |
 
 ---
 

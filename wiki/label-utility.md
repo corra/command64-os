@@ -23,7 +23,17 @@ LABEL [new-label]
   * Names shorter than 16 characters are automatically padded with PETSCII shifted space characters (`$A0`), which is the Commodore standard for directory headers.
   * Attempting to set a label longer than 16 characters will return an error without modifying the disk.
 
-*(Note: Running `LABEL` with no arguments is reserved for a future interactive prompt mode. Currently, it displays an error).*
+### Interactive Prompt Mode
+
+Running `LABEL` with no arguments prompts interactively instead of erroring:
+
+```text
+VOLUME LABEL (16 CHARS MAX)?
+```
+
+Type the new label (up to 16 characters, with destructive backspace
+support) and press `RETURN` to apply it. Pressing `RETURN` on an empty
+line cancels — the disk is left unmodified.
 
 ---
 

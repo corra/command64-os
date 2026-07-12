@@ -99,6 +99,25 @@ Renames a file on disk.
 - **Output:** `Carry` = 0.
 - **Error:** `Carry` = 1.
 
+### DOS_PARSE_PREFIX ($57)
+
+Parses an optional `<dev>:` device prefix off the front of a zero-page
+pointer's target string (e.g. `9:FILENAME`), resolving it to a device
+number without modifying the underlying string. Used internally by
+`fileOpen`/`fileDelete`/`fileRename` and available to callers that need the
+same prefix convention (see `DOS_SEND_COMMAND`).
+
+- **Input:** `X` = zero-page offset of the pointer to the string to parse
+  (not an X/Y pointer pair like most other calls — `X` alone is the ZP
+  address holding the Lo/Hi pointer).
+- **Output:**
+  - `A` = resolved device number (8-11), or `CurrentDevice` if no prefix
+    was present.
+  - `Carry` = 1 if a prefix was found and parsed, 0 if absent. **Note:**
+    this is inverted relative to every other `DOS_*` function, where
+    `Carry` = 0 means success — `Carry` here only reports whether a prefix
+    existed, not whether the call succeeded (it cannot fail).
+
 ### DOS_SEND_COMMAND ($58)
 
 Sends an arbitrary command-channel string to a drive unmodified (no

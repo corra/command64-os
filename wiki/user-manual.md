@@ -150,12 +150,21 @@ command64 supports up to four disk devices simultaneously (8, 9, 10, and 11).
 - `9:` — Shortcut equivalent to `DRIVE 9` to permanently switch to device 9.
 - `DRIVE` — Displays the currently active device.
 
+### FLUSH
+
+**Description:** Manually reads and clears a drive's command/error channel (LFN 15) and prints its current status string. Most commands already drain this channel themselves right after an error, so `FLUSH` is mainly a diagnostic escape hatch — e.g. to inspect or clear a stale status if it's ever suspected of blocking an otherwise-healthy command.
+**Syntax:** `FLUSH [device:]`
+**Examples:**
+
+- `FLUSH` — Reads and clears the error channel of the active device.
+- `FLUSH 9:` — Reads and clears the error channel of device 9 without changing the active device.
+
 ### Target Device Routing
 
 **Description:** Temporarily redirects a single disk operation to a specific drive (8, 9, 10, or 11) using the drive number followed by a colon (`:`).
 This routing applies only to the duration of that specific command, leaving the active device (set by `DRIVE`) unchanged.
 
-**Supported Commands:** `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, and `LABEL`.
+**Supported Commands:** `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, `LABEL`, and `FLUSH`.
 
 **Examples:**
 

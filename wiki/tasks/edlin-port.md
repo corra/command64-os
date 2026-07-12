@@ -37,7 +37,10 @@ live in `brain/plans/2026-07-09-edlin-port-feasibility.md` and
 - [x] Phase 4 — Save/streaming (`0.1.4`): Write, Append, exit-drain save.
 - [ ] Phase 5 — Search/Replace (`0.1.5`): simplified, no quote-char escaping.
 - [ ] Phase 6 — Hardening/tests/docs (`0.1.6`): `tests/src/edlin/`, REU-absent
-      fallback test, `wiki/edlin-utility.md`, CHANGELOG entry.
+      fallback test, CHANGELOG entry.
+      - [x] `wiki/edlin-utility.md` — user-facing command reference, covering
+            Phases 0-4 (I/D/L/P/edit-line/Q/W). Will need a Search/Replace
+            section added once Phase 5 ships.
 
 ## Verification
 
