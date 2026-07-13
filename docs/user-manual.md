@@ -96,6 +96,12 @@ The command64 shell is the primary interface for the OS.
 **Syntax:** `TYPE [filename]`
 **Example:** `TYPE README`
 
+### MORE
+
+**Description:** Displays the contents of a sequential or program file one screen at a time. When the screen fills, `MORE` displays `-- More --` and waits for a key before continuing.
+**Syntax:** `MORE [filename]`
+**Example:** `MORE README`
+
 ### COPY
 
 **Description:** Copies a file from one name/device to another.
@@ -176,13 +182,14 @@ command64 supports up to four disk devices simultaneously (8, 9, 10, and 11).
 **Description:** Temporarily redirects a single disk operation to a specific drive (8, 9, 10, or 11) using the drive number followed by a colon (`:`).
 This routing applies only to the duration of that specific command, leaving the active device (set by `DRIVE`) unchanged.
 
-**Supported Commands:** `DIR`, `TYPE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, `LABEL`, and `FLUSH`.
+**Supported Commands:** `DIR`, `TYPE`, `MORE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, `LABEL`, and `FLUSH`.
 
 **Examples:**
 
 - `DIR 9:` — Lists the directory of the disk in device 9.
 - `VOL 9:` — Displays the volume label of the disk in device 9.
 - `TYPE 9:README` — Displays the file `README` from device 9.
+- `MORE 9:README` — Displays the file `README` from device 9 one screen at a time.
 - `LABEL 9:NEWLABEL` — Sets the volume label of device 9 to `NEWLABEL`.
 - `DEL 9:OLDDATA` — Deletes `OLDDATA` on device 9.
 - `REN 9:OLD NEW` — Renames `OLD` to `NEW` on device 9.
@@ -277,7 +284,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **User Program Space (`UserProgStart` - $CFFF):** currently `$3200` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
+- **User Program Space (`UserProgStart` - $CFFF):** currently `$3400` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity

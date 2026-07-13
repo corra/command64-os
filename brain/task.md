@@ -152,3 +152,11 @@
     - [x] Verify direct and interactive setting/display round-trips
     - [x] Verify leap-year validation
     - [x] Verify midnight and month rollover
+
+- [x] MORE Command Implementation (Taskwarrior #24)
+  - [x] Add `MORE` to the internal command table and help text
+  - [x] Stream file contents through existing DOS open/read/close API calls
+  - [x] Add C64 screen pagination with `-- More --` prompt
+  - [x] Document `MORE` and target-device prefix support
+  - [x] Verify clean build with `make all`
+  - [x] Complete manual C64/VICE workflow verification

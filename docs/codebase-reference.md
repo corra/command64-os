@@ -216,15 +216,15 @@ $1FA0-$1FFF  VmmData                  vmmInitialized (1), vmmTempByte (1),
                                      Month/Day/LastHour ($1FFC-$1FFF)
 ──────────── ──────────────────────── ────────────────────────────────────────────
 $2000-$2494  AppTable                 Resident application registry helpers
-$2495-$311A  ShellExt                 Extended shell/date-time/file helpers and
+$2495-$32A7  ShellExt                 Extended shell/date-time/file helpers and
                                      larger string/data tables
-$311B-$31FF  Reserved padding         Page-aligned headroom before UserProgStart
+$32A8-$33FF  Reserved padding         Page-aligned headroom before UserProgStart
 ──────────── ──────────────────────── ────────────────────────────────────────────
-UserProgStart–$CFFF  User Program Space   External programs load and execute here (BASIC ROM banked out); currently `$3200`
+UserProgStart–$CFFF  User Program Space   External programs load and execute here (BASIC ROM banked out); currently `$3400`
 $C000–$CFFF  VMM MCT                  Memory Control Table (4096 bytes for 16MB REU)
 ```
 
-> **Note**: The addresses shown for OS segments (`$0820`–`$0CE0`) are compile-time constants in `src/command64.asm`; they may drift slightly between builds as code grows. The *stable* entry point for external programs is always exactly `$1000`. `UserProgStart` (the `AppTable`/`ShellExt` boundary that follows it) has shifted upward several times as OS-resident segments grew — from `$2000` to `$2200` to `$2600` to `$2C00` to the current `$3200` — and is configured via the CMake cache variable `USER_PROG_START_HEX`. Never hardcode a prior value; always compile external programs against the current build's constant.
+> **Note**: The addresses shown for OS segments (`$0820`–`$0CE0`) are compile-time constants in `src/command64.asm`; they may drift slightly between builds as code grows. The *stable* entry point for external programs is always exactly `$1000`. `UserProgStart` (the `AppTable`/`ShellExt` boundary that follows it) has shifted upward several times as OS-resident segments grew — from `$2000` to `$2200` to `$2600` to `$2C00` to `$3200` to the current `$3400` — and is configured via the CMake cache variable `USER_PROG_START_HEX`. Never hardcode a prior value; always compile external programs against the current build's constant.
 
 ---
 
@@ -950,7 +950,7 @@ Clobbers: A, X, Y, HandlerVecLo/Hi, ParsePos
 2. Reject names starting with `$` (prevents loading the directory listing as a program).
 3. Call `parsePointerDevice` to resolve optional device prefix.
 4. Call `findFile` to probe the disk for the program.
-5. If found: set `SpecificLoad = 0` (relocated), `HexValLo/Hi = UserProgStart` (currently `$3200`).
+5. If found: set `SpecificLoad = 0` (relocated), `HexValLo/Hi = UserProgStart` (currently `$3400`).
 6. Call `shellLoadPrg`.
 7. On success: `JSR UserProgStart`. The external program runs; when it returns (via `RTS` or `DOS_EXIT`), control returns here.
 
@@ -1102,13 +1102,13 @@ loop:
 
 ## 9. Module Reference — External Commands
 
-External commands are standalone PRG files that live at `UserProgStart` (currently `$3200`). They use the OS API via `JSR $1000` and terminate with `DOS_EXIT`. They share `CommandBuffer`, `ParsePos`, and `CurrentDevice` with the shell (these are at fixed RAM addresses). Non-relocatable binaries compiled for a prior `UserProgStart` value can still run via the Binary Relocator (§13.1).
+External commands are standalone PRG files that live at `UserProgStart` (currently `$3400`). They use the OS API via `JSR $1000` and terminate with `DOS_EXIT`. They share `CommandBuffer`, `ParsePos`, and `CurrentDevice` with the shell (these are at fixed RAM addresses). Non-relocatable binaries compiled for a prior `UserProgStart` value can still run via the Binary Relocator (§13.1).
 
 ### 9.1 `debug.s` — Interactive Memory Monitor
 
 **File**: [src/external/debug/debug.s](src/external/debug/debug.s)  
 **Toolchain**: ca65/ld65 via `add_ca65_app`  
-**Load address**: `UserProgStart` (currently `$3200`)  
+**Load address**: `UserProgStart` (currently `$3400`)  
 **Version**: 0.1.x (auto-incremented build number from `BUILD_DEBUG`)
 
 DEBUG is a port of the MS-DOS `DEBUG.COM` interactive memory/register tool.
@@ -1195,7 +1195,7 @@ API_EXIT:
 ### 9.2 `label.asm` — Disk Volume Label Writer
 
 **File**: [src/external/label/label.s](src/external/label/label.s) (built with ca65/ld65, not KickAssembler — see `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` Phase 4)  
-**Load address**: `UserProgStart` (currently `$3200`)
+**Load address**: `UserProgStart` (currently `$3400`)
 
 LABEL directly edits the CBM DOS directory structure on disk (Track 18, Sector 0, byte offset 144) to set the 16-byte volume name field.
 
@@ -1242,7 +1242,7 @@ Uppercase character literals under either assembler's default PETSCII translatio
 ### 9.3 `conway.asm` — Conway's Game of Life
 
 **Files**: [src/external/conway/conway_main.s](src/external/conway/conway_main.s), [conway_grid.s](src/external/conway/conway_grid.s) (built with ca65/ld65, not KickAssembler — see `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` Phase 4)  
-**Load address**: `UserProgStart` (currently `$3200`)
+**Load address**: `UserProgStart` (currently `$3400`)
 
 Full-screen cellular automaton. The 40×25 text screen is used 1:1 as the simulation grid (1000 cells). Rules: B3/S23 with toroidal wrapping on all four edges.
 
@@ -1306,7 +1306,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 ### 9.4 `pacman.asm` — Pac64
 
 **File**: [src/external/pacman/pacman.asm](src/external/pacman/pacman.asm)  
-**Load address**: `UserProgStart` (currently `$3200`)
+**Load address**: `UserProgStart` (currently `$3400`)
 
 Character-grid Pac-Man clone. The 40×24 playfield (row 24 is a dynamic status
 line) is rendered directly to screen/colour RAM, following the same
@@ -1323,7 +1323,7 @@ raster IRQ.
 unlike conway's buffers, they are **not** pinned to fixed addresses. Conway's
 own code fits under 1KB, leaving headroom below its hardcoded `$3000`/`$3400`
 buffers, but a full ghost-AI game does not reliably fit in the ~1KB gap
-between `UserProgStart` ($3200) and `$4000`; the assembler places both
+between `UserProgStart` ($3400) and `$4000`; the assembler places both
 tables wherever they naturally fall instead, removing the collision risk.
 `mazeItems` is reserved via `.fill 960,0` and regenerated at runtime by
 `resetItems`.
@@ -1463,7 +1463,7 @@ shellDispatch (table miss)
       petPrintString "loading..."
       KernalLOAD (A=0, X/Y=target)
   bcs sdExtError (load error)
-  → JSR UserProgStart (currently $3200)
+  → JSR UserProgStart (currently $3400)
       [program executes; may call DOS_EXIT → resets SP → JMP mainLoop]
       [or: program RTS → return here]
   rts → mainLoop
@@ -1654,7 +1654,7 @@ New external applications should use the ca65/ld65 workflow documented in `src/e
 
 .encoding "petscii_mixed"
 
-* = UserProgStart   ; currently $3200 — never hardcode; always compile against the current build's constant
+* = UserProgStart   ; currently $3400 — never hardcode; always compile against the current build's constant
 
 start:
     cld             ; always clear decimal mode
