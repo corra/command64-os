@@ -1,7 +1,7 @@
 # command64 OS PACMAN Utility Manual
 
 **File Name:** `pacman.prg`
-**Target Address:** `UserProgStart` (currently `$3200`)
+**Target Address:** `UserProgStart` (currently `$3400`)
 **Version:** 0.1.0
 
 ## Overview
@@ -93,7 +93,7 @@ table of 24-bit powers of ten.
 
 | Address range | Contents |
 | --- | --- |
-| `UserProgStart` (`$3200`) onward | Code, ghost/Pac-Man state, maze tables, read-only tables (~5.5KB total) |
+| `UserProgStart` (`$3400`) onward | Code, ghost/Pac-Man state, maze tables, read-only tables (~5.5KB total) |
 | `$70 – $75` | Zero-page scratch (subset of the `$70-$7F` external-program range) |
 
 ---

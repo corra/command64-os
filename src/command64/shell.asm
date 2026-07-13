@@ -39,6 +39,8 @@ tableCmd:
     .word cmdHelp
     .text "type  "
     .word cmdType
+    .text "more  "
+    .word cmdMore
     .text "copy  "
     .word cmdCopy
     .text "del   "
@@ -1094,6 +1096,220 @@ ctOpenErr:
     lda #PetCr
     jsr KernalChROUT
     rts
+
+.segment ShellExt
+
+// MORE — display contents of a file one screen at a time
+cmdMore:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    lda CommandBuffer, y
+    bne cmHaveArgs
+    jmp cmNoArgs
+cmHaveArgs:
+    lda CurrentDevice
+    sta SavedDevice
+
+    // Extract filename token and terminate it in place.
+    sty TempLo              // Start index
+cmScanEnd:
+    lda CommandBuffer, y
+    beq cmGotEnd
+    cmp #' '
+    beq cmGotEnd
+    iny
+    jmp cmScanEnd
+cmGotEnd:
+    lda #0
+    sta CommandBuffer, y
+
+    // Build a filename pointer and apply optional 8:/9:/10:/11: routing.
+    lda #<CommandBuffer
+    clc
+    adc TempLo
+    sta NamePtrLo
+    lda #>CommandBuffer
+    adc #0
+    sta NamePtrHi
+
+    ldx #NamePtrLo
+    jsr parsePointerDevice
+    sta CurrentDevice
+
+    ldy #0
+    lda (NamePtrLo), y
+    beq cmNoArgsRestore
+
+    lda #1
+    sta moreCurRow
+    sta moreCurCol
+
+    lda #0
+    sta HexValLo            // Read mode
+    ldx NamePtrLo
+    ldy NamePtrHi
+    lda #DOS_OPEN_FILE
+    jsr apiHandler
+    bcs cmOpenErr
+    sta FileHandle
+
+cmReadLoop:
+    ldx #<CommandBuffer
+    ldy #>CommandBuffer
+    lda #64
+    sta HexValLo
+    lda #0
+    sta HexValHi
+    lda #DOS_READ_FILE
+    jsr apiHandler
+    bcs cmReadDone
+
+    lda HexValLo
+    ora HexValHi
+    beq cmReadDone
+
+    ldy #0
+cmPrintLoop:
+    lda CommandBuffer, y
+    cmp #$1A                // MS-DOS text EOF marker (Ctrl-Z)
+    beq cmReadDone
+    tya
+    pha
+    lda CommandBuffer, y
+    jsr morePutChar
+    pla
+    tay
+    iny
+    cpy HexValLo
+    bne cmPrintLoop
+
+    lda HexValLo
+    cmp #64
+    beq cmReadLoop
+
+cmReadDone:
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+    lda #PetCr
+    jsr KernalChROUT
+    lda SavedDevice
+    sta CurrentDevice
+    rts
+
+cmNoArgsRestore:
+    lda SavedDevice
+    sta CurrentDevice
+cmNoArgs:
+    lda #<noFileMsg
+    ldy #>noFileMsg
+    jsr petPrintString
+    rts
+
+cmOpenErr:
+    jsr printDeviceStatusMsg
+    lda #PetCr
+    jsr KernalChROUT
+    lda SavedDevice
+    sta CurrentDevice
+    rts
+
+// --- morePutChar ---
+// Prints A, updates MORE's row/column counters, and pauses when the text area
+// fills. Preserves Y for the caller's buffer index.
+morePutChar:
+    cmp #PetLl
+    beq mpcLf
+    cmp #PetCr
+    beq mpcCr
+    cmp #$08
+    beq mpcBackspace
+    cmp #$09
+    beq mpcTab
+    cmp #$07
+    beq mpcControl
+
+    jsr KernalChROUT
+    inc moreCurCol
+    lda moreCurCol
+    cmp #41
+    bcc mpcDone
+    lda #1
+    sta moreCurCol
+    inc moreCurRow
+    jmp mpcMaybePause
+
+mpcLf:
+    lda #PetCr
+    jsr KernalChROUT
+    lda #PetLl
+    jsr KernalChROUT
+    lda #1
+    sta moreCurCol
+    inc moreCurRow
+    jmp mpcMaybePause
+
+mpcCr:
+    lda #PetCr
+    jsr KernalChROUT
+    lda #1
+    sta moreCurCol
+    inc moreCurRow
+    jmp mpcMaybePause
+
+mpcBackspace:
+    lda #$08
+    jsr KernalChROUT
+    lda moreCurCol
+    cmp #1
+    beq mpcDone
+    dec moreCurCol
+    rts
+
+mpcTab:
+    lda #$09
+    jsr KernalChROUT
+    lda moreCurCol
+    clc
+    adc #7
+    and #%11111000
+    clc
+    adc #1
+    sta moreCurCol
+    cmp #41
+    bcc mpcDone
+    sec
+    sbc #40
+    sta moreCurCol
+    inc moreCurRow
+    jmp mpcMaybePause
+
+mpcControl:
+    jsr KernalChROUT
+    rts
+
+mpcMaybePause:
+    lda moreCurRow
+    cmp #24
+    bcc mpcDone
+    jsr morePause
+mpcDone:
+    rts
+
+morePause:
+    lda #<morePromptMsg
+    ldy #>morePromptMsg
+    jsr petPrintString
+mpWaitKey:
+    jsr KernalGetIn
+    beq mpWaitKey
+    lda #PetCr
+    jsr KernalChROUT
+    lda #1
+    sta moreCurRow
+    sta moreCurCol
+    rts
+
+.segment CommandShell
 
 // DEL / ERASE — delete a file from disk
 cmdDel:
@@ -2730,6 +2946,8 @@ helpMsg:
     .byte $0D
     .text "TYPE   - DISPLAY FILE"
     .byte $0D
+    .text "MORE   - PAGE FILE"
+    .byte $0D
     .text "COPY   - COPY [SRC] [DST]"
     .byte $0D
     .text "DEL    - DELETE [FILE]"
@@ -2861,6 +3079,10 @@ dateTimeInvalidMsg:
     .text "Invalid format"
     .byte $0D, 0
 
+morePromptMsg:
+    .text "-- More --"
+    .byte 0
+
 .segment ShellExt
 
 // Directory state variables and formatting strings
@@ -2870,6 +3092,8 @@ dirSavedBlockLo:  .byte 0
 dirSavedBlockHi:  .byte 0
 dirPendingSpaces: .byte 0
 clNeedAlloc:       .byte 0
+moreCurRow:       .byte 0
+moreCurCol:       .byte 0
 dirSizeOpen:      .text " ("
                   .byte 0
 dirSizeClose:     .text "b)"

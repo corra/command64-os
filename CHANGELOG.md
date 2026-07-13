@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **MORE internal command**: Added `MORE [filename]`, an MS-DOS-style paged file viewer for sequential/program files. It reads through the existing DOS file API, supports `8:`/`9:`/`10:`/`11:` target-device prefixes, pauses with `-- More --`, and resumes on a single keypress.
 - **DATE/TIME internal commands (Phase 1)**: Added CIA #1 TOD-backed `DATE` and `TIME` built-ins with direct and interactive `YYYY-MM-DD` / `HH:MM:SS` entry, boot-time TOD initialization, resident kernel date storage, leap-year-aware validation, and lazy midnight/month rollover.
 - **EDLIN External Utility Port (Phases 0-4)**: Ported MS-DOS 4.00 EDLIN to COMMAND64 OS as a ca65-built external app (`edlin.prg` v0.1.4):
   - **Phase 0 (Scaffold)**: Integrates into the CMake build system, increments build counter via `BUILD_EDLIN`, and exits cleanly via `DOS_EXIT`.
@@ -19,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **User program origin shifted to `$3400`**: Moved the default `UserProgStart`/relocation companion origin to `$3400`/`$3500` so external apps remain above the expanded resident `ShellExt` segment after adding `MORE`.
 - **User program origin shifted to `$3200`**: Moved `UserProgStart` and the relocation companion origin to `$3200`/`$3300` so external apps cannot overlap the expanded resident `ShellExt` segment after the DATE/TIME implementation. Rebuilt external apps and tests against the new origin.
 - **Test target names normalized**: Renamed ca65 test apps with redundant
   `<name>test` source names to feature-only names (`test_api`, `test_bank`,

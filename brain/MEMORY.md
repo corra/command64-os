@@ -56,7 +56,7 @@
 - `LOAD` gated: protected-address check ($0000–$21FF, $C000–$FFFF) + table-full check before disk I/O; registers entry on success.
 - `RUN`/`GO` gated: requires app table membership; supports `RUN <name>` and `RUN <addr>`.
 - New commands: `APPS`/`PS` (list loaded programs), `FREE` (remove entry, guards APP_RUNNING).
-- Historical Kick test/debug sources previously compiled at `$2200`; current external programs and ca65-migrated tests build at `UserProgStart` (`$3200`) through the CMake app helpers.
+- Historical Kick test/debug sources previously compiled at `$2200`; current external programs and ca65-migrated tests build at `UserProgStart` (`$3400`) through the CMake app helpers.
 
 ### Key implementation details
 
@@ -67,7 +67,7 @@
 - `aptFind` calling convention: carry clear = name mode (`NamePtrLo/Hi`, `SrcHandle`); carry set = address mode (`HexValLo/Hi`). Returns X = slot index, `HandlerVecLo/Hi` = LoadAddr on found.
 - Phases B and C extend `apptable.asm` without changing the API surface.
 
-## Memory Map (current — as of Build 2619)
+## Memory Map (current — as of Build 2627)
 
 | Region | Purpose |
 | -------- | --------- |
@@ -90,8 +90,8 @@
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
 | `$03F4-$03FB` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi, AptCandEndLo/Hi) |
 | `$2000-$2494` | AppTable segment (apptable.asm) |
-| `$2495-$311A` | ShellExt segment (version, help, dir size routines, date/time routines, and shifted messages) |
-| `$3200+` | UserProgStart (External commands loaded here — shifted from $2E00 to accommodate ShellExt segment growth) |
+| `$2495-$32A7` | ShellExt segment (version, help, dir size routines, date/time routines, MORE, and shifted messages) |
+| `$3400+` | UserProgStart (External commands loaded here — shifted from $3200 to accommodate ShellExt segment growth) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
 | `$30-$4F` | Zero-page: VI Pointers and State (External Utility) |
