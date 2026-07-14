@@ -32,6 +32,8 @@ Add a menu, nine Life-like presets, custom Birth/Survival editing, and a
 - [x] Phase 5: `pause` is cyan while paused and green while running; color
   transitions functionally confirmed by the user.
 - [/] Phase 6: update documentation and create walkthrough.
+- [x] Increment the Conway patch release to `0.4.1.1057` and synchronize
+  current-version documentation.
 - [ ] Phase 7.1: replace the one-digit custom-rule editor: clear the selected
   B/S set, accept repeated `0`–`8` toggles, and finish on RETURN.
 - [ ] Phase 7.2: update documentation, verification evidence, walkthrough, and

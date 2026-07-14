@@ -152,6 +152,8 @@
     - [x] Phase 5: menu/simulation state machine, cyan/green pause indicator,
       and stack-safe exits implemented and functionally confirmed by the user
     - [/] Phase 6: update documentation, project records, and walkthrough
+    - [x] Increment Conway to `0.4.1.1057` and synchronize current-version
+      documentation
     - [ ] Phase 7.1: replace one-digit B/S editing with persistent full-set
       entry, clearing the selected set and finishing on RETURN
     - [ ] Phase 7.2: update documentation, verification evidence, walkthrough,

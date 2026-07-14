@@ -2,7 +2,7 @@
 
 **File Name:** `conway.prg`
 **Load Address:** Relocatable (selected by the command64 app manager)
-**Version:** 0.4.0 (Build 1056)
+**Version:** 0.4.1 (Build 1057)
 
 ## Overview
 
@@ -57,7 +57,7 @@ digit. A non-digit cancels the pending edit without changing the rule. Empty
 Birth or Survival sets are displayed as `none`.
 
 On quit, the screen is cleared and CONWAY prints its version banner
-(`CONWAY v0.4.0.1056`) before returning to the shell.
+(`CONWAY v0.4.1.1057`) before returning to the shell.
 
 ### Rule presets
 

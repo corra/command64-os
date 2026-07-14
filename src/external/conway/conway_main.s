@@ -19,7 +19,7 @@
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '4'
-VERSION_STAGE = '0'
+VERSION_STAGE = '1'
 .include "build_conway.inc"
 
 .import randomizeGrid
