@@ -1,5 +1,16 @@
 # Project Tasks
 
+- [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
+  - [x] Create active Taskwarrior task
+  - [x] Write detailed implementation plan for approval
+  - [ ] Review external app, `MORE`, and `DEBUG` reuse candidates
+  - [ ] Implement after explicit approval
+  - [ ] Build and manually verify
+
+- [ ] Taskwarrior #25 (`57d2cf4e`): Future external app return-code support
+  - [x] Confirm current `DOS_EXIT` has no meaningful app return-code channel
+  - [ ] Design ERRORLEVEL-style status support outside `COMP` scope
+
 - [x] Task #25: Fix EDLIN physical hardware save truncation
   - [x] Preserve final EOI byte in `DOS_READ_FILE`
   - [x] Check KERNAL write status after `CHROUT`
