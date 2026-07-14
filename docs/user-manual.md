@@ -254,7 +254,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 
 ### CONWAY
 
-**Description:** Conway's Game of Life — a full-screen cellular automaton simulation. The 40×25 text screen is used as a live grid; cells are born, survive, or die each generation according to the classic B3/S23 rules. The grid wraps toroidally (all four edges connect).
+**Description:** Conway's Game of Life — a cellular automaton simulation using a 40×24 live grid plus a status row. Cells are born, survive, or die each generation according to the classic B3/S23 rules. The grid wraps toroidally (all four edges connect), and a five-digit generation counter appears at the right of the status row.
 **Syntax:** `CONWAY`
 
 **Controls (during simulation):**
@@ -263,7 +263,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 | --- | --- |
 | `SPACE` | Pause / resume |
 | `R` | Re-randomize grid |
-| `C` | Clear grid (all cells dead) |
+| `C` | Clear grid, reset the counter, and pause |
 | `Q` or RUN/STOP | Quit and return to shell |
 
 ### PACMAN

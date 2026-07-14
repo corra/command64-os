@@ -144,7 +144,7 @@
     - [x] Phase 1: extend contracts and verify build/memory headroom
     - [ ] Implement Main Menu screen with preset selections
     - [ ] Implement Custom Rule editing mode (Birth/Survival toggling)
-    - [ ] Implement 16-bit binary-to-decimal generation counter
+    - [x] Phase 3: 16-bit generation counter implemented and manually verified
     - [x] Phase 2: compact presets and RAM-table solver implemented and
       manually verified
     - [ ] Build and inspect size/alignment/relocation artifacts

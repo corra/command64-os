@@ -1332,6 +1332,9 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `loadPreset` | Validates preset index, expands compact B/S masks, then atomically publishes `zpPresetIdx` |
 | `toggleBirth` / `toggleSurvival` | Validates and toggles one 0–8 lookup entry, then marks the active rule custom |
 | `getBirthRule` / `getSurvivalRule` | Validated read-only accessors for later menu rendering |
+| `resetGeneration` / `incrementGeneration` | Reset or modulo-increment the 16-bit generation count without screen I/O |
+| `drawSimulationStatus` | Writes an exact 40-column controls/`gen:` status template and current digits |
+| `drawGenerationCounter` | Converts the copied 16-bit counter and writes five leading-zero digits |
 | `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
 | `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
 | `getCurrBase` | Returns active buffer base (A=lo, X=hi) based on `zpBufSel` |

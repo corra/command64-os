@@ -23,7 +23,8 @@ Add a menu, nine Life-like presets, custom Birth/Survival editing, and a
   confirmed by the user.
 - [x] Phase 2: presets, active rule tables, and generic solver implemented;
   automated builds and user runtime verification pass.
-- [ ] Phase 3: implement and integrate the generation counter.
+- [x] Phase 3: generation counter implemented and integrated; automated builds
+  and user runtime verification pass.
 - [ ] Phase 4: implement compact menu rendering and dynamic fields.
 - [ ] Phase 5: integrate menu/simulation input state machine and shell exit.
 - [ ] Phase 6: update documentation and create walkthrough.

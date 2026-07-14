@@ -14,7 +14,8 @@
 
 .export randomizeGrid
 .export drawGrid
-.export drawStatusLine
+.export drawSimulationStatus
+.export drawGenerationCounter
 .export computeNext
 .export clearGrid
 .export clearScreen
@@ -527,13 +528,15 @@ rowOffHi:
     .byte $03,$03,$03,$03
 
 ; ---------------------------------------------------------------------------
-; drawStatusLine -- write the keybinding reminder to screen row 24.
+; drawSimulationStatus -- write the exact 40-column simulation status row,
+; then replace the template digits with the current generation count.
 ; Uses include/ca65/screencode.inc's screencode_mixed/petscii_mixed
 ; macros, mirroring Kick's ".encoding "screencode_mixed"" toggle idiom
 ; (conway.asm:711/715) -- these macros were built and verified specifically
 ; against this string's previous hand-encoded bytes.
+; Clobbers: A, X, Y, N, Z, C.
 ; ---------------------------------------------------------------------------
-drawStatusLine:
+drawSimulationStatus:
     ldx #0
 dslLoop:
     lda statusText, x
@@ -541,14 +544,85 @@ dslLoop:
     inx
     cpx #STATUS_TEXT_LEN
     bne dslLoop
+    jmp drawGenerationCounter
+
+; ---------------------------------------------------------------------------
+; drawGenerationCounter -- convert and draw five leading-zero decimal digits.
+; Clobbers: A, X, Y, N, Z, C. The live 16-bit counter is not modified.
+; ---------------------------------------------------------------------------
+drawGenerationCounter:
+    jsr convertGeneration
+    ldx #0
+dgcLoop:
+    lda digitBuf, x
+    clc
+    adc #$30
+    sta SCREEN + GEN_DIGITS_OFFSET, x
+    inx
+    cpx #5
+    bne dgcLoop
+    rts
+
+; ---------------------------------------------------------------------------
+; convertGeneration -- convert zpGenHi:zpGenLo to five numeric digits.
+; Uses high-byte-first comparison and preserves the low-byte subtraction
+; borrow into the high-byte SBC. Clobbers: A, Y, N, Z, C; preserves X.
+; ---------------------------------------------------------------------------
+convertGeneration:
+    lda zpGenLo
+    sta tempValLo
+    lda zpGenHi
+    sta tempValHi
+    ldy #0
+
+cgcPlaceLoop:
+    lda #0
+    sta digitBuf, y
+
+cgcSubtractTest:
+    lda tempValHi
+    cmp decimalDivHi, y
+    bcc cgcPlaceDone
+    bne cgcSubtract
+    lda tempValLo
+    cmp decimalDivLo, y
+    bcc cgcPlaceDone
+
+cgcSubtract:
+    lda tempValLo
+    sec
+    sbc decimalDivLo, y
+    sta tempValLo
+    lda tempValHi
+    sbc decimalDivHi, y
+    sta tempValHi
+    lda digitBuf, y
+    clc
+    adc #1
+    sta digitBuf, y
+    jmp cgcSubtractTest
+
+cgcPlaceDone:
+    iny
+    cpy #4
+    bne cgcPlaceLoop
+    lda tempValLo
+    sta digitBuf + 4
     rts
 
 screencode_mixed
 statusText:
-    .byte "space=pause  r=random  c=clear  q=quit"
+    .byte "sp:pause r:rnd c:clear q:quit  gen:00000"
 statusTextEnd:
 petscii_mixed
 STATUS_TEXT_LEN = statusTextEnd - statusText
+.assert STATUS_TEXT_LEN = 40, error, "simulation status must fill exactly 40 columns"
+.assert GEN_DIGITS_OFFSET + 5 = 1000, error, "generation digits must end at screen cell 999"
+
+decimalDivLo:
+    .byte <10000, <1000, <100, <10
+decimalDivHi:
+    .byte >10000, >1000, >100, >10
 
 ; Compact preset database: each entry is a low/high pair for neighbour
 ; counts 0..7 and count 8 (high bit 0). loadPreset expands one pair into each
@@ -582,6 +656,12 @@ ruleSurvival:
     .res 9, 0
 ruleMaskScratch:
     .byte 0
+tempValLo:
+    .byte 0
+tempValHi:
+    .byte 0
+digitBuf:
+    .res 5, 0
 
 ; ---------------------------------------------------------------------------
 ; Runtime buffers (relocatable, page-aligned)

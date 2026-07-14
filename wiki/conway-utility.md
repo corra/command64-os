@@ -6,7 +6,7 @@
 
 ## Overview
 
-`CONWAY` is Conway's Game of Life — a classic cellular automaton — rendered directly on the C64 text screen. The full 40×25 character display becomes a live simulation grid. Each cell follows John Conway's B3/S23 rules:
+`CONWAY` is Conway's Game of Life — a classic cellular automaton — rendered directly on the C64 text screen. Rows 0–23 form a 40×24 live grid and row 24 displays controls plus a five-digit generation counter. Each cell initially follows John Conway's B3/S23 rules:
 
 - **Birth:** A dead cell with exactly 3 live neighbours becomes alive.
 - **Survival:** A live cell with 2 or 3 live neighbours survives.
@@ -29,8 +29,8 @@ No arguments. The simulation starts immediately with a randomly seeded grid (~25
 | Key | Action |
 | --- | --- |
 | `SPACE` | Pause / resume the simulation |
-| `R` | Re-randomize the grid (new random seed) |
-| `C` | Clear the grid (all cells set to dead) |
+| `R` | Re-randomize the grid and reset the counter |
+| `C` | Clear the grid, reset the counter, and pause |
 | `Q` | Quit and return to the command64 shell |
 | RUN/STOP | Quit and return to the command64 shell |
 
@@ -46,6 +46,7 @@ On quit, the screen is cleared and CONWAY prints its version banner
 | Live cell | Green solid block (`$A0`, reverse-space glyph) |
 | Dead cell | Black (space character, background shows through) |
 | Border / background | Black (`$D020`/`$D021` set to 0) |
+| Generation | `gen:00000` at the right of the status row; increments after each completed generation |
 
 Color RAM is filled with green (VIC-II color 5) at startup and is not modified per frame. The live/dead distinction is carried entirely by the character written to screen RAM (`$A0` vs `$20`).
 

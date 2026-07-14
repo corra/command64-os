@@ -403,6 +403,8 @@ confirms manual verification and completion.
   confirmed by the user.
 - [x] Phase 2 rule engine implemented, independently audited, and manually
   confirmed by the user.
+- [x] Phase 3 generation counter implemented, independently audited, and
+  manually confirmed by the user.
 - [ ] Phases 1-6 implemented and verified.
 
 ### Phase 1 evidence (2026-07-14)
@@ -434,3 +436,21 @@ confirms manual verification and completion.
   invalid-index behavior, 0/1 normalization, Y restoration, and branch safety.
 - User confirmed default B3/S23 behavior, pause, randomize, clear, and shell
   exit work correctly.
+
+### Phase 3 evidence (2026-07-14)
+
+- Added pure reset/modulo-increment lifecycle routines, copied-value 16-bit
+  decimal conversion, five-digit drawing, and an exact 40-column status row.
+- Counter increments only after compute/swap, does not advance while paused,
+  and resets on randomize/clear; clear now forces pause as specified.
+- Added assembly-time assertions for 40-column status width and screen bounds.
+- `conway`, `image_d64`, and `test_image_d64` builds succeeded as build 1053.
+- Linked payload is 3520 bytes (`$0DC0`), leaving 1600 bytes (`$0640`).
+- Final relocatable PRG is 3746 bytes with 109 relocation points.
+- Base grids are `$3A00`/`$3E00`; +page grids are `$3B00`/`$3F00`.
+- Debug-assisted links remain byte-identical to production links.
+- First assembly exposed an illegal NMOS 6502 `INC abs,Y`; RCA replaced it
+  with explicit `LDA`/`CLC`/`ADC`/`STA`, after which all builds passed.
+- Two independent reviews verified carry/borrow behavior, edge vectors,
+  wraparound, lifecycle order, status layout, and future menu compatibility.
+- User confirmed Phase 3 appears complete after runtime verification.

@@ -23,7 +23,8 @@ VERSION_STAGE = '0'
 
 .import randomizeGrid
 .import drawGrid
-.import drawStatusLine
+.import drawSimulationStatus
+.import drawGenerationCounter
 .import computeNext
 .import clearGrid
 .import clearScreen
@@ -51,8 +52,7 @@ start:
     sta zpBufSel
     sta zpInMenu
     sta zpMenuState
-    sta zpGenLo
-    sta zpGenHi
+    jsr resetGeneration
 
     ; Always initialize the active rule tables before computeNext can run.
     ; Preset 0 is Conway's original B3/S23 behavior.
@@ -79,7 +79,7 @@ fillColorTail:
 
     jsr randomizeGrid
     jsr drawGrid
-    jsr drawStatusLine
+    jsr drawSimulationStatus
 
 ; ---------------------------------------------------------------------------
 ; Main loop
@@ -93,7 +93,9 @@ mainLoop:
     jsr waitDelay
     jsr computeNext
     jsr swapBufs
+    jsr incrementGeneration
     jsr drawGrid
+    jsr drawGenerationCounter
     jmp mainLoop
 
 ; ---------------------------------------------------------------------------
@@ -140,12 +142,39 @@ hkPause:
 
 hkRandom:
     jsr randomizeGrid
+    jsr resetGeneration
     jsr drawGrid
+    jsr drawGenerationCounter
     rts
 
 hkClear:
     jsr clearGrid
+    jsr resetGeneration
+    lda #$FF
+    sta zpPaused
     jsr drawGrid
+    jsr drawGenerationCounter
+    rts
+
+; ---------------------------------------------------------------------------
+; resetGeneration -- reset the 16-bit generation count without screen I/O.
+; Clobbers: A, N, Z.
+; ---------------------------------------------------------------------------
+resetGeneration:
+    lda #0
+    sta zpGenLo
+    sta zpGenHi
+    rts
+
+; ---------------------------------------------------------------------------
+; incrementGeneration -- increment modulo 65536 after a completed generation.
+; Preserves: A, X, Y. Clobbers: N, Z.
+; ---------------------------------------------------------------------------
+incrementGeneration:
+    inc zpGenLo
+    bne igDone
+    inc zpGenHi
+igDone:
     rts
 
 ; ---------------------------------------------------------------------------
