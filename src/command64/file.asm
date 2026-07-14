@@ -35,31 +35,8 @@
 // Clobbers: A, X, Y, TempLo, TempHi
 // (checkDeviceReady moved to ShellExt segment below to free up space in File segment)
 
-// --- printDeviceStatusMsg ---
-// Prints the message matching a checkDeviceReady/fileOpen/fileDelete/
-// fileRename/findFile error status code, without a trailing carriage return
-// (callers that want one add it themselves, matching each command's existing
-// error-message convention). Message strings live in shell.asm.
-// Input: A = status code (1=no device, 2=no disk, anything else=generic error)
-// Clobbers: A, X, Y
-printDeviceStatusMsg:
-    cmp #1
-    beq pdsmNoDevice
-    cmp #2
-    beq pdsmNoDisk
-    lda #<loadErrMsg
-    ldy #>loadErrMsg
-    jmp pdsmPrint
-pdsmNoDevice:
-    lda #<noDeviceMsg
-    ldy #>noDeviceMsg
-    jmp pdsmPrint
-pdsmNoDisk:
-    lda #<noDiskMsg
-    ldy #>noDiskMsg
-pdsmPrint:
-    jsr petPrintString
-    rts
+// (printDeviceStatusMsg moved to ShellExt below to free up space in File segment)
+
 
 // --- fileInit ---
 // Initializes the Handle Table by clearing all entries.
@@ -357,10 +334,12 @@ frDoRead:
     ldy TempHi              // Look at status
     beq frStore             // If status is 0, normal read: store and continue
     
+    pha                     // Preserve the EOI byte while validating status
     tya
     and #$BF                // Mask out EOI bit (bit 6 = $40)
-    bne frReadError         // Any other error bits? If yes, exit with error
-    
+    bne frReadErrorDrop     // Any other error bits? If yes, exit with error
+    pla                     // Restore final byte
+
     // EOI case: store the final byte, increment count, and then exit successfully
     ldy #0
     sta (PrintPtrLo), y
@@ -368,6 +347,10 @@ frDoRead:
     bne frDoneOK
     inc ReadCountHi
     jmp frDoneOK
+
+frReadErrorDrop:
+    pla                     // Drop saved byte before returning error
+    jmp frReadError
 
 frStore:
     ldy #0
@@ -455,11 +438,13 @@ fwLoop:
     
 fwDoWrite:
     jsr KernalREADST
-    bne fwDone              // Status non-zero? (Error)
+    bne fwWriteError        // Status non-zero? (Error)
     
     ldy #0
     lda (PrintPtrLo), y     // Get char from buffer
     jsr KernalChROUT        // Write char to channel
+    jsr KernalREADST
+    bne fwWriteError        // Catch late IEC write errors before counting byte
     
     // Advance buffer
     inc PrintPtrLo
@@ -483,6 +468,18 @@ fwDone:
     sta HexValHi
     
     clc
+    rts
+
+fwWriteError:
+    jsr KernalCLRCHN        // Reset to screen
+
+    // Return actual bytes written before the failing byte/status
+    lda WriteCountLo
+    sta HexValLo
+    lda WriteCountHi
+    sta HexValHi
+
+    sec
     rts
 
 fwError:
@@ -639,6 +636,32 @@ TargetDevice:
 // jump table) has no slack left, so these live in ShellExt instead — same
 // reasoning as aptRelocate in loader.asm. JSR works fine across segments.
 .segment ShellExt
+
+// --- printDeviceStatusMsg ---
+// Prints the message matching a checkDeviceReady/fileOpen/fileDelete/
+// fileRename/findFile error status code, without a trailing carriage return
+// (callers that want one add it themselves, matching each command's existing
+// error-message convention). Message strings live in shell.asm.
+// Input: A = status code (1=no device, 2=no disk, anything else=generic error)
+// Clobbers: A, X, Y
+printDeviceStatusMsg:
+    cmp #1
+    beq pdsmNoDevice
+    cmp #2
+    beq pdsmNoDisk
+    lda #<loadErrMsg
+    ldy #>loadErrMsg
+    jmp pdsmPrint
+pdsmNoDevice:
+    lda #<noDeviceMsg
+    ldy #>noDeviceMsg
+    jmp pdsmPrint
+pdsmNoDisk:
+    lda #<noDiskMsg
+    ldy #>noDiskMsg
+pdsmPrint:
+    jsr petPrintString
+    rts
 
 CdrDevice:
     .byte 0

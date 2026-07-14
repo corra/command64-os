@@ -1,5 +1,12 @@
 # Project Tasks
 
+- [x] Task #25: Fix EDLIN physical hardware save truncation
+  - [x] Preserve final EOI byte in `DOS_READ_FILE`
+  - [x] Check KERNAL write status after `CHROUT`
+  - [x] Read EDLIN target drive post-close status after `W`
+  - [x] Verify with `make all`
+  - [x] Manual physical-hardware verification
+
 - [x] Workspace initialization & state management setup
 - [x] Project infrastructure setup: Taskwarrior & Codebase Memory initialized, Code Wiki created (2026-06-25)
 

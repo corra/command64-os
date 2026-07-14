@@ -29,6 +29,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **EDLIN hardware save truncation**: Fixed physical-drive save truncation paths by preserving the final EOI byte in `DOS_READ_FILE`, checking KERNAL write status immediately after each `CHROUT`, and having EDLIN read the target drive's post-close command-channel status after `W` saves.
 - **DATE/TIME parser scratch preservation**: Fixed Date/Time scratch-register clobbering where parsing the day overwrote the parsed month, Date validation lost the parse cursor during month-length lookup, parsing seconds overwrote the parsed minute, and CIA TOD hour conversion overwrote the returned seconds value. Valid `DATE YYYY-MM-DD` and `TIME HH:MM:SS` inputs now preserve all parsed fields correctly.
 - **TYPE LF newline display**: `TYPE` now treats line-feed bytes (`$0A`) as text newlines by emitting a CR/LF pair during screen output, without changing file contents or the byte-preserving file APIs.
 - **Stale KERNAL I/O Status Clearing**: Fixed a bug where the KERNAL status byte (`$90`) was not cleared at the start of `DOS_READ_FILE` (`fileRead`) and `DOS_WRITE_FILE` (`fileWrite`) loops, causing stale status (such as EOF/EOI leftover from previous file reads or error channel checks) to prematurely terminate operations. This resolves the issue where EDLIN's `W` (write) command failed to write out the buffer and reported `ERROR: WRITE FAILED - DISK FULL?`. Defined the `KernalStatus = $90` constant in both KickAssembler and ca65 include files.

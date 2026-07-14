@@ -35,6 +35,7 @@
 - **VI Code Review**: Completed comprehensive correctness and architectural code review of `vi.asm` detailing critical VMM, yank buffer, horizontal scrolling, and data loss issues.
 - **FileOpen PRG Default & Read/Write Peer Review**: Completed peer review of the proposed fileopen default fix and read/write status sequencing plan ([2026-07-10_fileopen_prg_type_default_fix_peer_review.md](file:///home/morgan/development/c64/command64-os/brain/reviews/2026-07-10_fileopen_prg_type_default_fix_peer_review.md)), identifying critical logic omissions in the proposed `fileRead` assembly refactoring and specifying appropriate remediations.
 - **EDLIN Port Phase 4 (Save/streaming)**: Completed and verified in VICE. Verified empty new-file creation, line insertion, `@0:` save-replace writing (`W`), editor quit (`Q`), reload and listing (`L`) of modified file, and buffer ceiling limits. Bumps `VERSION_STAGE` to `'4'` (`0.1.4`).
+- **EDLIN hardware save truncation fixed**: Implemented core file API hardening for final EOI byte preservation and immediate post-`CHROUT` status checks, plus EDLIN post-close drive-status validation after `W`. `make all` passes and physical-hardware verification confirmed the fix under Task #25.
 - **DATE/TIME Phase 1**: Completed CIA #1 TOD-backed internal `DATE` and `TIME` commands. User verified direct and interactive set/display round-trips, midnight rollover, and month rollover. Phase 1 uses resident kernel date bytes at `$1FFC-$1FFF` and remains intentionally non-persistent until RTC hardware phases.
 
 
@@ -67,7 +68,7 @@
 - `aptFind` calling convention: carry clear = name mode (`NamePtrLo/Hi`, `SrcHandle`); carry set = address mode (`HexValLo/Hi`). Returns X = slot index, `HandlerVecLo/Hi` = LoadAddr on found.
 - Phases B and C extend `apptable.asm` without changing the API surface.
 
-## Memory Map (current — as of Build 2627)
+## Memory Map (current — as of Build 2629)
 
 | Region | Purpose |
 | -------- | --------- |
@@ -81,16 +82,16 @@
 | `$03A2-$03C9` | SourceBuf (40 bytes, COPY command) |
 | `$03CA-$03F1` | DestBuf (40 bytes, COPY command) |
 | `$0801` | BASIC SYS launcher (Main segment) |
-| `$0820-$0FEC` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
+| `$0820-$0FE8` | Chained pre-API OS Segments (Utils, Api, Loader, Path, Vmm, File consecutive) |
 | `$1000` | ApiStub (Stable OS Entry Point — `JMP apiHandler`) |
 | `$1003-$1018` | Petsci (petPrintString) |
-| `$1019-$10F0` | CommandTable (8-byte fixed-width entries) |
-| `$10F1-$1F31` | CommandShell (main loop, dispatcher, built-ins) |
+| `$1019-$10F8` | CommandTable (8-byte fixed-width entries) |
+| `$10F9-$1F39` | CommandShell (main loop, dispatcher, built-ins) |
 | `$1FA0-$1FFF` | VmmData (vmmInitialized, vmmTempByte, fileScratch, SysDateYear/Month/Day/LastHour) |
 | `$03F2-$03F3` | AptSegLo/Hi (App Table VMM segment, allocated by aptInit at startup) |
 | `$03F4-$03FB` | Cassette Buffer Workspace (AptTempLoadLo/Hi, AptTempSizeLo/Hi, AptTempEndLo/Hi, AptCandEndLo/Hi) |
 | `$2000-$2494` | AppTable segment (apptable.asm) |
-| `$2495-$32A7` | ShellExt segment (version, help, dir size routines, date/time routines, MORE, and shifted messages) |
+| `$2495-$32C5` | ShellExt segment (version, help, dir size routines, date/time routines, MORE, file-status helpers, and shifted messages) |
 | `$3400+` | UserProgStart (External commands loaded here — shifted from $3200 to accommodate ShellExt segment growth) |
 | `$C000–$CFFF` | VMM MCT (4KB Page Byte-Map, 16MB support) |
 | `$FB–$FE` | Zero-page: PrintPtrLo/Hi, NamePtrLo/Hi (User Safe) |
