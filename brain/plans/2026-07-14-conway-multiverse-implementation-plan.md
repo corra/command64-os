@@ -399,8 +399,10 @@ confirms manual verification and completion.
 - [x] Taskwarrior task #26 created.
 - [x] Detailed implementation plan drafted.
 - [x] User approval for phased implementation.
-- [/] Phase 1 contracts/capacity implemented and independently audited;
-  awaiting user confirmation before Phase 2.
+- [x] Phase 1 contracts/capacity implemented, independently audited, and
+  confirmed by the user.
+- [x] Phase 2 rule engine implemented, independently audited, and manually
+  confirmed by the user.
 - [ ] Phases 1-6 implemented and verified.
 
 ### Phase 1 evidence (2026-07-14)
@@ -416,3 +418,19 @@ confirms manual verification and completion.
 - Debug-assisted verification links were byte-identical to production links.
 - Independent contract review confirmed `$7E-$82` and the new screen offsets
   are inside their documented app-private/screen ranges.
+
+### Phase 2 evidence (2026-07-14)
+
+- Added validated preset loading, custom toggles, private accessors, compact
+  mask data, emitted 9-byte active tables, and preset-0 startup initialization.
+- Replaced only the solver's hardcoded B3/S23 decision block; neighbor counting,
+  toroidal pointers, buffer selection, and swap logic are unchanged.
+- `conway`, `image_d64`, and `test_image_d64` builds succeeded as build 1050.
+- Linked payload is 3264 bytes (`$0CC0`), leaving 1856 bytes (`$0740`).
+- Final relocatable PRG is 3434 bytes with 81 relocation points.
+- Base grids are `$3900`/`$3D00`; +page grids are `$3A00`/`$3E00`.
+- Debug-assisted links remain byte-identical to production links.
+- Two independent reviews verified all preset masks, atomic publication,
+  invalid-index behavior, 0/1 normalization, Y restoration, and branch safety.
+- User confirmed default B3/S23 behavior, pause, randomize, clear, and shell
+  exit work correctly.

@@ -19,9 +19,10 @@ Add a menu, nine Life-like presets, custom Birth/Survival editing, and a
 - [x] Reconcile design with current source, ZP, linker capacity, and relocation.
 - [x] Create the detailed phased implementation plan.
 - [x] Obtain explicit approval to implement.
-- [/] Phase 1: contracts and build/memory headroom implemented and audited;
-  awaiting user confirmation.
-- [ ] Phase 2: implement presets, active rule tables, and generic solver.
+- [x] Phase 1: contracts and build/memory headroom implemented, audited, and
+  confirmed by the user.
+- [x] Phase 2: presets, active rule tables, and generic solver implemented;
+  automated builds and user runtime verification pass.
 - [ ] Phase 3: implement and integrate the generation counter.
 - [ ] Phase 4: implement compact menu rendering and dynamic fields.
 - [ ] Phase 5: integrate menu/simulation input state machine and shell exit.

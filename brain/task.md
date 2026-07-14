@@ -141,11 +141,12 @@
     - [x] Update high-level plan for production ca65/ld65 tools
     - [x] Write detailed implementation plan
     - [x] Obtain phased implementation approval
-    - [/] Phase 1: extend contracts and verify build/memory headroom
+    - [x] Phase 1: extend contracts and verify build/memory headroom
     - [ ] Implement Main Menu screen with preset selections
     - [ ] Implement Custom Rule editing mode (Birth/Survival toggling)
     - [ ] Implement 16-bit binary-to-decimal generation counter
-    - [ ] Optimize neighborhood solver with RAM lookup tables
+    - [x] Phase 2: compact presets and RAM-table solver implemented and
+      manually verified
     - [ ] Build and inspect size/alignment/relocation artifacts
     - [ ] Complete user-run C64/VICE verification
   - [ ] Add Oscar64 C-Language runtime support

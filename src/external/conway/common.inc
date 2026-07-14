@@ -47,6 +47,8 @@ MENU_STATE_NORMAL   = 0
 MENU_STATE_BIRTH    = 1
 MENU_STATE_SURVIVAL = 2
 PRESET_CUSTOM       = $FF
+PRESET_COUNT        = 9
+RULE_COUNT          = 9
 
 ; ---------------------------------------------------------------------------
 ; Zero-page scratch ($70-$82 -- app-private external-program area)

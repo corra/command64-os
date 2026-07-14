@@ -1289,7 +1289,7 @@ A 25-entry precomputed table (`rowOffLo` / `rowOffHi`) stores `N × 40` for rows
 
 #### Neighbour Accumulation
 
-For each cell, the column loop resolves left/right column indices with compare-and-substitute for the toroidal wrap at columns 0 and 39. Six `(ptr),Y` reads (three rows × left column), two center-column reads, and six more right-column reads accumulate the 8-cell Moore count into `zpCount`. Conway B3/S23 rules are applied with a simple branch tree; result is written to `(zpDstLo),Y`.
+For each cell, the column loop resolves left/right column indices with compare-and-substitute for the toroidal wrap at columns 0 and 39. Six `(ptr),Y` reads (three rows × left column), two center-column reads, and six more right-column reads accumulate the 8-cell Moore count into `zpCount`. The current cell selects a private 9-byte Birth or Survival lookup table, indexed by `zpCount`; the normalized 0/1 result is written to `(zpDstLo),Y`. Presets are stored as compact 9-bit masks and expanded into these hot-path tables outside the generation loop.
 
 #### Branch Distance
 
@@ -1315,6 +1315,8 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `zpGenLo/Hi` | `$81–$82` | Reserved Multiverse 16-bit generation counter |
 | `rowOffLo/Hi` | in PRG | 25-entry row-offset table (N×40, lo and hi bytes) |
 | `cellCharTbl` | in PRG | 2-byte display map: `[0]=$20` (space), `[1]=$A0` (solid block) |
+| `ruleBirth/ruleSurvival` | in PRG | Private 9-byte active B/S lookup tables; entries are always 0 or 1 |
+| `presetBirthMasks/presetSurvivalMasks` | in PRG | Nine compact low/high 9-bit preset-mask pairs |
 | `stpBLo/Hi` | in PRG | Scratch: buffer base address saved across `setThreeRowPtrs` calls |
 | `dgPageCnt` | in PRG | Outer page counter for `drawGrid` (X clobbered by `TAX` inside loop) |
 
@@ -1327,6 +1329,9 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `handleKeys` | Non-blocking `KernalGetIn` poll; dispatches Q/STOP/SPACE/R/C |
 | `waitDelay` | Busy-waits `GEN_DELAY` jiffy ticks (default 3, ≈50 ms per generation) |
 | `computeNext` | Outer row loop → `setThreeRowPtrs` + `setDstRowPtr` → inner column loop with neighbour count and rule application |
+| `loadPreset` | Validates preset index, expands compact B/S masks, then atomically publishes `zpPresetIdx` |
+| `toggleBirth` / `toggleSurvival` | Validates and toggles one 0–8 lookup entry, then marks the active rule custom |
+| `getBirthRule` / `getSurvivalRule` | Validated read-only accessors for later menu rendering |
 | `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
 | `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
 | `getCurrBase` | Returns active buffer base (A=lo, X=hi) based on `zpBufSel` |

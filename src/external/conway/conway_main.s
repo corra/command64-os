@@ -27,6 +27,7 @@ VERSION_STAGE = '0'
 .import computeNext
 .import clearGrid
 .import clearScreen
+.import loadPreset
 
 .import __MAIN_START__
 
@@ -48,6 +49,15 @@ start:
     lda #0
     sta zpPaused
     sta zpBufSel
+    sta zpInMenu
+    sta zpMenuState
+    sta zpGenLo
+    sta zpGenHi
+
+    ; Always initialize the active rule tables before computeNext can run.
+    ; Preset 0 is Conway's original B3/S23 behavior.
+    lda #0
+    jsr loadPreset
 
     sta VIC_BORD
     sta VIC_BGND
