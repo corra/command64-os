@@ -25,7 +25,8 @@ Add a menu, nine Life-like presets, custom Birth/Survival editing, and a
   automated builds and user runtime verification pass.
 - [x] Phase 3: generation counter implemented and integrated; automated builds
   and user runtime verification pass.
-- [ ] Phase 4: implement compact menu rendering and dynamic fields.
+- [x] Phase 4: compact menu rendering and dynamic fields implemented and
+  approved; Phase 5 activation and visual verification remain pending.
 - [ ] Phase 5: integrate menu/simulation input state machine and shell exit.
 - [ ] Phase 6: update documentation and create walkthrough.
 - [ ] Complete user-run C64/VICE verification.

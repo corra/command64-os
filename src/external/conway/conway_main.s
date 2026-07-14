@@ -15,6 +15,7 @@
 
 .include "command64.inc"
 .include "common.inc"
+.include "screencode.inc"
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '4'
@@ -29,6 +30,8 @@ VERSION_STAGE = '0'
 .import clearGrid
 .import clearScreen
 .import loadPreset
+.import getBirthRule
+.import getSurvivalRule
 
 .import __MAIN_START__
 
@@ -178,6 +181,209 @@ igDone:
     rts
 
 ; ---------------------------------------------------------------------------
+; drawMenu -- render compact static lines, active preset/rules, and prompt.
+; Phase 4 defines this renderer; Phase 5 activates it from the state machine.
+; Clobbers: A, X, Y, N, Z, C and zpCurr/zpDst pointer pairs.
+; ---------------------------------------------------------------------------
+drawMenu:
+    jsr clearMenuArea
+    lda #0
+    sta menuDescIdx
+
+dmDescriptorLoop:
+    ldx menuDescIdx
+    lda menuDescriptors, x
+    sta zpCurrLo
+    inx
+    lda menuDescriptors, x
+    sta zpCurrHi
+    ora zpCurrLo
+    beq dmDescriptorsDone
+    inx
+    lda menuDescriptors, x
+    sta zpDstLo
+    inx
+    lda menuDescriptors, x
+    sta zpDstHi
+    inx
+    stx menuDescIdx
+    jsr copyMenuString
+    jmp dmDescriptorLoop
+
+dmDescriptorsDone:
+    jsr drawMenuDynamics
+    jmp drawMenuPrompt
+
+; Clear only the 24 grid/menu rows; simulation status row 24 is separate.
+clearMenuArea:
+    lda #<SCREEN
+    sta zpDstLo
+    lda #>SCREEN
+    sta zpDstHi
+    lda #CHAR_DEAD
+    ldx #0
+    ldy #0
+cmaPage:
+    sta (zpDstLo), y
+    iny
+    bne cmaPage
+    inc zpDstHi
+    inx
+    cpx #3
+    bne cmaPage
+    ldy #0
+cmaTail:
+    sta (zpDstLo), y
+    iny
+    cpy #192
+    bne cmaTail
+    rts
+
+; Copy a null-terminated screen-code string from zpCurr to zpDst.
+copyMenuString:
+    ldy #0
+cmsLoop:
+    lda (zpCurrLo), y
+    beq cmsDone
+    sta (zpDstLo), y
+    iny
+    bne cmsLoop
+cmsDone:
+    rts
+
+drawMenuDynamics:
+    jsr drawPresetArrow
+    jsr drawBirthSummary
+    jmp drawSurvivalSummary
+
+drawPresetArrow:
+    lda #CHAR_DEAD
+    ldx #0
+dpaClearLoop:
+    ldy #0
+    lda menuArrowLo, x
+    sta zpDstLo
+    lda menuArrowHi, x
+    sta zpDstHi
+    lda #CHAR_DEAD
+    sta (zpDstLo), y
+    inx
+    cpx #PRESET_COUNT
+    bne dpaClearLoop
+
+    lda zpPresetIdx
+    cmp #PRESET_COUNT
+    bcs dpaDone
+    tax
+    lda menuArrowLo, x
+    sta zpDstLo
+    lda menuArrowHi, x
+    sta zpDstHi
+    ldy #0
+    lda #$3E
+    sta (zpDstLo), y
+dpaDone:
+    rts
+
+drawBirthSummary:
+    ldy #RULE_COUNT - 1
+    lda #CHAR_DEAD
+dbsClear:
+    sta SCREEN + MENU_BIRTH_FIELD_OFFSET, y
+    dey
+    bpl dbsClear
+    ldx #0
+    ldy #0
+dbsRuleLoop:
+    jsr getBirthRule
+    beq dbsNextRule
+    txa
+    clc
+    adc #$30
+    sta SCREEN + MENU_BIRTH_FIELD_OFFSET, y
+    iny
+dbsNextRule:
+    inx
+    cpx #RULE_COUNT
+    bne dbsRuleLoop
+    cpy #0
+    bne dbsDone
+    ldx #0
+dbsNoneLoop:
+    lda menuNoneText, x
+    sta SCREEN + MENU_BIRTH_FIELD_OFFSET, x
+    inx
+    cpx #MENU_NONE_LEN
+    bne dbsNoneLoop
+dbsDone:
+    rts
+
+drawSurvivalSummary:
+    ldy #RULE_COUNT - 1
+    lda #CHAR_DEAD
+dssClear:
+    sta SCREEN + MENU_SURV_FIELD_OFFSET, y
+    dey
+    bpl dssClear
+    ldx #0
+    ldy #0
+dssRuleLoop:
+    jsr getSurvivalRule
+    beq dssNextRule
+    txa
+    clc
+    adc #$30
+    sta SCREEN + MENU_SURV_FIELD_OFFSET, y
+    iny
+dssNextRule:
+    inx
+    cpx #RULE_COUNT
+    bne dssRuleLoop
+    cpy #0
+    bne dssDone
+    ldx #0
+dssNoneLoop:
+    lda menuNoneText, x
+    sta SCREEN + MENU_SURV_FIELD_OFFSET, x
+    inx
+    cpx #MENU_NONE_LEN
+    bne dssNoneLoop
+dssDone:
+    rts
+
+drawMenuPrompt:
+    ldx #39
+    lda #CHAR_DEAD
+dmpClear:
+    sta SCREEN + MENU_PROMPT_OFFSET, x
+    dex
+    bpl dmpClear
+
+    lda zpMenuState
+    cmp #MENU_STATE_BIRTH
+    beq dmpBirth
+    cmp #MENU_STATE_SURVIVAL
+    beq dmpSurvival
+    lda #<menuPromptNormal
+    ldy #>menuPromptNormal
+    jmp dmpCopy
+dmpBirth:
+    lda #<menuPromptBirth
+    ldy #>menuPromptBirth
+    jmp dmpCopy
+dmpSurvival:
+    lda #<menuPromptSurvival
+    ldy #>menuPromptSurvival
+dmpCopy:
+    sta zpCurrLo
+    sty zpCurrHi
+    lda #<(SCREEN + MENU_PROMPT_OFFSET)
+    sta zpDstLo
+    lda #>(SCREEN + MENU_PROMPT_OFFSET)
+    sta zpDstHi
+    jmp copyMenuString
+
+; ---------------------------------------------------------------------------
 ; waitDelay -- busy-wait for GEN_DELAY jiffy-clock increments.
 ; ---------------------------------------------------------------------------
 waitDelay:
@@ -222,3 +428,116 @@ psDone:
 exitBanner:
     .byte "CONWAY v", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE
     .byte ".", BUILD_NUMBER, PetCr, 0
+
+; ---------------------------------------------------------------------------
+; Compact menu data. Blank cells are produced by clearMenuArea; only visible
+; lines are stored. Descriptor entries are source pointer, destination pointer.
+; ---------------------------------------------------------------------------
+menuDescIdx:
+    .byte 0
+
+menuDescriptors:
+    .word menuTitle,       SCREEN + 0  * GRID_W + 10
+    .word menuRule,        SCREEN + 1  * GRID_W + 10
+    .word menuSelect,      SCREEN + 3  * GRID_W + 2
+    .word menuPreset1,     SCREEN + 4  * GRID_W + 4
+    .word menuPreset2,     SCREEN + 5  * GRID_W + 4
+    .word menuPreset3,     SCREEN + 6  * GRID_W + 4
+    .word menuPreset4,     SCREEN + 7  * GRID_W + 4
+    .word menuPreset5,     SCREEN + 8  * GRID_W + 4
+    .word menuPreset6,     SCREEN + 9  * GRID_W + 4
+    .word menuPreset7,     SCREEN + 10 * GRID_W + 4
+    .word menuPreset8,     SCREEN + 11 * GRID_W + 4
+    .word menuPreset9,     SCREEN + 12 * GRID_W + 4
+    .word menuCurrent,     SCREEN + 14 * GRID_W + 2
+    .word menuBirthLabel,  SCREEN + 15 * GRID_W + 2
+    .word menuSurvLabel,   SCREEN + 16 * GRID_W + 2
+    .word menuControls1,   SCREEN + 18 * GRID_W + 2
+    .word menuControls2,   SCREEN + 19 * GRID_W + 2
+    .word menuControls3,   SCREEN + 20 * GRID_W + 2
+    .word 0, 0
+
+menuArrowLo:
+    .byte <(SCREEN + 4 * GRID_W + 2), <(SCREEN + 5 * GRID_W + 2)
+    .byte <(SCREEN + 6 * GRID_W + 2), <(SCREEN + 7 * GRID_W + 2)
+    .byte <(SCREEN + 8 * GRID_W + 2), <(SCREEN + 9 * GRID_W + 2)
+    .byte <(SCREEN + 10 * GRID_W + 2), <(SCREEN + 11 * GRID_W + 2)
+    .byte <(SCREEN + 12 * GRID_W + 2)
+menuArrowHi:
+    .byte >(SCREEN + 4 * GRID_W + 2), >(SCREEN + 5 * GRID_W + 2)
+    .byte >(SCREEN + 6 * GRID_W + 2), >(SCREEN + 7 * GRID_W + 2)
+    .byte >(SCREEN + 8 * GRID_W + 2), >(SCREEN + 9 * GRID_W + 2)
+    .byte >(SCREEN + 10 * GRID_W + 2), >(SCREEN + 11 * GRID_W + 2)
+    .byte >(SCREEN + 12 * GRID_W + 2)
+
+screencode_mixed
+menuTitle:       .byte "conway multiverse"
+menuTitleEnd:    .byte 0
+menuRule:        .byte "-----------------"
+menuRuleEnd:     .byte 0
+menuSelect:      .byte "select preset:"
+menuSelectEnd:   .byte 0
+menuPreset1:     .byte "1 conway life       b3/s23"
+menuPreset1End:  .byte 0
+menuPreset2:     .byte "2 ant colony        b3/s234"
+menuPreset2End:  .byte 0
+menuPreset3:     .byte "3 world on fire     b34/s23"
+menuPreset3End:  .byte 0
+menuPreset4:     .byte "4 blinkers          b345/s2"
+menuPreset4End:  .byte 0
+menuPreset5:     .byte "5 mazectric         b3/s1234"
+menuPreset5End:  .byte 0
+menuPreset6:     .byte "6 maze              b3/s12345"
+menuPreset6End:  .byte 0
+menuPreset7:     .byte "7 life no death     b3/s0-8"
+menuPreset7End:  .byte 0
+menuPreset8:     .byte "8 coral             b3/s45678"
+menuPreset8End:  .byte 0
+menuPreset9:     .byte "9 assimilation      b3/s4567"
+menuPreset9End:  .byte 0
+menuCurrent:     .byte "current rule:"
+menuCurrentEnd:  .byte 0
+menuBirthLabel:  .byte "birth:"
+menuBirthLabelEnd: .byte 0
+menuSurvLabel:   .byte "survival:"
+menuSurvLabelEnd: .byte 0
+menuControls1:   .byte "1-9:preset  b/s:edit"
+menuControls1End: .byte 0
+menuControls2:   .byte "return:run  r:random run"
+menuControls2End: .byte 0
+menuControls3:   .byte "q or run/stop:exit"
+menuControls3End: .byte 0
+
+menuPromptNormal: .byte "q:exit to shell"
+menuPromptNormalEnd: .byte 0
+menuPromptBirth: .byte "birth: press 0-8 to toggle"
+menuPromptBirthEnd: .byte 0
+menuPromptSurvival: .byte "survival: press 0-8 to toggle"
+menuPromptSurvivalEnd: .byte 0
+menuNoneText:    .byte "none"
+menuNoneTextEnd:
+petscii_mixed
+
+MENU_NONE_LEN = menuNoneTextEnd - menuNoneText
+
+.assert 10 + (menuTitleEnd - menuTitle) <= 40, error, "menu title crosses row"
+.assert 10 + (menuRuleEnd - menuRule) <= 40, error, "menu rule crosses row"
+.assert 2 + (menuSelectEnd - menuSelect) <= 40, error, "menu select crosses row"
+.assert 4 + (menuPreset1End - menuPreset1) <= 40, error, "preset 1 crosses row"
+.assert 4 + (menuPreset2End - menuPreset2) <= 40, error, "preset 2 crosses row"
+.assert 4 + (menuPreset3End - menuPreset3) <= 40, error, "preset 3 crosses row"
+.assert 4 + (menuPreset4End - menuPreset4) <= 40, error, "preset 4 crosses row"
+.assert 4 + (menuPreset5End - menuPreset5) <= 40, error, "preset 5 crosses row"
+.assert 4 + (menuPreset6End - menuPreset6) <= 40, error, "preset 6 crosses row"
+.assert 4 + (menuPreset7End - menuPreset7) <= 40, error, "preset 7 crosses row"
+.assert 4 + (menuPreset8End - menuPreset8) <= 40, error, "preset 8 crosses row"
+.assert 4 + (menuPreset9End - menuPreset9) <= 40, error, "preset 9 crosses row"
+.assert 2 + (menuCurrentEnd - menuCurrent) <= 40, error, "current label crosses row"
+.assert 2 + (menuBirthLabelEnd - menuBirthLabel) <= 40, error, "birth label crosses row"
+.assert 2 + (menuSurvLabelEnd - menuSurvLabel) <= 40, error, "survival label crosses row"
+.assert 2 + (menuControls1End - menuControls1) <= 40, error, "controls 1 crosses row"
+.assert 2 + (menuControls2End - menuControls2) <= 40, error, "controls 2 crosses row"
+.assert 2 + (menuControls3End - menuControls3) <= 40, error, "controls 3 crosses row"
+.assert menuPromptNormalEnd - menuPromptNormal <= 40, error, "normal prompt crosses row"
+.assert menuPromptBirthEnd - menuPromptBirth <= 40, error, "birth prompt crosses row"
+.assert menuPromptSurvivalEnd - menuPromptSurvival <= 40, error, "survival prompt crosses row"

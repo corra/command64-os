@@ -16,6 +16,8 @@ GRID_H    = 24
 GRID_SIZE = 960
 STATUS_ROW_OFFSET = 960
 MENU_PROMPT_OFFSET = 23 * GRID_W
+MENU_BIRTH_FIELD_OFFSET = 15 * GRID_W + 12
+MENU_SURV_FIELD_OFFSET  = 16 * GRID_W + 12
 GEN_LABEL_OFFSET   = STATUS_ROW_OFFSET + 31
 GEN_DIGITS_OFFSET  = STATUS_ROW_OFFSET + 35
 
@@ -49,6 +51,9 @@ MENU_STATE_SURVIVAL = 2
 PRESET_CUSTOM       = $FF
 PRESET_COUNT        = 9
 RULE_COUNT          = 9
+
+.assert MENU_BIRTH_FIELD_OFFSET + RULE_COUNT <= 16 * GRID_W, error, "birth rule field crosses row"
+.assert MENU_SURV_FIELD_OFFSET + RULE_COUNT <= 17 * GRID_W, error, "survival rule field crosses row"
 
 ; ---------------------------------------------------------------------------
 ; Zero-page scratch ($70-$82 -- app-private external-program area)

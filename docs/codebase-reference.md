@@ -1335,6 +1335,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `resetGeneration` / `incrementGeneration` | Reset or modulo-increment the 16-bit generation count without screen I/O |
 | `drawSimulationStatus` | Writes an exact 40-column controls/`gen:` status template and current digits |
 | `drawGenerationCounter` | Converts the copied 16-bit counter and writes five leading-zero digits |
+| `drawMenu` | Private compact 24-row menu renderer with line descriptors, preset arrow, rule summaries, and bounded prompts; activated by Phase 5 dispatch |
 | `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
 | `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
 | `getCurrBase` | Returns active buffer base (A=lo, X=hi) based on `zpBufSel` |

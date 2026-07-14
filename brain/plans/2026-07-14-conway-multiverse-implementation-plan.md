@@ -325,9 +325,12 @@ Gate: build; user verifies increment, pause, reset, `65535`, and wrap behavior.
 
 - Add compact menu strings and fixed-position screen writer.
 - Add preset arrow, rule summaries, and edit prompts.
-- Initialize menu on startup without altering shell exit yet.
+- Keep the renderer inactive during this phase; activate startup/menu dispatch
+  atomically in Phase 5 so legacy simulation keys cannot corrupt a half-wired
+  menu.
 
-Gate: build; user visually verifies all 24 menu rows and dynamic field cleanup.
+Gate: build, bounds/alignment/size audit, and Phase 3 runtime regression. Full
+visual/dynamic verification occurs immediately after Phase 5 activation.
 
 ### Phase 5 — State-machine integration
 
@@ -405,6 +408,8 @@ confirms manual verification and completion.
   confirmed by the user.
 - [x] Phase 3 generation counter implemented, independently audited, and
   manually confirmed by the user.
+- [x] Phase 4 compact menu renderer implemented, independently audited, and
+  approved for commit; activation/visual verification remain Phase 5 gates.
 - [ ] Phases 1-6 implemented and verified.
 
 ### Phase 1 evidence (2026-07-14)
@@ -454,3 +459,22 @@ confirms manual verification and completion.
 - Two independent reviews verified carry/borrow behavior, edge vectors,
   wraparound, lifecycle order, status layout, and future menu compatibility.
 - User confirmed Phase 3 appears complete after runtime verification.
+
+### Phase 4 evidence (2026-07-14)
+
+- Added private compact line descriptors/strings, 24-row clearing, bounded
+  string copying, preset arrow, Birth/Survival summaries, `none` fallback, and
+  three prompt variants without exporting raw rule tables.
+- Added compile-time row/field/prompt bounds assertions.
+- Renderer remains deliberately uncalled until Phase 5 installs menu-aware key
+  dispatch; this avoids transient legacy R/C/SPACE behavior corrupting it.
+- `conway`, `image_d64`, and `test_image_d64` builds succeeded as build 1055.
+- Linked payload is 4288 bytes (`$10C0`), leaving 832 bytes (`$0340`).
+- Final relocatable PRG is 4608 bytes with 156 relocation points.
+- Base grids are `$3D00`/`$4100`; +page grids are `$3E00`/`$4200`.
+- Debug-assisted links remain byte-identical to production links.
+- First assembly exposed a missing `screencode.inc` include in
+  `conway_main.s`; RCA added the shared macro definition, after which all
+  builds and assertions passed.
+- Two independent reviews verified exact layout, screen bounds, pointer/ZP
+  safety, stale-field clearing, and the Phase 5 activation boundary.
