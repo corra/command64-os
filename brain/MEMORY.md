@@ -99,7 +99,7 @@
 | `$61–$6C` | Zero-page: HandlerVec, ParsePos, Temp, HexVal, VmmSeg/Off/Bank (FAC1) |
 | `$6D` | Zero-page: FileHandle (Active API Handle) |
 | `$6E-$6F` | Zero-page: SrcHandle, DstHandle (Shell Scratch) |
-| `$70-$7F` | Zero-page: DEBUG Pointers (External Utility). Also used by `conway` ($70-$7D) and `pacman` ($70-$75) — external apps share this scratch range by convention since only one runs at a time. |
+| `$70-$82` | Zero-page: external-utility scratch. Used by DEBUG pointers, `conway` (`$70-$82`; `$7E-$82` reserved for Multiverse menu/counter state), and `pacman` (`$70-$75`) — external apps share this range by convention since only one runs at a time. |
 | `$02` | Zero-page: CmpBase (User Safe) |
 
 ## C64 Hardware Gotchas (hard-won)

@@ -1309,6 +1309,10 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `zpLfsr` | `$7B` | 8-bit Galois LFSR state (RNG) |
 | `zpPaused` | `$7C` | Pause flag: 0 = running, $FF = paused |
 | `zpBufSel` | `$7D` | Active buffer: 0 = `grid0`, 1 = `grid1` (relocatable page-aligned labels) |
+| `zpInMenu` | `$7E` | Reserved Multiverse state: nonzero while menu is active |
+| `zpMenuState` | `$7F` | Reserved Multiverse menu edit state |
+| `zpPresetIdx` | `$80` | Reserved Multiverse preset index or `$FF` for custom |
+| `zpGenLo/Hi` | `$81–$82` | Reserved Multiverse 16-bit generation counter |
 | `rowOffLo/Hi` | in PRG | 25-entry row-offset table (N×40, lo and hi bytes) |
 | `cellCharTbl` | in PRG | 2-byte display map: `[0]=$20` (space), `[1]=$A0` (solid block) |
 | `stpBLo/Hi` | in PRG | Scratch: buffer base address saved across `setThreeRowPtrs` calls |

@@ -15,6 +15,9 @@ GRID_W    = 40
 GRID_H    = 24
 GRID_SIZE = 960
 STATUS_ROW_OFFSET = 960
+MENU_PROMPT_OFFSET = 23 * GRID_W
+GEN_LABEL_OFFSET   = STATUS_ROW_OFFSET + 31
+GEN_DIGITS_OFFSET  = STATUS_ROW_OFFSET + 35
 
 ; ---------------------------------------------------------------------------
 ; Hardware addresses
@@ -38,7 +41,15 @@ CLR_LIVE  = 5
 GEN_DELAY = 3
 
 ; ---------------------------------------------------------------------------
-; Zero-page scratch ($70-$7D -- documented safe area for external programs)
+; UI state values
+; ---------------------------------------------------------------------------
+MENU_STATE_NORMAL   = 0
+MENU_STATE_BIRTH    = 1
+MENU_STATE_SURVIVAL = 2
+PRESET_CUSTOM       = $FF
+
+; ---------------------------------------------------------------------------
+; Zero-page scratch ($70-$82 -- app-private external-program area)
 ; ---------------------------------------------------------------------------
 zpPrevLo = $70
 zpPrevHi = $71
@@ -54,3 +65,8 @@ zpCount  = $7A
 zpLfsr   = $7B
 zpPaused = $7C
 zpBufSel = $7D
+zpInMenu = $7E
+zpMenuState = $7F
+zpPresetIdx = $80
+zpGenLo = $81
+zpGenHi = $82
