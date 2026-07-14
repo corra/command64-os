@@ -1,12 +1,15 @@
 # command64 OS CONWAY Utility Manual
 
 **File Name:** `conway.prg`
-**Target Address:** `$2000` (Standard User Program Space)
-**Version:** 0.4.0 (Build 1042)
+**Load Address:** Relocatable (selected by the command64 app manager)
+**Version:** 0.4.0 (Build 1056)
 
 ## Overview
 
-`CONWAY` is Conway's Game of Life — a classic cellular automaton — rendered directly on the C64 text screen. Rows 0–23 form a 40×24 live grid and row 24 displays controls plus a five-digit generation counter. Each cell initially follows John Conway's B3/S23 rules:
+`CONWAY` is a menu-driven Life-like cellular automaton rendered directly on
+the C64 text screen. Rows 0–23 form a 40×24 live grid and row 24 displays
+controls plus a five-digit generation counter. The menu initially selects
+John Conway's B3/S23 rules:
 
 - **Birth:** A dead cell with exactly 3 live neighbours becomes alive.
 - **Survival:** A live cell with 2 or 3 live neighbours survives.
@@ -43,14 +46,32 @@ when simulation resumes.
 | Key | Action |
 | --- | --- |
 | `1`–`9` | Select one of the nine Life-like presets |
-| `B`, then `0`–`8` | Toggle one Birth neighbor count and mark the rule custom |
-| `S`, then `0`–`8` | Toggle one Survival neighbor count and mark the rule custom |
+| `B`, then `0`–`8` | Toggle one Birth count, mark the rule custom, and return to the normal menu |
+| `S`, then `0`–`8` | Toggle one Survival count, mark the rule custom, and return to the normal menu |
 | RETURN | Run the retained field with the selected rule |
 | `R` | Randomize and run with the selected rule |
 | `Q` or RUN/STOP | Exit to the command64 shell |
 
+To change multiple counts, press `B` or `S` again before each additional
+digit. A non-digit cancels the pending edit without changing the rule. Empty
+Birth or Survival sets are displayed as `none`.
+
 On quit, the screen is cleared and CONWAY prints its version banner
-(`CONWAY v0.4.0.1042`) before returning to the shell.
+(`CONWAY v0.4.0.1056`) before returning to the shell.
+
+### Rule presets
+
+| Key | Name | Rule |
+| --- | --- | --- |
+| `1` | Conway's Life | B3/S23 |
+| `2` | Ant Colony | B3/S234 |
+| `3` | World on Fire | B34/S23 |
+| `4` | Blinkers | B345/S2 |
+| `5` | Mazectric | B3/S1234 |
+| `6` | Maze | B3/S12345 |
+| `7` | Life without Death | B3/S012345678 |
+| `8` | Coral | B3/S45678 |
+| `9` | Assimilation | B3/S4567 |
 
 ---
 
@@ -63,7 +84,10 @@ On quit, the screen is cleared and CONWAY prints its version banner
 | Border / background | Black (`$D020`/`$D021` set to 0) |
 | Generation | `gen:00000` at the right of the status row; increments after each completed generation |
 
-Color RAM is filled with green (VIC-II color 5) at startup and is not modified per frame. The live/dead distinction is carried entirely by the character written to screen RAM (`$A0` vs `$20`).
+Color RAM is filled with green (VIC-II color 5) at startup. Only the five
+letters in `pause` are recolored during simulation: cyan while paused and
+green while running. The live/dead distinction is carried by the character
+written to screen RAM (`$A0` vs `$20`).
 
 ---
 
@@ -73,11 +97,12 @@ Color RAM is filled with green (VIC-II color 5) at startup and is not modified p
 
 Each generation is computed using **double buffering**: a source buffer is read for neighbour counts while a separate destination buffer receives the new state. The buffers swap roles after every generation, so reads and writes never alias.
 
-- **Buffer addresses:** `$3000` (first buffer) and `$3400` (second buffer), each 1024 bytes, page-aligned (1000 cells used, 24 bytes of padding).
+- **Buffers:** `grid0` and `grid1` are emitted, relocatable, page-aligned
+  960-byte buffers (40×24 cells each).
 - **Cell encoding:** 1 byte per cell — `0` = dead, `1` = alive.
 - **Swap mechanism:** `computeNext` reads from the active buffer and writes to the inactive one; `swapBufs` toggles `zpBufSel` to exchange them, guaranteeing neighbour reads always see the prior generation's state.
 
-To avoid multiplying a row index by 40 at runtime, a 25-entry precomputed
+To avoid multiplying a row index by 40 at runtime, a 24-entry precomputed
 offset table (split into `rowOffLo`/`rowOffHi`) is used instead.
 `setThreeRowPtrs` performs three 16-bit base+offset additions (carry
 propagates naturally from lo to hi) to set up `zpPrevLo/Hi`, `zpCurrLo/Hi`,
@@ -99,16 +124,19 @@ This produces a different starting pattern on each run.
 
 ### Timing
 
-Animation speed is controlled by the KERNAL jiffy clock (`$A2`). The simulation waits for **3 jiffy ticks** between generations, giving approximately 20 generations per second on both PAL and NTSC systems.
+Animation speed is controlled by the KERNAL jiffy clock (`$A2`). The
+simulation waits for **3 jiffy ticks** between generations, giving a nominal
+20 generations per second on NTSC and about 16.7 on PAL, before computation
+and drawing overhead.
 
 ### Memory Usage
 
 | Region | Purpose |
 | --- | --- |
-| `$2000 – ~$227D` | CONWAY program code and data tables |
-| `$3000 – $33FF` | Grid buffer 0 (1024 bytes) |
-| `$3400 – $37FF` | Grid buffer 1 (1024 bytes) |
-| `$70 – $7D` | Zero-page scratch (14 bytes) |
+| Relocatable app image | Code, compact preset masks, active rules, counter scratch, and both emitted grid buffers |
+| `$0400–$07E7` | Screen RAM: 24-row grid/menu plus status row |
+| `$D800–$DBE7` | Color RAM |
+| `$70–$82` | App-private zero-page state and scratch |
 
 ### Zero Page Layout
 
@@ -118,12 +146,16 @@ Animation speed is controlled by the KERNAL jiffy clock (`$A2`). The simulation 
 | `$72–$73` | `zpCurrLo/Hi` | Pointer to current row in active buffer |
 | `$74–$75` | `zpNextLo/Hi` | Pointer to next row in active buffer |
 | `$76–$77` | `zpDstLo/Hi` | Pointer to current row in inactive buffer |
-| `$78` | `zpRow` | Row loop counter (0–24) |
+| `$78` | `zpRow` | Row loop counter (0–23) |
 | `$79` | `zpCol` | Column loop counter (0–39) |
 | `$7A` | `zpCount` | Moore-neighbourhood live count |
 | `$7B` | `zpLfsr` | LFSR state byte |
 | `$7C` | `zpPaused` | Pause flag (0 = running, $FF = paused) |
 | `$7D` | `zpBufSel` | Active buffer selector (0 = grid0, 1 = grid1) |
+| `$7E` | `zpInMenu` | Nonzero while the menu is active |
+| `$7F` | `zpMenuState` | Normal, Birth-edit, or Survival-edit state |
+| `$80` | `zpPresetIdx` | Preset index 0–8, or `$FF` for a custom rule |
+| `$81–$82` | `zpGenLo/Hi` | 16-bit generation counter |
 
 ---
 
@@ -135,7 +167,8 @@ Animation speed is controlled by the KERNAL jiffy clock (`$A2`). The simulation 
 CONWAY
 ```
 
-The screen goes black and the simulation begins with a randomized grid.
+The Multiverse menu opens with preset 1 selected and a randomized field
+retained behind it. Press RETURN to run that field.
 
 ### Pause, inspect, resume
 
@@ -143,11 +176,13 @@ Press `SPACE` to freeze the display. Press `SPACE` again to continue.
 
 ### Try a different pattern
 
-Press `R` to discard the current state and seed a fresh random grid.
+Press `R` during simulation to discard the current state and seed a fresh
+random grid. From the menu, `R` randomizes and immediately starts.
 
 ### Return to shell
 
-Press `Q` or the RUN/STOP key. The screen is cleared and the shell prompt returns.
+From simulation, press `Q` to return to the menu or RUN/STOP to exit directly.
+From the menu, press `Q` or RUN/STOP to return to the shell.
 
 ## Source
 

@@ -27,7 +27,7 @@
 9. [Module Reference — External Commands](#9-module-reference--external-commands)
    - 9.1 [debug.s — Interactive Memory Monitor] (#91debugs--interactive-memory-monitor)
    - 9.2 [label.asm — Disk Volume Label Writer](#92-labelasm--disk-volume-label-writer)
-   - 9.3 [conway.asm — Conway's Game of Life](#93-conwayasm--conways-game-of-life)
+   - 9.3 [conway_main.s / conway_grid.s — Conway Multiverse](#93-conway_mains--conway_grids--conway-multiverse)
    - 9.4 [pacman.asm — Pac64](#94-pacmanasm--pac64)
 10. [API Call Stacks](#10-api-call-stacks)
 11. [Code Graph and Interrelations](#11-code-graph-and-interrelations)
@@ -1272,12 +1272,30 @@ and prints mismatch offsets/values in hex. The logical compare offset is
 
 ---
 
-### 9.4 `conway.asm` — Conway's Game of Life
+### 9.3 `conway_main.s` / `conway_grid.s` — Conway Multiverse
 
-**Files**: [src/external/conway/conway_main.s](src/external/conway/conway_main.s), [conway_grid.s](src/external/conway/conway_grid.s) (built with ca65/ld65, not KickAssembler — see `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` Phase 4)  
-**Load address**: `UserProgStart` (currently `$3400`)
+**Files**: `src/external/conway/conway_main.s`,
+`src/external/conway/conway_grid.s`, and `src/external/conway/common.inc`
+(ca65/ld65)
+**Load address**: relocatable; selected and registered by the app manager
 
-Full-screen cellular automaton. The 40×25 text screen is used 1:1 as the simulation grid (1000 cells). Rules: B3/S23 with toroidal wrapping on all four edges.
+Menu-driven Life-like cellular automaton with nine presets, custom one-count
+Birth/Survival toggles, and a 16-bit generation counter. Simulation rows 0–23
+form a toroidal 40×24 grid (960 cells); row 24 is the status line. The menu
+uses rows 0–23 and clears all 1000 screen cells when entered.
+
+#### UI State and Rules
+
+`handleKeys` dispatches through `zpInMenu`. Menu state accepts presets 1–9,
+RETURN to run the retained field, R to randomize and run, and Q/RUN-STOP to
+exit. B or S enters an edit state; one `0`–`8` digit toggles the corresponding
+active lookup entry, marks the rule custom, and returns to the normal menu.
+A non-digit cancels the pending edit. Repeating B/S is required to toggle
+multiple counts; persistent full-set entry is deferred to Phase 7.
+
+Simulation SPACE toggles pause, R randomizes and resets the counter, C clears
+and pauses, Q returns to the menu, and RUN/STOP exits directly. The `pause`
+field is cyan while paused and green while running.
 
 #### Double-Buffer Design
 
@@ -1285,7 +1303,10 @@ Two 960-byte page-aligned buffers (`grid0`/`grid1`, embedded in-binary via a sou
 
 #### Row Pointer Setup (`setThreeRowPtrs`)
 
-A 25-entry precomputed table (`rowOffLo` / `rowOffHi`) stores `N × 40` for rows 0–24, avoiding a runtime multiply. For each row, three 16-bit base+offset additions set `zpPrev`, `zpCurr`, and `zpNext` to their row start addresses. Carry from the lo-byte `ADC` propagates naturally into the hi-byte add, making the arithmetic correct for offsets that cross a page boundary (rows 7+).
+A 24-entry precomputed table (`rowOffLo` / `rowOffHi`) stores `N × 40` for
+rows 0–23, avoiding a runtime multiply. For each row, three 16-bit base+offset
+additions set `zpPrev`, `zpCurr`, and `zpNext` to their row start addresses.
+Carry from the low-byte `ADC` propagates into the high-byte add.
 
 #### Neighbour Accumulation
 
@@ -1303,17 +1324,17 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `zpCurrLo/Hi` | `$72–$73` | Current-row pointer in active buffer |
 | `zpNextLo/Hi` | `$74–$75` | Next-row pointer in active buffer |
 | `zpDstLo/Hi` | `$76–$77` | Destination-row pointer in inactive buffer |
-| `zpRow` | `$78` | Row loop index (0–24) |
+| `zpRow` | `$78` | Row loop index (0–23) |
 | `zpCol` | `$79` | Column loop index (0–39) |
 | `zpCount` | `$7A` | Accumulated neighbour count |
 | `zpLfsr` | `$7B` | 8-bit Galois LFSR state (RNG) |
 | `zpPaused` | `$7C` | Pause flag: 0 = running, $FF = paused |
 | `zpBufSel` | `$7D` | Active buffer: 0 = `grid0`, 1 = `grid1` (relocatable page-aligned labels) |
-| `zpInMenu` | `$7E` | Reserved Multiverse state: nonzero while menu is active |
-| `zpMenuState` | `$7F` | Reserved Multiverse menu edit state |
-| `zpPresetIdx` | `$80` | Reserved Multiverse preset index or `$FF` for custom |
-| `zpGenLo/Hi` | `$81–$82` | Reserved Multiverse 16-bit generation counter |
-| `rowOffLo/Hi` | in PRG | 25-entry row-offset table (N×40, lo and hi bytes) |
+| `zpInMenu` | `$7E` | Nonzero while menu is active |
+| `zpMenuState` | `$7F` | Normal, Birth-edit, or Survival-edit state |
+| `zpPresetIdx` | `$80` | Preset index 0–8 or `$FF` for custom |
+| `zpGenLo/Hi` | `$81–$82` | 16-bit generation counter |
+| `rowOffLo/Hi` | in PRG | 24-entry row-offset table (N×40, low and high bytes) |
 | `cellCharTbl` | in PRG | 2-byte display map: `[0]=$20` (space), `[1]=$A0` (solid block) |
 | `ruleBirth/ruleSurvival` | in PRG | Private 9-byte active B/S lookup tables; entries are always 0 or 1 |
 | `presetBirthMasks/presetSurvivalMasks` | in PRG | Nine compact low/high 9-bit preset-mask pairs |
@@ -1324,18 +1345,18 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 
 | Routine | Description |
 | --- | --- |
-| `start` | Entry point: seed LFSR, set colors, call `randomizeGrid` + `drawGrid`, enter `mainLoop` |
-| `mainLoop` | Poll keys, wait delay, `computeNext`, `swapBufs`, `drawGrid`, repeat |
+| `start` | Seed LFSR, initialize state/colors and preset 1, randomize the retained field, then enter the menu |
+| `mainLoop` | Poll keys; menu/pause loops idle, while running it delays, computes, swaps, increments, and draws |
 | `handleKeys` | Non-blocking `KernalGetIn` poll; dispatches menu/edit/simulation states and preserves the direct shell-unwind contract |
 | `waitDelay` | Busy-waits `GEN_DELAY` jiffy ticks (default 3, ≈50 ms per generation) |
 | `computeNext` | Outer row loop → `setThreeRowPtrs` + `setDstRowPtr` → inner column loop with neighbour count and rule application |
 | `loadPreset` | Validates preset index, expands compact B/S masks, then atomically publishes `zpPresetIdx` |
 | `toggleBirth` / `toggleSurvival` | Validates and toggles one 0–8 lookup entry, then marks the active rule custom |
-| `getBirthRule` / `getSurvivalRule` | Validated read-only accessors for later menu rendering |
+| `getBirthRule` / `getSurvivalRule` | Validated read-only accessors used by menu rule summaries |
 | `resetGeneration` / `incrementGeneration` | Reset or modulo-increment the 16-bit generation count without screen I/O |
 | `drawSimulationStatus` | Writes an exact 40-column controls/`gen:` status template and current digits |
 | `drawGenerationCounter` | Converts the copied 16-bit counter and writes five leading-zero digits |
-| `drawMenu` | Private compact 24-row menu renderer with line descriptors, preset arrow, rule summaries, and bounded prompts; activated by Phase 5 dispatch |
+| `drawMenu` | Compact 24-row menu renderer with line descriptors, preset arrow, rule summaries, and bounded prompts |
 | `drawPauseColor` | Colors only status columns 3–7 cyan while paused and green while running |
 | `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
 | `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
@@ -1343,7 +1364,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `getNextBase` | Returns inactive buffer base (A=lo, X=hi) based on `zpBufSel` |
 | `swapBufs` | `zpBufSel ^= 1` |
 | `randomizeGrid` | Fills active buffer with ~25% live cells via LFSR; alive when `(LFSR & $0A) == 0` |
-| `clearGrid` | Zeros all 1000 cells in active buffer |
+| `clearGrid` | Zeros all 960 cells in the active buffer |
 | `drawGrid` | Copies active buffer to screen RAM (`$0400`), converting via `cellCharTbl` |
 | `clearScreen` | Fills screen RAM with `$20` (space) |
 | `lfsrStep` | Advances `zpLfsr` one step; result in A. Galois right-shift, mask `$B8` |
@@ -1357,7 +1378,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 
 Character-grid Pac-Man clone. The 40×24 playfield (row 24 is a dynamic status
 line) is rendered directly to screen/colour RAM, following the same
-direct-write, jiffy-polled, `KernalGetIn`-driven conventions as `conway.asm`.
+direct-write, jiffy-polled, `KernalGetIn`-driven conventions as Conway.
 Unlike conway's whole-grid-per-generation update, movement here is
 grid-locked and per-actor: Pac-Man and each of the four ghosts carry their
 own jiffy-driven move timer, so speeds are independently tunable without a

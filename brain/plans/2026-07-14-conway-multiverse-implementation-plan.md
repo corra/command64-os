@@ -353,6 +353,26 @@ verifies every pause-color transition.
 The task and Taskwarrior item remain in progress until the user explicitly
 confirms manual verification and completion.
 
+### Phase 7 — Full-set custom-rule editor
+
+#### Phase 7.1 — Editor implementation
+
+- Replace the Phase 5 one-digit B/S toggle workflow.
+- Clear the selected Birth or Survival set when its edit session begins.
+- Accept repeated `0`–`8` toggles while remaining in the selected edit mode.
+- Finish the edit session only when RETURN is pressed.
+
+Gate: build successfully; user verifies empty, single-count, multi-count, and
+repeated-toggle rule entry for both Birth and Survival sets.
+
+#### Phase 7.2 — Editor documentation
+
+- Update the manual, codebase reference, changelog, brain state, walkthrough,
+  task records, and Taskwarrior annotation for the full-set workflow.
+- Record final automated and user-run verification evidence.
+- Perform the DOX audit and ask the user whether the Phase 7 enhancement is
+  done before closing it.
+
 ## 13. Verification Matrix
 
 ### Automated/read-only
@@ -412,10 +432,13 @@ confirms manual verification and completion.
 - [x] Phase 3 generation counter implemented, independently audited, and
   manually confirmed by the user.
 - [x] Phase 4 compact menu renderer implemented, independently audited, and
-  approved for commit; activation/visual verification remain Phase 5 gates.
-- [/] Phase 5 state machine and cyan pause indicator implemented and
-  independently audited; user runtime verification is pending.
-- [ ] Phases 1-6 implemented and verified.
+  approved for commit.
+- [x] Phase 5 state machine, one-digit custom-rule editor, and cyan pause
+  indicator implemented, independently audited, and functionally confirmed by
+  the user.
+- [/] Phase 6 documentation and closeout in progress.
+- [ ] Phase 7.1 full-set custom-rule editor implemented and verified.
+- [ ] Phase 7.2 full-set editor documentation and closeout completed.
 
 ### Phase 1 evidence (2026-07-14)
 
@@ -504,15 +527,13 @@ confirms manual verification and completion.
 - Debug-assisted links remain byte-identical to production links.
 - Two independent reviews verified PETSCII ranges, transition side effects,
   stack safety, long-branch strategy, Color RAM `$DBC3-$DBC7`, and capacity.
-- User runtime verification of the complete transition/color matrix remains
-  required.
+- User functionally confirmed the complete Phase 5 behavior.
 
-#### Phase 5 working-checkpoint UX limitation
+#### Phase 7 enhancement boundary
 
-The build-1056 state machine is retained as a rollback checkpoint because its
-preset selection, menu/simulation transitions, counter lifecycle, exits, and
-pause coloring work. It is not the final custom-rule UX: B/S editing currently
-toggles one digit and immediately exits without clearing the selected rule
-table, making full rule entry confusing. The next Phase 5 increment will add
-persistent full-set entry and explicit Birth/Survival clearing before Phase 5
-can be accepted as complete.
+The Phase 5 state machine provides preset selection, menu/simulation
+transitions, counter lifecycle, exits, pause coloring, and one-digit B/S
+editing. Each edit command toggles one neighbor count and immediately returns
+to the normal menu without clearing the selected rule table. Persistent
+full-set entry and explicit Birth/Survival clearing are deferred to Phase 7.1;
+their documentation and closeout are deferred to Phase 7.2.

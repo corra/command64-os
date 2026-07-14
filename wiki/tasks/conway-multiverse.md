@@ -26,14 +26,16 @@ Add a menu, nine Life-like presets, custom Birth/Survival editing, and a
 - [x] Phase 3: generation counter implemented and integrated; automated builds
   and user runtime verification pass.
 - [x] Phase 4: compact menu rendering and dynamic fields implemented and
-  approved; Phase 5 activation and visual verification remain pending.
-- [/] Phase 5: menu/simulation state machine and stack-safe shell exit
-  implemented; user runtime verification pending.
-- [/] Phase 5: `pause` is cyan while paused and green while running; user
-  color-transition verification pending.
-- [/] Replace the working-checkpoint one-digit custom-rule editor: clear the
-  selected B/S set, accept repeated `0`–`8` toggles, and finish on RETURN.
-- [ ] Phase 6: update documentation and create walkthrough.
+  approved.
+- [x] Phase 5: menu/simulation state machine and stack-safe shell exit
+  implemented and functionally confirmed by the user.
+- [x] Phase 5: `pause` is cyan while paused and green while running; color
+  transitions functionally confirmed by the user.
+- [/] Phase 6: update documentation and create walkthrough.
+- [ ] Phase 7.1: replace the one-digit custom-rule editor: clear the selected
+  B/S set, accept repeated `0`–`8` toggles, and finish on RETURN.
+- [ ] Phase 7.2: update documentation, verification evidence, walkthrough, and
+  task records for the full-set editor.
 - [ ] Complete user-run C64/VICE verification.
 - [ ] Ask the user whether the task is done before closing this task or
   Taskwarrior #26.

@@ -142,17 +142,20 @@
     - [x] Write detailed implementation plan
     - [x] Obtain phased implementation approval
     - [x] Phase 1: extend contracts and verify build/memory headroom
-    - [ ] Implement Main Menu screen with preset selections
-    - [ ] Implement Custom Rule editing mode (Birth/Survival toggling)
+    - [x] Implement Main Menu screen with preset selections
+    - [x] Implement Custom Rule editing mode (one Birth/Survival toggle per
+      edit command)
     - [x] Phase 3: 16-bit generation counter implemented and manually verified
     - [x] Phase 2: compact presets and RAM-table solver implemented and
       manually verified
-    - [x] Phase 4: compact menu renderer implemented and approved;
-      activation/visual verification remain Phase 5 gates
-    - [/] Phase 5: menu/simulation state machine and cyan pause indicator
-      implemented; user runtime verification pending
-    - [/] Phase 5 UX correction: replace one-digit B/S editing with persistent
-      full-set entry; build 1056 remains the rollback checkpoint
+    - [x] Phase 4: compact menu renderer implemented and approved
+    - [x] Phase 5: menu/simulation state machine, cyan/green pause indicator,
+      and stack-safe exits implemented and functionally confirmed by the user
+    - [/] Phase 6: update documentation, project records, and walkthrough
+    - [ ] Phase 7.1: replace one-digit B/S editing with persistent full-set
+      entry, clearing the selected set and finishing on RETURN
+    - [ ] Phase 7.2: update documentation, verification evidence, walkthrough,
+      and task records for the full-set editor
     - [ ] Build and inspect size/alignment/relocation artifacts
     - [ ] Complete user-run C64/VICE verification
   - [ ] Add Oscar64 C-Language runtime support
