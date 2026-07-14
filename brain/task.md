@@ -3,9 +3,10 @@
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval
-  - [ ] Review external app, `MORE`, and `DEBUG` reuse candidates
-  - [ ] Implement after explicit approval
-  - [ ] Build and manually verify
+  - [x] Review external app, `MORE`, and `DEBUG` reuse candidates
+  - [x] Implement after explicit approval
+  - [x] Build `image_d64` and `test_image_d64`
+  - [ ] Manually verify
 
 - [ ] Taskwarrior #25 (`57d2cf4e`): Future external app return-code support
   - [x] Confirm current `DOS_EXIT` has no meaningful app return-code channel

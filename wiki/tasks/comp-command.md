@@ -24,18 +24,19 @@ streams and reports byte-level differences.
 
 - [x] Create active Taskwarrior task.
 - [x] Write implementation plan for approval.
-- [ ] Review external app build/startup patterns.
-- [ ] Review `MORE` behavior for parser expectations.
-- [ ] Review `DEBUG` compare/hex helpers for possible reuse.
-- [ ] Confirm shared `fileRead` bug status before manual verification.
-- [ ] Implement `src/external/comp/` source and build file.
-- [ ] Wire `COMP` into `CMakeLists.txt` and `IMAGE_PRG_TARGETS`.
-- [ ] Implement strict two-argument parser.
-- [ ] Implement raw streaming compare backend.
-- [ ] Implement hex offset/byte output.
-- [ ] Build `image_d64` successfully.
+- [x] Review external app build/startup patterns.
+- [x] Review `MORE` behavior for parser expectations.
+- [x] Review `DEBUG` compare/hex helpers for possible reuse.
+- [x] Confirm shared `fileRead` bug status before manual verification.
+- [x] Implement `src/external/comp/` source and build file.
+- [x] Wire `COMP` into `CMakeLists.txt` and `IMAGE_PRG_TARGETS`.
+- [x] Implement strict two-argument parser.
+- [x] Implement raw streaming compare backend.
+- [x] Implement hex offset/byte output.
+- [x] Build `image_d64` successfully.
+- [x] Build `test_image_d64` successfully.
 - [ ] Complete manual C64/VICE verification.
-- [ ] Update docs and task status.
+- [x] Update docs and task status.
 
 ## Manual Verification
 
@@ -49,4 +50,3 @@ streams and reports byte-level differences.
 6. Run missing-file and bad-argument cases and confirm clean return to prompt.
 7. Run against PRG files and confirm raw bytes, including load-address bytes,
    are compared.
-

@@ -62,6 +62,9 @@ set(EDLIN_ENTRY "src/external/edlin/edlin.s")
 file(GLOB_RECURSE FORMAT_SRCS CONFIGURE_DEPENDS "src/external/format/*.s" "src/external/format/*.inc" "include/ca65/*.inc")
 set(FORMAT_ENTRY "src/external/format/format.s")
 
+file(GLOB_RECURSE COMP_SRCS CONFIGURE_DEPENDS "src/external/comp/*.s" "src/external/comp/*.inc" "include/ca65/*.inc")
+set(COMP_ENTRY "src/external/comp/comp.s")
+
 file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.s" "src/external/conway/*.inc" "include/ca65/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway_main.s")
 
@@ -160,6 +163,16 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for FORMAT target")
 endif()
 set(FORMAT_TARGET format)
+
+# 3d. COMP External Command PRG Target — raw byte-stream file comparison
+# utility. Ships unconditionally in IMAGE_PRG_TARGETS from Phase 1, so a
+# missing ca65/ld65 toolchain fails configure like the other ca65 utilities.
+if(Ca65_FOUND)
+    add_ca65_app(comp "${COMP_ENTRY}" COMP_SRCS 1000 "0800")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for COMP target")
+endif()
+set(COMP_TARGET comp)
 
 # 4. CONWAY Game of Life — built with ca65/ld65 (migrated off the
 # spike/ca65-conway/ branch; see
@@ -269,7 +282,7 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
+set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64

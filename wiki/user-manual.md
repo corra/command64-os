@@ -240,6 +240,12 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 **Description:** Executes a program by name or address. With no argument, it runs whatever program is currently loaded at the base of User Program Space.
 **Syntax:** `RUN [name|address]` or `GO [name|address]`
 
+### COMP
+
+**Description:** Compares two files as raw byte streams. Differences are reported as hex byte offsets and byte values. Version 1 rejects options and compares file bytes exactly as stored, including PRG load-address bytes.
+**Syntax:** `COMP file1 file2`
+**Example:** `COMP OLD.PRG NEW.PRG`
+
 ### LABEL
 
 **Description:** Sets a new volume label (up to 16 characters) on the disk in the active drive.

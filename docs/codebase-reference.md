@@ -84,10 +84,16 @@ command64-os/
 │                               environment variable subroutines
 │
 ├── src/external/
+│   ├── comp/
+│   │   └── comp.s              COMP raw file-compare utility (ca65/ld65)
 │   ├── debug/
 │   │   └── debug.s             DEBUG utility (memory monitor, assembler; ca65/ld65)
+│   ├── edlin/
+│   │   └── edlin.s             EDLIN line editor (ca65/ld65)
+│   ├── format/
+│   │   └── format.s            FORMAT utility (ca65/ld65)
 │   └── label/
-│       └── label.asm           LABEL disk volume-name writer
+│       └── label.s             LABEL disk volume-name writer (ca65/ld65)
 │
 ├── tests/
 │   ├── src/
@@ -1239,7 +1245,34 @@ Uppercase character literals under either assembler's default PETSCII translatio
 
 ---
 
-### 9.3 `conway.asm` — Conway's Game of Life
+### 9.3 `comp.s` — Raw File Compare Utility
+
+**File**: [src/external/comp/comp.s](src/external/comp/comp.s)
+**Toolchain**: ca65/ld65 via `add_ca65_app`
+**Load address**: `UserProgStart` (currently `$3400`)
+**Version**: 0.1.x (auto-incremented build number from `BUILD_COMP`)
+
+COMP is an external MS-DOS-style file comparison utility. Phase 1 implements
+strict `COMP FILE1 FILE2` behavior only: no options, no prompting, and no `FC`
+wrapper. It opens both files through `DOS_OPEN_FILE`, streams them in 64-byte
+chunks with `DOS_READ_FILE`, compares raw stored bytes regardless of file type,
+and prints mismatch offsets/values in hex. The logical compare offset is
+24-bit and mismatch display is capped at 10 entries.
+
+#### Zero Page Usage (private to COMP)
+
+| ZP | Label | Purpose |
+| ---- | ------- | --------- |
+| `$70`–`$71` | `File1Handle` / `File2Handle` | Open file handles |
+| `$72` | `ArgStart` | Parser source index |
+| `$73`–`$75` | `OffsetLo` / `OffsetMid` / `OffsetHi` | 24-bit byte offset |
+| `$76` | `MismatchCount` | Displayed mismatch count |
+| `$77`–`$79` | `Read1Count` / `Read2Count` / `CompareCount` | Chunk byte counts |
+| `$7A`–`$7F` | `IndexSave`, byte saves, flags, `DestIndex` | Parser/compare scratch |
+
+---
+
+### 9.4 `conway.asm` — Conway's Game of Life
 
 **Files**: [src/external/conway/conway_main.s](src/external/conway/conway_main.s), [conway_grid.s](src/external/conway/conway_grid.s) (built with ca65/ld65, not KickAssembler — see `brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md` Phase 4)  
 **Load address**: `UserProgStart` (currently `$3400`)

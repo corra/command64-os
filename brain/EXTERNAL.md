@@ -34,7 +34,8 @@ These programs are essential for system maintenance and early verification of th
 | `XCOPY` | Extended file and directory copy | 💤 Backlog | Medium | DOS 4.0 |
 | `FIND` | Search for a string in a file | 💤 Backlog | Low | DOS 4.0 |
 | `SORT` | Sort input data | 💤 Backlog | Low | DOS 4.0 |
-| `COMP` / `FC` | Compare files | 💤 Backlog | Low | DOS 4.0 |
+| `COMP` | Compare files as raw byte streams | ✅ v0.1.0 (Build 1001) | Low | DOS 4.0 |
+| `FC` | File compare with binary/text options | 💤 Backlog | Low | DOS 4.0 |
 | `ATTRIB` | Change file attributes | 💤 Backlog | Medium | DOS 4.0 |
 
 ## 4. Development & Advanced Tools
