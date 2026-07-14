@@ -16,6 +16,7 @@
 .export drawGrid
 .export drawSimulationStatus
 .export drawGenerationCounter
+.export drawPauseColor
 .export computeNext
 .export clearGrid
 .export clearScreen
@@ -544,7 +545,23 @@ dslLoop:
     inx
     cpx #STATUS_TEXT_LEN
     bne dslLoop
-    jmp drawGenerationCounter
+    jsr drawGenerationCounter
+    jmp drawPauseColor
+
+; Draw only the status word "pause" in cyan while paused, green while running.
+; Clobbers: A, X, N, Z.
+drawPauseColor:
+    lda #CLR_LIVE
+    ldx zpPaused
+    beq dpcHaveColor
+    lda #CLR_PAUSED
+dpcHaveColor:
+    ldx #PAUSE_TEXT_LEN - 1
+dpcLoop:
+    sta COLORRAM + PAUSE_TEXT_OFFSET, x
+    dex
+    bpl dpcLoop
+    rts
 
 ; ---------------------------------------------------------------------------
 ; drawGenerationCounter -- convert and draw five leading-zero decimal digits.
@@ -612,7 +629,7 @@ cgcPlaceDone:
 
 screencode_mixed
 statusText:
-    .byte "sp:pause r:rnd c:clear q:quit  gen:00000"
+    .byte "sp:pause r:rnd c:clear q:menu  gen:00000"
 statusTextEnd:
 petscii_mixed
 STATUS_TEXT_LEN = statusTextEnd - statusText

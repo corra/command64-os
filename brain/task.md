@@ -149,6 +149,10 @@
       manually verified
     - [x] Phase 4: compact menu renderer implemented and approved;
       activation/visual verification remain Phase 5 gates
+    - [/] Phase 5: menu/simulation state machine and cyan pause indicator
+      implemented; user runtime verification pending
+    - [/] Phase 5 UX correction: replace one-digit B/S editing with persistent
+      full-set entry; build 1056 remains the rollback checkpoint
     - [ ] Build and inspect size/alignment/relocation artifacts
     - [ ] Complete user-run C64/VICE verification
   - [ ] Add Oscar64 C-Language runtime support

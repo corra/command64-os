@@ -20,7 +20,8 @@ The grid is **toroidal**: the left edge wraps to the right, and the top edge wra
 CONWAY
 ```
 
-No arguments. The simulation starts immediately with a randomly seeded grid (~25% live cells).
+No arguments. The utility opens on its Multiverse menu with preset 1 selected
+and a randomized field retained behind the menu.
 
 ---
 
@@ -31,8 +32,22 @@ No arguments. The simulation starts immediately with a randomly seeded grid (~25
 | `SPACE` | Pause / resume the simulation |
 | `R` | Re-randomize the grid and reset the counter |
 | `C` | Clear the grid, reset the counter, and pause |
-| `Q` | Quit and return to the command64 shell |
+| `Q` | Return to the Multiverse menu |
 | RUN/STOP | Quit and return to the command64 shell |
+
+While paused, only the status word `pause` changes to cyan. It returns to green
+when simulation resumes.
+
+### Menu controls
+
+| Key | Action |
+| --- | --- |
+| `1`–`9` | Select one of the nine Life-like presets |
+| `B`, then `0`–`8` | Toggle one Birth neighbor count and mark the rule custom |
+| `S`, then `0`–`8` | Toggle one Survival neighbor count and mark the rule custom |
+| RETURN | Run the retained field with the selected rule |
+| `R` | Randomize and run with the selected rule |
+| `Q` or RUN/STOP | Exit to the command64 shell |
 
 On quit, the screen is cleared and CONWAY prints its version banner
 (`CONWAY v0.4.0.1042`) before returning to the shell.

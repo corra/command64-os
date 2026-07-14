@@ -1326,7 +1326,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | --- | --- |
 | `start` | Entry point: seed LFSR, set colors, call `randomizeGrid` + `drawGrid`, enter `mainLoop` |
 | `mainLoop` | Poll keys, wait delay, `computeNext`, `swapBufs`, `drawGrid`, repeat |
-| `handleKeys` | Non-blocking `KernalGetIn` poll; dispatches Q/STOP/SPACE/R/C |
+| `handleKeys` | Non-blocking `KernalGetIn` poll; dispatches menu/edit/simulation states and preserves the direct shell-unwind contract |
 | `waitDelay` | Busy-waits `GEN_DELAY` jiffy ticks (default 3, ≈50 ms per generation) |
 | `computeNext` | Outer row loop → `setThreeRowPtrs` + `setDstRowPtr` → inner column loop with neighbour count and rule application |
 | `loadPreset` | Validates preset index, expands compact B/S masks, then atomically publishes `zpPresetIdx` |
@@ -1336,6 +1336,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `drawSimulationStatus` | Writes an exact 40-column controls/`gen:` status template and current digits |
 | `drawGenerationCounter` | Converts the copied 16-bit counter and writes five leading-zero digits |
 | `drawMenu` | Private compact 24-row menu renderer with line descriptors, preset arrow, rule summaries, and bounded prompts; activated by Phase 5 dispatch |
+| `drawPauseColor` | Colors only status columns 3–7 cyan while paused and green while running |
 | `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
 | `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
 | `getCurrBase` | Returns active buffer base (A=lo, X=hi) based on `zpBufSel` |

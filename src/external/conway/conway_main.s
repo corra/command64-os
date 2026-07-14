@@ -26,10 +26,13 @@ VERSION_STAGE = '0'
 .import drawGrid
 .import drawSimulationStatus
 .import drawGenerationCounter
+.import drawPauseColor
 .import computeNext
 .import clearGrid
 .import clearScreen
 .import loadPreset
+.import toggleBirth
+.import toggleSurvival
 .import getBirthRule
 .import getSurvivalRule
 
@@ -81,8 +84,7 @@ fillColorTail:
     bne fillColorTail
 
     jsr randomizeGrid
-    jsr drawGrid
-    jsr drawSimulationStatus
+    jsr enterMenu
 
 ; ---------------------------------------------------------------------------
 ; Main loop
@@ -90,6 +92,8 @@ fillColorTail:
 mainLoop:
     jsr handleKeys
 
+    lda zpInMenu
+    bne mainLoop
     lda zpPaused
     bne mainLoop
 
@@ -102,28 +106,129 @@ mainLoop:
     jmp mainLoop
 
 ; ---------------------------------------------------------------------------
-; handleKeys -- non-blocking keyboard poll; act on recognised keys.
+; handleKeys -- non-blocking dispatcher for menu and simulation states.
+; Exit paths JMP directly to exitToShell so only this routine's return address
+; is discarded before RTS resumes the shell's original JSR caller.
 ; ---------------------------------------------------------------------------
 handleKeys:
     jsr KernalGetIn
     beq hkNone
 
-    cmp #$51                    ; Q
-    beq hkQuit
-    cmp #3                      ; RUN/STOP
-    beq hkQuit
-    cmp #$20                    ; SPACE
-    beq hkPause
-    cmp #$52                    ; R
-    beq hkRandom
-    cmp #$43                    ; C
-    beq hkClear
+    ldx zpInMenu
+    beq handleSimulationKey
+    jmp handleMenuKey
 hkNone:
     rts
 
-hkQuit:
-    ; Discard mainLoop's return address before RTS so control returns to
-    ; the shell that JSR'd into this program's entry point, not mainLoop.
+handleSimulationKey:
+    cmp #3                      ; RUN/STOP
+    beq hskExit
+    cmp #$51                    ; Q -> menu
+    beq hskMenu
+    cmp #$20                    ; SPACE
+    beq hskPause
+    cmp #$52                    ; R
+    beq hskRandom
+    cmp #$43                    ; C
+    beq hskClear
+    rts
+hskExit:
+    jmp exitToShell
+hskMenu:
+    jmp enterMenu
+hskPause:
+    lda zpPaused
+    eor #$FF
+    sta zpPaused
+    jsr drawPauseColor
+    rts
+hskRandom:
+    jsr randomizeGrid
+    jsr resetGeneration
+    jsr drawGrid
+    jsr drawGenerationCounter
+    jsr drawPauseColor
+    rts
+hskClear:
+    jsr clearGrid
+    jsr resetGeneration
+    lda #$FF
+    sta zpPaused
+    jsr drawGrid
+    jsr drawGenerationCounter
+    jsr drawPauseColor
+    rts
+
+handleMenuKey:
+    ldx zpMenuState
+    bne handleMenuEditKey
+
+    cmp #3                      ; RUN/STOP
+    beq hmkExit
+    cmp #$51                    ; Q
+    beq hmkExit
+    cmp #$0D                    ; RETURN
+    beq hmkStart
+    cmp #$52                    ; R: randomize and start
+    beq hmkRandomStart
+    cmp #$42                    ; B: edit Birth
+    beq hmkBirth
+    cmp #$53                    ; S: edit Survival
+    beq hmkSurvival
+    cmp #$31                    ; '1'
+    bcc hmkIgnore
+    cmp #$3A                    ; one past '9'
+    bcs hmkIgnore
+    sec
+    sbc #$31
+    jsr loadPreset
+    jmp drawMenuDynamics
+hmkIgnore:
+    rts
+hmkExit:
+    jmp exitToShell
+hmkStart:
+    jmp startSimulation
+hmkRandomStart:
+    jsr randomizeGrid
+    jmp startSimulation
+hmkBirth:
+    lda #MENU_STATE_BIRTH
+    sta zpMenuState
+    jmp drawMenuPrompt
+hmkSurvival:
+    lda #MENU_STATE_SURVIVAL
+    sta zpMenuState
+    jmp drawMenuPrompt
+
+handleMenuEditKey:
+    cmp #$30                    ; '0'
+    bcc hmeCancel
+    cmp #$39                    ; one past '8'
+    bcs hmeCancel
+    sec
+    sbc #$30
+    tax
+    lda zpMenuState
+    cmp #MENU_STATE_BIRTH
+    beq hmeToggleBirth
+    jsr toggleSurvival
+    jmp hmeFinish
+hmeToggleBirth:
+    jsr toggleBirth
+hmeFinish:
+    lda #MENU_STATE_NORMAL
+    sta zpMenuState
+    jsr drawMenuDynamics
+    jmp drawMenuPrompt
+hmeCancel:
+    lda #MENU_STATE_NORMAL
+    sta zpMenuState
+    jsr drawMenuDynamics
+    jmp drawMenuPrompt
+
+; Precondition: reached by JMP from handleKeys dispatch, never nested JSR.
+exitToShell:
     lda #0
     sta VIC_BORD
     sta VIC_BGND
@@ -137,26 +242,22 @@ hkQuit:
     pla
     rts
 
-hkPause:
-    lda zpPaused
-    eor #$FF
-    sta zpPaused
-    rts
-
-hkRandom:
-    jsr randomizeGrid
-    jsr resetGeneration
-    jsr drawGrid
-    jsr drawGenerationCounter
-    rts
-
-hkClear:
-    jsr clearGrid
-    jsr resetGeneration
+enterMenu:
     lda #$FF
+    sta zpInMenu
+    lda #MENU_STATE_NORMAL
+    sta zpMenuState
+    jsr drawMenu
+    rts
+
+startSimulation:
+    lda #0
+    sta zpInMenu
+    sta zpMenuState
     sta zpPaused
+    jsr resetGeneration
     jsr drawGrid
-    jsr drawGenerationCounter
+    jsr drawSimulationStatus
     rts
 
 ; ---------------------------------------------------------------------------
@@ -214,7 +315,7 @@ dmDescriptorsDone:
     jsr drawMenuDynamics
     jmp drawMenuPrompt
 
-; Clear only the 24 grid/menu rows; simulation status row 24 is separate.
+; Clear all 25 rows so no simulation status/color text remains below the menu.
 clearMenuArea:
     lda #<SCREEN
     sta zpDstLo
@@ -235,7 +336,7 @@ cmaPage:
 cmaTail:
     sta (zpDstLo), y
     iny
-    cpy #192
+    cpy #232
     bne cmaTail
     rts
 

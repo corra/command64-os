@@ -27,7 +27,12 @@ Add a menu, nine Life-like presets, custom Birth/Survival editing, and a
   and user runtime verification pass.
 - [x] Phase 4: compact menu rendering and dynamic fields implemented and
   approved; Phase 5 activation and visual verification remain pending.
-- [ ] Phase 5: integrate menu/simulation input state machine and shell exit.
+- [/] Phase 5: menu/simulation state machine and stack-safe shell exit
+  implemented; user runtime verification pending.
+- [/] Phase 5: `pause` is cyan while paused and green while running; user
+  color-transition verification pending.
+- [/] Replace the working-checkpoint one-digit custom-rule editor: clear the
+  selected B/S set, accept repeated `0`–`8` toggles, and finish on RETURN.
 - [ ] Phase 6: update documentation and create walkthrough.
 - [ ] Complete user-run C64/VICE verification.
 - [ ] Ask the user whether the task is done before closing this task or

@@ -336,9 +336,12 @@ visual/dynamic verification occurs immediately after Phase 5 activation.
 
 - Split menu/simulation key dispatch.
 - Add start/resume/random start, simulation-to-menu, and dual exit paths.
+- Render only the status word `pause` in cyan while paused and green while
+  running; refresh it on SPACE, clear, randomize, and simulation start.
 - Audit stack depth and the `PLA/PLA/RTS` shell-return sequence.
 
-Gate: build; user performs complete keyboard/state transition matrix.
+Gate: build; user performs complete keyboard/state transition matrix and
+verifies every pause-color transition.
 
 ### Phase 6 — Documentation and closeout
 
@@ -410,6 +413,8 @@ confirms manual verification and completion.
   manually confirmed by the user.
 - [x] Phase 4 compact menu renderer implemented, independently audited, and
   approved for commit; activation/visual verification remain Phase 5 gates.
+- [/] Phase 5 state machine and cyan pause indicator implemented and
+  independently audited; user runtime verification is pending.
 - [ ] Phases 1-6 implemented and verified.
 
 ### Phase 1 evidence (2026-07-14)
@@ -478,3 +483,36 @@ confirms manual verification and completion.
   builds and assertions passed.
 - Two independent reviews verified exact layout, screen bounds, pointer/ZP
   safety, stale-field clearing, and the Phase 5 activation boundary.
+
+### Phase 5 evidence (2026-07-14)
+
+- Activated the startup menu and added menu/simulation dispatch for presets,
+  Birth/Survival edit states, start/random-start, pause/randomize/clear,
+  simulation-to-menu, and Q/RUN-STOP shell exit.
+- Edit-state non-digits cancel without redispatch; preset/rule changes do not
+  mutate the retained field or counter until simulation starts.
+- All exits JMP directly from the `handleKeys` dispatch chain to the audited
+  `PLA/PLA/RTS` shell-unwind path; no nested exit JSR was introduced.
+- Added the requested status color: only `pause` is cyan (`3`) while paused
+  and green (`5`) while running; SPACE/clear/randomize/start refresh it.
+- Menu clearing now covers all 1000 screen cells so stale status text is not
+  visible on row 24.
+- `conway`, `image_d64`, and `test_image_d64` builds succeeded as build 1056.
+- Linked payload is 4544 bytes (`$11C0`), leaving 576 bytes (`$0240`).
+- Final relocatable PRG is 4914 bytes with 181 relocation points.
+- Base grids are `$3E00`/`$4200`; +page grids are `$3F00`/`$4300`.
+- Debug-assisted links remain byte-identical to production links.
+- Two independent reviews verified PETSCII ranges, transition side effects,
+  stack safety, long-branch strategy, Color RAM `$DBC3-$DBC7`, and capacity.
+- User runtime verification of the complete transition/color matrix remains
+  required.
+
+#### Phase 5 working-checkpoint UX limitation
+
+The build-1056 state machine is retained as a rollback checkpoint because its
+preset selection, menu/simulation transitions, counter lifecycle, exits, and
+pause coloring work. It is not the final custom-rule UX: B/S editing currently
+toggles one digit and immediately exits without clearing the selected rule
+table, making full rule entry confusing. The next Phase 5 increment will add
+persistent full-set entry and explicit Birth/Survival clearing before Phase 5
+can be accepted as complete.

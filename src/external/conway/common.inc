@@ -20,6 +20,8 @@ MENU_BIRTH_FIELD_OFFSET = 15 * GRID_W + 12
 MENU_SURV_FIELD_OFFSET  = 16 * GRID_W + 12
 GEN_LABEL_OFFSET   = STATUS_ROW_OFFSET + 31
 GEN_DIGITS_OFFSET  = STATUS_ROW_OFFSET + 35
+PAUSE_TEXT_OFFSET  = STATUS_ROW_OFFSET + 3
+PAUSE_TEXT_LEN     = 5
 
 ; ---------------------------------------------------------------------------
 ; Hardware addresses
@@ -36,6 +38,7 @@ JIFFY_CLK = $A2
 CHAR_LIVE = $A0
 CHAR_DEAD = $20
 CLR_LIVE  = 5
+CLR_PAUSED = 3
 
 ; ---------------------------------------------------------------------------
 ; Timing
@@ -54,6 +57,7 @@ RULE_COUNT          = 9
 
 .assert MENU_BIRTH_FIELD_OFFSET + RULE_COUNT <= 16 * GRID_W, error, "birth rule field crosses row"
 .assert MENU_SURV_FIELD_OFFSET + RULE_COUNT <= 17 * GRID_W, error, "survival rule field crosses row"
+.assert PAUSE_TEXT_OFFSET + PAUSE_TEXT_LEN <= 1000, error, "pause color field crosses screen"
 
 ; ---------------------------------------------------------------------------
 ; Zero-page scratch ($70-$82 -- app-private external-program area)
