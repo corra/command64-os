@@ -14,10 +14,17 @@
 
 .export randomizeGrid
 .export drawGrid
-.export drawStatusLine
+.export drawSimulationStatus
+.export drawGenerationCounter
+.export drawPauseColor
 .export computeNext
 .export clearGrid
 .export clearScreen
+.export loadPreset
+.export toggleBirth
+.export toggleSurvival
+.export getBirthRule
+.export getSurvivalRule
 
 .segment "CODE"
 
@@ -251,28 +258,16 @@ cnGotRight:
     beq cnDead
 
 cnAlive:
-    lda zpCount
-    cmp #2
-    beq cnSurvive
-    cmp #3
-    beq cnSurvive
-    jmp cnKill
+    ldx zpCount
+    lda ruleSurvival, x
+    jmp cnStoreRule
 
 cnDead:
-    lda zpCount
-    cmp #3
-    beq cnBorn
-    jmp cnKill
+    ldx zpCount
+    lda ruleBirth, x
 
-cnSurvive:
-cnBorn:
-    lda #1
-    ldy zpCol
-    sta (zpDstLo), y
-    jmp cnNext
-
-cnKill:
-    lda #0
+cnStoreRule:
+    and #1
     ldy zpCol
     sta (zpDstLo), y
 
@@ -401,6 +396,120 @@ lfsrNFB:
     rts
 
 ; ---------------------------------------------------------------------------
+; loadPreset -- expand compact 9-bit B/S masks into hot-path lookup tables.
+; Input:  A = preset index (0..PRESET_COUNT-1)
+; Output: C clear on success; C set if A is out of range.
+; Clobbers: A, X, Y, N, Z. On failure, active rules and zpPresetIdx are intact.
+; ---------------------------------------------------------------------------
+loadPreset:
+    cmp #PRESET_COUNT
+    bcs lpInvalid
+    pha
+    asl
+    tax
+
+    lda presetBirthMasks, x
+    sta ruleMaskScratch
+    ldy #0
+lpBirthLoop:
+    lsr ruleMaskScratch
+    lda #0
+    rol
+    sta ruleBirth, y
+    iny
+    cpy #8
+    bne lpBirthLoop
+    lda presetBirthMasks + 1, x
+    and #1
+    sta ruleBirth + 8
+
+    lda presetSurvivalMasks, x
+    sta ruleMaskScratch
+    ldy #0
+lpSurvivalLoop:
+    lsr ruleMaskScratch
+    lda #0
+    rol
+    sta ruleSurvival, y
+    iny
+    cpy #8
+    bne lpSurvivalLoop
+    lda presetSurvivalMasks + 1, x
+    and #1
+    sta ruleSurvival + 8
+
+    pla
+    sta zpPresetIdx
+    clc
+    rts
+
+lpInvalid:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; toggleBirth / toggleSurvival -- toggle one active neighbour count.
+; Input: X = neighbour count (0..8)
+; Output: C clear on success; C set if X is out of range.
+; Preserves: X, Y. Clobbers: A, N, Z. A valid toggle marks the rule custom.
+; ---------------------------------------------------------------------------
+toggleBirth:
+    cpx #RULE_COUNT
+    bcs tbInvalid
+    lda ruleBirth, x
+    eor #1
+    sta ruleBirth, x
+    lda #PRESET_CUSTOM
+    sta zpPresetIdx
+    clc
+    rts
+tbInvalid:
+    sec
+    rts
+
+toggleSurvival:
+    cpx #RULE_COUNT
+    bcs tsInvalid
+    lda ruleSurvival, x
+    eor #1
+    sta ruleSurvival, x
+    lda #PRESET_CUSTOM
+    sta zpPresetIdx
+    clc
+    rts
+tsInvalid:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; getBirthRule / getSurvivalRule -- read one active rule-table entry.
+; Input: X = neighbour count (0..8)
+; Output: A = 0/1 and C clear; invalid X returns A=0 and C set.
+; Preserves: X, Y.
+; ---------------------------------------------------------------------------
+getBirthRule:
+    cpx #RULE_COUNT
+    bcs gbrInvalid
+    lda ruleBirth, x
+    clc
+    rts
+gbrInvalid:
+    lda #0
+    sec
+    rts
+
+getSurvivalRule:
+    cpx #RULE_COUNT
+    bcs gsrInvalid
+    lda ruleSurvival, x
+    clc
+    rts
+gsrInvalid:
+    lda #0
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; Read-only data tables
 ; ---------------------------------------------------------------------------
 cellCharTbl:
@@ -420,13 +529,15 @@ rowOffHi:
     .byte $03,$03,$03,$03
 
 ; ---------------------------------------------------------------------------
-; drawStatusLine -- write the keybinding reminder to screen row 24.
+; drawSimulationStatus -- write the exact 40-column simulation status row,
+; then replace the template digits with the current generation count.
 ; Uses include/ca65/screencode.inc's screencode_mixed/petscii_mixed
 ; macros, mirroring Kick's ".encoding "screencode_mixed"" toggle idiom
 ; (conway.asm:711/715) -- these macros were built and verified specifically
 ; against this string's previous hand-encoded bytes.
+; Clobbers: A, X, Y, N, Z, C.
 ; ---------------------------------------------------------------------------
-drawStatusLine:
+drawSimulationStatus:
     ldx #0
 dslLoop:
     lda statusText, x
@@ -434,14 +545,140 @@ dslLoop:
     inx
     cpx #STATUS_TEXT_LEN
     bne dslLoop
+    jsr drawGenerationCounter
+    jmp drawPauseColor
+
+; Draw only the status word "pause" in cyan while paused, green while running.
+; Clobbers: A, X, N, Z.
+drawPauseColor:
+    lda #CLR_LIVE
+    ldx zpPaused
+    beq dpcHaveColor
+    lda #CLR_PAUSED
+dpcHaveColor:
+    ldx #PAUSE_TEXT_LEN - 1
+dpcLoop:
+    sta COLORRAM + PAUSE_TEXT_OFFSET, x
+    dex
+    bpl dpcLoop
+    rts
+
+; ---------------------------------------------------------------------------
+; drawGenerationCounter -- convert and draw five leading-zero decimal digits.
+; Clobbers: A, X, Y, N, Z, C. The live 16-bit counter is not modified.
+; ---------------------------------------------------------------------------
+drawGenerationCounter:
+    jsr convertGeneration
+    ldx #0
+dgcLoop:
+    lda digitBuf, x
+    clc
+    adc #$30
+    sta SCREEN + GEN_DIGITS_OFFSET, x
+    inx
+    cpx #5
+    bne dgcLoop
+    rts
+
+; ---------------------------------------------------------------------------
+; convertGeneration -- convert zpGenHi:zpGenLo to five numeric digits.
+; Uses high-byte-first comparison and preserves the low-byte subtraction
+; borrow into the high-byte SBC. Clobbers: A, Y, N, Z, C; preserves X.
+; ---------------------------------------------------------------------------
+convertGeneration:
+    lda zpGenLo
+    sta tempValLo
+    lda zpGenHi
+    sta tempValHi
+    ldy #0
+
+cgcPlaceLoop:
+    lda #0
+    sta digitBuf, y
+
+cgcSubtractTest:
+    lda tempValHi
+    cmp decimalDivHi, y
+    bcc cgcPlaceDone
+    bne cgcSubtract
+    lda tempValLo
+    cmp decimalDivLo, y
+    bcc cgcPlaceDone
+
+cgcSubtract:
+    lda tempValLo
+    sec
+    sbc decimalDivLo, y
+    sta tempValLo
+    lda tempValHi
+    sbc decimalDivHi, y
+    sta tempValHi
+    lda digitBuf, y
+    clc
+    adc #1
+    sta digitBuf, y
+    jmp cgcSubtractTest
+
+cgcPlaceDone:
+    iny
+    cpy #4
+    bne cgcPlaceLoop
+    lda tempValLo
+    sta digitBuf + 4
     rts
 
 screencode_mixed
 statusText:
-    .byte "space=pause  r=random  c=clear  q=quit"
+    .byte "sp:pause r:rnd c:clear q:menu  gen:00000"
 statusTextEnd:
 petscii_mixed
 STATUS_TEXT_LEN = statusTextEnd - statusText
+.assert STATUS_TEXT_LEN = 40, error, "simulation status must fill exactly 40 columns"
+.assert GEN_DIGITS_OFFSET + 5 = 1000, error, "generation digits must end at screen cell 999"
+
+decimalDivLo:
+    .byte <10000, <1000, <100, <10
+decimalDivHi:
+    .byte >10000, >1000, >100, >10
+
+; Compact preset database: each entry is a low/high pair for neighbour
+; counts 0..7 and count 8 (high bit 0). loadPreset expands one pair into each
+; private 9-byte lookup table before publishing zpPresetIdx.
+presetBirthMasks:
+    .byte $08,$00               ; 1. Conway's Life: B3
+    .byte $08,$00               ; 2. Ant Colony: B3
+    .byte $18,$00               ; 3. World on Fire: B34
+    .byte $38,$00               ; 4. Blinkers: B345
+    .byte $08,$00               ; 5. Mazectric: B3
+    .byte $08,$00               ; 6. Maze: B3
+    .byte $08,$00               ; 7. Life without Death: B3
+    .byte $08,$00               ; 8. Coral: B3
+    .byte $08,$00               ; 9. Assimilation: B3
+
+presetSurvivalMasks:
+    .byte $0C,$00               ; 1. Conway's Life: S23
+    .byte $1C,$00               ; 2. Ant Colony: S234
+    .byte $0C,$00               ; 3. World on Fire: S23
+    .byte $04,$00               ; 4. Blinkers: S2
+    .byte $1E,$00               ; 5. Mazectric: S1234
+    .byte $3E,$00               ; 6. Maze: S12345
+    .byte $FF,$01               ; 7. Life without Death: S012345678
+    .byte $F0,$01               ; 8. Coral: S45678
+    .byte $F0,$00               ; 9. Assimilation: S4567
+
+; Emitted mutable state: it must remain inside the relocatable app extent.
+ruleBirth:
+    .res 9, 0
+ruleSurvival:
+    .res 9, 0
+ruleMaskScratch:
+    .byte 0
+tempValLo:
+    .byte 0
+tempValHi:
+    .byte 0
+digitBuf:
+    .res 5, 0
 
 ; ---------------------------------------------------------------------------
 ; Runtime buffers (relocatable, page-aligned)

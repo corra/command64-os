@@ -15,6 +15,13 @@ GRID_W    = 40
 GRID_H    = 24
 GRID_SIZE = 960
 STATUS_ROW_OFFSET = 960
+MENU_PROMPT_OFFSET = 23 * GRID_W
+MENU_BIRTH_FIELD_OFFSET = 15 * GRID_W + 12
+MENU_SURV_FIELD_OFFSET  = 16 * GRID_W + 12
+GEN_LABEL_OFFSET   = STATUS_ROW_OFFSET + 31
+GEN_DIGITS_OFFSET  = STATUS_ROW_OFFSET + 35
+PAUSE_TEXT_OFFSET  = STATUS_ROW_OFFSET + 3
+PAUSE_TEXT_LEN     = 5
 
 ; ---------------------------------------------------------------------------
 ; Hardware addresses
@@ -31,6 +38,7 @@ JIFFY_CLK = $A2
 CHAR_LIVE = $A0
 CHAR_DEAD = $20
 CLR_LIVE  = 5
+CLR_PAUSED = 3
 
 ; ---------------------------------------------------------------------------
 ; Timing
@@ -38,7 +46,21 @@ CLR_LIVE  = 5
 GEN_DELAY = 3
 
 ; ---------------------------------------------------------------------------
-; Zero-page scratch ($70-$7D -- documented safe area for external programs)
+; UI state values
+; ---------------------------------------------------------------------------
+MENU_STATE_NORMAL   = 0
+MENU_STATE_BIRTH    = 1
+MENU_STATE_SURVIVAL = 2
+PRESET_CUSTOM       = $FF
+PRESET_COUNT        = 9
+RULE_COUNT          = 9
+
+.assert MENU_BIRTH_FIELD_OFFSET + RULE_COUNT <= 16 * GRID_W, error, "birth rule field crosses row"
+.assert MENU_SURV_FIELD_OFFSET + RULE_COUNT <= 17 * GRID_W, error, "survival rule field crosses row"
+.assert PAUSE_TEXT_OFFSET + PAUSE_TEXT_LEN <= 1000, error, "pause color field crosses screen"
+
+; ---------------------------------------------------------------------------
+; Zero-page scratch ($70-$82 -- app-private external-program area)
 ; ---------------------------------------------------------------------------
 zpPrevLo = $70
 zpPrevHi = $71
@@ -54,3 +76,8 @@ zpCount  = $7A
 zpLfsr   = $7B
 zpPaused = $7C
 zpBufSel = $7D
+zpInMenu = $7E
+zpMenuState = $7F
+zpPresetIdx = $80
+zpGenLo = $81
+zpGenHi = $82

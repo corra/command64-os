@@ -254,7 +254,7 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 
 ### CONWAY
 
-**Description:** Conway's Game of Life — a full-screen cellular automaton simulation. The 40×25 text screen is used as a live grid; cells are born, survive, or die each generation according to the classic B3/S23 rules. The grid wraps toroidally (all four edges connect).
+**Description:** A 40×24 toroidal Life-like cellular automaton with nine presets, custom Birth/Survival rules, and a five-digit generation counter. CONWAY opens on a menu; preset 1 is classic B3/S23 Life.
 **Syntax:** `CONWAY`
 
 **Controls (during simulation):**
@@ -263,8 +263,14 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 | --- | --- |
 | `SPACE` | Pause / resume |
 | `R` | Re-randomize grid |
-| `C` | Clear grid (all cells dead) |
-| `Q` or RUN/STOP | Quit and return to shell |
+| `C` | Clear grid, reset the counter, and pause |
+| `Q` | Return to the CONWAY menu |
+| RUN/STOP | Quit and return to shell |
+
+While paused, the status word `pause` is cyan; it returns to green when the
+simulation resumes. The menu accepts `1`–`9` for presets, `B` or `S` followed
+by `0`–`8` for custom rule toggles, RETURN to run the retained field, `R` to
+randomize and run, and `Q` or RUN/STOP to exit.
 
 ### PACMAN
 

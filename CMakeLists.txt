@@ -183,7 +183,7 @@ set(COMP_TARGET comp)
 # — like DEBUG/LABEL — a missing ca65/ld65 toolchain fails the entire
 # configure rather than silently skipping this target.
 if(Ca65_FOUND)
-    add_ca65_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1040 "0C00" "256")
+    add_ca65_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1040 "1400" "256")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CONWAY target")
 endif()
