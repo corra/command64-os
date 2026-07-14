@@ -1193,15 +1193,115 @@ cwHaveChunk:
 cwDone:
     lda #DOS_CLOSE_FILE
     jsr OS_API
+    jsr cmdWriteCheckCloseStatus
+    bcs cwWriteErrMsg
     rts
 
 cwWriteErr:
     lda #DOS_CLOSE_FILE
     jsr OS_API
+cwWriteErrMsg:
     ldx #<msgWriteFailed
     ldy #>msgWriteFailed
     lda #DOS_PRINT_STR
     jsr OS_API
+    rts
+
+cmdWriteCheckCloseStatus:
+    lda FilenamePtrLo
+    sta ScanPtrLo
+    lda FilenamePtrHi
+    sta ScanPtrHi
+
+    ; Build an empty command-channel request, preserving any device prefix
+    ; from the edited filename so the post-close status comes from the same
+    ; drive that received the save.
+    ldy #0
+    lda (ScanPtrLo), y
+    cmp #'1'
+    bne cwcsNotDoubleDigit
+
+    iny
+    lda (ScanPtrLo), y
+    cmp #'0'
+    beq cwcsMaybeDoubleDigit
+    cmp #'1'
+    beq cwcsMaybeDoubleDigit
+    jmp cwcsNoPrefix
+
+cwcsMaybeDoubleDigit:
+    iny
+    lda (ScanPtrLo), y
+    cmp #':'
+    beq cwcsDoubleDigit
+    jmp cwcsNoPrefix
+
+cwcsNotDoubleDigit:
+    cmp #'8'
+    beq cwcsMaybeSingleDigit
+    cmp #'9'
+    beq cwcsMaybeSingleDigit
+    jmp cwcsNoPrefix
+
+cwcsMaybeSingleDigit:
+    iny
+    lda (ScanPtrLo), y
+    cmp #':'
+    beq cwcsSingleDigit
+    jmp cwcsNoPrefix
+
+cwcsDoubleDigit:
+    ldy #0
+    lda (ScanPtrLo), y
+    sta WriteStatusCmd
+    iny
+    lda (ScanPtrLo), y
+    sta WriteStatusCmd+1
+    iny
+    lda (ScanPtrLo), y
+    sta WriteStatusCmd+2
+    lda #0
+    sta WriteStatusCmd+3
+    jmp cwcsSend
+
+cwcsSingleDigit:
+    ldy #0
+    lda (ScanPtrLo), y
+    sta WriteStatusCmd
+    iny
+    lda (ScanPtrLo), y
+    sta WriteStatusCmd+1
+    lda #0
+    sta WriteStatusCmd+2
+    jmp cwcsSend
+
+cwcsNoPrefix:
+    lda #0
+    sta WriteStatusCmd
+
+cwcsSend:
+    lda #<WriteStatusBuf
+    sta PrintPtrLo
+    lda #>WriteStatusBuf
+    sta PrintPtrHi
+    ldx #<WriteStatusCmd
+    ldy #>WriteStatusCmd
+    lda #DOS_SEND_COMMAND
+    jsr OS_API
+    bcs cwcsErr
+
+    lda WriteStatusBuf
+    cmp #'0'
+    bne cwcsErr
+    lda WriteStatusBuf+1
+    cmp #'0'
+    bne cwcsErr
+
+    clc
+    rts
+
+cwcsErr:
+    sec
     rts
 
 .segment "RODATA"
@@ -1250,3 +1350,5 @@ SavedOffsetLo: .res 1
 SavedOffsetHi: .res 1
 WriteExistsFlag: .res 1
 WriteNameBuf:  .res 24  ; prefix (<=3) + "@0:" (3) + filename (<=16) + null
+WriteStatusCmd: .res 4   ; optional target-device prefix plus null
+WriteStatusBuf: .res 40  ; drive status response from DOS_SEND_COMMAND
