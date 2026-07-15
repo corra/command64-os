@@ -1,7 +1,7 @@
 ---
 feature: pacman-phase3-code-review-remediation
 created: 2026-07-15
-status: in-progress
+status: completed
 ---
 
 # Plan: Pac-Man Phase 3.1 Code Review Remediation
@@ -62,9 +62,9 @@ warp behavior until warp tunnels are implemented.
 - [x] Review completed and findings classified with the user.
 - [x] Establish synchronized wiki, brain, and Taskwarrior records (Tasks 27-33).
 - [x] Correct actor redraw ordering (user verified 2026-07-15).
-- [/] Repair and harden the autotiler (implemented; user acceptance pending).
-- [/] Integrate automatic maze generation into the Pac-Man build (implemented;
-  user acceptance pending).
+- [x] Repair and harden the autotiler (user accepted 2026-07-15).
+- [x] Integrate automatic maze generation into the Pac-Man build (user
+  accepted 2026-07-15).
 - [x] Synchronize user and maintainer documentation (user accepted 2026-07-15).
 - [x] Implement collision/life-loss handling after the user observed Blinky
   overwriting Pac-Man without a state transition.

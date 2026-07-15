@@ -214,13 +214,12 @@
     - [x] Implement keyboard poll and direction buffering in `pacman_main.s`
     - [x] Implement Pac-Man move timers, level speed scaling, and dot/pellet eating slowdown
 
-  - [/] Phase 3.1: Blinky AI Integration and Code Review Remediation
+  - [x] Phase 3.1: Blinky AI Integration and Code Review Remediation
     - [x] Review Phase 2 regressions and the active Blinky integration
     - [x] Synchronize `wiki/tasks/pacman-ca65-rewrite.md` and Taskwarrior
     - [x] Correct actor redraw ordering and manually verify actor visibility
-    - [/] Repair and harden `autotile.py` (implemented; user acceptance pending)
-    - [/] Integrate `autotile.py` into the Pac-Man CMake target (implemented;
-      user acceptance pending)
+    - [x] Repair and harden `autotile.py`
+    - [x] Integrate `autotile.py` into the Pac-Man CMake target
     - [x] Synchronize Pac-Man documentation with current behavior
     - [x] Implement and manually verify Pac-Man/Blinky collision and life-loss handling
     - [x] Classify Blinky corner loops and verify the invisible-target symptom
