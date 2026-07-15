@@ -147,10 +147,24 @@ getGhostColor:
     lda #COLOR_WHITE
     rts
 :   cmp #MODE_FRIGHTENED
-    bne :+
+    bne @normalColor
+    
+    ; Check if timer is < 120 ticks (approx 2s) to flash
+    lda zpFrightenedTimer+1
+    bne @drawBlue
+    lda zpFrightenedTimer
+    cmp #120
+    bcs @drawBlue
+    
+    ; Flashing check (bit 4 toggles every 16 ticks)
+    and #16
+    beq @drawBlue
+    lda #COLOR_WHITE
+    rts
+@drawBlue:
     lda #COLOR_BLUE
     rts
-:   cpx #GHOST_BLINKY
+@normalColor:   cpx #GHOST_BLINKY
     bne :+
     lda #COLOR_RED
     rts

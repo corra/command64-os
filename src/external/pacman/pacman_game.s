@@ -232,6 +232,11 @@ drawMaze:
     sta zpTmpCol
     jmp @rowLoop
 @done:
+    ; Check if Level 256 (zpLevel == 0)
+    lda zpLevel
+    bne @notKillScreen
+    jsr corruptRightHalf
+@notKillScreen:
     rts
 
 ; ---------------------------------------------------------------------------
@@ -436,3 +441,80 @@ mazeWalls:
     .byte 3,0,1,1,1,1,1,2,2,1,1,1,0,7,8,0,1,1,1,2,2,1,1,1,1,1,0,4 ; Row 21
     .byte 3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4 ; Row 22
     .byte 7,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,8 ; Row 23
+
+; ---------------------------------------------------------------------------
+; corruptRightHalf -- Overwrite Columns 14-27 with random garbage (Level 256)
+; ---------------------------------------------------------------------------
+corruptRightHalf:
+    lda #0
+    sta zpTmpRow
+@rowLoop:
+    lda #14
+    sta zpTmpCol
+@colLoop:
+    ; LFSR step
+    lda zpLfsr
+    beq @seed
+    asl
+    bcc :+
+    eor #$1D
+:   sta zpLfsr
+    jmp @gotRand
+@seed:
+    lda #$37
+    sta zpLfsr
+@gotRand:
+    pha
+    and #7
+    bne :+
+    lda #1
+:   tax ; X gets color
+    pla
+    
+    ; Write character/color directly to screen
+    pha
+    txa
+    pha
+    
+    lda zpTmpCol
+    clc
+    adc #6
+    clc
+    ldy zpTmpRow
+    adc rowOffLo, y
+    sta zpTmpPtrLo
+    lda rowOffHi, y
+    adc #>SCREEN
+    sta zpTmpPtrHi
+    
+    lda zpTmpCol
+    clc
+    adc #6
+    clc
+    ldy zpTmpRow
+    adc rowOffLo, y
+    sta zpTmpDistLo
+    lda rowOffHi, y
+    adc #>COLORRAM
+    sta zpTmpDistHi
+    
+    pla
+    ldy #0
+    sta (zpTmpDistLo), y
+    pla
+    sta (zpTmpPtrLo), y
+    
+    ; Set item in cell to ITEM_NONE
+    lda #ITEM_NONE
+    jsr setItemCell
+    
+    inc zpTmpCol
+    lda zpTmpCol
+    cmp #28
+    bcc @colLoop
+    
+    inc zpTmpRow
+    lda zpTmpRow
+    cmp #24
+    bcc @rowLoop
+    rts
