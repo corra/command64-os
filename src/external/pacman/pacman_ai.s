@@ -510,8 +510,8 @@ isTargetTileLegal:
     clc
     rts
 @gateCheck:
-    ; Only eaten or house-recovering ghosts can enter gate (placeholder block for now)
-    clc
+    ; Ghosts are allowed to pass through the door gate
+    sec
     rts
 @legal:
     sec

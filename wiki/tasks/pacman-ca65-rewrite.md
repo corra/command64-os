@@ -21,15 +21,13 @@ movement, and scatter/chase scheduling.
 - [x] Review the current Phase 2 and Phase 3.1 implementation.
 - [x] Synchronize task records with the active implementation state.
 - [x] Draw the maze before resetting and drawing actors.
-- [/] Repair and harden `autotile.py`: implementation is in place and awaits
-  user acceptance.
+- [x] Repair and harden `autotile.py`.
   - Syntax repaired.
   - Logical topology separated from rendered wall tile codes.
   - Ambiguous visual corners represented by validated presentation overrides.
   - Dimensions, replacement count, and idempotence validated.
   - Read-only consistency-check mode added.
-- [/] Run the maze autotiler automatically before every Pac-Man build; CMake
-  integration is implemented and awaits user acceptance.
+- [x] Run the maze autotiler automatically before every Pac-Man build.
 - [x] Correct the Pac-Man utility and user manuals.
 - [x] Build the relocatable `pacman` target without warnings or errors.
 - [x] Implement and manually verify Phase 3.1 Pac-Man/Blinky collision and
@@ -47,5 +45,6 @@ movement, and scatter/chase scheduling.
 
 ## Completion Gate
 
-Phase 3.1 and this remediation remain in progress until the user confirms the
-manual verification walkthrough.
+Phase 3.1 remediation was user-verified and accepted on 2026-07-15. The parent
+Pac-Man rewrite remains active for the deferred findings and later gameplay
+phases.

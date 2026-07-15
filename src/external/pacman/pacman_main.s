@@ -146,12 +146,12 @@ mainLoop:
     jsr getPacSpeed
     sta zpPacTimer
     jsr updatePacman
-    jsr checkBlinkyCollision
+    jsr checkActiveGhostCollision
     bcs mainLoop
 @skipPacMove:
 
     jsr updateGhosts
-    jsr checkBlinkyCollision
+    jsr checkActiveGhostCollision
     jmp mainLoop
 
 ; ---------------------------------------------------------------------------
@@ -176,7 +176,7 @@ resetPositions:
     ldx #3
 @loop:
     stx zpGhostIdx
-    cpx #GHOST_BLINKY
+    cpx #GHOST_PINKY
     bne :+
     jsr drawGhost
 :   ldx zpGhostIdx
@@ -258,24 +258,24 @@ updatePacman:
     rts
 
 ; ---------------------------------------------------------------------------
-; checkBlinkyCollision -- Detect Pac-Man/Blinky tile overlap.
+; checkActiveGhostCollision -- Detect Pac-Man/Ghost tile overlap.
 ; Returns carry set when a life-loss/game-over transition was started.
 ; Frightened/eaten collisions are reserved for their later score behavior.
 ; ---------------------------------------------------------------------------
-checkBlinkyCollision:
+checkActiveGhostCollision:
     lda zpGameState
     cmp #STATE_PLAYING
     bne @noCollision
 
-    lda ghostMode + GHOST_BLINKY
+    lda ghostMode + GHOST_PINKY
     cmp #MODE_FRIGHTENED
     bcs @noCollision
 
     lda zpPacRow
-    cmp ghostRow + GHOST_BLINKY
+    cmp ghostRow + GHOST_PINKY
     bne @noCollision
     lda zpPacCol
-    cmp ghostCol + GHOST_BLINKY
+    cmp ghostCol + GHOST_PINKY
     bne @noCollision
 
     dec zpLives
@@ -753,8 +753,8 @@ updateGhosts:
 @loop:
     stx zpGhostIdx
     
-    ; Isolation: only Blinky (0) updates during Phase 3.1
-    cpx #GHOST_BLINKY
+    ; Isolation: only Pinky (1) updates during Phase 3.2
+    cpx #GHOST_PINKY
     bne @nextGhost
     
     ; Decrement ghost timer
