@@ -2,7 +2,7 @@
 
 **File Name:** `conway.prg`
 **Load Address:** Relocatable (selected by the command64 app manager)
-**Version:** 0.4.1 (Build 1057)
+**Version:** 0.4.1 (Build 1058)
 
 ## Overview
 
@@ -57,7 +57,7 @@ digit. A non-digit cancels the pending edit without changing the rule. Empty
 Birth or Survival sets are displayed as `none`.
 
 On quit, the screen is cleared and CONWAY prints its version banner
-(`CONWAY v0.4.1.1057`) before returning to the shell.
+(`CONWAY v0.4.1.1058`) before returning to the shell.
 
 ### Rule presets
 
@@ -83,6 +83,7 @@ On quit, the screen is cleared and CONWAY prints its version banner
 | Dead cell | Black (space character, background shows through) |
 | Border / background | Black (`$D020`/`$D021` set to 0) |
 | Generation | `gen:00000` at the right of the status row; increments after each completed generation |
+| Menu version | Full patch/build version (`0.4.1.1058`) at the bottom-right |
 
 Color RAM is filled with green (VIC-II color 5) at startup. Only the five
 letters in `pause` are recolored during simulation: cyan while paused and

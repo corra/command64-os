@@ -21,9 +21,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **CONWAY patch release**: Incremented the Conway Multiverse utility to
-  `0.4.1.1057`; the patch banner identifies the menu, rule-preset, custom
+  `0.4.1.1058`; the patch banner identifies the menu, rule-preset, custom
   one-count editor, generation-counter, and pause-color release documented in
-  Phase 6.
+  Phase 6. The main menu also shows the full patch/build version in its
+  bottom-right corner.
 - **User program origin shifted to `$3400`**: Moved the default `UserProgStart`/relocation companion origin to `$3400`/`$3500` so external apps remain above the expanded resident `ShellExt` segment after adding `MORE`.
 - **User program origin shifted to `$3200`**: Moved `UserProgStart` and the relocation companion origin to `$3200`/`$3300` so external apps cannot overlap the expanded resident `ShellExt` segment after the DATE/TIME implementation. Rebuilt external apps and tests against the new origin.
 - **Test target names normalized**: Renamed ca65 test apps with redundant

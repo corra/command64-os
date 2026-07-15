@@ -154,6 +154,9 @@
     - [/] Phase 6: update documentation, project records, and walkthrough
     - [x] Increment Conway to `0.4.1.1057` and synchronize current-version
       documentation
+    - [x] Display the full `0.4.1.1058` patch/build version at the bottom-right
+      of the main menu without overlapping dynamic prompts; visually confirmed
+      by the user
     - [ ] Phase 7.1: replace one-digit B/S editing with persistent full-set
       entry, clearing the selected set and finishing on RETURN
     - [ ] Phase 7.2: update documentation, verification evidence, walkthrough,

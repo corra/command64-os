@@ -482,7 +482,19 @@ dmpCopy:
     sta zpDstLo
     lda #>(SCREEN + MENU_PROMPT_OFFSET)
     sta zpDstHi
-    jmp copyMenuString
+    jsr copyMenuString
+
+    ; Keep the full release/build version right-aligned after every prompt
+    ; redraw. The assembly-time assertions below guarantee a blank separator
+    ; after the longest prompt and keep the final byte inside row 23.
+    ldx #0
+dmpVersionLoop:
+    lda menuVersion, x
+    sta SCREEN + MENU_PROMPT_OFFSET + GRID_W - MENU_VERSION_LEN, x
+    inx
+    cpx #MENU_VERSION_LEN
+    bne dmpVersionLoop
+    rts
 
 ; ---------------------------------------------------------------------------
 ; waitDelay -- busy-wait for GEN_DELAY jiffy-clock increments.
@@ -615,11 +627,17 @@ menuPromptBirth: .byte "birth: press 0-8 to toggle"
 menuPromptBirthEnd: .byte 0
 menuPromptSurvival: .byte "survival: press 0-8 to toggle"
 menuPromptSurvivalEnd: .byte 0
+menuVersion:
+    .byte VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."
+    .byte BUILD_NUMBER
+menuVersionEnd:
 menuNoneText:    .byte "none"
 menuNoneTextEnd:
 petscii_mixed
 
 MENU_NONE_LEN = menuNoneTextEnd - menuNoneText
+MENU_VERSION_LEN = menuVersionEnd - menuVersion
+MENU_VERSION_COL = GRID_W - MENU_VERSION_LEN
 
 .assert 10 + (menuTitleEnd - menuTitle) <= 40, error, "menu title crosses row"
 .assert 10 + (menuRuleEnd - menuRule) <= 40, error, "menu rule crosses row"
@@ -642,3 +660,6 @@ MENU_NONE_LEN = menuNoneTextEnd - menuNoneText
 .assert menuPromptNormalEnd - menuPromptNormal <= 40, error, "normal prompt crosses row"
 .assert menuPromptBirthEnd - menuPromptBirth <= 40, error, "birth prompt crosses row"
 .assert menuPromptSurvivalEnd - menuPromptSurvival <= 40, error, "survival prompt crosses row"
+.assert MENU_VERSION_LEN <= GRID_W, error, "menu version exceeds row width"
+.assert (menuPromptSurvivalEnd - menuPromptSurvival) + 1 <= MENU_VERSION_COL, error, "menu version overlaps prompt"
+.assert MENU_PROMPT_OFFSET + MENU_VERSION_COL + MENU_VERSION_LEN <= 1000, error, "menu version crosses screen"

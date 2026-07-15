@@ -1292,6 +1292,10 @@ exit. B or S enters an edit state; one `0`–`8` digit toggles the corresponding
 active lookup entry, marks the rule custom, and returns to the normal menu.
 A non-digit cancels the pending edit. Repeating B/S is required to toggle
 multiple counts; persistent full-set entry is deferred to Phase 7.
+The bottom menu row redraws the dynamic prompt at column 0 and right-aligns
+the generated `major.minor.patch.build` version at columns 30–39. Assembly
+assertions enforce a blank separator after the longest prompt and screen
+bounds for the complete version field.
 
 Simulation SPACE toggles pause, R randomizes and resets the counter, C clears
 and pauses, Q returns to the menu, and RUN/STOP exits directly. The `pause`
@@ -1356,7 +1360,7 @@ The column loop body is ~140 bytes — beyond the 6502 ±127-byte relative-branc
 | `resetGeneration` / `incrementGeneration` | Reset or modulo-increment the 16-bit generation count without screen I/O |
 | `drawSimulationStatus` | Writes an exact 40-column controls/`gen:` status template and current digits |
 | `drawGenerationCounter` | Converts the copied 16-bit counter and writes five leading-zero digits |
-| `drawMenu` | Compact 24-row menu renderer with line descriptors, preset arrow, rule summaries, and bounded prompts |
+| `drawMenu` | Compact 24-row menu renderer with line descriptors, preset arrow, rule summaries, bounded prompts, and a right-aligned full version |
 | `drawPauseColor` | Colors only status columns 3–7 cyan while paused and green while running |
 | `setThreeRowPtrs` | Sets `zpPrev/Curr/Next` from active buffer base + `rowOffLo/Hi[zpRow±1]` |
 | `setDstRowPtr` | Sets `zpDst` from inactive buffer base + `rowOffLo/Hi[zpRow]` |
