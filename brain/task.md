@@ -198,3 +198,13 @@
   - [x] Document `MORE` and target-device prefix support
   - [x] Verify clean build with `make all`
   - [x] Complete manual C64/VICE workflow verification
+
+- [ ] Pac-Man ca65 Rewrite
+  - [x] Phase 1: Core Setup & Build Pipeline
+    - [x] Create `BUILD_PACMAN` file
+    - [x] Create `src/external/pacman/common.inc` with zero-page definitions and constants
+    - [x] Create skeleton `src/external/pacman/pacman_main.s`
+    - [x] Delete old Kick Assembler `pacman.asm`
+    - [x] Update `CMakeLists.txt` with ca65 build rules for `pacman`
+    - [x] Compile skeleton successfully
+

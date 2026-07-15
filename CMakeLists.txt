@@ -68,8 +68,8 @@ set(COMP_ENTRY "src/external/comp/comp.s")
 file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.s" "src/external/conway/*.inc" "include/ca65/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway_main.s")
 
-file(GLOB_RECURSE PACMAN_SRCS CONFIGURE_DEPENDS "src/external/pacman/*.asm" "include/*.inc")
-set(PACMAN_ENTRY "src/external/pacman/pacman.asm")
+file(GLOB_RECURSE PACMAN_SRCS CONFIGURE_DEPENDS "src/external/pacman/*.s" "src/external/pacman/*.inc" "include/ca65/*.inc")
+set(PACMAN_ENTRY "src/external/pacman/pacman_main.s")
 
 file(GLOB_RECURSE VI_SRCS CONFIGURE_DEPENDS "src/external/vi/*.asm" "include/*.inc")
 set(VI_ENTRY "src/external/vi/vi.asm")
@@ -190,7 +190,11 @@ endif()
 set(CONWAY_TARGET conway)
 
 # 4b. PACMAN — character-grid Pac-Man clone
-add_external_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000)
+if(Ca65_FOUND)
+    add_ca65_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000 "2800")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for PACMAN target")
+endif()
 
 # 4c. VI — vi-like visual text editor
 # add_external_app(vi "${VI_ENTRY}" VI_SRCS 1000)
