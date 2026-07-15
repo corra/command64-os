@@ -76,6 +76,7 @@ start:
     sta scoreLo
     sta scoreMid
     sta scoreHi
+    sta zpExtraLifeAwarded
 
     lda JIFFY_CLK
     sta zpLastJiffy
@@ -87,6 +88,8 @@ start:
 
     jsr clearScreen
     jsr resetItems
+    lda dotsRemainingLo
+    sta zpTotalDots
     jsr drawMaze
     jsr resetPositions
     jsr drawStatusLabels
@@ -129,6 +132,8 @@ mainLoop:
     ; Advance level
     inc zpLevel
     jsr resetItems
+    lda dotsRemainingLo
+    sta zpTotalDots
     jsr drawMaze
     jsr resetPositions
     jsr renderStatusRow
@@ -155,6 +160,23 @@ mainLoop:
 @gameplay:
     jsr updateCycleScheduler
 
+    ; Ticks down fruit active timer
+    lda zpFruitTimerLo
+    ora zpFruitTimerHi
+    beq @skipFruitTimer
+    
+    lda zpFruitTimerLo
+    bne :+
+    dec zpFruitTimerHi
+:   dec zpFruitTimerLo
+    
+    lda zpFruitTimerLo
+    ora zpFruitTimerHi
+    bne @skipFruitTimer
+    
+    jsr despawnFruit
+@skipFruitTimer:
+
     ; Decrement Pac-man move timer
     dec zpPacTimer
     bne @skipPacMove
@@ -162,7 +184,9 @@ mainLoop:
     sta zpPacTimer
     jsr updatePacman
     jsr checkActiveGhostCollision
-    bcs mainLoop
+    bcc :+
+    jmp mainLoop
+:
 @skipPacMove:
 
     jsr updateGhosts
@@ -475,6 +499,20 @@ consumeItem:
     beq @eatDot
     cmp #ITEM_PELLET
     beq @eatPellet
+    cmp #ITEM_FRUIT
+    beq @eatFruit
+    rts
+
+@eatFruit:
+    lda #ITEM_NONE
+    jsr setItemCell
+    
+    jsr getFruitScore
+    jsr addScore16
+    
+    lda #0
+    sta zpFruitTimerLo
+    sta zpFruitTimerHi
     rts
 
 @eatDot:
@@ -517,6 +555,20 @@ decDots:
 @decLo:
     dec dotsRemainingLo
     
+    ; Spawn fruit check: dots eaten = zpTotalDots - dotsRemainingLo
+    lda zpTotalDots
+    sec
+    sbc dotsRemainingLo
+    cmp #70
+    beq @doSpawn
+    cmp #170
+    beq @doSpawn
+    jmp @checkLevelClear
+    
+@doSpawn:
+    jsr spawnFruit
+    
+@checkLevelClear:
     ; check if 0
     lda dotsRemainingLo
     ora dotsRemainingHi
@@ -540,6 +592,7 @@ addScoreLo:
     lda scoreHi
     adc #0
     sta scoreHi
+    jsr checkExtraLife
     jsr renderStatusRow
     rts
 
@@ -556,6 +609,7 @@ addScore16:
     lda scoreHi
     adc #0
     sta scoreHi
+    jsr checkExtraLife
     jsr renderStatusRow
     rts
 
@@ -988,3 +1042,96 @@ ghostChars:
 exitBanner:
     .byte "PACMAN v", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE
     .byte ".", BUILD_NUMBER, PetCr, 0
+
+; ---------------------------------------------------------------------------
+; spawnFruit -- Spawn fruit item on Row 14, Col 13
+; ---------------------------------------------------------------------------
+spawnFruit:
+    lda #14
+    sta zpTmpRow
+    lda #13
+    sta zpTmpCol
+    lda #ITEM_FRUIT
+    jsr setItemCell
+    
+    lda #14
+    sta zpTmpRow
+    lda #13
+    sta zpTmpCol
+    jsr drawGridCell
+    
+    lda #<600
+    sta zpFruitTimerLo
+    lda #>600
+    sta zpFruitTimerHi
+    rts
+
+; ---------------------------------------------------------------------------
+; despawnFruit -- Despawn fruit from Row 14, Col 13 if present
+; ---------------------------------------------------------------------------
+despawnFruit:
+    lda #14
+    sta zpTmpRow
+    lda #13
+    sta zpTmpCol
+    jsr getItemCell
+    cmp #ITEM_FRUIT
+    bne @done
+    
+    lda #ITEM_NONE
+    jsr setItemCell
+    
+    lda #14
+    sta zpTmpRow
+    lda #13
+    sta zpTmpCol
+    jsr drawGridCell
+@done:
+    rts
+
+; ---------------------------------------------------------------------------
+; getFruitScore -- Returns fruit score Lo in A and Hi in Y based on level
+; ---------------------------------------------------------------------------
+getFruitScore:
+    lda zpLevel
+    sec
+    sbc #1
+    cmp #8
+    bcc :+
+    lda #7
+:   tay
+    lda fruitScoresLo, y
+    pha
+    lda fruitScoresHi, y
+    tay ; Y gets Hi byte
+    pla ; A gets Lo byte
+    rts
+
+fruitScoresLo:
+    .byte <100, <300, <500, <700, <1000, <2000, <3000, <5000
+fruitScoresHi:
+    .byte >100, >300, >500, >700, >1000, >2000, >3000, >5000
+
+; ---------------------------------------------------------------------------
+; checkExtraLife -- Award 1 extra life at 10,000 points ($002710)
+; ---------------------------------------------------------------------------
+checkExtraLife:
+    lda zpExtraLifeAwarded
+    bne @done
+    
+    lda scoreHi
+    bne @award
+    lda scoreMid
+    cmp #$27
+    bcc @done
+    bne @award
+    lda scoreLo
+    cmp #$10
+    bcc @done
+    
+@award:
+    inc zpLives
+    lda #1
+    sta zpExtraLifeAwarded
+@done:
+    rts

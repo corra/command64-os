@@ -343,9 +343,22 @@ drawGridCell:
     ldx #COLOR_YELLOW
     jmp @writeToScreen
 
+@fruitChars:  .byte $03, $13, $10, $01, $07, $18, $02, $0B ; 'C', 'S', 'P', 'A', 'G', 'X', 'B', 'K'
+@fruitColors: .byte COLOR_RED, COLOR_PINK, COLOR_ORANGE, COLOR_RED, COLOR_GREEN, COLOR_YELLOW, COLOR_YELLOW, COLOR_CYAN
+
 @drawFruit:
-    lda #6 ; 'F'
-    ldx #COLOR_RED
+    lda zpLevel
+    sec
+    sbc #1
+    cmp #8
+    bcc :+
+    lda #7
+:   tay
+    lda @fruitChars, y
+    pha
+    lda @fruitColors, y
+    tax
+    pla
 
 @writeToScreen:
     pha
@@ -420,6 +433,6 @@ mazeWalls:
     .byte 3,11,0,0,3,4,0,0,0,0,0,0,0,3,4,0,0,0,0,0,0,0,3,4,0,0,11,4 ; Row 18
     .byte 3,1,1,0,7,8,0,5,6,0,1,1,1,9,9,1,1,1,0,5,6,0,7,8,0,1,1,4 ; Row 19
     .byte 3,0,0,0,0,0,0,3,4,0,0,0,0,3,4,0,0,0,0,3,4,0,0,0,0,0,0,4 ; Row 20
-    .byte 3,0,1,1,1,1,1,2,2,1,1,1,0,3,4,0,1,1,1,2,2,1,1,1,1,1,0,4 ; Row 21
-    .byte 3,0,0,0,0,0,0,0,0,0,0,0,0,3,4,0,0,0,0,0,0,0,0,0,0,0,0,4 ; Row 22
+    .byte 3,0,1,1,1,1,1,2,2,1,1,1,0,7,8,0,1,1,1,2,2,1,1,1,1,1,0,4 ; Row 21
+    .byte 3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4 ; Row 22
     .byte 7,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,2,8 ; Row 23

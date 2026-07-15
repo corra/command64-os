@@ -32,6 +32,10 @@ dotsRemainingLo = $83
 dotsRemainingHi = $84
 zpGhostsEatenCount = $85 ; Consecutive ghosts eaten in current session
 zpFreezeTimer      = $86 ; Screen freeze timer when ghost eaten
+zpFruitTimerLo     = $87 ; Fruit active timer Lo
+zpFruitTimerHi     = $88 ; Fruit active timer Hi
+zpTotalDots        = $89 ; Total dots at start of level
+zpExtraLifeAwarded = $8A ; Extra life at 10k awarded flag
 
 
 ; --- Directions ---
@@ -81,6 +85,7 @@ COLOR_PINK   = 10
 COLOR_ORANGE = 8
 COLOR_YELLOW = 7
 COLOR_BLUE   = 6
+COLOR_GREEN  = 5
 
 ; --- Ghost Index Constants ---
 GHOST_BLINKY = 0

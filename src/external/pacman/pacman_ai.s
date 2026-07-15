@@ -133,6 +133,8 @@ initGhosts:
     sta zpFrightenedTimer
     sta zpFrightenedTimer+1
     sta zpFreezeTimer
+    sta zpFruitTimerLo
+    sta zpFruitTimerHi
     rts
 
 ; ---------------------------------------------------------------------------
@@ -183,8 +185,8 @@ updateGhostAI:
     cmp #MODE_EATEN
     bne :+
     
-    ; EATEN routing: Target ghost house entrance (Row 10, Col 13)
-    lda #10
+    ; EATEN routing: Target ghost house interior (Row 12, Col 13)
+    lda #12
     sta targetRow
     lda #13
     sta targetCol
@@ -697,25 +699,8 @@ getGhostSpeed:
 :   cmp #MODE_FRIGHTENED
     bne :+
     lda #8
-    jmp @checkTunnel
+    rts
 :   lda #5
-@checkTunnel:
-    ldx zpGhostIdx
-    lda ghostRow, x
-    cmp #10
-    bne @doneSpeed
-    
-    lda ghostCol, x
-    cmp #6
-    bcc @slowdown
-    cmp #22
-    bcs @slowdown
-    jmp @doneSpeed
-    
-@slowdown:
-    clc
-    adc #3
-@doneSpeed:
     rts
 
 ; ---------------------------------------------------------------------------
