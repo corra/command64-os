@@ -176,10 +176,8 @@ resetPositions:
     ldx #3
 @loop:
     stx zpGhostIdx
-    cpx #GHOST_CLYDE
-    bne :+
     jsr drawGhost
-:   ldx zpGhostIdx
+    ldx zpGhostIdx
     dex
     bpl @loop
     rts
@@ -267,17 +265,21 @@ checkActiveGhostCollision:
     cmp #STATE_PLAYING
     bne @noCollision
 
-    lda ghostMode + GHOST_CLYDE
+    ldx #3
+@loop:
+    stx zpGhostIdx
+    lda ghostMode, x
     cmp #MODE_FRIGHTENED
-    bcs @noCollision
-
+    bcs @next
+    
     lda zpPacRow
-    cmp ghostRow + GHOST_CLYDE
-    bne @noCollision
+    cmp ghostRow, x
+    bne @next
     lda zpPacCol
-    cmp ghostCol + GHOST_CLYDE
-    bne @noCollision
+    cmp ghostCol, x
+    bne @next
 
+    ; Collision detected!
     dec zpLives
     bne @lifeLost
 
@@ -289,14 +291,18 @@ checkActiveGhostCollision:
     sec
     rts
 
+@next:
+    ldx zpGhostIdx
+    dex
+    bpl @loop
+@noCollision:
+    clc
+    rts
+
 @lifeLost:
     lda #STATE_LIFE_LOST
     sta zpGameState
     sec
-    rts
-
-@noCollision:
-    clc
     rts
 
 ; ---------------------------------------------------------------------------
@@ -752,10 +758,6 @@ updateGhosts:
     ldx #3
 @loop:
     stx zpGhostIdx
-    
-    ; Isolation: only Clyde (3) updates during Phase 3.4
-    cpx #GHOST_CLYDE
-    bne @nextGhost
     
     ; Decrement ghost timer
     dec ghostTimer, x
