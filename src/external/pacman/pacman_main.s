@@ -176,7 +176,7 @@ resetPositions:
     ldx #3
 @loop:
     stx zpGhostIdx
-    cpx #GHOST_PINKY
+    cpx #GHOST_INKY
     bne :+
     jsr drawGhost
 :   ldx zpGhostIdx
@@ -267,15 +267,15 @@ checkActiveGhostCollision:
     cmp #STATE_PLAYING
     bne @noCollision
 
-    lda ghostMode + GHOST_PINKY
+    lda ghostMode + GHOST_INKY
     cmp #MODE_FRIGHTENED
     bcs @noCollision
 
     lda zpPacRow
-    cmp ghostRow + GHOST_PINKY
+    cmp ghostRow + GHOST_INKY
     bne @noCollision
     lda zpPacCol
-    cmp ghostCol + GHOST_PINKY
+    cmp ghostCol + GHOST_INKY
     bne @noCollision
 
     dec zpLives
@@ -753,25 +753,35 @@ updateGhosts:
 @loop:
     stx zpGhostIdx
     
-    ; Isolation: only Pinky (1) updates during Phase 3.2
-    cpx #GHOST_PINKY
-    bne @nextGhost
+    ; Isolation check for Phase 3.3: Blinky (0) and Inky (2) update
+    cpx #GHOST_BLINKY
+    beq @doUpdate
+    cpx #GHOST_INKY
+    beq @doUpdate
+    jmp @nextGhost
+@doUpdate:
     
     ; Decrement ghost timer
     dec ghostTimer, x
-    bne @nextGhost
+    beq :+
+    jmp @nextGhost
+:
     
     ; Reload speed reload timer
     jsr getGhostSpeed
     ldx zpGhostIdx
     sta ghostTimer, x
     
-    ; Erase ghost from current position
+    ; Erase ghost from current position (if not Blinky)
+    lda zpGhostIdx
+    cmp #GHOST_BLINKY
+    beq @skipErase
     lda ghostRow, x
     sta zpTmpRow
     lda ghostCol, x
     sta zpTmpCol
     jsr drawGridCell
+@skipErase:
     
     ; Update ghost direction via AI target math
     ldx zpGhostIdx
@@ -813,13 +823,18 @@ updateGhosts:
     lda #0
     sta ghostCol, x
 @noWrap:
+    lda zpGhostIdx
+    cmp #GHOST_BLINKY
+    beq @skipDraw
     jsr drawGhost
+@skipDraw:
     
 @nextGhost:
     ldx zpGhostIdx
     dex
-    bpl @loop
+    bpl :+
     rts
+:   jmp @loop
 
 ; ---------------------------------------------------------------------------
 ; drawGhost -- Draws ghost in X at its row/col using single-carry 16-bit math
