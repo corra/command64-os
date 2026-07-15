@@ -707,14 +707,72 @@ getGhostSpeed:
     ldx zpGhostIdx
     lda ghostMode, x
     cmp #MODE_EATEN
-    bne :+
-    lda #2
+    bne @notEaten
+    lda #3
     rts
-:   cmp #MODE_FRIGHTENED
-    bne :+
-    lda #8
+    
+@notEaten:
+    cmp #MODE_FRIGHTENED
+    bne @normalSpeed
+    
+    ; Frightened speed: Level 1 = 14, Level 2+ = 12
+    lda zpLevel
+    cmp #2
+    bcc :+
+    lda #12
     rts
-:   lda #5
+:   lda #14
+    rts
+
+@normalSpeed:
+    ; Normal base speed based on level
+    lda zpLevel
+    cmp #2
+    bcc @level1
+    cmp #5
+    bcc @level2_4
+    
+    ; Level 5+
+    lda #7
+    jmp @checkBlinky
+    
+@level1:
+    lda #10
+    jmp @checkBlinky
+    
+@level2_4:
+    lda #9
+    
+@checkBlinky:
+    sta zpTmpVal
+    
+    ldx zpGhostIdx
+    cpx #GHOST_BLINKY
+    bne @done
+    
+    ; Blinky Cruise Elroy check
+    lda dotsRemainingHi
+    bne @done
+    
+    lda dotsRemainingLo
+    cmp #15
+    bcs :+
+    
+    ; Cruise Elroy 2: -2 ticks
+    lda zpTmpVal
+    sec
+    sbc #2
+    sta zpTmpVal
+    jmp @done
+    
+:   cmp #30
+    bcs @done
+    
+    ; Cruise Elroy 1: -1 tick
+    dec zpTmpVal
+    
+@done:
+    lda zpTmpVal
     rts
 
 ; ---------------------------------------------------------------------------

@@ -235,7 +235,7 @@ getPacSpeed:
     lda pacSpeedTbl, x
     rts
 
-pacSpeedTbl: .byte 6, 5, 5, 5, 4
+pacSpeedTbl: .byte 8, 6, 6, 6, 6
 
 ; ---------------------------------------------------------------------------
 ; updatePacman -- Resolves keyboard/joystick input and moves Pac-Man
