@@ -32,6 +32,8 @@ VERSION_STAGE = '3'
 .import getGhostColor
 .import getGhostSpeed
 .import updateCycleScheduler
+.import triggerFrightenedMode
+.import zpCycleStep
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -96,6 +98,19 @@ start:
 mainLoop:
     jsr handleKeys
 
+    ; Check freeze timer
+    lda zpFreezeTimer
+    beq :+
+    
+    ; Ticks down freeze timer on jiffy clock
+    lda JIFFY_CLK
+    cmp zpLastJiffy
+    beq mainLoop
+    sta zpLastJiffy
+    
+    dec zpFreezeTimer
+    jmp mainLoop
+:
     ; Check if game paused
     lda zpPaused
     bne mainLoop
@@ -260,6 +275,11 @@ updatePacman:
 ; Returns carry set when a life-loss/game-over transition was started.
 ; Frightened/eaten collisions are reserved for their later score behavior.
 ; ---------------------------------------------------------------------------
+eatenScoreLo:
+    .byte <200, <400, <800, <1600
+eatenScoreHi:
+    .byte >200, >400, >800, >1600
+
 checkActiveGhostCollision:
     lda zpGameState
     cmp #STATE_PLAYING
@@ -269,8 +289,8 @@ checkActiveGhostCollision:
 @loop:
     stx zpGhostIdx
     lda ghostMode, x
-    cmp #MODE_FRIGHTENED
-    bcs @next
+    cmp #MODE_EATEN
+    beq @next
     
     lda zpPacRow
     cmp ghostRow, x
@@ -280,6 +300,46 @@ checkActiveGhostCollision:
     bne @next
 
     ; Collision detected!
+    ; Check if ghost is frightened
+    lda ghostMode, x
+    cmp #MODE_FRIGHTENED
+    bne @normalGhostCollision
+
+    ; --- Frightened Ghost Collision (Eat Ghost) ---
+    lda zpGhostsEatenCount
+    cmp #4
+    bcc :+
+    lda #3
+:   tay
+    
+    lda eatenScoreLo, y
+    ldx eatenScoreHi, y
+    txa
+    tay ; Y gets Hi byte
+    jsr addScore16
+    
+    inc zpGhostsEatenCount
+    
+    ldx zpGhostIdx
+    lda #MODE_EATEN
+    sta ghostMode, x
+    
+    ; Erase and draw eyes immediately
+    lda ghostRow, x
+    sta zpTmpRow
+    lda ghostCol, x
+    sta zpTmpCol
+    jsr drawGridCell
+    ldx zpGhostIdx
+    jsr drawGhost
+    
+    ; Set freeze timer (30 jiffies = 0.5s)
+    lda #30
+    sta zpFreezeTimer
+    
+    jmp @next
+
+@normalGhostCollision:
     dec zpLives
     bne @lifeLost
 
@@ -437,6 +497,9 @@ consumeItem:
     jsr addScoreLo
     jsr decDots
     
+    ; Trigger Frightened Mode for ghosts
+    jsr triggerFrightenedMode
+    
     ; Slowdown: +3 ticks
     lda zpPacTimer
     clc
@@ -473,6 +536,22 @@ addScoreLo:
     sta scoreLo
     lda scoreMid
     adc #0
+    sta scoreMid
+    lda scoreHi
+    adc #0
+    sta scoreHi
+    jsr renderStatusRow
+    rts
+
+; ---------------------------------------------------------------------------
+; addScore16 -- Add 16-bit points in A (Lo) and Y (Hi) to 24-bit score
+; ---------------------------------------------------------------------------
+addScore16:
+    clc
+    adc scoreLo
+    sta scoreLo
+    tya
+    adc scoreMid
     sta scoreMid
     lda scoreHi
     adc #0
@@ -817,6 +896,28 @@ updateGhosts:
     lda #0
     sta ghostCol, x
 @noWrap:
+    ; Revive check for eaten ghosts
+    lda ghostMode, x
+    cmp #MODE_EATEN
+    bne @skipRevive
+    lda ghostRow, x
+    cmp #12
+    bne @skipRevive
+    lda ghostCol, x
+    cmp #13
+    beq @revive
+    cmp #14
+    bne @skipRevive
+@revive:
+    lda zpCycleStep
+    and #1
+    bne :+
+    lda #MODE_SCATTER
+    sta ghostMode, x
+    jmp @skipRevive
+:   lda #MODE_CHASE
+    sta ghostMode, x
+@skipRevive:
     jsr drawGhost
     
 @nextGhost:

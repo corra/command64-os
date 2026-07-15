@@ -30,6 +30,8 @@ zpTmpDistHi    = $81
 zpGhostIdx     = $82 ; Index of currently processing ghost (0-3)
 dotsRemainingLo = $83
 dotsRemainingHi = $84
+zpGhostsEatenCount = $85 ; Consecutive ghosts eaten in current session
+zpFreezeTimer      = $86 ; Screen freeze timer when ghost eaten
 
 
 ; --- Directions ---

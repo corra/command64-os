@@ -27,6 +27,7 @@
 .export getGhostSpeed
 .export updateCycleScheduler
 .export transitionGhostModes
+.export triggerFrightenedMode
 
 .segment "BSS"
 
@@ -73,6 +74,11 @@ cycleThresholdsLo:
     .byte <(7*60), <(20*60), <(7*60), <(20*60), <(5*60), <(20*60), <(5*60)
 cycleThresholdsHi:
     .byte >(7*60), >(20*60), >(7*60), >(20*60), >(5*60), >(20*60), >(5*60)
+
+frightenedDurationsLo:
+    .byte <(360), <(300), <(240), <(180), <(120), <(60), <(60), <(60), <(0)
+frightenedDurationsHi:
+    .byte >(360), >(300), >(240), >(180), >(120), >(60), >(60), >(60), >(0)
 
 .segment "CODE"
 
@@ -126,13 +132,23 @@ initGhosts:
     sta zpCycleTimer+1
     sta zpFrightenedTimer
     sta zpFrightenedTimer+1
+    sta zpFreezeTimer
     rts
 
 ; ---------------------------------------------------------------------------
 ; getGhostColor -- Returns color code in A for ghost in X
 ; ---------------------------------------------------------------------------
 getGhostColor:
-    cpx #GHOST_BLINKY
+    lda ghostMode, x
+    cmp #MODE_EATEN
+    bne :+
+    lda #COLOR_WHITE
+    rts
+:   cmp #MODE_FRIGHTENED
+    bne :+
+    lda #COLOR_BLUE
+    rts
+:   cpx #GHOST_BLINKY
     bne :+
     lda #COLOR_RED
     rts
@@ -163,6 +179,17 @@ getGhostScatterTarget:
 updateGhostAI:
     stx zpGhostIdx
     
+    lda ghostMode, x
+    cmp #MODE_EATEN
+    bne :+
+    
+    ; EATEN routing: Target ghost house entrance (Row 10, Col 13)
+    lda #10
+    sta targetRow
+    lda #13
+    sta targetCol
+    jmp @findNextDir
+:
     ; If ghost is Frightened (MODE_FRIGHTENED), decide randomly via LFSR
     lda ghostMode, x
     cmp #MODE_FRIGHTENED
@@ -559,6 +586,9 @@ getAbsDiff:
 ; makeRandomDecision -- Pick a random direction for frightened ghost
 ; ---------------------------------------------------------------------------
 makeRandomDecision:
+    lda #0
+    sta zpTmpVal ; Use as retry counter
+@nextTry:
     ; LFSR step
     lda zpLfsr
     beq @seed
@@ -575,15 +605,17 @@ makeRandomDecision:
     and #3
     sta bestDir
     
-    ; Ensure it is not reversing
+    ; Ensure it is not reversing (unless we have retried 8+ times)
+    lda zpTmpVal
+    cmp #8
+    bcs @skipReverseCheck
+    
     ldx zpGhostIdx
     lda ghostDir, x
-    eor #1 ; reverses UP(0)<->DOWN(1) and LEFT(2)<->RIGHT(3)?
-    ; Wait, DIR_UP = 0, DIR_DOWN = 1 (reverse bit 0)
-    ; DIR_LEFT = 2, DIR_RIGHT = 3 (reverse bit 0)
-    ; So yes, eor #1 gives the exact reverse direction!
+    eor #1
     cmp bestDir
-    beq @retryLFSR ; if reverse, retry with shifted bits
+    beq @retryLFSR
+@skipReverseCheck:
     
     ; Test if tile in bestDir is legal
     lda bestDir
@@ -620,11 +652,23 @@ makeRandomDecision:
     bcs @applyRand
     
 @retryLFSR:
+    inc zpTmpVal
+    lda zpTmpVal
+    cmp #16
+    bcs @forceReverse
+    
     ; Rotate LFSR and try again
     lda zpLfsr
     lsr
     sta zpLfsr
     jmp @checkRandomDir
+
+@forceReverse:
+    ldx zpGhostIdx
+    lda ghostDir, x
+    eor #1
+    sta ghostDir, x
+    rts
 
 @applyRand:
     lda bestDir
@@ -653,14 +697,53 @@ getGhostSpeed:
 :   cmp #MODE_FRIGHTENED
     bne :+
     lda #8
-    rts
+    jmp @checkTunnel
 :   lda #5
+@checkTunnel:
+    ldx zpGhostIdx
+    lda ghostRow, x
+    cmp #10
+    bne @doneSpeed
+    
+    lda ghostCol, x
+    cmp #6
+    bcc @slowdown
+    cmp #22
+    bcs @slowdown
+    jmp @doneSpeed
+    
+@slowdown:
+    clc
+    adc #3
+@doneSpeed:
     rts
 
 ; ---------------------------------------------------------------------------
 ; updateCycleScheduler -- Increments timer and transitions modes
 ; ---------------------------------------------------------------------------
 updateCycleScheduler:
+    ; Check if frightened timer is active
+    lda zpFrightenedTimer
+    ora zpFrightenedTimer+1
+    beq @normalScheduler
+
+    ; Decrement frightened timer
+    lda zpFrightenedTimer
+    bne :+
+    dec zpFrightenedTimer+1
+:   dec zpFrightenedTimer
+
+    ; Check if expired
+    lda zpFrightenedTimer
+    ora zpFrightenedTimer+1
+    bne @exitScheduler
+
+    ; Frightened timer just expired: transition ghosts back to current scheduler mode
+    jsr endFrightenedMode
+@exitScheduler:
+    rts
+
+@normalScheduler:
     inc zpCycleTimer
     bne :+
     inc zpCycleTimer+1
@@ -722,4 +805,90 @@ transitionGhostModes:
 @skip:
     dex
     bpl @loop
+    rts
+
+; ---------------------------------------------------------------------------
+; endFrightenedMode -- Swaps all frightened ghosts back to normal mode
+; ---------------------------------------------------------------------------
+endFrightenedMode:
+    lda zpCycleStep
+    and #1
+    bne @switchToChase
+@switchToScatter:
+    lda #MODE_SCATTER
+    jmp @apply
+@switchToChase:
+    lda #MODE_CHASE
+@apply:
+    sta zpTmpVal
+    
+    ldx #3
+@loop:
+    stx zpGhostIdx
+    lda ghostMode, x
+    cmp #MODE_FRIGHTENED
+    bne @skip
+    
+    lda zpTmpVal
+    sta ghostMode, x
+@skip:
+    dex
+    bpl @loop
+    rts
+
+; ---------------------------------------------------------------------------
+; triggerFrightenedMode -- Triggers frightened mode for all active ghosts
+; ---------------------------------------------------------------------------
+triggerFrightenedMode:
+    lda zpLevel
+    sec
+    sbc #1
+    cmp #8
+    bcc :+
+    lda #8
+:   tay
+    lda frightenedDurationsLo, y
+    sta zpFrightenedTimer
+    lda frightenedDurationsHi, y
+    sta zpFrightenedTimer+1
+    
+    lda zpFrightenedTimer
+    ora zpFrightenedTimer+1
+    beq @onlyReverse
+    
+    lda #0
+    sta zpGhostsEatenCount
+    
+    ldx #3
+@loop:
+    stx zpGhostIdx
+    lda ghostMode, x
+    cmp #MODE_EATEN
+    beq @skip
+    
+    lda #MODE_FRIGHTENED
+    sta ghostMode, x
+    
+    lda ghostDir, x
+    eor #1
+    sta ghostDir, x
+@skip:
+    dex
+    bpl @loop
+    rts
+
+@onlyReverse:
+    ldx #3
+@loopOnlyRev:
+    stx zpGhostIdx
+    lda ghostMode, x
+    cmp #MODE_EATEN
+    beq @skipOnlyRev
+    
+    lda ghostDir, x
+    eor #1
+    sta ghostDir, x
+@skipOnlyRev:
+    dex
+    bpl @loopOnlyRev
     rts
