@@ -274,7 +274,11 @@ randomize and run, and `Q` or RUN/STOP to exit.
 
 ### PACMAN
 
-**Description:** Pac64 — a character-grid Pac-Man clone. Pac-Man and four ghosts (Blinky, Pinky, Inky, Clyde) move one tile at a time through a 40×24 maze; ghosts run the full authentic scatter/chase/frightened/eaten state machine with all four classic personalities.
+**Description:** Pac64 — an in-progress character-grid Pac-Man clone with a
+centered 28×24 maze and a status row. Pac-Man movement and Phase 3.1 Blinky
+scatter/chase behavior are active. The other ghosts and frightened/eaten,
+fruit, and tunnel systems are planned. Contact with Blinky costs one life,
+resets the maze and actors while lives remain, and stops play at zero lives.
 **Syntax:** `PACMAN`
 
 **Controls (during play):**
@@ -283,7 +287,7 @@ randomize and run, and `Q` or RUN/STOP to exit.
 | --- | --- |
 | `W`/`A`/`S`/`D` | Move up / left / down / right (buffered) |
 | `P` or `SPACE` | Pause / resume |
-| `Q` or RUN/STOP | Quit and return to shell |
+| `Q` | Quit and return to shell |
 
 ---
 

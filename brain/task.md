@@ -217,11 +217,14 @@
   - [/] Phase 3.1: Blinky AI Integration and Code Review Remediation
     - [x] Review Phase 2 regressions and the active Blinky integration
     - [x] Synchronize `wiki/tasks/pacman-ca65-rewrite.md` and Taskwarrior
-    - [/] Correct actor redraw ordering (implemented; manual confirmation pending)
+    - [x] Correct actor redraw ordering and manually verify actor visibility
     - [/] Repair and harden `autotile.py` (implemented; user acceptance pending)
     - [/] Integrate `autotile.py` into the Pac-Man CMake target (implemented;
       user acceptance pending)
-    - [ ] Synchronize Pac-Man documentation with current behavior
-    - [ ] Complete build verification and user-run C64/VICE walkthrough
+    - [x] Synchronize Pac-Man documentation with current behavior
+    - [x] Implement and manually verify Pac-Man/Blinky collision and life-loss handling
+    - [x] Classify Blinky corner loops and verify the invisible-target symptom
+      is resolved by collision handling
+    - [x] Complete build verification and user-run C64/VICE walkthrough
     - [ ] Deferred: restore the exact 240-dot maze after visual revisions
     - [ ] Deferred: implement ghost warp-tunnel behavior

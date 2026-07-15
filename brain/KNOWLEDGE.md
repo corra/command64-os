@@ -14,6 +14,7 @@ This file serves as the shared repository for architectural decisions, technical
 | 2026-05-01 | Oscar64 | Selected as the C compiler for C64 target. | Active |
 | 2026-06-25 | Code Wiki & Project Tooling | Created structured code wiki under wiki/, corrected child DOX index paths, and initialized Taskwarrior + Codebase Memory. | Active |
 | 2026-07-08 | Gap-Buffer VI Editor | Implemented a user-space vi-alike text editor using a Gap Buffer for O(1) edits, supporting line numbering, word/line operations, and horizontal/vertical scrolling. | Active |
+| 2026-07-15 | Pac-Man generated maze topology | `autotile.py` owns logical path/wall/gate/pellet topology; neighboring cells infer normal render shapes and validated overrides handle visually ambiguous corners. CMake regenerates `mazeWalls` before Pac-Man assembly. | Active |
 
 ## Technical Findings
 
@@ -32,6 +33,19 @@ This file serves as the shared repository for architectural decisions, technical
 - **[2026-07-11] `test_filetest` PRG Type Default RCA**: The apparent loss of the first two bytes (`"He"`) from `TEST.TXT` is explained by `DOS_OPEN_FILE` defaulting write-mode files to PRG when `HexValHi` is unset; PRG-aware tools interpret the first two bytes as a load address. The accompanying `READ FROM FILE: G` symptom still points to the separate `fileRead` `READST`/`CHRIN` sequencing bug and LFN 15 status-drain fragility. Full investigation and plan: `brain/plans/2026-07-10-fileopen-prg-type-default-fix.md`.
 - **[2026-07-11] `TYPE` LF Display Translation**: `TYPE` is a text-display command, so LF-only text files need display-time newline synthesis on the C64. The fix belongs in `cmdType`'s screen-output loop: translate `$0A` to `PetCr`/`PetLl`, while keeping `DOS_READ_FILE`, `DOS_WRITE_FILE`, and `COPY` byte-preserving.
 - **[2026-07-14] External App Return Codes Absent**: `DOS_EXIT ($4C)` resets the stack and jumps to `mainLoop`; it has no documented input status byte and no shell-visible last-status storage. External utilities such as `COMP` are screen-output-only until a separate ERRORLEVEL-style status design is implemented. Tracked as Taskwarrior #25 / `wiki/tasks/external-app-return-codes.md`.
+- **[2026-07-15] Pac-Man Phase 3.1 Boundary**: Only Blinky is advanced and
+  rendered. Pinky/Inky/Clyde target math exists but is inactive; frightened,
+  collision, fruit, house-release, and tunnel behavior must not be documented
+  as playable yet.
+- **[2026-07-15] Blinky Corner Loop Classification**: During scatter mode,
+  Blinky's unreachable top-right target intentionally produces a repeating
+  16-tile circuit around that corner. Corner circulation during the scheduled
+  scatter windows is expected; a loop persisting after chase transition would
+  be a separate defect.
+- **[2026-07-15] Pac-Man Collision Sequencing**: Collision must be checked after
+  either Pac-Man or Blinky moves so contact cannot leave Pac-Man logically
+  active but visually overwritten. A harmful collision interrupts the current
+  tick before the other actor advances.
 
 ## Current Status — Build 2436 / Stage 15 (2026-06-25)
 

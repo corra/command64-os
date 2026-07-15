@@ -11,7 +11,7 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-07-08)
+## Current State (2026-07-15)
 
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
@@ -23,7 +23,7 @@
 - **Conway memory safety & relocation crash fix**: Resolved memory collisions between code and double buffers by embedding the grid buffers as relocatable, page-aligned data tables inside the binaries. Both Kick and ca65 builds generate identical size-bounded relocatable binaries (3008 bytes, 59 relocation entries).
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017).
+- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055).
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
 - **test app naming cleanup**: Redundant `<name>test` ca65 test apps now use
@@ -37,6 +37,13 @@
 - **EDLIN Port Phase 4 (Save/streaming)**: Completed and verified in VICE. Verified empty new-file creation, line insertion, `@0:` save-replace writing (`W`), editor quit (`Q`), reload and listing (`L`) of modified file, and buffer ceiling limits. Bumps `VERSION_STAGE` to `'4'` (`0.1.4`).
 - **EDLIN hardware save truncation fixed**: Implemented core file API hardening for final EOI byte preservation and immediate post-`CHROUT` status checks, plus EDLIN post-close drive-status validation after `W`. `make all` passes and physical-hardware verification confirmed the fix under Task #25.
 - **DATE/TIME Phase 1**: Completed CIA #1 TOD-backed internal `DATE` and `TIME` commands. User verified direct and interactive set/display round-trips, midnight rollover, and month rollover. Phase 1 uses resident kernel date bytes at `$1FFC-$1FFF` and remains intentionally non-persistent until RTC hardware phases.
+- **Pac-Man Phase 3.1 remediation**: Blinky-only scatter/chase movement is active.
+  Actor redraw ordering is corrected, and `autotile.py` now owns a validated
+  24x28 logical topology with presentation-only corner overrides. CMake runs
+  the generator before Pac-Man assembly. Exact 240-dot layout and ghost warp
+  behavior remain deferred. Actor visibility and the complete Pac-Man/Blinky
+  collision, life-loss, reset, and game-over flow were user-verified in build
+  1054; version 0.1.3 build 1055 contains the accepted patch-stage bump.
 
 
 

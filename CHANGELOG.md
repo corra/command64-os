@@ -9,7 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Pac-Man External Utility ca65 Rewrite (Phase 2)**: Added definitive centered 28x24 playfield, wall definitions, and item grid matching exact arcade item count (240 dots and 4 pellets). Implemented screen coordinate offset drawing, keyboard/Joystick Port 2 direction buffering, movement tick timing, and score status rendering.
+- **Pac-Man External Utility ca65 Rewrite (Phase 3.1 WIP)**: Added Blinky target selection, square-table direction evaluation, scatter/chase scheduling, actor timers, and automatic logical-topology maze generation before the ca65 build. Pinky/Inky/Clyde movement and frightened/eaten behavior remain inactive.
+- **Pac-Man External Utility ca65 Rewrite (Phase 2)**: Added the centered 28x24 playfield, rendered wall definitions, runtime item grid, screen coordinate drawing, keyboard/Joystick Port 2 direction buffering, movement timing, and score status rendering. The visually evolving maze currently contains 246 dots and 4 pellets; restoring the specified 240-dot count is deferred.
 - **Pac-Man External Utility ca65 Rewrite (Phase 1)**: Initiated complete rewrite of `pacman` using ca65/ld65. Added ZP allocations in `common.inc`, skeleton game loop in `pacman_main.s`, screen rendering routines in `pacman_game.s`, and verified clean build and relocations under ca65.
 - **MORE internal command**: Added `MORE [filename]`, an MS-DOS-style paged file viewer for sequential/program files. It reads through the existing DOS file API, supports `8:`/`9:`/`10:`/`11:` target-device prefixes, pauses with `-- More --`, and resumes on a single keypress.
 - **DATE/TIME internal commands (Phase 1)**: Added CIA #1 TOD-backed `DATE` and `TIME` built-ins with direct and interactive `YYYY-MM-DD` / `HH:MM:SS` entry, boot-time TOD initialization, resident kernel date storage, leap-year-aware validation, and lazy midnight/month rollover.
@@ -22,6 +23,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **PACMAN 0.1.3 patch stage**: Advanced the Pac-Man version after verified
+  actor redraw ordering and Pac-Man/Blinky collision, life-loss, and game-over
+  remediation.
 - **CONWAY patch release**: Incremented the Conway Multiverse utility to
   `0.4.1.1058`; the patch banner identifies the menu, rule-preset, custom
   one-count editor, generation-counter, and pause-color release documented in
@@ -36,6 +40,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Pac-Man collision visibility**: Added Pac-Man/Blinky collision checks after
+  either actor moves. Harmful contact now decrements one life, interrupts the
+  current tick, resets the maze and actors while lives remain, and freezes at
+  zero lives instead of leaving Pac-Man invisibly active under Blinky.
 - **EDLIN hardware save truncation**: Fixed physical-drive save truncation paths by preserving the final EOI byte in `DOS_READ_FILE`, checking KERNAL write status immediately after each `CHROUT`, and having EDLIN read the target drive's post-close command-channel status after `W` saves.
 - **DATE/TIME parser scratch preservation**: Fixed Date/Time scratch-register clobbering where parsing the day overwrote the parsed month, Date validation lost the parse cursor during month-length lookup, parsing seconds overwrote the parsed minute, and CIA TOD hour conversion overwrote the returned seconds value. Valid `DATE YYYY-MM-DD` and `TIME HH:MM:SS` inputs now preserve all parsed fields correctly.
 - **TYPE LF newline display**: `TYPE` now treats line-feed bytes (`$0A`) as text newlines by emitting a CR/LF pair during screen output, without changing file contents or the byte-preserving file APIs.

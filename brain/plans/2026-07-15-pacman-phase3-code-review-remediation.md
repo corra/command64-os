@@ -61,9 +61,21 @@ warp behavior until warp tunnels are implemented.
 
 - [x] Review completed and findings classified with the user.
 - [x] Establish synchronized wiki, brain, and Taskwarrior records (Tasks 27-33).
-- [/] Correct actor redraw ordering (implemented; manual confirmation pending).
+- [x] Correct actor redraw ordering (user verified 2026-07-15).
 - [/] Repair and harden the autotiler (implemented; user acceptance pending).
 - [/] Integrate automatic maze generation into the Pac-Man build (implemented;
   user acceptance pending).
-- [ ] Synchronize user and maintainer documentation.
-- [ ] Complete automated and manual verification.
+- [x] Synchronize user and maintainer documentation (user accepted 2026-07-15).
+- [x] Implement collision/life-loss handling after the user observed Blinky
+  overwriting Pac-Man without a state transition.
+  - Collision checks now run after either actor moves, interrupt the tick,
+    decrement one life, reset actors while lives remain, and freeze at zero
+    lives. User verified the complete life-loss/game-over flow on 2026-07-15.
+- [x] Classify reported Blinky corner loops as expected scatter behavior or an
+  AI direction-selection defect before changing pathfinding.
+  - A fixed-target path trace repeats a 16-tile loop around Blinky's top-right
+    scatter corner, matching the intended scatter behavior. No pathfinding
+    change is justified unless the user observes a persistent loop during
+    chase mode. The reported invisible-target loop was resolved by collision
+    handling.
+- [x] Complete automated and manual collision/visibility verification.

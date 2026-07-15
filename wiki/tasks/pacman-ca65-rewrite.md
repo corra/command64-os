@@ -1,7 +1,8 @@
 # Pac-Man ca65 Rewrite
 
 Status: [/]
-Taskwarrior: 27 (parent), 28-33 (subtasks/deferred work)
+Taskwarrior: project `command64.pacman`, parent task 27; subtask IDs may shift
+when completed tasks leave the pending list.
 
 ## Goal
 
@@ -19,8 +20,7 @@ movement, and scatter/chase scheduling.
 
 - [x] Review the current Phase 2 and Phase 3.1 implementation.
 - [x] Synchronize task records with the active implementation state.
-- [/] Draw the maze before resetting and drawing actors; source change is in
-  place and awaits manual C64/VICE confirmation.
+- [x] Draw the maze before resetting and drawing actors.
 - [/] Repair and harden `autotile.py`: implementation is in place and awaits
   user acceptance.
   - Syntax repaired.
@@ -30,9 +30,15 @@ movement, and scatter/chase scheduling.
   - Read-only consistency-check mode added.
 - [/] Run the maze autotiler automatically before every Pac-Man build; CMake
   integration is implemented and awaits user acceptance.
-- [ ] Correct the Pac-Man utility and user manuals.
-- [ ] Build the relocatable `pacman` target without warnings or errors.
-- [ ] Manually verify immediate actor visibility and Blinky movement in C64/VICE.
+- [x] Correct the Pac-Man utility and user manuals.
+- [x] Build the relocatable `pacman` target without warnings or errors.
+- [x] Implement and manually verify Phase 3.1 Pac-Man/Blinky collision and
+  life-loss handling.
+- [x] Investigate reported Blinky corner loops: the apparent loop around an
+  invisible Pac-Man was a collision-state symptom; the normal 16-tile
+  top-right scatter loop remains expected.
+- [x] Manually verify immediate actor visibility, Blinky movement, collision
+  reset, life decrement, and game over.
 
 ## Deferred Findings
 

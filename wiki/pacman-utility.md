@@ -2,16 +2,16 @@
 
 **File Name:** `pacman.prg`
 **Target Address:** `UserProgStart` (currently `$3400`)
-**Version:** 0.1.0
+**Version:** 0.1.3.1055
 
 ## Overview
 
-`PACMAN` (internally "Pac64") is a character-grid Pac-Man clone for the
-40×24 C64 text screen (row 24 is a dynamic status line). Pac-Man and four
-ghosts — Blinky, Pinky, Inky, and Clyde — move one grid tile at a time, each
-on its own independently tunable jiffy-clock timer. Ghost behaviour is the
-full authentic scatter/chase/frightened/eaten state machine with all four
-classic personalities, not a simplified chase-only bot.
+`PACMAN` (internally "Pac64") is an in-progress character-grid Pac-Man clone.
+The maze occupies a centered 28×24 playfield on the C64's 40×25 text screen;
+row 24 is a dynamic status line. Pac-Man movement, Phase 3.1 Blinky
+scatter/chase movement, collision, life loss, and game over are active. Pinky,
+Inky, Clyde, frightened/eaten behavior, fruit, and ghost tunnel traversal are
+not yet playable.
 
 ## Command Syntax
 
@@ -30,7 +30,6 @@ No arguments. Starts immediately at level 1 with 3 lives.
 | `W` / `A` / `S` / `D` | Move up / left / down / right (buffered: an early turn is taken the instant it becomes legal) |
 | `P` / `SPACE` | Pause / resume |
 | `Q` | Quit and return to the command64 shell |
-| RUN/STOP | Quit and return to the command64 shell |
 
 ---
 
@@ -38,50 +37,45 @@ No arguments. Starts immediately at level 1 with 3 lives.
 
 ### Maze tables
 
-`mazeWalls` (read-only: 0=open, 1=wall, 2=ghost-only door) and `mazeItems`
-(mutable: 0=empty, 1=dot=10pts, 2=power pellet=50pts) are both 960-byte
-tables. Unlike CONWAY's grid buffers, neither is pinned to a fixed address:
-CONWAY's old small-code layout once left headroom below fixed buffer pages,
-but a full ghost-AI game cannot rely on a hardcoded gap below or above
-`UserProgStart`, so both tables are ordinary labelled data placed wherever
-the assembler lays them out. `mazeItems` starts as reserved zero bytes and
-is populated at runtime by `resetItems`.
+`mazeWalls` and `mazeItems` are each 672-byte tables covering 28×24 cells.
+`mazeWalls` uses 0 for an open path, 1–9 for rendered wall shapes, 10 for the
+ghost gate, and 11 for an open power-pellet marker. `mazeItems` is mutable:
+0=empty, 1=dot, 2=power pellet, and 3=fruit. It is populated at runtime by
+`resetItems`.
 
-The ghost-only door (value 2) blocks Pac-Man's `canMovePac` check but not
-ghosts' `canMoveGhost` check, so Pac-Man cannot wander into the ghost house.
+The logical topology lives in `autotile.py`. Normal wall shapes are inferred
+from neighboring topology cells; eight presentation-only overrides preserve
+ambiguous corners. CMake runs this generator before every Pac-Man build, and
+`autotile.py --check` verifies that `pacman_game.s` is current.
+
+The gate (value 10) blocks Pac-Man. Ghost gate entry and warp-tunnel traversal
+are deferred.
 
 ### Grid-locked, per-actor movement
 
-Movement is one tile per tick, where a tick fires when a per-actor
-jiffy-driven delay counter expires — unlike CONWAY's single whole-grid
-update per generation. This lets Pac-Man and all four ghosts move at
-independently tunable speeds without a raster IRQ.
+Movement is one tile per actor-timer expiration. Pac-Man and Blinky currently
+use independently tunable jiffy-driven delays without a raster IRQ. The other
+three ghost records and timers are initialized but not advanced in Phase 3.1.
 
 ### Ghost AI
 
-Ghosts are stored as parallel arrays (`ghostRow/Col/Dir/Mode/...`) indexed
-by ghost identity, not four copy-pasted variable sets. Each elapsed tick,
-`ghostMoveTick` runs a two-pass update: pass 1 computes every pending
-ghost's target tile from positions as they stood at the start of the tick
-(so Inky's target reads Blinky's pre-move position regardless of update
-order); pass 2 resolves and applies each pending ghost's move. A legal
-direction is chosen by minimum squared distance to the target tile
-(precomputed `sqrTbl` avoids a runtime multiply), tie-broken in fixed order
-up > left > down > right, excluding the reverse of the ghost's current
-heading (except while eaten).
+Ghosts are stored as parallel arrays (`ghostRow/Col/Dir/Mode/...`) indexed by
+identity. Blinky is the only ghost currently updated and drawn. A legal
+direction is chosen by minimum squared distance to the target tile using a
+square lookup table, tie-broken in fixed order up > left > down > right, while
+excluding reversal unless no forward candidate exists.
 
-- **Blinky** chases Pac-Man's tile directly.
-- **Pinky** targets 4 tiles ahead of Pac-Man's facing direction.
-- **Inky** targets the point reflected through Blinky's position from 2
-  tiles ahead of Pac-Man.
-- **Clyde** chases Pac-Man until within 8 tiles, then retreats to his own
-  scatter corner.
+- **Blinky:** active in Phase 3.1; alternates between his scatter corner and
+  Pac-Man's tile.
+- **Pinky, Inky, and Clyde:** target calculations exist in `pacman_ai.s`, but
+  their movement remains disabled pending later Phase 3 integration.
 
-Scatter/chase phases repeat on a timed schedule; a power pellet flips
-non-eaten/non-housed ghosts to frightened (award 200/400/800/1600 doubling
-per ghost eaten within one pellet's window). Ghost-house release is a v1
-simplification: a housed ghost pops directly to the door-exit tile when its
-own release timer expires, rather than authentic dot-count-based release.
+The scatter/chase scheduler is active. A collision is checked after either
+Pac-Man or Blinky moves; harmful contact decrements one life, resets the maze
+and actors while lives remain, and freezes play at zero lives. Power pellets
+currently award 50 points and apply Pac-Man's movement delay, but they do not
+yet activate frightened mode. Ghost consumption, house release, and
+eaten-ghost recovery remain unimplemented.
 
 ### Score rendering
 
@@ -93,8 +87,8 @@ table of 24-bit powers of ten.
 
 | Address range | Contents |
 | --- | --- |
-| `UserProgStart` (`$3400`) onward | Code, ghost/Pac-Man state, maze tables, read-only tables (~5.5KB total) |
-| `$70 – $75` | Zero-page scratch (subset of the `$70-$7F` external-program range) |
+| `UserProgStart` (`$3400`) onward | Relocatable code, actor state, maze tables, and lookup tables |
+| `$70–$84` | App-private Pac-Man state and scratch zero page |
 
 ---
 
@@ -110,8 +104,11 @@ The maze is drawn and the game begins at level 1 with 3 lives.
 Press `P` or `SPACE` to freeze the display. Press it again to continue.
 
 ### Return to shell
-Press `Q` or the RUN/STOP key to quit back to the shell prompt.
+Press `Q` to quit back to the shell prompt.
 
 ## Source
 
-[src/external/pacman/pacman.asm](../src/external/pacman/pacman.asm)
+- [pacman_main.s](../src/external/pacman/pacman_main.s)
+- [pacman_game.s](../src/external/pacman/pacman_game.s)
+- [pacman_ai.s](../src/external/pacman/pacman_ai.s)
+- [autotile.py](../src/external/pacman/autotile.py)

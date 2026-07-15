@@ -9,7 +9,7 @@
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '2'
+VERSION_STAGE = '3'
 .include "build_pacman.inc"
 
 .import __MAIN_START__
@@ -109,7 +109,7 @@ mainLoop:
     ; Level state check
     lda zpGameState
     cmp #STATE_LEVEL_CLEAR
-    bne @gameplay
+    bne @checkLifeLost
     
     ; Advance level
     inc zpLevel
@@ -121,6 +121,22 @@ mainLoop:
     sta zpGameState
     jmp mainLoop
 
+@checkLifeLost:
+    cmp #STATE_LIFE_LOST
+    bne @checkGameOver
+
+    ; Restore the maze first, then draw actors at their reset positions.
+    jsr drawMaze
+    jsr resetPositions
+    jsr renderStatusRow
+    lda #STATE_PLAYING
+    sta zpGameState
+    jmp mainLoop
+
+@checkGameOver:
+    cmp #STATE_GAME_OVER
+    beq mainLoop
+
 @gameplay:
     jsr updateCycleScheduler
 
@@ -130,9 +146,12 @@ mainLoop:
     jsr getPacSpeed
     sta zpPacTimer
     jsr updatePacman
+    jsr checkBlinkyCollision
+    bcs mainLoop
 @skipPacMove:
 
     jsr updateGhosts
+    jsr checkBlinkyCollision
     jmp mainLoop
 
 ; ---------------------------------------------------------------------------
@@ -236,6 +255,48 @@ updatePacman:
     jsr drawPacman
     rts
 @done:
+    rts
+
+; ---------------------------------------------------------------------------
+; checkBlinkyCollision -- Detect Pac-Man/Blinky tile overlap.
+; Returns carry set when a life-loss/game-over transition was started.
+; Frightened/eaten collisions are reserved for their later score behavior.
+; ---------------------------------------------------------------------------
+checkBlinkyCollision:
+    lda zpGameState
+    cmp #STATE_PLAYING
+    bne @noCollision
+
+    lda ghostMode + GHOST_BLINKY
+    cmp #MODE_FRIGHTENED
+    bcs @noCollision
+
+    lda zpPacRow
+    cmp ghostRow + GHOST_BLINKY
+    bne @noCollision
+    lda zpPacCol
+    cmp ghostCol + GHOST_BLINKY
+    bne @noCollision
+
+    dec zpLives
+    bne @lifeLost
+
+    lda #STATE_GAME_OVER
+    sta zpGameState
+    lda #1
+    sta zpPaused
+    jsr renderStatusRow
+    sec
+    rts
+
+@lifeLost:
+    lda #STATE_LIFE_LOST
+    sta zpGameState
+    sec
+    rts
+
+@noCollision:
+    clc
     rts
 
 ; ---------------------------------------------------------------------------
