@@ -94,6 +94,9 @@ start:
     jsr resetPositions
     jsr drawStatusLabels
     jsr renderStatusRow
+    jsr showReadyBanner
+    lda JIFFY_CLK
+    sta zpLastJiffy
 
 ; ---------------------------------------------------------------------------
 ; Main game loop
@@ -128,7 +131,29 @@ mainLoop:
     lda zpGameState
     cmp #STATE_LEVEL_CLEAR
     bne @checkLifeLost
-    
+
+    ; Flash border 4 times (8 toggles)
+    ldx #7
+@flashLoop:
+    txa
+    and #1
+    bne :+
+    lda #COLOR_BLACK
+    jmp :++
+:   lda #COLOR_WHITE
+:   sta $D020
+
+    stx zpGhostIdx
+    jsr delay15
+    ldx zpGhostIdx
+
+    dex
+    bpl @flashLoop
+
+    ; Restore border to black
+    lda #COLOR_BLACK
+    sta $D020
+
     ; Advance level
     inc zpLevel
     jsr resetItems
@@ -137,6 +162,9 @@ mainLoop:
     jsr drawMaze
     jsr resetPositions
     jsr renderStatusRow
+    jsr showReadyBanner
+    lda JIFFY_CLK
+    sta zpLastJiffy
     lda #STATE_PLAYING
     sta zpGameState
     jmp mainLoop
@@ -145,17 +173,23 @@ mainLoop:
     cmp #STATE_LIFE_LOST
     bne @checkGameOver
 
+    lda #STATE_LIFE_LOST
+    sta zpGameState
     ; Restore the maze first, then draw actors at their reset positions.
     jsr drawMaze
     jsr resetPositions
-    jsr renderStatusRow
+    jsr showReadyBanner
+    lda JIFFY_CLK
+    sta zpLastJiffy
     lda #STATE_PLAYING
     sta zpGameState
     jmp mainLoop
 
 @checkGameOver:
     cmp #STATE_GAME_OVER
-    beq mainLoop
+    bne :+
+    jmp mainLoop
+:
 
 @gameplay:
     jsr updateCycleScheduler
@@ -364,6 +398,7 @@ checkActiveGhostCollision:
     jmp @next
 
 @normalGhostCollision:
+    jsr playDeathAnimation
     dec zpLives
     bne @lifeLost
 
@@ -782,7 +817,7 @@ drawStatusLabels:
     ; Draw "level:"
     ldx #0
 @l3: lda labelLevel, x
-    sta SCREEN + 960 + 27, x
+    sta SCREEN + 960 + 26, x  ; Shifted 1 column left (Col 26)
     inx
     cpx #6
     bne @l3
@@ -817,11 +852,11 @@ renderStatusRow:
     txa
     clc
     adc #$30
-    sta SCREEN + 960 + 33
+    sta SCREEN + 960 + 32  ; Shifted 1 column left (Col 32)
     pla
     clc
     adc #$30
-    sta SCREEN + 960 + 34
+    sta SCREEN + 960 + 33  ; Shifted 1 column left (Col 33)
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1135,3 +1170,175 @@ checkExtraLife:
     sta zpExtraLifeAwarded
 @done:
     rts
+
+; ---------------------------------------------------------------------------
+; playDeathAnimation -- Play retro C64 text dissolve animation on collision
+; ---------------------------------------------------------------------------
+playDeathAnimation:
+    ; 1. Erase all ghosts from the screen
+    ldx #3
+@eraseGhosts:
+    stx zpGhostIdx
+    lda ghostRow, x
+    sta zpTmpRow
+    lda ghostCol, x
+    sta zpTmpCol
+    jsr drawGridCell
+    ldx zpGhostIdx
+    dex
+    bpl @eraseGhosts
+    
+    ; 2. Animate Pac-Man shrinking
+    lda zpPacRow
+    sta zpTmpRow
+    lda zpPacCol
+    sta zpTmpCol
+    
+    ; Phase 1: Pac-Man 'Q' in Yellow
+    lda #CHAR_PACMAN
+    ldx #COLOR_YELLOW
+    jsr @writePacChar
+    jsr delay15
+    
+    ; Phase 2: Pellet '*' in Yellow
+    lda #$51
+    ldx #COLOR_YELLOW
+    jsr @writePacChar
+    jsr delay15
+    
+    ; Phase 3: Dot '.' in White
+    lda #CHAR_DOT
+    ldx #COLOR_WHITE
+    jsr @writePacChar
+    jsr delay15
+    
+    ; Phase 4: Empty space ' ' in Black
+    lda #CHAR_EMPTY
+    ldx #COLOR_BLACK
+    jsr @writePacChar
+    jsr delay15
+    rts
+
+@writePacChar:
+    pha
+    txa
+    pha
+    
+    lda zpTmpCol
+    clc
+    adc #6
+    clc
+    ldy zpTmpRow
+    adc rowOffLo, y
+    sta zpTmpPtrLo
+    lda rowOffHi, y
+    adc #>SCREEN
+    sta zpTmpPtrHi
+    
+    lda zpTmpCol
+    clc
+    adc #6
+    clc
+    ldy zpTmpRow
+    adc rowOffLo, y
+    sta zpTmpDistLo
+    lda rowOffHi, y
+    adc #>COLORRAM
+    sta zpTmpDistHi
+    
+    pla
+    ldy #0
+    sta (zpTmpDistLo), y
+    pla
+    sta (zpTmpPtrLo), y
+    rts
+
+delay15:
+    lda JIFFY_CLK
+    clc
+    adc #15
+    sta zpTmpVal
+:   lda JIFFY_CLK
+    cmp zpTmpVal
+    bcc :-
+    rts
+
+; ---------------------------------------------------------------------------
+; showReadyBanner -- Display "READY!" centered below the ghost house gate
+; ---------------------------------------------------------------------------
+showReadyBanner:
+    ; Draw "READY!" in yellow at Row 14, Cols 11–16
+    ldx #0
+@loop:
+    lda charReady, x
+    sta zpTmpVal
+    
+    txa
+    clc
+    adc #11
+    sta zpTmpCol
+    
+    lda #14
+    sta zpTmpRow
+    
+    lda zpTmpCol
+    clc
+    adc #6
+    clc
+    ldy #14
+    adc rowOffLo, y
+    sta zpTmpPtrLo
+    lda rowOffHi, y
+    adc #>SCREEN
+    sta zpTmpPtrHi
+    
+    lda zpTmpCol
+    clc
+    adc #6
+    clc
+    ldy #14
+    adc rowOffLo, y
+    sta zpTmpDistLo
+    lda rowOffHi, y
+    adc #>COLORRAM
+    sta zpTmpDistHi
+    
+    ldy #0
+    lda #COLOR_YELLOW
+    sta (zpTmpDistLo), y
+    lda zpTmpVal
+    sta (zpTmpPtrLo), y
+    
+    inx
+    cpx #6
+    bne @loop
+    
+    ; Delay 120 jiffies (~2 seconds)
+    lda JIFFY_CLK
+    clc
+    adc #120
+    sta zpTmpVal
+:   lda JIFFY_CLK
+    cmp zpTmpVal
+    bcc :-
+    
+    ; Cleanly erase "READY!" by redrawing Cols 11-16
+    ldx #0
+@erase:
+    txa
+    clc
+    adc #11
+    sta zpTmpCol
+    lda #14
+    sta zpTmpRow
+    
+    stx zpGhostIdx
+    jsr drawGridCell
+    ldx zpGhostIdx
+    
+    inx
+    cpx #6
+    bne @erase
+    rts
+
+charReady: .byte $12, $05, $01, $04, $19, $21 ; "READY!"
