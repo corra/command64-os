@@ -53,4 +53,4 @@ The purpose of the `src/external` directory is to contain external user space ap
 
 # Child DOX Index
 
-- (none)
+- [pacman/AGENTS.md](pacman/AGENTS.md)

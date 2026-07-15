@@ -208,3 +208,20 @@
     - [x] Update `CMakeLists.txt` with ca65 build rules for `pacman`
     - [x] Compile skeleton successfully
 
+  - [x] Phase 2: Maze Layout, Draw Engine, and Pac-Man Movement
+    - [x] Define 28x24 maze Walls and Items arrays in `pacman_game.s`
+    - [x] Implement fast screen/color block rendering in `pacman_game.s`
+    - [x] Implement keyboard poll and direction buffering in `pacman_main.s`
+    - [x] Implement Pac-Man move timers, level speed scaling, and dot/pellet eating slowdown
+
+  - [/] Phase 3.1: Blinky AI Integration and Code Review Remediation
+    - [x] Review Phase 2 regressions and the active Blinky integration
+    - [x] Synchronize `wiki/tasks/pacman-ca65-rewrite.md` and Taskwarrior
+    - [/] Correct actor redraw ordering (implemented; manual confirmation pending)
+    - [/] Repair and harden `autotile.py` (implemented; user acceptance pending)
+    - [/] Integrate `autotile.py` into the Pac-Man CMake target (implemented;
+      user acceptance pending)
+    - [ ] Synchronize Pac-Man documentation with current behavior
+    - [ ] Complete build verification and user-run C64/VICE walkthrough
+    - [ ] Deferred: restore the exact 240-dot maze after visual revisions
+    - [ ] Deferred: implement ghost warp-tunnel behavior

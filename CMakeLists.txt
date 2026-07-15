@@ -70,6 +70,8 @@ set(CONWAY_ENTRY "src/external/conway/conway_main.s")
 
 file(GLOB_RECURSE PACMAN_SRCS CONFIGURE_DEPENDS "src/external/pacman/*.s" "src/external/pacman/*.inc" "include/ca65/*.inc")
 set(PACMAN_ENTRY "src/external/pacman/pacman_main.s")
+set(PACMAN_AUTOTILE "${CMAKE_SOURCE_DIR}/src/external/pacman/autotile.py")
+set(PACMAN_GAME_SOURCE "${CMAKE_SOURCE_DIR}/src/external/pacman/pacman_game.s")
 
 file(GLOB_RECURSE VI_SRCS CONFIGURE_DEPENDS "src/external/vi/*.asm" "include/*.inc")
 set(VI_ENTRY "src/external/vi/vi.asm")
@@ -191,7 +193,15 @@ set(CONWAY_TARGET conway)
 
 # 4b. PACMAN — character-grid Pac-Man clone
 if(Ca65_FOUND)
+    add_custom_target(pacman_autotile
+        COMMAND "${Python3_EXECUTABLE}" "${PACMAN_AUTOTILE}"
+        DEPENDS "${PACMAN_AUTOTILE}" "${PACMAN_GAME_SOURCE}"
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        COMMENT "Generating PACMAN maze wall tiles"
+        VERBATIM
+    )
     add_ca65_app(pacman "${PACMAN_ENTRY}" PACMAN_SRCS 1000 "2800")
+    add_dependencies(pacman pacman_autotile)
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for PACMAN target")
 endif()

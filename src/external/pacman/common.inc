@@ -28,6 +28,9 @@ zpTmpPtrHi     = $7F
 zpTmpDistLo    = $80
 zpTmpDistHi    = $81
 zpGhostIdx     = $82 ; Index of currently processing ghost (0-3)
+dotsRemainingLo = $83
+dotsRemainingHi = $84
+
 
 ; --- Directions ---
 DIR_UP    = 0
@@ -50,6 +53,12 @@ PLAY_H = 24 ; Active maze rows (0 to 23), row 24 is status bar
 
 SCREEN   = $0400
 COLORRAM = $D800
+JIFFY_CLK = $A2
+; --- Item Constants ---
+ITEM_NONE   = 0
+ITEM_DOT    = 1
+ITEM_PELLET = 2
+ITEM_FRUIT  = 3
 
 
 ; --- Grid Characters ---
@@ -70,3 +79,16 @@ COLOR_PINK   = 10
 COLOR_ORANGE = 8
 COLOR_YELLOW = 7
 COLOR_BLUE   = 6
+
+; --- Ghost Index Constants ---
+GHOST_BLINKY = 0
+GHOST_PINKY  = 1
+GHOST_INKY   = 2
+GHOST_CLYDE  = 3
+
+; --- Ghost Modes ---
+MODE_CHASE      = 0
+MODE_SCATTER    = 1
+MODE_FRIGHTENED = 2
+MODE_EATEN      = 3
+

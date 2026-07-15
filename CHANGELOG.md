@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Pac-Man External Utility ca65 Rewrite (Phase 2)**: Added definitive centered 28x24 playfield, wall definitions, and item grid matching exact arcade item count (240 dots and 4 pellets). Implemented screen coordinate offset drawing, keyboard/Joystick Port 2 direction buffering, movement tick timing, and score status rendering.
 - **Pac-Man External Utility ca65 Rewrite (Phase 1)**: Initiated complete rewrite of `pacman` using ca65/ld65. Added ZP allocations in `common.inc`, skeleton game loop in `pacman_main.s`, screen rendering routines in `pacman_game.s`, and verified clean build and relocations under ca65.
 - **MORE internal command**: Added `MORE [filename]`, an MS-DOS-style paged file viewer for sequential/program files. It reads through the existing DOS file API, supports `8:`/`9:`/`10:`/`11:` target-device prefixes, pauses with `-- More --`, and resumes on a single keypress.
 - **DATE/TIME internal commands (Phase 1)**: Added CIA #1 TOD-backed `DATE` and `TIME` built-ins with direct and interactive `YYYY-MM-DD` / `HH:MM:SS` entry, boot-time TOD initialization, resident kernel date storage, leap-year-aware validation, and lazy midnight/month rollover.
