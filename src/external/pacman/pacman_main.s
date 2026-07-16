@@ -34,6 +34,11 @@ VERSION_STAGE = '3'
 .import updateCycleScheduler
 .import triggerFrightenedMode
 .import zpCycleStep
+.import recordReleaseDot
+.import resetReleaseIdleTimer
+.import tickReleaseIdleTimer
+.import initReleaseStateForLevel
+.import initReleaseStateForLifeLoss
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -77,6 +82,7 @@ start:
     sta scoreMid
     sta scoreHi
     sta zpExtraLifeAwarded
+    sta zpPostDeathRelease
 
     lda JIFFY_CLK
     sta zpLastJiffy
@@ -90,6 +96,7 @@ start:
     jsr resetItems
     lda dotsRemainingLo
     sta zpTotalDots
+    jsr initReleaseStateForLevel
     jsr drawMaze
     jsr resetPositions
     jsr drawStatusLabels
@@ -156,9 +163,12 @@ mainLoop:
 
     ; Advance level
     inc zpLevel
+    lda #0
+    sta zpPostDeathRelease
     jsr resetItems
     lda dotsRemainingLo
     sta zpTotalDots
+    jsr initReleaseStateForLevel
     jsr drawMaze
     jsr resetPositions
     jsr renderStatusRow
@@ -175,6 +185,9 @@ mainLoop:
 
     lda #STATE_LIFE_LOST
     sta zpGameState
+    lda #1
+    sta zpPostDeathRelease
+    jsr initReleaseStateForLifeLoss
     ; Restore the maze first, then draw actors at their reset positions.
     jsr drawMaze
     jsr resetPositions
@@ -193,6 +206,7 @@ mainLoop:
 
 @gameplay:
     jsr updateCycleScheduler
+    jsr tickReleaseIdleTimer
 
     ; Ticks down fruit active timer
     lda zpFruitTimerLo
@@ -581,7 +595,9 @@ consumeItem:
     rts
 
 ; ---------------------------------------------------------------------------
-; decDots -- Decrement remaining dots counter
+; decDots -- Decrement remaining dots counter; the shared funnel for both
+; dot and energizer consumption, so this is also where ghost-house release
+; accounting (Phase 5) is driven exactly once per consumed item.
 ; ---------------------------------------------------------------------------
 decDots:
     lda dotsRemainingLo
@@ -589,7 +605,10 @@ decDots:
     dec dotsRemainingHi
 @decLo:
     dec dotsRemainingLo
-    
+
+    jsr recordReleaseDot
+    jsr resetReleaseIdleTimer
+
     ; Spawn fruit check: dots eaten = zpTotalDots - dotsRemainingLo
     lda zpTotalDots
     sec
@@ -985,26 +1004,23 @@ updateGhosts:
     lda #0
     sta ghostCol, x
 @noWrap:
-    ; Revive check for eaten ghosts
+    ; Revive check for eaten ghosts: transition EATEN -> EXITING so
+    ; handleHouseExit routes the revived ghost through Col EXIT_DOOR_COL
+    ; and the door under controlled exit logic (Phase 8). Revived ghosts
+    ; leave without waiting on personal/global release counters.
     lda ghostMode, x
     cmp #MODE_EATEN
     bne @skipRevive
     lda ghostRow, x
-    cmp #12
+    cmp #EATEN_REVIVE_ROW
     bne @skipRevive
     lda ghostCol, x
-    cmp #13
+    cmp #EATEN_REVIVE_COL
     beq @revive
-    cmp #14
+    cmp #EATEN_REVIVE_COL+1
     bne @skipRevive
 @revive:
-    lda zpCycleStep
-    and #1
-    bne :+
-    lda #MODE_SCATTER
-    sta ghostMode, x
-    jmp @skipRevive
-:   lda #MODE_CHASE
+    lda #MODE_EXITING
     sta ghostMode, x
 @skipRevive:
     jsr drawGhost
@@ -1079,22 +1095,23 @@ exitBanner:
     .byte ".", BUILD_NUMBER, PetCr, 0
 
 ; ---------------------------------------------------------------------------
-; spawnFruit -- Spawn fruit item on Row 14, Col 13
+; spawnFruit -- Spawn fruit item on the fruit rest tile (resetItems keeps
+; this tile permanently dot-free; see FRUIT_SPAWN_ROW/COL in common.inc)
 ; ---------------------------------------------------------------------------
 spawnFruit:
-    lda #14
+    lda #FRUIT_SPAWN_ROW
     sta zpTmpRow
-    lda #13
+    lda #FRUIT_SPAWN_COL
     sta zpTmpCol
     lda #ITEM_FRUIT
     jsr setItemCell
-    
-    lda #14
+
+    lda #FRUIT_SPAWN_ROW
     sta zpTmpRow
-    lda #13
+    lda #FRUIT_SPAWN_COL
     sta zpTmpCol
     jsr drawGridCell
-    
+
     lda #<600
     sta zpFruitTimerLo
     lda #>600
@@ -1102,23 +1119,23 @@ spawnFruit:
     rts
 
 ; ---------------------------------------------------------------------------
-; despawnFruit -- Despawn fruit from Row 14, Col 13 if present
+; despawnFruit -- Despawn fruit from the fruit rest tile if present
 ; ---------------------------------------------------------------------------
 despawnFruit:
-    lda #14
+    lda #FRUIT_SPAWN_ROW
     sta zpTmpRow
-    lda #13
+    lda #FRUIT_SPAWN_COL
     sta zpTmpCol
     jsr getItemCell
     cmp #ITEM_FRUIT
     bne @done
-    
+
     lda #ITEM_NONE
     jsr setItemCell
-    
-    lda #14
+
+    lda #FRUIT_SPAWN_ROW
     sta zpTmpRow
-    lda #13
+    lda #FRUIT_SPAWN_COL
     sta zpTmpCol
     jsr drawGridCell
 @done:
@@ -1254,13 +1271,20 @@ playDeathAnimation:
     rts
 
 delay15:
+    lda #15
+    jsr delayA
+    rts
+
+delayA:
+    sta zpTmpDistLo
     lda JIFFY_CLK
-    clc
-    adc #15
     sta zpTmpVal
-:   lda JIFFY_CLK
-    cmp zpTmpVal
-    bcc :-
+@loop:
+    lda JIFFY_CLK
+    sec
+    sbc zpTmpVal
+    cmp zpTmpDistLo
+    bcc @loop
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1314,13 +1338,8 @@ showReadyBanner:
     bne @loop
     
     ; Delay 120 jiffies (~2 seconds)
-    lda JIFFY_CLK
-    clc
-    adc #120
-    sta zpTmpVal
-:   lda JIFFY_CLK
-    cmp zpTmpVal
-    bcc :-
+    lda #120
+    jsr delayA
     
     ; Cleanly erase "READY!" by redrawing Cols 11-16
     ldx #0

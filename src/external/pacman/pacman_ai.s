@@ -28,6 +28,11 @@
 .export updateCycleScheduler
 .export transitionGhostModes
 .export triggerFrightenedMode
+.export recordReleaseDot
+.export resetReleaseIdleTimer
+.export tickReleaseIdleTimer
+.export initReleaseStateForLevel
+.export initReleaseStateForLifeLoss
 
 .segment "BSS"
 
@@ -42,6 +47,16 @@ ghostTargetCol: .res 4
 zpCycleTimer:    .res 2 ; 16-bit Jiffy scheduler timer
 zpCycleStep:     .res 1 ; Current cycle step (0-7)
 zpFrightenedTimer: .res 2 ; 16-bit timer for power pellet mode
+
+; --- Ghost-house release accounting (brain/plans/2026-07-15_pacman-
+; ghost-house-remediation-plan.md, Phases 4-7). Explicit counters replace
+; the old zpTotalDots/zpSpawnDots-derived subtraction: release decisions
+; must not be coupled to ghost movement/polling frequency. ---
+ghostPersonalDots:  .res 4 ; per-ghost personal dot counter; index 0 (Blinky) unused
+activeDotOwner:     .res 1 ; ghost index currently accruing personal dots, or GHOST_NONE
+globalReleaseDots:  .res 1 ; post-death global release counter
+releaseIdleLo:      .res 1 ; non-blocking forced-release inactivity timer (16-bit jiffies)
+releaseIdleHi:      .res 1
 
 ; Target coordinate temporaries (signed 8-bit)
 targetRow: .res 1
@@ -67,6 +82,12 @@ squareTableHi:
 ; Clyde:  Bottom-Left (23, 0)
 scatterRows: .byte 0,  0, 23, 23
 scatterCols: .byte 27, 0, 27, 0
+
+; Personal ghost-house release dot limits, indexed by ghost (index 0,
+; Blinky, is unused -- Blinky never waits in the house). Level 3+ always
+; releases immediately (handled as a special case, not tabled).
+personalLimitsLevel1: .byte 0, 0, 30, 60
+personalLimitsLevel2: .byte 0, 0, 0,  50
 
 ; Timed scatter/chase sequence thresholds (in seconds, converted to jiffies * 60)
 ; Steps: Scatter 7s, Chase 20s, Scatter 7s, Chase 20s, Scatter 5s, Chase 20s, Scatter 5s, Chase permanent
@@ -120,8 +141,15 @@ initGhosts:
 @loop:
     lda #1
     sta ghostTimer, x
-    lda #MODE_SCATTER ; Starts in scatter
+    cpx #GHOST_BLINKY
+    beq @blinkyScatter
+    lda #MODE_HOUSE
     sta ghostMode, x
+    jmp @next
+@blinkyScatter:
+    lda #MODE_SCATTER
+    sta ghostMode, x
+@next:
     dex
     bpl @loop
     
@@ -196,13 +224,21 @@ updateGhostAI:
     stx zpGhostIdx
     
     lda ghostMode, x
-    cmp #MODE_EATEN
+    cmp #MODE_HOUSE
+    bne :+
+    jsr handleHouseBouncing
+    rts
+:   cmp #MODE_EXITING
+    bne :+
+    jsr handleHouseExit
+    rts
+:   cmp #MODE_EATEN
     bne :+
     
-    ; EATEN routing: Target ghost house interior (Row 12, Col 13)
-    lda #12
+    ; EATEN routing: Target ghost house interior revival tile
+    lda #EATEN_REVIVE_ROW
     sta targetRow
-    lda #13
+    lda #EATEN_REVIVE_COL
     sta targetCol
     jmp @findNextDir
 :
@@ -553,9 +589,15 @@ isTargetTileLegal:
     clc
     rts
 @gateCheck:
-    ; Ghosts are allowed to pass through the door gate
-    sec
-    rts
+    ; Only EATEN (returning eyes) and EXITING (controlled exit routing)
+    ; ghosts may cross the door gate; everyone else treats it as a wall.
+    ldx zpGhostIdx
+    lda ghostMode, x
+    cmp #MODE_EATEN
+    beq @legal
+    cmp #MODE_EXITING
+    beq @legal
+    jmp @illegal
 @legal:
     sec
     rts
@@ -829,20 +871,29 @@ updateCycleScheduler:
     rts
 
 ; ---------------------------------------------------------------------------
-; transitionGhostModes -- Swaps all chase/scatter ghosts to the new cycle mode
+; getScheduledGhostMode -- Returns the scheduled outside mode (SCATTER or
+; CHASE) in A, derived from zpCycleStep. Does not touch X/Y.
 ; ---------------------------------------------------------------------------
-transitionGhostModes:
+getScheduledGhostMode:
     lda zpCycleStep
     and #1
-    bne @switchToChase
-@switchToScatter:
+    bne @chase
     lda #MODE_SCATTER
-    jmp @apply
-@switchToChase:
+    rts
+@chase:
     lda #MODE_CHASE
-@apply:
+    rts
+
+; ---------------------------------------------------------------------------
+; transitionGhostModes -- Swaps all active outside ghosts to the new cycle
+; mode. House lifecycle modes (HOUSE/EXITING/EATEN) and an active
+; FRIGHTENED are never overwritten by the scheduler -- see the lifecycle
+; state machine documented in common.inc.
+; ---------------------------------------------------------------------------
+transitionGhostModes:
+    jsr getScheduledGhostMode
     sta zpTmpVal
-    
+
     ldx #3
 @loop:
     stx zpGhostIdx
@@ -851,10 +902,14 @@ transitionGhostModes:
     beq @skip
     cmp #MODE_FRIGHTENED
     beq @skip
-    
+    cmp #MODE_HOUSE
+    beq @skip
+    cmp #MODE_EXITING
+    beq @skip
+
     lda zpTmpVal
     sta ghostMode, x
-    
+
     ; Reverse direction
     lda ghostDir, x
     eor #1
@@ -868,24 +923,16 @@ transitionGhostModes:
 ; endFrightenedMode -- Swaps all frightened ghosts back to normal mode
 ; ---------------------------------------------------------------------------
 endFrightenedMode:
-    lda zpCycleStep
-    and #1
-    bne @switchToChase
-@switchToScatter:
-    lda #MODE_SCATTER
-    jmp @apply
-@switchToChase:
-    lda #MODE_CHASE
-@apply:
+    jsr getScheduledGhostMode
     sta zpTmpVal
-    
+
     ldx #3
 @loop:
     stx zpGhostIdx
     lda ghostMode, x
     cmp #MODE_FRIGHTENED
     bne @skip
-    
+
     lda zpTmpVal
     sta ghostMode, x
 @skip:
@@ -922,6 +969,10 @@ triggerFrightenedMode:
     lda ghostMode, x
     cmp #MODE_EATEN
     beq @skip
+    cmp #MODE_HOUSE
+    beq @skip
+    cmp #MODE_EXITING
+    beq @skip
     
     lda #MODE_FRIGHTENED
     sta ghostMode, x
@@ -941,6 +992,10 @@ triggerFrightenedMode:
     lda ghostMode, x
     cmp #MODE_EATEN
     beq @skipOnlyRev
+    cmp #MODE_HOUSE
+    beq @skipOnlyRev
+    cmp #MODE_EXITING
+    beq @skipOnlyRev
     
     lda ghostDir, x
     eor #1
@@ -948,4 +1003,311 @@ triggerFrightenedMode:
 @skipOnlyRev:
     dex
     bpl @loopOnlyRev
+    rts
+
+; ---------------------------------------------------------------------------
+; handleHouseBouncing -- Direction-only bounce inside the house. Never
+; writes ghostRow/ghostCol; the common movement stage in updateGhosts
+; (pacman_main.s) performs the actual one-cell move from ghostDir.
+; ---------------------------------------------------------------------------
+handleHouseBouncing:
+    ldx zpGhostIdx
+    jsr checkGhostRelease
+    ldx zpGhostIdx      ; reload; checkGhostRelease's contract does not
+                        ; guarantee X preservation across future changes
+    bcc @continueBounce
+
+    ; Release! Begin exiting immediately -- hand off to handleHouseExit so
+    ; the same tick picks the correct alignment direction toward the door.
+    lda #MODE_EXITING
+    sta ghostMode, x
+    jmp handleHouseExit
+
+@continueBounce:
+    lda ghostRow, x
+    cmp #12
+    bne @checkRow13
+    lda ghostDir, x
+    cmp #DIR_UP
+    bne @done
+    lda #DIR_DOWN
+    sta ghostDir, x
+    rts
+
+@checkRow13:
+    cmp #13
+    bne @done
+    lda ghostDir, x
+    cmp #DIR_DOWN
+    bne @done
+    lda #DIR_UP
+    sta ghostDir, x
+@done:
+    rts
+
+; ---------------------------------------------------------------------------
+; handleHouseExit -- Direction-only routing to Col EXIT_DOOR_COL, then UP
+; out through the door. Never writes ghostRow/ghostCol; the common
+; movement stage in updateGhosts performs the actual one-cell move.
+; ---------------------------------------------------------------------------
+handleHouseExit:
+    ldx zpGhostIdx
+    lda ghostCol, x
+    cmp #EXIT_DOOR_COL
+    beq @atDoorCol
+    bcc @goRight
+
+    ; Col > EXIT_DOOR_COL: face Left
+    lda #DIR_LEFT
+    sta ghostDir, x
+    rts
+
+@goRight:
+    ; Col < EXIT_DOOR_COL: face Right
+    lda #DIR_RIGHT
+    sta ghostDir, x
+    rts
+
+@atDoorCol:
+    lda ghostRow, x
+    cmp #EXIT_DOOR_ROW
+    bne @faceUp         ; still inside (Row 12/13): just face Up
+
+    ; At the door row: select the outside mode this tick so the common
+    ; movement stage's Up move lands the ghost outside already in mode.
+    lda zpFrightenedTimer
+    ora zpFrightenedTimer+1
+    beq @setScheduled
+    lda #MODE_FRIGHTENED
+    sta ghostMode, x
+    jmp @faceUp
+@setScheduled:
+    jsr getScheduledGhostMode
+    ldx zpGhostIdx
+    sta ghostMode, x
+@faceUp:
+    ldx zpGhostIdx
+    lda #DIR_UP
+    sta ghostDir, x
+    rts
+
+; ---------------------------------------------------------------------------
+; checkGhostRelease -- Returns carry set if ghost in X is allowed to leave.
+; Uses the explicit ghostPersonalDots/globalReleaseDots counters (Phases
+; 4-6) instead of deriving dots-eaten by subtraction; counters are
+; advanced exactly once per consumed dot by recordReleaseDot.
+; ---------------------------------------------------------------------------
+checkGhostRelease:
+    ldx zpGhostIdx
+    cpx #GHOST_BLINKY
+    bne :+
+    sec ; Blinky is always allowed out
+    rts
+
+:   lda zpPostDeathRelease
+    bne @globalMode
+
+    ; --- Individual (personal counter) release ---
+    lda zpLevel
+    cmp #3
+    bcc :+
+    sec ; Level 3+: all personal limits are zero, release immediately
+    rts
+:   jsr getPersonalLimit    ; A = this ghost's personal limit; X preserved
+    sta zpTmpVal
+    lda ghostPersonalDots, x
+    cmp zpTmpVal            ; carry set if counter >= limit
+    rts
+
+@globalMode:
+    ; --- Post-death global release: exact-value arcade semantics ---
+    lda globalReleaseDots
+    cpx #GHOST_PINKY
+    bne @tryInkyGlobal
+    cmp #7
+    beq @releaseGlobal
+    clc
+    rts
+@tryInkyGlobal:
+    cpx #GHOST_INKY
+    bne @clydeGlobal
+    cmp #17
+    beq @releaseGlobal
+    clc
+    rts
+@clydeGlobal:
+    ; Only GHOST_CLYDE remains here.
+    cmp #32
+    bne @notClydeExact
+    lda #0
+    sta zpPostDeathRelease  ; Clyde released at exactly 32: disable global mode
+    sec
+    rts
+@notClydeExact:
+    clc
+    rts
+@releaseGlobal:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; getPersonalLimit -- Returns the personal release-dot limit for ghost X
+; (must be Pinky/Inky/Clyde) in A, based on zpLevel. Caller must handle
+; Level 3+ (all-zero) separately. Does not clobber X.
+; ---------------------------------------------------------------------------
+getPersonalLimit:
+    lda zpLevel
+    cmp #2
+    bcc @level1
+    lda personalLimitsLevel2, x
+    rts
+@level1:
+    lda personalLimitsLevel1, x
+    rts
+
+; ---------------------------------------------------------------------------
+; getActiveDotOwner -- Scans Pinky/Inky/Clyde in priority order for the
+; first still in MODE_HOUSE; returns its index in X (also cached in
+; activeDotOwner for diagnostics), or GHOST_NONE in X if none remain
+; waiting inside.
+; ---------------------------------------------------------------------------
+getActiveDotOwner:
+    ldx #GHOST_PINKY
+    lda ghostMode, x
+    cmp #MODE_HOUSE
+    beq @found
+    ldx #GHOST_INKY
+    lda ghostMode, x
+    cmp #MODE_HOUSE
+    beq @found
+    ldx #GHOST_CLYDE
+    lda ghostMode, x
+    cmp #MODE_HOUSE
+    beq @found
+    ldx #GHOST_NONE
+@found:
+    stx activeDotOwner
+    rts
+
+; ---------------------------------------------------------------------------
+; recordReleaseDot -- Called exactly once from decDots (pacman_main.s) for
+; each dot or energizer consumed. Advances the post-death global counter
+; or the current personal-counter owner, per the active release mode.
+; Clobbers: A, X. Preserves: Y.
+; ---------------------------------------------------------------------------
+recordReleaseDot:
+    lda zpPostDeathRelease
+    beq @personalPath
+    inc globalReleaseDots
+    rts
+@personalPath:
+    jsr getActiveDotOwner
+    cpx #GHOST_NONE
+    beq @done
+    inc ghostPersonalDots, x
+@done:
+    rts
+
+; ---------------------------------------------------------------------------
+; forceGhostRelease -- Forces the highest-priority ghost still waiting in
+; the house to begin exiting (release-inactivity timeout). Does not
+; consume any release counter -- a forced exit is not an earned release.
+; ---------------------------------------------------------------------------
+forceGhostRelease:
+    ldx #GHOST_PINKY
+    lda ghostMode, x
+    cmp #MODE_HOUSE
+    beq @release
+    ldx #GHOST_INKY
+    lda ghostMode, x
+    cmp #MODE_HOUSE
+    beq @release
+    ldx #GHOST_CLYDE
+    lda ghostMode, x
+    cmp #MODE_HOUSE
+    beq @release
+    rts ; nobody waiting inside
+@release:
+    lda #MODE_EXITING
+    sta ghostMode, x
+    jsr getActiveDotOwner ; refresh cached owner now that one fewer ghost is housed
+    rts
+
+; ---------------------------------------------------------------------------
+; resetReleaseIdleTimer -- Reloads the non-blocking forced-release timer
+; per the level's configured delay (240 jiffies levels 1-4, 180 from
+; level 5).
+; ---------------------------------------------------------------------------
+resetReleaseIdleTimer:
+    lda zpLevel
+    cmp #5
+    bcc @levels1to4
+    lda #<180
+    sta releaseIdleLo
+    lda #>180
+    sta releaseIdleHi
+    rts
+@levels1to4:
+    lda #<240
+    sta releaseIdleLo
+    lda #>240
+    sta releaseIdleHi
+    rts
+
+; ---------------------------------------------------------------------------
+; tickReleaseIdleTimer -- Decrements the inactivity timer once per elapsed
+; gameplay jiffy (called from the main loop's @gameplay section, never
+; from ghost movement). On expiry, forces a release and reloads the timer.
+; ---------------------------------------------------------------------------
+tickReleaseIdleTimer:
+    lda releaseIdleLo
+    bne @decLo
+    dec releaseIdleHi
+@decLo:
+    dec releaseIdleLo
+    lda releaseIdleLo
+    ora releaseIdleHi
+    bne @done
+    jsr forceGhostRelease
+    jsr resetReleaseIdleTimer
+@done:
+    rts
+
+; ---------------------------------------------------------------------------
+; resetPersonalCounters -- Clears all per-ghost personal release counters
+; and sets the active dot owner to Pinky. Called only at the start of a
+; new level; life loss preserves personal-counter progress.
+; ---------------------------------------------------------------------------
+resetPersonalCounters:
+    lda #0
+    sta ghostPersonalDots + GHOST_BLINKY
+    sta ghostPersonalDots + GHOST_PINKY
+    sta ghostPersonalDots + GHOST_INKY
+    sta ghostPersonalDots + GHOST_CLYDE
+    lda #GHOST_PINKY
+    sta activeDotOwner
+    rts
+
+; ---------------------------------------------------------------------------
+; initReleaseStateForLevel -- Called at the start of every new level
+; (initial game start and level-advance). zpPostDeathRelease is cleared
+; by the caller; this resets personal counters, the global counter, and
+; the inactivity timer.
+; ---------------------------------------------------------------------------
+initReleaseStateForLevel:
+    jsr resetPersonalCounters
+    lda #0
+    sta globalReleaseDots
+    jsr resetReleaseIdleTimer
+    rts
+
+; ---------------------------------------------------------------------------
+; initReleaseStateForLifeLoss -- Called when a life is lost.
+; zpPostDeathRelease is set by the caller; personal counters are
+; preserved, only the global counter and inactivity timer reset.
+; ---------------------------------------------------------------------------
+initReleaseStateForLifeLoss:
+    lda #0
+    sta globalReleaseDots
+    jsr resetReleaseIdleTimer
     rts

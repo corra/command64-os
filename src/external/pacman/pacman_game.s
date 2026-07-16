@@ -151,6 +151,17 @@ resetItems:
     beq @setNone
 @notSpawn:
 
+    ; Fruit rest tile: must stay dot-free, or spawnFruit silently destroys
+    ; an uneaten dot without decrementing dotsRemaining (level can never
+    ; complete). See FRUIT_SPAWN_ROW/COL in common.inc.
+    lda zpTmpRow
+    cmp #FRUIT_SPAWN_ROW
+    bne @notFruitTile
+    lda zpTmpCol
+    cmp #FRUIT_SPAWN_COL
+    beq @setNone
+@notFruitTile:
+
 @setDot:
     lda #ITEM_DOT
     jmp @incItems

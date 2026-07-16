@@ -17,6 +17,9 @@ unsloth_compiled_cache/
 # Tools
 tools/cc1541-git/
 
+# Python bytecode cache
+__pycache__/
+
 # OS-specific
 .DS_Store
 package-lock.json
