@@ -2,10 +2,9 @@
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; CASM central resource ownership and terminal paths. Phase 1 owns no live OS
-; resources; cleanup records are nevertheless fully bounded and repeat-safe.
-; The private close/free helpers are explicit stubs until the file-service and
-; VMM phases introduce real acquisitions.
+; CASM central resource ownership and terminal paths. Phase 2 closes live file
+; handles through Command 64 services. VMM records remain bounded stubs until
+; the separately approved VMM-storage phase introduces real allocations.
 
 .include "command64.inc"
 .include "common.inc"
@@ -34,6 +33,8 @@ CasmLastDiag:      .res 1
 CasmCleanupGuard:  .res 1
 CasmFileCount:     .res 1
 CasmVmmCount:      .res 1
+CasmCleanupOffset: .res 1
+CasmCleanupDiag:   .res 1
 CasmFileRegistry:  .res CASM_FILE_REGISTRY_BYTES
 CasmVmmRegistry:   .res CASM_VMM_REGISTRY_BYTES
 
@@ -55,6 +56,8 @@ resourcesInit:
     sta CasmCleanupGuard
     sta CasmFileCount
     sta CasmVmmCount
+    sta CasmCleanupOffset
+    sta CasmCleanupDiag
 
     ldx #0
 riFileLoop:
@@ -234,29 +237,32 @@ rrvBadSlot:
 ; resourcesCleanup
 ; Best-effort, bounded, repeat-safe cleanup of all registered ownership.
 ;
-; Phase 1 close/free helpers only invalidate records: Phase 2 replaces the
-; file helper with DOS_CLOSE_FILE, and the VMM-storage phase replaces the VMM
-; helper with DOS_FREE_MEM. Phase 1 never registers a live OS resource.
-;
 ; Inputs:  none
-; Outputs: C clear, A = CASM_DIAG_NONE
-; Clobbers: A, X
+; Outputs: C clear, A = CASM_DIAG_NONE when all owned resources were released
+;          C set, A = CASM_DIAG_CLEANUP_FAILED if any file close failed
+; Clobbers: A, X, FileHandle and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 resourcesCleanup:
     lda CasmCleanupGuard
     bne rcAlreadyActive
     lda #CASM_CLEANUP_ACTIVE
     sta CasmCleanupGuard
+    lda #CASM_DIAG_NONE
+    sta CasmCleanupDiag
 
     ldx #0
 rcFileLoop:
-    jsr cleanupFileStub
+    stx CasmCleanupOffset
+    jsr cleanupFileRecord
+    bcc rcFileNext
+    lda #CASM_DIAG_CLEANUP_FAILED
+    sta CasmCleanupDiag
+rcFileNext:
+    ldx CasmCleanupOffset
     inx
     inx
     cpx #CASM_FILE_REGISTRY_BYTES
     bcc rcFileLoop
-    lda #0
-    sta CasmFileCount
 
     ldx #0
 rcVmmLoop:
@@ -270,18 +276,49 @@ rcVmmLoop:
     lda #0
     sta CasmVmmCount
     sta CasmCleanupGuard
+    lda CasmCleanupDiag
+    beq rcSuccess
+    sec
+    rts
 rcAlreadyActive:
+rcSuccess:
     lda #CASM_DIAG_NONE
     clc
     rts
 
-; Input: X = file-record byte offset. Phase 2 replaces invalidation with a
-; real close followed by invalidation only when the close succeeds.
-cleanupFileStub:
+; ---------------------------------------------------------------------------
+; cleanupFileRecord (private)
+; Close one owned record. A failed close retains the record and count so a
+; later cleanup call can retry it.
+;
+; Inputs:  X = file-record byte offset; CasmCleanupOffset mirrors X
+; Outputs: C clear, A = CASM_DIAG_NONE if free or successfully closed
+;          C set, A = CASM_DIAG_CLEANUP_FAILED if DOS_CLOSE_FILE failed
+; Clobbers: A, X, FileHandle and OS API-defined volatile registers
+; ---------------------------------------------------------------------------
+cleanupFileRecord:
+    lda CasmFileRegistry + CASM_FILE_REC_FLAG, x
+    beq cfrSuccess
+    lda CasmFileRegistry + CASM_FILE_REC_HANDLE, x
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    bcs cfrFailed
+    ldx CasmCleanupOffset
     lda #CASM_RESOURCE_FREE
     sta CasmFileRegistry + CASM_FILE_REC_FLAG, x
     lda #CASM_INVALID_HANDLE
     sta CasmFileRegistry + CASM_FILE_REC_HANDLE, x
+    lda CasmFileCount
+    beq cfrSuccess
+    dec CasmFileCount
+cfrSuccess:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+cfrFailed:
+    lda #CASM_DIAG_CLEANUP_FAILED
+    sec
     rts
 
 ; Input: X = VMM-record byte offset. The VMM-storage phase replaces this with
@@ -305,6 +342,10 @@ exitSuccess:
     lda #CASM_DIAG_NONE
     sta CasmLastDiag
     jsr resourcesCleanup
+    bcc esExit
+    sta CasmLastDiag
+    jsr diagPrintFatal
+esExit:
     lda #DOS_EXIT
     jsr OS_API
 esUnexpectedReturn:

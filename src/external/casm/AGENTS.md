@@ -22,19 +22,29 @@ The `src/external/casm` directory owns CASM, a native Command 64
   preserved values, and clobbered registers.
 - Keep base-RAM storage bounded. Allocate large source, symbol, relocation,
   and metadata stores through Command 64 VMM services.
+- Phase 2 accepts one unquoted source filename, uses 63-byte filename payloads
+  plus null terminators, and transfers input through a 256-byte bounded buffer.
+  It parses `/O`, `/S`, `/M`, and `/L` without creating production output;
+  output runtime behavior begins with the numeric static-output phase.
 - Register every acquired file handle and VMM allocation with the central
   resource owner immediately after acquisition.
 - Route every successful and fatal termination path through central cleanup
   before invoking `DOS_EXIT`.
 - Preserve the primary failure when cleanup encounters a secondary failure.
+- Preserve state needed after `OS_API` calls in bounded application storage;
+  do not rely on transient shared zero-page values surviving an OS service.
+- Use explicit PETSCII byte constants for command-buffer parsing, option
+  matching, and synthesized filenames; do not depend on ca65 host character
+  literals for runtime byte comparisons.
 - Keep source locations file-aware and line-aware from the first source-stream
   implementation.
 - Keep Pass 1 and Pass 2 deterministic; Pass 2 reparses a rewindable source
   stream rather than relying on an unbounded in-memory syntax tree.
 - Emit structured events in Pass 2 so PRG, listing, and map consumers do not
   duplicate instruction generation.
-- Do not implement Phase 1 source files until the user approves the Phase 0
-  memory, resource, diagnostic, version, and initial link-size contracts.
+- Do not implement a phase until the user approves that phase's prerequisite
+  contract gate. Phase 0A governs the scaffold; Phase 0B governs Phase 2 CLI
+  and file services; later language/storage contracts remain Phase 0C work.
 
 # Work Guidance
 

@@ -79,6 +79,44 @@ This file serves as the shared repository for architectural decisions, technical
 - The initial ld65 `MAIN` envelope is `$1000` bytes and must be enlarged only
   through a measured later-phase decision.
 
+### CASM Phase 2 CLI/File ABI (approved 2026-07-16)
+
+- Phase 2 parses exactly one unquoted source filename and recognizes `/O`,
+  `/S`, `/M`, and `/L` without modifying the OS-owned 80-byte command buffer.
+- Filename payloads are bounded to 63 bytes plus a null terminator; native
+  input transfers use one 256-byte base-RAM buffer.
+- A successful OS file open must be registered immediately or
+  compensating-closed. Failed closes retain central ownership for cleanup.
+- State required after an `OS_API` service returns must be kept in CASM-owned
+  bounded storage unless that service explicitly guarantees preservation.
+  In particular, `fileClose` preserves its registry slot in BSS across
+  `DOS_CLOSE_FILE`, not in transient shared zero page.
+- Routines whose ABI returns status in carry must normalize carry after every
+  comparison on the return path. `CMP #CASM_STREAM_EOF` sets carry on equality;
+  returning that flag made normal EOF `$03` look like fatal diagnostic `$03`.
+- CASM command-buffer grammar and synthesized filename bytes use explicit
+  PETSCII numeric constants. ca65's C64 target character mapping can make a
+  source literal such as `'S'` differ from the unshifted PETSCII byte `$53`.
+- Central Phase 2 cleanup visits every owned file record, clears records only
+  after `DOS_CLOSE_FILE` succeeds, retains failures for a repeat attempt, and
+  never replaces an existing primary fatal diagnostic with cleanup failure.
+- Phase 2 consumes input only. Production output create/write/delete behavior
+  and incomplete-output runtime verification begin with numeric static output.
+- Language, expression, symbol, VMM-store, emission-event, and R6 contracts
+  remain behind the later Phase 0C gate.
+- Phase 2 diagnostic codes `$01-$13` are contiguous and map through a bounded
+  allocation-free pointer table. Zero, out-of-range, and `$FF` values use the
+  internal-error fallback; successful input validation has a separate fixed
+  message and does not consume a fatal diagnostic code.
+- Phase 2 orchestration initializes resources before CLI/file state, rejects
+  parsed-but-unavailable `/S`, `/M`, and `/L` options before I/O, derives but
+  does not create the future output name, consumes one input to normalized EOF,
+  explicitly closes it, and routes every failure through central cleanup.
+- cc1541 cannot write a zero-byte host file, and its directory-only zero-block
+  SEQ entry is not openable through the current Commodore DOS/KERNAL file path.
+  CASM treats that case as input-open failure; stream boundary coverage uses
+  openable 17-byte, 256-byte, and 513-byte SEQ fixtures.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM stream-boundary fixtures**: Added deterministic 0-byte, 17-byte,
+  256-byte, and 513-byte SEQ inputs to `test.d64` for Phase 2 input-stream
+  verification.
+- **CASM Native Assembler (Phase 2 WIP)**: Added bounded single-source CLI
+  parsing, managed native input streaming, centralized file-handle cleanup,
+  allocation-free diagnostics, and Phase 2 orchestration. Output options are
+  recognized but remain unavailable until their production phases.
 - **CASM Native Assembler (Phase 1 scaffold)**: Added a ca65/ld65-built native
   external application with an approved `$70-$8F` private zero-page contract,
   bounded file/VMM ownership registries, repeat-safe cleanup, fixed fatal
@@ -45,6 +52,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM PETSCII option matching**: Replaced ca65 host character literals in
+  CLI grammar comparisons and synthesized `.PRG` bytes with explicit PETSCII
+  constants. This fixes valid `/O`, `/S`, `/M`, and `/L` tokens being reported
+  as unknown options.
+- **CASM EOF cleanup false failure**: Normalized carry after the EOF comparison
+  in `inputStreamRead`. Previously, `CMP` returned carry set for EOF value `$03`,
+  which orchestration misread as fatal diagnostic `$03` (`RESOURCE CLEANUP
+  FAILED`) before explicit close. The close registry slot also remains preserved
+  in CASM-owned BSS across `DOS_CLOSE_FILE`. Runtime verification passed on
+  build 1011.
 - **Pac-Man collision visibility**: Added Pac-Man/Blinky collision checks after
   either actor moves. Harmful contact now decrements one life, interrupts the
   current tick, resets the maze and actors while lives remain, and freezes at

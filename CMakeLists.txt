@@ -312,6 +312,26 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${CASM_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
+set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
+set(CASM_TEST_FIXTURES
+    "${CASM_TEST_FIXTURE_DIR}/casmempty.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casm256.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmmulti.seq"
+)
+
+add_custom_command(
+    OUTPUT ${CASM_TEST_FIXTURES}
+    COMMAND "${CMAKE_COMMAND}"
+        "-DOUTPUT_DIR=${CASM_TEST_FIXTURE_DIR}"
+        -P "${CMAKE_SOURCE_DIR}/cmake/GenerateCasmTestFixtures.cmake"
+    DEPENDS "${CMAKE_SOURCE_DIR}/cmake/GenerateCasmTestFixtures.cmake"
+    COMMENT "Generating bounded CASM stream test fixtures"
+    VERBATIM
+)
+
+add_custom_target(casm_test_fixtures DEPENDS ${CASM_TEST_FIXTURES})
+
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"
     DISK_LABEL "${DISK_NAME}"
@@ -325,6 +345,28 @@ add_c64_disk_image(test_image_d64
     DISK_ID "${DISK_ID}"
     PRGS ${TEST_IMAGE_PRG_TARGETS}
 )
+add_dependencies(test_image_d64 casm_test_fixtures)
+
+foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
+    get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
+    if(CASM_FIXTURE_NAME STREQUAL "casmempty")
+        add_custom_command(
+            TARGET test_image_d64 POST_BUILD
+            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_NAME}" -T SEQ
+                -L "${CMAKE_BINARY_DIR}/test.d64"
+            COMMENT "Appending empty CASM SEQ fixture to test.d64"
+            VERBATIM
+        )
+    else()
+        add_custom_command(
+            TARGET test_image_d64 POST_BUILD
+            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_NAME}" -T SEQ
+                -w "${CASM_FIXTURE}" "${CMAKE_BINARY_DIR}/test.d64"
+            COMMENT "Appending ${CASM_FIXTURE_NAME} SEQ fixture to test.d64"
+            VERBATIM
+        )
+    endif()
+endforeach()
 
 # Add test SEQ file to test.d64
 add_custom_command(

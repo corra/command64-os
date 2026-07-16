@@ -12,6 +12,20 @@
   - [x] Confirm the Phase 0 contracts required by the Phase 1 plan before
         source implementation
 
+- [x] Taskwarrior #29 (`df2f766c`): CASM Phase 2 CLI and native file-service
+      foundation
+  - [x] `ba51bd58` Synchronize task records and record approved Phase 0B
+        contracts
+  - [x] `79d7f6aa` Declare shared CLI, file, and stream ABI
+  - [x] `5d997dfd` Implement bounded command-line parser
+  - [x] `8e0711ad` Implement managed native file wrappers
+  - [x] `b7d0e543` Implement real central file-handle cleanup
+  - [x] `3bc11e77` Extend CLI and file-service diagnostics
+  - [x] `1d2c1761` Integrate Phase 2 entry-point orchestration
+  - [x] `0870f804` Correct EOF carry propagation and preserve the registered
+        resource slot across `DOS_CLOSE_FILE`; build 1011 runtime verified
+  - [x] `9e4d8175` Verify artifacts and obtain user runtime confirmation
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

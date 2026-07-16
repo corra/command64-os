@@ -110,6 +110,17 @@
 | `$70-$8F` | Zero-page: external-utility scratch. Used by DEBUG pointers, `conway` (`$70-$82`; `$7E-$82` reserved for Multiverse menu/counter state), `pacman` (`$70-$75`), and CASM (`$70-$8F`: general, I/O/VMM, parser/expression, and pass/emission scratch categories). External apps share this range by convention since only one runs at a time. |
 | `$02` | Zero-page: CmpBase (User Safe) |
 
+CASM Phase 2 build 1014 uses 2,256 linked code/data bytes and 449 BSS bytes
+inside its `$1000` `MAIN` envelope, leaving 1,391 bytes of combined envelope
+headroom. The CLI module owns 131 BSS bytes: two 64-byte filename buffers and
+three one-byte length/option fields. The file-I/O module owns 271 BSS bytes,
+including its 256-byte transfer buffer and bounded handle, slot, state, count,
+and diagnostic fields, including the close-slot byte preserved across the OS
+service call. Central resources own 47 BSS bytes, including the two
+bounded cleanup traversal/status bytes added for real file close handling.
+Diagnostics add no BSS; their bounded Phase 2 selector and fixed messages use
+45 code bytes and 599 read-only bytes.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

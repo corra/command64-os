@@ -3,8 +3,9 @@
 ; Copyright (c) 2026 Command64 project contributors
 ;
 ; CASM shared constants and module ABI. This file declares no storage and
-; emits no code. Phase 0 contracts were approved on 2026-07-16; changes to
-; these foundational limits require a new approved planning increment.
+; emits no code. Phase 0A scaffold and Phase 0B CLI/file contracts were
+; approved on 2026-07-16; changes to these foundational limits require a new
+; approved planning increment.
 
 .ifndef CASM_COMMON_INC
 CASM_COMMON_INC = 1
@@ -43,6 +44,14 @@ CasmParseScratch0 = $80
 CasmParseScratch1 = $81
 CasmParseScratch2 = $82
 CasmParseScratch3 = $83
+
+; Phase 2 CLI aliases. These values are transient within cli.s calls and must
+; not be treated as persistent parser state across public routine boundaries.
+CasmCliPos        = CasmParseScratch0
+CasmCliTokenStart = CasmParseScratch1
+CasmCliDestIndex  = CasmParseScratch2
+CasmCliScratch    = CasmParseScratch3
+
 CasmExprScratch0  = $84
 CasmExprScratch1  = $85
 CasmExprScratch2  = $86
@@ -94,6 +103,76 @@ CASM_VMM_REGISTRY_BYTES  = CASM_VMM_CAPACITY * CASM_VMM_REC_SIZE
 .assert CASM_VMM_CAPACITY = 8, error, "CASM VMM registry contract changed"
 
 ; ---------------------------------------------------------------------------
+; Phase 2 bounded CLI and file-service contract
+; ---------------------------------------------------------------------------
+
+; CommandBuffer is an 80-byte OS-owned buffer. CASM copies filenames into
+; private bounded buffers and never inserts terminators into CommandBuffer.
+CASM_COMMAND_BUFFER_SIZE = 80
+CASM_FILENAME_MAX        = 63
+CASM_FILENAME_BUFFER_SIZE = CASM_FILENAME_MAX + 1
+CASM_IO_BUFFER_SIZE      = $0100
+
+.assert CASM_FILENAME_BUFFER_SIZE = 64, error, "CASM filename buffer changed"
+.assert CASM_FILENAME_BUFFER_SIZE <= CASM_COMMAND_BUFFER_SIZE, error, "CASM filename buffer exceeds command buffer"
+.assert CASM_IO_BUFFER_SIZE = 256, error, "CASM I/O buffer changed"
+
+; Parsed option bits. CLI state stores one byte and rejects an option whose bit
+; is already set. Option names are compared case-insensitively; filename bytes
+; are copied unchanged.
+CASM_PETSCII_SPACE = $20
+CASM_PETSCII_DOT   = $2E
+CASM_PETSCII_SLASH = $2F
+CASM_PETSCII_COLON = $3A
+CASM_PETSCII_G     = $47
+CASM_PETSCII_L     = $4C
+CASM_PETSCII_M     = $4D
+CASM_PETSCII_O     = $4F
+CASM_PETSCII_P     = $50
+CASM_PETSCII_R     = $52
+CASM_PETSCII_S     = $53
+
+CASM_OPT_OUTPUT = %00000001
+CASM_OPT_STATIC = %00000010
+CASM_OPT_MAP    = %00000100
+CASM_OPT_LIST   = %00001000
+CASM_OPT_ALL    = CASM_OPT_OUTPUT | CASM_OPT_STATIC | CASM_OPT_MAP | CASM_OPT_LIST
+
+; Stable parser results. Public CLI routines return carry clear with
+; CASM_PARSE_OK or carry set with a CASM_DIAG_* value; these identifiers are
+; available for internal dispatch and static fixtures.
+CASM_PARSE_OK = $00
+
+; Command 64 DOS_OPEN_FILE access modes and the future assembler output type.
+CASM_FILE_MODE_READ  = 0
+CASM_FILE_MODE_WRITE = 1
+CASM_OUTPUT_FILE_TYPE = CASM_PETSCII_P
+
+CASM_INVALID_SLOT = $FF
+
+; Managed local file state. A handle becomes OPEN only after it has been
+; registered centrally. CLOSE_FAILED remains owned so cleanup can retry it.
+CASM_FILE_STATE_CLOSED       = $00
+CASM_FILE_STATE_OPEN         = $01
+CASM_FILE_STATE_CLOSE_FAILED = $02
+
+; Input-stream result stored separately from carry so normalized EOF is not
+; confused with an OS error. The Phase 2 wrapper treats carry-set/zero-count
+; read-past-EOF compatibility as CASM_STREAM_EOF.
+CASM_STREAM_CLOSED = $00
+CASM_STREAM_READY  = $01
+CASM_STREAM_DATA   = $02
+CASM_STREAM_EOF    = $03
+CASM_STREAM_ERROR  = $04
+
+; Output lifecycle values are reserved for the Phase 5 production consumer.
+; Phase 2 defines the ABI but does not create placeholder output files.
+CASM_OUTPUT_NOT_CREATED = $00
+CASM_OUTPUT_CREATED     = $01
+CASM_OUTPUT_INVALID     = $00
+CASM_OUTPUT_VALID       = $01
+
+; ---------------------------------------------------------------------------
 ; Stable diagnostic identifiers
 ; ---------------------------------------------------------------------------
 
@@ -101,6 +180,22 @@ CASM_DIAG_NONE           = $00
 CASM_DIAG_INIT_FAILED    = $01
 CASM_DIAG_REGISTRY_FULL  = $02
 CASM_DIAG_CLEANUP_FAILED = $03
+CASM_DIAG_SOURCE_REQUIRED = $04
+CASM_DIAG_EXTRA_SOURCE    = $05
+CASM_DIAG_MALFORMED_OUTPUT_OPTION = $06
+CASM_DIAG_DUPLICATE_OPTION = $07
+CASM_DIAG_UNKNOWN_OPTION   = $08
+CASM_DIAG_FILENAME_TOO_LONG = $09
+CASM_DIAG_NOT_IMPLEMENTED  = $0A
+CASM_DIAG_INPUT_OPEN_FAILED = $0B
+CASM_DIAG_INPUT_READ_FAILED = $0C
+CASM_DIAG_INPUT_CLOSE_FAILED = $0D
+CASM_DIAG_OUTPUT_CREATE_FAILED = $0E
+CASM_DIAG_OUTPUT_WRITE_FAILED = $0F
+CASM_DIAG_OUTPUT_CLOSE_FAILED = $10
+CASM_DIAG_OUTPUT_DELETE_FAILED = $11
+CASM_DIAG_OUTPUT_SHORT_WRITE = $12
+CASM_DIAG_STREAM_STATE_FAILED = $13
 CASM_DIAG_UNKNOWN        = $FF
 
 ; Registration/release routines return carry clear on success. On failure,
@@ -111,6 +206,7 @@ CASM_DIAG_UNKNOWN        = $FF
 ; ---------------------------------------------------------------------------
 
 CASM_PHASE_SCAFFOLD = $01
+CASM_PHASE_CLI_FILE = $02
 
 CASM_CLEANUP_IDLE   = $00
 CASM_CLEANUP_ACTIVE = $01
