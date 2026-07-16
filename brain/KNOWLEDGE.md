@@ -64,6 +64,21 @@ This file serves as the shared repository for architectural decisions, technical
 
 ## Architectural Decisions & Constraints
 
+### CASM Phase 1 Foundation (approved 2026-07-16)
+
+- CASM is a native ca65/ld65 Command 64 application, not a host assembler.
+- CASM reserves the external-app private `$70-$8F` zero-page range in four
+  eight-byte transient categories: general values, I/O/VMM, parser/expression,
+  and pass/emission.
+- Central ownership tracks at most eight file handles and eight VMM
+  allocations. Cleanup is bounded, repeat-safe, and preserves the primary
+  error over cleanup failures.
+- Phase 1 uses diagnostics for initialization failure, registry exhaustion,
+  cleanup failure, and unknown internal failure; its banner is
+  `CASM V0.1.0.<build>`.
+- The initial ld65 `MAIN` envelope is `$1000` bytes and must be enlarged only
+  through a measured later-phase decision.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

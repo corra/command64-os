@@ -1,7 +1,7 @@
 ---
 feature: casm-native-assembler
 created: 2026-07-16
-status: planned
+status: in-progress
 ---
 
 # Plan: CASM Native 6502/6510 Assembler

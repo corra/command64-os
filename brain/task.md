@@ -1,5 +1,17 @@
 # Project Tasks
 
+- [x] Taskwarrior UUID `13a45324`: CASM Phase 1 native application scaffold
+  - [x] `ef6a001e` Create synchronized task records and CASM-local DOX contract
+  - [x] `7b318ab7` Declare approved zero-page, base-RAM, and module ABI
+  - [x] `05e59de2` Implement central resource ownership and exit paths
+  - [x] `8891fe27` Implement minimal diagnostics
+  - [x] `eb83b449` Implement entry point and version banner
+  - [x] `c6c3b55e` Integrate ca65 target and release disk
+  - [x] `5a0e36c5` Verify configure, target, R6 artifact, and disk image
+  - [x] `161ed5a9` Record walkthrough and obtain user runtime confirmation
+  - [x] Confirm the Phase 0 contracts required by the Phase 1 plan before
+        source implementation
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

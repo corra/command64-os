@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Native Assembler (Phase 1 scaffold)**: Added a ca65/ld65-built native
+  external application with an approved `$70-$8F` private zero-page contract,
+  bounded file/VMM ownership registries, repeat-safe cleanup, fixed fatal
+  diagnostics, build-version banner, R6 relocation, and release-disk entry.
+  Source parsing and assembly behavior begin in later phases.
 - **Pac-Man External Utility ca65 Rewrite (Phase 3.1 WIP)**: Added Blinky target selection, square-table direction evaluation, scatter/chase scheduling, actor timers, and automatic logical-topology maze generation before the ca65 build. Pinky/Inky/Clyde movement and frightened/eaten behavior remain inactive.
 - **Pac-Man External Utility ca65 Rewrite (Phase 2)**: Added the centered 28x24 playfield, rendered wall definitions, runtime item grid, screen coordinate drawing, keyboard/Joystick Port 2 direction buffering, movement timing, and score status rendering. The visually evolving maze currently contains 246 dots and 4 pellets; restoring the specified 240-dot count is deferred.
 - **Pac-Man External Utility ca65 Rewrite (Phase 1)**: Initiated complete rewrite of `pacman` using ca65/ld65. Added ZP allocations in `common.inc`, skeleton game loop in `pacman_main.s`, screen rendering routines in `pacman_game.s`, and verified clean build and relocations under ca65.

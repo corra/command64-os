@@ -2,7 +2,7 @@
 feature: casm-native-assembler
 phase: 1
 created: 2026-07-16
-status: planned
+status: completed
 depends-on: casm-phase-0-contract-freeze
 ---
 
@@ -32,6 +32,22 @@ Implementation must not begin until Phase 0 freezes and the user approves:
 
 If any of these contracts remain open, resolve them in Phase 0 rather than
 embedding a temporary representation in the scaffold.
+
+### Approved Phase 0 Values (2026-07-16)
+
+- Reserve the full app-private `$70-$8F` range for CASM, divided into general
+  pointer/value, I/O/VMM, parser/expression, and pass/emission categories.
+- Support at most eight simultaneously owned file handles and eight VMM
+  allocations.
+- Perform bounded best-effort cleanup, preserve the primary error, and make
+  repeated cleanup safe.
+- Define stable diagnostics for initialization failure, registry exhaustion,
+  cleanup failure, and unknown internal failure.
+- Print `CASM V0.1.0.<build>` in Phase 1.
+- Use an initial ld65 `MAIN` envelope of `$1000` bytes and enlarge it only in
+  a later measured and approved phase increment.
+
+The user approved these values on 2026-07-16.
 
 ## Scope
 
@@ -392,3 +408,8 @@ Phase 1 is ready to be marked done only when:
 
 Until that confirmation, leave Phase 1 and its tasks in verification or
 awaiting-confirmation status rather than marking them done.
+
+## Completion Record
+
+Completed on 2026-07-16 after the user confirmed that every manual walkthrough
+step passed in local emulation and explicitly approved marking Phase 1 done.

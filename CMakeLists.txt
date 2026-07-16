@@ -65,6 +65,9 @@ set(FORMAT_ENTRY "src/external/format/format.s")
 file(GLOB_RECURSE COMP_SRCS CONFIGURE_DEPENDS "src/external/comp/*.s" "src/external/comp/*.inc" "include/ca65/*.inc")
 set(COMP_ENTRY "src/external/comp/comp.s")
 
+file(GLOB_RECURSE CASM_SRCS CONFIGURE_DEPENDS "src/external/casm/*.s" "src/external/casm/*.inc" "include/ca65/*.inc")
+set(CASM_ENTRY "src/external/casm/casm.s")
+
 file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.s" "src/external/conway/*.inc" "include/ca65/*.inc")
 set(CONWAY_ENTRY "src/external/conway/conway_main.s")
 
@@ -175,6 +178,16 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for COMP target")
 endif()
 set(COMP_TARGET comp)
+
+# 3e. CASM Native 6502/6510 Assembler — Phase 1 application scaffold.
+# Ships from its first phase so launch, relocation, cleanup, and shell-return
+# behavior use the production external-app path before parser work begins.
+if(Ca65_FOUND)
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "1000")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
+endif()
+set(CASM_TARGET casm)
 
 # 4. CONWAY Game of Life — built with ca65/ld65 (migrated off the
 # spike/ca65-conway/ branch; see
@@ -296,7 +309,7 @@ endforeach()
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
 # 6. Disk images
-set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
+set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${CASM_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 
 add_c64_disk_image(image_d64
