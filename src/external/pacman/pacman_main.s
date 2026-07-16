@@ -9,7 +9,7 @@
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '3'
+VERSION_STAGE = '9'
 .include "build_pacman.inc"
 
 .import __MAIN_START__

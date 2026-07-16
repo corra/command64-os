@@ -44,6 +44,7 @@
   behavior remain deferred. Actor visibility and the complete Pac-Man/Blinky
   collision, life-loss, reset, and game-over flow were user-verified in build
   1054; version 0.1.3 build 1055 contains the accepted patch-stage bump.
+- **Pac-Man Ghost House Code Review**: Completed comprehensive primary and secondary correctness audits of the uncommitted ghost house bouncing, release, and scheduler mechanics ([primary review](file:///home/morgan/development/c64/command64-os/brain/reviews/2026-07-15_pacman-ghost-house-review.md) and [secondary review](file:///home/morgan/development/c64/command64-os/brain/reviews/2026-07-15_pacman-ghost-house-secondary-review.md)), identifying bugs in bouncing coordinate drift, exit double-movement, scheduler mode corruption, and the door gate check, and proposing optimized direction-only refactorings.
 
 
 

@@ -39,6 +39,12 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
     + Don't: **DO NOT USE** absolute paths when referencing files within the project which may be incorrect
     under a different development environment.
 
+### Repository and State
+
+1.
+    + NEVER: Modify the repository without explicit permission from the user.
+    + EXCEPTION TO RULE: ALWAYS use `git stash` automatically to protect against codebase loss or corruption. 
+
 ### Bug Fixes
 
 1.
@@ -77,6 +83,11 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
 4.
     + Do: Execute work in small, atomic, turn-based increments.
     + Don't: Chain multiple steps or actions without awaiting the next instruction.
+5.
+    + DO: Maintain a robust build system.
+    + DO NOT: Write on-the-fly scripts.
+    + DO: Save scripts in a `scripts` folder in the project so they may be reusede. If a script is worth writing once it is worth saving to prevent reduntant work later.
+    + ALWAYS: If a script become part of the build process it **must be integrated** into the build system.
 
 ### Technical Execution & Verification
 
