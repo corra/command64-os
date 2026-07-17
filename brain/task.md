@@ -35,7 +35,9 @@
   - [x] `fcb0e164` Implement the rewindable source backend; user runtime matrix
         confirmed and completion approved 2026-07-16; build 1020 advanced CASM
         to `0.1.6`
-  - [ ] `9c733c1a` Implement newline normalization and provenance
+  - [x] `9c733c1a` Implement newline normalization and provenance; user runtime
+        matrix confirmed and completion approved 2026-07-16; build 1022 advanced
+        CASM to `0.1.7`
   - [ ] `cda20f5b` Implement deterministic rewind and bounded line API
   - [ ] `7196a56f` Implement the minimal lexer core
   - [ ] `9e1a1a12` Implement textual and numeric token scanning

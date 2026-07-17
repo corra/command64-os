@@ -318,6 +318,11 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
     "${CASM_TEST_FIXTURE_DIR}/casm256.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmulti.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmcr.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmcrlf.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmsplit.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmblank.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmfincr.seq"
 )
 
 add_custom_command(

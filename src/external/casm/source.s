@@ -2,21 +2,24 @@
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; CASM Phase 3 WP4 rewindable source backend. This module owns the executable
-; byte-stream source layer that sits over the Phase 2 managed input wrapper and
-; the WP3 bounded source subrecord in state.s. It initializes source state,
-; opens exactly one source, refills and traverses the shared 256-byte
-; CasmIoBuffer, exposes a repeat-stable EOF, and closes through the central
-; resource owner.
+; CASM Phase 3 source backend (WP4 traversal, WP5 normalization). This module
+; owns the executable byte-stream source layer that sits over the Phase 2
+; managed input wrapper and the WP3 bounded source subrecord in state.s. It
+; initializes source state, opens exactly one source, refills and traverses the
+; shared 256-byte CasmIoBuffer, exposes a repeat-stable EOF, and closes through
+; the central resource owner.
 ;
-; WP4 intentionally returns raw physical bytes. CR, LF, CRLF, provenance
-; advancement, and normalized newline results begin in WP5; rewind and the
-; bounded line API begin in WP6. sourceNextByte is therefore a documented
-; transitional raw-byte API: every $00-$FF input byte, including CR and LF,
-; returns CASM_SOURCE_BYTE. A zero byte remains a successful BYTE result and is
-; never inferred from A or Z.
+; WP5 normalizes newlines and tracks provenance. sourceNextByte collapses CR,
+; LF, and CRLF (including CRLF split across a block boundary) into one
+; CASM_SOURCE_NEWLINE result via the persistent pending-CR latch, resolves a
+; final CR before EOF, and advances one-based line/column plus the physical
+; offset with checked commits. A non-newline byte is delivered raw in
+; CasmSourceResultByte as CASM_SOURCE_BYTE; a zero byte remains a valid BYTE
+; result and is never inferred from A or Z. CasmSourceResultByte is 0 for
+; NEWLINE and EOF. sourceGetLocation exposes the next result's provenance.
 ;
-; This translation unit imports the WP3 source subrecord and the Phase 2 file
+; Rewind and the bounded line API remain WP6; the lexer remains WP7. This
+; translation unit imports the WP3 source subrecord and the Phase 2 file
 ; wrappers. It defines no BSS, writes no lexer state, and calls no OS service
 ; except through inputStreamOpen/inputStreamRead/inputStreamClose.
 
@@ -52,6 +55,7 @@
 .export sourceInit
 .export sourceOpen
 .export sourceNextByte
+.export sourceGetLocation
 .export sourceClose
 
 .segment "CODE"
@@ -124,19 +128,24 @@ soBadState:
     rts
 
 ; ---------------------------------------------------------------------------
-; sourceNextByte (WP4 transitional raw ABI)
-; Return the next raw physical byte, a repeat-stable EOF, or a failure. The raw
-; byte is delivered in CasmSourceResultByte, never inferred from A or Z.
+; sourceNextByte (WP5 normalized ABI)
+; Return the next normalized result: a raw non-newline byte, one collapsed
+; newline for CR/LF/CRLF, a repeat-stable EOF, or a failure. The raw byte is
+; delivered in CasmSourceResultByte and never inferred from A or Z; the byte is
+; 0 for NEWLINE and EOF.
 ;
 ; Inputs:    source state READY/BYTE or EOF/BYTE
-; Outputs:   Byte: A = CASM_SOURCE_BYTE, C clear, Z clear;
-;                  CasmSourceResultByte = raw physical byte
-;            EOF:  A = CASM_SOURCE_EOF, C clear, Z clear;
-;                  CasmSourceResultByte = 0
-;            Fail: A = CASM_DIAG_*, C set; source state ERROR
+; Outputs:   Byte:    A = CASM_SOURCE_BYTE, C clear, Z clear;
+;                     CasmSourceResultByte = raw byte at (line, column)
+;            Newline: A = CASM_SOURCE_NEWLINE, C clear, Z clear;
+;                     CasmSourceResultByte = 0
+;            EOF:     A = CASM_SOURCE_EOF, C clear, Z clear;
+;                     CasmSourceResultByte = 0
+;            Fail:    A = CASM_DIAG_*, C set; source state ERROR
 ; Preserves: none
-; Clobbers:  A, X, Y, source scratch, refill/OS volatile state on refill
-; Scratch:   none
+; Clobbers:  A, X, Y, source scratch (CasmSourceScratch0), refill/OS volatile
+;            state on refill
+; Scratch:   CasmSourceScratch0 holds the current physical byte
 ; ---------------------------------------------------------------------------
 sourceNextByte:
     lda CasmSourceState
@@ -145,52 +154,70 @@ sourceNextByte:
     cmp #CASM_SOURCE_STATE_READY
     bne snbBadState
 
-    ; Determine byte availability with an unsigned 16-bit index < length test.
-    lda CasmSourceBlockIndexLo
-    cmp CasmSourceBlockLenLo
-    lda CasmSourceBlockIndexHi
-    sbc CasmSourceBlockLenHi
-    bcc snbSelect               ; index < length -> a byte is available
-
-    ; index >= length: only an exact index == length may refill; index above
-    ; length is a corrupt cursor and a stream-state failure.
-    lda CasmSourceBlockIndexLo
-    cmp CasmSourceBlockLenLo
-    bne snbCursorFail
-    lda CasmSourceBlockIndexHi
-    cmp CasmSourceBlockLenHi
-    bne snbCursorFail
-
-    jsr sourceRefill
-    bcs snbFail                 ; refill failed; source already ERROR
+snbFetch:
+    jsr sourceFetchPhysical
+    bcs snbFail                 ; fetch error; source already ERROR
     cmp #CASM_SOURCE_EOF
-    beq snbEofResult
-    ; Refill installed a nonempty block with index 0; a byte is now available.
+    beq snbEofFromFetch
+    ; A = CASM_STREAM_DATA; the physical byte is in CasmSourceScratch0.
 
-snbSelect:
-    ; Offset overflow is validated before any cursor or result is committed.
-    lda CasmSourceOffsetLo
-    cmp #$FF
-    bne snbOffsetOk
-    lda CasmSourceOffsetHi
-    cmp #$FF
-    beq snbOffsetOverflow       ; offset == $FFFF -> another byte would overflow
-snbOffsetOk:
-    ; index < length and length <= 256 guarantee index high is zero here.
-    ldx CasmSourceBlockIndexLo
-    lda CasmIoBuffer,x
+    ; Pending-CR latch: if the previous result was a CR newline and this byte is
+    ; the LF half of a CRLF, swallow it (its offset is already counted) and fetch
+    ; the following byte. Any other byte ends the pending state.
+    lda CasmSourcePendingCr
+    beq snbClassify
+    lda #0
+    sta CasmSourcePendingCr
+    lda CasmSourceScratch0
+    cmp #CASM_PETSCII_LF
+    beq snbFetch
+
+snbClassify:
+    lda CasmSourceScratch0
+    cmp #CASM_PETSCII_CR
+    beq snbNewlineCr
+    cmp #CASM_PETSCII_LF
+    beq snbNewlineLf
+
+    ; Normal byte at the current column; the exhausted latch (column 0) means a
+    ; further byte on this line would overflow the 8-bit column.
+    lda CasmSourceColumn
+    beq snbColumnOverflow
+    lda CasmSourceScratch0
     sta CasmSourceResultByte
-    ; Commit the block index (16-bit).
-    inc CasmSourceBlockIndexLo
-    bne snbIndexDone
-    inc CasmSourceBlockIndexHi
-snbIndexDone:
-    ; Commit the physical consumed offset (16-bit).
-    inc CasmSourceOffsetLo
-    bne snbOffsetDone
-    inc CasmSourceOffsetHi
-snbOffsetDone:
+    ; Advance the column: 255 enters the exhausted latch, otherwise increment.
+    lda CasmSourceColumn
+    cmp #CASM_SOURCE_COLUMN_MAX
+    bcc snbColumnInc            ; column < 255
+    lda #0                      ; column == 255 -> exhausted latch
+    sta CasmSourceColumn
+    jmp snbByteReturn
+snbColumnInc:
+    inc CasmSourceColumn
+snbByteReturn:
     lda #CASM_SOURCE_BYTE
+    clc
+    rts
+
+snbNewlineLf:
+    ; LF newline: pending-CR stays clear.
+    jsr sourceAdvanceNewline
+    bcs snbLocFail
+    lda #0
+    sta CasmSourceResultByte
+    lda #CASM_SOURCE_NEWLINE
+    clc
+    rts
+snbNewlineCr:
+    ; CR newline: emit one newline now and arm the pending-CR latch so an
+    ; immediately following LF collapses into this CRLF.
+    jsr sourceAdvanceNewline
+    bcs snbLocFail
+    lda #1
+    sta CasmSourcePendingCr
+    lda #0
+    sta CasmSourceResultByte
+    lda #CASM_SOURCE_NEWLINE
     clc
     rts
 
@@ -200,26 +227,192 @@ snbEof:
     lda #CASM_SOURCE_EOF
     clc
     rts
-snbEofResult:
-    ; sourceRefill committed EOF and cleared CasmSourceResultByte; A already
-    ; holds CASM_SOURCE_EOF with carry clear.
+snbEofFromFetch:
+    ; sourceFetchPhysical committed EOF and cleared CasmSourceResultByte. Clear
+    ; pending-CR: a final CR already emitted its newline before this EOF.
+    lda #0
+    sta CasmSourcePendingCr
+    lda #CASM_SOURCE_EOF
     clc
     rts
 snbFail:
-    ; A holds the refill diagnostic; source state is already ERROR.
+    ; A holds the fetch diagnostic; source state is already ERROR.
     sec
     rts
-snbOffsetOverflow:
+snbLocFail:
+    ; sourceAdvanceNewline set source ERROR and left A = diagnostic, C set.
+    sec
+    rts
+snbColumnOverflow:
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_SOURCE_LOCATION_OVERFLOW
+    sec
+    rts
+snbBadState:
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceGetLocation
+; Validate that the next result's provenance is available and representable,
+; leaving it readable in the persistent source fields. This is an in-place
+; snapshot accessor: the canonical location already lives in CasmSourceFileId,
+; CasmSourceOffsetLo/Hi, CasmSourceLineLo/Hi, and CasmSourceColumn, describing
+; the next result. A caller reads them immediately and copies them before the
+; next mutating call.
+;
+; Inputs:    source state READY or EOF
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; location fields readable
+;            Fail:    A = CASM_DIAG_SOURCE_LOCATION_OVERFLOW (pending column
+;                     overflow in READY) or CASM_DIAG_STREAM_STATE_FAILED
+;                     (invalid state), C set; state unchanged
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; Scratch:   none
+; ---------------------------------------------------------------------------
+sourceGetLocation:
+    lda CasmSourceState
+    cmp #CASM_SOURCE_STATE_EOF
+    beq sglOk                   ; EOF: location is final, no next byte to overflow
+    cmp #CASM_SOURCE_STATE_READY
+    bne sglBadState
+    ; READY: reject a pending column-exhausted latch, since the next byte would
+    ; overflow the 8-bit column.
+    lda CasmSourceColumn
+    beq sglOverflow
+sglOk:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+sglOverflow:
+    lda #CASM_DIAG_SOURCE_LOCATION_OVERFLOW
+    sec
+    rts
+sglBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceFetchPhysical (private)
+; Fetch one physical byte from the current block, refilling when the block is
+; exhausted. Every fetched byte advances the checked block index and physical
+; offset so the offset stays equal to CasmInputTotal at EOF.
+;
+; Inputs:    source state READY
+; Outputs:   Data: A = CASM_STREAM_DATA, C clear; CasmSourceScratch0 = byte,
+;                  block index and physical offset advanced
+;            EOF:  A = CASM_SOURCE_EOF, C clear; state EOF committed, result
+;                  byte cleared (via sourceRefill)
+;            Fail: A = CASM_DIAG_*, C set; source state ERROR
+; Preserves: none
+; Clobbers:  A, X, Y, refill/OS volatile state on refill
+; ---------------------------------------------------------------------------
+sourceFetchPhysical:
+    ; Unsigned 16-bit index < length test decides availability.
+    lda CasmSourceBlockIndexLo
+    cmp CasmSourceBlockLenLo
+    lda CasmSourceBlockIndexHi
+    sbc CasmSourceBlockLenHi
+    bcc sfpHaveByte             ; index < length -> a byte is available
+
+    ; index >= length: only an exact index == length may refill; index above
+    ; length is a corrupt cursor and a stream-state failure.
+    lda CasmSourceBlockIndexLo
+    cmp CasmSourceBlockLenLo
+    bne sfpCursorFail
+    lda CasmSourceBlockIndexHi
+    cmp CasmSourceBlockLenHi
+    bne sfpCursorFail
+
+    jsr sourceRefill
+    bcs sfpFail                 ; refill failed; source already ERROR
+    cmp #CASM_SOURCE_EOF
+    beq sfpEof
+    ; Refill installed a nonempty block with index 0; a byte is now available.
+
+sfpHaveByte:
+    ; Offset overflow is validated before any cursor or byte is committed.
+    lda CasmSourceOffsetLo
+    cmp #$FF
+    bne sfpOffsetOk
+    lda CasmSourceOffsetHi
+    cmp #$FF
+    beq sfpOffsetOverflow       ; offset == $FFFF -> another byte would overflow
+sfpOffsetOk:
+    ; index < length and length <= 256 guarantee index high is zero here.
+    ldx CasmSourceBlockIndexLo
+    lda CasmIoBuffer,x
+    sta CasmSourceScratch0
+    ; Commit the block index (16-bit).
+    inc CasmSourceBlockIndexLo
+    bne sfpIndexDone
+    inc CasmSourceBlockIndexHi
+sfpIndexDone:
+    ; Commit the physical consumed offset (16-bit).
+    inc CasmSourceOffsetLo
+    bne sfpOffsetDone
+    inc CasmSourceOffsetHi
+sfpOffsetDone:
+    lda #CASM_STREAM_DATA
+    clc
+    rts
+sfpEof:
+    ; sourceRefill committed EOF with A = CASM_SOURCE_EOF, C clear.
+    clc
+    rts
+sfpFail:
+    sec
+    rts
+sfpOffsetOverflow:
     lda #CASM_SOURCE_STATE_ERROR
     sta CasmSourceState
     lda #CASM_DIAG_SOURCE_OFFSET_OVERFLOW
     sec
     rts
-snbCursorFail:
-snbBadState:
+sfpCursorFail:
     lda #CASM_SOURCE_STATE_ERROR
     sta CasmSourceState
     lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceAdvanceNewline (private)
+; Advance the location past one normalized newline: check the 16-bit line for
+; overflow, increment it, and reset the column to 1. The column-exhausted latch
+; is discarded because the line ended before a further byte was needed.
+;
+; Inputs:    none
+; Outputs:   Success: C clear; line advanced, column reset to 1
+;            Fail:    A = CASM_DIAG_SOURCE_LOCATION_OVERFLOW, C set; source ERROR
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+sourceAdvanceNewline:
+    lda CasmSourceLineLo
+    cmp #<CASM_SOURCE_LINE_MAX
+    bne sanAdvance
+    lda CasmSourceLineHi
+    cmp #>CASM_SOURCE_LINE_MAX
+    beq sanOverflow             ; line == $FFFF -> next line would overflow
+sanAdvance:
+    inc CasmSourceLineLo
+    bne sanColumnReset
+    inc CasmSourceLineHi
+sanColumnReset:
+    lda #CASM_SOURCE_COLUMN_INITIAL
+    sta CasmSourceColumn
+    clc
+    rts
+sanOverflow:
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_SOURCE_LOCATION_OVERFLOW
     sec
     rts
 

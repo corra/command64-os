@@ -142,7 +142,11 @@ separate prerequisite-gated work.
       created, entry point routed through the source API, `$15` overflow
       mapping. User runtime fixture matrix confirmed and completion approved on
       2026-07-16; build 1020 advanced CASM to `0.1.6`.
-- [ ] Task UUID `9c733c1a`: implement newline normalization and provenance.
+- [x] Task UUID `9c733c1a`: implement newline normalization and provenance.
+      CR/LF/CRLF collapsing with the pending-CR latch (including the block-split
+      case), final-CR resolution, line/column provenance, `sourceGetLocation`,
+      and five newline fixtures. User runtime matrix confirmed and completion
+      approved on 2026-07-16; build 1022 advanced CASM to `0.1.7`.
 - [ ] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
 - [ ] Task UUID `7196a56f`: implement the minimal lexer core.
 - [ ] Task UUID `9e1a1a12`: implement textual and numeric token scanning.

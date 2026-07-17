@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 3 WP5 newlines and provenance**: `sourceNextByte` now returns the
+  approved normalized model: CR, LF, and CRLF each collapse to one
+  `CASM_SOURCE_NEWLINE` via a persistent pending-CR latch that survives an input
+  block boundary, a final CR resolves before EOF, and one-based line/column plus
+  the physical offset advance with checked commits. Added `sourceGetLocation` for
+  next-result provenance and bounded CR/CRLF/split/blank/final-CR test fixtures.
+  A source line longer than 255 bytes now correctly fails with the stable `$16`
+  location-overflow diagnostic, since columns are one-based 8-bit values. The
+  consume-only entry point is unchanged and still prints `INPUT VALIDATED`;
+  rewind and the line API remain WP6 and the lexer remains WP7. Approved
+  completion and runtime verification advance CASM to `0.1.7` build 1022.
 - **CASM Phase 3 WP4 rewindable source backend**: Added `source.s` with the
   executable byte-stream source layer over the managed Phase 2 input wrapper and
   WP3 bounded state. `sourceInit`, `sourceOpen`, transitional raw `sourceNextByte`,

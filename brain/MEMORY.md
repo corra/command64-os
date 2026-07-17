@@ -149,6 +149,16 @@ points are 315 and the final R6 PRG is 3,301 bytes at `$3400`. CASM is now
 `0.1.6`; WP4 completion was approved after user runtime confirmation on
 2026-07-16.
 
+CASM Phase 3 Work Package 5 build 1022 adds newline normalization and provenance
+inside the existing `source.s`. Linked code/data grows from 2,663 to 2,859 bytes
+(CODE `$08C2` + RODATA `$0269`, unchanged RODATA); WP5 adds no BSS, so total BSS
+stays 512 bytes and the WP3 state layout is untouched. Envelope usage is
+`$3400-$412A`, leaving 725 bytes of combined `$1000` headroom. Relocation points
+are 339. `casm.s` was not modified: its consume-only loop already treats a
+non-EOF, non-carry result as continue, so `CASM_SOURCE_NEWLINE` needed no
+orchestration change. CASM is now `0.1.7`; WP5 completion was approved after user
+runtime confirmation on 2026-07-16.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

@@ -142,6 +142,30 @@ This file serves as the shared repository for architectural decisions, technical
   input-total overflow share the single `$15` diagnostic. `source.s` adds no BSS
   and writes no lexer state. User completion approval advanced CASM from `0.1.5`
   to `0.1.6`.
+- WP5 replaces the transitional raw API with the normalized one. CR, LF, and
+  CRLF collapse to one `CASM_SOURCE_NEWLINE` via the persistent
+  `CasmSourcePendingCr` latch, which is what makes a CRLF split across an input
+  block boundary work: the CR emits the newline and arms the latch, and the
+  following LF is swallowed after the refill. A final CR emits its newline and
+  the subsequent EOF clears the latch. `CasmSourceResultByte` is authoritative
+  only for `CASM_SOURCE_BYTE` and is 0 for NEWLINE/EOF; the lexer keys on the
+  result code and never interprets raw CR or LF.
+- `CasmSourceOffset` is the **physical** consumed offset, not a count of returned
+  results: it advances once per physical byte including the LF swallowed inside a
+  CRLF. That is precisely what keeps `CasmSourceOffset == CasmInputTotal` true at
+  first EOF once one result can span two physical bytes.
+- Because `CasmSourceColumn` is one byte and Phase 0C.1 requires checked
+  one-based columns, a source line longer than 255 bytes is unrepresentable and
+  fails in byte mode with `$16`. A byte at column 255 arms an exhausted latch;
+  only a further *byte* on that line fails, so a legitimate 255-byte line plus
+  newline succeeds. The WP4 `casm256`/`casmmulti` fixtures are single lines over
+  that limit and therefore now fail with `$16` by design; `casmsplit` carries the
+  multi-block traversal coverage instead. WP6's line API rejects the same
+  physical condition with `$17`; the two APIs keep distinct diagnostics.
+- `sourceGetLocation` is a validated in-place accessor, not a copy: the canonical
+  next-result location already lives in the persistent source fields, so it adds
+  no snapshot BSS and callers copy the fields before the next mutating call. User
+  completion approval advanced CASM from `0.1.6` to `0.1.7`.
 - WP2 independently verified all 56 DEBUG mnemonic names and ordering against
   the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
   mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,
