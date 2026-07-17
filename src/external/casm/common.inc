@@ -371,7 +371,11 @@ CASM_DIAG_SYNTAX_ERROR = $1C
 CASM_DIAG_EXPECTED_NEWLINE = $1D
 CASM_DIAG_OPERAND_OUT_OF_RANGE = $1E
 CASM_DIAG_INVALID_ADDR_MODE = $1F
-CASM_DIAG_PHASE4_LAST = CASM_DIAG_INVALID_ADDR_MODE
+CASM_DIAG_DUPLICATE_ORG = $20
+CASM_DIAG_ORG_REQUIRED = $21
+CASM_DIAG_ADDRESS_OVERFLOW = $22
+CASM_DIAG_BRANCH_OUT_OF_RANGE = $23
+CASM_DIAG_PHASE4_LAST = CASM_DIAG_BRANCH_OUT_OF_RANGE
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -379,7 +383,8 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_PHASE3_LAST = $1B, error, "CASM Phase 3 diagnostic range changed"
 .assert CASM_DIAG_SYNTAX_ERROR = CASM_DIAG_PHASE3_LAST + 1, error, "CASM Phase 4 diagnostics must remain contiguous"
 .assert CASM_DIAG_INVALID_ADDR_MODE = CASM_DIAG_OPERAND_OUT_OF_RANGE + 1, error, "CASM Phase 4 diagnostics must remain contiguous"
-.assert CASM_DIAG_PHASE4_LAST = $1F, error, "CASM Phase 4 diagnostic range changed"
+.assert CASM_DIAG_BRANCH_OUT_OF_RANGE = CASM_DIAG_DUPLICATE_ORG + 3, error, "CASM Phase 4 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE4_LAST = $23, error, "CASM Phase 4 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -443,6 +448,17 @@ CASM_INSN_SIZE   = 3
 
 .assert CASM_MODE_COUNT = CASM_MODE_RELATIVE + 1, error, "CASM addressing mode range changed"
 .assert CASM_INSN_SIZE = 3, error, "CASM instruction encoding record size changed"
+
+; ---------------------------------------------------------------------------
+; Phase 4 emission engine contract (WP13)
+; ---------------------------------------------------------------------------
+
+; Bounded output staging buffer used by emit.s. This is distinct from the
+; single 256-byte CasmIoBuffer (which stays reserved for input): input and
+; output are both live during the single emit pass, so output cannot reuse it.
+CASM_EMIT_BUFFER_SIZE = 64
+
+.assert CASM_EMIT_BUFFER_SIZE = 64, error, "CASM emit buffer size changed"
 
 ; Registration/release routines return carry clear on success. On failure,
 ; carry is set and A contains one of the CASM_DIAG_* identifiers above.

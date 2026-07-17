@@ -119,3 +119,64 @@ file(WRITE "${OUTPUT_DIR}/casmam1.seq" "LDA A\n")
 file(WRITE "${OUTPUT_DIR}/casmam2.seq" "INX #5\n")
 # Immediate operand exceeds 8 bits            -> OPERAND OUT OF RANGE ($1E)
 file(WRITE "${OUTPUT_DIR}/casmrng1.seq" "LDA #\$1234\n")
+
+# WP13 emission fixtures.
+#
+# Valid program exercising implied/immediate/absolute/relative modes and the
+# .BYTE/.WORD directives. Assembles to a 20-byte PRG loading at $C000:
+#   00 C0                      ; PRG header (load address $C000)
+#   A9 01                      ; LDA #$01
+#   8D 20 D0                   ; STA $D020
+#   A2 10                      ; LDX #$10
+#   E8                         ; INX
+#   D0 FD                      ; BNE $C007   (displacement -3)
+#   60                         ; RTS
+#   01 02 FF                   ; .BYTE $01,$02,$FF
+#   34 12 CD AB                ; .WORD $1234,$ABCD
+file(WRITE "${OUTPUT_DIR}/casmemit1.seq"
+    ".ORG \$C000\n"
+    "LDA #\$01\n"
+    "STA \$D020\n"
+    "LDX #\$10\n"
+    "INX\n"
+    "BNE \$C007\n"
+    "RTS\n"
+    ".BYTE \$01, \$02, \$FF\n"
+    ".WORD \$1234, \$ABCD\n"
+)
+# Code before any .ORG                        -> ORG REQUIRED ($21)
+file(WRITE "${OUTPUT_DIR}/casmorg1.seq" "LDA #\$01\n")
+# A second .ORG                               -> DUPLICATE ORG ($20)
+file(WRITE "${OUTPUT_DIR}/casmorg2.seq" ".ORG \$C000\n.ORG \$C100\n")
+# Branch target far outside -128..+127        -> BRANCH OUT OF RANGE ($23)
+file(WRITE "${OUTPUT_DIR}/casmbr1.seq" ".ORG \$C000\nBNE \$D000\n")
+
+# End-to-end demo: a runnable program that prints a message and returns to the
+# shell. It assembles to a plain PRG loading at $3400 (the current
+# UserProgStart), so no labels are used -- the message address ($340E) and the
+# OS_API entry ($1000) are literal. It calls DOS_PRINT_STR (A=$09, X/Y = string
+# pointer) then DOS_EXIT (A=$4C). Assemble with `casm casmhello`, then on the
+# C64: `LOAD CASMHELLO` and `GO 3400`. The message renders in the default
+# uppercase charset: "YES IT BUILDS! -- CASM".
+#
+# Layout (load $3400):
+#   3400 A2 0E        LDX #<msg
+#   3402 A0 34        LDY #>msg
+#   3404 A9 09        LDA #DOS_PRINT_STR
+#   3406 20 00 10     JSR $1000            ; OS_API
+#   3409 A9 4C        LDA #DOS_EXIT
+#   340B 20 00 10     JSR $1000
+#   340E ...          ; msg: "YES IT BUILDS! -- CASM", CR, NUL
+file(WRITE "${OUTPUT_DIR}/casmhello.seq"
+    ".ORG \$3400\n"
+    "LDX #\$0E\n"
+    "LDY #\$34\n"
+    "LDA #\$09\n"
+    "JSR \$1000\n"
+    "LDA #\$4C\n"
+    "JSR \$1000\n"
+    ".BYTE \$59, \$45, \$53, \$20, \$49, \$54, \$20\n"
+    ".BYTE \$42, \$55, \$49, \$4C, \$44, \$53, \$21, \$20\n"
+    ".BYTE \$2D, \$2D, \$20, \$43, \$41, \$53, \$4D\n"
+    ".BYTE \$0D, \$00\n"
+)

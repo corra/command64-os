@@ -20,6 +20,7 @@
 
 .export CasmParserStmt
 .export parserParseStatement
+.export parseNumericValue
 
 .segment "BSS"
 
@@ -91,7 +92,26 @@ ppsMnemonic:
     sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     sta CasmParserStmt + CASM_PARSER_STMT_REG_SUBTYPE
+    ; The .BYTE/.WORD directives take a comma-separated numeric list that the
+    ; single-operand addressing-mode grammar below cannot express. Return after
+    ; classifying the directive and leave its operand tokens in the lexer stream
+    ; for the WP13 emission engine to read and emit (parser contract refinement).
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    cmp #CASM_TOKEN_DIRECTIVE
+    bne ppsGrammar
+    lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
+    cmp #CASM_DIRECTIVE_BYTE
+    beq ppsDeferOperands
+    cmp #CASM_DIRECTIVE_WORD
+    beq ppsDeferOperands
+ppsGrammar:
     jmp parseOperandSequence
+ppsDeferOperands:
+    lda #CASM_OPKIND_IMPLIED
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
 
 ppsFail:
     rts

@@ -207,7 +207,18 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
       (invalid mode) and `casmrng1` (immediate 8-bit overflow) added. User
       runtime confirmed all cases. Completion approved on 2026-07-17; build
       1047 advanced CASM to `0.1.14`.
-- [ ] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
+- [x] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
+      New `emit.s` engine: `CasmPc` tracking, PRG load-address header + bounded
+      64-byte staged writes, `.ORG`/`.BYTE`/`.WORD` handling, per-instruction
+      operand encoding, and the relative-branch displacement + range check
+      moved here from WP12. Added diagnostics `$20`–`$23`; refined the parser to
+      leave `.BYTE`/`.WORD` operand lists for the emitter; made output
+      operational (emit by default, `/S` accepted, `/M`/`/L` still rejected).
+      The MAIN envelope was raised `$2000`→`$2800` (approved) to fit emission.
+      Fixtures `casmemit1` (valid → PRG), `casmorg1`/`casmorg2`/`casmbr1`
+      (error paths), and `casmhello` (runnable print-and-exit demo). User
+      runtime confirmed all cases. Completion approved on 2026-07-17; build
+      1053 advanced CASM to `0.1.15`.
 - [ ] Task UUID `d1e2f3a4`: execute orchestration and end-to-end binary validation.
 - [ ] Task UUID `c2a3b4c5`: verify artifacts and obtain user runtime confirmation.
 
@@ -217,6 +228,7 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
 - [ ] 6502 addressing mode mapping and numeric size boundaries are enforced.
 - [ ] Relative branch distance checks are validated.
 - [ ] Output PRG files match reference binary files byte-for-byte.
-- [ ] CASM remains within the approved $2000 MAIN envelope.
+- [ ] CASM remains within the approved MAIN envelope (raised $2000 -> $2800 in
+      WP13 to fit the emission engine).
 - [ ] Build, artifact, and build-number checks pass.
 - [ ] The user completes the runtime walkthrough and approves Phase 4.

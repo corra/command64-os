@@ -11,7 +11,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "14"
+.define VERSION_STAGE "15"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -35,6 +35,14 @@
 .import opcodesFindOpcode
 .import diagPrintPhase2Ready
 
+.import CasmOutputName
+.import fileCreateOutput
+.import outputAbort
+.import emitInit
+.import emitInstruction
+.import emitDirective
+.import emitFinalize
+
 .segment "HEADER"
     .word __MAIN_START__
 
@@ -51,13 +59,13 @@
 ; ---------------------------------------------------------------------------
 start:
     jsr resourcesInit
-    bcs startFatal
+    bcs startInitFatal
     jsr cliInit
-    bcs startFatal
+    bcs startInitFatal
     jsr fileIoInit
-    bcs startFatal
+    bcs startInitFatal
     jsr sourceInit
-    bcs startFatal
+    bcs startInitFatal
     lda #CASM_PHASE_CLI_FILE
     sta CasmPhase
 
@@ -66,49 +74,79 @@ start:
     jsr diagPrintString
 
     jsr cliParse
-    bcs startFatal
+    bcs startInitFatal
 
-    ; Phase 2 accepts these option spellings so their grammar is stable, but
-    ; their features do not become operational until later phases.
+    ; WP13 makes output operational: a successful assembly writes a PRG by
+    ; default, and /S (static) selects that now-default output mode. The map
+    ; and listing options remain unimplemented.
     lda CasmCliOptions
-    and #(CASM_OPT_STATIC | CASM_OPT_MAP | CASM_OPT_LIST)
+    and #(CASM_OPT_MAP | CASM_OPT_LIST)
     beq startOptionsReady
     lda #CASM_DIAG_NOT_IMPLEMENTED
     jmp exitFatal
 
 startOptionsReady:
     jsr cliDeriveOutputName
-    bcs startFatal
+    bcs startInitFatal
     jsr sourceOpen
-    bcs startFatal
+    bcs startInitFatal
 
     jsr lexerInit
-    bcs startFatal
+    bcs startInitFatal
 
-    ; WP11/WP12 temporary verification driver: parse each statement and, for
-    ; mnemonic statements, resolve the opcode so syntax, addressing-mode, and
-    ; operand-range diagnostics all surface through the central fatal path.
-    ; Print the validated banner once the stream parses to EOF. WP14 replaces
-    ; this with the parser/emitter loop.
+    ; Create the output PRG and initialize the emission engine.
+    ldx #<CasmOutputName
+    ldy #>CasmOutputName
+    jsr fileCreateOutput
+    bcs startInitFatal
+    jsr emitInit
+    bcs startInitFatal
+    jmp startParseLoop
+
+startInitFatal:
+    ; Trampoline: initialization branches are out of direct range of the
+    ; fatal tail below.
+    jmp startFatal
+
+    ; WP13 temporary driver: parse each statement and emit it. Mnemonics are
+    ; encoded through the opcode matcher and emitted; directives are handled by
+    ; the emission engine. All syntax, addressing-mode, operand-range, and
+    ; emission diagnostics surface through the central fatal path. WP14 replaces
+    ; this with the production parser/emitter orchestration.
 startParseLoop:
     jsr parserParseStatement
     bcs startFatal
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE
     cmp #CASM_TOKEN_MNEMONIC
-    bne startParseCheckEof
+    beq startEmitInsn
+    cmp #CASM_TOKEN_DIRECTIVE
+    beq startEmitDir
+    cmp #CASM_TOKEN_EOF
+    beq startAssembled
+    jmp startParseLoop          ; NEWLINE: nothing to emit
+startEmitInsn:
     jsr opcodesFindOpcode
     bcs startFatal
-startParseCheckEof:
-    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
-    cmp #CASM_TOKEN_EOF
-    bne startParseLoop
+    jsr emitInstruction
+    bcs startFatal
+    jmp startParseLoop
+startEmitDir:
+    jsr emitDirective
+    bcs startFatal
+    jmp startParseLoop
 
+startAssembled:
+    jsr emitFinalize
+    bcs startFatal
     jsr diagPrintPhase2Ready
     jsr sourceClose
     bcs startFatal
     jmp exitSuccess
 
 startFatal:
+    ; Best-effort delete of any partial output while preserving the primary
+    ; diagnostic in A, then route through central cleanup.
+    jsr outputAbort
     jmp exitFatal
 
 .segment "RODATA"

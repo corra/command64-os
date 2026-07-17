@@ -52,15 +52,28 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
 
 ### 3. Work Package 13: Directives and Emission Engine
 - **Goal**: Process numeric directives and emit machine bytes to a native output file.
+- Detailed plan: `brain/plans/2026-07-17-casm-phase4-wp13-directives-emission.md`.
 - **Scope**:
   - Parse `.ORG` (must be single, initial; records start address).
-  - Parse `.BYTE` and `.WORD` containing comma-separated numeric literals.
-  - Write output stream buffers to the derived output file using `fileIo` write APIs.
-  - Generate the standard 2-byte PRG load address header.
+  - Parse `.BYTE` and `.WORD` containing comma-separated numeric literals. This
+    requires refining the WP11 parser: its single-operand addressing-mode
+    grammar cannot express a comma-separated list, so `parserParseStatement`
+    leaves `.BYTE`/`.WORD` operands for the WP13 directive handler to read from
+    the lexer.
+  - Emit a plain absolute PRG (2-byte load-address header = the `.ORG` value,
+    then raw bytes) via `fileIo` write APIs. No R6 relocation trailer.
   - Track Program Counter (`CasmPc`) and check segment limits (max `$FFFF`).
   - Compute relative branch displacements against `CasmPc` and enforce the
     `-128..+127` range (moved here from WP12, which now only selects the
     Relative mode and branch opcode; see the WP12 amendment note above).
+  - Single forward pass is sufficient (Phase 4 has no symbols/forward
+    references); this is a strict, forward-compatible subset of the two-pass
+    architecture, which arrives with symbol support in a later phase.
+  - **Decision (amendment 2026-07-17)**: WP13 is where output becomes
+    operational (per the Phase 0B note that output begins in the numeric
+    static-output phase). Confirmed: emit by default on a successful assembly,
+    accept `/S` as the now-default static mode, and keep only `/M`/`/L`
+    rejected.
 - **Diagnostics added**:
   - `CASM_DIAG_DUPLICATE_ORG` ($20) -> `"CASM: DUPLICATE ORG"`
   - `CASM_DIAG_ORG_REQUIRED` ($21) -> `"CASM: ORG REQUIRED"`

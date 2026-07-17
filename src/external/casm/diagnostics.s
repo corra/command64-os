@@ -383,6 +383,10 @@ diagMessageLo:
     .byte <msgExpectedNewline
     .byte <msgOperandOutOfRange
     .byte <msgInvalidAddrMode
+    .byte <msgDuplicateOrg
+    .byte <msgOrgRequired
+    .byte <msgAddressOverflow
+    .byte <msgBranchOutOfRange
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -417,6 +421,10 @@ diagMessageHi:
     .byte >msgExpectedNewline
     .byte >msgOperandOutOfRange
     .byte >msgInvalidAddrMode
+    .byte >msgDuplicateOrg
+    .byte >msgOrgRequired
+    .byte >msgAddressOverflow
+    .byte >msgBranchOutOfRange
 diagMessageHiEnd:
 
 .assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE4_LAST, error, "CASM diagnostic low table is incomplete"
@@ -484,6 +492,14 @@ msgOperandOutOfRange:
     .byte "CASM: OPERAND OUT OF RANGE", PetCr, 0
 msgInvalidAddrMode:
     .byte "CASM: INVALID ADDRESSING MODE", PetCr, 0
+msgDuplicateOrg:
+    .byte "CASM: DUPLICATE ORG", PetCr, 0
+msgOrgRequired:
+    .byte "CASM: ORG REQUIRED", PetCr, 0
+msgAddressOverflow:
+    .byte "CASM: ADDRESS OVERFLOW", PetCr, 0
+msgBranchOutOfRange:
+    .byte "CASM: BRANCH OUT OF RANGE", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

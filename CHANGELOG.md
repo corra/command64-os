@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 4 WP13 directives and emission engine**: Added `emit.s`, which
+  turns matched statements into a real Commodore PRG. It tracks the program
+  counter, writes the 2-byte load-address header and the assembled bytes to the
+  CLI-derived output file through a bounded 64-byte staging buffer (the 256-byte
+  input buffer stays reserved for the concurrent read pass), processes the
+  `.ORG` (single, initial), `.BYTE`, and `.WORD` directives, encodes each
+  instruction's operand bytes, and computes and range-checks relative-branch
+  displacements against the program counter (moved here from WP12 with the
+  program counter it depends on). Output is a plain absolute PRG. Added
+  diagnostics `CASM_DIAG_DUPLICATE_ORG` ($20), `CASM_DIAG_ORG_REQUIRED` ($21),
+  `CASM_DIAG_ADDRESS_OVERFLOW` ($22), and `CASM_DIAG_BRANCH_OUT_OF_RANGE` ($23).
+  Refined the WP11 parser to leave `.BYTE`/`.WORD` comma-separated operand lists
+  in the lexer stream for the emission engine (the single-operand addressing
+  grammar cannot express a list). Output is now operational: a successful
+  assembly writes a PRG by default, `/S` is accepted as the static output mode,
+  and `/M`/`/L` remain unimplemented. The MAIN linker envelope was raised
+  `$2000` -> `$2800` (approved) to fit the emission engine. The temporary
+  `casm.s` driver now creates the output, dispatches each statement to the
+  matcher/emitter, finalizes on EOF, and deletes a partial output on failure;
+  WP14 replaces it with production orchestration. Added fixtures `casmemit1`
+  (valid program -> PRG), `casmorg1`/`casmorg2`/`casmbr1` (the new error paths),
+  and `casmhello` (a runnable print-and-exit demo). User runtime confirmed the
+  cases. Completion advances CASM to `0.1.15` build 1053.
 - **CASM Phase 4 WP12 opcode table and addressing-mode matcher**: Added
   `opcodes.s`, a compressed legal-6502 opcode table (per-mnemonic 13-bit
   supported-mode mask, run offset, and packed opcode run — 56 mnemonics, 151
