@@ -49,7 +49,7 @@
   - [x] `9e1a1a12` Implement textual and numeric token scanning
   - [x] `3367d36d` Implement mnemonic classification
   - [x] `a68d3603` Integrate diagnostics and temporary token dump
-  - [ ] `178b0884` Verify artifacts and obtain user runtime confirmation
+  - [x] `178b0884` Verify artifacts and obtain user runtime confirmation
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

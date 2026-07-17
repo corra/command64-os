@@ -160,18 +160,40 @@ separate prerequisite-gated work.
 - [x] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
 - [x] Task UUID `3367d36d`: implement mnemonic classification.
 - [x] Task UUID `a68d3603`: integrate diagnostics and temporary token dump.
-- [ ] Task UUID `178b0884`: verify artifacts and obtain user runtime
+- [x] Task UUID `178b0884`: verify artifacts and obtain user runtime
       confirmation.
 
 ## Phase 3 Acceptance
 
-- [ ] Phase 0C.1 and the DEBUG reuse decision are recorded.
-- [ ] Source traversal and rewind are byte-, newline-, and location-identical.
-- [ ] CR, LF, and CRLF normalize correctly across input-block boundaries.
-- [ ] Lines, tokens, offsets, cursors, and locations fail before overflow.
-- [ ] All approved token classes and lexical failure cases are deterministic.
-- [ ] The temporary token dump reports correct file, line, and column data.
-- [ ] CASM stays within the approved $2000 MAIN envelope.
-- [ ] Build, artifact, release-disk, and no-change build checks pass.
-- [ ] The user completes the runtime walkthrough.
-- [ ] The user explicitly approves marking Phase 3 done.
+- [x] Phase 0C.1 and the DEBUG reuse decision are recorded.
+- [x] Source traversal and rewind are byte-, newline-, and location-identical.
+- [x] CR, LF, and CRLF normalize correctly across input-block boundaries.
+- [x] Lines, tokens, offsets, cursors, and locations fail before overflow.
+- [x] All approved token classes and lexical failure cases are deterministic.
+- [x] The temporary token dump reports correct file, line, and column data.
+- [x] CASM stays within the approved $2000 MAIN envelope.
+- [x] Build, artifact, release-disk, and no-change build checks pass.
+- [x] The user completes the runtime walkthrough.
+- [x] The user explicitly approves marking Phase 3 done.
+
+# CASM Phase 4 — Statement Parser, Opcode Table, and Numeric Static Assembly
+
+Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
+
+## Tasks
+
+- [ ] Task UUID `31bb2198`: implement statement parser and syntax validation.
+- [ ] Task UUID `501bc58c`: implement opcode table and addressing mode matcher.
+- [ ] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
+- [ ] Task UUID `d1e2f3a4`: execute orchestration and end-to-end binary validation.
+- [ ] Task UUID `c2a3b4c5`: verify artifacts and obtain user runtime confirmation.
+
+## Phase 4 Acceptance
+
+- [ ] Syntactic errors and operand delimiters are fully validated.
+- [ ] 6502 addressing mode mapping and numeric size boundaries are enforced.
+- [ ] Relative branch distance checks are validated.
+- [ ] Output PRG files match reference binary files byte-for-byte.
+- [ ] CASM remains within the approved $2000 MAIN envelope.
+- [ ] Build, artifact, and build-number checks pass.
+- [ ] The user completes the runtime walkthrough and approves Phase 4.
