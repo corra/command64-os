@@ -186,6 +186,21 @@ This file serves as the shared repository for architectural decisions, technical
   could not otherwise fit; `add_ca65_app(casm ... "2000")` sets `MAIN: size`.
   `inputStreamRead` is now a thin caller of the additive `inputStreamReadInto`.
   User completion approval advanced CASM from `0.1.7` to `0.1.8`.
+- WP7 adds `lexer.s`, the first source-layer consumer, with a one-result
+  lookahead over `sourceNextByte`, bounded token primitives, whitespace/comment
+  skipping (the comment's terminating newline is preserved as a token), and the
+  EOF/newline/punctuation tokens. `CasmLexerState`'s enum
+  (`CASM_LEXER_STATE_INIT/READY/EOF/ERROR`) was added to `common.inc` — the byte
+  WP3 reserved. The lexer owns lookahead invalidation after a rewind
+  (`lexerInit`), discharging WP6's deferral; a lexer failure never closes the
+  source. Provenance subtlety: `sourceGetLocation` returns `$16` at the
+  column-255 exhausted latch (correct for byte-only callers but too strict for
+  the lexer, which may next get a harmless newline), so `lexerFill` reads the
+  exported in-place location fields directly and clamps the latch to
+  `CASM_SOURCE_COLUMN_MAX`, leaving real overflow to `sourceNextByte`; no
+  source-layer change. WP7 is static-only: no shipped-path caller until WP10 and
+  no end-to-end run until WP8 adds identifiers. Completion advanced CASM to
+  `0.1.9` (the version was pre-advanced by the multi-digit stage migration).
 - WP2 independently verified all 56 DEBUG mnemonic names and ordering against
   the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
   mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,

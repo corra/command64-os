@@ -172,6 +172,17 @@ bytes and the WP3 state layout is untouched. Envelope usage is `$3400-$4262` =
 zero-size file cannot be opened. CASM is now `0.1.8`; WP6 completion was approved
 after user runtime confirmation on 2026-07-17.
 
+CASM Phase 3 Work Package 7 build 1028 adds `lexer.s`, the minimal lexer core and
+first source-layer consumer, plus the `CASM_LEXER_STATE_*` enum in `common.inc`.
+Linked code/data grows from 3,171 to 3,544 bytes (CODE `$0B5C` + RODATA `$027C`);
+`lexer.s` defines no BSS, so total BSS stays 512 bytes. Envelope usage is
+`$3400-$43D7` = 4,056 bytes, leaving 4,136 bytes of `$2000` headroom. Relocation
+points are 460. WP7 is Option 1 (static-only): `casm.s` is unchanged and the
+lexer has no shipped-path caller until WP10, so it was verified statically and by
+non-regression. The version was pre-advanced to `0.1.9` by the separately
+committed multi-digit version-stage migration; WP7 completion was approved after
+user non-regression confirmation on 2026-07-17.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

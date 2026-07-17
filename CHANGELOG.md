@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 3 WP7 minimal lexer core**: Added `lexer.s`, the first consumer
+  of the source layer. It owns a one-result lookahead over `sourceNextByte` and
+  the token record, captures file/line/column provenance before each token's
+  first byte, skips whitespace and semicolon comments (preserving the
+  terminating newline token), and emits EOF, newline, and the
+  punctuation/delimiter tokens (`, : # ( ) + - < >`). A single not-implemented
+  default arm marks the WP8 identifier/number seam. Added the `CASM_LEXER_STATE_*`
+  enum WP3 reserved. `lexer.s` defines no BSS, never closes the source, and has
+  no shipped-path caller yet — the entry point is unchanged and still prints
+  `INPUT VALIDATED`; the token dump and diagnostic text remain WP10. Verified
+  statically. Completion advances CASM to `0.1.9` build 1028.
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **CASM Phase 3 WP6 deterministic rewind and bounded line API**: Added
   `sourceRewind` (close/reopen with a full source-owned reset so a second

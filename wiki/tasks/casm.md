@@ -152,7 +152,11 @@ separate prerequisite-gated work.
       `inputStreamReadInto`, absolute cursor, and the `$1000` → `$2000` envelope
       increase. User runtime matrix confirmed and completion approved on
       2026-07-17; build 1025 advanced CASM to `0.1.8`.
-- [ ] Task UUID `7196a56f`: implement the minimal lexer core.
+- [x] Task UUID `7196a56f`: implement the minimal lexer core (Option 1
+      static-only). `lexer.s` with the lookahead, token primitives,
+      whitespace/comment skipping, and punctuation tokens, plus the
+      `CASM_LEXER_STATE_*` enum. User non-regression confirmed and completion
+      approved on 2026-07-17; build 1028, CASM at `0.1.9`.
 - [ ] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
 - [ ] Task UUID `3367d36d`: implement mnemonic classification.
 - [ ] Task UUID `a68d3603`: integrate diagnostics and temporary token dump.
