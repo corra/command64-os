@@ -225,6 +225,9 @@ I/O error without leaked handles or incomplete output.
 
 ### Phase 3: Source Stream and Minimal Lexer
 
+Detailed implementation is governed by
+`brain/plans/2026-07-16-casm-phase3-source-stream-lexer.md`.
+
 Define and implement:
 
 ```text
@@ -250,10 +253,11 @@ The interface must allow a VMM/multi-file backend without lexer changes.
 Gate: a temporary token-dump mode reproduces all lexical fixtures with correct
 file and line locations.
 
-### Phase 4: Opcode Table and Numeric Static Assembly
+### Phase 4: Statement Parser, Opcode Table, and Numeric Static Assembly
 
 Implement a restricted numeric-only vertical slice:
 
+- Bounded statement parsing between the lexer and numeric code generation.
 - Official opcode/addressing-mode table.
 - Implied, accumulator, immediate, zero-page, zero-page indexed, absolute,
   absolute indexed, indirect, indexed-indirect, indirect-indexed, and relative
@@ -288,7 +292,16 @@ signed constant addend
 
 Gate: expression fixtures pass without depending on instruction emission.
 
-### Phase 6: Symbol Table and Two-Pass Assembly
+### Phase 6A: VMM Storage Foundation
+
+- Implement bounded VMM-backed record storage before any symbol-table user.
+- Define record capacity, allocation, access, replay, and failure contracts.
+- Verify small deterministic fixtures through base-RAM and VMM-backed paths.
+
+Gate: bounded VMM records can be written, read, and replayed without source or
+symbol semantics.
+
+### Phase 6B: Symbol Table and Two-Pass Assembly
 
 - Allocate VMM-backed symbol storage.
 - Use a documented 6502-efficient hash with bounded RAM buckets and VMM

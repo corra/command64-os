@@ -117,6 +117,43 @@ This file serves as the shared repository for architectural decisions, technical
   CASM treats that case as input-open failure; stream boundary coverage uses
   openable 17-byte, 256-byte, and 513-byte SEQ fixtures.
 
+### CASM Phase 3 Source/Lexer Contract (approved 2026-07-16)
+
+- WP2 independently verified all 56 DEBUG mnemonic names and ordering against
+  the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
+  mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,
+  shared include, or build coupling to DEBUG. DEBUG parsing, addressing,
+  branch, opcode lookup, and direct-write routines are not reused; opcode and
+  addressing-table decisions remain Phase 4 work. User completion approval
+  advanced CASM from `0.1.3` to `0.1.4`.
+- Work Package 1 synchronized the approved contracts and task hierarchy; user
+  completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+- Phase 3 accepts one top-level source file, reuses the managed 256-byte input
+  buffer, and bounds physical input and line numbers to checked 16-bit values.
+- Source identity begins with file ID zero and the original source filename.
+  Lines and columns are one-based; columns are checked 8-bit values.
+- CR, LF, and CRLF each normalize to one logical newline, including CRLF split
+  across input blocks. Location advances only when that newline is consumed.
+- `sourceRewind` closes and reopens the file, then resets byte, newline,
+  location, lookahead, EOF, and line-window state. Byte and line APIs cannot be
+  mixed without an explicit rewind/reset.
+- Logical line payload is limited to 255 bytes. The line convenience API and
+  transfer-block use of `CasmIoBuffer` must be explicitly mutually exclusive;
+  Phase 3 allocates no second 256-byte buffer.
+- Token text is limited to 31 bytes plus a terminator and preserves original
+  spelling. Identifier labels remain case-sensitive; mnemonic, directive, and
+  register classification is case-insensitive.
+- Phase 3 validates decimal, `$` hexadecimal, and `%` binary lexical shape but
+  does not convert values. Malformed prefixes and invalid numeric suffixes fail
+  as single lexical errors rather than splitting into unrelated tokens.
+- Every token records type, subtype, length, file ID, 16-bit starting line,
+  one-byte starting column, and bounded original text. Spaces/tabs are skipped;
+  comments preserve their terminating logical newline token.
+- Phase 4 is the first production output consumer and includes the bounded
+  statement parser before opcode selection and numeric static emission.
+- VMM storage precedes VMM-backed symbols: Phase 6A provides bounded storage
+  and Phase 6B adds the symbol table and deterministic two-pass assembly.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

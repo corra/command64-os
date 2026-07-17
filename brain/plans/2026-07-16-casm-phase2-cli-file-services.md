@@ -20,7 +20,7 @@ through managed Command 64 file services, and survives parse, open, read, close,
 and cleanup failures without leaking handles.
 
 Phase 2 establishes interfaces consumed by the Phase 3 source stream and the
-Phase 5 numeric static-output path. It does not tokenize, parse assembly
+Phase 4 numeric static-output path. It does not tokenize, parse assembly
 statements, create an assembler output, or claim runtime verification of output
 write/delete behavior that has no production caller yet.
 
@@ -35,7 +35,7 @@ the user must approve this Phase 0B subset:
 - the bounded input-buffer size;
 - EOF and partial-read interpretation for `DOS_READ_FILE`;
 - the managed file-record ABI and compensating-close rule; and
-- the division between Phase 2 input runtime behavior and Phase 5 output
+- the division between Phase 2 input runtime behavior and Phase 4 output
   runtime behavior.
 
 Language, lexer, expression, symbol, VMM-store, emission-event, and R6 contracts
@@ -164,7 +164,7 @@ Add only bounded BSS:
 - one 256-byte I/O buffer;
 - input/output handle and registry-slot state;
 - 16-bit requested and completed transfer counts; and
-- output-created/output-valid flags reserved for the Phase 5 consumer.
+- output-created/output-valid flags reserved for the Phase 4 consumer.
 
 Use `$80-$83` only for narrowly documented CLI parser scratch. File transfers
 use the existing `$78-$7B` I/O fields. Later expression, pass, and emission
@@ -256,7 +256,7 @@ already-closed local record is harmless.
 ### Output ABI Boundary
 
 Output wrappers receive static review and build coverage in Phase 2, but have no
-artificial production caller. Phase 5 must activate runtime create/write/close,
+artificial production caller. Phase 4 must activate runtime create/write/close,
 short-write detection, output-valid state, and `outputAbort` deletion when the
 numeric assembler has real bytes to serialize.
 
@@ -285,7 +285,7 @@ registry cases are statically traced and bounded.
 
 Extend `diagnostics.s` with stable, allocation-free messages for all Phase 2
 parse and input-service failures. Output diagnostics are reserved now so the
-Phase 5 output consumer does not renumber the diagnostic ABI.
+Phase 4 output consumer does not renumber the diagnostic ABI.
 
 Diagnostics do not open files, allocate memory, or require filename provenance.
 Filename/line formatting begins with the Phase 3 source-location contract.
@@ -327,7 +327,7 @@ Confirm:
 - every open is registered immediately or compensating-closed;
 - a failed close retains ownership;
 - cleanup attempts all owned records and preserves the primary error;
-- output runtime behavior is not claimed before Phase 5;
+- output runtime behavior is not claimed before Phase 4;
 - VMM cleanup remains unchanged; and
 - no Phase 3+ lexer, parser, expression, symbol, emission, or relocation logic
   entered Phase 2.
@@ -362,7 +362,7 @@ The user verifies in the supported local emulator or on hardware:
 
 Do not use the broken `c64-testing` MCP or a web emulator. Output create/write,
 disk-full, short-write, delete, and incomplete-output runtime tests are explicit
-Phase 5 dependencies, not Phase 2 acceptance criteria.
+Phase 4 dependencies, not Phase 2 acceptance criteria.
 
 ## Atomic Implementation Order
 
@@ -387,9 +387,9 @@ analysis before altering the design.
 
 - Phase 3 consumes the managed input wrapper and adds rewind, newline
   normalization, filename identity, line provenance, and lexer behavior.
-- The statement parser and constant-expression phase consumes Phase 3; neither
-  is implicitly implemented here.
-- Phase 5 is the first production consumer of output create/write/close/delete
+- The Phase 4 statement parser and Phase 5 expression evaluator consume Phase
+  3; neither is implicitly implemented here.
+- Phase 4 is the first production consumer of output create/write/close/delete
   and must verify short writes and incomplete-output deletion at runtime.
 - VMM storage must be implemented before any VMM-backed symbol table or
   VMM-backed source phase.

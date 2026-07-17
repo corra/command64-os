@@ -35,6 +35,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM 0.1.4 DEBUG reuse decision**: Independently verified DEBUG's complete
+  56-mnemonic ordering and selected a CASM-local 168-byte mnemonic table for
+  future WP9 implementation. DEBUG routines, runtime state, opcode metadata,
+  and build inputs remain uncoupled from CASM; Phase 4 retains opcode and
+  addressing-mode decisions.
+- **CASM 0.1.3 Phase 3 activation**: Synchronized the approved Phase 0C.1
+  source/lexer contract, Phase 3 work-package tasks, corrected Phase 4 output
+  dependency, and storage-first Phase 6A/6B split. Completing Work Package 1
+  advanced the CASM stage version from `0.1.2` to `0.1.3`.
 - **PACMAN 0.1.3 patch stage**: Advanced the Pac-Man version after verified
   actor redraw ordering and Pac-Man/Blinky collision, life-loss, and game-over
   remediation.

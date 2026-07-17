@@ -26,6 +26,21 @@
         resource slot across `DOS_CLOSE_FILE`; build 1011 runtime verified
   - [x] `9e4d8175` Verify artifacts and obtain user runtime confirmation
 
+- [/] Taskwarrior #29 (`099257cc`): CASM Phase 3 source stream and minimal
+      lexer
+  - [x] `65832339` Synchronize task records, dependency corrections, and
+        approved Phase 0C.1 contracts
+  - [x] `9ab8caf3` Investigate DEBUG assembler reuse feasibility
+  - [ ] `9e0c03f3` Declare shared source/lexer ABI and bounded state
+  - [ ] `fcb0e164` Implement the rewindable source backend
+  - [ ] `9c733c1a` Implement newline normalization and provenance
+  - [ ] `cda20f5b` Implement deterministic rewind and bounded line API
+  - [ ] `7196a56f` Implement the minimal lexer core
+  - [ ] `9e1a1a12` Implement textual and numeric token scanning
+  - [ ] `3367d36d` Implement mnemonic classification
+  - [ ] `a68d3603` Integrate diagnostics and temporary token dump
+  - [ ] `178b0884` Verify artifacts and obtain user runtime confirmation
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

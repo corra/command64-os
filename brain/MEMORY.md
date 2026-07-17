@@ -121,6 +121,17 @@ bounded cleanup traversal/status bytes added for real file close handling.
 Diagnostics add no BSS; their bounded Phase 2 selector and fixed messages use
 45 code bytes and 599 read-only bytes.
 
+CASM Phase 3 Work Package 1 build 1015 synchronized the approved Phase 0C.1
+contract and task hierarchy without changing memory ownership or layout. User
+completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+The linked code/data remains 2,256 bytes with 449 BSS bytes and 1,391 bytes of
+combined `$1000` envelope headroom.
+
+CASM Phase 3 Work Package 2 build 1016 approved a future CASM-local 168-byte
+mnemonic table but added no runtime state or table data. Completion advanced
+the stage version from `0.1.3` to `0.1.4`; linked code/data remains 2,256 bytes
+with 449 BSS bytes and 1,391 bytes of combined envelope headroom.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

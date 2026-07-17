@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
-Status: [x]
-Taskwarrior: 29 (`df2f766c`)
-Plan: `brain/plans/2026-07-16-casm-phase2-cli-file-services.md`
+Status: [/]
+Taskwarrior: 29 (`099257cc`)
+Plan: `brain/plans/2026-07-16-casm-phase3-source-stream-lexer.md`
 
 ## Goal
 
@@ -12,11 +12,11 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 2 establishes bounded command-line parsing and managed native input file
-services. It parses one source and the initial option vocabulary, consumes a
-bounded input stream, replaces the Phase 1 file-cleanup stub, and preserves safe
-shell return across parse and I/O failures. It does not tokenize source,
-assemble code, or create production output.
+Phase 3 extends the managed Phase 2 input foundation with a rewindable,
+file-aware source stream and bounded minimal lexer. It normalizes logical
+newlines, tracks one-based source locations, exposes deterministic rewind, and
+produces a temporary token dump. It does not parse statements, evaluate
+expressions, define symbols, emit machine code, or create production output.
 
 ## Phase 1 Prerequisite
 
@@ -125,3 +125,38 @@ The Phase 2 walkthrough and confirmed CLI matrix are recorded in
 Phase 2 completed on 2026-07-16 after the user confirmed the full build 1014
 walkthrough and approved closing the milestone. Later assembler phases remain
 separate prerequisite-gated work.
+
+## Phase 3 Prerequisite
+
+- [x] User approved the Phase 0C.1 source-stream, newline, location, token,
+      numeric-shape, and bounds contracts in the Phase 3 plan.
+- [x] User approved beginning Work Package 1 on 2026-07-16.
+
+## Phase 3 Subtasks
+
+- [x] Task UUID `65832339`: synchronize task records, dependency corrections,
+      and approved Phase 0C.1 contracts.
+- [x] Task UUID `9ab8caf3`: investigate DEBUG assembler reuse feasibility.
+- [ ] Task UUID `9e0c03f3`: declare shared source/lexer ABI and bounded state.
+- [ ] Task UUID `fcb0e164`: implement the rewindable source backend.
+- [ ] Task UUID `9c733c1a`: implement newline normalization and provenance.
+- [ ] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
+- [ ] Task UUID `7196a56f`: implement the minimal lexer core.
+- [ ] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
+- [ ] Task UUID `3367d36d`: implement mnemonic classification.
+- [ ] Task UUID `a68d3603`: integrate diagnostics and temporary token dump.
+- [ ] Task UUID `178b0884`: verify artifacts and obtain user runtime
+      confirmation.
+
+## Phase 3 Acceptance
+
+- [ ] Phase 0C.1 and the DEBUG reuse decision are recorded.
+- [ ] Source traversal and rewind are byte-, newline-, and location-identical.
+- [ ] CR, LF, and CRLF normalize correctly across input-block boundaries.
+- [ ] Lines, tokens, offsets, cursors, and locations fail before overflow.
+- [ ] All approved token classes and lexical failure cases are deterministic.
+- [ ] The temporary token dump reports correct file, line, and column data.
+- [ ] CASM stays within the approved `$1000` `MAIN` envelope.
+- [ ] Build, artifact, release-disk, and no-change build checks pass.
+- [ ] The user completes the runtime walkthrough.
+- [ ] The user explicitly approves marking Phase 3 done.
