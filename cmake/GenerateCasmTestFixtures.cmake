@@ -70,3 +70,41 @@ file(WRITE "${OUTPUT_DIR}/casmln255.seq" "${CASM_LINE_255}${CASM_LF}SECOND${CASM
 # byte mode, and line-too-long ($17) once a line-API caller exists.
 string(REPEAT "L " 128 CASM_LINE_256)
 file(WRITE "${OUTPUT_DIR}/casmln256.seq" "${CASM_LINE_256}${CASM_LF}")
+
+# WP11 statement-parser fixtures. These exercise the restricted LL(1) grammar
+# through the temporary parse driver in casm.s. The valid fixture parses to EOF
+# and prints "CASM: INPUT VALIDATED"; each error fixture stops at its first
+# malformed statement and prints one specific WP11 diagnostic, so every error
+# case needs its own file (the parser exits fatally on the first failure).
+#
+# Grammar-only: WP11 validates statement structure, not opcode/operand-size
+# legality (that is WP12). So structurally valid but semantically odd lines are
+# accepted here by design.
+
+# One statement per addressing-mode opkind, all valid: implied, immediate
+# (decimal/hex/binary), absolute/ZP, absolute-X, absolute-Y, accumulator,
+# indirect-indexed (Y), indexed-indirect (X), and indirect.
+file(WRITE "${OUTPUT_DIR}/casmwp11.seq"
+    "INX\n"
+    "LDA #10\n"
+    "LDA #\$FF\n"
+    "LDX #%10101010\n"
+    "LDA \$10\n"
+    "STA \$0400,X\n"
+    "STA \$0500,Y\n"
+    "ASL A\n"
+    "LDA (\$10),Y\n"
+    "LDA (\$10,X)\n"
+    "JMP (\$1234)\n"
+)
+
+# Immediate with no number after '#'          -> CASM_DIAG_SYNTAX_ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmerr1.seq" "LDA #\n")
+# Indexed with no register after the comma    -> CASM_DIAG_SYNTAX_ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmerr2.seq" "STA \$0400,\n")
+# Indexed-indirect requires X, not Y          -> CASM_DIAG_SYNTAX_ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmerr3.seq" "LDA (\$10,Y)\n")
+# Trailing token after a complete operand     -> CASM_DIAG_EXPECTED_NEWLINE ($1D)
+file(WRITE "${OUTPUT_DIR}/casmerr4.seq" "LDA #10 20\n")
+# Immediate value exceeds 65535           -> CASM_DIAG_OPERAND_OUT_OF_RANGE ($1E)
+file(WRITE "${OUTPUT_DIR}/casmerr5.seq" "LDA #70000\n")

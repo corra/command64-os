@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 4 WP11 statement parser and syntax validation**: Added
+  `parser.s` with `parserParseStatement`, an LL(1) parser that consumes the
+  lexer's single-token buffer and validates the restricted numeric statement
+  grammar into the exported `CasmParserStmt` record (type, subtype, operand
+  kind, 16-bit value, register subtype). Every 6502 addressing-mode shape is
+  matched — implied, accumulator, immediate, absolute/ZP, absolute-X/Y,
+  indirect, indexed-indirect `($nn,X)`, and indirect-indexed `($nn),Y` — while
+  labels/identifiers are rejected pending a later phase. `parseNumericValue`
+  converts decimal, hex, and binary literals to 16 bits with a 24-bit
+  sticky-overflow accumulator that rejects values above 65535 regardless of
+  digit count. Added diagnostics `CASM_DIAG_SYNTAX_ERROR` (`$1C`),
+  `CASM_DIAG_EXPECTED_NEWLINE` (`$1D`), and `CASM_DIAG_OPERAND_OUT_OF_RANGE`
+  (`$1E`, moved up from WP12 so the converter's bounds check stays contiguous).
+  A temporary parse driver in `casm.s` replaced the WP10 token-dump loop so
+  syntax diagnostics surface through the central fatal path and a clean parse
+  prints `INPUT VALIDATED`; WP14 replaces this driver with the parser/emitter
+  loop. Added targeted fixtures `casmwp11` (all addressing modes, valid) and
+  `casmerr1`–`casmerr5` (one per WP11 diagnostic). User runtime confirmed the
+  valid and error fixtures behave as specified and that `casmshort` reports
+  `SYNTAX ERROR` on its deferred-label `JMP START_LABEL`. Completion advances
+  CASM to `0.1.13` build 1042.
 - **CASM Phase 3 WP7 minimal lexer core**: Added `lexer.s`, the first consumer
   of the source layer. It owns a one-result lookahead over `sourceNextByte` and
   the token record, captures file/line/column provenance before each token's

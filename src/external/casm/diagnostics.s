@@ -48,7 +48,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE3_LAST + 1
+    cmp #CASM_DIAG_PHASE4_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED
@@ -379,6 +379,9 @@ diagMessageLo:
     .byte <msgInvalidSourceByte
     .byte <msgMalformedNumber
     .byte <msgLexerStateFailed
+    .byte <msgSyntaxError
+    .byte <msgExpectedNewline
+    .byte <msgOperandOutOfRange
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -409,10 +412,13 @@ diagMessageHi:
     .byte >msgInvalidSourceByte
     .byte >msgMalformedNumber
     .byte >msgLexerStateFailed
+    .byte >msgSyntaxError
+    .byte >msgExpectedNewline
+    .byte >msgOperandOutOfRange
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE3_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE3_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE4_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE4_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -468,6 +474,12 @@ msgMalformedNumber:
     .byte "CASM: MALFORMED NUMBER", PetCr, 0
 msgLexerStateFailed:
     .byte "CASM: INVALID LEXER STATE", PetCr, 0
+msgSyntaxError:
+    .byte "CASM: SYNTAX ERROR", PetCr, 0
+msgExpectedNewline:
+    .byte "CASM: EXPECTED NEWLINE", PetCr, 0
+msgOperandOutOfRange:
+    .byte "CASM: OPERAND OUT OF RANGE", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

@@ -182,7 +182,18 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
 
 ## Tasks
 
-- [ ] Task UUID `31bb2198`: implement statement parser and syntax validation.
+- [x] Task UUID `31bb2198`: implement statement parser and syntax validation.
+      `parser.s` with `parserParseStatement` (LL(1) statement/operand grammar
+      over the lexer's single-token buffer) and `parseNumericValue` (decimal/
+      hex/binary to 16-bit with a 24-bit sticky-overflow bounds check).
+      `CasmParserStmt` record, opkind equates, and diagnostics `$1C`–`$1E`
+      added. A temporary parse driver in `casm.s` replaced the WP10 token dump
+      so syntax diagnostics surface through the fatal path; WP14 replaces it.
+      Targeted fixtures (`casmwp11` plus `casmerr1`–`casmerr5`) added. User
+      runtime confirmed the valid fixture prints `INPUT VALIDATED`, each error
+      fixture prints its diagnostic, and `casmshort` correctly reports
+      `SYNTAX ERROR` on its deferred-label `JMP START_LABEL`. Completion
+      approved on 2026-07-17; build 1042 advanced CASM to `0.1.13`.
 - [ ] Task UUID `501bc58c`: implement opcode table and addressing mode matcher.
 - [ ] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
 - [ ] Task UUID `d1e2f3a4`: execute orchestration and end-to-end binary validation.

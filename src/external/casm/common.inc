@@ -367,11 +367,47 @@ CASM_DIAG_INVALID_SOURCE_BYTE = $19
 CASM_DIAG_MALFORMED_NUMBER = $1A
 CASM_DIAG_LEXER_STATE_FAILED = $1B
 CASM_DIAG_PHASE3_LAST = CASM_DIAG_LEXER_STATE_FAILED
+CASM_DIAG_SYNTAX_ERROR = $1C
+CASM_DIAG_EXPECTED_NEWLINE = $1D
+CASM_DIAG_OPERAND_OUT_OF_RANGE = $1E
+CASM_DIAG_PHASE4_LAST = CASM_DIAG_OPERAND_OUT_OF_RANGE
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
 .assert CASM_DIAG_SOURCE_REWIND_FAILED = CASM_DIAG_PHASE2_LAST + 1, error, "CASM Phase 3 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE3_LAST = $1B, error, "CASM Phase 3 diagnostic range changed"
+.assert CASM_DIAG_SYNTAX_ERROR = CASM_DIAG_PHASE3_LAST + 1, error, "CASM Phase 4 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE4_LAST = $1E, error, "CASM Phase 4 diagnostic range changed"
+
+; ---------------------------------------------------------------------------
+; Phase 4 statement parser contract
+; ---------------------------------------------------------------------------
+
+; CasmParserStmt record layout. A fixed-size BSS record populated by
+; parserParseStatement (parser.s) for the downstream addressing-mode matcher
+; and emission engine.
+CASM_PARSER_STMT_TYPE        = 0
+CASM_PARSER_STMT_SUBTYPE     = 1
+CASM_PARSER_STMT_OPKIND      = 2
+CASM_PARSER_STMT_VAL_LO      = 3
+CASM_PARSER_STMT_VAL_HI      = 4
+CASM_PARSER_STMT_REG_SUBTYPE = 5
+CASM_PARSER_STMT_SIZE        = 6
+
+; Operand category recorded in CasmParserStmt.OpKind.
+CASM_OPKIND_IMPLIED          = 0
+CASM_OPKIND_ACCUMULATOR      = 1
+CASM_OPKIND_IMMEDIATE        = 2
+CASM_OPKIND_ABSOLUTE         = 3  ; Covers ZP, Absolute
+CASM_OPKIND_ABSOLUTE_X       = 4  ; ZP,X / Abs,X
+CASM_OPKIND_ABSOLUTE_Y       = 5  ; ZP,Y / Abs,Y
+CASM_OPKIND_INDIRECT         = 6
+CASM_OPKIND_INDEXED_INDIRECT = 7  ; (ZP,X)
+CASM_OPKIND_INDIRECT_INDEXED = 8  ; (ZP),Y
+CASM_OPKIND_COUNT            = 9
+
+.assert CASM_PARSER_STMT_SIZE = 6, error, "CASM parser statement record size changed"
+.assert CASM_OPKIND_COUNT = CASM_OPKIND_INDIRECT_INDEXED + 1, error, "CASM operand kind range changed"
 
 ; Registration/release routines return carry clear on success. On failure,
 ; carry is set and A contains one of the CASM_DIAG_* identifiers above.

@@ -21,6 +21,10 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
 - **Diagnostics added**:
   - `CASM_DIAG_SYNTAX_ERROR` ($1C) -> `"CASM: SYNTAX ERROR"`
   - `CASM_DIAG_EXPECTED_NEWLINE` ($1D) -> `"CASM: EXPECTED NEWLINE"`
+  - `CASM_DIAG_OPERAND_OUT_OF_RANGE` ($1E) -> `"CASM: OPERAND OUT OF RANGE"`
+    (amended 2026-07-17: moved up from WP12 because the WP11 numeric-literal
+    converter's >65535 bounds check needs it; keeping it contiguous at $1E
+    avoids a hole in the dense `diagPrintFatal` message table)
 
 ### 2. Work Package 12: Opcode Table and Addressing Mode Matcher
 - **Goal**: Define the 6502 opcode lookup tables and match mnemonics with operands.
@@ -31,8 +35,10 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
   - Determine numeric sizes (8-bit vs 16-bit) and select the correct opcode.
   - Relative branch range check (`-128` to `127`) from current program counter.
 - **Diagnostics added**:
-  - `CASM_DIAG_INVALID_ADDR_MODE` ($1E) -> `"CASM: INVALID ADDRESSING MODE"`
-  - `CASM_DIAG_OPERAND_OUT_OF_RANGE` ($1F) -> `"CASM: OPERAND OUT OF RANGE"`
+  - `CASM_DIAG_INVALID_ADDR_MODE` ($1F) -> `"CASM: INVALID ADDRESSING MODE"`
+    (amended 2026-07-17: was $1E; shifted to $1F because WP11 now owns $1E for
+    `CASM_DIAG_OPERAND_OUT_OF_RANGE`. Net slot usage through WP12 is unchanged,
+    so WP13's $20-$22 are unaffected.)
 
 ### 3. Work Package 13: Directives and Emission Engine
 - **Goal**: Process numeric directives and emit machine bytes to a native output file.

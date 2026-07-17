@@ -11,7 +11,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "12"
+.define VERSION_STAGE "13"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -30,9 +30,9 @@
 .import exitFatal
 
 .import lexerInit
-.import lexerNext
-.import diagDumpToken
-.import CasmTokenRecord
+.import parserParseStatement
+.import CasmParserStmt
+.import diagPrintPhase2Ready
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -83,14 +83,19 @@ startOptionsReady:
 
     jsr lexerInit
     bcs startFatal
-startLexerLoop:
-    jsr lexerNext
-    bcs startFatal
-    jsr diagDumpToken
-    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
-    cmp #CASM_TOKEN_EOF
-    bne startLexerLoop
 
+    ; WP11 temporary verification driver: parse each statement so any syntax
+    ; diagnostic surfaces through the central fatal path, and print the
+    ; validated banner once the stream parses to EOF. WP14 replaces this with
+    ; the parser/emitter loop.
+startParseLoop:
+    jsr parserParseStatement
+    bcs startFatal
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    cmp #CASM_TOKEN_EOF
+    bne startParseLoop
+
+    jsr diagPrintPhase2Ready
     jsr sourceClose
     bcs startFatal
     jmp exitSuccess

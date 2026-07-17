@@ -329,6 +329,12 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmfincr.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmln255.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmln256.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmwp11.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr2.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr3.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr4.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr5.seq"
 )
 
 add_custom_command(
