@@ -35,7 +35,7 @@ The purpose of the `src/external` directory is to contain external user space ap
 1. **Directory Setup**: Create a subdirectory `src/external/<appname>/`. Place the entry source and any app-local `.s`/`.inc` files inside it.
 2. **Build File**: Create a persistent file `BUILD_<APPNAME_UPPER>` in the app directory. Initialize it with a starting build number (typically `1000\n`).
 3. **Assembly Versioning Integration**:
-   - Define version constants (`VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_STAGE`) in the entry assembly file.
+   - Define version constants (`VERSION_MAJOR`, `VERSION_MINOR`, `VERSION_STAGE`) using preprocessor text macros (`.define`) in the entry assembly file (e.g. `.define VERSION_STAGE "0"`).
    - Include the shared app API with `.include "command64.inc"`; `add_ca65_app` already passes `-I include/ca65`.
    - Include the generated build file when a printed version banner needs `BUILD_NUMBER`; `add_ca65_app` emits ca65 syntax (`.define BUILD_NUMBER "<n>"`).
 4. **CMake Target**:

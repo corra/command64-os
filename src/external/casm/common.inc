@@ -237,6 +237,15 @@ CASM_SOURCE_LINE_READY    = $02
 CASM_SOURCE_LINE_EOF      = $03
 CASM_SOURCE_LINE_COUNT    = $04
 
+; Lexer states. WP3 reserved the CasmLexerState byte in state.s and left its
+; values for WP7. INIT is the pre-lexerInit value; READY produces tokens; EOF
+; latches a repeat-stable EOF token; ERROR records a failure.
+CASM_LEXER_STATE_INIT  = $00
+CASM_LEXER_STATE_READY = $01
+CASM_LEXER_STATE_EOF   = $02
+CASM_LEXER_STATE_ERROR = $03
+CASM_LEXER_STATE_COUNT = $04
+
 CASM_TOKEN_TEXT_MAX         = 31
 CASM_TOKEN_TEXT_BUFFER_SIZE = CASM_TOKEN_TEXT_MAX + 1
 
@@ -300,6 +309,7 @@ CASM_TOKEN_REC_SIZE    = CASM_TOKEN_REC_TEXT + CASM_TOKEN_TEXT_BUFFER_SIZE
 .assert CASM_SOURCE_STATE_COUNT = CASM_SOURCE_STATE_ERROR + 1, error, "CASM source state range changed"
 .assert CASM_SOURCE_API_COUNT = CASM_SOURCE_API_LINE + 1, error, "CASM source API range changed"
 .assert CASM_SOURCE_LINE_COUNT = CASM_SOURCE_LINE_EOF + 1, error, "CASM source line state range changed"
+.assert CASM_LEXER_STATE_COUNT = CASM_LEXER_STATE_ERROR + 1, error, "CASM lexer state range changed"
 .assert CASM_TOKEN_TEXT_BUFFER_SIZE = 32, error, "CASM token text buffer changed"
 .assert CASM_TOKEN_COUNT = CASM_TOKEN_GREATER + 1, error, "CASM token type range changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"

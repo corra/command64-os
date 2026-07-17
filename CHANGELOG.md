@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **CASM Phase 3 WP6 deterministic rewind and bounded line API**: Added
   `sourceRewind` (close/reopen with a full source-owned reset so a second
   traversal is byte-, newline-, and location-identical) and `sourceNextLine`

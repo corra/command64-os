@@ -270,6 +270,13 @@ This file serves as the shared repository for architectural decisions, technical
 - **Format**: MS-DOS standard double-null terminated strings (`VAR1=VAL1\0VAR2=VAL2\0\0`).
 - **Access**: Managed via the `SET` and `PATH` internal commands. External programs can access it via the VMM API.
 
+### Generalized Multi-Digit Version Stage (approved 2026-07-17)
+- **Constraint**: ca65 equates defined using `=` are restricted to numeric expressions and cannot represent string literals. Consequently, version staging was historically limited to single-byte character constants (e.g. `'0'`–`'9'`).
+- **Resolution**: Transitioning to preprocessor text macros (`.define VERSION_STAGE "10"`) allows version stage strings of arbitrary length/digits.
+- **Implementation**: The preprocessor evaluates these macros during assembly time. Placing them in `.byte` declarations (e.g., `.byte VERSION_STAGE`) compiles them directly to their PETSCII character representations. This transition is completely static, resulting in zero runtime overhead or changes to execution logic.
+- **Generalization**: This standard is generalized to all `ca65` external applications and test suites in the repository, ensuring uniform version representation.
+
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

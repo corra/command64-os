@@ -24,9 +24,9 @@
 .include "command64.inc"
 .include "common.inc"
 
-VERSION_MAJOR = '0'
-VERSION_MINOR = '4'
-VERSION_STAGE = '0'
+.define VERSION_MAJOR "0"
+.define VERSION_MINOR "4"
+.define VERSION_STAGE "0"
 .include "build_label.inc"
 
 .import __MAIN_START__
@@ -436,8 +436,7 @@ devMsg:
 ; "LABEL v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
 ; + "." + BUILD_NUMBER banner format exactly.
 verMsg:
-    .byte $4C, $41, $42, $45, $4C, $20, $56
-    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte "LABEL V", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."
     .byte BUILD_NUMBER
     .byte $0D, $00
 

@@ -38,9 +38,9 @@
 .export FilenamePtrLo
 .export FilenamePtrHi
 
-VERSION_MAJOR = '0'
-VERSION_MINOR = '1'
-VERSION_STAGE = '4'  ; Phase 4 verified in VICE
+.define VERSION_MAJOR "0"
+.define VERSION_MINOR "1"
+.define VERSION_STAGE "4"  ; Phase 4 verified in VICE
 .include "build_edlin.inc"
 
 .import __MAIN_START__
@@ -338,8 +338,7 @@ oliDoneRead:
 ; "EDLIN V" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
 ; + "." + BUILD_NUMBER, same banner format as label.s/format.s.
 verMsg:
-    .byte $45, $44, $4C, $49, $4E, $20, $56
-    .byte VERSION_MAJOR, $2E, VERSION_MINOR, $2E, VERSION_STAGE, $2E
+    .byte "EDLIN V", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."
     .byte BUILD_NUMBER
     .byte $0D, $00
 ; "USAGE: EDLIN <FILENAME>"

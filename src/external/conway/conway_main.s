@@ -17,9 +17,9 @@
 .include "common.inc"
 .include "screencode.inc"
 
-VERSION_MAJOR = '0'
-VERSION_MINOR = '4'
-VERSION_STAGE = '1'
+.define VERSION_MAJOR "0"
+.define VERSION_MINOR "4"
+.define VERSION_STAGE "1"
 .include "build_conway.inc"
 
 .import randomizeGrid
