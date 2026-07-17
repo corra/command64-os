@@ -45,6 +45,31 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Do not implement a phase until the user approves that phase's prerequisite
   contract gate. Phase 0A governs the scaffold; Phase 0B governs Phase 2 CLI
   and file services; later language/storage contracts remain Phase 0C work.
+- Every CASM work package from Phase 3 Work Package 3 onward must have a
+  dedicated detailed implementation plan saved under `brain/plans/` and
+  explicitly approved by the user before that package becomes active or
+  implementation begins. Parent-phase approval and approval of an earlier
+  package do not approve a later package.
+- Read-only discovery may precede work-package plan approval. Investigation,
+  source or build edits, fixture creation, functional documentation changes,
+  and task activation must wait for the dedicated plan. Material deviations
+  discovered during implementation require an amended plan and renewed user
+  approval before work continues.
+- Each detailed work-package plan must define its objective, prerequisites,
+  inherited decisions, scope, expected files, ABI and storage effects,
+  register/flag/scratch contracts, atomic increments, failure and cleanup
+  behavior, verification, documentation/task/DOX updates, stop conditions, and
+  completion gate.
+- Completing a CASM work package increments the stage component of the current
+  `major.minor.stage` version while preserving the current major and minor
+  components. The new stage is recorded only after verification and explicit
+  user completion approval, together with task, knowledge, memory, changelog,
+  and walkthrough updates.
+- Version stages are unbounded decimal values, not single digits. The current
+  one-byte `VERSION_STAGE` banner representation may remain temporarily, but a
+  separately planned and approved multi-digit representation must be completed
+  before any work package at version `0.1.9` may be completed. That migration
+  must preserve the independent build-number component.
 
 # Work Guidance
 
