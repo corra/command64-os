@@ -194,7 +194,19 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
       fixture prints its diagnostic, and `casmshort` correctly reports
       `SYNTAX ERROR` on its deferred-label `JMP START_LABEL`. Completion
       approved on 2026-07-17; build 1042 advanced CASM to `0.1.13`.
-- [ ] Task UUID `501bc58c`: implement opcode table and addressing mode matcher.
+- [x] Task UUID `501bc58c`: implement opcode table and addressing mode matcher.
+      `opcodes.s` with the compressed legal-6502 table (56 mnemonic mode masks,
+      run offsets, 151 packed opcodes) and `opcodesFindOpcode`, which resolves
+      the WP11 operand kind to a concrete `CASM_MODE_*` (with ZP/absolute
+      promotion and branch detection), verifies mnemonic support, and records
+      opcode/mode/length in the exported `CasmInsn`. Added `CASM_MODE_*`,
+      `CasmInsn`, and `CASM_DIAG_INVALID_ADDR_MODE` ($1F); reused `$1E` for
+      8-bit operand overflow. Relative displacement/range check deferred to
+      WP13 per the amended parent plan. The temporary `casm.s` driver now runs
+      the matcher on mnemonic statements. Fixtures `casmam1`/`casmam2`
+      (invalid mode) and `casmrng1` (immediate 8-bit overflow) added. User
+      runtime confirmed all cases. Completion approved on 2026-07-17; build
+      1047 advanced CASM to `0.1.14`.
 - [ ] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
 - [ ] Task UUID `d1e2f3a4`: execute orchestration and end-to-end binary validation.
 - [ ] Task UUID `c2a3b4c5`: verify artifacts and obtain user runtime confirmation.

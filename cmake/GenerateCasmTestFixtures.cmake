@@ -108,3 +108,14 @@ file(WRITE "${OUTPUT_DIR}/casmerr3.seq" "LDA (\$10,Y)\n")
 file(WRITE "${OUTPUT_DIR}/casmerr4.seq" "LDA #10 20\n")
 # Immediate value exceeds 65535           -> CASM_DIAG_OPERAND_OUT_OF_RANGE ($1E)
 file(WRITE "${OUTPUT_DIR}/casmerr5.seq" "LDA #70000\n")
+
+# WP12 addressing-mode matcher fixtures. Each parses cleanly (valid WP11
+# grammar) but fails opcode resolution in the matcher, so it exercises a WP12
+# diagnostic through the temporary driver.
+#
+# Accumulator mode on an instruction that has none -> INVALID ADDRESSING MODE ($1F)
+file(WRITE "${OUTPUT_DIR}/casmam1.seq" "LDA A\n")
+# Immediate mode on an implied-only instruction  -> INVALID ADDRESSING MODE ($1F)
+file(WRITE "${OUTPUT_DIR}/casmam2.seq" "INX #5\n")
+# Immediate operand exceeds 8 bits            -> OPERAND OUT OF RANGE ($1E)
+file(WRITE "${OUTPUT_DIR}/casmrng1.seq" "LDA #\$1234\n")

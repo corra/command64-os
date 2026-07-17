@@ -370,14 +370,16 @@ CASM_DIAG_PHASE3_LAST = CASM_DIAG_LEXER_STATE_FAILED
 CASM_DIAG_SYNTAX_ERROR = $1C
 CASM_DIAG_EXPECTED_NEWLINE = $1D
 CASM_DIAG_OPERAND_OUT_OF_RANGE = $1E
-CASM_DIAG_PHASE4_LAST = CASM_DIAG_OPERAND_OUT_OF_RANGE
+CASM_DIAG_INVALID_ADDR_MODE = $1F
+CASM_DIAG_PHASE4_LAST = CASM_DIAG_INVALID_ADDR_MODE
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
 .assert CASM_DIAG_SOURCE_REWIND_FAILED = CASM_DIAG_PHASE2_LAST + 1, error, "CASM Phase 3 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE3_LAST = $1B, error, "CASM Phase 3 diagnostic range changed"
 .assert CASM_DIAG_SYNTAX_ERROR = CASM_DIAG_PHASE3_LAST + 1, error, "CASM Phase 4 diagnostics must remain contiguous"
-.assert CASM_DIAG_PHASE4_LAST = $1E, error, "CASM Phase 4 diagnostic range changed"
+.assert CASM_DIAG_INVALID_ADDR_MODE = CASM_DIAG_OPERAND_OUT_OF_RANGE + 1, error, "CASM Phase 4 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE4_LAST = $1F, error, "CASM Phase 4 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -408,6 +410,39 @@ CASM_OPKIND_COUNT            = 9
 
 .assert CASM_PARSER_STMT_SIZE = 6, error, "CASM parser statement record size changed"
 .assert CASM_OPKIND_COUNT = CASM_OPKIND_INDIRECT_INDEXED + 1, error, "CASM operand kind range changed"
+
+; ---------------------------------------------------------------------------
+; Phase 4 opcode table and addressing-mode matcher contract (WP12)
+; ---------------------------------------------------------------------------
+
+; Concrete 6502 addressing modes. The bit position of each mode is also the
+; canonical packing order of a mnemonic's opcode run in opcodes.s, so these
+; values are stable ABI: opcodeMaskLo/Hi bits and opcodeBytes ordering both
+; depend on them.
+CASM_MODE_IMPLIED          = 0
+CASM_MODE_ACCUMULATOR      = 1
+CASM_MODE_IMMEDIATE        = 2
+CASM_MODE_ZEROPAGE         = 3
+CASM_MODE_ZEROPAGE_X       = 4
+CASM_MODE_ZEROPAGE_Y       = 5
+CASM_MODE_ABSOLUTE         = 6
+CASM_MODE_ABSOLUTE_X       = 7
+CASM_MODE_ABSOLUTE_Y       = 8
+CASM_MODE_INDIRECT         = 9
+CASM_MODE_INDEXED_INDIRECT = 10
+CASM_MODE_INDIRECT_INDEXED = 11
+CASM_MODE_RELATIVE         = 12
+CASM_MODE_COUNT            = 13
+
+; CasmInsn encoding record populated by opcodesFindOpcode (opcodes.s) and
+; consumed by the WP13 emission engine.
+CASM_INSN_OPCODE = 0   ; selected opcode byte
+CASM_INSN_MODE   = 1   ; resolved CASM_MODE_*
+CASM_INSN_LENGTH = 2   ; 1..3 total instruction bytes
+CASM_INSN_SIZE   = 3
+
+.assert CASM_MODE_COUNT = CASM_MODE_RELATIVE + 1, error, "CASM addressing mode range changed"
+.assert CASM_INSN_SIZE = 3, error, "CASM instruction encoding record size changed"
 
 ; Registration/release routines return carry clear on success. On failure,
 ; carry is set and A contains one of the CASM_DIAG_* identifiers above.

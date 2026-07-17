@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 4 WP12 opcode table and addressing-mode matcher**: Added
+  `opcodes.s`, a compressed legal-6502 opcode table (per-mnemonic 13-bit
+  supported-mode mask, run offset, and packed opcode run — 56 mnemonics, 151
+  opcodes) indexed by the lexer's mnemonic subtype, plus `opcodesFindOpcode`.
+  The matcher resolves a WP11 `CasmParserStmt` operand kind to one concrete
+  `CASM_MODE_*` (including zero-page/absolute promotion by value size and
+  relative-branch detection), verifies the mnemonic supports that mode, selects
+  the opcode by counting set mask bits below the resolved mode, and records
+  opcode/mode/length in the exported `CasmInsn` record for WP13. Added the
+  `CASM_MODE_*` enumeration, the `CasmInsn` record, and
+  `CASM_DIAG_INVALID_ADDR_MODE` ($1F); the WP11 `CASM_DIAG_OPERAND_OUT_OF_RANGE`
+  ($1E) is reused to reject immediate and indirect-zero-page operands that
+  exceed 8 bits. Relative-branch displacement and range checking are deferred to
+  WP13, where the program counter exists (parent plan amended accordingly). The
+  temporary `casm.s` driver now runs the matcher on mnemonic statements so
+  addressing-mode and operand-range errors surface through the central fatal
+  path. Added fixtures `casmam1`/`casmam2` (invalid addressing mode) and
+  `casmrng1` (immediate 8-bit overflow). User runtime confirmed the valid and
+  error fixtures behave as specified. Completion advances CASM to `0.1.14`
+  build 1047.
 - **CASM Phase 4 WP11 statement parser and syntax validation**: Added
   `parser.s` with `parserParseStatement`, an LL(1) parser that consumes the
   lexer's single-token buffer and validates the restricted numeric statement

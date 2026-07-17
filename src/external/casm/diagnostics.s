@@ -382,6 +382,7 @@ diagMessageLo:
     .byte <msgSyntaxError
     .byte <msgExpectedNewline
     .byte <msgOperandOutOfRange
+    .byte <msgInvalidAddrMode
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -415,6 +416,7 @@ diagMessageHi:
     .byte >msgSyntaxError
     .byte >msgExpectedNewline
     .byte >msgOperandOutOfRange
+    .byte >msgInvalidAddrMode
 diagMessageHiEnd:
 
 .assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE4_LAST, error, "CASM diagnostic low table is incomplete"
@@ -480,6 +482,8 @@ msgExpectedNewline:
     .byte "CASM: EXPECTED NEWLINE", PetCr, 0
 msgOperandOutOfRange:
     .byte "CASM: OPERAND OUT OF RANGE", PetCr, 0
+msgInvalidAddrMode:
+    .byte "CASM: INVALID ADDRESSING MODE", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

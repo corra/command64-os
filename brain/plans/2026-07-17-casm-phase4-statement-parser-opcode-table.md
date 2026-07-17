@@ -33,12 +33,22 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
   - Implement addressing-mode matcher that inspects operand tokens (e.g. `#` for immediate, `(...,X)` for indexed-indirect, `,X` or `,Y` for indexed, etc.) and determines the target mode:
     - Implied, Accumulator, Immediate, Zero-Page, Zero-Page X/Y, Absolute, Absolute X/Y, Indirect, Indexed-Indirect (X), Indirect-Indexed (Y), and Relative.
   - Determine numeric sizes (8-bit vs 16-bit) and select the correct opcode.
-  - Relative branch range check (`-128` to `127`) from current program counter.
+  - For branch mnemonics, select the Relative mode and branch opcode only. The
+    displacement computation and `-128..+127` range check move to WP13 (see the
+    amendment note below).
+  - Reuse `CASM_DIAG_OPERAND_OUT_OF_RANGE` ($1E, added in WP11) to reject
+    immediate/zero-page-indirect operands that exceed 8 bits.
+  - Detailed plan: `brain/plans/2026-07-17-casm-phase4-wp12-opcode-table-matcher.md`.
 - **Diagnostics added**:
   - `CASM_DIAG_INVALID_ADDR_MODE` ($1F) -> `"CASM: INVALID ADDRESSING MODE"`
     (amended 2026-07-17: was $1E; shifted to $1F because WP11 now owns $1E for
     `CASM_DIAG_OPERAND_OUT_OF_RANGE`. Net slot usage through WP12 is unchanged,
-    so WP13's $20-$22 are unaffected.)
+    so WP13's existing $20-$22 numbering is unaffected.)
+  - **Amendment 2026-07-17 (dependency fix)**: the original WP12 scope listed a
+    "relative branch range check from current program counter." The program
+    counter (`CasmPc`) is not introduced until WP13, so WP12 cannot range-check
+    branches. WP12 now resolves the Relative *mode* and opcode only; the
+    PC-relative displacement and range check are WP13 work.
 
 ### 3. Work Package 13: Directives and Emission Engine
 - **Goal**: Process numeric directives and emit machine bytes to a native output file.
@@ -48,10 +58,16 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
   - Write output stream buffers to the derived output file using `fileIo` write APIs.
   - Generate the standard 2-byte PRG load address header.
   - Track Program Counter (`CasmPc`) and check segment limits (max `$FFFF`).
+  - Compute relative branch displacements against `CasmPc` and enforce the
+    `-128..+127` range (moved here from WP12, which now only selects the
+    Relative mode and branch opcode; see the WP12 amendment note above).
 - **Diagnostics added**:
   - `CASM_DIAG_DUPLICATE_ORG` ($20) -> `"CASM: DUPLICATE ORG"`
   - `CASM_DIAG_ORG_REQUIRED` ($21) -> `"CASM: ORG REQUIRED"`
   - `CASM_DIAG_ADDRESS_OVERFLOW` ($22) -> `"CASM: ADDRESS OVERFLOW"`
+  - `CASM_DIAG_BRANCH_OUT_OF_RANGE` ($23) -> `"CASM: BRANCH OUT OF RANGE"`
+    (added 2026-07-17: the relative range check moved here from WP12 with the
+    program counter it depends on)
 
 ### 4. Work Package 14: Phase 4 Orchestration and Verification
 - **Goal**: Integrate components into the main assembler execution path and verify against reference binaries.

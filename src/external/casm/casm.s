@@ -11,7 +11,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "13"
+.define VERSION_STAGE "14"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -32,6 +32,7 @@
 .import lexerInit
 .import parserParseStatement
 .import CasmParserStmt
+.import opcodesFindOpcode
 .import diagPrintPhase2Ready
 
 .segment "HEADER"
@@ -84,13 +85,20 @@ startOptionsReady:
     jsr lexerInit
     bcs startFatal
 
-    ; WP11 temporary verification driver: parse each statement so any syntax
-    ; diagnostic surfaces through the central fatal path, and print the
-    ; validated banner once the stream parses to EOF. WP14 replaces this with
-    ; the parser/emitter loop.
+    ; WP11/WP12 temporary verification driver: parse each statement and, for
+    ; mnemonic statements, resolve the opcode so syntax, addressing-mode, and
+    ; operand-range diagnostics all surface through the central fatal path.
+    ; Print the validated banner once the stream parses to EOF. WP14 replaces
+    ; this with the parser/emitter loop.
 startParseLoop:
     jsr parserParseStatement
     bcs startFatal
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    cmp #CASM_TOKEN_MNEMONIC
+    bne startParseCheckEof
+    jsr opcodesFindOpcode
+    bcs startFatal
+startParseCheckEof:
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE
     cmp #CASM_TOKEN_EOF
     bne startParseLoop
