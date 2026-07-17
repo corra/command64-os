@@ -31,8 +31,9 @@
   - [x] `65832339` Synchronize task records, dependency corrections, and
         approved Phase 0C.1 contracts
   - [x] `9ab8caf3` Investigate DEBUG assembler reuse feasibility
-  - [ ] `9e0c03f3` Declare shared source/lexer ABI and bounded state
-  - [ ] `fcb0e164` Implement the rewindable source backend
+  - [x] `9e0c03f3` Declare shared source/lexer ABI and bounded state
+  - [/] `fcb0e164` Implement the rewindable source backend; plan approved and
+        task started 2026-07-16
   - [ ] `9c733c1a` Implement newline normalization and provenance
   - [ ] `cda20f5b` Implement deterministic rewind and bounded line API
   - [ ] `7196a56f` Implement the minimal lexer core

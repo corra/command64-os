@@ -38,6 +38,15 @@ The `src/external/casm` directory owns CASM, a native Command 64
   literals for runtime byte comparisons.
 - Keep source locations file-aware and line-aware from the first source-stream
   implementation.
+- Keep Phase 3 persistent source, lookahead, and token storage in the bounded
+  storage-only `state.s`. Executable `source.s` and `lexer.s` import their
+  subrecords when WP4 and WP7 implement them; they must not redefine storage.
+- Phase 3 state is exactly 63 BSS bytes: a 16-byte source subrecord and a
+  47-byte lexer/lookahead/token subrecord containing one contiguous 39-byte
+  token record with 31 payload bytes plus terminator.
+- `CasmIoBuffer` remains the only 256-byte source buffer. Byte mode owns it as
+  a transfer block; future line mode owns it as a bounded line window. The two
+  modes are mutually exclusive until rewind/reset.
 - Keep Pass 1 and Pass 2 deterministic; Pass 2 reparses a rewindable source
   stream rather than relying on an unbounded in-memory syntax tree.
 - Emit structured events in Pass 2 so PRG, listing, and map consumers do not
@@ -80,6 +89,9 @@ The `src/external/casm` directory owns CASM, a native Command 64
   `brain/task.md` together.
 - Prefer fixed-capacity tables, explicit bounds checks, and 16-bit carry
   handling over implicit wraparound.
+- Treat `common.inc` Phase 3 token types, record offsets, diagnostic numbers,
+  source results, and `$80-$83` scratch aliases as stable ABI. Later work
+  packages require an approved plan amendment before changing them.
 - Treat resource cleanup, source provenance, expression relocation class, and
   instruction-size stability as foundational interfaces rather than late
   error handling.

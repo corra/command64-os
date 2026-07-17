@@ -119,6 +119,19 @@ This file serves as the shared repository for architectural decisions, technical
 
 ### CASM Phase 3 Source/Lexer Contract (approved 2026-07-16)
 
+- WP3 freezes the source/lexer ABI in `common.inc` and owns persistent Phase 3
+  storage in storage-only `state.s`. The layout is exactly 63 BSS bytes: 16
+  source bytes plus 47 lexer/lookahead/token bytes. The token record is 39
+  contiguous bytes with a seven-byte header and 32-byte text buffer.
+- WP3 reserves diagnostics `$14-$1B`, sixteen token types, type-specific
+  directive/register/number subtypes, mnemonic subtype range 0-55, and only
+  `$80-$83` as transient source/lexer aliases. It adds no diagnostic messages
+  or runtime source/lexer path.
+- `CasmIoBuffer` remains the sole 256-byte buffer. Future byte mode uses it as
+  a transfer block; line mode must switch exclusive ownership and build the
+  line directly in the same buffer. Mixing APIs requires rewind/reset.
+- WP3 completion-candidate approval advanced CASM from `0.1.4` to `0.1.5`;
+  final WP3 closure remains gated by user runtime confirmation.
 - WP2 independently verified all 56 DEBUG mnemonic names and ordering against
   the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
   mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,

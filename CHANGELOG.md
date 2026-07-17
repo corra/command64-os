@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 3 WP3 bounded ABI/state**: Added stable source results and
+  states, sixteen token types, type-specific subtypes, explicit PETSCII lexical
+  bytes, reserved diagnostics `$14-$1B`, and a storage-only 63-byte Phase 3 BSS
+  module. Source and lexer execution remain deferred to WP4 and WP7. Approved
+  completion and runtime verification advance CASM to `0.1.5` build 1018.
 - **CASM stream-boundary fixtures**: Added deterministic 0-byte, 17-byte,
   256-byte, and 513-byte SEQ inputs to `test.d64` for Phase 2 input-stream
   verification.

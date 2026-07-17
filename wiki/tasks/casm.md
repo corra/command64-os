@@ -137,8 +137,9 @@ separate prerequisite-gated work.
 - [x] Task UUID `65832339`: synchronize task records, dependency corrections,
       and approved Phase 0C.1 contracts.
 - [x] Task UUID `9ab8caf3`: investigate DEBUG assembler reuse feasibility.
-- [ ] Task UUID `9e0c03f3`: declare shared source/lexer ABI and bounded state.
-- [ ] Task UUID `fcb0e164`: implement the rewindable source backend.
+- [x] Task UUID `9e0c03f3`: declare shared source/lexer ABI and bounded state.
+- [/] Task UUID `fcb0e164`: implement the rewindable source backend; detailed
+      plan approved and implementation authorized on 2026-07-16.
 - [ ] Task UUID `9c733c1a`: implement newline normalization and provenance.
 - [ ] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
 - [ ] Task UUID `7196a56f`: implement the minimal lexer core.

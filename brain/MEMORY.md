@@ -132,6 +132,14 @@ mnemonic table but added no runtime state or table data. Completion advanced
 the stage version from `0.1.3` to `0.1.4`; linked code/data remains 2,256 bytes
 with 449 BSS bytes and 1,391 bytes of combined envelope headroom.
 
+CASM Phase 3 Work Package 3 version build 1018 retains 2,256
+linked code/data bytes and 241 relocation points. Storage-only `state.s` adds
+exactly 63 BSS bytes with zero code, RODATA, DATA, or zero-page allocation:
+16 bytes for source state and 47 bytes for lexer/lookahead/token state. Total
+BSS is 512 bytes and combined `$1000` envelope headroom is 1,328 bytes. The
+final R6 PRG is 2,746 bytes at `$3400`. CASM is now `0.1.5`; WP3 completion was
+approved after user runtime confirmation on 2026-07-16.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

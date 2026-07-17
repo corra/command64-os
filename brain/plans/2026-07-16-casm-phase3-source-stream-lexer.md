@@ -289,6 +289,7 @@ symbols, emission events, or output lifecycle.
 | `wiki/tasks/casm.md` | Modify | Phase 3 gate, subtasks, and acceptance tracker |
 | `brain/task.md` | Modify | Synchronize Taskwarrior Phase 3 state |
 | `src/external/casm/common.inc` | Modify | Source/lexer constants, ABI, and diagnostics |
+| `src/external/casm/state.s` | Create | WP3 bounded source, lookahead, and token BSS only |
 | `src/external/casm/source.s` | Create | Rewindable source stream and provenance |
 | `src/external/casm/lexer.s` | Create | Minimal bounded lexer |
 | `src/external/casm/casm.s` | Modify | Temporary token-dump orchestration |
@@ -323,6 +324,10 @@ sourceClose
 - Carry set means failure and `A` contains `CASM_DIAG_*`.
 - `sourceNextByte` returns the normalized source byte separately from its
   result code so EOF cannot be confused with data or carry state.
+- WP4 initially implements `sourceNextByte` as a transitional raw-byte API and
+  returns every physical byte as `CASM_SOURCE_BYTE`. WP5 owns the approved
+  normalized semantics and adds `CASM_SOURCE_NEWLINE`; WP7 cannot consume the
+  API before WP5 is complete.
 - State that survives an `OS_API` call is stored in CASM-owned bounded BSS.
 - EOF is repeat-stable.
 - Every public routine documents inputs, outputs, carry/zero meaning,
@@ -424,6 +429,8 @@ explicitly approved, incorporating the approved Work Package 2 decisions.
   for expression, pass, and emission phases.
 - Add bounded BSS for source cursor, block length/index, lookahead, location,
   token record, and token text.
+- Create the storage-only `state.s`; executable `source.s` and `lexer.s`
+  remain owned by WP4 and WP7 respectively.
 - Add compile-time assertions for every capacity and table relationship.
 - Measure BSS and linked growth before continuing.
 
@@ -439,11 +446,16 @@ explicitly approved.
 - Implement initialization, open, block refill, byte traversal, explicit close,
   and repeat-safe EOF.
 - Advance physical offsets only after successful byte consumption.
-- Preserve primary diagnostics across close/reopen cleanup failures.
+- Treat `CasmSourceOffset` as bytes consumed, distinct from Phase 2's
+  bytes-fetched total, and validate equality before first EOF.
+- Return raw CR, LF, null, and all other byte values unchanged; WP5 owns
+  normalization and WP6 owns line-API null rejection.
 - Retain registered ownership when close fails.
+- Route the existing consume-only entry path through the source API without
+  introducing WP10's token dump or changing its success message.
 
-Gate: raw byte fixtures traverse 17-byte, 256-byte, and 513-byte inputs without
-loss, duplication, or cursor wrap.
+Gate: raw byte fixtures traverse 17-byte, 256-byte, and 513-byte inputs with
+consumed/fetched count equality, without loss, duplication, or cursor wrap.
 
 ### Work Package 5: Newlines and Provenance
 
@@ -465,6 +477,8 @@ Prerequisite: its dedicated detailed implementation plan is saved and
 explicitly approved.
 
 - Implement close/reopen `sourceRewind`.
+- Preserve the primary rewind diagnostic across secondary close/reopen cleanup
+  failures while following central ownership rules.
 - Reset all source, line, EOF, and lookahead state.
 - Implement bounded `sourceNextLine` without adding a second 256-byte buffer.
 - Reject embedded null bytes and overlong lines.
