@@ -9,7 +9,14 @@ endif()
 file(MAKE_DIRECTORY "${OUTPUT_DIR}")
 
 file(WRITE "${OUTPUT_DIR}/casmempty.seq" "")
-file(WRITE "${OUTPUT_DIR}/casmshort.seq" "CASM SHORT INPUT\n")
+file(WRITE "${OUTPUT_DIR}/casmshort.seq"
+    ".ORG \$2000\n"
+    "    LDA #10\n"
+    "    STA \$0400,X\n"
+    "    LDA %10101010\n"
+    "    ; COMMENT\n"
+    "    JMP START_LABEL\n"
+)
 
 string(REPEAT "A" 256 CASM_EXACT_BLOCK)
 file(WRITE "${OUTPUT_DIR}/casm256.seq" "${CASM_EXACT_BLOCK}")
@@ -55,10 +62,11 @@ file(WRITE "${OUTPUT_DIR}/casmfincr.seq" "LINE${CASM_CR}")
 
 # Exactly 255 payload bytes plus a newline: the maximum accepted logical line,
 # and the case that must survive a LINE-mode refill across the block boundary.
-string(REPEAT "L" 255 CASM_LINE_255)
+string(REPEAT "L " 127 CASM_LINE_255_BASE)
+set(CASM_LINE_255 "${CASM_LINE_255_BASE}L")
 file(WRITE "${OUTPUT_DIR}/casmln255.seq" "${CASM_LINE_255}${CASM_LF}SECOND${CASM_LF}")
 
 # 256 payload bytes before a newline: rejected with location-overflow ($16) in
 # byte mode, and line-too-long ($17) once a line-API caller exists.
-string(REPEAT "L" 256 CASM_LINE_256)
+string(REPEAT "L " 128 CASM_LINE_256)
 file(WRITE "${OUTPUT_DIR}/casmln256.seq" "${CASM_LINE_256}${CASM_LF}")

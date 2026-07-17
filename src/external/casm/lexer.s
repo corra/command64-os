@@ -780,7 +780,13 @@ compareTokenText:
 @loop:
     lda (CasmPtr0Lo), y
     tax
+    cpy CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    bne @useChar
+    lda #0
+    jmp @check
+@useChar:
     lda CasmTokenText, y
+@check:
     bne @checkExp
     cpx #0
     beq @match
@@ -827,17 +833,26 @@ classifyMnemonic:
     ldy #0
     lda CasmTokenText, y
     jsr normalizeChar
-    cmp (CasmPtr0Lo), y
+    sta CasmLexerScratch0
+    lda (CasmPtr0Lo), y
+    jsr normalizeChar
+    cmp CasmLexerScratch0
     bne @next
     iny
     lda CasmTokenText, y
     jsr normalizeChar
-    cmp (CasmPtr0Lo), y
+    sta CasmLexerScratch0
+    lda (CasmPtr0Lo), y
+    jsr normalizeChar
+    cmp CasmLexerScratch0
     bne @next
     iny
     lda CasmTokenText, y
     jsr normalizeChar
-    cmp (CasmPtr0Lo), y
+    sta CasmLexerScratch0
+    lda (CasmPtr0Lo), y
+    jsr normalizeChar
+    cmp CasmLexerScratch0
     beq @match
 @next:
     lda CasmPtr0Lo

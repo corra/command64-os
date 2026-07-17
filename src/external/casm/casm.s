@@ -11,7 +11,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "11"
+.define VERSION_STAGE "12"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -24,12 +24,15 @@
 .import fileIoInit
 .import sourceInit
 .import sourceOpen
-.import sourceNextByte
 .import sourceClose
 .import diagPrintString
-.import diagPrintPhase2Ready
 .import exitSuccess
 .import exitFatal
+
+.import lexerInit
+.import lexerNext
+.import diagDumpToken
+.import CasmTokenRecord
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -78,20 +81,18 @@ startOptionsReady:
     jsr sourceOpen
     bcs startFatal
 
-    ; Route the consume-only Phase 2 behavior through the WP4 source API. The
-    ; loop traverses every raw byte and block boundary but does not inspect or
-    ; print bytes, preserving the existing INPUT VALIDATED success output.
-startReadLoop:
-    jsr sourceNextByte
+    jsr lexerInit
     bcs startFatal
-    cmp #CASM_SOURCE_EOF
-    beq startInputDone
-    jmp startReadLoop
+startLexerLoop:
+    jsr lexerNext
+    bcs startFatal
+    jsr diagDumpToken
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_EOF
+    bne startLexerLoop
 
-startInputDone:
     jsr sourceClose
     bcs startFatal
-    jsr diagPrintPhase2Ready
     jmp exitSuccess
 
 startFatal:
