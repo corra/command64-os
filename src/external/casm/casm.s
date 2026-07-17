@@ -11,7 +11,7 @@
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '5'
+VERSION_STAGE = '6'
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -22,9 +22,10 @@ VERSION_STAGE = '5'
 .import cliDeriveOutputName
 .import CasmCliOptions
 .import fileIoInit
-.import inputStreamOpen
-.import inputStreamRead
-.import inputStreamClose
+.import sourceInit
+.import sourceOpen
+.import sourceNextByte
+.import sourceClose
 .import diagPrintString
 .import diagPrintPhase2Ready
 .import exitSuccess
@@ -51,6 +52,8 @@ start:
     bcs startFatal
     jsr fileIoInit
     bcs startFatal
+    jsr sourceInit
+    bcs startFatal
     lda #CASM_PHASE_CLI_FILE
     sta CasmPhase
 
@@ -72,18 +75,21 @@ start:
 startOptionsReady:
     jsr cliDeriveOutputName
     bcs startFatal
-    jsr inputStreamOpen
+    jsr sourceOpen
     bcs startFatal
 
+    ; Route the consume-only Phase 2 behavior through the WP4 source API. The
+    ; loop traverses every raw byte and block boundary but does not inspect or
+    ; print bytes, preserving the existing INPUT VALIDATED success output.
 startReadLoop:
-    jsr inputStreamRead
+    jsr sourceNextByte
     bcs startFatal
-    cmp #CASM_STREAM_EOF
+    cmp #CASM_SOURCE_EOF
     beq startInputDone
     jmp startReadLoop
 
 startInputDone:
-    jsr inputStreamClose
+    jsr sourceClose
     bcs startFatal
     jsr diagPrintPhase2Ready
     jmp exitSuccess

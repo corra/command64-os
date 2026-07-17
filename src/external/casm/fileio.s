@@ -428,9 +428,12 @@ isrEof:
     clc
     rts
 isrOverflow:
+    ; A source larger than 65,535 bytes overruns the checked fetched total.
+    ; WP4 maps this to the single stable source-offset overflow diagnostic so
+    ; oversized input has one code shared with sourceNextByte's offset guard.
     lda #CASM_STREAM_ERROR
     sta CasmInputState
-    lda #CASM_DIAG_STREAM_STATE_FAILED
+    lda #CASM_DIAG_SOURCE_OFFSET_OVERFLOW
     sec
     rts
 

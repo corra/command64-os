@@ -138,8 +138,10 @@ separate prerequisite-gated work.
       and approved Phase 0C.1 contracts.
 - [x] Task UUID `9ab8caf3`: investigate DEBUG assembler reuse feasibility.
 - [x] Task UUID `9e0c03f3`: declare shared source/lexer ABI and bounded state.
-- [/] Task UUID `fcb0e164`: implement the rewindable source backend; detailed
-      plan approved and implementation authorized on 2026-07-16.
+- [x] Task UUID `fcb0e164`: implement the rewindable source backend. `source.s`
+      created, entry point routed through the source API, `$15` overflow
+      mapping. User runtime fixture matrix confirmed and completion approved on
+      2026-07-16; build 1020 advanced CASM to `0.1.6`.
 - [ ] Task UUID `9c733c1a`: implement newline normalization and provenance.
 - [ ] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
 - [ ] Task UUID `7196a56f`: implement the minimal lexer core.

@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 3 WP4 rewindable source backend**: Added `source.s` with the
+  executable byte-stream source layer over the managed Phase 2 input wrapper and
+  WP3 bounded state. `sourceInit`, `sourceOpen`, transitional raw `sourceNextByte`,
+  and `sourceClose` initialize source state, refill and traverse the shared
+  256-byte `CasmIoBuffer`, expose a repeat-stable EOF, and close through central
+  ownership. First EOF verifies the consumed offset equals the managed fetched
+  total, and input-total overflow now maps to the single `$15` diagnostic. The
+  consume-only entry point routes through the source API while preserving the
+  `INPUT VALIDATED` success output; newline normalization, rewind, line access,
+  and the lexer remain deferred to WP5+. Approved completion and runtime
+  verification advance CASM to `0.1.6` build 1020.
 - **CASM Phase 3 WP3 bounded ABI/state**: Added stable source results and
   states, sixteen token types, type-specific subtypes, explicit PETSCII lexical
   bytes, reserved diagnostics `$14-$1B`, and a storage-only 63-byte Phase 3 BSS

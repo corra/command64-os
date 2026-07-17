@@ -132,6 +132,16 @@ This file serves as the shared repository for architectural decisions, technical
   line directly in the same buffer. Mixing APIs requires rewind/reset.
 - WP3 completion-candidate approval advanced CASM from `0.1.4` to `0.1.5`;
   final WP3 closure remains gated by user runtime confirmation.
+- WP4 adds executable `source.s` over the managed input wrapper and WP3 state.
+  `sourceNextByte` is a deliberate transitional raw-byte API: every `$00-$FF`
+  byte, including CR and LF, returns `CASM_SOURCE_BYTE` with the byte in
+  `CasmSourceResultByte`, never inferred from A or Z. WP5 replaces only the
+  newline semantics; the lexer is gated on WP5. The source consumed offset is a
+  distinct checked 16-bit cursor from the managed fetched total; at first EOF
+  they must be equal, which is the raw-fixture loss/duplication gate. Offset and
+  input-total overflow share the single `$15` diagnostic. `source.s` adds no BSS
+  and writes no lexer state. User completion approval advanced CASM from `0.1.5`
+  to `0.1.6`.
 - WP2 independently verified all 56 DEBUG mnemonic names and ordering against
   the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
   mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,

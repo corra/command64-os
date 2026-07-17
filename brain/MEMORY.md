@@ -140,6 +140,15 @@ BSS is 512 bytes and combined `$1000` envelope headroom is 1,328 bytes. The
 final R6 PRG is 2,746 bytes at `$3400`. CASM is now `0.1.5`; WP3 completion was
 approved after user runtime confirmation on 2026-07-16.
 
+CASM Phase 3 Work Package 4 build 1020 adds executable `source.s` (the
+rewindable source backend) and routes the consume-only entry point through it.
+Linked code/data grows from 2,256 to 2,663 bytes (CODE `$07FE` + RODATA
+`$0269`); `source.s` adds no BSS, so total BSS stays 512 bytes. Envelope usage
+is `$3400-$4066`, leaving 921 bytes of combined `$1000` headroom. Relocation
+points are 315 and the final R6 PRG is 3,301 bytes at `$3400`. CASM is now
+`0.1.6`; WP4 completion was approved after user runtime confirmation on
+2026-07-16.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.
