@@ -47,7 +47,7 @@
         and punctuation tokens; user non-regression confirmed and completion
         approved 2026-07-17; build 1028, CASM at `0.1.9`
   - [x] `9e1a1a12` Implement textual and numeric token scanning
-  - [ ] `3367d36d` Implement mnemonic classification
+  - [x] `3367d36d` Implement mnemonic classification
   - [ ] `a68d3603` Integrate diagnostics and temporary token dump
   - [ ] `178b0884` Verify artifacts and obtain user runtime confirmation
 

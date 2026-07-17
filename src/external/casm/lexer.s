@@ -660,6 +660,11 @@ lnId:
     jmp lexerEmitWithSubtype
 @notY:
 @notReg:
+    jsr classifyMnemonic
+    bcs @notMnem
+    lda #CASM_TOKEN_MNEMONIC
+    jmp lexerEmitWithSubtype
+@notMnem:
     lda #CASM_TOKEN_IDENTIFIER
     jmp lexerEmit
 
@@ -800,6 +805,57 @@ compareTokenText:
     sec
     rts
 
+; ---------------------------------------------------------------------------
+; classifyMnemonic (private)
+; Compare CasmTokenText against the mnemonic table case-insensitively.
+;
+; Outputs:   C clear and X = index (0-55) on match; C set on mismatch
+; ---------------------------------------------------------------------------
+classifyMnemonic:
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #3
+    beq @checkTable
+    sec
+    rts
+@checkTable:
+    lda #<mnemonicTable
+    sta CasmPtr0Lo
+    lda #>mnemonicTable
+    sta CasmPtr0Hi
+    ldx #0
+@loop:
+    ldy #0
+    lda CasmTokenText, y
+    jsr normalizeChar
+    cmp (CasmPtr0Lo), y
+    bne @next
+    iny
+    lda CasmTokenText, y
+    jsr normalizeChar
+    cmp (CasmPtr0Lo), y
+    bne @next
+    iny
+    lda CasmTokenText, y
+    jsr normalizeChar
+    cmp (CasmPtr0Lo), y
+    beq @match
+@next:
+    lda CasmPtr0Lo
+    clc
+    adc #3
+    sta CasmPtr0Lo
+    lda CasmPtr0Hi
+    adc #0
+    sta CasmPtr0Hi
+    inx
+    cpx #CASM_MNEMONIC_COUNT
+    bcc @loop
+    sec
+    rts
+@match:
+    clc
+    rts
+
 .segment "RODATA"
 
 lexerPunctBytes:
@@ -818,3 +874,14 @@ dirWordStr:     .byte ".WORD", 0
 dirIncludeStr:  .byte ".INCLUDE", 0
 dirStaticStr:   .byte ".STATIC", 0
 dirRelocStr:    .byte ".RELOC", 0
+
+mnemonicTable:
+    .byte "ADC", "AND", "ASL", "BCC", "BCS", "BEQ", "BIT", "BMI"
+    .byte "BNE", "BPL", "BRK", "BVC", "BVS", "CLC", "CLD", "CLI"
+    .byte "CLV", "CMP", "CPX", "CPY", "DEC", "DEX", "DEY", "EOR"
+    .byte "INC", "INX", "INY", "JMP", "JSR", "LDA", "LDX", "LDY"
+    .byte "LSR", "NOP", "ORA", "PHA", "PHP", "PLA", "PLP", "ROL"
+    .byte "ROR", "RTI", "RTS", "SBC", "SEC", "SED", "SEI", "STA"
+    .byte "STX", "STY", "TAX", "TAY", "TSX", "TXA", "TXS", "TYA"
+MnemonicTableSize = * - mnemonicTable
+.assert MnemonicTableSize = 168, error, "Mnemonic table must occupy exactly 168 bytes"
