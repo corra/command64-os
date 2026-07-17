@@ -147,7 +147,11 @@ separate prerequisite-gated work.
       case), final-CR resolution, line/column provenance, `sourceGetLocation`,
       and five newline fixtures. User runtime matrix confirmed and completion
       approved on 2026-07-16; build 1022 advanced CASM to `0.1.7`.
-- [ ] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
+- [x] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
+      Option A partitioned single buffer, `sourceRewind`, `sourceNextLine`,
+      `inputStreamReadInto`, absolute cursor, and the `$1000` → `$2000` envelope
+      increase. User runtime matrix confirmed and completion approved on
+      2026-07-17; build 1025 advanced CASM to `0.1.8`.
 - [ ] Task UUID `7196a56f`: implement the minimal lexer core.
 - [ ] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
 - [ ] Task UUID `3367d36d`: implement mnemonic classification.

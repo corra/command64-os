@@ -11,7 +11,7 @@
 
 VERSION_MAJOR = '0'
 VERSION_MINOR = '1'
-VERSION_STAGE = '7'
+VERSION_STAGE = '8'
 .include "build_casm.inc"
 
 .import __MAIN_START__

@@ -166,6 +166,26 @@ This file serves as the shared repository for architectural decisions, technical
   next-result location already lives in the persistent source fields, so it adds
   no snapshot BSS and callers copy the fields before the next mutating call. User
   completion approval advanced CASM from `0.1.6` to `0.1.7`.
+- WP6 adds `sourceRewind` and `sourceNextLine`. The "single buffer, line window"
+  contract was contradictory as written — a full-buffer refill destroys a line
+  that spans blocks. It is realized as an explicit partition: while a line builds,
+  `CasmIoBuffer[0..lineLength-1]` is the payload and `[lineLength..255]` is the
+  transfer region a refill reads into, and the block cursor holds absolute buffer
+  positions (byte mode base is always 0, so it is bit-identical). Safety rests on
+  writePos (`CasmSourceLineLength`) <= readPos (`CasmSourceBlockIndex`), equal
+  only right after a LINE-mode refill where the byte is loaded before it is
+  stored. `sourceNextLine` reuses WP5 normalization via the private
+  `sourceNextResult` entry rather than duplicating a newline state machine.
+- Byte and line modes are mutually exclusive: line mode is claimed only on a
+  fresh stream (offset 0, line state IDLE), mixing returns `$13`, and a rewind
+  restores the choice. `sourceRewind` resets only source-owned state; lookahead
+  invalidation is WP7's because `source.s` writes no lexer state. A rewind close
+  failure returns the primary `$0D` (ownership retained); a reopen failure
+  returns `$14` with the source CLOSED/NONE.
+- WP6 raised the CASM linker envelope from `$1000` to `$2000` because Phase 3
+  could not otherwise fit; `add_ca65_app(casm ... "2000")` sets `MAIN: size`.
+  `inputStreamRead` is now a thin caller of the additive `inputStreamReadInto`.
+  User completion approval advanced CASM from `0.1.7` to `0.1.8`.
 - WP2 independently verified all 56 DEBUG mnemonic names and ordering against
   the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
   mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,

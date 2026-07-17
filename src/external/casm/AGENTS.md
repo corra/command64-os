@@ -44,9 +44,21 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Phase 3 state is exactly 63 BSS bytes: a 16-byte source subrecord and a
   47-byte lexer/lookahead/token subrecord containing one contiguous 39-byte
   token record with 31 payload bytes plus terminator.
-- `CasmIoBuffer` remains the only 256-byte source buffer. Byte mode owns it as
-  a transfer block; future line mode owns it as a bounded line window. The two
-  modes are mutually exclusive until rewind/reset.
+- `CasmIoBuffer` remains the only 256-byte source buffer. Byte mode owns the
+  whole buffer as a transfer block. Line mode partitions it:
+  `[0 .. lineLength-1]` holds the accumulated line payload and
+  `[lineLength .. 255]` is the transfer region a refill reads into, so a logical
+  line survives a block boundary without a second buffer. Naive reuse is invalid:
+  a full-buffer refill would destroy a line that spans blocks.
+- The source block cursor holds absolute `CasmIoBuffer` positions, not
+  base-relative counts. Byte mode always has base 0, so its cursor is unchanged;
+  only line mode uses a nonzero base.
+- Byte mode and line mode are mutually exclusive. Line mode is claimed only on a
+  fresh stream; mixing the APIs is rejected, and switching requires an explicit
+  `sourceRewind`.
+- `sourceRewind` resets only source-owned state. Lookahead is lexer state and
+  `source.s` writes none; the lexer owns invalidating its lookahead after a
+  rewind.
 - Keep Pass 1 and Pass 2 deterministic; Pass 2 reparses a rewindable source
   stream rather than relying on an unbounded in-memory syntax tree.
 - Emit structured events in Pass 2 so PRG, listing, and map consumers do not

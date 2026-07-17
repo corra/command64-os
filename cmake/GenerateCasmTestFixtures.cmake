@@ -43,3 +43,22 @@ file(WRITE "${OUTPUT_DIR}/casmblank.seq" "A${CASM_LF}${CASM_LF}${CASM_LF}B${CASM
 
 # File ending in a lone CR: the final CR resolves as a newline before EOF.
 file(WRITE "${OUTPUT_DIR}/casmfincr.seq" "LINE${CASM_CR}")
+
+# WP6 line-boundary fixtures. The line API bounds a logical line to 255 payload
+# bytes; byte mode rejects the same overlong line via the checked 8-bit column.
+# These exercise the boundary on the shipped byte path.
+#
+# No embedded-null fixture exists: CMake cannot emit a $00 byte in a string, and
+# it would prove nothing anyway. Null rejection ($19) is line-mode only, and the
+# shipped path never calls sourceNextLine, so a null fixture would only confirm
+# byte mode passes nulls through. $19 is verified statically.
+
+# Exactly 255 payload bytes plus a newline: the maximum accepted logical line,
+# and the case that must survive a LINE-mode refill across the block boundary.
+string(REPEAT "L" 255 CASM_LINE_255)
+file(WRITE "${OUTPUT_DIR}/casmln255.seq" "${CASM_LINE_255}${CASM_LF}SECOND${CASM_LF}")
+
+# 256 payload bytes before a newline: rejected with location-overflow ($16) in
+# byte mode, and line-too-long ($17) once a line-API caller exists.
+string(REPEAT "L" 256 CASM_LINE_256)
+file(WRITE "${OUTPUT_DIR}/casmln256.seq" "${CASM_LINE_256}${CASM_LF}")

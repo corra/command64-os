@@ -46,6 +46,7 @@
 ; Phase 2 managed file services and shared transfer state.
 .import inputStreamOpen
 .import inputStreamRead
+.import inputStreamReadInto
 .import inputStreamClose
 .import CasmIoBuffer
 .import CasmInputState
@@ -55,7 +56,9 @@
 .export sourceInit
 .export sourceOpen
 .export sourceNextByte
+.export sourceNextLine
 .export sourceGetLocation
+.export sourceRewind
 .export sourceClose
 
 .segment "CODE"
@@ -134,7 +137,7 @@ soBadState:
 ; delivered in CasmSourceResultByte and never inferred from A or Z; the byte is
 ; 0 for NEWLINE and EOF.
 ;
-; Inputs:    source state READY/BYTE or EOF/BYTE
+; Inputs:    source state READY/BYTE or EOF/BYTE; API mode BYTE
 ; Outputs:   Byte:    A = CASM_SOURCE_BYTE, C clear, Z clear;
 ;                     CasmSourceResultByte = raw byte at (line, column)
 ;            Newline: A = CASM_SOURCE_NEWLINE, C clear, Z clear;
@@ -146,8 +149,24 @@ soBadState:
 ; Clobbers:  A, X, Y, source scratch (CasmSourceScratch0), refill/OS volatile
 ;            state on refill
 ; Scratch:   CasmSourceScratch0 holds the current physical byte
+;
+; The mode gate rejects a byte call once line mode has been claimed; the two
+; APIs cannot be mixed without an explicit sourceRewind. sourceNextLine shares
+; the normalization below through the private sourceNextResult entry, which
+; carries no mode gate.
 ; ---------------------------------------------------------------------------
 sourceNextByte:
+    lda CasmSourceApiMode
+    cmp #CASM_SOURCE_API_BYTE
+    beq sourceNextResult
+    jmp snbBadState             ; LINE claimed or NONE -> API mixing/state failure
+
+; ---------------------------------------------------------------------------
+; sourceNextResult (private)
+; The WP5 normalized traversal without the API mode gate. sourceNextByte and
+; sourceNextLine both enter here.
+; ---------------------------------------------------------------------------
+sourceNextResult:
     lda CasmSourceState
     cmp #CASM_SOURCE_STATE_EOF
     beq snbEof
@@ -252,6 +271,205 @@ snbColumnOverflow:
 snbBadState:
     lda #CASM_SOURCE_STATE_ERROR
     sta CasmSourceState
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceNextLine
+; Return one bounded logical line. The payload is CasmIoBuffer[0 .. length-1],
+; null-terminated at [length]; a 255-byte payload plus terminator exactly fills
+; the 256-byte buffer. The line is valid only until the next source call.
+;
+; Line mode is claimed here on a fresh stream and reuses the WP5 normalization
+; through sourceNextResult, so newline collapsing, provenance, and EOF behave
+; exactly as in byte mode. While a line is built, CasmIoBuffer is partitioned:
+; [0 .. lineLength-1] is the payload and [lineLength .. 255] is the unread
+; transfer region that sourceRefill reads into.
+;
+; Buffer-aliasing safety: the write position (CasmSourceLineLength) is always
+; less than or equal to the read position (CasmSourceBlockIndex). They are equal
+; only immediately after a LINE-mode refill, and because sourceNextResult loads
+; the byte into CasmSourceResultByte before it is stored here, that case is a
+; read-then-write of the same cell. A CRLF swallow or a newline advances the
+; read position without advancing the write position, only widening the margin.
+;
+; Inputs:    line mode claimed or claimable; state READY or EOF
+; Outputs:   Line: A = CASM_SOURCE_NEWLINE, C clear; CasmSourceLineLength = length,
+;                  CasmSourceLineState = READY (newline) or EOF (final partial)
+;            EOF:  A = CASM_SOURCE_EOF, C clear; CasmSourceLineLength = 0
+;            Fail: A = CASM_DIAG_STREAM_STATE_FAILED, CASM_DIAG_SOURCE_LINE_TOO_LONG,
+;                  CASM_DIAG_INVALID_SOURCE_BYTE, or a propagated byte
+;                  diagnostic; C set; source state ERROR
+; Preserves: none
+; Clobbers:  A, X, Y, source scratch, refill/OS volatile state
+; ---------------------------------------------------------------------------
+sourceNextLine:
+    lda CasmSourceApiMode
+    cmp #CASM_SOURCE_API_LINE
+    beq snlModeReady            ; line mode already claimed
+    cmp #CASM_SOURCE_API_BYTE
+    bne snlBadStateNear         ; NONE -> not open
+    ; Byte mode may be promoted to line mode only on a fresh stream. Once any
+    ; byte has been consumed, mixing the APIs requires an explicit rewind.
+    lda CasmSourceOffsetLo
+    ora CasmSourceOffsetHi
+    bne snlBadStateNear
+    lda CasmSourceLineState
+    cmp #CASM_SOURCE_LINE_IDLE
+    bne snlBadStateNear
+    lda #CASM_SOURCE_API_LINE
+    sta CasmSourceApiMode
+    jmp snlModeReady
+
+snlBadStateNear:
+    ; Trampoline: the shared failure tail is out of branch range from here.
+    jmp snlBadState
+
+snlModeReady:
+    lda CasmSourceState
+    cmp #CASM_SOURCE_STATE_EOF
+    beq snlEof
+    cmp #CASM_SOURCE_STATE_READY
+    bne snlBadStateNear
+
+    lda #0
+    sta CasmSourceLineLength
+    lda #CASM_SOURCE_LINE_BUILDING
+    sta CasmSourceLineState
+
+snlLoop:
+    jsr sourceNextResult
+    bcs snlFail                 ; source already ERROR
+    cmp #CASM_SOURCE_NEWLINE
+    beq snlLineReady
+    cmp #CASM_SOURCE_EOF
+    beq snlEofReached
+
+    ; Byte: an embedded null is invalid source in the line API (byte mode still
+    ; returns it as a valid CASM_SOURCE_BYTE).
+    lda CasmSourceResultByte
+    beq snlInvalidByte
+    ; Reject an overlong line before storing the overflowing byte.
+    lda CasmSourceLineLength
+    cmp #CASM_SOURCE_LINE_PAYLOAD_MAX
+    bcs snlTooLong              ; already 255 payload bytes
+    ldx CasmSourceLineLength
+    lda CasmSourceResultByte
+    sta CasmIoBuffer,x
+    inc CasmSourceLineLength
+    jmp snlLoop
+
+snlLineReady:
+    lda #CASM_SOURCE_LINE_READY
+    sta CasmSourceLineState
+snlReturnLine:
+    ; Terminate at [length]. That cell is always an already-consumed byte or is
+    ; past valid data, never unread input.
+    ldx CasmSourceLineLength
+    lda #0
+    sta CasmIoBuffer,x
+    lda #CASM_SOURCE_NEWLINE
+    clc
+    rts
+
+snlEofReached:
+    ; EOF while building: return a final unterminated line if one accumulated,
+    ; otherwise report EOF. CasmSourceLineState distinguishes the two.
+    lda #CASM_SOURCE_LINE_EOF
+    sta CasmSourceLineState
+    lda CasmSourceLineLength
+    bne snlReturnLine
+snlEof:
+    lda #0
+    sta CasmSourceLineLength
+    lda #CASM_SOURCE_LINE_EOF
+    sta CasmSourceLineState
+    lda #CASM_SOURCE_EOF
+    clc
+    rts
+
+snlFail:
+    ; A holds the propagated byte diagnostic.
+    sec
+    rts
+snlInvalidByte:
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_INVALID_SOURCE_BYTE
+    sec
+    rts
+snlTooLong:
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_SOURCE_LINE_TOO_LONG
+    sec
+    rts
+snlBadState:
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceRewind
+; Close and reopen the source, then reset every source-owned field so a second
+; traversal is byte-, newline-, and location-identical to the first. The reopen
+; also resets the managed fetched total, so the EOF count invariant holds again.
+;
+; Lookahead invalidation is deliberately not performed here: lookahead is lexer
+; state and this module writes none. WP7 owns invalidating CasmLookahead* after
+; a rewind.
+;
+; Inputs:    source state READY or EOF
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; state READY, API BYTE, reset
+;            Fail:    A = CASM_DIAG_INPUT_CLOSE_FAILED (close; source ERROR and
+;                     the handle retained in CLOSE_FAILED for central retry),
+;                     CASM_DIAG_SOURCE_REWIND_FAILED (reopen; source CLOSED/NONE
+;                     with no leaked handle), or CASM_DIAG_STREAM_STATE_FAILED;
+;                     C set
+; Preserves: none
+; Clobbers:  A, X, Y, wrapper/OS volatile state
+; ---------------------------------------------------------------------------
+sourceRewind:
+    lda CasmSourceState
+    cmp #CASM_SOURCE_STATE_READY
+    beq srwClose
+    cmp #CASM_SOURCE_STATE_EOF
+    bne srwBadState
+srwClose:
+    jsr inputStreamClose
+    bcs srwCloseFailed
+    jsr inputStreamOpen
+    bcs srwReopenFailed
+    lda #CASM_SOURCE_STATE_READY
+    sta CasmSourceState
+    lda #CASM_SOURCE_API_BYTE
+    sta CasmSourceApiMode
+    jsr sourceResetTraversal
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+srwCloseFailed:
+    ; The close diagnostic is the primary failure and must not be masked by the
+    ; rewind code; inputStreamClose retained ownership in CLOSE_FAILED.
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_INPUT_CLOSE_FAILED
+    sec
+    rts
+srwReopenFailed:
+    ; The close succeeded, so no handle is leaked. Report the rewind-specific
+    ; primary and leave the source closed.
+    lda #CASM_SOURCE_STATE_CLOSED
+    sta CasmSourceState
+    lda #CASM_SOURCE_API_NONE
+    sta CasmSourceApiMode
+    lda #CASM_DIAG_SOURCE_REWIND_FAILED
+    sec
+    rts
+srwBadState:
     lda #CASM_DIAG_STREAM_STATE_FAILED
     sec
     rts
@@ -505,32 +723,92 @@ sourceResetTraversal:
 ; Clobbers:  A, X, Y, inputStreamRead/OS volatile state
 ; ---------------------------------------------------------------------------
 sourceRefill:
-    jsr inputStreamRead
+    ; Refill only the transfer region above the protected line payload. In BYTE
+    ; mode the base is 0, so this is a full-buffer read and the installed cursor
+    ; is identical to the pre-WP6 form.
+    jsr sourceComputeBase
+    beq srFullBlock             ; base 0 -> whole buffer
+    ; LINE mode with an accumulated payload: read into CasmIoBuffer + base with
+    ; length 256 - base, preserving CasmIoBuffer[0 .. base-1].
+    pha
+    eor #$FF
+    clc
+    adc #$01                    ; A = 256 - base (base is 1..255)
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    pla
+    clc
+    adc #<CasmIoBuffer
+    tax
+    lda #>CasmIoBuffer
+    adc #0
+    tay
+    jmp srDoRead
+srFullBlock:
+    lda #<CASM_IO_BUFFER_SIZE
+    sta CasmIoLenLo
+    lda #>CASM_IO_BUFFER_SIZE
+    sta CasmIoLenHi
+    ldx #<CasmIoBuffer
+    ldy #>CasmIoBuffer
+srDoRead:
+    jsr inputStreamReadInto
     bcs srReadFailed
     cmp #CASM_STREAM_EOF
     beq srEof
 
-    ; DATA: validate the actual block length is 1-256 before exposing a byte.
-    lda CasmIoLenHi
-    beq srCheckLoNonZero        ; high 0 -> low must be 1-255
-    cmp #$01
-    bne srInvalidBlock          ; high > 1 -> length > 256
+    ; DATA: a zero-length DATA result is inconsistent.
     lda CasmIoLenLo
-    bne srInvalidBlock          ; $01xx with low != 0 -> length > 256
-    jmp srInstall               ; length == $0100 (256)
-srCheckLoNonZero:
-    lda CasmIoLenLo
-    beq srInvalidBlock          ; length 0 with a DATA result is inconsistent
-srInstall:
-    lda CasmIoLenLo
-    sta CasmSourceBlockLenLo
-    lda CasmIoLenHi
-    sta CasmSourceBlockLenHi
-    lda #0
+    ora CasmIoLenHi
+    beq srInvalidBlock
+
+    ; Install absolute cursor positions: index = base, length = base + count.
+    ; The base is recomputed from persistent state because zero-page source
+    ; scratch does not survive the OS read above.
+    jsr sourceComputeBase
     sta CasmSourceBlockIndexLo
+    lda #0
     sta CasmSourceBlockIndexHi
+    lda CasmSourceBlockIndexLo
+    clc
+    adc CasmIoLenLo
+    sta CasmSourceBlockLenLo
+    lda #0
+    adc CasmIoLenHi
+    sta CasmSourceBlockLenHi
+
+    ; Validate the installed end position is 1-256; length 256 encodes as $0100.
+    lda CasmSourceBlockLenHi
+    beq srInstallDone           ; end 1-255
+    cmp #$01
+    bne srInvalidBlock          ; end > 256
+    lda CasmSourceBlockLenLo
+    bne srInvalidBlock          ; $01xx with low != 0 -> end > 256
+srInstallDone:
     lda #CASM_STREAM_DATA
     clc
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceComputeBase (private)
+; Return the protected buffer prefix: 0 in BYTE mode, or the accumulated line
+; payload length in LINE mode. Derived from persistent state so it is valid
+; both before and after an OS read.
+;
+; Inputs:    none
+; Outputs:   A = base, Z set when the base is 0
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+sourceComputeBase:
+    lda CasmSourceApiMode
+    cmp #CASM_SOURCE_API_LINE
+    beq scbLine
+    lda #0
+    rts
+scbLine:
+    lda CasmSourceLineLength
     rts
 
 srEof:

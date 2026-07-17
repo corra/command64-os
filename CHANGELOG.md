@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 3 WP6 deterministic rewind and bounded line API**: Added
+  `sourceRewind` (close/reopen with a full source-owned reset so a second
+  traversal is byte-, newline-, and location-identical) and `sourceNextLine`
+  (bounded 255-byte logical lines with line-too-long `$17` and embedded-null
+  `$19` rejection). Line mode partitions the single `CasmIoBuffer` into an
+  accumulated-payload prefix and a transfer region so a line survives a block
+  boundary without a second buffer, and reuses the WP5 normalization rather than
+  duplicating it; the block cursor became absolute. Added the additive
+  `inputStreamReadInto` wrapper (with `inputStreamRead` reimplemented on top of
+  it) and raised the CASM linker envelope from `$1000` to `$2000` so the
+  remaining Phase 3 work packages fit. The shipped byte path is unchanged and
+  still prints `INPUT VALIDATED`; the lexer remains WP7 and Phase 3 diagnostic
+  text remains WP10. Approved completion and runtime verification advance CASM to
+  `0.1.8` build 1025.
 - **CASM Phase 3 WP5 newlines and provenance**: `sourceNextByte` now returns the
   approved normalized model: CR, LF, and CRLF each collapse to one
   `CASM_SOURCE_NEWLINE` via a persistent pending-CR latch that survives an input

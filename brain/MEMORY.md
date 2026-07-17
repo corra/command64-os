@@ -159,6 +159,18 @@ non-EOF, non-carry result as continue, so `CASM_SOURCE_NEWLINE` needed no
 orchestration change. CASM is now `0.1.7`; WP5 completion was approved after user
 runtime confirmation on 2026-07-16.
 
+CASM Phase 3 Work Package 6 build 1025 adds `sourceRewind` and `sourceNextLine`
+and raises the CASM linker envelope from `$1000` to `$2000` because Phase 3 could
+not otherwise fit (725 bytes of headroom against an estimated 1,370-1,940 for
+WP6-WP10). Linked code/data grows from 2,859 to 3,171 bytes (CODE `$09FA` +
+RODATA `$0269`); Option A's buffer partition adds no BSS, so total BSS stays 512
+bytes and the WP3 state layout is untouched. Envelope usage is `$3400-$4262` =
+3,683 bytes, leaving 4,509 bytes of `$2000` headroom. Relocation points are 388.
+`casm.s` is unchanged. Runtime confirmed `casmln256`/`casm256`/`casmmulti` return
+`$16` (shown as the generic `INTERNAL ERROR` until WP10 wires the text) and a
+zero-size file cannot be opened. CASM is now `0.1.8`; WP6 completion was approved
+after user runtime confirmation on 2026-07-17.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.
