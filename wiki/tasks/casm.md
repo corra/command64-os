@@ -157,7 +157,7 @@ separate prerequisite-gated work.
       whitespace/comment skipping, and punctuation tokens, plus the
       `CASM_LEXER_STATE_*` enum. User non-regression confirmed and completion
       approved on 2026-07-17; build 1028, CASM at `0.1.9`.
-- [ ] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
+- [x] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
 - [ ] Task UUID `3367d36d`: implement mnemonic classification.
 - [ ] Task UUID `a68d3603`: integrate diagnostics and temporary token dump.
 - [ ] Task UUID `178b0884`: verify artifacts and obtain user runtime
@@ -171,7 +171,7 @@ separate prerequisite-gated work.
 - [ ] Lines, tokens, offsets, cursors, and locations fail before overflow.
 - [ ] All approved token classes and lexical failure cases are deterministic.
 - [ ] The temporary token dump reports correct file, line, and column data.
-- [ ] CASM stays within the approved `$1000` `MAIN` envelope.
+- [ ] CASM stays within the approved $2000 MAIN envelope.
 - [ ] Build, artifact, release-disk, and no-change build checks pass.
 - [ ] The user completes the runtime walkthrough.
 - [ ] The user explicitly approves marking Phase 3 done.

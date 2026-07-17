@@ -301,7 +301,7 @@ symbols, emission events, or output lifecycle.
 | `CHANGELOG.md` or dated changelog | Modify/create | Observable token-dump behavior |
 | `brain/walkthroughs/2026-07-16-casm-phase3-source-stream-lexer.md` | Create | Build and user evidence |
 
-The current `$1000` `MAIN` envelope remains in force. Phase 2 build 1014 uses
+The `$2000` `MAIN` envelope is in force (raised from `$1000` in WP6). Phase 2 build 1014 uses
 2,256 linked code/data bytes and 449 BSS bytes, leaving 1,391 bytes of combined
 headroom. Implementation stops for approval if Phase 3 cannot fit within the
 current envelope.

@@ -99,12 +99,18 @@ lnBadStateJmp:
 
 lnSkip:
     jsr lexerFill
-    bcs lnFail
+    bcc @okFill
+    jmp lnFail
+@okFill:
     lda CasmLookaheadResult
     cmp #CASM_SOURCE_NEWLINE
-    beq lnNewline
+    bne @notNewline
+    jmp lnNewline
+@notNewline:
     cmp #CASM_SOURCE_EOF
-    beq lnEof
+    bne @notEof
+    jmp lnEof
+@notEof:
 
     ; BYTE result: whitespace and comments are skipped; punctuation is emitted.
     lda CasmLookaheadByte
@@ -116,9 +122,42 @@ lnSkip:
     beq lnComment
     jsr lexerClassifyPunct
     bcc lnPunct
-    ; Not whitespace, comment, or punctuation: the WP8 identifier/number seam.
-    lda #CASM_DIAG_NOT_IMPLEMENTED
+
+    ; Check if it's a directive (.)
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_DOT
+    beq lnDirectiveJmp
+
+    ; Check if it's a hex number ($)
+    cmp #CASM_PETSCII_DOLLAR
+    beq lnHexJmp
+
+    ; Check if it's a binary number (%)
+    cmp #CASM_PETSCII_PERCENT
+    beq lnBinJmp
+
+    ; Check if it's a decimal number (0-9)
+    jsr isDecDigit
+    bcc lnDecJmp
+
+    ; Check if it's an identifier first character (A-Z, a-z, _)
+    jsr isIdFirst
+    bcc lnIdJmp
+
+    ; None of the above: invalid source byte!
+    lda #CASM_DIAG_INVALID_SOURCE_BYTE
     jmp lnFailWithA
+
+lnDirectiveJmp:
+    jmp lnDirective
+lnHexJmp:
+    jmp lnHex
+lnBinJmp:
+    jmp lnBin
+lnDecJmp:
+    jmp lnDec
+lnIdJmp:
+    jmp lnId
 
 lnSkipByte:
     jsr lexerConsume
@@ -128,7 +167,9 @@ lnComment:
     jsr lexerConsume            ; consume the ';'
 lnCommentBody:
     jsr lexerFill
-    bcs lnFail
+    bcc @okComment
+    jmp lnFail
+@okComment:
     lda CasmLookaheadResult
     cmp #CASM_SOURCE_NEWLINE
     beq lnSkip                  ; preserve the newline; re-dispatch emits it
@@ -338,6 +379,427 @@ lcpNotFound:
     sec
     rts
 
+; ---------------------------------------------------------------------------
+; WP8 Scanner Jumps and Helpers
+; ---------------------------------------------------------------------------
+
+CASM_PETSCII_DOLLAR = $24
+CASM_PETSCII_UPPER_X = $58
+CASM_PETSCII_UPPER_Y = $59
+
+lnDirective:
+    jsr lexerTokenReset
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume            ; consume '.'
+@dirLoop:
+    jsr lexerFill
+    bcc @ok2
+    jmp lnFail
+@ok2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @dirDone
+    cmp #CASM_SOURCE_NEWLINE
+    beq @dirDone
+    lda CasmLookaheadByte
+    jsr isIdCont
+    bcs @dirDone
+    jsr lexerTokenAppend
+    bcc @ok3
+    jmp lnTokenTooLong
+@ok3:
+    jsr lexerConsume
+    jmp @dirLoop
+@dirDone:
+    ldx #<dirOrgStr
+    ldy #>dirOrgStr
+    jsr compareTokenText
+    bcs @notOrg
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_ORG
+    jmp lexerEmitWithSubtype
+@notOrg:
+    ldx #<dirByteStr
+    ldy #>dirByteStr
+    jsr compareTokenText
+    bcs @notByte
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_BYTE
+    jmp lexerEmitWithSubtype
+@notByte:
+    ldx #<dirWordStr
+    ldy #>dirWordStr
+    jsr compareTokenText
+    bcs @notWord
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_WORD
+    jmp lexerEmitWithSubtype
+@notWord:
+    ldx #<dirIncludeStr
+    ldy #>dirIncludeStr
+    jsr compareTokenText
+    bcs @notInclude
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_INCLUDE
+    jmp lexerEmitWithSubtype
+@notInclude:
+    ldx #<dirStaticStr
+    ldy #>dirStaticStr
+    jsr compareTokenText
+    bcs @notStatic
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_STATIC
+    jmp lexerEmitWithSubtype
+@notStatic:
+    ldx #<dirRelocStr
+    ldy #>dirRelocStr
+    jsr compareTokenText
+    bcs @notReloc
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_RELOC
+    jmp lexerEmitWithSubtype
+@notReloc:
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_UNKNOWN
+    jmp lexerEmitWithSubtype
+
+lnHex:
+    jsr lexerTokenReset
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume            ; consume '$'
+    jsr lexerFill
+    bcc @ok2
+    jmp lnFail
+@ok2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnMalformedHex
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnMalformedHex
+    lda CasmLookaheadByte
+    jsr isHexDigit
+    bcs lnMalformedHex
+@hexLoop:
+    jsr lexerTokenAppend
+    bcc @ok3
+    jmp lnTokenTooLong
+@ok3:
+    jsr lexerConsume
+    jsr lexerFill
+    bcc @ok4
+    jmp lnFail
+@ok4:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @hexDone
+    cmp #CASM_SOURCE_NEWLINE
+    beq @hexDone
+    lda CasmLookaheadByte
+    jsr isHexDigit
+    bcc @hexLoop
+    jsr isIdCont
+    bcc lnMalformedHex
+@hexDone:
+    lda #CASM_TOKEN_NUMBER
+    ldx #CASM_NUMBER_HEX
+    jmp lexerEmitWithSubtype
+
+lnMalformedHex:
+    jmp lnMalformedNum
+
+lnBin:
+    jsr lexerTokenReset
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume            ; consume '%'
+    jsr lexerFill
+    bcc @ok2
+    jmp lnFail
+@ok2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnMalformedBin
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnMalformedBin
+    lda CasmLookaheadByte
+    jsr isBinDigit
+    bcs lnMalformedBin
+@binLoop:
+    jsr lexerTokenAppend
+    bcc @ok3
+    jmp lnTokenTooLong
+@ok3:
+    jsr lexerConsume
+    jsr lexerFill
+    bcc @ok4
+    jmp lnFail
+@ok4:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @binDone
+    cmp #CASM_SOURCE_NEWLINE
+    beq @binDone
+    lda CasmLookaheadByte
+    jsr isBinDigit
+    bcc @binLoop
+    jsr isIdCont
+    bcc lnMalformedBin
+@binDone:
+    lda #CASM_TOKEN_NUMBER
+    ldx #CASM_NUMBER_BINARY
+    jmp lexerEmitWithSubtype
+
+lnMalformedBin:
+    jmp lnMalformedNum
+
+lnDec:
+    jsr lexerTokenReset
+@decLoop:
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume
+    jsr lexerFill
+    bcc @ok2
+    jmp lnFail
+@ok2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @decDone
+    cmp #CASM_SOURCE_NEWLINE
+    beq @decDone
+    lda CasmLookaheadByte
+    jsr isDecDigit
+    bcc @decLoop
+    jsr isIdCont
+    bcc lnMalformedDec
+@decDone:
+    lda #CASM_TOKEN_NUMBER
+    ldx #CASM_NUMBER_DECIMAL
+    jmp lexerEmitWithSubtype
+
+lnMalformedDec:
+    jmp lnMalformedNum
+
+lnMalformedNum:
+@malLoop:
+    jsr lexerFill
+    bcc @ok
+    jmp lnFail
+@ok:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @malDone
+    cmp #CASM_SOURCE_NEWLINE
+    beq @malDone
+    lda CasmLookaheadByte
+    jsr isIdCont
+    bcs @malDone
+    jsr lexerConsume
+    jmp @malLoop
+@malDone:
+    lda #CASM_DIAG_MALFORMED_NUMBER
+    jmp lnFailWithA
+
+lnId:
+    jsr lexerTokenReset
+@idLoop:
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume
+    jsr lexerFill
+    bcc @ok2
+    jmp lnFail
+@ok2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @idDone
+    cmp #CASM_SOURCE_NEWLINE
+    beq @idDone
+    lda CasmLookaheadByte
+    jsr isIdCont
+    bcc @idLoop
+@idDone:
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #1
+    bne @notReg
+    lda CasmTokenText
+    jsr normalizeChar
+    cmp #CASM_PETSCII_UPPER_A
+    bne @notA
+    lda #CASM_TOKEN_REGISTER
+    ldx #CASM_REGISTER_A
+    jmp lexerEmitWithSubtype
+@notA:
+    cmp #CASM_PETSCII_UPPER_X
+    bne @notX
+    lda #CASM_TOKEN_REGISTER
+    ldx #CASM_REGISTER_X
+    jmp lexerEmitWithSubtype
+@notX:
+    cmp #CASM_PETSCII_UPPER_Y
+    bne @notY
+    lda #CASM_TOKEN_REGISTER
+    ldx #CASM_REGISTER_Y
+    jmp lexerEmitWithSubtype
+@notY:
+@notReg:
+    lda #CASM_TOKEN_IDENTIFIER
+    jmp lexerEmit
+
+lnTokenTooLong:
+    lda #CASM_DIAG_TOKEN_TOO_LONG
+    jmp lnFailWithA
+
+lexerEmitWithSubtype:
+    sta CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    stx CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
+    ldx CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    lda #0
+    sta CasmTokenText, x
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; Helpers
+; ---------------------------------------------------------------------------
+
+isIdFirst:
+    cmp #CASM_PETSCII_UNDERSCORE
+    beq @yes
+    cmp #CASM_PETSCII_UPPER_A
+    bcc @notUn
+    cmp #CASM_PETSCII_UPPER_Z + 1
+    bcc @yes
+@notUn:
+    cmp #CASM_PETSCII_SHIFTED_A
+    bcc @no
+    cmp #CASM_PETSCII_SHIFTED_Z + 1
+    bcc @yes
+@no:
+    sec
+    rts
+@yes:
+    clc
+    rts
+
+isIdCont:
+    jsr isIdFirst
+    bcc @yes
+    cmp #CASM_PETSCII_DIGIT_0
+    bcc @no
+    cmp #CASM_PETSCII_DIGIT_9 + 1
+    bcc @yes
+@no:
+    sec
+    rts
+@yes:
+    clc
+    rts
+
+isHexDigit:
+    cmp #CASM_PETSCII_DIGIT_0
+    bcc @notDig
+    cmp #CASM_PETSCII_DIGIT_9 + 1
+    bcc @yes
+@notDig:
+    cmp #CASM_PETSCII_UPPER_A
+    bcc @notUn
+    cmp #CASM_PETSCII_UPPER_A + 6
+    bcc @yes
+@notUn:
+    cmp #CASM_PETSCII_SHIFTED_A
+    bcc @no
+    cmp #CASM_PETSCII_SHIFTED_A + 6
+    bcc @yes
+@no:
+    sec
+    rts
+@yes:
+    clc
+    rts
+
+isBinDigit:
+    cmp #CASM_PETSCII_DIGIT_0
+    beq @yes
+    cmp #CASM_PETSCII_DIGIT_0 + 1
+    beq @yes
+    sec
+    rts
+@yes:
+    clc
+    rts
+
+isDecDigit:
+    cmp #CASM_PETSCII_DIGIT_0
+    bcc @no
+    cmp #CASM_PETSCII_DIGIT_9 + 1
+    bcc @yes
+@no:
+    sec
+    rts
+@yes:
+    clc
+    rts
+
+normalizeChar:
+    cmp #CASM_PETSCII_SHIFTED_A
+    bcc @done
+    cmp #CASM_PETSCII_SHIFTED_Z + 1
+    bcs @done
+    and #$7F
+@done:
+    rts
+
+compareTokenText:
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #0
+@loop:
+    lda (CasmPtr0Lo), y
+    tax
+    lda CasmTokenText, y
+    bne @checkExp
+    cpx #0
+    beq @match
+    bne @mismatch
+@checkExp:
+    cpx #0
+    beq @mismatch
+    jsr normalizeChar
+    pha
+    txa
+    jsr normalizeChar
+    sta CasmLexerScratch0
+    pla
+    cmp CasmLexerScratch0
+    bne @mismatch
+    iny
+    jmp @loop
+@match:
+    clc
+    rts
+@mismatch:
+    sec
+    rts
+
 .segment "RODATA"
 
 lexerPunctBytes:
@@ -349,3 +811,10 @@ lexerPunctTypes:
     .byte CASM_TOKEN_COMMA, CASM_TOKEN_COLON, CASM_TOKEN_HASH
     .byte CASM_TOKEN_LPAREN, CASM_TOKEN_RPAREN, CASM_TOKEN_PLUS
     .byte CASM_TOKEN_MINUS, CASM_TOKEN_LESS, CASM_TOKEN_GREATER
+
+dirOrgStr:      .byte ".ORG", 0
+dirByteStr:     .byte ".BYTE", 0
+dirWordStr:     .byte ".WORD", 0
+dirIncludeStr:  .byte ".INCLUDE", 0
+dirStaticStr:   .byte ".STATIC", 0
+dirRelocStr:    .byte ".RELOC", 0
