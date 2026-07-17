@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
-Status: [x]
-Taskwarrior: 29 (`df2f766c`)
-Plan: `brain/plans/2026-07-16-casm-phase2-cli-file-services.md`
+Status: [/]
+Taskwarrior: 29 (`099257cc`)
+Plan: `brain/plans/2026-07-16-casm-phase3-source-stream-lexer.md`
 
 ## Goal
 
@@ -12,11 +12,11 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 2 establishes bounded command-line parsing and managed native input file
-services. It parses one source and the initial option vocabulary, consumes a
-bounded input stream, replaces the Phase 1 file-cleanup stub, and preserves safe
-shell return across parse and I/O failures. It does not tokenize source,
-assemble code, or create production output.
+Phase 3 extends the managed Phase 2 input foundation with a rewindable,
+file-aware source stream and bounded minimal lexer. It normalizes logical
+newlines, tracks one-based source locations, exposes deterministic rewind, and
+produces a temporary token dump. It does not parse statements, evaluate
+expressions, define symbols, emit machine code, or create production output.
 
 ## Phase 1 Prerequisite
 
@@ -125,3 +125,110 @@ The Phase 2 walkthrough and confirmed CLI matrix are recorded in
 Phase 2 completed on 2026-07-16 after the user confirmed the full build 1014
 walkthrough and approved closing the milestone. Later assembler phases remain
 separate prerequisite-gated work.
+
+## Phase 3 Prerequisite
+
+- [x] User approved the Phase 0C.1 source-stream, newline, location, token,
+      numeric-shape, and bounds contracts in the Phase 3 plan.
+- [x] User approved beginning Work Package 1 on 2026-07-16.
+
+## Phase 3 Subtasks
+
+- [x] Task UUID `65832339`: synchronize task records, dependency corrections,
+      and approved Phase 0C.1 contracts.
+- [x] Task UUID `9ab8caf3`: investigate DEBUG assembler reuse feasibility.
+- [x] Task UUID `9e0c03f3`: declare shared source/lexer ABI and bounded state.
+- [x] Task UUID `fcb0e164`: implement the rewindable source backend. `source.s`
+      created, entry point routed through the source API, `$15` overflow
+      mapping. User runtime fixture matrix confirmed and completion approved on
+      2026-07-16; build 1020 advanced CASM to `0.1.6`.
+- [x] Task UUID `9c733c1a`: implement newline normalization and provenance.
+      CR/LF/CRLF collapsing with the pending-CR latch (including the block-split
+      case), final-CR resolution, line/column provenance, `sourceGetLocation`,
+      and five newline fixtures. User runtime matrix confirmed and completion
+      approved on 2026-07-16; build 1022 advanced CASM to `0.1.7`.
+- [x] Task UUID `cda20f5b`: implement deterministic rewind and bounded line API.
+      Option A partitioned single buffer, `sourceRewind`, `sourceNextLine`,
+      `inputStreamReadInto`, absolute cursor, and the `$1000` → `$2000` envelope
+      increase. User runtime matrix confirmed and completion approved on
+      2026-07-17; build 1025 advanced CASM to `0.1.8`.
+- [x] Task UUID `7196a56f`: implement the minimal lexer core (Option 1
+      static-only). `lexer.s` with the lookahead, token primitives,
+      whitespace/comment skipping, and punctuation tokens, plus the
+      `CASM_LEXER_STATE_*` enum. User non-regression confirmed and completion
+      approved on 2026-07-17; build 1028, CASM at `0.1.9`.
+- [x] Task UUID `9e1a1a12`: implement textual and numeric token scanning.
+- [x] Task UUID `3367d36d`: implement mnemonic classification.
+- [x] Task UUID `a68d3603`: integrate diagnostics and temporary token dump.
+- [x] Task UUID `178b0884`: verify artifacts and obtain user runtime
+      confirmation.
+
+## Phase 3 Acceptance
+
+- [x] Phase 0C.1 and the DEBUG reuse decision are recorded.
+- [x] Source traversal and rewind are byte-, newline-, and location-identical.
+- [x] CR, LF, and CRLF normalize correctly across input-block boundaries.
+- [x] Lines, tokens, offsets, cursors, and locations fail before overflow.
+- [x] All approved token classes and lexical failure cases are deterministic.
+- [x] The temporary token dump reports correct file, line, and column data.
+- [x] CASM stays within the approved $2000 MAIN envelope.
+- [x] Build, artifact, release-disk, and no-change build checks pass.
+- [x] The user completes the runtime walkthrough.
+- [x] The user explicitly approves marking Phase 3 done.
+
+# CASM Phase 4 — Statement Parser, Opcode Table, and Numeric Static Assembly
+
+Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
+
+## Tasks
+
+- [x] Task UUID `31bb2198`: implement statement parser and syntax validation.
+      `parser.s` with `parserParseStatement` (LL(1) statement/operand grammar
+      over the lexer's single-token buffer) and `parseNumericValue` (decimal/
+      hex/binary to 16-bit with a 24-bit sticky-overflow bounds check).
+      `CasmParserStmt` record, opkind equates, and diagnostics `$1C`–`$1E`
+      added. A temporary parse driver in `casm.s` replaced the WP10 token dump
+      so syntax diagnostics surface through the fatal path; WP14 replaces it.
+      Targeted fixtures (`casmwp11` plus `casmerr1`–`casmerr5`) added. User
+      runtime confirmed the valid fixture prints `INPUT VALIDATED`, each error
+      fixture prints its diagnostic, and `casmshort` correctly reports
+      `SYNTAX ERROR` on its deferred-label `JMP START_LABEL`. Completion
+      approved on 2026-07-17; build 1042 advanced CASM to `0.1.13`.
+- [x] Task UUID `501bc58c`: implement opcode table and addressing mode matcher.
+      `opcodes.s` with the compressed legal-6502 table (56 mnemonic mode masks,
+      run offsets, 151 packed opcodes) and `opcodesFindOpcode`, which resolves
+      the WP11 operand kind to a concrete `CASM_MODE_*` (with ZP/absolute
+      promotion and branch detection), verifies mnemonic support, and records
+      opcode/mode/length in the exported `CasmInsn`. Added `CASM_MODE_*`,
+      `CasmInsn`, and `CASM_DIAG_INVALID_ADDR_MODE` ($1F); reused `$1E` for
+      8-bit operand overflow. Relative displacement/range check deferred to
+      WP13 per the amended parent plan. The temporary `casm.s` driver now runs
+      the matcher on mnemonic statements. Fixtures `casmam1`/`casmam2`
+      (invalid mode) and `casmrng1` (immediate 8-bit overflow) added. User
+      runtime confirmed all cases. Completion approved on 2026-07-17; build
+      1047 advanced CASM to `0.1.14`.
+- [x] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
+      New `emit.s` engine: `CasmPc` tracking, PRG load-address header + bounded
+      64-byte staged writes, `.ORG`/`.BYTE`/`.WORD` handling, per-instruction
+      operand encoding, and the relative-branch displacement + range check
+      moved here from WP12. Added diagnostics `$20`–`$23`; refined the parser to
+      leave `.BYTE`/`.WORD` operand lists for the emitter; made output
+      operational (emit by default, `/S` accepted, `/M`/`/L` still rejected).
+      The MAIN envelope was raised `$2000`→`$2800` (approved) to fit emission.
+      Fixtures `casmemit1` (valid → PRG), `casmorg1`/`casmorg2`/`casmbr1`
+      (error paths), and `casmhello` (runnable print-and-exit demo). User
+      runtime confirmed all cases. Completion approved on 2026-07-17; build
+      1053 advanced CASM to `0.1.15`.
+- [ ] Task UUID `d1e2f3a4`: execute orchestration and end-to-end binary validation.
+- [ ] Task UUID `c2a3b4c5`: verify artifacts and obtain user runtime confirmation.
+
+## Phase 4 Acceptance
+
+- [ ] Syntactic errors and operand delimiters are fully validated.
+- [ ] 6502 addressing mode mapping and numeric size boundaries are enforced.
+- [ ] Relative branch distance checks are validated.
+- [ ] Output PRG files match reference binary files byte-for-byte.
+- [ ] CASM remains within the approved MAIN envelope (raised $2000 -> $2800 in
+      WP13 to fit the emission engine).
+- [ ] Build, artifact, and build-number checks pass.
+- [ ] The user completes the runtime walkthrough and approves Phase 4.

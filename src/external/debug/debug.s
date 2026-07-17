@@ -7,9 +7,9 @@
 .include "command64.inc"
 
 ; --- Version Information ---
-VERSION_MAJOR = '0'
-VERSION_MINOR = '4'
-VERSION_STAGE = '0' ; Release 0.4.0 ca65 migration
+.define VERSION_MAJOR "0"
+.define VERSION_MINOR "4"
+.define VERSION_STAGE "0" ; Release 0.4.0 ca65 migration
 .include "build_debug.inc"
 
 ; --- Zero Page Pointers ($70-$7F) ---

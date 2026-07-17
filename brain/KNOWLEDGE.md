@@ -117,6 +117,128 @@ This file serves as the shared repository for architectural decisions, technical
   CASM treats that case as input-open failure; stream boundary coverage uses
   openable 17-byte, 256-byte, and 513-byte SEQ fixtures.
 
+### CASM Phase 3 Source/Lexer Contract (approved 2026-07-16)
+
+- WP3 freezes the source/lexer ABI in `common.inc` and owns persistent Phase 3
+  storage in storage-only `state.s`. The layout is exactly 63 BSS bytes: 16
+  source bytes plus 47 lexer/lookahead/token bytes. The token record is 39
+  contiguous bytes with a seven-byte header and 32-byte text buffer.
+- WP3 reserves diagnostics `$14-$1B`, sixteen token types, type-specific
+  directive/register/number subtypes, mnemonic subtype range 0-55, and only
+  `$80-$83` as transient source/lexer aliases. It adds no diagnostic messages
+  or runtime source/lexer path.
+- `CasmIoBuffer` remains the sole 256-byte buffer. Future byte mode uses it as
+  a transfer block; line mode must switch exclusive ownership and build the
+  line directly in the same buffer. Mixing APIs requires rewind/reset.
+- WP3 completion-candidate approval advanced CASM from `0.1.4` to `0.1.5`;
+  final WP3 closure remains gated by user runtime confirmation.
+- WP4 adds executable `source.s` over the managed input wrapper and WP3 state.
+  `sourceNextByte` is a deliberate transitional raw-byte API: every `$00-$FF`
+  byte, including CR and LF, returns `CASM_SOURCE_BYTE` with the byte in
+  `CasmSourceResultByte`, never inferred from A or Z. WP5 replaces only the
+  newline semantics; the lexer is gated on WP5. The source consumed offset is a
+  distinct checked 16-bit cursor from the managed fetched total; at first EOF
+  they must be equal, which is the raw-fixture loss/duplication gate. Offset and
+  input-total overflow share the single `$15` diagnostic. `source.s` adds no BSS
+  and writes no lexer state. User completion approval advanced CASM from `0.1.5`
+  to `0.1.6`.
+- WP5 replaces the transitional raw API with the normalized one. CR, LF, and
+  CRLF collapse to one `CASM_SOURCE_NEWLINE` via the persistent
+  `CasmSourcePendingCr` latch, which is what makes a CRLF split across an input
+  block boundary work: the CR emits the newline and arms the latch, and the
+  following LF is swallowed after the refill. A final CR emits its newline and
+  the subsequent EOF clears the latch. `CasmSourceResultByte` is authoritative
+  only for `CASM_SOURCE_BYTE` and is 0 for NEWLINE/EOF; the lexer keys on the
+  result code and never interprets raw CR or LF.
+- `CasmSourceOffset` is the **physical** consumed offset, not a count of returned
+  results: it advances once per physical byte including the LF swallowed inside a
+  CRLF. That is precisely what keeps `CasmSourceOffset == CasmInputTotal` true at
+  first EOF once one result can span two physical bytes.
+- Because `CasmSourceColumn` is one byte and Phase 0C.1 requires checked
+  one-based columns, a source line longer than 255 bytes is unrepresentable and
+  fails in byte mode with `$16`. A byte at column 255 arms an exhausted latch;
+  only a further *byte* on that line fails, so a legitimate 255-byte line plus
+  newline succeeds. The WP4 `casm256`/`casmmulti` fixtures are single lines over
+  that limit and therefore now fail with `$16` by design; `casmsplit` carries the
+  multi-block traversal coverage instead. WP6's line API rejects the same
+  physical condition with `$17`; the two APIs keep distinct diagnostics.
+- `sourceGetLocation` is a validated in-place accessor, not a copy: the canonical
+  next-result location already lives in the persistent source fields, so it adds
+  no snapshot BSS and callers copy the fields before the next mutating call. User
+  completion approval advanced CASM from `0.1.6` to `0.1.7`.
+- WP6 adds `sourceRewind` and `sourceNextLine`. The "single buffer, line window"
+  contract was contradictory as written — a full-buffer refill destroys a line
+  that spans blocks. It is realized as an explicit partition: while a line builds,
+  `CasmIoBuffer[0..lineLength-1]` is the payload and `[lineLength..255]` is the
+  transfer region a refill reads into, and the block cursor holds absolute buffer
+  positions (byte mode base is always 0, so it is bit-identical). Safety rests on
+  writePos (`CasmSourceLineLength`) <= readPos (`CasmSourceBlockIndex`), equal
+  only right after a LINE-mode refill where the byte is loaded before it is
+  stored. `sourceNextLine` reuses WP5 normalization via the private
+  `sourceNextResult` entry rather than duplicating a newline state machine.
+- Byte and line modes are mutually exclusive: line mode is claimed only on a
+  fresh stream (offset 0, line state IDLE), mixing returns `$13`, and a rewind
+  restores the choice. `sourceRewind` resets only source-owned state; lookahead
+  invalidation is WP7's because `source.s` writes no lexer state. A rewind close
+  failure returns the primary `$0D` (ownership retained); a reopen failure
+  returns `$14` with the source CLOSED/NONE.
+- WP6 raised the CASM linker envelope from `$1000` to `$2000` because Phase 3
+  could not otherwise fit; `add_ca65_app(casm ... "2000")` sets `MAIN: size`.
+  `inputStreamRead` is now a thin caller of the additive `inputStreamReadInto`.
+  User completion approval advanced CASM from `0.1.7` to `0.1.8`.
+- WP7 adds `lexer.s`, the first source-layer consumer, with a one-result
+  lookahead over `sourceNextByte`, bounded token primitives, whitespace/comment
+  skipping (the comment's terminating newline is preserved as a token), and the
+  EOF/newline/punctuation tokens. `CasmLexerState`'s enum
+  (`CASM_LEXER_STATE_INIT/READY/EOF/ERROR`) was added to `common.inc` — the byte
+  WP3 reserved. The lexer owns lookahead invalidation after a rewind
+  (`lexerInit`), discharging WP6's deferral; a lexer failure never closes the
+  source. Provenance subtlety: `sourceGetLocation` returns `$16` at the
+  column-255 exhausted latch (correct for byte-only callers but too strict for
+  the lexer, which may next get a harmless newline), so `lexerFill` reads the
+  exported in-place location fields directly and clamps the latch to
+  `CASM_SOURCE_COLUMN_MAX`, leaving real overflow to `sourceNextByte`; no
+  source-layer change. WP7 is static-only: no shipped-path caller until WP10 and
+  no end-to-end run until WP8 adds identifiers. Completion advanced CASM to
+  `0.1.9` (the version was pre-advanced by the multi-digit stage migration).
+- WP8 adds identifier, dot-prefixed directive, register, and decimal/hex/binary numeric token scanning to `lexer.s`. Characters are classified using custom ASCII-range helpers. Overlong tokens (exceeding 31 characters) reject with `TOKEN_TOO_LONG` (`$18`). Malformed numeric formats (lone prefixes or invalid suffixes) skip trailing invalid characters and return `MALFORMED_NUMBER` (`$1A`). Single-character registers (A/X/Y) and directives are mapped case-insensitively. Branch range errors are resolved with inverted jump logic. Version stage advanced to `10` (`0.1.10`).
+- WP9 defines `mnemonicTable` in `lexer.s` RODATA with exactly 56 three-byte elements (168 bytes total), asserted at build time. The `classifyMnemonic` routine performs case-insensitive linear search on tokens of length exactly 3. Successful matches are emitted as `CASM_TOKEN_MNEMONIC` with the respective 0-55 subtype index. Unmatched identifier tokens fallback to `CASM_TOKEN_IDENTIFIER`. Version stage advanced to `11` (`0.1.11`).
+- WP10 integrates the Phase 3 lexer loop (`lexerInit` -> `lexerNext` -> `diagDumpToken`) into `casm.s`, replacing Phase 2's raw byte consumption and mapping contiguous Phase 3 fatal diagnostics `$14-$1B` to user-friendly messages in `diagnostics.s`. The `diagDumpToken` utility formats and prints all token subtypes, indices, text, and starting line/column provenance. Fixes length-checked string comparison in `compareTokenText` to resolve a null-termination BSS collision. Version stage advanced to `12` (`0.1.12`).
+- WP2 independently verified all 56 DEBUG mnemonic names and ordering against
+  the repository's standard 6502 reference. WP9 will use a CASM-local 168-byte
+  mnemonic table with explicit PETSCII bytes and no `???` entry, runtime link,
+  shared include, or build coupling to DEBUG. DEBUG parsing, addressing,
+  branch, opcode lookup, and direct-write routines are not reused; opcode and
+  addressing-table decisions remain Phase 4 work. User completion approval
+  advanced CASM from `0.1.3` to `0.1.4`.
+- Work Package 1 synchronized the approved contracts and task hierarchy; user
+  completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+- Phase 3 accepts one top-level source file, reuses the managed 256-byte input
+  buffer, and bounds physical input and line numbers to checked 16-bit values.
+- Source identity begins with file ID zero and the original source filename.
+  Lines and columns are one-based; columns are checked 8-bit values.
+- CR, LF, and CRLF each normalize to one logical newline, including CRLF split
+  across input blocks. Location advances only when that newline is consumed.
+- `sourceRewind` closes and reopens the file, then resets byte, newline,
+  location, lookahead, EOF, and line-window state. Byte and line APIs cannot be
+  mixed without an explicit rewind/reset.
+- Logical line payload is limited to 255 bytes. The line convenience API and
+  transfer-block use of `CasmIoBuffer` must be explicitly mutually exclusive;
+  Phase 3 allocates no second 256-byte buffer.
+- Token text is limited to 31 bytes plus a terminator and preserves original
+  spelling. Identifier labels remain case-sensitive; mnemonic, directive, and
+  register classification is case-insensitive.
+- Phase 3 validates decimal, `$` hexadecimal, and `%` binary lexical shape but
+  does not convert values. Malformed prefixes and invalid numeric suffixes fail
+  as single lexical errors rather than splitting into unrelated tokens.
+- Every token records type, subtype, length, file ID, 16-bit starting line,
+  one-byte starting column, and bounded original text. Spaces/tabs are skipped;
+  comments preserve their terminating logical newline token.
+- Phase 4 is the first production output consumer and includes the bounded
+  statement parser before opcode selection and numeric static emission.
+- VMM storage precedes VMM-backed symbols: Phase 6A provides bounded storage
+  and Phase 6B adds the symbol table and deterministic two-pass assembly.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
@@ -165,6 +287,13 @@ This file serves as the shared repository for architectural decisions, technical
 - **Storage**: Allocated in the REU via `vmmAlloc` (4KB / 1 page) during shell initialization.
 - **Format**: MS-DOS standard double-null terminated strings (`VAR1=VAL1\0VAR2=VAL2\0\0`).
 - **Access**: Managed via the `SET` and `PATH` internal commands. External programs can access it via the VMM API.
+
+### Generalized Multi-Digit Version Stage (approved 2026-07-17)
+- **Constraint**: ca65 equates defined using `=` are restricted to numeric expressions and cannot represent string literals. Consequently, version staging was historically limited to single-byte character constants (e.g. `'0'`–`'9'`).
+- **Resolution**: Transitioning to preprocessor text macros (`.define VERSION_STAGE "10"`) allows version stage strings of arbitrary length/digits.
+- **Implementation**: The preprocessor evaluates these macros during assembly time. Placing them in `.byte` declarations (e.g., `.byte VERSION_STAGE`) compiles them directly to their PETSCII character representations. This transition is completely static, resulting in zero runtime overhead or changes to execution logic.
+- **Generalization**: This standard is generalized to all `ca65` external applications and test suites in the repository, ensuring uniform version representation.
+
 
 ## C64 Platform Constraints Discovered
 

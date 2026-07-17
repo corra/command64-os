@@ -24,6 +24,7 @@
 .export fileDelete
 .export inputStreamOpen
 .export inputStreamRead
+.export inputStreamReadInto
 .export inputStreamClose
 .export outputAbort
 
@@ -390,10 +391,15 @@ inputStreamOpen:
     jmp fileOpenInput
 
 ; ---------------------------------------------------------------------------
-; inputStreamRead
-; Read the next 256-byte block into CasmIoBuffer and advance the checked total.
+; inputStreamReadInto
+; Read a bounded block into a caller-supplied destination and advance the
+; checked 16-bit fetched total. WP6 added this so the source layer can refill
+; only the region above an accumulated line payload; inputStreamRead is the
+; full-buffer case built on top of it, so byte mode is provably unchanged.
 ;
 ; Inputs:    managed input stream is open
+;            X/Y = destination pointer (low/high)
+;            CasmIoLenLo/Hi = requested byte count
 ; Outputs:   C clear, A = CASM_STREAM_DATA or CASM_STREAM_EOF
 ;            CasmIoLenLo/Hi = actual byte count
 ;            C set, A = CASM_DIAG_* on failure or 16-bit total overflow
@@ -401,13 +407,7 @@ inputStreamOpen:
 ; Clobbers:  A, X, Y and fileRead clobbers
 ; Scratch:   none
 ; ---------------------------------------------------------------------------
-inputStreamRead:
-    lda #<CASM_IO_BUFFER_SIZE
-    sta CasmIoLenLo
-    lda #>CASM_IO_BUFFER_SIZE
-    sta CasmIoLenHi
-    ldx #<CasmIoBuffer
-    ldy #>CasmIoBuffer
+inputStreamReadInto:
     jsr fileRead
     bcs isrReturn
     cmp #CASM_STREAM_EOF
@@ -428,11 +428,37 @@ isrEof:
     clc
     rts
 isrOverflow:
+    ; A source larger than 65,535 bytes overruns the checked fetched total.
+    ; WP4 maps this to the single stable source-offset overflow diagnostic so
+    ; oversized input has one code shared with sourceNextByte's offset guard.
     lda #CASM_STREAM_ERROR
     sta CasmInputState
-    lda #CASM_DIAG_STREAM_STATE_FAILED
+    lda #CASM_DIAG_SOURCE_OFFSET_OVERFLOW
     sec
     rts
+
+; ---------------------------------------------------------------------------
+; inputStreamRead
+; Read the next 256-byte block into CasmIoBuffer and advance the checked total.
+; This is the full-buffer case of inputStreamReadInto and is behaviorally
+; identical to its pre-WP6 form.
+;
+; Inputs:    managed input stream is open
+; Outputs:   C clear, A = CASM_STREAM_DATA or CASM_STREAM_EOF
+;            CasmIoLenLo/Hi = actual byte count
+;            C set, A = CASM_DIAG_* on failure or 16-bit total overflow
+; Preserves: none
+; Clobbers:  A, X, Y and fileRead clobbers
+; Scratch:   none
+; ---------------------------------------------------------------------------
+inputStreamRead:
+    lda #<CASM_IO_BUFFER_SIZE
+    sta CasmIoLenLo
+    lda #>CASM_IO_BUFFER_SIZE
+    sta CasmIoLenHi
+    ldx #<CasmIoBuffer
+    ldy #>CasmIoBuffer
+    jmp inputStreamReadInto
 
 ; ---------------------------------------------------------------------------
 ; inputStreamClose

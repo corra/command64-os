@@ -183,7 +183,11 @@ set(COMP_TARGET comp)
 # Ships from its first phase so launch, relocation, cleanup, and shell-return
 # behavior use the production external-app path before parser work begins.
 if(Ca65_FOUND)
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "1000")
+    # WP6 raised the MAIN envelope from $1000 to $2000. Phase 3's remaining work
+    # packages (lexer core, token scanning, the 168-byte mnemonic table, and the
+    # diagnostics/token dump) cannot fit the 725 bytes of headroom that remained
+    # at WP5. $2000 matches the DEBUG precedent and leaves room through Phase 4.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "2800")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -318,6 +322,27 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
     "${CASM_TEST_FIXTURE_DIR}/casm256.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmulti.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmcr.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmcrlf.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmsplit.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmblank.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmfincr.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmln255.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmln256.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmwp11.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr2.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr3.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr4.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmerr5.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmam1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmam2.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmrng1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmemit1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmorg1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmorg2.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmbr1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmhello.seq"
 )
 
 add_custom_command(

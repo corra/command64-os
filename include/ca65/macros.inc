@@ -21,9 +21,9 @@
 ; Kick apps build their version banner with string concatenation:
 ;   .text "NAME v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
 ;   .text "." + BUILD_NUMBER
-; ca65 has no "+"-on-strings operator, but none is needed: once BUILD_NUMBER
-; arrives as a ".define BUILD_NUMBER \"42\""-style text-substitution token
-; (generated per-build by the CMake layer, same as Kick's build_<name>.inc),
+; ca65 has no "+"-on-strings operator, but none is needed: once version variables
+; and BUILD_NUMBER arrive as ".define VERSION_STAGE \"0\"" or ".define BUILD_NUMBER \"42\""-style
+; text-substitution tokens (generated per-build by the CMake layer or manually),
 ; a plain comma-separated .byte list assembles the same banner directly:
 ;
 ;   .byte   "NAME v", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE

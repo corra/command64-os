@@ -23,7 +23,8 @@
 - **Conway memory safety & relocation crash fix**: Resolved memory collisions between code and double buffers by embedding the grid buffers as relocatable, page-aligned data tables inside the binaries. Both Kick and ca65 builds generate identical size-bounded relocatable binaries (3008 bytes, 59 relocation entries).
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055).
+- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055) / CASM 0.1.12 (Build 1036).
+- **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
 - **test app naming cleanup**: Redundant `<name>test` ca65 test apps now use
@@ -120,6 +121,73 @@ service call. Central resources own 47 BSS bytes, including the two
 bounded cleanup traversal/status bytes added for real file close handling.
 Diagnostics add no BSS; their bounded Phase 2 selector and fixed messages use
 45 code bytes and 599 read-only bytes.
+
+CASM Phase 3 Work Package 1 build 1015 synchronized the approved Phase 0C.1
+contract and task hierarchy without changing memory ownership or layout. User
+completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+The linked code/data remains 2,256 bytes with 449 BSS bytes and 1,391 bytes of
+combined `$1000` envelope headroom.
+
+CASM Phase 3 Work Package 2 build 1016 approved a future CASM-local 168-byte
+mnemonic table but added no runtime state or table data. Completion advanced
+the stage version from `0.1.3` to `0.1.4`; linked code/data remains 2,256 bytes
+with 449 BSS bytes and 1,391 bytes of combined envelope headroom.
+
+CASM Phase 3 Work Package 3 version build 1018 retains 2,256
+linked code/data bytes and 241 relocation points. Storage-only `state.s` adds
+exactly 63 BSS bytes with zero code, RODATA, DATA, or zero-page allocation:
+16 bytes for source state and 47 bytes for lexer/lookahead/token state. Total
+BSS is 512 bytes and combined `$1000` envelope headroom is 1,328 bytes. The
+final R6 PRG is 2,746 bytes at `$3400`. CASM is now `0.1.5`; WP3 completion was
+approved after user runtime confirmation on 2026-07-16.
+
+CASM Phase 3 Work Package 4 build 1020 adds executable `source.s` (the
+rewindable source backend) and routes the consume-only entry point through it.
+Linked code/data grows from 2,256 to 2,663 bytes (CODE `$07FE` + RODATA
+`$0269`); `source.s` adds no BSS, so total BSS stays 512 bytes. Envelope usage
+is `$3400-$4066`, leaving 921 bytes of combined `$1000` headroom. Relocation
+points are 315 and the final R6 PRG is 3,301 bytes at `$3400`. CASM is now
+`0.1.6`; WP4 completion was approved after user runtime confirmation on
+2026-07-16.
+
+CASM Phase 3 Work Package 5 build 1022 adds newline normalization and provenance
+inside the existing `source.s`. Linked code/data grows from 2,663 to 2,859 bytes
+(CODE `$08C2` + RODATA `$0269`, unchanged RODATA); WP5 adds no BSS, so total BSS
+stays 512 bytes and the WP3 state layout is untouched. Envelope usage is
+`$3400-$412A`, leaving 725 bytes of combined `$1000` headroom. Relocation points
+are 339. `casm.s` was not modified: its consume-only loop already treats a
+non-EOF, non-carry result as continue, so `CASM_SOURCE_NEWLINE` needed no
+orchestration change. CASM is now `0.1.7`; WP5 completion was approved after user
+runtime confirmation on 2026-07-16.
+
+CASM Phase 3 Work Package 6 build 1025 adds `sourceRewind` and `sourceNextLine`
+and raises the CASM linker envelope from `$1000` to `$2000` because Phase 3 could
+not otherwise fit (725 bytes of headroom against an estimated 1,370-1,940 for
+WP6-WP10). Linked code/data grows from 2,859 to 3,171 bytes (CODE `$09FA` +
+RODATA `$0269`); Option A's buffer partition adds no BSS, so total BSS stays 512
+bytes and the WP3 state layout is untouched. Envelope usage is `$3400-$4262` =
+3,683 bytes, leaving 4,509 bytes of `$2000` headroom. Relocation points are 388.
+`casm.s` is unchanged. Runtime confirmed `casmln256`/`casm256`/`casmmulti` return
+`$16` (shown as the generic `INTERNAL ERROR` until WP10 wires the text) and a
+zero-size file cannot be opened. CASM is now `0.1.8`; WP6 completion was approved
+after user runtime confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 7 build 1028 adds `lexer.s`, the minimal lexer core and
+first source-layer consumer, plus the `CASM_LEXER_STATE_*` enum in `common.inc`.
+Linked code/data grows from 3,171 to 3,544 bytes (CODE `$0B5C` + RODATA `$027C`);
+`lexer.s` defines no BSS, so total BSS stays 512 bytes. Envelope usage is
+`$3400-$43D7` = 4,056 bytes, leaving 4,136 bytes of `$2000` headroom. Relocation
+points are 460. WP7 is Option 1 (static-only): `casm.s` is unchanged and the
+lexer has no shipped-path caller until WP10, so it was verified statically and by
+non-regression. The version was pre-advanced to `0.1.9` by the separately
+committed multi-digit version-stage migration; WP7 completion was approved after
+user non-regression confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 8 build 1030 adds textual and numeric token scanning to `lexer.s`, including dot-prefixed directives, case-insensitive registers, and hexadecimal, decimal, and binary numeric scanners, resolving relative branch limits. Version advanced to `0.1.10`; WP8 completion was approved after user runtime confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 9 build 1032 adds mnemonic classification with a local 168-byte `mnemonicTable` in `lexer.s` RODATA and case-insensitive search logic in `classifyMnemonic`. Version advanced to `0.1.11`; WP9 completion was approved after user runtime confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 10 build 1036 integrates the lexer into the main application read loop, prints a temporary token dump (type names, register/directive/number subtype names, mnemonic indices, text content, line/column location), maps contiguous Phase 3 error codes in `diagnostics.s`, fixes length-checked string comparisons, and updates `GenerateCasmTestFixtures.cmake` with alternating space-separated characters to verify source column boundaries. Version advanced to `0.1.12`; WP10 completion was approved after user runtime confirmation on 2026-07-17.
 
 ## C64 Hardware Gotchas (hard-won)
 

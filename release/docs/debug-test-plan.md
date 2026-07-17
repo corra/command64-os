@@ -20,7 +20,7 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
    C64:> debug
    ```
 
-4. Verify the startup message displays (e.g., `DEBUG v0.1.8.1027`) followed by the prompt:
+4. Verify the startup message displays (e.g., `DEBUG v0.4.0.1101`) followed by the prompt:
 
    ```bash
    -
@@ -116,64 +116,67 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 ## Test Suite 3: Memory Manipulation (`D`, `E`, `F`, `M`, `C`, `S`)
 
+> [!IMPORTANT]
+> **Safety Constraint**: All memory manipulation tests in this suite must target the scratch range `$5000+`, which is safe from memory collisions with the resident `debug` program (located at `$2000-$376B`). Never use `E`, `F`, `M`, or `W`/`L` writes against addresses inside `$2000-$376B` — doing so overwrites the running debugger's own code/data.
+
 ### Test 3.1: Memory Dump (`D`)
 
 - **Procedures & Inputs**:
   - `D` (No args): Displays 128 bytes (16 rows of 8 bytes) starting from the last set `currentAddr`.
-  - `D 2000`: Sets `currentAddr` to `$2000` and displays 128 bytes.
-  - `D 2000 201F` (Range): Displays memory from `$2000` to `$201F` inclusive.
-  - `D 2000 L 10` (Length): Displays exactly 16 bytes starting at `$2000`.
+  - `D 5000`: Sets `currentAddr` to `$5000` and displays 128 bytes.
+  - `D 5000 501F` (Range): Displays memory from `$5000` to `$501F` inclusive.
+  - `D 5000 L 10` (Length): Displays exactly 16 bytes starting at `$5000`.
   - `D` (Continuous): Pressing `D` sequentially advances `currentAddr` by 128 bytes each time.
 
 - **Pass Criteria**:
   - Dump layout matches C64 screen: `ADDR: XX XX XX XX XX XX XX XX  ASCII`
-  - Start addresses greater than end addresses (e.g. `D 2010 2000`) print `error`.
+  - Start addresses greater than end addresses (e.g. `D 5010 5000`) print `error`.
 
 ### Test 3.2: Memory Enter (`E`)
 
-- **Input**: `E 2500 11 22 33 "C64" 44`
+- **Input**: `E 5500 11 22 33 "C64" 44`
 
 - **Procedure**:
   1. Enter the list command.
-  2. Verify with `D 2500 L 08`.
+  2. Verify with `D 5500 L 08`.
 - **Pass Criteria**:
-  - Dump shows bytes at `$2500` as: `11 22 33 43 36 34 44` (ASCII `"C"`, `"6"`, `"4"` mapped to hex `$43`, `$36`, `$34`).
-  - `currentAddr` is updated to the byte after the last entered item (`$2507`).
+  - Dump shows bytes at `$5500` as: `11 22 33 43 36 34 44` (ASCII `"C"`, `"6"`, `"4"` mapped to hex `$43`, `$36`, `$34`).
+  - `currentAddr` is updated to the byte after the last entered item (`$5507`).
 
 ### Test 3.3: Memory Fill (`F`)
 
-- **Input**: `F 3000 300F AA BB`
+- **Input**: `F 5000 500F AA BB`
 
 - **Procedure**:
   1. Fill the range with the alternating pattern.
-  2. Dump range using `D 3000 300F`.
+  2. Dump range using `D 5000 500F`.
 - **Pass Criteria**: Memory contains alternating `AA BB AA BB...`.
 
 ### Test 3.4: Memory Move (`M`)
 
 - **Procedures & Inputs**:
-  - **Forward Copy (No Overlap)**: `M 3000 3007 3100` (copies `$3000-$3007` to `$3100`).
-  - **Backward Copy (Overlap, Dest > Src)**: Fill `$3000-$3007` with `01 02 03 04 05 06 07 08`. Move with `M 3000 3006 3001`.
+  - **Forward Copy (No Overlap)**: `M 5000 5007 5100` (copies `$5000-$5007` to `$5100`).
+  - **Backward Copy (Overlap, Dest > Src)**: Fill `$5000-$5007` with `01 02 03 04 05 06 07 08`. Move with `M 5000 5006 5001`.
 
 - **Pass Criteria**:
-  - Dump `$3100` shows identical bytes to `$3000`.
-  - Overlap move results in memory `$3000-$3007` containing `01 01 02 03 04 05 06 07` (verifies overlap protection prevents source bytes from being corrupted before read).
+  - Dump `$5100` shows identical bytes to `$5000`.
+  - Overlap move results in memory `$5000-$5007` containing `01 01 02 03 04 05 06 07` (verifies overlap protection prevents source bytes from being corrupted before read).
 
 ### Test 3.5: Memory Compare (`C`)
 
 - **Input**:
-  - Identical blocks: `C 3000 3007 3100` (when blocks match).
-  - Non-identical: Modify `$3102` to `EE` and compare again.
+  - Identical blocks: `C 5000 5007 5100` (when blocks match).
+  - Non-identical: Modify `$5102` to `EE` and compare again.
 
 - **Pass Criteria**:
   - Matching blocks return no output.
-  - Non-matching blocks output: `3002 XX EE 3102` (displays address 1, value 1, value 2, address 2).
+  - Non-matching blocks output: `5002 XX EE 5102` (displays address 1, value 1, value 2, address 2).
 
 ### Test 3.6: Memory Search (`S`)
 
 - **Input**:
-  - `S 3000 3100 "C64"`
-  - `S 3000 3100 AA BB`
+  - `S 5000 5100 "C64"`
+  - `S 5000 5100 AA BB`
 
 - **Pass Criteria**: Displays the starting hex address(es) of all matching sequences in range. If no matches exist, returns directly to the prompt.
 
@@ -186,13 +189,14 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 - **Input**: `R`
 
 - **Procedure**: Execute `R` on the prompt.
-- **Pass Criteria**: Displays the current captured CPU register state:
+- **Pass Criteria**: Displays the current captured CPU register state on two lines:
 
   ```hex
-  A=xx X=xx Y=xx P=xx S=xx
+  A=xx X=xx Y=xx P=xx S=xx PC=xxxx
+  P=xx: N=x V=x * B=x D=x I=x Z=x C=x
   ```
 
-  (where `xx` represents hex numbers).
+  (where `xx`/`xxxx` represents hex numbers, and `x` represents flag bit values `0` or `1`).
 
 ### Test 4.2: Modify Register (Valid Inputs)
 
@@ -214,6 +218,29 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
   - Type `R A` -> `: FF 00` (extra parameters).
 
 - **Pass Criteria**: The utility prints `error` immediately and leaves register unmodified.
+
+### Test 4.4: Display and Edit Register P (Whole Byte)
+
+- **Input & Procedure**:
+  1. Type `R P` and press `[Enter]`. Verify it displays the current value of P, e.g. `P 30` followed by the status flags line `P=30: N=0 V=0 * B=1 D=0 I=0 Z=0 C=0`, and prompts with `:`.
+  2. Input `81` and press `[Enter]`.
+  3. Type `R` to display all registers.
+- **Pass Criteria**:
+  - The second line under all registers displays `P=81: N=1 V=0 * B=0 D=0 I=0 Z=0 C=1`.
+  - Pressing `[Enter]` on `:` without typing a value leaves P unmodified.
+
+### Test 4.5: Edit Register P via Flag Assignments
+
+- **Input & Procedure**:
+  1. Type `R P` and press `[Enter]`.
+  2. Input `N=1 V=1 Z=0 C=0` and press `[Enter]`.
+  3. Type `R` to display all registers.
+- **Pass Criteria**:
+  - Register P flags are correctly updated: N=1, V=1, Z=0, C=0.
+  - The output displays `P=E0: N=1 V=1 * B=0 D=0 I=0 Z=0 C=0`.
+  - Inputs with spaces around `=` (e.g. `n = 0`) are successfully parsed.
+  - Inputs with invalid flags (e.g. `X=1` or `*=1`) or invalid values (e.g. `N=2`) return `error`.
+
 
 ---
 
@@ -313,18 +340,18 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 - **Procedure**:
   1. Start a fresh `debug` session.
-  2. Type `W 2000 2010` and press `[Enter]`.
+  2. Type `W 5000 5010` and press `[Enter]`.
 
 - **Pass Criteria**: The utility prints `error` immediately.
 
 #### Test 7.2.2: Save as Standard Program (`PRG` - Default)
 
-- **Input**: `N TMP.PRG` followed by `W 2000 200F`
+- **Input**: `N TMP.PRG` followed by `W 5000 500F`
 
 - **Procedure**:
   1. Set the name to `TMP.PRG`.
-  2. Fill a test pattern in memory: `F 2000 200F AA` (fills `$2000`–`$200F` with `$AA`).
-  3. Type `W 2000 200F` and press `[Enter]`.
+  2. Fill a test pattern in memory: `F 5000 500F AA` (fills `$5000`–`$500F` with `$AA`).
+  3. Type `W 5000 500F` and press `[Enter]`.
 - **Pass Criteria**:
   - The drive active light flashes and control returns cleanly.
   - Quit debug (`Q`), run `dir` $\rightarrow$ verify `TMP.PRG` exists on the disk.
@@ -332,19 +359,19 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 #### Test 7.2.3: Save as Alternative Formats (`SEQ` and `USR`)
 
-- **Input**: `W S 2000 200F` (Sequential) and `W U 2000 200F` (User)
+- **Input**: `W S 5000 500F` (Sequential) and `W U 5000 500F` (User)
 
 - **Procedure**:
-  1. Set the name to `TMP.SEQ`. Type `W S 2000 200F` (using either shifted or unshifted `S`) and press `[Enter]`.
-  2. Set the name to `TMP.USR`. Type `W U 2000 200F` (using either shifted or unshifted `U`) and press `[Enter]`.
+  1. Set the name to `TMP.SEQ`. Type `W S 5000 500F` (using either shifted or unshifted `S`) and press `[Enter]`.
+  2. Set the name to `TMP.USR`. Type `W U 5000 500F` (using either shifted or unshifted `U`) and press `[Enter]`.
 - **Pass Criteria**: Both writes return cleanly. Verify their existence on disk via `dir`. Typing `type TMP.SEQ` should show raw characters with no address header.
 
 #### Test 7.2.4: Range Bounds Enforcement
 
-- **Input**: `W 2010 2000`
+- **Input**: `W 5010 5000`
 
 - **Procedure**:
-  1. Type `W 2010 2000` (start address greater than end address) and press `[Enter]`.
+  1. Type `W 5010 5000` (start address greater than end address) and press `[Enter]`.
 - **Pass Criteria**: The utility prints `error` immediately instead of writing indefinitely.
 
 ---
@@ -353,15 +380,18 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 #### Test 7.3.1: Load with Empty Filename
 
+> [!IMPORTANT]
+> **Safety Constraint**: Loads relocated away from a file's header address must target `$6000+`, kept clear of both the resident `debug` program (`$2000-$376B`) and the `$4000` scratch range used by the assembler/trace/proceed test suites (8-12). Loads at the file's own header address rely on the `$5000` scratch range established in Suite 7.2.
+
 - **Procedure**:
   1. Start a fresh `debug` session.
-  2. Type `L` or `L 2000` and press `[Enter]`.
+  2. Type `L` or `L 5000` and press `[Enter]`.
 
 - **Pass Criteria**: Prints `error` immediately.
 
 #### Test 7.3.2: Malformed Address Syntax Checks
 
-- **Input**: `L G000` or `L 200G`
+- **Input**: `L G000` or `L 500G`
 
 - **Procedure**:
   1. Set the name to `TMP.PRG`.
@@ -370,16 +400,16 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 #### Test 7.3.3: Relocated Loading & Address Tracking (`PRG`)
 
-- **Input**: `L 4000`
+- **Input**: `L 6000`
 
 - **Procedure**:
   1. Set the name to `TMP.PRG` (the file written in Test 7.2.2).
-  2. Clear target memory: `F 4000 400F 00`.
-  3. Type `L 4000` and press `[Enter]`.
+  2. Clear target memory: `F 6000 600F 00`.
+  3. Type `L 6000` and press `[Enter]`.
   4. Type `D` (with no arguments) and press `[Enter]`.
 - **Pass Criteria**:
   - The load returns cleanly.
-  - The memory dump defaults to starting at `$4000` and shows the loaded `$AA` bytes, proving `currentAddr` was updated.
+  - The memory dump defaults to starting at `$6000` and shows the loaded `$AA` bytes, proving `currentAddr` was updated.
 
 #### Test 7.3.4: Absolute Header Loading & Address Tracking (`PRG`)
 
@@ -387,26 +417,26 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 - **Procedure**:
   1. Set the name to `TMP.PRG`.
-  2. Clear target memory: `F 2000 200F 00`.
+  2. Clear target memory: `F 5000 500F 00`.
   3. Type `L` (no address argument) and press `[Enter]`.
   4. Type `D` (with no arguments) and press `[Enter]`.
 - **Pass Criteria**:
-  - The file loads back to its header start address (`$2000`).
-  - The memory dump defaults to starting at `$2000` and shows the loaded `$AA` bytes, proving `currentAddr` was successfully read from KERNAL `$C1/$C2`.
-  - *Troubleshooting Note*: If emulator fastloaders (like Virtual FS / True Drive Emulation settings) are active, KERNAL `$C1/$C2` (`MEMUSS`) may not be updated correctly and default to `$A000`. If this occurs, dump the memory at the file's original address manually (`D 2000`) to confirm the load succeeded.
+  - The file loads back to its header start address (`$5000`).
+  - The memory dump defaults to starting at `$5000` and shows the loaded `$AA` bytes, proving `currentAddr` was successfully read from KERNAL `$C1/$C2`.
+  - *Troubleshooting Note*: If emulator fastloaders (like Virtual FS / True Drive Emulation settings) are active, KERNAL `$C1/$C2` (`MEMUSS`) may not be updated correctly and default to `$A000`. If this occurs, dump the memory at the file's original address manually (`D 5000`) to confirm the load succeeded.
 
 #### Test 7.3.5: Relocated Loading (`SEQ` and `USR`)
 
-- **Input**: `L S 4000` with `TMP.SEQ` (or `TMP.USR`)
+- **Input**: `L S 6000` with `TMP.SEQ` (or `TMP.USR`)
 
 - **Procedure**:
   1. Set the name to `TMP.SEQ` (the file written in Test 7.2.3).
-  2. Clear target memory: `F 4000 400F 00`.
-  3. Type `L S 4000` and press `[Enter]`.
+  2. Clear target memory: `F 6000 600F 00`.
+  3. Type `L S 6000` and press `[Enter]`.
   4. Type `D` (with no arguments) and press `[Enter]`.
 - **Pass Criteria**:
   - The custom byte loader runs and control returns cleanly.
-  - Dumping memory at `$4000` shows the `$AA` bytes (proves custom read loop loaded the raw bytes).
+  - Dumping memory at `$6000` shows the `$AA` bytes (proves custom read loop loaded the raw bytes).
 
 #### Test 7.3.6: Default Address Loading (`SEQ` and `USR`)
 
@@ -414,13 +444,13 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 - **Procedure**:
   1. Set the name to `TMP.SEQ`.
-  2. Clear target memory: `F 4000 400F 00`.
-  3. Set `currentAddr` by running `D 4000`.
+  2. Clear target memory: `F 6000 600F 00`.
+  3. Set `currentAddr` by running `D 6000`.
   4. Type `L S` (no address argument) and press `[Enter]`.
   5. Type `D` and press `[Enter]`.
 - **Pass Criteria**:
   - The file loads successfully.
-  - The dump starting at `currentAddr` (`$4000`) displays the loaded `$AA` bytes.
+  - The dump starting at `currentAddr` (`$6000`) displays the loaded `$AA` bytes.
 
 ---
 
@@ -429,12 +459,12 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 - **Procedure**:
   1. Launch `debug`.
   2. Type `n testdata.bin` and press `[Enter]`.
-  3. Fill memory: `f 4000 40ff 55` (places pattern `$55` at `$4000`–`$40FF`).
-  4. Write range: `w 4000 40ff`
-  5. Clear memory: `f 4000 40ff 00`
-  6. Verify memory is empty: `d 4000 l 10` (should show all `$00` bytes).
-  7. Load file back: `l` (relies on header `$4000` saved in the file).
-  8. Verify memory is restored: `d` (should default dump starting at `$4000` and show the `$55` pattern).
+  3. Fill memory: `f 6000 60ff 55` (places pattern `$55` at `$6000`–`$60FF`).
+  4. Write range: `w 6000 60ff`
+  5. Clear memory: `f 6000 60ff 00`
+  6. Verify memory is empty: `d 6000 l 10` (should show all `$00` bytes).
+  7. Load file back: `l` (relies on header `$6000` saved in the file).
+  8. Verify memory is restored: `d` (should default dump starting at `$6000` and show the `$55` pattern).
 
 - **Pass Criteria**: Memory dump shows `$55` successfully restored across the `$4000-$40FF` range.
 
@@ -608,18 +638,168 @@ This suite verifies that the interactive assembler correctly prompts, reads, par
 
 ---
 
-## Test Suite 10 (Future): Breakpoint Tracing (`T`, `P`)
+## Test Suite 10: Single-Step Instruction Tracing (`T`)
 
-- **Note**: *Tracing is planned for implementation in Phase 3*
+> [!IMPORTANT]
+> **Safety Constraint**: All manual tracing/proceed tests must use target addresses (e.g. `$4000+`) that are safe from memory collisions with the resident `debug` program itself (located at `$2000-$376B`), unless they are explicitly intended to test boundary conditions or destructive behavior.
 
-### Test 10.1: Single-Step Tracing (`T`)
+### Test 10.1: Default Trace (Current PC)
 
-- **Proposed Input**: `T` or `T 2000`
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble at `$4000` via `A 4000`:
 
-- **Expected Flow**: Hijacks instruction execution at target address. Replaces the next instruction with a software breakpoint (`BRK`). Restores CPU registers, executes the single instruction, catches the break, restores original code, prints updated registers and next disassembled instruction, and returns to the `-` prompt.
+     ```asm
+     4000: LDA #$05
+     4002: INX
+     ```
 
-### Test 10.2: Step-Over Proceed Tracing (`P`)
+  2. Set `PC` to `$4000` and `X` to `$00` (`R PC` -> `4000`, `R X` -> `00`).
+  3. Execute `T`.
+- **Pass Criteria**:
+  - The CPU executes `LDA #$05`.
+  - The printed register line displays: `A=05 X=00 Y=00 P=xx S=xx PC=4002` (validating virtual registers and PC update).
+  - The next instruction is disassembled: `4002: INX`.
+  - Returns control to the `-` prompt.
 
-- **Proposed Input**: `P`
+### Test 10.2: Relocated Trace (Address Argument)
 
-- **Expected Flow**: Similar to `T`, but if the next instruction is a subroutine call (`JSR`), it places the breakpoint at the instruction *after* the `JSR` and executes without stopping, step-over proceeding the subroutine and breaking only on return.
+- **Input**: `T 4002`
+- **Procedure**:
+  1. Verify the setup from Test 10.1 is still active.
+  2. Execute `T 4002`.
+- **Pass Criteria**:
+  - The CPU executes the `INX` instruction at `$4002`.
+  - Registers printed show: `A=05 X=01 Y=00 P=xx S=xx PC=4003` (verifying `X` is incremented and `PC` is advanced).
+
+### Test 10.3: Conditional Branching (Taken & Not Taken Paths)
+
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble a branch sequence at `$4000`:
+
+     ```asm
+     4000: CPX #$01
+     4002: BEQ $4006
+     4004: NOP
+     4005: RTS
+     4006: SEC
+     4007: RTS
+     ```
+
+  2. Test Case A (Branch Taken): Set `PC` to `$4000`, `X` to `$01`.
+     - Execute `T` (executes `CPX #$01`).
+     - Execute `T` (reaches `BEQ $4006` with Zero flag set).
+     - Execute `T`.
+     - **Pass Criteria**: `PC` lands at `$4006` (`SEC`). Breakpoints were successfully handled on both relative branch paths, and the taken path was followed.
+  3. Test Case B (Branch Not Taken): Set `PC` to `$4000`, `X` to `$00`.
+     - Execute `T` (executes `CPX #$01`).
+     - Execute `T` (reaches `BEQ $4006` with Zero flag clear).
+     - Execute `T`.
+     - **Pass Criteria**: `PC` lands at `$4004` (`NOP`). The not-taken path was followed.
+
+---
+
+## Test Suite 11: Proceed Step-Over (`P`)
+
+### Test 11.1: Proceed Over Subroutine Call (`JSR`)
+
+- **Input**: `P`
+- **Procedure**:
+  1. Assemble at `$4000`:
+
+     ```asm
+     4000: JSR $4500
+     4003: NOP
+     ```
+
+  2. Assemble a subroutine at `$4500`:
+
+     ```asm
+     4500: LDY #$aa
+     4502: RTS
+     ```
+
+  3. Set `PC` to `$4000`, `Y` to `$00`.
+  4. Execute `P` on the JSR instruction.
+- **Pass Criteria**:
+  - The debugger steps over the subroutine call.
+  - Registers print shows: `A=xx X=xx Y=AA P=xx S=xx PC=4003`.
+  - Next instruction disassembled: `4003: NOP`.
+  - This confirms that the subroutine ran to completion, modified `Y`, and execution safely broke on return.
+
+### Test 11.2: Proceed Over Branch Loop
+
+- **Input**: `P`
+- **Procedure**:
+  1. Assemble at `$4000`:
+
+     ```asm
+     4000: LDX #$02
+     4002: DEX
+     4003: BNE $4002
+     4005: NOP
+     ```
+
+  2. Set `PC` to `$4000`.
+  3. Execute `T` (executes `LDX #$02`).
+  4. Execute `T` (executes `DEX`, `X` becomes `01`).
+  5. Execute `P` on the `BNE $4002` loop branch.
+- **Pass Criteria**:
+  - The program executes the remaining loop iterations without stopping on each one.
+  - Breaks cleanly on the `NOP` at `$4005` with register state `X=00`.
+
+---
+
+## Test Suite 12: ROM Safety Protection & Guards
+
+### Test 12.1: JSR to ROM Target (Step-Over Fallback)
+
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble a JSR to KERNAL `CHROUT` at `$4000`:
+
+     ```asm
+     4000: JSR $FFD2
+     4003: RTS
+     ```
+
+  2. Set `PC` to `$4000`, `A` to `$41` (character 'A').
+  3. Execute `T` on the JSR.
+- **Pass Criteria**:
+  - The character `'A'` is printed to the screen.
+  - The tracer detects that the target `$FFD2` is inside ROM ($\ge \$D000$) and automatically steps over it.
+  - Breaks cleanly at `$4003` (`RTS`) without crashing.
+
+### Test 12.2: JMP to ROM Target (Execution Guard)
+
+- **Input**: `T`
+- **Procedure**:
+  1. Assemble `JMP $FFD2` at `$4000`.
+  2. Set `PC` to `$4000`.
+  3. Execute `T`.
+- **Pass Criteria**:
+  - The trace is safely blocked.
+  - The debugger prints: `error: cannot trace target in ROM`
+  - Returns immediately to the `-` command prompt.
+
+---
+
+## Test Suite 13: Exit Banking Restoration
+
+### Test 13.1: BASIC ROM Restore on Quit
+
+- **Input**: `Q` followed by `EXIT`
+- **Procedure**:
+  1. Start `DEBUG`.
+  2. Verify BASIC ROM is banked out (e.g., run `D A000` to dump, write bytes using `E A000`, and confirm memory is writable RAM).
+  3. Type `Q` to quit `DEBUG` and return to the `command64` shell.
+  4. Type `EXIT` in the shell prompt.
+- **Pass Criteria**:
+  - The system returns to the Commodore BASIC prompt:
+
+    ```petscii
+    READY.
+    ```
+
+  - The warm start displays cleanly, and typing BASIC commands (like `PRINT 1+1`) works and prints outputs (confirming the BASIC ROM mapping was fully restored before jumping to KERNAL warm start).

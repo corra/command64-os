@@ -9,6 +9,123 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 4 WP13 directives and emission engine**: Added `emit.s`, which
+  turns matched statements into a real Commodore PRG. It tracks the program
+  counter, writes the 2-byte load-address header and the assembled bytes to the
+  CLI-derived output file through a bounded 64-byte staging buffer (the 256-byte
+  input buffer stays reserved for the concurrent read pass), processes the
+  `.ORG` (single, initial), `.BYTE`, and `.WORD` directives, encodes each
+  instruction's operand bytes, and computes and range-checks relative-branch
+  displacements against the program counter (moved here from WP12 with the
+  program counter it depends on). Output is a plain absolute PRG. Added
+  diagnostics `CASM_DIAG_DUPLICATE_ORG` ($20), `CASM_DIAG_ORG_REQUIRED` ($21),
+  `CASM_DIAG_ADDRESS_OVERFLOW` ($22), and `CASM_DIAG_BRANCH_OUT_OF_RANGE` ($23).
+  Refined the WP11 parser to leave `.BYTE`/`.WORD` comma-separated operand lists
+  in the lexer stream for the emission engine (the single-operand addressing
+  grammar cannot express a list). Output is now operational: a successful
+  assembly writes a PRG by default, `/S` is accepted as the static output mode,
+  and `/M`/`/L` remain unimplemented. The MAIN linker envelope was raised
+  `$2000` -> `$2800` (approved) to fit the emission engine. The temporary
+  `casm.s` driver now creates the output, dispatches each statement to the
+  matcher/emitter, finalizes on EOF, and deletes a partial output on failure;
+  WP14 replaces it with production orchestration. Added fixtures `casmemit1`
+  (valid program -> PRG), `casmorg1`/`casmorg2`/`casmbr1` (the new error paths),
+  and `casmhello` (a runnable print-and-exit demo). User runtime confirmed the
+  cases. Completion advances CASM to `0.1.15` build 1053.
+- **CASM Phase 4 WP12 opcode table and addressing-mode matcher**: Added
+  `opcodes.s`, a compressed legal-6502 opcode table (per-mnemonic 13-bit
+  supported-mode mask, run offset, and packed opcode run — 56 mnemonics, 151
+  opcodes) indexed by the lexer's mnemonic subtype, plus `opcodesFindOpcode`.
+  The matcher resolves a WP11 `CasmParserStmt` operand kind to one concrete
+  `CASM_MODE_*` (including zero-page/absolute promotion by value size and
+  relative-branch detection), verifies the mnemonic supports that mode, selects
+  the opcode by counting set mask bits below the resolved mode, and records
+  opcode/mode/length in the exported `CasmInsn` record for WP13. Added the
+  `CASM_MODE_*` enumeration, the `CasmInsn` record, and
+  `CASM_DIAG_INVALID_ADDR_MODE` ($1F); the WP11 `CASM_DIAG_OPERAND_OUT_OF_RANGE`
+  ($1E) is reused to reject immediate and indirect-zero-page operands that
+  exceed 8 bits. Relative-branch displacement and range checking are deferred to
+  WP13, where the program counter exists (parent plan amended accordingly). The
+  temporary `casm.s` driver now runs the matcher on mnemonic statements so
+  addressing-mode and operand-range errors surface through the central fatal
+  path. Added fixtures `casmam1`/`casmam2` (invalid addressing mode) and
+  `casmrng1` (immediate 8-bit overflow). User runtime confirmed the valid and
+  error fixtures behave as specified. Completion advances CASM to `0.1.14`
+  build 1047.
+- **CASM Phase 4 WP11 statement parser and syntax validation**: Added
+  `parser.s` with `parserParseStatement`, an LL(1) parser that consumes the
+  lexer's single-token buffer and validates the restricted numeric statement
+  grammar into the exported `CasmParserStmt` record (type, subtype, operand
+  kind, 16-bit value, register subtype). Every 6502 addressing-mode shape is
+  matched — implied, accumulator, immediate, absolute/ZP, absolute-X/Y,
+  indirect, indexed-indirect `($nn,X)`, and indirect-indexed `($nn),Y` — while
+  labels/identifiers are rejected pending a later phase. `parseNumericValue`
+  converts decimal, hex, and binary literals to 16 bits with a 24-bit
+  sticky-overflow accumulator that rejects values above 65535 regardless of
+  digit count. Added diagnostics `CASM_DIAG_SYNTAX_ERROR` (`$1C`),
+  `CASM_DIAG_EXPECTED_NEWLINE` (`$1D`), and `CASM_DIAG_OPERAND_OUT_OF_RANGE`
+  (`$1E`, moved up from WP12 so the converter's bounds check stays contiguous).
+  A temporary parse driver in `casm.s` replaced the WP10 token-dump loop so
+  syntax diagnostics surface through the central fatal path and a clean parse
+  prints `INPUT VALIDATED`; WP14 replaces this driver with the parser/emitter
+  loop. Added targeted fixtures `casmwp11` (all addressing modes, valid) and
+  `casmerr1`–`casmerr5` (one per WP11 diagnostic). User runtime confirmed the
+  valid and error fixtures behave as specified and that `casmshort` reports
+  `SYNTAX ERROR` on its deferred-label `JMP START_LABEL`. Completion advances
+  CASM to `0.1.13` build 1042.
+- **CASM Phase 3 WP7 minimal lexer core**: Added `lexer.s`, the first consumer
+  of the source layer. It owns a one-result lookahead over `sourceNextByte` and
+  the token record, captures file/line/column provenance before each token's
+  first byte, skips whitespace and semicolon comments (preserving the
+  terminating newline token), and emits EOF, newline, and the
+  punctuation/delimiter tokens (`, : # ( ) + - < >`). A single not-implemented
+  default arm marks the WP8 identifier/number seam. Added the `CASM_LEXER_STATE_*`
+  enum WP3 reserved. `lexer.s` defines no BSS, never closes the source, and has
+  no shipped-path caller yet — the entry point is unchanged and still prints
+  `INPUT VALIDATED`; the token dump and diagnostic text remain WP10. Verified
+  statically. Completion advances CASM to `0.1.9` build 1028.
+- **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
+- **CASM Phase 3 WP6 deterministic rewind and bounded line API**: Added
+  `sourceRewind` (close/reopen with a full source-owned reset so a second
+  traversal is byte-, newline-, and location-identical) and `sourceNextLine`
+  (bounded 255-byte logical lines with line-too-long `$17` and embedded-null
+  `$19` rejection). Line mode partitions the single `CasmIoBuffer` into an
+  accumulated-payload prefix and a transfer region so a line survives a block
+  boundary without a second buffer, and reuses the WP5 normalization rather than
+  duplicating it; the block cursor became absolute. Added the additive
+  `inputStreamReadInto` wrapper (with `inputStreamRead` reimplemented on top of
+  it) and raised the CASM linker envelope from `$1000` to `$2000` so the
+  remaining Phase 3 work packages fit. The shipped byte path is unchanged and
+  still prints `INPUT VALIDATED`; the lexer remains WP7 and Phase 3 diagnostic
+  text remains WP10. Approved completion and runtime verification advance CASM to
+  `0.1.8` build 1025.
+- **CASM Phase 3 WP5 newlines and provenance**: `sourceNextByte` now returns the
+  approved normalized model: CR, LF, and CRLF each collapse to one
+  `CASM_SOURCE_NEWLINE` via a persistent pending-CR latch that survives an input
+  block boundary, a final CR resolves before EOF, and one-based line/column plus
+  the physical offset advance with checked commits. Added `sourceGetLocation` for
+  next-result provenance and bounded CR/CRLF/split/blank/final-CR test fixtures.
+  A source line longer than 255 bytes now correctly fails with the stable `$16`
+  location-overflow diagnostic, since columns are one-based 8-bit values. The
+  consume-only entry point is unchanged and still prints `INPUT VALIDATED`;
+  rewind and the line API remain WP6 and the lexer remains WP7. Approved
+  completion and runtime verification advance CASM to `0.1.7` build 1022.
+- **CASM Phase 3 WP4 rewindable source backend**: Added `source.s` with the
+  executable byte-stream source layer over the managed Phase 2 input wrapper and
+  WP3 bounded state. `sourceInit`, `sourceOpen`, transitional raw `sourceNextByte`,
+  and `sourceClose` initialize source state, refill and traverse the shared
+  256-byte `CasmIoBuffer`, expose a repeat-stable EOF, and close through central
+  ownership. First EOF verifies the consumed offset equals the managed fetched
+  total, and input-total overflow now maps to the single `$15` diagnostic. The
+  consume-only entry point routes through the source API while preserving the
+  `INPUT VALIDATED` success output; newline normalization, rewind, line access,
+  and the lexer remain deferred to WP5+. Approved completion and runtime
+  verification advance CASM to `0.1.6` build 1020.
+- **CASM Phase 3 WP3 bounded ABI/state**: Added stable source results and
+  states, sixteen token types, type-specific subtypes, explicit PETSCII lexical
+  bytes, reserved diagnostics `$14-$1B`, and a storage-only 63-byte Phase 3 BSS
+  module. Source and lexer execution remain deferred to WP4 and WP7. Approved
+  completion and runtime verification advance CASM to `0.1.5` build 1018.
 - **CASM stream-boundary fixtures**: Added deterministic 0-byte, 17-byte,
   256-byte, and 513-byte SEQ inputs to `test.d64` for Phase 2 input-stream
   verification.
@@ -35,6 +152,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM 0.1.4 DEBUG reuse decision**: Independently verified DEBUG's complete
+  56-mnemonic ordering and selected a CASM-local 168-byte mnemonic table for
+  future WP9 implementation. DEBUG routines, runtime state, opcode metadata,
+  and build inputs remain uncoupled from CASM; Phase 4 retains opcode and
+  addressing-mode decisions.
+- **CASM 0.1.3 Phase 3 activation**: Synchronized the approved Phase 0C.1
+  source/lexer contract, Phase 3 work-package tasks, corrected Phase 4 output
+  dependency, and storage-first Phase 6A/6B split. Completing Work Package 1
+  advanced the CASM stage version from `0.1.2` to `0.1.3`.
 - **PACMAN 0.1.3 patch stage**: Advanced the Pac-Man version after verified
   actor redraw ordering and Pac-Man/Blinky collision, life-loss, and game-over
   remediation.

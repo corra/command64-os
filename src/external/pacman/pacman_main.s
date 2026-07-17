@@ -7,9 +7,9 @@
 .include "command64.inc"
 .include "common.inc"
 
-VERSION_MAJOR = '0'
-VERSION_MINOR = '1'
-VERSION_STAGE = '9'
+.define VERSION_MAJOR "0"
+.define VERSION_MINOR "1"
+.define VERSION_STAGE "9"
 .include "build_pacman.inc"
 
 .import __MAIN_START__

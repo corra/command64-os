@@ -38,6 +38,27 @@ The `src/external/casm` directory owns CASM, a native Command 64
   literals for runtime byte comparisons.
 - Keep source locations file-aware and line-aware from the first source-stream
   implementation.
+- Keep Phase 3 persistent source, lookahead, and token storage in the bounded
+  storage-only `state.s`. Executable `source.s` and `lexer.s` import their
+  subrecords when WP4 and WP7 implement them; they must not redefine storage.
+- Phase 3 state is exactly 63 BSS bytes: a 16-byte source subrecord and a
+  47-byte lexer/lookahead/token subrecord containing one contiguous 39-byte
+  token record with 31 payload bytes plus terminator.
+- `CasmIoBuffer` remains the only 256-byte source buffer. Byte mode owns the
+  whole buffer as a transfer block. Line mode partitions it:
+  `[0 .. lineLength-1]` holds the accumulated line payload and
+  `[lineLength .. 255]` is the transfer region a refill reads into, so a logical
+  line survives a block boundary without a second buffer. Naive reuse is invalid:
+  a full-buffer refill would destroy a line that spans blocks.
+- The source block cursor holds absolute `CasmIoBuffer` positions, not
+  base-relative counts. Byte mode always has base 0, so its cursor is unchanged;
+  only line mode uses a nonzero base.
+- Byte mode and line mode are mutually exclusive. Line mode is claimed only on a
+  fresh stream; mixing the APIs is rejected, and switching requires an explicit
+  `sourceRewind`.
+- `sourceRewind` resets only source-owned state. Lookahead is lexer state and
+  `source.s` writes none; the lexer owns invalidating its lookahead after a
+  rewind.
 - Keep Pass 1 and Pass 2 deterministic; Pass 2 reparses a rewindable source
   stream rather than relying on an unbounded in-memory syntax tree.
 - Emit structured events in Pass 2 so PRG, listing, and map consumers do not
@@ -45,6 +66,31 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Do not implement a phase until the user approves that phase's prerequisite
   contract gate. Phase 0A governs the scaffold; Phase 0B governs Phase 2 CLI
   and file services; later language/storage contracts remain Phase 0C work.
+- Every CASM work package from Phase 3 Work Package 3 onward must have a
+  dedicated detailed implementation plan saved under `brain/plans/` and
+  explicitly approved by the user before that package becomes active or
+  implementation begins. Parent-phase approval and approval of an earlier
+  package do not approve a later package.
+- Read-only discovery may precede work-package plan approval. Investigation,
+  source or build edits, fixture creation, functional documentation changes,
+  and task activation must wait for the dedicated plan. Material deviations
+  discovered during implementation require an amended plan and renewed user
+  approval before work continues.
+- Each detailed work-package plan must define its objective, prerequisites,
+  inherited decisions, scope, expected files, ABI and storage effects,
+  register/flag/scratch contracts, atomic increments, failure and cleanup
+  behavior, verification, documentation/task/DOX updates, stop conditions, and
+  completion gate.
+- Completing a CASM work package increments the stage component of the current
+  `major.minor.stage` version while preserving the current major and minor
+  components. The new stage is recorded only after verification and explicit
+  user completion approval, together with task, knowledge, memory, changelog,
+  and walkthrough updates.
+- Version stages are unbounded decimal values, not single digits. The current
+  one-byte `VERSION_STAGE` banner representation may remain temporarily, but a
+  separately planned and approved multi-digit representation must be completed
+  before any work package at version `0.1.9` may be completed. That migration
+  must preserve the independent build-number component.
 
 # Work Guidance
 
@@ -55,6 +101,9 @@ The `src/external/casm` directory owns CASM, a native Command 64
   `brain/task.md` together.
 - Prefer fixed-capacity tables, explicit bounds checks, and 16-bit carry
   handling over implicit wraparound.
+- Treat `common.inc` Phase 3 token types, record offsets, diagnostic numbers,
+  source results, and `$80-$83` scratch aliases as stable ABI. Later work
+  packages require an approved plan amendment before changing them.
 - Treat resource cleanup, source provenance, expression relocation class, and
   instruction-size stability as foundational interfaces rather than late
   error handling.

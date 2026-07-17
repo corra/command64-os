@@ -289,6 +289,7 @@ symbols, emission events, or output lifecycle.
 | `wiki/tasks/casm.md` | Modify | Phase 3 gate, subtasks, and acceptance tracker |
 | `brain/task.md` | Modify | Synchronize Taskwarrior Phase 3 state |
 | `src/external/casm/common.inc` | Modify | Source/lexer constants, ABI, and diagnostics |
+| `src/external/casm/state.s` | Create | WP3 bounded source, lookahead, and token BSS only |
 | `src/external/casm/source.s` | Create | Rewindable source stream and provenance |
 | `src/external/casm/lexer.s` | Create | Minimal bounded lexer |
 | `src/external/casm/casm.s` | Modify | Temporary token-dump orchestration |
@@ -300,7 +301,7 @@ symbols, emission events, or output lifecycle.
 | `CHANGELOG.md` or dated changelog | Modify/create | Observable token-dump behavior |
 | `brain/walkthroughs/2026-07-16-casm-phase3-source-stream-lexer.md` | Create | Build and user evidence |
 
-The current `$1000` `MAIN` envelope remains in force. Phase 2 build 1014 uses
+The `$2000` `MAIN` envelope is in force (raised from `$1000` in WP6). Phase 2 build 1014 uses
 2,256 linked code/data bytes and 449 BSS bytes, leaving 1,391 bytes of combined
 headroom. Implementation stops for approval if Phase 3 cannot fit within the
 current envelope.
@@ -323,6 +324,10 @@ sourceClose
 - Carry set means failure and `A` contains `CASM_DIAG_*`.
 - `sourceNextByte` returns the normalized source byte separately from its
   result code so EOF cannot be confused with data or carry state.
+- WP4 initially implements `sourceNextByte` as a transitional raw-byte API and
+  returns every physical byte as `CASM_SOURCE_BYTE`. WP5 owns the approved
+  normalized semantics and adds `CASM_SOURCE_NEWLINE`; WP7 cannot consume the
+  API before WP5 is complete.
 - State that survives an `OS_API` call is stored in CASM-owned bounded BSS.
 - EOF is repeat-stable.
 - Every public routine documents inputs, outputs, carry/zero meaning,
@@ -356,6 +361,42 @@ lexerGetToken
 
 ## Work Packages
 
+### Detailed Planning and Version Gates
+
+Work Packages 3 through 11 each require a dedicated detailed implementation
+plan under `brain/plans/` and explicit user approval before the package becomes
+active or implementation begins. Approval of this parent plan or an earlier
+work package does not approve a later package. Read-only discovery needed to
+prepare a plan is permitted; investigation, source/build changes, fixtures,
+functional documentation, and task activation wait for plan approval.
+
+Each plan must incorporate prerequisite findings and define its objective,
+scope, files, ABI and memory effects, register/flag/scratch contracts, atomic
+increments, failure and cleanup behavior, verification, documentation and task
+updates, stop conditions, and completion gate. A material deviation requires
+the plan to be amended and reapproved before implementation continues.
+
+Required Phase 3 plan files are:
+
+```text
+brain/plans/2026-07-16-casm-phase3-wp03-shared-abi-bounded-state.md
+brain/plans/2026-07-16-casm-phase3-wp04-rewindable-source-backend.md
+brain/plans/2026-07-16-casm-phase3-wp05-newlines-provenance.md
+brain/plans/2026-07-16-casm-phase3-wp06-rewind-line-api.md
+brain/plans/2026-07-16-casm-phase3-wp07-minimal-lexer-core.md
+brain/plans/2026-07-16-casm-phase3-wp08-textual-numeric-tokens.md
+brain/plans/2026-07-16-casm-phase3-wp09-mnemonic-classification.md
+brain/plans/2026-07-16-casm-phase3-wp10-diagnostics-token-dump.md
+brain/plans/2026-07-16-casm-phase3-wp11-verification-closeout.md
+```
+
+Completion of every CASM work package increments the decimal stage component
+of the current `major.minor.stage` version after verification and explicit user
+approval. Major and minor remain fixed unless separately approved, and the
+build number remains independent. The current banner stores `VERSION_STAGE` as
+one byte; a separately planned multi-digit stage implementation is therefore a
+hard prerequisite before any work package at `0.1.9` may be completed.
+
 ### Work Package 1: Task and Contract Synchronization
 
 1. Add a Phase 3 milestone and one measurable subtask per work package to
@@ -379,12 +420,17 @@ build coupling to DEBUG has been introduced accidentally.
 
 ### Work Package 3: Shared ABI and Bounded State
 
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved, incorporating the approved Work Package 2 decisions.
+
 - Add source results, token types/subtypes, limits, PETSCII constants, phase
   identifiers, and diagnostics to `common.inc`.
 - Assign only the approved `$80-$83` parser scratch aliases; retain `$84-$8F`
   for expression, pass, and emission phases.
 - Add bounded BSS for source cursor, block length/index, lookahead, location,
   token record, and token text.
+- Create the storage-only `state.s`; executable `source.s` and `lexer.s`
+  remain owned by WP4 and WP7 respectively.
 - Add compile-time assertions for every capacity and table relationship.
 - Measure BSS and linked growth before continuing.
 
@@ -393,17 +439,28 @@ later-phase zero page is consumed.
 
 ### Work Package 4: Rewindable Source Backend
 
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
+
 - Create `source.s` and integrate it with the managed Phase 2 input wrappers.
 - Implement initialization, open, block refill, byte traversal, explicit close,
   and repeat-safe EOF.
 - Advance physical offsets only after successful byte consumption.
-- Preserve primary diagnostics across close/reopen cleanup failures.
+- Treat `CasmSourceOffset` as bytes consumed, distinct from Phase 2's
+  bytes-fetched total, and validate equality before first EOF.
+- Return raw CR, LF, null, and all other byte values unchanged; WP5 owns
+  normalization and WP6 owns line-API null rejection.
 - Retain registered ownership when close fails.
+- Route the existing consume-only entry path through the source API without
+  introducing WP10's token dump or changing its success message.
 
-Gate: raw byte fixtures traverse 17-byte, 256-byte, and 513-byte inputs without
-loss, duplication, or cursor wrap.
+Gate: raw byte fixtures traverse 17-byte, 256-byte, and 513-byte inputs with
+consumed/fetched count equality, without loss, duplication, or cursor wrap.
 
 ### Work Package 5: Newlines and Provenance
+
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
 
 - Normalize CR, LF, and CRLF, including all block-boundary cases.
 - Track file ID, physical offset, one-based line, and one-based column.
@@ -416,7 +473,12 @@ newline form.
 
 ### Work Package 6: Deterministic Rewind and Line API
 
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
+
 - Implement close/reopen `sourceRewind`.
+- Preserve the primary rewind diagnostic across secondary close/reopen cleanup
+  failures while following central ownership rules.
 - Reset all source, line, EOF, and lookahead state.
 - Implement bounded `sourceNextLine` without adding a second 256-byte buffer.
 - Reject embedded null bytes and overlong lines.
@@ -426,6 +488,9 @@ Gate: two traversals return identical bytes, newline results, and locations;
 line boundary cases pass at 255 accepted and 256 rejected bytes.
 
 ### Work Package 7: Minimal Lexer Core
+
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
 
 - Create `lexer.s`.
 - Implement initialization, lookahead, token reset, token append, and token
@@ -440,6 +505,9 @@ deterministic across buffer boundaries and rewind.
 
 ### Work Package 8: Textual and Numeric Tokens
 
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
+
 - Scan bounded identifiers without modifying spelling.
 - Scan dot-prefixed directives.
 - Classify registers case-insensitively.
@@ -451,6 +519,9 @@ stable diagnostic with the correct start location.
 
 ### Work Package 9: Mnemonic Classification
 
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved, incorporating the approved Work Package 2 reuse decision.
+
 - Implement the mnemonic-table strategy approved by Work Package 2.
 - Classify all documented 6502 mnemonics case-insensitively.
 - Keep opcode bytes and addressing-mode metadata out of Phase 3.
@@ -461,6 +532,9 @@ Gate: all 56 mnemonics classify in supported case forms; near misses remain
 identifiers rather than valid mnemonics.
 
 ### Work Package 10: Diagnostics and Token Dump
+
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
 
 Add stable diagnostics for:
 
@@ -482,6 +556,9 @@ Gate: token dump is deterministic and clearly identified as temporary
 verification behavior, not final CASM output.
 
 ### Work Package 11: Verification and Closeout
+
+Prerequisite: its dedicated detailed implementation plan is saved and
+explicitly approved.
 
 - Run static carry, bounds, ownership, provenance, and phase-scope audits.
 - Build the narrow `casm` target and inspect its PRG header, R6 footer, linked
@@ -563,6 +640,7 @@ Phase 3 is ready for completion approval only when:
 - CASM remains within an approved measured memory envelope;
 - the release disk remains intact;
 - task, brain, changelog, walkthrough, and applicable DOX records agree;
+- every completed work package has advanced the version stage and the
+  multi-digit representation is complete before completion at `0.1.9`;
 - the user completes the runtime walkthrough; and
 - the user explicitly approves marking Phase 3 done.
-

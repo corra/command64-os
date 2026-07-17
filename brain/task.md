@@ -26,6 +26,31 @@
         resource slot across `DOS_CLOSE_FILE`; build 1011 runtime verified
   - [x] `9e4d8175` Verify artifacts and obtain user runtime confirmation
 
+- [/] Taskwarrior #29 (`099257cc`): CASM Phase 3 source stream and minimal
+      lexer
+  - [x] `65832339` Synchronize task records, dependency corrections, and
+        approved Phase 0C.1 contracts
+  - [x] `9ab8caf3` Investigate DEBUG assembler reuse feasibility
+  - [x] `9e0c03f3` Declare shared source/lexer ABI and bounded state
+  - [x] `fcb0e164` Implement the rewindable source backend; user runtime matrix
+        confirmed and completion approved 2026-07-16; build 1020 advanced CASM
+        to `0.1.6`
+  - [x] `9c733c1a` Implement newline normalization and provenance; user runtime
+        matrix confirmed and completion approved 2026-07-16; build 1022 advanced
+        CASM to `0.1.7`
+  - [x] `cda20f5b` Implement deterministic rewind and bounded line API (Option A
+        partitioned buffer, envelope raised to `$2000`); user runtime matrix
+        confirmed and completion approved 2026-07-17; build 1025 advanced CASM to
+        `0.1.8`
+  - [x] `7196a56f` Implement the minimal lexer core (Option 1 static-only);
+        `lexer.s` with lookahead, token primitives, whitespace/comment skipping,
+        and punctuation tokens; user non-regression confirmed and completion
+        approved 2026-07-17; build 1028, CASM at `0.1.9`
+  - [x] `9e1a1a12` Implement textual and numeric token scanning
+  - [x] `3367d36d` Implement mnemonic classification
+  - [x] `a68d3603` Integrate diagnostics and temporary token dump
+  - [x] `178b0884` Verify artifacts and obtain user runtime confirmation
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval
