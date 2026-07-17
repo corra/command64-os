@@ -92,9 +92,14 @@ Execution was verified in the local VICE emulator using the built `test.d64` dis
   ```
 - **Observed Screen Output**:
   ```text
+  IDENTIFIER [L] L:1 C:1
+  IDENTIFIER [L] L:1 C:3
+  IDENTIFIER [L] L:1 C:5
+  ... (scrolling identifiers for each space-separated L up to column 255)
+  IDENTIFIER [L] L:1 C:255
   CASM: SOURCE LOCATION OVERFLOW
   ```
-- **Interpretation**: In byte mode, exceeding the 255-character column limit triggers `$16` (`CASM_DIAG_SOURCE_LOCATION_OVERFLOW`), which prints the correct extended diagnostic string and exits with error code set.
+- **Interpretation**: Since the fixture uses alternating characters and spaces to avoid triggering the 31-character token length limit, each `L` is successfully emitted as a single-character identifier. The lexer loops and prints these tokens until the line column index overflows 255, returning `$16` (`CASM_DIAG_SOURCE_LOCATION_OVERFLOW`), printing the proper error string, and terminating with error code set.
 
 ### 3. Verification of `casm casmempty` (Open Failure Check)
 - **Command Run**:

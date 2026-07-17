@@ -23,7 +23,7 @@
 - **Conway memory safety & relocation crash fix**: Resolved memory collisions between code and double buffers by embedding the grid buffers as relocatable, page-aligned data tables inside the binaries. Both Kick and ca65 builds generate identical size-bounded relocatable binaries (3008 bytes, 59 relocation entries).
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055) / CASM 0.1.9 (Build 1026).
+- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055) / CASM 0.1.12 (Build 1036).
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
@@ -182,6 +182,12 @@ lexer has no shipped-path caller until WP10, so it was verified statically and b
 non-regression. The version was pre-advanced to `0.1.9` by the separately
 committed multi-digit version-stage migration; WP7 completion was approved after
 user non-regression confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 8 build 1030 adds textual and numeric token scanning to `lexer.s`, including dot-prefixed directives, case-insensitive registers, and hexadecimal, decimal, and binary numeric scanners, resolving relative branch limits. Version advanced to `0.1.10`; WP8 completion was approved after user runtime confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 9 build 1032 adds mnemonic classification with a local 168-byte `mnemonicTable` in `lexer.s` RODATA and case-insensitive search logic in `classifyMnemonic`. Version advanced to `0.1.11`; WP9 completion was approved after user runtime confirmation on 2026-07-17.
+
+CASM Phase 3 Work Package 10 build 1036 integrates the lexer into the main application read loop, prints a temporary token dump (type names, register/directive/number subtype names, mnemonic indices, text content, line/column location), maps contiguous Phase 3 error codes in `diagnostics.s`, fixes length-checked string comparisons, and updates `GenerateCasmTestFixtures.cmake` with alternating space-separated characters to verify source column boundaries. Version advanced to `0.1.12`; WP10 completion was approved after user runtime confirmation on 2026-07-17.
 
 ## C64 Hardware Gotchas (hard-won)
 
