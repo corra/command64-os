@@ -45,21 +45,13 @@ tableCmd:
     .word cmdCopy
     .text "del   "
     .word cmdDel
-    .text "erase "
-    .word cmdDel
     .text "ren   "
     .word cmdRen
-    .text "rename"
-    .word cmdRen
     .text "drive "
-    .word cmdDrive
-    .text "device"
     .word cmdDrive
     .text "dev   "
     .word cmdDrive
     .text "run   "
-    .word cmdRun
-    .text "go    "
     .word cmdRun
     .text "set   "
     .word cmdSet
@@ -67,8 +59,6 @@ tableCmd:
     .word cmdVol
     .text "path  "
     .word cmdPath
-    .text "apps  "
-    .word cmdApps
     .text "ps    "
     .word cmdApps
     .text "free  "

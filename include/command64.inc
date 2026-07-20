@@ -6,7 +6,7 @@
 // --- KERNAL Jump Table Addresses ---
 // Always reference the jump table ($FF00+), never raw ROM body addresses.
 .label KernalChROUT    = $FFD2  // Output character to current channel
-.label KernalGetIn       = $FFE4  // Raw keyboard input (bypasses screen editor/quote mode)
+.label KernalGetIn     = $FFE4  // Raw keyboard input (bypasses screen editor/quote mode)
 .label KernalChRIN     = $FFCF  // Input character from current channel (screen editor)
 .label KernalCLALL     = $FFE7  // Close all I/O channels (was $E548, raw ROM addr, wrong)
 .label KernalWarmStart = $E37B  // BASIC warm start (assumes ZP intact — NOT safe after shell)
@@ -97,9 +97,9 @@
 // --- CIA #1 TOD Clock Registers ---
 .label CIA1_CRA  = $DC0E // Control Register A: bit 7 = TOD input freq (0=60Hz/NTSC, 1=50Hz/PAL)
 .label CIA1_CRB  = $DC0F // Control Register B: bit 7 = TOD alarm/clock select (0=clock)
-.label CIA1_TOD_HR  = $DC0B // TOD Hours (BCD, bit 7 = PM); reading latches TOD registers
-.label CIA1_TOD_MIN = $DC0A // TOD Minutes (BCD)
-.label CIA1_TOD_SEC = $DC09 // TOD Seconds (BCD)
+.label CIA1_TOD_HR    = $DC0B // TOD Hours (BCD, bit 7 = PM); reading latches TOD registers
+.label CIA1_TOD_MIN   = $DC0A // TOD Minutes (BCD)
+.label CIA1_TOD_SEC   = $DC09 // TOD Seconds (BCD)
 .label CIA1_TOD_10THS = $DC08 // TOD Tenths of a second (BCD); reading unlatches, writing restarts clock
 .label KernalVideoStd = $02A6 // KERNAL video standard flag: 0 = NTSC, 1 = PAL
 

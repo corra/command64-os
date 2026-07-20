@@ -12,14 +12,17 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
   - [EDLIN Utility Manual](edlin-utility.md) - Learn how to use the ported MS-DOS line editor.
   - [CONWAY Utility Manual](conway-utility.md) - Learn how to run the Conway's Game of Life demo app.
   - [PACMAN Utility Manual](pacman-utility.md) - Learn how to run the Pac-Man demo app.
+  - [CASM Utility Manual](casm-utility.md) - Learn how to assemble 6502 source into a runnable PRG on the C64 itself.
 
 - **Developer Specifications & References:**
   - [OS Service Bus API Reference](api-reference.md) - The stable entry point (`JSR $1000`) and function codes ($02–$56).
   - [Programmer's Reference](programmers-reference.md) - Memory map zero-page structures, segment safe areas, and registers.
   - [Virtual Memory Manager (VMM) Specification](vmm-api.md) - 4KB paging, RAM Expansion Unit (REU) DMA, and MCT details.
   - [PETSCII Helper API](pet-sci-api.md) - PETSCII printing macros and lowercase normalization rules.
+  - [CASM Programmer's Reference](casm-programmers-reference.md) - Internal architecture, module ABIs, and diagnostic contract of the native 6502 assembler.
   - [C64 Hardware Gotchas](hardware-gotchas.md) - Hard-won findings about C64 hardware traps, REU clobbering, and input limits.
   - [MS-DOS v4.0 Feature Completeness Comparison](ms-dos-comparison.md) - Functional and architectural comparison mapping.
+  - [Codebase Knowledge Graph](codebase-knowledge-graph.md) - Mermaid diagrams of `src/` and `include/` module structure, memory layout, and runtime call graphs.
 
 ## Tasks
 
