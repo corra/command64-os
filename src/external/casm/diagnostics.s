@@ -35,11 +35,17 @@
 .import CasmStmtLocLineHi
 .import CasmStmtLocColumn
 
-.import CasmDiagLineBuf
+.import CasmDiagLineBufA
+.import CasmDiagLineBufB
+.import CasmDiagLineSel
 .import CasmDiagLineLen
 .import CasmDiagLineClipped
 .import CasmDiagLineNoLo
 .import CasmDiagLineNoHi
+.import CasmDiagPrevLen
+.import CasmDiagPrevClipped
+.import CasmDiagPrevNoLo
+.import CasmDiagPrevNoHi
 
 ; Terminal, fatal-path-only line recovery. See its contract in source.s.
 .import sourceDrainLineTail
@@ -397,6 +403,75 @@ diagSanitizeByte:
     rts
 
 ; ---------------------------------------------------------------------------
+; diagResolveView
+; Decide which echo buffer, if either, holds the diagnostic's line, and publish
+; it as the view the renderer reads.
+;
+; The current buffer holds the line being consumed; the previous buffer holds
+; the one before it, which is where an emit diagnostic's line lives because the
+; parser consumed the statement's terminating newline before emit ran.
+;
+; Inputs:    CasmDiagLocLineLo/Hi and both buffers' line numbers
+; Outputs:   C clear with CasmDiagViewSel/Len/Clipped published when a buffer
+;            matches; C set when neither does
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagResolveView:
+    lda CasmDiagLocLineLo
+    cmp CasmDiagLineNoLo
+    bne drvTryPrev
+    lda CasmDiagLocLineHi
+    cmp CasmDiagLineNoHi
+    bne drvTryPrev
+    ; The current line.
+    lda CasmDiagLineSel
+    sta CasmDiagViewSel
+    lda CasmDiagLineLen
+    sta CasmDiagViewLen
+    lda CasmDiagLineClipped
+    sta CasmDiagViewClipped
+    clc
+    rts
+drvTryPrev:
+    lda CasmDiagLocLineLo
+    cmp CasmDiagPrevNoLo
+    bne drvNoMatch
+    lda CasmDiagLocLineHi
+    cmp CasmDiagPrevNoHi
+    bne drvNoMatch
+    ; The previous line, which lives in the buffer the selector does not point
+    ; at. It is already complete, since it ended with a newline.
+    lda CasmDiagLineSel
+    eor #$01
+    sta CasmDiagViewSel
+    lda CasmDiagPrevLen
+    sta CasmDiagViewLen
+    lda CasmDiagPrevClipped
+    sta CasmDiagViewClipped
+    clc
+    rts
+drvNoMatch:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; diagViewByte
+; Read one byte from the resolved view buffer.
+;
+; Inputs:    X = index, CasmDiagViewSel
+; Outputs:   A = byte
+; Preserves: X, Y
+; ---------------------------------------------------------------------------
+diagViewByte:
+    lda CasmDiagViewSel
+    bne @bufB
+    lda CasmDiagLineBufA,x
+    rts
+@bufB:
+    lda CasmDiagLineBufB,x
+    rts
+
+; ---------------------------------------------------------------------------
 ; diagComputeWindow
 ; Choose the slice of the echoed line to display and where the caret falls.
 ;
@@ -404,7 +479,7 @@ diagSanitizeByte:
 ; to keep the failing column visible, and a two-character prefix is always
 ; emitted (either indent or a left clip marker) so the caret offset is uniform.
 ;
-; Inputs:    CasmDiagLineLen, CasmDiagLocColumn, CasmDiagLineClipped
+; Inputs:    CasmDiagViewLen, CasmDiagLocColumn, CasmDiagViewClipped
 ; Outputs:   CasmDiagWinStart, CasmDiagWinCount, CasmDiagCaretPos,
 ;            CasmDiagWinFlags
 ; Clobbers:  A, X, Y
@@ -423,7 +498,7 @@ diagComputeWindow:
     dex                         ; 1-based column -> 0-based index
 @indexReady:
     ; X = index. Short lines never scroll.
-    lda CasmDiagLineLen
+    lda CasmDiagViewLen
     cmp #CASM_DIAG_WINDOW_WIDTH + 1
     bcc @startZero              ; len <= 38: whole line fits
     cpx #CASM_DIAG_WINDOW_WIDTH
@@ -437,9 +512,9 @@ diagComputeWindow:
     sta CasmDiagWinStart
     clc
     adc #CASM_DIAG_WINDOW_WIDTH
-    cmp CasmDiagLineLen
+    cmp CasmDiagViewLen
     bcc @startSet               ; window ends within the line
-    lda CasmDiagLineLen
+    lda CasmDiagViewLen
     sec
     sbc #CASM_DIAG_WINDOW_WIDTH
     sta CasmDiagWinStart
@@ -453,7 +528,7 @@ diagComputeWindow:
 
 @count:
     ; count = min(WINDOW_WIDTH, len - start)
-    lda CasmDiagLineLen
+    lda CasmDiagViewLen
     sec
     sbc CasmDiagWinStart
     cmp #CASM_DIAG_WINDOW_WIDTH + 1
@@ -467,14 +542,14 @@ diagComputeWindow:
     lda CasmDiagWinStart
     clc
     adc CasmDiagWinCount
-    cmp CasmDiagLineLen
+    cmp CasmDiagViewLen
     bcs @checkOverflow
     lda CasmDiagWinFlags
     ora #CASM_DIAG_CLIP_RIGHT
     sta CasmDiagWinFlags
     jmp @caret
 @checkOverflow:
-    lda CasmDiagLineClipped
+    lda CasmDiagViewClipped
     beq @caret
     lda CasmDiagWinFlags
     ora #CASM_DIAG_CLIP_RIGHT
@@ -528,7 +603,7 @@ diagPrintLineAndCaret:
     clc
     adc CasmDiagWinStart        ; A still holds Y: window index -> buffer index
     tax
-    lda CasmDiagLineBuf,x
+    jsr diagViewByte
     jsr diagSanitizeByte
     jsr printChar
     pla
@@ -642,20 +717,28 @@ diagPrintSourceContext:
     ldy #>msgCR
     jsr diagPrintString
 
-    ; The echo buffer holds one line at a time. If the diagnostic refers to an
-    ; earlier line, the text is gone and a caret would point into unrelated
-    ; source, so the location line stands alone.
-    lda CasmDiagLocLineLo
-    cmp CasmDiagLineNoLo
-    bne @noText
-    lda CasmDiagLocLineHi
-    cmp CasmDiagLineNoHi
-    bne @noText
+    ; Only two lines are retained. If the diagnostic refers to any earlier
+    ; line, the text is gone and a caret would point into unrelated source, so
+    ; the location line stands alone.
+    jsr diagResolveView
+    bcs @noText
+
+    ; Drain only when the diagnostic is on the line still being consumed. The
+    ; previous line already ended at a newline and is complete, and draining
+    ; would append the *following* line's bytes to the current buffer.
+    lda CasmDiagViewSel
+    cmp CasmDiagLineSel
+    bne @render
     ; Recover the rest of the line before rendering. Deliberately sequenced
     ; after the message and location are already on screen: the drain is a
     ; terminal, best-effort read, so if it fails or hangs the user still has
     ; the diagnostic that matters.
     jsr sourceDrainLineTail
+    lda CasmDiagLineLen         ; the drain extended it; refresh the view
+    sta CasmDiagViewLen
+    lda CasmDiagLineClipped
+    sta CasmDiagViewClipped
+@render:
     jmp diagPrintLineAndCaret
 @noText:
     rts

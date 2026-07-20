@@ -45,11 +45,17 @@
 
 ; WP15 diagnostic line echo. Written here and never read by traversal: no
 ; source decision may depend on these.
-.import CasmDiagLineBuf
+.import CasmDiagLineBufA
+.import CasmDiagLineBufB
+.import CasmDiagLineSel
 .import CasmDiagLineLen
 .import CasmDiagLineClipped
 .import CasmDiagLineNoLo
 .import CasmDiagLineNoHi
+.import CasmDiagPrevLen
+.import CasmDiagPrevClipped
+.import CasmDiagPrevNoLo
+.import CasmDiagPrevNoHi
 .import CasmDiagCapture
 
 ; Phase 2 managed file services and shared transfer state.
@@ -240,16 +246,8 @@ snbByteReturn:
     ; line echoed from there would have holes in it and misalign the caret.
     lda CasmDiagCapture
     beq snbEchoDone
-    ldx CasmDiagLineLen
-    cpx #CASM_DIAG_LINE_MAX
-    bcs snbEchoFull             ; buffer full: latch truncation, keep traversing
     lda CasmSourceResultByte
-    sta CasmDiagLineBuf,x
-    inc CasmDiagLineLen
-    jmp snbEchoDone
-snbEchoFull:
-    lda #1
-    sta CasmDiagLineClipped
+    jsr diagLineAppend
 snbEchoDone:
     lda #CASM_SOURCE_BYTE
     clc
@@ -487,7 +485,7 @@ sourceDrainLineTail:
 sdtLoop:
     lda CasmDiagLineLen
     cmp #CASM_DIAG_LINE_MAX
-    bcs sdtClipped              ; buffer full: report truncation, stop reading
+    bcs sdtDone                 ; buffer full: diagLineAppend already latched it
     jsr sourceFetchPhysical
     bcs sdtDone                 ; read failure: keep what was already captured
     cmp #CASM_SOURCE_EOF
@@ -499,14 +497,40 @@ sdtLoop:
     beq sdtDone
     cmp #CASM_PETSCII_LF
     beq sdtDone
-    ldx CasmDiagLineLen
-    sta CasmDiagLineBuf,x
-    inc CasmDiagLineLen
+    jsr diagLineAppend
     jmp sdtLoop
-sdtClipped:
+sdtDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; diagLineAppend (private, WP15)
+; Append one byte to whichever echo buffer is currently selected, latching the
+; truncation flag instead of overflowing.
+;
+; Shared by the normalized echo in sourceNextResult and by the fatal-path
+; drain, so buffer selection and bounds live in exactly one place.
+;
+; Inputs:    A = byte to append
+; Outputs:   CasmDiagLineLen advanced, or CasmDiagLineClipped latched
+; Preserves: nothing
+; Clobbers:  A, X, Y, processor flags
+; ---------------------------------------------------------------------------
+diagLineAppend:
+    ldx CasmDiagLineLen
+    cpx #CASM_DIAG_LINE_MAX
+    bcs dlaFull
+    ldy CasmDiagLineSel
+    bne dlaBufB
+    sta CasmDiagLineBufA,x
+    jmp dlaCommit
+dlaBufB:
+    sta CasmDiagLineBufB,x
+dlaCommit:
+    inc CasmDiagLineLen
+    rts
+dlaFull:
     lda #1
     sta CasmDiagLineClipped
-sdtDone:
     rts
 
 ; ---------------------------------------------------------------------------
@@ -722,10 +746,27 @@ sanAdvance:
 sanColumnReset:
     lda #CASM_SOURCE_COLUMN_INITIAL
     sta CasmSourceColumn
-    ; WP15: the line just ended, so the echo buffer starts accumulating the
-    ; new line. Recorded unconditionally (not gated on CasmDiagCapture) so the
-    ; buffer can never retain stale content from a period when capture was off.
-    ; Uses only A, honoring this routine's X/Y preservation contract.
+    ; WP15: the line just ended. Demote it to "previous" and start the new line
+    ; in the other buffer. The buffers are swapped by flipping the selector, so
+    ; no bytes are copied here. Retaining the previous line is what lets an emit
+    ; diagnostic still show its source: the parser consumes a statement's
+    ; terminating newline before the emission engine runs, so an emit failure
+    ; always reports a line that is no longer the current one.
+    ;
+    ; Recorded unconditionally (not gated on CasmDiagCapture) so a buffer can
+    ; never retain stale content from a period when capture was off. Uses only
+    ; A, honoring this routine's X/Y preservation contract.
+    lda CasmDiagLineLen
+    sta CasmDiagPrevLen
+    lda CasmDiagLineClipped
+    sta CasmDiagPrevClipped
+    lda CasmDiagLineNoLo
+    sta CasmDiagPrevNoLo
+    lda CasmDiagLineNoHi
+    sta CasmDiagPrevNoHi
+    lda CasmDiagLineSel
+    eor #$01                    ; CASM_DIAG_SEL_A <-> CASM_DIAG_SEL_B
+    sta CasmDiagLineSel
     lda #0
     sta CasmDiagLineLen
     sta CasmDiagLineClipped
@@ -815,12 +856,19 @@ sourceResetTraversal:
     sta CasmSourceLineLo
     lda #CASM_SOURCE_COLUMN_INITIAL
     sta CasmSourceColumn
-    ; WP15: the echo buffer tracks the traversal, so a reset or rewind must
-    ; discard it and re-anchor it to the initial line.
+    ; WP15: the echo buffers track the traversal, so a reset or rewind must
+    ; discard both and re-anchor the current one to the initial line. The
+    ; previous-line number resets to CASM_DIAG_LINE_NONE, which no real
+    ; 1-based location can match.
     lda #0
     sta CasmDiagLineLen
     sta CasmDiagLineClipped
     sta CasmDiagLineNoHi        ; CASM_SOURCE_LINE_INITIAL high byte
+    sta CasmDiagLineSel         ; CASM_DIAG_SEL_A
+    sta CasmDiagPrevLen
+    sta CasmDiagPrevClipped
+    sta CasmDiagPrevNoLo        ; CASM_DIAG_LINE_NONE
+    sta CasmDiagPrevNoHi
     lda #<CASM_SOURCE_LINE_INITIAL
     sta CasmDiagLineNoLo
     rts

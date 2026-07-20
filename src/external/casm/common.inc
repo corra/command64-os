@@ -73,6 +73,11 @@ CasmDiagWinCount = CasmExprScratch1
 CasmDiagCaretPos = CasmExprScratch2
 CasmDiagWinFlags = CasmExprScratch3
 
+; Resolved view of whichever echo buffer holds the diagnostic's line.
+CasmDiagViewSel     = CasmPassScratch0
+CasmDiagViewLen     = CasmPassScratch1
+CasmDiagViewClipped = CasmPassScratch2
+
 ; CasmDiagWinFlags bits.
 CASM_DIAG_CLIP_LEFT  = $01
 CASM_DIAG_CLIP_RIGHT = $02
@@ -511,6 +516,18 @@ CASM_DIAG_SUBST_CHAR   = $2E    ; '.'
 ; CasmIoBuffer and do not pay the per-byte echo cost.
 CASM_DIAG_CAPTURE_OFF = $00
 CASM_DIAG_CAPTURE_ON  = $01
+
+; Two echo buffers are retained, not one. The parser consumes a statement's
+; terminating newline before the emission engine runs, so by the time an emit
+; diagnostic raises, the current buffer already holds the *following* line.
+; Keeping the previous line lets those diagnostics still show their source.
+; The buffers are swapped by flipping this selector, never copied.
+CASM_DIAG_SEL_A = $00
+CASM_DIAG_SEL_B = $01
+
+; Line numbers are 1-based, so zero is a natural "no previous line" marker
+; that can never match a real diagnostic location.
+CASM_DIAG_LINE_NONE = $0000
 
 ; CasmDiagLocValid tri-state. BYTE additionally reports the offending byte's
 ; hex value, which a plain VALID location does not carry. A separate state
