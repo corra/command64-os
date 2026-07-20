@@ -151,6 +151,79 @@ file(WRITE "${OUTPUT_DIR}/casmorg2.seq" ".ORG \$C000\n.ORG \$C100\n")
 # Branch target far outside -128..+127        -> BRANCH OUT OF RANGE ($23)
 file(WRITE "${OUTPUT_DIR}/casmbr1.seq" ".ORG \$C000\nBNE \$D000\n")
 
+# WP15 diagnostic source-context fixtures. Each triggers one source-position
+# diagnostic and is checked for its rendered line, caret column, and byte
+# offset -- not merely for the diagnostic identifier.
+
+# Invalid byte mid-line, with text after it. '@' is neither punctuation, an
+# identifier start, nor a number prefix, so the lexer rejects it. The trailing
+# text is the point: it proves the forward drain recovers the part of the line
+# the echo buffer had not yet seen when the error fired.
+#   -> INVALID SOURCE BYTE ($19) at line 2, col 9, offset 8
+file(WRITE "${OUTPUT_DIR}/casmbadb.seq"
+    ".ORG \$C000\n"
+    "LDA #\$0A@,X  ; TRAILING TEXT\n"
+)
+
+# Invalid byte at column 1: the caret must sit at the first rendered column
+# with no left clip marker.
+#   -> INVALID SOURCE BYTE ($19) at line 2, col 1, offset 0
+file(WRITE "${OUTPUT_DIR}/casmcol1.seq"
+    ".ORG \$C000\n"
+    "@LDA #\$01\n"
+)
+
+# A raw $93 (PETSCII clear-screen) embedded in the source. Printing this byte
+# unsanitized would erase the diagnostic being displayed, so this fixture
+# verifies the substitution rather than any parsing behaviour.
+#   -> INVALID SOURCE BYTE ($19), rendered as '.', reported as BYTE $93
+string(ASCII 147 CASM_CLR)
+file(WRITE "${OUTPUT_DIR}/casmctrl.seq"
+    ".ORG \$C000\n"
+    "LDA #\$01${CASM_CLR}\n"
+)
+
+# Error far along a line, forcing the display window to slide. A long .BYTE
+# list is used because the filler must be valid source: a comment would be
+# skipped by the lexer and never reach the offending byte.
+# ".BYTE" spans columns 1-5, then 18 repeats of " $01," span columns 6-95,
+# placing the '@' at column 96.
+#   -> INVALID SOURCE BYTE ($19) at line 2, col 96, offset 95
+string(REPEAT " \$01," 18 CASM_LONG_HEAD)
+file(WRITE "${OUTPUT_DIR}/casmlong.seq"
+    ".ORG \$C000\n"
+    ".BYTE${CASM_LONG_HEAD}@ TRAILING\n"
+)
+
+# Error EARLY in a long line, so the window starts at the line start and stops
+# short of the end: the only fixture that produces a right clip marker.
+#
+# NOTE: this cannot pass until the WP15 forward drain lands. Before the drain,
+# the echo buffer ends at the offending byte, so the buffered line is 7 bytes
+# and there is nothing to the right to clip. Right clipping is structurally
+# unreachable without the drain, which is exactly why it needs its own fixture
+# rather than being folded into casmlong.
+#
+# ".BYTE " spans columns 1-6, placing '@' at column 7. The trailing values make
+# the drained line 97 bytes, well past the 38-column window.
+#   -> INVALID SOURCE BYTE ($19) at line 2, col 7, offset 6, right clip set
+string(REPEAT " \$01," 18 CASM_CLIP_TAIL)
+file(WRITE "${OUTPUT_DIR}/casmclip.seq"
+    ".ORG \$C000\n"
+    ".BYTE @${CASM_CLIP_TAIL}\n"
+)
+
+# The same offending byte in a CRLF file. Newline normalization collapses CRLF
+# to one newline and must not shift the reported column: a one-column caret
+# drift on DOS-style sources is precisely the failure this feature would be
+# embarrassed by, and no other fixture pairs an error with CRLF endings.
+#   -> INVALID SOURCE BYTE ($19) at line 2, col 9, offset 8 (identical
+#      geometry to casmbadb, which uses LF)
+file(WRITE "${OUTPUT_DIR}/casmcrer.seq"
+    ".ORG \$C000${CASM_CRLF}"
+    "LDA #\$01@${CASM_CRLF}"
+)
+
 # End-to-end demo: a runnable program that prints a message and returns to the
 # shell. It assembles to a plain PRG loading at $3400 (the current
 # UserProgStart), so no labels are used -- the message address ($340E) and the

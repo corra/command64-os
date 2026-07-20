@@ -43,6 +43,15 @@
 .import CasmSourceLineLength
 .import CasmSourceLineState
 
+; WP15 diagnostic line echo. Written here and never read by traversal: no
+; source decision may depend on these.
+.import CasmDiagLineBuf
+.import CasmDiagLineLen
+.import CasmDiagLineClipped
+.import CasmDiagLineNoLo
+.import CasmDiagLineNoHi
+.import CasmDiagCapture
+
 ; Phase 2 managed file services and shared transfer state.
 .import inputStreamOpen
 .import inputStreamRead
@@ -169,13 +178,23 @@ sourceNextByte:
 sourceNextResult:
     lda CasmSourceState
     cmp #CASM_SOURCE_STATE_EOF
-    beq snbEof
+    beq snbEofNear
     cmp #CASM_SOURCE_STATE_READY
-    bne snbBadState
+    bne snbBadStateNear
+    jmp snbFetch
+
+; Trampolines: the WP15 line echo lengthened the byte-return path, pushing the
+; shared result and failure tails out of branch range from here.
+snbEofNear:
+    jmp snbEof
+snbBadStateNear:
+    jmp snbBadState
+snbFailNear:
+    jmp snbFail
 
 snbFetch:
     jsr sourceFetchPhysical
-    bcs snbFail                 ; fetch error; source already ERROR
+    bcs snbFailNear             ; fetch error; source already ERROR
     cmp #CASM_SOURCE_EOF
     beq snbEofFromFetch
     ; A = CASM_STREAM_DATA; the physical byte is in CasmSourceScratch0.
@@ -214,6 +233,23 @@ snbClassify:
 snbColumnInc:
     inc CasmSourceColumn
 snbByteReturn:
+    ; WP15: echo the delivered byte into the diagnostic line buffer. Capture
+    ; happens here, in the source layer, rather than in the lexer because the
+    ; lexer discards whitespace and comment bodies without recording them; a
+    ; line echoed from there would have holes in it and misalign the caret.
+    lda CasmDiagCapture
+    beq snbEchoDone
+    ldx CasmDiagLineLen
+    cpx #CASM_DIAG_LINE_MAX
+    bcs snbEchoFull             ; buffer full: latch truncation, keep traversing
+    lda CasmSourceResultByte
+    sta CasmDiagLineBuf,x
+    inc CasmDiagLineLen
+    jmp snbEchoDone
+snbEchoFull:
+    lda #1
+    sta CasmDiagLineClipped
+snbEchoDone:
     lda #CASM_SOURCE_BYTE
     clc
     rts
@@ -625,6 +661,17 @@ sanAdvance:
 sanColumnReset:
     lda #CASM_SOURCE_COLUMN_INITIAL
     sta CasmSourceColumn
+    ; WP15: the line just ended, so the echo buffer starts accumulating the
+    ; new line. Recorded unconditionally (not gated on CasmDiagCapture) so the
+    ; buffer can never retain stale content from a period when capture was off.
+    ; Uses only A, honoring this routine's X/Y preservation contract.
+    lda #0
+    sta CasmDiagLineLen
+    sta CasmDiagLineClipped
+    lda CasmSourceLineLo        ; already advanced to the new line above
+    sta CasmDiagLineNoLo
+    lda CasmSourceLineHi
+    sta CasmDiagLineNoHi
     clc
     rts
 sanOverflow:
@@ -707,6 +754,14 @@ sourceResetTraversal:
     sta CasmSourceLineLo
     lda #CASM_SOURCE_COLUMN_INITIAL
     sta CasmSourceColumn
+    ; WP15: the echo buffer tracks the traversal, so a reset or rewind must
+    ; discard it and re-anchor it to the initial line.
+    lda #0
+    sta CasmDiagLineLen
+    sta CasmDiagLineClipped
+    sta CasmDiagLineNoHi        ; CASM_SOURCE_LINE_INITIAL high byte
+    lda #<CASM_SOURCE_LINE_INITIAL
+    sta CasmDiagLineNoLo
     rts
 
 ; ---------------------------------------------------------------------------

@@ -12,9 +12,34 @@
 .export diagPrintFatal
 .export diagPrintPhase2Ready
 .export diagDumpToken
+.export diagClearLoc
+.export diagSetLocFromLookahead
+.export diagSetLocFromToken
+.export diagSetLocFromStmt
+.export diagStampStmtLoc
 
 .import CasmTokenRecord
 .import CasmTokenText
+
+.import CasmLookaheadLineLo
+.import CasmLookaheadLineHi
+.import CasmLookaheadColumn
+.import CasmLookaheadByte
+
+.import CasmDiagLocValid
+.import CasmDiagLocLineLo
+.import CasmDiagLocLineHi
+.import CasmDiagLocColumn
+.import CasmDiagLocByte
+.import CasmStmtLocLineLo
+.import CasmStmtLocLineHi
+.import CasmStmtLocColumn
+
+.import CasmDiagLineBuf
+.import CasmDiagLineLen
+.import CasmDiagLineClipped
+.import CasmDiagLineNoLo
+.import CasmDiagLineNoHi
 
 .segment "CODE"
 
@@ -59,7 +84,10 @@ diagPrintFatal:
     tay
     pla
     tax
-    jmp diagPrintString
+    jsr diagPrintString
+    ; WP15: append the source location and caret when the raise site recorded
+    ; one. Self-gating, so diagnostics with no source position are unchanged.
+    jmp diagPrintSourceContext
 dpfUnknown:
     ldx #<msgUnknown
     ldy #>msgUnknown
@@ -78,6 +106,114 @@ diagPrintPhase2Ready:
     ldx #<msgPhase2Ready
     ldy #>msgPhase2Ready
     jmp diagPrintString
+
+; ---------------------------------------------------------------------------
+; diagClearLoc
+; Invalidate any recorded source location. Every path that reports a
+; diagnostic without a source position must call this first: a location left
+; over from an earlier raise would otherwise attach itself to an unrelated
+; message and point the user at an innocent line.
+;
+; Inputs:    none
+; Outputs:   CasmDiagLocValid = CASM_DIAG_LOC_INVALID
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagClearLoc:
+    lda #CASM_DIAG_LOC_INVALID
+    sta CasmDiagLocValid
+    rts
+
+; ---------------------------------------------------------------------------
+; diagSetLocFromLookahead
+; Record the pending lookahead byte's provenance as the diagnostic location,
+; including the byte itself. This is the correct source for a failure about a
+; specific byte the lexer is looking at but has not yet consumed; the live
+; source cursor has already moved past it.
+;
+; The caller must hold a valid lookahead (CasmLookaheadValid set by lexerFill).
+;
+; Inputs:    valid lookahead
+; Outputs:   CasmDiagLoc* populated; CasmDiagLocValid = CASM_DIAG_LOC_BYTE
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagSetLocFromLookahead:
+    lda CasmLookaheadLineLo
+    sta CasmDiagLocLineLo
+    lda CasmLookaheadLineHi
+    sta CasmDiagLocLineHi
+    lda CasmLookaheadColumn
+    sta CasmDiagLocColumn
+    lda CasmLookaheadByte
+    sta CasmDiagLocByte
+    lda #CASM_DIAG_LOC_BYTE
+    sta CasmDiagLocValid
+    rts
+
+; ---------------------------------------------------------------------------
+; diagSetLocFromToken
+; Record the current token's start as the diagnostic location. Used by
+; failures that concern a whole token rather than one byte, so no offending
+; byte is reported.
+;
+; Inputs:    populated CasmTokenRecord
+; Outputs:   CasmDiagLoc* populated; CasmDiagLocValid = CASM_DIAG_LOC_VALID
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagSetLocFromToken:
+    lda CasmTokenRecord + CASM_TOKEN_REC_LINE_LO
+    sta CasmDiagLocLineLo
+    lda CasmTokenRecord + CASM_TOKEN_REC_LINE_HI
+    sta CasmDiagLocLineHi
+    lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    sta CasmDiagLocColumn
+    lda #CASM_DIAG_LOC_VALID
+    sta CasmDiagLocValid
+    rts
+
+; ---------------------------------------------------------------------------
+; diagSetLocFromStmt
+; Record the current statement's start as the diagnostic location. The
+; emission engine raises after a statement's tokens are consumed, so the token
+; record points past the statement and only the stamped statement location
+; still identifies it.
+;
+; Inputs:    CasmStmtLoc* stamped by parserParseStatement
+; Outputs:   CasmDiagLoc* populated; CasmDiagLocValid = CASM_DIAG_LOC_VALID
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagSetLocFromStmt:
+    lda CasmStmtLocLineLo
+    sta CasmDiagLocLineLo
+    lda CasmStmtLocLineHi
+    sta CasmDiagLocLineHi
+    lda CasmStmtLocColumn
+    sta CasmDiagLocColumn
+    lda #CASM_DIAG_LOC_VALID
+    sta CasmDiagLocValid
+    rts
+
+; ---------------------------------------------------------------------------
+; diagStampStmtLoc
+; Copy the current token's start into the statement location. Called by
+; parserParseStatement once per statement, on the statement's first token.
+;
+; Inputs:    populated CasmTokenRecord
+; Outputs:   CasmStmtLoc* populated
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagStampStmtLoc:
+    lda CasmTokenRecord + CASM_TOKEN_REC_LINE_LO
+    sta CasmStmtLocLineLo
+    lda CasmTokenRecord + CASM_TOKEN_REC_LINE_HI
+    sta CasmStmtLocLineHi
+    lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    sta CasmStmtLocColumn
+    rts
 
 ; ---------------------------------------------------------------------------
 ; printChar
@@ -199,6 +335,321 @@ printDec16:
     clc
     adc #$30
     jsr printChar
+    rts
+
+; ---------------------------------------------------------------------------
+; printHex8
+; Print "$XX" for the byte in A.
+;
+; Clobbers: A, X, Y and OS API-defined volatile registers
+; ---------------------------------------------------------------------------
+printHex8:
+    pha
+    lda #$24                    ; '$'
+    jsr printChar
+    pla
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr printNibble
+    pla
+    and #$0F
+printNibble:
+    cmp #10
+    bcc @digit
+    clc
+    adc #$37                    ; 10 -> 'A'
+    jmp printChar
+@digit:
+    clc
+    adc #$30                    ; 0 -> '0'
+    jmp printChar
+
+; ---------------------------------------------------------------------------
+; diagSanitizeByte
+; Map a source byte to something safe to send to the screen.
+;
+; This is a correctness requirement, not cosmetics. The diagnostic that most
+; needs this display is INVALID SOURCE BYTE, which fires precisely because the
+; byte is not ordinary; echoing a raw $93 would clear the screen and erase the
+; message, and $12 would leave the display in reverse video.
+;
+; Inputs:    A = raw source byte
+; Outputs:   A = the byte, or CASM_DIAG_SUBST_CHAR if it is a control code
+; Preserves: X, Y
+; ---------------------------------------------------------------------------
+diagSanitizeByte:
+    cmp #CASM_DIAG_PRINT_LO_MIN
+    bcc @subst                  ; $00-$1F control
+    cmp #CASM_DIAG_PRINT_LO_MAX + 1
+    bcc @ok                     ; $20-$7F printable
+    cmp #CASM_DIAG_PRINT_HI_MIN
+    bcc @subst                  ; $80-$9F control
+@ok:
+    rts
+@subst:
+    lda #CASM_DIAG_SUBST_CHAR
+    rts
+
+; ---------------------------------------------------------------------------
+; diagComputeWindow
+; Choose the slice of the echoed line to display and where the caret falls.
+;
+; A source line may be 255 bytes; the screen is 40 columns. The window slides
+; to keep the failing column visible, and a two-character prefix is always
+; emitted (either indent or a left clip marker) so the caret offset is uniform.
+;
+; Inputs:    CasmDiagLineLen, CasmDiagLocColumn, CasmDiagLineClipped
+; Outputs:   CasmDiagWinStart, CasmDiagWinCount, CasmDiagCaretPos,
+;            CasmDiagWinFlags
+; Clobbers:  A, X, Y
+; ---------------------------------------------------------------------------
+diagComputeWindow:
+    lda #0
+    sta CasmDiagWinFlags
+
+    ; Zero-based index of the failing byte. Column 0 is the source layer's
+    ; column-exhausted latch, which can only occur past byte 254.
+    ldx CasmDiagLocColumn
+    bne @haveCol
+    ldx #CASM_DIAG_LINE_MAX
+    bne @indexReady
+@haveCol:
+    dex                         ; 1-based column -> 0-based index
+@indexReady:
+    ; X = index. Short lines never scroll.
+    lda CasmDiagLineLen
+    cmp #CASM_DIAG_WINDOW_WIDTH + 1
+    bcc @startZero              ; len <= 38: whole line fits
+    cpx #CASM_DIAG_WINDOW_WIDTH
+    bcc @startZero              ; error within the first 38 columns
+
+    ; Center the window on the error, then pull it back so it does not run
+    ; past the end of the line.
+    txa
+    sec
+    sbc #CASM_DIAG_WINDOW_WIDTH / 2
+    sta CasmDiagWinStart
+    clc
+    adc #CASM_DIAG_WINDOW_WIDTH
+    cmp CasmDiagLineLen
+    bcc @startSet               ; window ends within the line
+    lda CasmDiagLineLen
+    sec
+    sbc #CASM_DIAG_WINDOW_WIDTH
+    sta CasmDiagWinStart
+@startSet:
+    lda #CASM_DIAG_CLIP_LEFT
+    sta CasmDiagWinFlags
+    jmp @count
+@startZero:
+    lda #0
+    sta CasmDiagWinStart
+
+@count:
+    ; count = min(WINDOW_WIDTH, len - start)
+    lda CasmDiagLineLen
+    sec
+    sbc CasmDiagWinStart
+    cmp #CASM_DIAG_WINDOW_WIDTH + 1
+    bcc @countSet
+    lda #CASM_DIAG_WINDOW_WIDTH
+@countSet:
+    sta CasmDiagWinCount
+
+    ; Right clip when the window stops short of the end, or when the line
+    ; itself overflowed the echo buffer.
+    lda CasmDiagWinStart
+    clc
+    adc CasmDiagWinCount
+    cmp CasmDiagLineLen
+    bcs @checkOverflow
+    lda CasmDiagWinFlags
+    ora #CASM_DIAG_CLIP_RIGHT
+    sta CasmDiagWinFlags
+    jmp @caret
+@checkOverflow:
+    lda CasmDiagLineClipped
+    beq @caret
+    lda CasmDiagWinFlags
+    ora #CASM_DIAG_CLIP_RIGHT
+    sta CasmDiagWinFlags
+
+@caret:
+    ; Caret sits under the failing byte, offset by the two-character prefix.
+    ; An index past the window (a failure reported at end of line) parks the
+    ; caret just after the last rendered character.
+    txa
+    sec
+    sbc CasmDiagWinStart
+    cmp CasmDiagWinCount
+    bcc @caretSet
+    lda CasmDiagWinCount
+@caretSet:
+    clc
+    adc #CASM_DIAG_INDENT
+    sta CasmDiagCaretPos
+    rts
+
+; ---------------------------------------------------------------------------
+; diagPrintLineAndCaret
+; Print the windowed source line followed by the caret row.
+;
+; Clobbers: A, X, Y and OS API-defined volatile registers
+; ---------------------------------------------------------------------------
+diagPrintLineAndCaret:
+    jsr diagComputeWindow
+
+    ; Prefix: left clip marker, or plain indent.
+    lda CasmDiagWinFlags
+    and #CASM_DIAG_CLIP_LEFT
+    beq @indent
+    ldx #<msgClipLeft
+    ldy #>msgClipLeft
+    jsr diagPrintString
+    jmp @body
+@indent:
+    ldx #<msgIndent
+    ldy #>msgIndent
+    jsr diagPrintString
+
+@body:
+    ldy #0
+@bodyLoop:
+    cpy CasmDiagWinCount
+    beq @bodyDone
+    tya
+    pha                         ; save the loop index across printChar
+    clc
+    adc CasmDiagWinStart        ; A still holds Y: window index -> buffer index
+    tax
+    lda CasmDiagLineBuf,x
+    jsr diagSanitizeByte
+    jsr printChar
+    pla
+    tay
+    iny
+    jmp @bodyLoop
+@bodyDone:
+
+    lda CasmDiagWinFlags
+    and #CASM_DIAG_CLIP_RIGHT
+    beq @endLine
+    ldx #<msgClipRight
+    ldy #>msgClipRight
+    jsr diagPrintString
+@endLine:
+    ldx #<msgCR
+    ldy #>msgCR
+    jsr diagPrintString
+
+    ; Caret row: emitted as its own line so it never depends on how the OS
+    ; print routine wrapped the row above.
+    ldy #0
+@caretLoop:
+    cpy CasmDiagCaretPos
+    beq @caretDone
+    tya
+    pha
+    lda #$20                    ; ' '
+    jsr printChar
+    pla
+    tay
+    iny
+    jmp @caretLoop
+@caretDone:
+    lda #$5E                    ; '^'
+    jsr printChar
+    ldx #<msgCR
+    ldy #>msgCR
+    jmp diagPrintString
+
+; ---------------------------------------------------------------------------
+; diagPrintSourceContext
+; Print the location line for a source-position diagnostic, and the offending
+; line with a caret when the echo buffer still holds that line.
+;
+; Does nothing when no location was recorded, which is how CLI, file, and
+; internal-state diagnostics stay bare.
+;
+; Inputs:    CasmDiagLoc* and the echo buffer
+; Outputs:   none
+; Clobbers:  A, X, Y and OS API-defined volatile registers
+; ---------------------------------------------------------------------------
+diagPrintSourceContext:
+    lda CasmDiagLocValid
+    bne @haveLoc
+    rts
+@haveLoc:
+    ldx #<msgAtLine
+    ldy #>msgAtLine
+    jsr diagPrintString
+    lda CasmDiagLocLineLo
+    sta CasmValue0Lo
+    lda CasmDiagLocLineHi
+    sta CasmValue0Hi
+    jsr printDec16
+
+    ldx #<msgColPrefix
+    ldy #>msgColPrefix
+    jsr diagPrintString
+    lda CasmDiagLocColumn
+    sta CasmValue0Lo
+    lda #0
+    sta CasmValue0Hi
+    jsr printDec16
+
+    ; Both conventions are printed: COL is 1-based, matching the existing
+    ; diagDumpToken output, while OFFSET is the 0-based byte index into the
+    ; line. Cheap here, and it removes an ambiguity the user would otherwise
+    ; have to resolve by experiment.
+    ldx #<msgOffsetPrefix
+    ldy #>msgOffsetPrefix
+    jsr diagPrintString
+    lda CasmDiagLocColumn
+    beq @offsetZero
+    sec
+    sbc #1
+    jmp @offsetStore
+@offsetZero:
+    lda #0
+@offsetStore:
+    sta CasmValue0Lo
+    lda #0
+    sta CasmValue0Hi
+    jsr printDec16
+    ldx #<msgOffsetSuffix
+    ldy #>msgOffsetSuffix
+    jsr diagPrintString
+
+    ; The offending byte, when the raise site recorded one. Printed as hex
+    ; because the rendered line substitutes a '.' for exactly these bytes.
+    lda CasmDiagLocValid
+    cmp #CASM_DIAG_LOC_BYTE
+    bne @noByte
+    ldx #<msgBytePrefix
+    ldy #>msgBytePrefix
+    jsr diagPrintString
+    lda CasmDiagLocByte
+    jsr printHex8
+@noByte:
+    ldx #<msgCR
+    ldy #>msgCR
+    jsr diagPrintString
+
+    ; The echo buffer holds one line at a time. If the diagnostic refers to an
+    ; earlier line, the text is gone and a caret would point into unrelated
+    ; source, so the location line stands alone.
+    lda CasmDiagLocLineLo
+    cmp CasmDiagLineNoLo
+    bne @noText
+    lda CasmDiagLocLineHi
+    cmp CasmDiagLineNoHi
+    bne @noText
+    jmp diagPrintLineAndCaret
+@noText:
     rts
 
 ; ---------------------------------------------------------------------------
@@ -576,3 +1027,13 @@ msgTextSuffix:    .byte "]", 0
 msgLocLinePrefix: .byte " L:", 0
 msgLocColPrefix:  .byte " C:", 0
 msgCR:            .byte PetCr, 0
+
+; WP15 source context strings.
+msgAtLine:       .byte "AT LINE ", 0
+msgColPrefix:    .byte ", COL ", 0
+msgOffsetPrefix: .byte " (OFFSET ", 0
+msgOffsetSuffix: .byte ")", 0
+msgBytePrefix:   .byte " BYTE ", 0
+msgIndent:       .byte "  ", 0
+msgClipLeft:     .byte "<.", 0
+msgClipRight:    .byte ".>", 0
