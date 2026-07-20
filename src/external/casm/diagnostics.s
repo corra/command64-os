@@ -41,6 +41,9 @@
 .import CasmDiagLineNoLo
 .import CasmDiagLineNoHi
 
+; Terminal, fatal-path-only line recovery. See its contract in source.s.
+.import sourceDrainLineTail
+
 .segment "CODE"
 
 ; ---------------------------------------------------------------------------
@@ -648,6 +651,11 @@ diagPrintSourceContext:
     lda CasmDiagLocLineHi
     cmp CasmDiagLineNoHi
     bne @noText
+    ; Recover the rest of the line before rendering. Deliberately sequenced
+    ; after the message and location are already on screen: the drain is a
+    ; terminal, best-effort read, so if it fails or hangs the user still has
+    ; the diagnostic that matters.
+    jsr sourceDrainLineTail
     jmp diagPrintLineAndCaret
 @noText:
     rts

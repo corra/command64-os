@@ -69,6 +69,7 @@
 .export sourceGetLocation
 .export sourceRewind
 .export sourceClose
+.export sourceDrainLineTail
 
 .segment "CODE"
 
@@ -446,6 +447,66 @@ snlBadState:
     sta CasmSourceState
     lda #CASM_DIAG_STREAM_STATE_FAILED
     sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceDrainLineTail (WP15, diagnostic-only and TERMINAL)
+; Append the remainder of the current physical line to the diagnostic echo
+; buffer, stopping at CR, LF, EOF, a full buffer, or any read failure.
+;
+; The echo buffer ends at the byte that failed, because that is the last byte
+; traversal delivered. Without this routine a diagnostic can only ever show the
+; source up to the caret, never the text after it.
+;
+; CONTRACT -- read before calling:
+;   * Call only on the fatal path, immediately before central cleanup. The
+;     caller must already have decided to terminate.
+;   * This routine deliberately bypasses the source state gate: it runs after
+;     the source has been driven into ERROR, which is the whole point. It reads
+;     raw physical bytes and does not maintain the line, column, offset, or
+;     pending-CR invariants that the normalized traversal guarantees.
+;   * It therefore leaves the source unusable for further traversal. Calling it
+;     anywhere other than the fatal path will corrupt an in-progress assembly.
+;   * It never reports a diagnostic of its own. Any failure silently truncates
+;     the displayed line rather than masking the caller's primary diagnostic,
+;     which is the diagnostic the user actually needs.
+;
+; The input stream is still open at this point: casm.s routes a fatal through
+; startFatal -> exitFatal -> diagPrintFatal (here) -> resourcesCleanup, and the
+; close happens in that last step.
+;
+; Inputs:    valid echo buffer contents for the current line
+; Outputs:   CasmDiagLineLen extended; CasmDiagLineClipped set on overflow
+; Preserves: nothing
+; Clobbers:  A, X, Y, source scratch, refill/OS volatile state
+; ---------------------------------------------------------------------------
+sourceDrainLineTail:
+    lda CasmSourceState
+    cmp #CASM_SOURCE_STATE_EOF
+    beq sdtDone                 ; nothing further to read
+sdtLoop:
+    lda CasmDiagLineLen
+    cmp #CASM_DIAG_LINE_MAX
+    bcs sdtClipped              ; buffer full: report truncation, stop reading
+    jsr sourceFetchPhysical
+    bcs sdtDone                 ; read failure: keep what was already captured
+    cmp #CASM_SOURCE_EOF
+    beq sdtDone
+    ; Raw byte: a newline in either encoding ends the line. No normalization is
+    ; attempted, since a display tail does not need the pending-CR latch.
+    lda CasmSourceScratch0
+    cmp #CASM_PETSCII_CR
+    beq sdtDone
+    cmp #CASM_PETSCII_LF
+    beq sdtDone
+    ldx CasmDiagLineLen
+    sta CasmDiagLineBuf,x
+    inc CasmDiagLineLen
+    jmp sdtLoop
+sdtClipped:
+    lda #1
+    sta CasmDiagLineClipped
+sdtDone:
     rts
 
 ; ---------------------------------------------------------------------------
