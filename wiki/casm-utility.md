@@ -236,6 +236,31 @@ for the complete list of all 36 codes):
 | `.ORG $C000` / `BNE $D000` *(target far out of branch range)* | `CASM: BRANCH OUT OF RANGE` |
 | A word CASM doesn't recognize where a statement should start | `CASM: SYNTAX ERROR` |
 
+### Reading a diagnostic
+
+A diagnostic that concerns a specific place in the source prints two extra
+lines under the message: a location and the offending line with a caret.
+Assembling a file whose second line is `LDA #$0A@,X` produces:
+
+```text
+CASM: INVALID SOURCE BYTE
+AT LINE 2, COL 9 (OFFSET 8) BYTE $40
+  LDA #$0A@,X
+          ^
+```
+
+- **LINE** and **COL** are 1-based; **OFFSET** is the 0-based byte index into
+  the line (always `COL - 1`), which some editors report instead of a column.
+- **BYTE** appears only for `INVALID SOURCE BYTE`, giving the rejected byte's
+  value. That byte is shown as `.` in the line above, because it is by
+  definition not a normal printable character, so its value is stated in hex
+  rather than left ambiguous.
+- Lines wider than the screen scroll a window to keep the caret visible, with
+  `<.` or `.>` marking a clipped edge.
+
+Diagnostics with no source position — a missing file, an option error, an
+internal failure — print the message line alone.
+
 ## Not Yet Supported
 
 These will produce a specific error rather than silently doing the wrong

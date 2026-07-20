@@ -307,3 +307,32 @@ fixture cannot reproduce a case, stop and raise it.
   Size after step 5: 8462 bytes of the $2800 envelope, plus 269 bytes BSS.
 
   Remaining: steps 6-9. Note that `casmclip` cannot pass until step 6.
+- 2026-07-20: Step 6 (forward drain) complete and verified. `sourceDrainLineTail`
+  recovers the line past the caret so trailing text renders; this also makes
+  right-hand clipping reachable, which `casmclip` now exercises. The routine is
+  terminal and diagnostic-only, bypassing the source state gate and never
+  reporting a diagnostic of its own. Committed 5cdaaf3.
+- 2026-07-20: Step 7 (parser + emit raise sites) complete and verified. Parser
+  failures use the token location; emit failures use the stamped statement
+  location. Committed ae9eab2.
+
+  Deviation, and the largest design change in the WP: the plan kept a single
+  echo buffer, but the parser consumes a statement's terminating newline before
+  the emission engine runs, so an emit diagnostic always reports a line the
+  single buffer no longer held. Every emit diagnostic would have lost its caret.
+  Resolved by retaining the previous line in a second 256-byte buffer, swapped
+  by flipping a selector rather than copied. The per-byte echo and the drain
+  store now share one `diagLineAppend` helper. The `CasmDiagLineNo` guard from
+  step 5 generalized into `diagResolveView`, which matches the diagnostic's line
+  against both buffers.
+
+  Correction to an earlier estimate: the true MAIN-envelope headroom is 432
+  bytes (9808 of $2800 used), measured from a link map, not the ~1.7 KB implied
+  in the Memory Budget section above. That figure counted space ahead of BSS;
+  the echo buffers live in BSS. The feature fits with margin, but future CASM
+  code has less room than the budget section suggests.
+
+- 2026-07-20: Step 8 (link check) complete. Both `casm_3400.cfg` and
+  `casm_3500.cfg` link within `$2800`; headroom 432 bytes as above.
+
+  Remaining: step 9 (docs).
