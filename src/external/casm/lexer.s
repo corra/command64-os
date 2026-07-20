@@ -37,6 +37,11 @@
 .import CasmSourceLineHi
 .import CasmSourceColumn
 
+; WP15 diagnostic context.
+.import CasmDiagCapture
+.import diagSetLocFromLookahead
+.import diagSetLocFromToken
+
 .export lexerInit
 .export lexerNext
 .export lexerGetToken
@@ -65,6 +70,11 @@ lexerInit:
     sta CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
     sta CasmTokenRecord + CASM_TOKEN_REC_LENGTH
     sta CasmTokenText
+    ; WP15: the lexer is the BYTE-mode consumer of the source, so it owns
+    ; enabling the line echo. LINE-mode callers already hold their line in
+    ; CasmIoBuffer and must not pay the per-byte echo cost.
+    lda #CASM_DIAG_CAPTURE_ON
+    sta CasmDiagCapture
     lda #CASM_DIAG_NONE
     clc
     rts
@@ -144,7 +154,10 @@ lnSkip:
     jsr isIdFirst
     bcc lnIdJmp
 
-    ; None of the above: invalid source byte!
+    ; None of the above: invalid source byte! The lookahead still holds the
+    ; offending byte and its provenance; the live source cursor has already
+    ; moved past it.
+    jsr diagSetLocFromLookahead
     lda #CASM_DIAG_INVALID_SOURCE_BYTE
     jmp lnFailWithA
 
@@ -190,6 +203,7 @@ lnPunct:
     jmp lexerEmit               ; returns C clear, A = token type
 lnPunctAppendFail:
     pla                         ; discard the saved type
+    jsr diagSetLocFromLookahead
     lda #CASM_DIAG_TOKEN_TOO_LONG
     jmp lnFailWithA
 
@@ -611,6 +625,9 @@ lnMalformedNum:
     jsr lexerConsume
     jmp @malLoop
 @malDone:
+    ; Point at the start of the malformed number, not at wherever scanning
+    ; gave up: the whole literal is what the user needs to look at.
+    jsr diagSetLocFromToken
     lda #CASM_DIAG_MALFORMED_NUMBER
     jmp lnFailWithA
 
@@ -669,6 +686,7 @@ lnId:
     jmp lexerEmit
 
 lnTokenTooLong:
+    jsr diagSetLocFromToken
     lda #CASM_DIAG_TOKEN_TOO_LONG
     jmp lnFailWithA
 

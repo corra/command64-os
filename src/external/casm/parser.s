@@ -18,6 +18,10 @@
 .import CasmTokenRecord
 .import CasmTokenText
 
+; WP15 diagnostic context.
+.import diagSetLocFromToken
+.import diagStampStmtLoc
+
 .export CasmParserStmt
 .export parserParseStatement
 .export parseNumericValue
@@ -61,6 +65,13 @@ CasmParserTempExt:  .res 1
 parserParseStatement:
     jsr lexerNext
     bcs ppsFail
+
+    ; WP15: record where this statement began. The emission engine raises
+    ; after the statement's tokens are consumed, by which point the token
+    ; record points past the statement and only this still identifies it.
+    pha
+    jsr diagStampStmtLoc
+    pla
 
     cmp #CASM_TOKEN_EOF
     beq ppsEmpty
@@ -117,6 +128,7 @@ ppsFail:
     rts
 
 ppsSyntaxError:
+    jsr diagSetLocFromToken     ; the token that cannot start a statement
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
@@ -337,6 +349,7 @@ posExpectTerminator:
     beq posDone
     cmp #CASM_TOKEN_EOF
     beq posDone
+    jsr diagSetLocFromToken     ; the token that should have been a newline
     lda #CASM_DIAG_EXPECTED_NEWLINE
     sec
     rts
@@ -347,6 +360,7 @@ posDone:
     rts
 
 posSyntaxError:
+    jsr diagSetLocFromToken     ; the unexpected token
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
@@ -422,6 +436,10 @@ pnvBinLoop:
 pnvDone:
     lda CasmParserOverflow
     beq pnvStore
+    ; The number token is still current, and this routine is reached from both
+    ; the parser and the emission engine's operand lists, so the token record
+    ; is the correct location source for either caller.
+    jsr diagSetLocFromToken
     lda #CASM_DIAG_OPERAND_OUT_OF_RANGE
     sec
     rts

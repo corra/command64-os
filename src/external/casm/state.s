@@ -35,6 +35,26 @@
 .export CasmLookaheadColumn
 .export CasmTokenRecord
 .export CasmTokenText
+.export CasmDiagLineBufA
+.export CasmDiagLineBufB
+.export CasmDiagLineSel
+.export CasmDiagLineLen
+.export CasmDiagLineClipped
+.export CasmDiagLineNoLo
+.export CasmDiagLineNoHi
+.export CasmDiagPrevLen
+.export CasmDiagPrevClipped
+.export CasmDiagPrevNoLo
+.export CasmDiagPrevNoHi
+.export CasmDiagCapture
+.export CasmDiagLocValid
+.export CasmDiagLocLineLo
+.export CasmDiagLocLineHi
+.export CasmDiagLocColumn
+.export CasmDiagLocByte
+.export CasmStmtLocLineLo
+.export CasmStmtLocLineHi
+.export CasmStmtLocColumn
 
 .segment "BSS"
 
@@ -76,6 +96,73 @@ CasmTokenText:
 CasmTokenRecordEnd:
 CasmLexerStateEnd:
 CasmPhase3StateEnd:
+
+; ---------------------------------------------------------------------------
+; WP15 diagnostic source context state
+;
+; Deliberately outside the CasmPhase3State span above, whose exact-size
+; asserts are a documented contract. This is diagnostic state, not source or
+; lexer state: no traversal or tokenization decision may read it.
+;
+; The echo buffers record source lines as they are consumed, because BYTE-mode
+; traversal leaves no other record of them (see the WP15 contract in
+; common.inc).
+;
+; Two buffers are kept. The parser consumes a statement's terminating newline
+; before the emission engine runs, so an emit diagnostic raises when the
+; current buffer already holds the following line; without the previous line,
+; every emit diagnostic would lose its caret. CasmDiagLineSel says which buffer
+; is current, and a newline swaps roles by flipping it rather than copying 256
+; bytes.
+;
+; The Clipped flags latch when a line exceeds its buffer, so the renderer
+; reports truncation rather than showing a silently short line.
+; ---------------------------------------------------------------------------
+CasmDiagStateStart:
+CasmDiagLineBufA:
+    .res CASM_DIAG_LINE_BUF_SIZE
+CasmDiagLineBufB:
+    .res CASM_DIAG_LINE_BUF_SIZE
+CasmDiagLineSel:     .res 1
+CasmDiagLineLen:     .res 1
+CasmDiagLineClipped: .res 1
+CasmDiagCapture:     .res 1
+
+; Line number each buffer holds. The renderer matches the diagnostic's own line
+; against these and suppresses the text and caret when neither matches. Without
+; that guard a diagnostic would print a caret into whatever line happened to be
+; buffered, confidently pointing at the wrong source.
+CasmDiagLineNoLo: .res 1
+CasmDiagLineNoHi: .res 1
+
+; The previous line: its length, truncation flag, and number. It lives in
+; whichever buffer CasmDiagLineSel does not currently select.
+CasmDiagPrevLen:     .res 1
+CasmDiagPrevClipped: .res 1
+CasmDiagPrevNoLo:    .res 1
+CasmDiagPrevNoHi:    .res 1
+
+; Location attached to a source-position diagnostic. CasmDiagLocValid gates
+; every consumer: an unset location must never attach to an unrelated
+; diagnostic, and must never trigger the terminal line-tail drain.
+CasmDiagLocValid:  .res 1
+CasmDiagLocLineLo: .res 1
+CasmDiagLocLineHi: .res 1
+CasmDiagLocColumn: .res 1
+CasmDiagLocByte:   .res 1
+
+; Statement-start location, stamped by parserParseStatement. The emission
+; engine raises diagnostics after the statement's tokens are consumed, so the
+; token record no longer points at the statement. Kept separate rather than
+; grown into CasmParserStmt, whose 6-byte size is an asserted shared ABI.
+CasmStmtLocLineLo: .res 1
+CasmStmtLocLineHi: .res 1
+CasmStmtLocColumn: .res 1
+CasmDiagStateEnd:
+
+.assert CasmDiagLineBufB - CasmDiagLineBufA = CASM_DIAG_LINE_BUF_SIZE, error, "CASM diagnostic line buffer A size changed"
+.assert CasmDiagLineSel - CasmDiagLineBufB = CASM_DIAG_LINE_BUF_SIZE, error, "CASM diagnostic line buffer B size changed"
+.assert CasmDiagStateEnd - CasmDiagStateStart = 530, error, "CASM diagnostic state must be exactly 530 bytes"
 
 .assert CasmTokenText - CasmTokenRecord = CASM_TOKEN_REC_TEXT, error, "CASM token text offset does not match shared ABI"
 .assert CasmTokenRecordEnd - CasmTokenRecord = CASM_TOKEN_REC_SIZE, error, "CASM token record must be exactly 39 bytes"

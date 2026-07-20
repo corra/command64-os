@@ -24,6 +24,12 @@
 .import lexerNext
 .import parseNumericValue
 
+; WP15 diagnostic context. Statement-level failures use the stamped statement
+; location; failures inside a .BYTE/.WORD operand list use the token record,
+; which still points at the offending value.
+.import diagSetLocFromToken
+.import diagSetLocFromStmt
+
 .export emitInit
 .export emitInstruction
 .export emitDirective
@@ -138,6 +144,7 @@ eiRelEmit:
     clc
     rts
 eiBranchErr:
+    jsr diagSetLocFromStmt      ; the branch instruction's own line
     lda #CASM_DIAG_BRANCH_OUT_OF_RANGE
     sec
     rts
@@ -170,6 +177,7 @@ emitDirective:
     sec
     rts
 edSyntax:
+    jsr diagSetLocFromStmt      ; the unrecognized directive
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
@@ -188,6 +196,7 @@ edWord:
 emitOrg:
     lda CasmOrgSet
     beq eoSet
+    jsr diagSetLocFromStmt      ; the offending second .ORG
     lda #CASM_DIAG_DUPLICATE_ORG
     sec
     rts
@@ -241,10 +250,12 @@ eblRead:
     cmp #CASM_TOKEN_EOF
     beq eblDone
 eblSyntax:
+    jsr diagSetLocFromToken     ; the bad token within the .BYTE list
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
 eblRange:
+    jsr diagSetLocFromToken     ; the out-of-range value itself
     lda #CASM_DIAG_OPERAND_OUT_OF_RANGE
     sec
     rts
@@ -278,6 +289,7 @@ ewlRead:
     cmp #CASM_TOKEN_EOF
     beq ewlDone
 ewlSyntax:
+    jsr diagSetLocFromToken     ; the bad token within the .WORD list
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
@@ -293,6 +305,7 @@ ewlRet:
 emitRequireOrg:
     lda CasmOrgSet
     bne eroOk
+    jsr diagSetLocFromStmt      ; the first statement needing an origin
     lda #CASM_DIAG_ORG_REQUIRED
     sec
     rts

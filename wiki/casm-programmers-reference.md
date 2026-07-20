@@ -396,44 +396,98 @@ PETSCII message, looked up via a parallel low/high address table in
 asserted at build time; `$00` (`NONE`) and `$FF`/out-of-range (`UNKNOWN` →
 `"CASM: INTERNAL ERROR"`) are the only gaps.
 
-| Code | Identifier | Message | Raised by |
-|---|---|---|---|
-| `$01` | `INIT_FAILED` | INITIALIZATION FAILED | (reserved) |
-| `$02` | `REGISTRY_FULL` | RESOURCE REGISTRY FULL | `resourceRegisterHandle`/`Vmm` |
-| `$03` | `CLEANUP_FAILED` | RESOURCE CLEANUP FAILED | `resourcesCleanup` |
-| `$04` | `SOURCE_REQUIRED` | SOURCE FILE REQUIRED | `cli.s` |
-| `$05` | `EXTRA_SOURCE` | TOO MANY SOURCE FILES | `cli.s` |
-| `$06` | `MALFORMED_OUTPUT_OPTION` | MALFORMED /O OPTION | `cli.s` |
-| `$07` | `DUPLICATE_OPTION` | DUPLICATE OPTION | `cli.s` |
-| `$08` | `UNKNOWN_OPTION` | UNKNOWN OPTION | `cli.s` |
-| `$09` | `FILENAME_TOO_LONG` | FILENAME TOO LONG | `cli.s` |
-| `$0A` | `NOT_IMPLEMENTED` | FEATURE NOT IMPLEMENTED | `casm.s` (`/M`,`/L`), `emit.s` (`.STATIC`/`.RELOC`/`.INCLUDE`) |
-| `$0B` | `INPUT_OPEN_FAILED` | CANNOT OPEN INPUT | `fileio.s` |
-| `$0C` | `INPUT_READ_FAILED` | INPUT READ FAILED | `fileio.s` |
-| `$0D` | `INPUT_CLOSE_FAILED` | INPUT CLOSE FAILED | `fileio.s`/`source.s` |
-| `$0E` | `OUTPUT_CREATE_FAILED` | CANNOT CREATE OUTPUT | `fileio.s` |
-| `$0F` | `OUTPUT_WRITE_FAILED` | OUTPUT WRITE FAILED | `fileio.s` |
-| `$10` | `OUTPUT_CLOSE_FAILED` | OUTPUT CLOSE FAILED | `fileio.s` |
-| `$11` | `OUTPUT_DELETE_FAILED` | OUTPUT DELETE FAILED | `fileio.s` |
-| `$12` | `OUTPUT_SHORT_WRITE` | SHORT OUTPUT WRITE | `fileio.s` |
-| `$13` | `STREAM_STATE_FAILED` | INVALID STREAM STATE | `fileio.s`/`source.s` *(Phase 2 range ends here)* |
-| `$14` | `SOURCE_REWIND_FAILED` | SOURCE REWIND FAILED | `source.s` |
-| `$15` | `SOURCE_OFFSET_OVERFLOW` | SOURCE OFFSET OVERFLOW | `source.s` / `fileio.s` (>64K source) |
-| `$16` | `SOURCE_LOCATION_OVERFLOW` | SOURCE LOCATION OVERFLOW | `source.s` (line/column overflow) |
-| `$17` | `SOURCE_LINE_TOO_LONG` | SOURCE LINE TOO LONG | `source.s` (line mode, >255 bytes) |
-| `$18` | `TOKEN_TOO_LONG` | TOKEN TOO LONG | `lexer.s` (>31 text bytes) |
-| `$19` | `INVALID_SOURCE_BYTE` | INVALID SOURCE BYTE | `lexer.s` / `source.s` (embedded null in line mode) |
-| `$1A` | `MALFORMED_NUMBER` | MALFORMED NUMBER | `lexer.s` |
-| `$1B` | `LEXER_STATE_FAILED` | INVALID LEXER STATE | `lexer.s` *(Phase 3 range ends here)* |
-| `$1C` | `SYNTAX_ERROR` | SYNTAX ERROR | `parser.s` / `emit.s` (unknown directive) |
-| `$1D` | `EXPECTED_NEWLINE` | EXPECTED NEWLINE | `parser.s` |
-| `$1E` | `OPERAND_OUT_OF_RANGE` | OPERAND OUT OF RANGE | `parser.s` (16-bit overflow), `opcodes.s` (8-bit modes), `emit.s` (`.BYTE` >255) |
-| `$1F` | `INVALID_ADDR_MODE` | INVALID ADDRESSING MODE | `opcodes.s` |
-| `$20` | `DUPLICATE_ORG` | DUPLICATE ORG | `emit.s` |
-| `$21` | `ORG_REQUIRED` | ORG REQUIRED | `emit.s` |
-| `$22` | `ADDRESS_OVERFLOW` | ADDRESS OVERFLOW | `emit.s` (`CasmPc` past `$FFFF`) |
-| `$23` | `BRANCH_OUT_OF_RANGE` | BRANCH OUT OF RANGE | `emit.s` (relative displacement outside ±127) *(Phase 4 range ends here)* |
-| `$FF` | `UNKNOWN` | INTERNAL ERROR | fallback for `$00`/out-of-range values |
+The **Context** column marks the diagnostics that additionally print a
+location line and a caret under the offending source (see §13.1). The rest
+print the message line alone — they have no meaningful source position.
+
+### 13.1 Source-context contract
+
+A source-position diagnostic prints two lines beneath its message:
+
+```text
+AT LINE 2, COL 9 (OFFSET 8) BYTE $40
+  LDA #$0A@,X
+          ^
+```
+
+`LINE`/`COL` are 1-based; `OFFSET` is the 0-based byte index (`COL - 1`).
+`BYTE` is emitted only for `INVALID_SOURCE_BYTE`. How this is produced:
+
+- **Location.** `diagnostics.s` holds a `CasmDiagLoc*` record. A raise site
+  stamps it immediately before returning its diagnostic, via one of three
+  helpers: `diagSetLocFromLookahead` (the pending byte, used for
+  `INVALID_SOURCE_BYTE`, which also records the byte), `diagSetLocFromToken`
+  (the current token — parser and lexer sites), or `diagSetLocFromStmt` (the
+  statement start — emit sites). `diagPrintSourceContext` self-gates on
+  `CasmDiagLocValid`, so an unstamped diagnostic stays bare and a stale
+  location never attaches to an unrelated failure.
+
+- **Line text.** The lexer drives the source in byte mode, so `CasmIoBuffer`
+  is a block window, not a line window, and cannot recover the line after a
+  refill. `source.s` instead echoes each consumed line into a dedicated
+  buffer (`diagLineAppend`). **Two** buffers are kept and swapped on each
+  newline: the parser consumes a statement's terminating newline before
+  `emit.s` runs, so an emit diagnostic's line is the *previous* one by then.
+  `diagResolveView` matches the diagnostic's line against both and renders
+  whichever holds it, or suppresses the line and caret if neither does.
+
+- **Tail recovery.** The echo ends at the failing byte. For a current-line
+  diagnostic the renderer first calls `sourceDrainLineTail`, which reads
+  forward to the next newline to recover text right of the caret. It is
+  **terminal and diagnostic-only**: it bypasses the source state gate (the
+  source is already `ERROR`), maintains none of the traversal invariants, and
+  never reports a diagnostic of its own — a failed read silently truncates
+  the display rather than masking the primary diagnostic. It is safe solely
+  on the fatal path, immediately before `resourcesCleanup`.
+
+- **Sanitizing and windowing.** Bytes outside printable PETSCII render as `.`
+  (required, not cosmetic: `INVALID_SOURCE_BYTE` fires on exactly such bytes,
+  and echoing a raw `$93` would clear the screen). Lines wider than the
+  38-column window slide to keep the caret visible, with `<.`/`.>` marking a
+  clipped edge. The caret row is emitted separately so it never depends on the
+  OS print routine's own wrapping.
+
+The echo buffers cost 512 bytes of BSS. Design and rationale:
+`brain/plans/2026-07-20-casm-diagnostic-source-context.md`.
+
+| Code | Identifier | Message | Context | Raised by |
+|---|---|---|---|---|
+| `$01` | `INIT_FAILED` | INITIALIZATION FAILED |  | (reserved) |
+| `$02` | `REGISTRY_FULL` | RESOURCE REGISTRY FULL |  | `resourceRegisterHandle`/`Vmm` |
+| `$03` | `CLEANUP_FAILED` | RESOURCE CLEANUP FAILED |  | `resourcesCleanup` |
+| `$04` | `SOURCE_REQUIRED` | SOURCE FILE REQUIRED |  | `cli.s` |
+| `$05` | `EXTRA_SOURCE` | TOO MANY SOURCE FILES |  | `cli.s` |
+| `$06` | `MALFORMED_OUTPUT_OPTION` | MALFORMED /O OPTION |  | `cli.s` |
+| `$07` | `DUPLICATE_OPTION` | DUPLICATE OPTION |  | `cli.s` |
+| `$08` | `UNKNOWN_OPTION` | UNKNOWN OPTION |  | `cli.s` |
+| `$09` | `FILENAME_TOO_LONG` | FILENAME TOO LONG |  | `cli.s` |
+| `$0A` | `NOT_IMPLEMENTED` | FEATURE NOT IMPLEMENTED |  | `casm.s` (`/M`,`/L`), `emit.s` (`.STATIC`/`.RELOC`/`.INCLUDE`) |
+| `$0B` | `INPUT_OPEN_FAILED` | CANNOT OPEN INPUT |  | `fileio.s` |
+| `$0C` | `INPUT_READ_FAILED` | INPUT READ FAILED |  | `fileio.s` |
+| `$0D` | `INPUT_CLOSE_FAILED` | INPUT CLOSE FAILED |  | `fileio.s`/`source.s` |
+| `$0E` | `OUTPUT_CREATE_FAILED` | CANNOT CREATE OUTPUT |  | `fileio.s` |
+| `$0F` | `OUTPUT_WRITE_FAILED` | OUTPUT WRITE FAILED |  | `fileio.s` |
+| `$10` | `OUTPUT_CLOSE_FAILED` | OUTPUT CLOSE FAILED |  | `fileio.s` |
+| `$11` | `OUTPUT_DELETE_FAILED` | OUTPUT DELETE FAILED |  | `fileio.s` |
+| `$12` | `OUTPUT_SHORT_WRITE` | SHORT OUTPUT WRITE |  | `fileio.s` |
+| `$13` | `STREAM_STATE_FAILED` | INVALID STREAM STATE |  | `fileio.s`/`source.s` *(Phase 2 range ends here)* |
+| `$14` | `SOURCE_REWIND_FAILED` | SOURCE REWIND FAILED |  | `source.s` |
+| `$15` | `SOURCE_OFFSET_OVERFLOW` | SOURCE OFFSET OVERFLOW |  | `source.s` / `fileio.s` (>64K source) |
+| `$16` | `SOURCE_LOCATION_OVERFLOW` | SOURCE LOCATION OVERFLOW |  | `source.s` (line/column overflow) |
+| `$17` | `SOURCE_LINE_TOO_LONG` | SOURCE LINE TOO LONG | ✓ | `source.s` (line mode, >255 bytes) |
+| `$18` | `TOKEN_TOO_LONG` | TOKEN TOO LONG | ✓ | `lexer.s` (>31 text bytes) |
+| `$19` | `INVALID_SOURCE_BYTE` | INVALID SOURCE BYTE | ✓ | `lexer.s` / `source.s` (embedded null in line mode) |
+| `$1A` | `MALFORMED_NUMBER` | MALFORMED NUMBER | ✓ | `lexer.s` |
+| `$1B` | `LEXER_STATE_FAILED` | INVALID LEXER STATE |  | `lexer.s` *(Phase 3 range ends here)* |
+| `$1C` | `SYNTAX_ERROR` | SYNTAX ERROR | ✓ | `parser.s` / `emit.s` (unknown directive) |
+| `$1D` | `EXPECTED_NEWLINE` | EXPECTED NEWLINE | ✓ | `parser.s` |
+| `$1E` | `OPERAND_OUT_OF_RANGE` | OPERAND OUT OF RANGE | ✓ | `parser.s` (16-bit overflow), `opcodes.s` (8-bit modes), `emit.s` (`.BYTE` >255) |
+| `$1F` | `INVALID_ADDR_MODE` | INVALID ADDRESSING MODE | ✓ | `opcodes.s` |
+| `$20` | `DUPLICATE_ORG` | DUPLICATE ORG | ✓ | `emit.s` |
+| `$21` | `ORG_REQUIRED` | ORG REQUIRED | ✓ | `emit.s` |
+| `$22` | `ADDRESS_OVERFLOW` | ADDRESS OVERFLOW |  | `emit.s` (`CasmPc` past `$FFFF`) |
+| `$23` | `BRANCH_OUT_OF_RANGE` | BRANCH OUT OF RANGE | ✓ | `emit.s` (relative displacement outside ±127) *(Phase 4 range ends here)* |
+| `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
 ## 14. Extending CASM
 

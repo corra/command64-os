@@ -65,6 +65,23 @@ CasmExprScratch1  = $85
 CasmExprScratch2  = $86
 CasmExprScratch3  = $87
 
+; WP15 diagnostic renderer aliases. Safe to overlay the expression scratch:
+; the renderer runs only on the terminal fatal path, after all evaluation has
+; stopped. Deliberately not the lexer scratch, which printDec16 clobbers.
+CasmDiagWinStart = CasmExprScratch0
+CasmDiagWinCount = CasmExprScratch1
+CasmDiagCaretPos = CasmExprScratch2
+CasmDiagWinFlags = CasmExprScratch3
+
+; Resolved view of whichever echo buffer holds the diagnostic's line.
+CasmDiagViewSel     = CasmPassScratch0
+CasmDiagViewLen     = CasmPassScratch1
+CasmDiagViewClipped = CasmPassScratch2
+
+; CasmDiagWinFlags bits.
+CASM_DIAG_CLIP_LEFT  = $01
+CASM_DIAG_CLIP_RIGHT = $02
+
 ; Pass and emission transient scratch ($88-$8F), reserved until the
 ; corresponding approved phases define narrower aliases.
 CasmPassScratch0 = $88
@@ -462,6 +479,68 @@ CASM_EMIT_BUFFER_SIZE = 64
 
 ; Registration/release routines return carry clear on success. On failure,
 ; carry is set and A contains one of the CASM_DIAG_* identifiers above.
+
+; ---------------------------------------------------------------------------
+; WP15 diagnostic source context contract
+; ---------------------------------------------------------------------------
+
+; A source-position diagnostic prints the offending line with a caret under the
+; failing column. The lexer drives the source in BYTE mode, so CasmIoBuffer
+; holds a 256-byte block window rather than a line window and cannot be used to
+; recover the line: a refill may already have overwritten the line start. The
+; source layer therefore echoes each consumed line into CasmDiagLineBuf.
+;
+; The echo is a separate buffer from CasmIoBuffer by necessity, not choice.
+; Both are live simultaneously during traversal.
+CASM_DIAG_LINE_BUF_SIZE = $0100
+CASM_DIAG_LINE_MAX      = $FF
+
+; The screen is 40 columns. A source line may be 255 bytes, so the rendered
+; line is a sliding window positioned to keep the failing column visible.
+; INDENT leaves room for a clipping marker on each side within 40 columns.
+CASM_DIAG_WINDOW_WIDTH = 38
+CASM_DIAG_INDENT       = 2
+
+; Bytes outside the safe printable PETSCII ranges are substituted before they
+; reach the screen. This is required for correctness, not cosmetics: an
+; INVALID SOURCE BYTE diagnostic fires precisely because the byte is unusual,
+; and echoing a raw $93 (clear screen) or $12 (reverse on) would corrupt or
+; erase the message being printed. $00-$1F and $80-$9F are PETSCII control
+; ranges; everything else renders as some visible glyph.
+CASM_DIAG_PRINT_LO_MIN = $20
+CASM_DIAG_PRINT_LO_MAX = $7F
+CASM_DIAG_PRINT_HI_MIN = $A0
+CASM_DIAG_SUBST_CHAR   = $2E    ; '.'
+
+; Line-echo capture gate. LINE-mode callers already hold the line in
+; CasmIoBuffer and do not pay the per-byte echo cost.
+CASM_DIAG_CAPTURE_OFF = $00
+CASM_DIAG_CAPTURE_ON  = $01
+
+; Two echo buffers are retained, not one. The parser consumes a statement's
+; terminating newline before the emission engine runs, so by the time an emit
+; diagnostic raises, the current buffer already holds the *following* line.
+; Keeping the previous line lets those diagnostics still show their source.
+; The buffers are swapped by flipping this selector, never copied.
+CASM_DIAG_SEL_A = $00
+CASM_DIAG_SEL_B = $01
+
+; Line numbers are 1-based, so zero is a natural "no previous line" marker
+; that can never match a real diagnostic location.
+CASM_DIAG_LINE_NONE = $0000
+
+; CasmDiagLocValid tri-state. BYTE additionally reports the offending byte's
+; hex value, which a plain VALID location does not carry. A separate state
+; rather than a separate flag byte, because $00 is itself a legal source byte
+; and cannot double as "no byte recorded".
+CASM_DIAG_LOC_INVALID = $00
+CASM_DIAG_LOC_VALID   = $01
+CASM_DIAG_LOC_BYTE    = $02
+
+.assert CASM_DIAG_LINE_BUF_SIZE = 256, error, "CASM diagnostic line buffer changed"
+.assert CASM_DIAG_LINE_MAX = 255, error, "CASM diagnostic line payload changed"
+.assert CASM_DIAG_WINDOW_WIDTH + CASM_DIAG_INDENT <= 40, error, "CASM diagnostic window exceeds the 40-column screen"
+.assert CASM_DIAG_LINE_BUF_SIZE = CASM_IO_BUFFER_SIZE, error, "CASM diagnostic line buffer must match the source line bound"
 
 ; ---------------------------------------------------------------------------
 ; Phase and cleanup state
