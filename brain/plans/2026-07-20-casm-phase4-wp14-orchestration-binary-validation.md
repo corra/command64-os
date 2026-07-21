@@ -345,3 +345,74 @@ Phase 4; it unblocks WP15.
     for the COMP runs above. Increment 5's production orchestration must
     preserve this auto-derivation (and the increment-8 re-run must confirm the
     same `<input>.prg` name still results).
+- 2026-07-21: Increment 4 complete (driver audit + module decision). Read-only
+  analysis; no source changed.
+
+  DECISION: keep the compiler loop IN-PLACE in `casm.s`. No `compiler.s`
+  extraction. Rationale: the loop is ~35 lines, cohesive and bounded; it is
+  tightly coupled to the entry init sequence and the shared `startInitFatal` /
+  `startFatal` trampolines; the real module boundaries (parser/opcode/emit/
+  fileio/resources) are already clean `.export` ABIs, so the loop is only
+  dispatch glue. Extraction would export `startParseLoop`, duplicate the fatal
+  linkage, and add a translation unit for no ABI clarity gain, while tempting
+  the premature Pass 1/Pass 2 split this plan forbids. No new BSS/ZP is needed,
+  matching the preferred ABI outcome. This decision changes no ABI or storage,
+  so no plan amendment is required.
+
+  AUDIT FINDING: the current post-DSC1 driver already implements the full
+  production orchestration contract correctly. Traced paths:
+  - Entry ownership: `start` does resource/CLI/fileio/source/lexer init,
+    output-name derivation (`cliDeriveOutputName`), output creation
+    (`fileCreateOutput`), then the loop. All init failures funnel through
+    `startInitFatal` -> `startFatal`.
+  - Success: loop dispatches MNEMONIC (`opcodesFindOpcode`+`emitInstruction`),
+    DIRECTIVE (`emitDirective`), NEWLINE (no-op), EOF -> `emitFinalize`
+    (= `emitFlush`, the final buffered write) -> print INPUT VALIDATED ->
+    explicit `sourceClose` -> `exitSuccess`. The output is intentionally NOT
+    closed here; it stays registry-owned and is closed by `resourcesCleanup`.
+    This matches the contract line "output remains centrally owned for checked
+    close during cleanup" verbatim. INPUT VALIDATED prints only after the final
+    buffered write succeeds; a later output-close failure surfaces via
+    `exitSuccess` as CLEANUP_FAILED (allowed: "cleanup failure may replace
+    success").
+  - Failure: parser/matcher/emitter return the primary diagnostic unchanged in
+    A; `startFatal` calls `outputAbort` (preserves primary in `CasmFilePrimary`,
+    closes the output with a checked close, deletes the partial PRG gated on
+    `CasmOutputCreated`) then `exitFatal`, which prints the PRIMARY diagnostic
+    BEFORE `resourcesCleanup`, so a cleanup failure can never mask a compile
+    error.
+  - Single-close: handles live in `CasmFileRegistry`; `sourceClose` /
+    `outputAbort` deregister on success, and `resourcesCleanup` is guarded and
+    only closes still-owned records, so every handle closes exactly once.
+  - Pre-creation safety: `fileIoInit` sets `CasmOutputState = CLOSED` and
+    `CasmOutputCreated = 0`, so an init-time fatal reaching `outputAbort` skips
+    both the close and the delete (safe no-op) -- no spurious
+    OUTPUT_CLOSE_FAILED before output exists.
+
+  IMPLICATION FOR INCREMENT 5: no structural rewrite is warranted. Increment 5
+  reduces to (a) replacing the stale "WP13 temporary driver / WP14 replaces
+  this" framing in `casm.s` with production-orchestration documentation that
+  records the in-place decision and the traced contract, and (b) rebuilding and
+  re-inspecting both link maps. Because this is comment-only, the emitted bytes
+  are expected to be identical (so the increment-8 COMP re-run should still
+  pass), while `BUILD_CASM` will bump once for the source-text change.
+- 2026-07-21: Increment 5 complete (production orchestration documented).
+  Comment-only change to `casm.s`; no instruction, data, or ABI change.
+  - Replaced the stale file header ("Phase 2 ... Tokenization and assembly begin
+    later") with the production orchestration description; corrected the `start`
+    header; replaced the "WP13 temporary driver / WP14 replaces this" block with
+    a production compiler-loop contract comment recording the dispatch rules,
+    the diagnostic funnel, the registry-owned checked close, the INPUT VALIDATED
+    ordering, and the in-place (no `compiler.s`) decision and its rationale.
+  - Verified comment-only: a filtered diff shows no changed non-comment line.
+  - `BUILD_CASM` 1068 -> 1069 (expected: source text feeds the content hash).
+  - Link maps re-inspected and BYTE-IDENTICAL in layout to the increment-1
+    baseline: CODE `$3400-$4E32` (`$1A33`), RODATA (`$7C0`), BSS (`$467`),
+    `$3400` ends `$5A59`, `$3500` ends `$5B59`. Both within `$2800`; headroom
+    unchanged at 422 bytes.
+  - `casm.prg` differs from the increment-1 baseline in exactly ONE byte:
+    offset `$1A45`, `'8'` -> `'9'` -- the last digit of the build number in
+    CASM's own version banner. Size unchanged (11039), relocation count
+    unchanged (1170). Because this byte lives in CASM's banner and not in the
+    PRGs CASM emits, the increment-8 COMP comparisons for `casmemit1` and
+    `casmhello` are unaffected by this increment.
