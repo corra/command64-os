@@ -9,6 +9,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 4 complete (WP15 verification and closeout)**: Independently
+  audited and closed the numeric static assembler phase at CASM `0.1.17`
+  build 1079. WP15 changed no CASM production source; it verified, reconciled
+  records, and captured final evidence.
+
+  The audit found three record defects that earlier packages had missed. No
+  Phase 4 parent Taskwarrior milestone existed at all — Phases 1-3 each had one,
+  so WP11-WP15 were orphaned with nothing to roll up into (created `4796b60c`,
+  deliberately not reusing the completed Phase 3 UUID). Three wiki task UUIDs
+  for WP11-WP13 (`31bb2198`, `501bc58c`, `83ab4f2d`) were phantoms that exist
+  nowhere in Taskwarrior; WP14's earlier UUID repair had covered only WP14/WP15.
+  And both `wiki/tasks/casm.md` and `brain/task.md` still described Phase 3 as
+  the current milestone.
+
+  Static acceptance audit: all 52 `ADC`/`SBC` sites establish carry explicitly
+  (the one scan hit is the canonical `cmp`/`sbc` 16-bit compare), no `SED`
+  anywhere, every `pha`/`pla` asymmetry is the two-exit success/failure pattern,
+  and the output lifecycle funnels through a single `startFatal` ->
+  `outputAbort` choke point that preserves the primary diagnostic. Both link
+  configurations (`$3400` and `$3500`) fit the `$2800` MAIN envelope with 408
+  bytes headroom each. The R6 artifact was cross-checked field by field
+  (11057 = 2 + 8705 + 2344 + 6, base `$3400`, 1172 relocations). All three
+  trusted references were verified manifest -> binary -> `test.d64` by an
+  independent transcription written for the audit rather than the project's own
+  converter.
+
+  Closed WP14's two outstanding evidence gaps. G4.2: `casmzpi2`
+  (`LDA ($100,X)`) raises `OPERAND OUT OF RANGE` via `ofRequire8Bit`, as
+  predicted from source. G7: assembling over an existing output file does **not**
+  clobber or corrupt it — this falsified a predicted data-loss hazard. The
+  predicted mechanism was partly real (the write-mode open does leave
+  `63,FILE EXISTS` latched, because `fileOpen` skips error-channel verification
+  for writes), but `fileDelete`'s `checkDeviceReady` preflight bails on that
+  latched status, so the delete never executes. Recorded as a latent fragility
+  for Phase 11: `CasmOutputCreated` conflates "created" with "opened an existing
+  file", and the file is protected by drive error state rather than by that flag.
+
+  Phase 5 (minimal expression evaluator) is now unblocked.
+
 - **CASM Phase 4 WP14 orchestration and binary validation**: Established trusted
   byte-for-byte verification of the native assembler's output and closed two
   defects it exposed. Added `scripts/hex_manifest_to_bin.py`, a strict manifest
