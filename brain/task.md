@@ -26,8 +26,12 @@
         resource slot across `DOS_CLOSE_FILE`; build 1011 runtime verified
   - [x] `9e4d8175` Verify artifacts and obtain user runtime confirmation
 
-- [/] Taskwarrior #29 (`099257cc`): CASM Phase 3 source stream and minimal
+- [x] Taskwarrior #29 (`099257cc`): CASM Phase 3 source stream and minimal
       lexer
+      (corrected from `[/]` during WP15 increment 2: Taskwarrior has recorded
+      this Completed since 2026-07-17 and all eleven subtasks were ticked, so
+      the in-progress marker was stale. This is a record-truth correction to a
+      long-approved phase, not a Phase 4 acceptance tick.)
   - [x] `65832339` Synchronize task records, dependency corrections, and
         approved Phase 0C.1 contracts
   - [x] `9ab8caf3` Investigate DEBUG assembler reuse feasibility
@@ -51,7 +55,22 @@
   - [x] `a68d3603` Integrate diagnostics and temporary token dump
   - [x] `178b0884` Verify artifacts and obtain user runtime confirmation
 
-- [x] Taskwarrior #29 (`3e4eab43-0f48-4db5-843f-c749bcb79d8a`): CASM Phase 4 WP14: execute orchestration and end-to-end binary validation
+- [/] Taskwarrior (`4796b60c-5f4a-43c7-8270-436075bb3f7b`): CASM Phase 4
+      statement parser, opcode table, and numeric static assembly
+  - Parent milestone created 2026-07-21 during WP15 increment 2. Phases 1-3 each
+    had a parent record; Phase 4 had none, so WP11-WP15 were orphaned. The
+    completed Phase 3 UUID `099257cc` was deliberately not reused.
+  - [x] `82a11475` WP11: implement statement parser and syntax validation;
+        build 1042, CASM `0.1.13`
+  - [x] `a3f90f05` WP12: implement opcode table and addressing mode matcher;
+        build 1047, CASM `0.1.14`
+  - [x] `ded1cfd9` WP13: implement numeric directives and byte/word emission
+  - [x] `3e4eab43` WP14: orchestration and end-to-end binary validation;
+        build 1078, CASM `0.1.16`
+  - [/] `8612c2a2` WP15: verification and phase closeout (active)
+  - Phase 4 is NOT done until the user explicitly approves it at WP15 closeout.
+
+- [x] Taskwarrior (`3e4eab43-0f48-4db5-843f-c749bcb79d8a`): CASM Phase 4 WP14: execute orchestration and end-to-end binary validation
   - [x] Create detailed implementation plan
   - [x] Obtain phased implementation approval
   - [x] Increment 1: reconcile DSC1 documentation and capture baselines
@@ -71,7 +90,22 @@
   - Outstanding for the record only: observed values for G4.2 (`casmzpi2`
     diagnostic) and G7.1–G7.3 (assembling over an existing output file).
 
-- [ ] Taskwarrior #30 (`8612c2a2-afdd-4c8f-bf42-4947bc486f97`): CASM Phase 4 WP15: verify artifacts and obtain user runtime confirmation
+- [/] Taskwarrior (`8612c2a2-afdd-4c8f-bf42-4947bc486f97`): CASM Phase 4 WP15: verify artifacts and obtain user runtime confirmation
+  - Plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
+  - Activated 2026-07-21 on `feature/casm-phase4-wp15` from clean tree `55fe474`.
+  - [x] Increment 1: confirm WP14 complete and its records agree
+  - [/] Increment 2: reconcile records (Phase 4 parent milestone created;
+        phantom wiki UUIDs `31bb2198`/`501bc58c`/`83ab4f2d` replaced with the
+        real `82a11475`/`a3f90f05`/`ded1cfd9`; stale Phase 3 milestone text
+        replaced in `wiki/tasks/casm.md` and here)
+  - [ ] Increment 3: capture clean baseline
+  - [ ] Increment 4: build `casm`, inspect link maps and R6 artifact, no-change rebuild
+  - [ ] Increment 5: build `image_d64` and `test_image_d64`; verify references
+  - [ ] Increment 6: static acceptance audit
+  - [ ] Increment 7: advance CASM `0.1.16` -> `0.1.17` (D1) and reinspect
+  - [ ] Increment 8: write the in-progress walkthrough
+  - [ ] Increment 9: user executes the reduced smoke set plus G4.2/G7.1-G7.3 captures
+  - [ ] Increment 10: separate user decision on Phase 4 completion
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
 Status: [/]
-Taskwarrior: 29 (`099257cc`)
-Plan: `brain/plans/2026-07-16-casm-phase3-source-stream-lexer.md`
+Taskwarrior: 30 (`4796b60c`)
+Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
 
 ## Goal
 
@@ -12,11 +12,16 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 3 extends the managed Phase 2 input foundation with a rewindable,
-file-aware source stream and bounded minimal lexer. It normalizes logical
-newlines, tracks one-based source locations, exposes deterministic rewind, and
-produces a temporary token dump. It does not parse statements, evaluate
-expressions, define symbols, emit machine code, or create production output.
+Phase 4 builds the numeric static assembler on the Phase 3 lexer: a statement
+parser with a deterministic addressing-mode grammar, the compressed legal-6502
+opcode table and mode matcher, and an emission engine that tracks the program
+counter and writes plain absolute PRG output. It does not evaluate expressions,
+define symbols, resolve labels, run two passes, or emit R6 relocation records.
+
+WP11-WP14 are complete at CASM `0.1.16`. **WP15, the independent verification
+and closeout package, is active**; Phase 4 is not done until the user explicitly
+approves it. Phase 5 (minimal expression evaluator) is planned and blocked
+behind that approval.
 
 ## Phase 1 Prerequisite
 
@@ -178,11 +183,17 @@ separate prerequisite-gated work.
 
 # CASM Phase 4 — Statement Parser, Opcode Table, and Numeric Static Assembly
 
+Milestone task UUID: `4796b60c-5f4a-43c7-8270-436075bb3f7b` (created during WP15
+increment 2; Phases 1-3 each had a parent record but Phase 4 had none, leaving
+WP11-WP15 orphaned. The completed Phase 3 UUID `099257cc` was deliberately not
+reused.)
+
 Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
+WP15 plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 
 ## Tasks
 
-- [x] Task UUID `31bb2198`: implement statement parser and syntax validation.
+- [x] Task UUID `82a11475`: implement statement parser and syntax validation.
       `parser.s` with `parserParseStatement` (LL(1) statement/operand grammar
       over the lexer's single-token buffer) and `parseNumericValue` (decimal/
       hex/binary to 16-bit with a 24-bit sticky-overflow bounds check).
@@ -194,7 +205,7 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
       fixture prints its diagnostic, and `casmshort` correctly reports
       `SYNTAX ERROR` on its deferred-label `JMP START_LABEL`. Completion
       approved on 2026-07-17; build 1042 advanced CASM to `0.1.13`.
-- [x] Task UUID `501bc58c`: implement opcode table and addressing mode matcher.
+- [x] Task UUID `a3f90f05`: implement opcode table and addressing mode matcher.
       `opcodes.s` with the compressed legal-6502 table (56 mnemonic mode masks,
       run offsets, 151 packed opcodes) and `opcodesFindOpcode`, which resolves
       the WP11 operand kind to a concrete `CASM_MODE_*` (with ZP/absolute
@@ -207,7 +218,7 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
       (invalid mode) and `casmrng1` (immediate 8-bit overflow) added. User
       runtime confirmed all cases. Completion approved on 2026-07-17; build
       1047 advanced CASM to `0.1.14`.
-- [x] Task UUID `83ab4f2d`: implement numeric directives and byte/word emission.
+- [x] Task UUID `ded1cfd9`: implement numeric directives and byte/word emission.
       New `emit.s` engine: `CasmPc` tracking, PRG load-address header + bounded
       64-byte staged writes, `.ORG`/`.BYTE`/`.WORD` handling, per-instruction
       operand encoding, and the relative-branch displacement + range check
