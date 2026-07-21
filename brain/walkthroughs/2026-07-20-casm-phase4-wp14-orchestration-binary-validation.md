@@ -200,7 +200,27 @@ Each diagnostic should print with its source line and caret (DSC1 behavior).
 
 ## Completion
 
-WP14 completes only after every runtime step above is confirmed, the
-walkthrough is approved, CASM advances `0.1.15` → `0.1.16`, and the Taskwarrior
-UUID `3e4eab43-0f48-4db5-843f-c749bcb79d8a` plus the wiki/brain/CHANGELOG
-records agree. WP14 completion does not complete Phase 4; it unblocks WP15.
+**WP14 is COMPLETE, approved by the user on 2026-07-21.**
+
+- Full runtime matrix confirmed passing on build `0.1.15.1077`, after both
+  defect fixes.
+- CASM advanced `0.1.15` → `0.1.16`; the banner reads `CASM V0.1.16.1078`,
+  verified in the linked binary.
+- Records synchronised: `CHANGELOG.md`, `wiki/tasks/casm.md`, `brain/task.md`,
+  this walkthrough, and Taskwarrior
+  `3e4eab43-0f48-4db5-843f-c749bcb79d8a`.
+
+Two defects were found and fixed inside WP14, both by the acceptance work
+itself: the silently-accepted bare `.ORG`, found by static reading, and the
+unreachable `CASM_MODE_ZEROPAGE_Y`, found at runtime by the `casmmodes`
+byte comparison. The second would have been invisible to a reference generated
+from CASM's own opcode table, which is the whole argument for the
+hand-derived trusted-reference rule.
+
+Still open for the record only, not blocking: the observed values for G4.2
+(which diagnostic `casmzpi2` produces) and G7.1–G7.3 (what actually happens
+when CASM assembles over an existing output file — the `,P,W` no-replace
+hazard behind the test plan's isolation protocol).
+
+**WP14 completion does not complete Phase 4; it unblocks WP15**, the
+independent acceptance audit and phase closeout, which remains untouched.

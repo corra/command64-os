@@ -51,6 +51,28 @@
   - [x] `a68d3603` Integrate diagnostics and temporary token dump
   - [x] `178b0884` Verify artifacts and obtain user runtime confirmation
 
+- [x] Taskwarrior #29 (`3e4eab43-0f48-4db5-843f-c749bcb79d8a`): CASM Phase 4 WP14: execute orchestration and end-to-end binary validation
+  - [x] Create detailed implementation plan
+  - [x] Obtain phased implementation approval
+  - [x] Increment 1: reconcile DSC1 documentation and capture baselines
+  - [x] Increment 2: strict hex-manifest conversion tooling and `casmemit1.ref`
+  - [x] Increment 3: `casmhello.ref` integrated and verified
+  - [x] Increment 4: compiler loop driver audit and module decision
+  - [x] Increment 5: production orchestration documented
+  - [x] Increment 6: syntax, addressing, range, PC, and cleanup fixtures added
+  - [x] Fix `.ORG` operand defect and verify regression safety
+  - [x] Increment 7: host-side verification and manual walkthrough setup
+  - [x] Add `casmmodes.ref` per-addressing-mode byte certification
+  - [x] Fix unreachable `CASM_MODE_ZEROPAGE_Y` and add build-breaking guard
+  - [x] Increment 8: user runtime matrix verification — all groups pass
+  - [x] Increment 9: advance to `0.1.16` build 1078 and synchronize records
+  - Completed 2026-07-21. Two defects found and fixed; WP14 does not complete
+    Phase 4 — it unblocks WP15.
+  - Outstanding for the record only: observed values for G4.2 (`casmzpi2`
+    diagnostic) and G7.1–G7.3 (assembling over an existing output file).
+
+- [ ] Taskwarrior #30 (`8612c2a2-afdd-4c8f-bf42-4947bc486f97`): CASM Phase 4 WP15: verify artifacts and obtain user runtime confirmation
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

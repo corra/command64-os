@@ -9,6 +9,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 4 WP14 orchestration and binary validation**: Established trusted
+  byte-for-byte verification of the native assembler's output and closed two
+  defects it exposed. Added `scripts/hex_manifest_to_bin.py`, a strict manifest
+  to binary converter that verifies a declared byte count and SHA-256 and
+  contains no 6502 knowledge, so a CASM opcode-table defect cannot be reproduced
+  inside its own reference. Added three reviewed reference manifests under
+  `tests/fixtures/casm/` — `casmemit1.ref.hex` (20 bytes), `casmhello.ref.hex`
+  (40), and `casmmodes.ref.hex` (30, one legal statement per `CASM_MODE_*`
+  value) — each hand-assembled from the documented 6502 instruction set rather
+  than from CASM or its opcode table. All three are generated at build time and
+  installed on `test.d64` as PRGs for comparison with the native `COMP` utility.
+  The WP13 "temporary driver" was audited against the production orchestration
+  contract and found to already satisfy it — entry ownership, the
+  `emitFinalize` → `INPUT VALIDATED` → `sourceClose` → cleanup success ordering,
+  the registry-owned checked close, `startFatal` → `outputAbort` → `exitFatal`
+  with the primary diagnostic printed before cleanup, exactly-once handle
+  closing, and a safe `outputAbort` no-op before output creation — so it was
+  documented in place rather than rewritten and no `compiler.s` was extracted.
+  Added 23 acceptance-matrix fixtures covering empty and mis-delimited
+  `.BYTE`/`.WORD` lists, malformed `.ORG`, comments and blank lines, the `$FF`
+  and `$100` immediate and zero-page-indirect boundaries, zero-page/absolute
+  promotion, branch displacements at −129/−128/+127/+128, a program counter
+  ending at and advancing past `$FFFF`, and a partial-output cleanup case.
+  Fixed: a bare `.ORG` parsed as `OPKIND_IMPLIED` with value 0 and `emitOrg`
+  never inspected the operand kind, so it silently assembled as `.ORG $0000` and
+  wrote a `00 00` PRG header; `emitOrg` now requires `CASM_OPKIND_ABSOLUTE`,
+  which also rejects `.ORG A`, `.ORG #$10`, `.ORG $10,X` and `.ORG ($10)`, and
+  runs before the duplicate-`.ORG` check so a malformed `.ORG` always reports as
+  malformed. Fixed: `CASM_MODE_ZEROPAGE_Y` was unreachable dead code because
+  `opcodesFindOpcode` tested its support bit against the high mask byte with
+  `1 << (CASM_MODE_ZEROPAGE_Y - 8)` — that mode is 5, so its bit lives in the low
+  byte, and ca65 silently evaluates the negative shift to `$00`; every
+  `LDX $10,Y` therefore assembled as absolute,Y, a miscompilation rather than a
+  size regression because zero-page,Y wraps within page zero and absolute,Y does
+  not. The mask bits are now single-definition `OF_BIT_*` constants asserted to
+  be non-zero and byte-sized, so both re-introducing the wrong half and
+  renumbering a mode fail the build. This defect was found by the `casmmodes`
+  comparison and would have been invisible to a reference generated from CASM's
+  own table. User runtime confirmed the full matrix. Completion advances CASM to
+  `0.1.16` build 1078.
 - **CASM Phase 4 WP13 directives and emission engine**: Added `emit.s`, which
   turns matched statements into a real Commodore PRG. It tracks the program
   counter, writes the 2-byte load-address header and the assembled bytes to the
