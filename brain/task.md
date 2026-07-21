@@ -121,6 +121,34 @@
   - [x] Increment 10: user approved Phase 4 done on 2026-07-21
   - Walkthrough: `brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 
+- [/] Taskwarrior (`6b72d639-53d0-4d1a-92ba-8c4d56096388`): CASM Phase 5
+      minimal expression evaluator
+  - Parent plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
+  - [x] `0062fd20-929d-4ffd-a2b5-032db5ec4109`: WP16 prerequisite
+        reconciliation and Phase 0C.3 freeze
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`
+    - Active on `feature/casm-phase5-wp16-2` from baseline `9e58b8a`
+    - Existing Phase 5 Taskwarrior UUIDs preserved; WP19 reopened after rollback
+    - Premature WP17/WP18/WP20 starts stopped; sequential dependencies recorded
+    - [x] Phase 4 baseline and completion evidence verified
+    - [x] Phase 0C.3 contract frozen in `brain/KNOWLEDGE.md`
+    - [x] Wiki/brain/Taskwarrior hierarchy synchronized
+    - [x] Detailed WP17 plan drafted; WP18-WP21 slugs reserved
+    - [x] Version-only completion candidate dry-run verified; baseline restored
+    - [x] User approved completion; advanced to `0.1.18` build 1080
+    - [x] Final build, no-change rebuild, and release image verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`
+  - [ ] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
+        storage; depends on WP16
+  - [ ] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
+        arithmetic core; depends on WP17
+  - [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
+        resolver behavior; reopened and dependent on WP18
+  - [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
+        fixture harness; depends on WP19
+  - [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
+        and completion gate; depends on WP20
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

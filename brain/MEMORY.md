@@ -208,6 +208,14 @@ missing Phase 4 parent Taskwarrior milestone, three phantom wiki UUIDs for
 WP11-WP13, and stale Phase 3 milestone text) and closed WP14's two open
 evidence gaps.
 
+CASM Phase 5 WP16 freezes the Phase 0C.3 expression/resolver contract without
+adding runtime storage. Its completion-candidate dry run retained Phase 4's
+8,705 linked CODE+RODATA bytes, 1,127 BSS bytes, 408-byte `$2800` MAIN headroom,
+and 1,172 relocation points at both `$3400` and `$3500` link bases. No
+zero-page, BSS, linker, parser, emitter, file, VMM, or cleanup ownership changes.
+After explicit WP16 completion approval, the version-only increment produced
+`0.1.18` build 1080 with the verified three-banner-byte delta.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

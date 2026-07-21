@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
 Status: [/]
-Taskwarrior: 30 (`4796b60c`)
-Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
+Taskwarrior: 30 (`6b72d639`)
+Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
 
 ## Goal
 
@@ -12,19 +12,14 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 4 builds the numeric static assembler on the Phase 3 lexer: a statement
-parser with a deterministic addressing-mode grammar, the compressed legal-6502
-opcode table and mode matcher, and an emission engine that tracks the program
-counter and writes plain absolute PRG output. It does not evaluate expressions,
-define symbols, resolve labels, run two passes, or emit R6 relocation records.
+Phase 5 adds a bounded expression evaluator and resolver boundary without
+implementing symbol storage, two-pass assembly, or relocation emission.
 
 **Phase 4 is complete**, approved by the user on 2026-07-21 at CASM `0.1.17`
 build 1079. WP11-WP15 are all closed.
 
-Next: **Phase 5 — minimal expression evaluator**, now unblocked. Its parent
-contract is `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
-and its entry work package WP16 is planned in
-`brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
+WP16 is complete at CASM `0.1.18` build 1080. WP17 is the next package but
+remains pending separate plan approval; WP18-WP21 remain sequentially blocked.
 
 ## Phase 1 Prerequisite
 
@@ -280,3 +275,36 @@ WP15 plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.
 
 **Phase 4 complete — approved by the user on 2026-07-21 at CASM `0.1.17`
 build 1079.** Milestone `4796b60c-5f4a-43c7-8270-436075bb3f7b`.
+
+# CASM Phase 5 - Minimal Expression Evaluator
+
+Parent Taskwarrior UUID: `6b72d639-53d0-4d1a-92ba-8c4d56096388`
+
+Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
+
+## Phase 5 Work Packages
+
+- [x] `0062fd20-929d-4ffd-a2b5-032db5ec4109`: WP16 prerequisite
+      reconciliation and Phase 0C.3 freeze. Recovery review preserved all
+      existing UUIDs, reopened incorrectly completed WP19, stopped premature
+      downstream starts, and encoded sequential Taskwarrior dependencies.
+      User approved completion; CASM advanced to `0.1.18` build 1080.
+- [ ] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
+      storage. Depends on WP16.
+- [ ] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
+      arithmetic core. Depends on WP17.
+- [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
+      resolver behavior. Reopened after rollback; depends on WP18.
+- [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
+      fixture harness. Depends on WP19.
+- [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
+      and completion gate. Depends on WP20.
+
+## Phase 5 Acceptance
+
+- [x] Phase 0C.3 contract and task hierarchy are frozen by WP16.
+- [ ] Expression ABI and storage remain bounded within the approved MAIN area.
+- [ ] Numeric behavior remains byte-compatible with Phase 4.
+- [ ] Resolved, unresolved, relocatable, extraction, and addend cases pass.
+- [ ] Existing Phase 4 reference programs remain byte-identical.
+- [ ] User completes the WP21 runtime walkthrough and approves Phase 5.

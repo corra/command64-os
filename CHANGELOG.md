@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CASM Phase 5 WP16 contract and recovery gate**: reconciled the abandoned
+  Phase 5 Taskwarrior state without replacing UUIDs, reopened WP19, stopped
+  premature downstream work, encoded WP16-WP21 dependencies, and froze the
+  Phase 0C.3 expression/resolver contract. Added the separately gated WP17 ABI
+  plan and advanced CASM to `0.1.18` build 1080; no evaluator runtime behavior
+  is included.
+
 ### Added
 
 - **CASM Phase 4 complete (WP15 verification and closeout)**: Independently

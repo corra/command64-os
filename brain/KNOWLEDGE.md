@@ -213,6 +213,36 @@ This file serves as the shared repository for architectural decisions, technical
   advanced CASM from `0.1.3` to `0.1.4`.
 - Work Package 1 synchronized the approved contracts and task hierarchy; user
   completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+
+### CASM Phase 5 Expression/Resolver Contract (Phase 0C.3, approved 2026-07-21)
+
+- Grammar is `extraction? primary addend?`, where extraction is `<` or `>`,
+  primary is a number or identifier, and addend is `+/-` followed by a number.
+  Only symbol-derived primaries accept addends; numeric arithmetic, parentheses,
+  unary negation, chaining, symbol-to-symbol arithmetic, and current-PC
+  expressions are deferred.
+- The bounded result record holds a 16-bit value; resolved, symbol-derived,
+  relocatable, and force-absolute-width flags; full/low/high extraction; an
+  opaque 16-bit symbol ID; and an addend represented as sign plus unsigned
+  16-bit magnitude.
+- Unresolved symbols retain resolver identity, relocation class, extraction,
+  and addend metadata. They force absolute-width selection so placeholder zero
+  cannot destabilize instruction size between passes.
+- Resolved arithmetic is checked against `$0000..$FFFF` and never wraps.
+  Low-byte extraction is not relocatable; high-byte extraction preserves
+  potential relocation classification for Phase 8.
+- The resolver owns symbol identity and returns resolved state, optional value,
+  and absolute/relocatable class. Phase 5 uses a deterministic fixture boundary;
+  Phase 6A owns VMM records, Phase 6B the production resolver/two-pass model,
+  and Phase 8 relocation consumption.
+- Carry clear means the result record is valid. Carry set means `A` contains a
+  stable diagnostic and callers must not consume the record.
+- Evaluator routines execute neither `SED` nor `CLD`; every `ADC`/`SBC` path
+  establishes carry explicitly. CASM's application-entry decimal-mode
+  assumption remains inherited hardening debt rather than a Phase 5 guarantee.
+- The evaluator emits no bytes and creates no relocation records. WP20 may pass
+  resolved values into existing emission, but unresolved placeholders must not
+  be emitted as zero.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.
