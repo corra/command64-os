@@ -10,7 +10,11 @@ Labels, symbols, forward references, expressions, macros, listings, and maps are
 
 ## Proposed Work Package Breakdown
 
-To maintain state-gated execution and atomic commits, Phase 4 is partitioned into four distinct work packages:
+To maintain state-gated execution and atomic commits, Phase 4 is partitioned
+into five distinct work packages. The original plan folded final phase
+verification into WP14; Taskwarrior created separate WP14 and WP15 records, so
+the corrected split reserves WP14 for orchestration/binary validation and WP15
+for independent phase verification and closeout.
 
 ### 1. Work Package 11: Statement Parser and Syntax Validation
 - **Goal**: Parse individual source statements from the lexer stream.
@@ -84,12 +88,25 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
 
 ### 4. Work Package 14: Phase 4 Orchestration and Verification
 - **Goal**: Integrate components into the main assembler execution path and verify against reference binaries.
+- Detailed plan: `brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`.
 - **Scope**:
   - Replace the temporary token dump loop in [casm.s](src/external/casm/casm.s) with the parser/compiler loop.
   - Handle central fatal cleanup on compile errors (closing source and deleting partial/incomplete output files).
   - Write test assembly fixtures in [GenerateCasmTestFixtures.cmake](cmake/GenerateCasmTestFixtures.cmake) containing valid numeric instructions.
   - Verify generated binaries match expected machine code bytes exactly.
   - Advanced version stage to `16` (`0.1.16`).
+
+### 5. Work Package 15: Phase 4 Verification and Closeout
+- **Goal**: Independently reproduce the Phase 4 acceptance evidence, obtain
+  final user runtime confirmation, synchronize all milestone records, and ask
+  the user whether Phase 4 is done.
+- Detailed plan:
+  `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`.
+- Depends on completed and user-approved WP14.
+- Advances the version stage to `17` (`0.1.17`) only through its separately
+  approved completion gate.
+- The diagnostic source-context feature historically called `WP15` is renamed
+  DSC1 in current planning and is not this Phase 4 work package.
 
 ---
 
@@ -118,7 +135,8 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
 - Wire parser and emitter loop.
 
 #### [MODIFY] [GenerateCasmTestFixtures.cmake](cmake/GenerateCasmTestFixtures.cmake)
-- Append test fixtures `casmnum1.asm`, `casmnum2.asm` and compile expected outputs `casmnum1.ref`, `casmnum2.ref` for binary verification.
+- Extend the existing `casmemit1` and `casmhello` fixtures and add independently
+  generated `casmemit1.ref` and `casmhello.ref` files for binary verification.
 
 ---
 
@@ -126,13 +144,14 @@ To maintain state-gated execution and atomic commits, Phase 4 is partitioned int
 
 ### Automated Tests
 - Run `cmake --build build --target casm` to verify error-free compilation and table size bounds check.
-- Compare output byte-for-byte using a validation script or comparison targets (e.g. `comp` utility on Command 64) against trusted expected binaries.
+- Verify trusted reference manifests during the host build and compare CASM
+  output byte-for-byte with the native `comp` utility on Command 64.
 
 ### Manual Verification
 - Deploy to local VICE emulator and run:
   ```text
-  casm casmnum1.asm /o:casmnum1.prg
-  comp casmnum1.prg casmnum1.ref
+  casm casmemit1 /o:casmemit1.prg
+  comp casmemit1.prg casmemit1.ref
   ```
   Verify that the `comp` command reports the files match exactly and returns success.
 - Test error paths (e.g. invalid instruction syntax, out-of-bounds relative branches) and confirm correct descriptive fatal messages are displayed.

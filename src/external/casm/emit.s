@@ -194,6 +194,21 @@ edWord:
 ; second .ORG.
 ; ---------------------------------------------------------------------------
 emitOrg:
+    ; .ORG requires a plain numeric operand. The statement grammar is shared
+    ; with instructions, so a bare ".ORG" parses as OPKIND_IMPLIED with value 0
+    ; and every other operand form (".ORG A", ".ORG #$10", ".ORG $10,X",
+    ; ".ORG ($10)") parses as its own kind -- all of which would otherwise be
+    ; accepted here as a silent origin of $0000 or a bogus origin, because the
+    ; value fields alone cannot distinguish them. OPKIND_ABSOLUTE covers both
+    ; zero-page and absolute numeric operands, so it is the only kind allowed.
+    lda CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    cmp #CASM_OPKIND_ABSOLUTE
+    beq eoKindOk
+    jsr diagSetLocFromStmt      ; the malformed .ORG statement
+    lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+eoKindOk:
     lda CasmOrgSet
     beq eoSet
     jsr diagSetLocFromStmt      ; the offending second .ORG

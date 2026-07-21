@@ -50,6 +50,33 @@ ofMaskLo       = CasmExprScratch1   ; mnemonic support mask, low 8 bits
 ofMaskHi       = CasmExprScratch2   ; mnemonic support mask, high 5 bits
 ofScratch      = CasmExprScratch3   ; general scratch
 
+; Compile-time mask bits for the hardcoded mode tests below.
+;
+; The supported-mode bitmap is split across two bytes: modes 0-7 in ofMaskLo,
+; modes 8-12 in ofMaskHi. Writing the shift inline at each test site invites a
+; silent, unreportable bug: for a mode below 8, "1 << (MODE - 8)" is a negative
+; shift, which ca65 evaluates to $00 with NO diagnostic, so the AND always fails
+; and the mode becomes permanently unreachable. That is exactly how
+; CASM_MODE_ZEROPAGE_Y was dead until Phase 4 WP14 -- every "LDX $10,Y"
+; assembled as absolute,Y, which is not equivalent, since zero-page,Y wraps
+; within page zero and absolute,Y does not. A byte-for-byte reference comparison
+; caught it; nothing in the build did.
+;
+; Defining each bit exactly once and asserting it is a non-zero value that fits
+; one byte makes that mistake a build failure: a wrong-half expression collapses
+; to $00 and trips the assert, and a too-large one exceeds $FF. Use sites name
+; the constant and cannot re-derive it incorrectly. The LO/HI suffix records
+; which mask byte the constant must be tested against.
+OF_BIT_LO_ZEROPAGE   = (1 << CASM_MODE_ZEROPAGE)
+OF_BIT_LO_ZEROPAGE_X = (1 << CASM_MODE_ZEROPAGE_X)
+OF_BIT_LO_ZEROPAGE_Y = (1 << CASM_MODE_ZEROPAGE_Y)
+OF_BIT_HI_RELATIVE   = (1 << (CASM_MODE_RELATIVE - 8))
+
+.assert OF_BIT_LO_ZEROPAGE > 0 && OF_BIT_LO_ZEROPAGE < 256, error, "OF_BIT_LO_ZEROPAGE must be a non-zero bit within ofMaskLo"
+.assert OF_BIT_LO_ZEROPAGE_X > 0 && OF_BIT_LO_ZEROPAGE_X < 256, error, "OF_BIT_LO_ZEROPAGE_X must be a non-zero bit within ofMaskLo"
+.assert OF_BIT_LO_ZEROPAGE_Y > 0 && OF_BIT_LO_ZEROPAGE_Y < 256, error, "OF_BIT_LO_ZEROPAGE_Y must be a non-zero bit within ofMaskLo"
+.assert OF_BIT_HI_RELATIVE > 0 && OF_BIT_HI_RELATIVE < 256, error, "OF_BIT_HI_RELATIVE must be a non-zero bit within ofMaskHi"
+
 opcodesFindOpcode:
     ; Load the mnemonic's support mask once; resolution and the presence check
     ; both consult it.
@@ -107,7 +134,7 @@ opcodesFindOpcode:
     bne @notAbsX
     ; ZeroPage,X when the value fits a byte and the mode is supported.
     lda ofMaskLo
-    and #(1 << CASM_MODE_ZEROPAGE_X)
+    and #OF_BIT_LO_ZEROPAGE_X
     beq @useAbsX
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne @useAbsX
@@ -119,9 +146,16 @@ opcodesFindOpcode:
 @notAbsX:
     cmp #CASM_OPKIND_ABSOLUTE_Y
     bne @notAbsY
-    ; ZeroPage,Y bit lives in the high mask byte.
-    lda ofMaskHi
-    and #(1 << (CASM_MODE_ZEROPAGE_Y - 8))
+    ; ZeroPage,Y when the value fits a byte and the mode is supported. The bit
+    ; lives in the LOW mask byte (CASM_MODE_ZEROPAGE_Y is 5), mirroring the
+    ; ZeroPage,X path above. This previously read ofMaskHi with a
+    ; "CASM_MODE_ZEROPAGE_Y - 8" shift: ca65 silently evaluates that negative
+    ; shift to $00, so the AND always failed and ZeroPage,Y was unreachable --
+    ; every "LDX $10,Y" assembled as absolute,Y, which is not equivalent because
+    ; zero-page,Y wraps within page zero. See the OF_BIT_* asserts at the top of
+    ; this file, which now make that mistake a build failure.
+    lda ofMaskLo
+    and #OF_BIT_LO_ZEROPAGE_Y
     beq @useAbsY
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne @useAbsY
@@ -135,7 +169,7 @@ opcodesFindOpcode:
     ; its NUMBER operand is a 16-bit target, so resolve to RELATIVE with no
     ; 8-bit check (WP13 computes and range-checks the displacement).
     lda ofMaskHi
-    and #(1 << (CASM_MODE_RELATIVE - 8))
+    and #OF_BIT_HI_RELATIVE
     beq @notBranch
     lda #CASM_MODE_RELATIVE
     jmp ofHaveMode
@@ -143,7 +177,7 @@ opcodesFindOpcode:
     ; ZeroPage when the value fits a byte and the mode is supported, else
     ; Absolute.
     lda ofMaskLo
-    and #(1 << CASM_MODE_ZEROPAGE)
+    and #OF_BIT_LO_ZEROPAGE
     beq @useAbs
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne @useAbs

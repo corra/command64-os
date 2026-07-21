@@ -2,16 +2,19 @@
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; CASM native 6502/6510 assembler entry point. Phase 2 parses one bounded
-; source filename, consumes it through managed native file services, and
-; returns through central cleanup. Tokenization and assembly begin later.
+; CASM native 6502/6510 assembler entry point. Owns the production assembly
+; orchestration (Phase 4 WP14): initialize resources/CLI/file-IO/source/lexer,
+; derive and create the output PRG, run the single-pass compiler loop
+; (parse -> match -> emit) to EOF, finalize the output, and route every success
+; and failure through central cleanup. Handle ownership, partial-output abort,
+; and single-close semantics are documented at start and startParseLoop below.
 
 .include "command64.inc"
 .include "common.inc"
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "15"
+.define VERSION_STAGE "16"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -51,8 +54,8 @@
 
 ; ---------------------------------------------------------------------------
 ; start
-; Initialize CASM, parse the Phase 2 command line, consume the bounded input
-; stream, and return to Command 64 through central cleanup.
+; Initialize CASM, parse the command line, assemble the source to an output PRG,
+; and return to Command 64 through central cleanup.
 ;
 ; Inputs:  Command 64 external-application launch state
 ; Outputs: does not return directly; exitSuccess invokes DOS_EXIT
@@ -114,11 +117,21 @@ startInitFatal:
     ; fatal tail below.
     jmp startFatal
 
-    ; WP13 temporary driver: parse each statement and emit it. Mnemonics are
-    ; encoded through the opcode matcher and emitted; directives are handled by
-    ; the emission engine. All syntax, addressing-mode, operand-range, and
-    ; emission diagnostics surface through the central fatal path. WP14 replaces
-    ; this with the production parser/emitter orchestration.
+    ; Production compiler loop (Phase 4 WP14). Single pass: parse one statement,
+    ; then dispatch by type -- a MNEMONIC is matched by the opcode table and
+    ; emitted, a DIRECTIVE is handled by the emission engine, a NEWLINE emits
+    ; nothing, and EOF finalizes. Every syntax, addressing-mode, operand-range,
+    ; and emission diagnostic returns C set with A = CASM_DIAG_* and funnels
+    ; through startFatal. On success the output is left registry-owned for a
+    ; checked close during cleanup; INPUT VALIDATED prints only after the final
+    ; buffered write (emitFinalize) succeeds.
+    ;
+    ; The WP14 audit kept this loop in casm.s rather than extracting a
+    ; compiler.s module: it is bounded dispatch glue over the already-modular
+    ; parser/opcode/emit ABIs, tightly coupled to the entry init sequence and
+    ; the startInitFatal/startFatal trampolines, so a separate module would add
+    ; an export boundary without clarifying one. It also must not anticipate the
+    ; later Pass 1/Pass 2 architecture.
 startParseLoop:
     jsr parserParseStatement
     bcs startFatal

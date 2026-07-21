@@ -219,8 +219,26 @@ Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
       (error paths), and `casmhello` (runnable print-and-exit demo). User
       runtime confirmed all cases. Completion approved on 2026-07-17; build
       1053 advanced CASM to `0.1.15`.
-- [ ] Task UUID `d1e2f3a4`: execute orchestration and end-to-end binary validation.
-- [ ] Task UUID `c2a3b4c5`: verify artifacts and obtain user runtime confirmation.
+- [x] Task UUID `3e4eab43-0f48-4db5-843f-c749bcb79d8a`: execute orchestration and
+      end-to-end binary validation. Added `scripts/hex_manifest_to_bin.py` (a
+      strict, 6502-agnostic manifest→binary converter with byte-count and
+      SHA-256 checks) and three reviewed reference manifests — `casmemit1.ref`
+      (20 bytes), `casmhello.ref` (40), `casmmodes.ref` (30, one legal statement
+      per `CASM_MODE_*`) — each hand-assembled from the 6502 instruction set
+      rather than from CASM, generated at build time and installed on `test.d64`
+      for native `COMP`. The WP13 "temporary driver" was audited against the
+      production orchestration contract, found to already satisfy it, and so was
+      documented in place; no `compiler.s` was extracted. Added 23
+      acceptance-matrix fixtures (delimiter, `.ORG`, immediate/ZP boundaries,
+      branch ±128/±129, PC at and past `$FFFF`, partial-output cleanup). Two
+      defects found and fixed: a bare `.ORG` silently assembled as `.ORG $0000`
+      (`emitOrg` now requires `CASM_OPKIND_ABSOLUTE`), and
+      `CASM_MODE_ZEROPAGE_Y` was unreachable so every `LDX $10,Y` assembled as
+      absolute,Y — a miscompilation, since zero-page,Y wraps within page zero —
+      now fixed and guarded by build-breaking asserts. User runtime confirmed
+      the full matrix. Completion approved on 2026-07-21; build 1078 advanced
+      CASM to `0.1.16`.
+- [ ] Task UUID `8612c2a2-afdd-4c8f-bf42-4947bc486f97`: verify artifacts and obtain user runtime confirmation.
 
 ## Phase 4 Acceptance
 
