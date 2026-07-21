@@ -253,3 +253,115 @@ file(WRITE "${OUTPUT_DIR}/casmhello.seq"
     ".BYTE \$2D, \$2D, \$20, \$43, \$41, \$53, \$4D\n"
     ".BYTE \$0D, \$00\n"
 )
+
+# ---------------------------------------------------------------------------
+# WP14 acceptance-matrix fixtures.
+#
+# Each expectation below was derived statically from parser.s/emit.s, not from
+# running CASM; the WP14 runtime matrix confirms them. Unlike the WP11 error
+# fixtures, most of these begin with a valid .ORG so the failure happens AFTER
+# the output PRG has been created -- that is what exercises the outputAbort
+# partial-output delete path.
+#
+# Note on .BYTE/.WORD: the parser defers their operand lists to the emission
+# engine (emitByteList/emitWordList), so their delimiter diagnostics are raised
+# in emit.s, not parser.s.
+
+# -- Syntax and delimiter boundaries ----------------------------------------
+
+# Empty .BYTE list: emitByteList reads a NEWLINE where a NUMBER must appear.
+#   -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmbyte0.seq" ".ORG \$C000\n.BYTE\n")
+# Empty .WORD list, same path in emitWordList.       -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmword0.seq" ".ORG \$C000\n.WORD\n")
+# Leading comma: the first list token is a COMMA.    -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmcma1.seq" ".ORG \$C000\n.BYTE ,\$01\n")
+# Doubled comma. $01 is emitted BEFORE the failure, so this is also a
+# partial-output case.                               -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmcma2.seq" ".ORG \$C000\n.BYTE \$01,,\$02\n")
+# Trailing comma: the comma is consumed, then a NEWLINE arrives where a NUMBER
+# must be. $01 is emitted first.                     -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmcma3.seq" ".ORG \$C000\n.BYTE \$01,\n")
+# .BYTE element wider than 8 bits (VAL_HI nonzero).
+#   -> OPERAND OUT OF RANGE ($1E)
+file(WRITE "${OUTPUT_DIR}/casmbyrng.seq" ".ORG \$C000\n.BYTE \$100\n")
+
+# .ORG with no operand. This exposed a WP14 defect: the bare directive parses as
+# OPKIND_IMPLIED with value 0, and emitOrg did not inspect OpKind, so CASM
+# silently assembled it as ".ORG $0000". Fixed in WP14 by requiring
+# OPKIND_ABSOLUTE in emitOrg.                        -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmorg3.seq" ".ORG\n")
+# .ORG with a non-numeric operand. Parses as OPKIND_ACCUMULATOR, which the same
+# emitOrg guard rejects; without the guard it would have silently set origin
+# $0000 just like the bare form.                     -> SYNTAX ERROR ($1C)
+file(WRITE "${OUTPUT_DIR}/casmorg5.seq" ".ORG A\n")
+# Trailing token after a complete .ORG operand.  -> EXPECTED NEWLINE ($1D)
+file(WRITE "${OUTPUT_DIR}/casmorg4.seq" ".ORG \$C000 \$D000\n")
+
+# Blank lines and comments surrounding valid statements, including a leading
+# comment before .ORG and a trailing comment at EOF.  -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmcmnt.seq"
+    "; leading comment before any code\n"
+    "\n"
+    ".ORG \$C000\n"
+    "\n"
+    "    ; indented comment-only line\n"
+    "LDA #\$01\n"
+    "\n"
+    "INX          ; trailing comment after a statement\n"
+    "; final comment at end of file\n"
+)
+
+# -- Addressing and numeric boundaries --------------------------------------
+
+# Immediate at the 8-bit maximum.                     -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmimm1.seq" ".ORG \$C000\nLDA #\$FF\n")
+# Immediate one past the 8-bit maximum.
+#   -> OPERAND OUT OF RANGE ($1E)
+file(WRITE "${OUTPUT_DIR}/casmimm2.seq" ".ORG \$C000\nLDA #\$100\n")
+# Zero-page / absolute promotion boundary: $FF must select a zero-page opcode
+# (2 bytes) and $0100 an absolute one (3 bytes).      -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmzp1.seq" ".ORG \$C000\nLDA \$FF\nLDA \$0100\n")
+# Zero-page indirect forms at the $FF boundary.       -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmzpi1.seq"
+    ".ORG \$C000\n"
+    "LDA (\$FF,X)\n"
+    "LDA (\$FF),Y\n"
+)
+# Zero-page indirect one past the boundary: $100 cannot be a zero-page operand.
+#   -> expected a range or addressing-mode diagnostic; confirm which at runtime
+file(WRITE "${OUTPUT_DIR}/casmzpi2.seq" ".ORG \$C000\nLDA (\$100,X)\n")
+
+# Branch displacement boundaries. The branch sits at $C000 and is 2 bytes, so
+# nextPc = $C002 and displacement = target - $C002.
+# +127: target $C002 + 127 = $C081.                   -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmbrp1.seq" ".ORG \$C000\nBNE \$C081\n")
+# +128: target $C082.                          -> BRANCH OUT OF RANGE ($23)
+file(WRITE "${OUTPUT_DIR}/casmbrp2.seq" ".ORG \$C000\nBNE \$C082\n")
+# -128: target $C002 - 128 = $BF82.                   -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmbrn1.seq" ".ORG \$C000\nBNE \$BF82\n")
+# -129: target $BF81.                          -> BRANCH OUT OF RANGE ($23)
+file(WRITE "${OUTPUT_DIR}/casmbrn2.seq" ".ORG \$C000\nBNE \$BF81\n")
+
+# Program counter ending exactly at $FFFF: the byte AT $FFFF is emitted, the PC
+# then wraps and latches CasmPcOverflow, but nothing further is emitted.
+#   -> assembles cleanly
+file(WRITE "${OUTPUT_DIR}/casmpcend.seq" ".ORG \$FFFF\n.BYTE \$01\n")
+# Advancing past $FFFF: the second byte hits the latched overflow.
+#   -> ADDRESS OVERFLOW ($22)
+file(WRITE "${OUTPUT_DIR}/casmpcovf.seq" ".ORG \$FFFF\n.BYTE \$01, \$02\n")
+
+# -- Output and cleanup ------------------------------------------------------
+
+# Several statements assemble and are written to the output PRG, and only then
+# does a syntax error fire. The partial PRG must NOT survive: startFatal ->
+# outputAbort deletes it. Verify with DIR that no output file remains.
+#   -> SYNTAX ERROR ($1C), and no output file left on disk
+file(WRITE "${OUTPUT_DIR}/casmpart.seq"
+    ".ORG \$C000\n"
+    "LDA #\$01\n"
+    "STA \$D020\n"
+    "INX\n"
+    ".BYTE \$AA, \$BB, \$CC\n"
+    "LDA #\n"
+)

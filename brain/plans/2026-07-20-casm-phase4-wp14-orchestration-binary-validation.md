@@ -416,3 +416,66 @@ Phase 4; it unblocks WP15.
     unchanged (1170). Because this byte lives in CASM's banner and not in the
     PRGs CASM emits, the increment-8 COMP comparisons for `casmemit1` and
     `casmhello` are unaffected by this increment.
+- 2026-07-21: Increment 6 complete (acceptance-matrix fixtures). 21 new fixtures
+  added to `GenerateCasmTestFixtures.cmake` and registered in `CMakeLists.txt`.
+  No CASM source change; `BUILD_CASM` stays 1069.
+
+  Expectations were derived statically from `parser.s`/`emit.s`, not by running
+  CASM; the increment-8 runtime matrix confirms them. A relevant structural
+  fact: the parser DEFERS `.BYTE`/`.WORD` operand lists to the emission engine,
+  so their delimiter diagnostics are raised in `emit.s`, not `parser.s`.
+
+  Syntax/delimiter: `casmbyte0` (empty `.BYTE`), `casmword0` (empty `.WORD`),
+  `casmcma1` (leading comma), `casmcma2` (doubled comma), `casmcma3` (trailing
+  comma), `casmbyrng` (`.BYTE $100`), `casmorg4` (trailing `.ORG` token),
+  `casmcmnt` (comments/blank lines around valid statements, positive).
+  `casmcma2`/`casmcma3` emit a byte BEFORE failing, so they are also
+  partial-output cases.
+
+  Addressing/numeric: `casmimm1` (`#$FF` ok) / `casmimm2` (`#$100` range),
+  `casmzp1` (ZP vs absolute promotion at `$FF`/`$0100`), `casmzpi1` (ZP-indirect
+  at `$FF`) / `casmzpi2` (`$100`, exact diagnostic to be confirmed at runtime),
+  branch boundaries `casmbrp1` (+127 ok), `casmbrp2` (+128 fail), `casmbrn1`
+  (-128 ok), `casmbrn2` (-129 fail) -- all computed from nextPc = `$C002`;
+  `casmpcend` (PC ends exactly at `$FFFF`, ok) / `casmpcovf` (past `$FFFF`,
+  ADDRESS OVERFLOW).
+
+  Cleanup: `casmpart` assembles several statements into the output PRG and only
+  then fails, so it exercises the `startFatal` -> `outputAbort` partial-PRG
+  delete. Verified by `DIR` showing no leftover output.
+
+  DEFECT FOUND (`casmorg3`, `.ORG` with no operand): CASM silently accepts it.
+  `parseOperandSequence` classifies the bare directive via `posImplied` as
+  OPKIND_IMPLIED with value 0, `posDone` returns success, and `emitOrg` never
+  inspects OpKind -- so the origin is set to `$0000` and a `00 00` PRG header is
+  emitted with no diagnostic. The WP14 acceptance matrix explicitly requires a
+  missing `.ORG` operand to be rejected, so this is a genuine gap, not a fixture
+  error. Fixing it is an assembler behavior change (a new OpKind guard in
+  `emitOrg`, roughly 10 bytes against 422 bytes of headroom) and is being raised
+  for an explicit decision rather than changed unilaterally.
+
+  Disk verified: all 21 fixtures present on `test.d64` (79 entries, up from 58),
+  both `.ref` PRGs intact, 316 blocks free, no shipping app or existing fixture
+  displaced.
+- 2026-07-21: `.ORG` operand defect FIXED in WP14 (user-approved, using the
+  existing `CASM_DIAG_SYNTAX_ERROR` `$1C` rather than a new code, so the Phase 4
+  diagnostic range and its contiguity asserts are untouched).
+  - `emitOrg` now requires `CASM_OPKIND_ABSOLUTE` before setting the origin.
+    That kind covers both zero-page and absolute numeric operands, so it is
+    exactly the set `.ORG` should accept. The guard rejects the bare `.ORG`
+    (OPKIND_IMPLIED) and every other operand form the shared statement grammar
+    can produce -- `.ORG A`, `.ORG #$10`, `.ORG $10,X`, `.ORG ($10)` -- each of
+    which previously became a silent `$0000` or bogus origin, because the value
+    fields alone cannot distinguish them from a real address.
+  - Ordering: the OpKind guard runs BEFORE the duplicate-`.ORG` check, so a
+    malformed `.ORG` is always diagnosed as malformed regardless of position.
+    `casmorg2` (two well-formed `.ORG`s) still reports DUPLICATE ORG, so there
+    is no regression.
+  - New fixture `casmorg5` (`.ORG A`) covers the non-numeric operand case that
+    the broadened guard enables; `casmorg3`'s comment no longer documents the
+    defect as expected behavior.
+  - Cost: CODE `$1A33` -> `$1A41` (+14 bytes). Headroom 422 -> 408 bytes; both
+    `$3400` and `$3500` still link within `$2800`. RODATA and BSS unchanged.
+    `BUILD_CASM` 1069 -> 1070. Disk now 80 entries, 315 blocks free.
+  - Runtime confirmation of `casmorg3`/`casmorg5` is part of increment 8; the
+    fix is a static change verified by build and link inspection only.
