@@ -94,16 +94,20 @@
   - Plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
   - Activated 2026-07-21 on `feature/casm-phase4-wp15` from clean tree `55fe474`.
   - [x] Increment 1: confirm WP14 complete and its records agree
-  - [/] Increment 2: reconcile records (Phase 4 parent milestone created;
-        phantom wiki UUIDs `31bb2198`/`501bc58c`/`83ab4f2d` replaced with the
-        real `82a11475`/`a3f90f05`/`ded1cfd9`; stale Phase 3 milestone text
-        replaced in `wiki/tasks/casm.md` and here)
-  - [ ] Increment 3: capture clean baseline
-  - [ ] Increment 4: build `casm`, inspect link maps and R6 artifact, no-change rebuild
-  - [ ] Increment 5: build `image_d64` and `test_image_d64`; verify references
-  - [ ] Increment 6: static acceptance audit
-  - [ ] Increment 7: advance CASM `0.1.16` -> `0.1.17` (D1) and reinspect
-  - [ ] Increment 8: write the in-progress walkthrough
+  - [x] Increment 2: reconcile records (Phase 4 parent milestone `4796b60c`
+        created; phantom wiki UUIDs `31bb2198`/`501bc58c`/`83ab4f2d` replaced
+        with the real `82a11475`/`a3f90f05`/`ded1cfd9`; stale Phase 3 milestone
+        text replaced in `wiki/tasks/casm.md` and here)
+  - [x] Increment 3: clean baseline captured at `d75adca`
+  - [x] Increment 4: both link configs fit `$2800` with 408 bytes headroom;
+        R6 artifact cross-checked (11057 B, base `$3400`, 1172 relocations)
+  - [x] Increment 5: both disks verified; 3 trusted refs match end to end by
+        independent transcription; non-circular provenance confirmed
+  - [x] Increment 6: static audit — 52/52 carry sites clean, no `SED`, stack
+        balanced, output lifecycle and diagnostic preservation sound
+  - [x] Increment 7: advanced to `0.1.17`, `BUILD_CASM` 1078 -> 1079 exactly
+        once and stable on no-change rebuild; banner `CASM V0.1.17.1079`
+  - [x] Increment 8: walkthrough written with pending manual steps
   - [ ] Increment 9: user executes the reduced smoke set plus G4.2/G7.1-G7.3 captures
   - [ ] Increment 10: separate user decision on Phase 4 completion
 
