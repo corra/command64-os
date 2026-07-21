@@ -76,6 +76,14 @@ are prohibited.
 
 ## Runtime Verification (to be performed by the user)
 
+> **The authoritative procedure is
+> `brain/plans/2026-07-21-casm-phase4-wp14-test-plan.md`.** It adds the test
+> isolation protocol (CASM opens output with `,P,W` and no `@` replace prefix,
+> so a leftover `.PRG` confounds results), exact expected diagnostic strings,
+> predicted line numbers, a regression group, a DSC1 presentation group, and
+> full traceability to the acceptance matrix. The tables below are the summary
+> view; where the two differ, the test plan wins.
+
 Attach `build/test.d64`. **Every expected result below is derived from static
 reading of `parser.s`/`emit.s`, not from executing CASM.** Record actual results
 in the Result column; a mismatch is a finding, not necessarily a fixture error.
