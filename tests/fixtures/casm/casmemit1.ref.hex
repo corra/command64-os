@@ -1,0 +1,32 @@
+# CASM WP14 trusted reference: casmemit1
+#
+# Independently hand-assembled from the casmemit1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Cross-checks:
+#   - brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md
+#     (canonical bytes)
+#   - brain/walkthroughs/2026-07-17-casm-phase4-wp13-directives-emission.md
+#     ("casmemit1 expected bytes")
+#
+# Source (.ORG $C000) and hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   A9 01        LDA #$01
+#   8D 20 D0     STA $D020
+#   A2 10        LDX #$10
+#   E8           INX                 ; at $C007
+#   D0 FD        BNE $C007           ; PC after = $C00A; $C007-$C00A = -3 = $FD
+#   60           RTS
+#   01 02 FF     .BYTE $01,$02,$FF
+#   34 12 CD AB  .WORD $1234,$ABCD   ; little-endian
+#
+# bytes: 20
+# sha256: 3fa0fd916fb95148537c613500b61bb87f2c74e377a976c0ed9582960fa450f8
+
+00 C0
+A9 01
+8D 20 D0
+A2 10
+E8
+D0 FD
+60
+01 02 FF
+34 12 CD AB

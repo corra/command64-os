@@ -1,10 +1,15 @@
 ---
 feature: casm-diagnostic-source-context
 created: 2026-07-20
-status: planned
+status: completed
 ---
 
-# Plan: CASM Diagnostic Source Context (WP15)
+# Plan: CASM Diagnostic Source Context (DSC1; formerly WP15)
+
+> Naming correction, 2026-07-20: Phase 4 already owns a pending WP15 task for
+> final verification and closeout. This interstitial diagnostic feature is
+> therefore designated DSC1. Historical commits and source comments that say
+> `WP15` refer to DSC1; they do not complete or supersede Phase 4 WP15.
 
 ## Goal & Rationale
 
@@ -336,3 +341,18 @@ fixture cannot reproduce a case, stop and raise it.
   `casm_3500.cfg` link within `$2800`; headroom 432 bytes as above.
 
   Remaining: step 9 (docs).
+- 2026-07-20: Step 9 (docs) complete. `wiki/casm-programmers-reference.md` and
+  `wiki/casm-utility.md` document the source-context diagnostic format (line,
+  column, byte offset, hex byte, and caret). Committed ecf22b6. DSC1 was then
+  merged into `main` (merge eef3fb4).
+- 2026-07-20: Post-merge fix. `cf31a33` corrects a garbage source location that
+  printed for locationless diagnostics (the `startFatal` path in `casm.s` and an
+  opcode-table raise site in `opcodes.s`). Locationless diagnostics now suppress
+  the location/caret block instead of emitting stale buffer coordinates. This is
+  the final DSC1 change and is part of the code WP14 inherits.
+- 2026-07-20: DSC1 marked **completed** during WP14 increment 1 record
+  reconciliation. Corrected headroom: the `cf31a33` fix grew MAIN slightly, so
+  the current post-DSC1 headroom measured from a fresh link map is **422 bytes**
+  (`$3400` build: CODE `$3400-$4E32`, RODATA `$4E33-$55F2`, BSS `$55F3-$5A59`;
+  `$2800` MAIN ends at `$5C00`, leaving `$1A6` = 422 bytes), not the 432 bytes
+  recorded at step 8. WP14 planning that cites ~432 bytes should read 422.

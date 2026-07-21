@@ -363,6 +363,34 @@ add_custom_command(
 
 add_custom_target(casm_test_fixtures DEPENDS ${CASM_TEST_FIXTURES})
 
+# CASM WP14 trusted reference PRGs. Reviewed hex manifests under
+# tests/fixtures/casm/*.ref.hex are transcribed to binary by
+# scripts/hex_manifest_to_bin.py (which contains no 6502 knowledge, so it cannot
+# reproduce a CASM opcode-table defect) and placed on test.d64 as PRGs, so the
+# native COMP utility can byte-for-byte compare CASM output against them. See
+# brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md.
+set(CASM_REF_DIR "${CMAKE_BINARY_DIR}/casm_refs")
+set(CASM_REF_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/tests/fixtures/casm")
+set(CASM_REF_NAMES casmemit1 casmhello)
+set(CASM_REF_BINS "")
+foreach(REF_NAME IN LISTS CASM_REF_NAMES)
+    set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
+    set(REF_BIN "${CASM_REF_DIR}/${REF_NAME}.ref")
+    add_custom_command(
+        OUTPUT "${REF_BIN}"
+        COMMAND "${CMAKE_COMMAND}" -E make_directory "${CASM_REF_DIR}"
+        COMMAND "${Python3_EXECUTABLE}"
+            "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+            "${REF_MANIFEST}" "${REF_BIN}"
+        DEPENDS "${REF_MANIFEST}"
+            "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        COMMENT "Generating CASM trusted reference ${REF_NAME}.ref from manifest"
+        VERBATIM
+    )
+    list(APPEND CASM_REF_BINS "${REF_BIN}")
+endforeach()
+add_custom_target(casm_reference_fixtures DEPENDS ${CASM_REF_BINS})
+
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"
     DISK_LABEL "${DISK_NAME}"
@@ -377,6 +405,20 @@ add_c64_disk_image(test_image_d64
     PRGS ${TEST_IMAGE_PRG_TARGETS}
 )
 add_dependencies(test_image_d64 casm_test_fixtures)
+add_dependencies(test_image_d64 casm_reference_fixtures)
+
+# Append the WP14 trusted reference PRGs to test.d64 (PRG type, lowercase -f so
+# they store as unshifted PETSCII matching what the user types on the default
+# uppercase charset -- same convention as the SEQ fixtures above).
+foreach(REF_NAME IN LISTS CASM_REF_NAMES)
+    add_custom_command(
+        TARGET test_image_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${REF_NAME}.ref" -T PRG
+            -w "${CASM_REF_DIR}/${REF_NAME}.ref" "${CMAKE_BINARY_DIR}/test.d64"
+        COMMENT "Appending CASM reference ${REF_NAME}.ref (PRG) to test.d64"
+        VERBATIM
+    )
+endforeach()
 
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)

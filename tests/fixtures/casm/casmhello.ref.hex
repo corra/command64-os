@@ -1,0 +1,35 @@
+# CASM WP14 trusted reference: casmhello
+#
+# Independently hand-assembled from the casmhello fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. The message bytes
+# are copied verbatim from the fixture's .BYTE directives (a source input, not a
+# CASM output) and decode to the documented "YES IT BUILDS! -- CASM" + CR + NUL.
+#
+# Source (.ORG $3400) and hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   A2 0E        LDX #$0E            ; <msg  (msg at $340E)
+#   A0 34        LDY #$34            ; >msg
+#   A9 09        LDA #$09            ; DOS_PRINT_STR
+#   20 00 10     JSR $1000          ; OS_API
+#   A9 4C        LDA #$4C            ; DOS_EXIT
+#   20 00 10     JSR $1000
+#   -- msg at $340E, "YES IT BUILDS! -- CASM" + CR + NUL --
+#   59 45 53 20 49 54 20                ; "YES IT "
+#   42 55 49 4C 44 53 21 20             ; "BUILDS! "
+#   2D 2D 20 43 41 53 4D                ; "-- CASM"
+#   0D 00                               ; CR, NUL
+#
+# bytes: 40
+# sha256: b33414b7fe07c525b958fce1fa8b87c722b7e2429b4bccffdf623e0737aa9bec
+
+00 34
+A2 0E
+A0 34
+A9 09
+20 00 10
+A9 4C
+20 00 10
+59 45 53 20 49 54 20
+42 55 49 4C 44 53 21 20
+2D 2D 20 43 41 53 4D
+0D 00
