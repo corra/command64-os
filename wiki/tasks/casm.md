@@ -18,10 +18,13 @@ opcode table and mode matcher, and an emission engine that tracks the program
 counter and writes plain absolute PRG output. It does not evaluate expressions,
 define symbols, resolve labels, run two passes, or emit R6 relocation records.
 
-WP11-WP14 are complete at CASM `0.1.16`. **WP15, the independent verification
-and closeout package, is active**; Phase 4 is not done until the user explicitly
-approves it. Phase 5 (minimal expression evaluator) is planned and blocked
-behind that approval.
+**Phase 4 is complete**, approved by the user on 2026-07-21 at CASM `0.1.17`
+build 1079. WP11-WP15 are all closed.
+
+Next: **Phase 5 — minimal expression evaluator**, now unblocked. Its parent
+contract is `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
+and its entry work package WP16 is planned in
+`brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
 
 ## Phase 1 Prerequisite
 
@@ -249,15 +252,31 @@ WP15 plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.
       now fixed and guarded by build-breaking asserts. User runtime confirmed
       the full matrix. Completion approved on 2026-07-21; build 1078 advanced
       CASM to `0.1.16`.
-- [ ] Task UUID `8612c2a2-afdd-4c8f-bf42-4947bc486f97`: verify artifacts and obtain user runtime confirmation.
+- [x] Task UUID `8612c2a2-afdd-4c8f-bf42-4947bc486f97`: verify artifacts and
+      obtain user runtime confirmation. Independent acceptance audit found and
+      corrected three record defects (missing Phase 4 parent milestone; three
+      phantom wiki UUIDs for WP11-WP13; stale Phase 3 milestone text). Static
+      audit clean: 52/52 carry sites, no `SED`, balanced stack, sound output
+      lifecycle and diagnostic preservation. Both link configs fit `$2800` with
+      408 bytes headroom; R6 artifact cross-checked field by field; all three
+      trusted references verified end to end by independent transcription.
+      WP14's two open evidence gaps closed: G4.2 confirmed
+      `OPERAND OUT OF RANGE`; G7 confirmed CASM does not clobber an existing
+      output file. User runtime confirmed and completion approved on
+      2026-07-21; build 1079 advanced CASM to `0.1.17`.
+      Walkthrough:
+      `brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 
 ## Phase 4 Acceptance
 
-- [ ] Syntactic errors and operand delimiters are fully validated.
-- [ ] 6502 addressing mode mapping and numeric size boundaries are enforced.
-- [ ] Relative branch distance checks are validated.
-- [ ] Output PRG files match reference binary files byte-for-byte.
-- [ ] CASM remains within the approved MAIN envelope (raised $2000 -> $2800 in
+- [x] Syntactic errors and operand delimiters are fully validated.
+- [x] 6502 addressing mode mapping and numeric size boundaries are enforced.
+- [x] Relative branch distance checks are validated.
+- [x] Output PRG files match reference binary files byte-for-byte.
+- [x] CASM remains within the approved MAIN envelope (raised $2000 -> $2800 in
       WP13 to fit the emission engine).
-- [ ] Build, artifact, and build-number checks pass.
-- [ ] The user completes the runtime walkthrough and approves Phase 4.
+- [x] Build, artifact, and build-number checks pass.
+- [x] The user completes the runtime walkthrough and approves Phase 4.
+
+**Phase 4 complete — approved by the user on 2026-07-21 at CASM `0.1.17`
+build 1079.** Milestone `4796b60c-5f4a-43c7-8270-436075bb3f7b`.

@@ -55,8 +55,9 @@
   - [x] `a68d3603` Integrate diagnostics and temporary token dump
   - [x] `178b0884` Verify artifacts and obtain user runtime confirmation
 
-- [/] Taskwarrior (`4796b60c-5f4a-43c7-8270-436075bb3f7b`): CASM Phase 4
+- [x] Taskwarrior (`4796b60c-5f4a-43c7-8270-436075bb3f7b`): CASM Phase 4
       statement parser, opcode table, and numeric static assembly
+      **COMPLETE — user approved 2026-07-21 at CASM `0.1.17` build 1079.**
   - Parent milestone created 2026-07-21 during WP15 increment 2. Phases 1-3 each
     had a parent record; Phase 4 had none, so WP11-WP15 were orphaned. The
     completed Phase 3 UUID `099257cc` was deliberately not reused.
@@ -67,8 +68,12 @@
   - [x] `ded1cfd9` WP13: implement numeric directives and byte/word emission
   - [x] `3e4eab43` WP14: orchestration and end-to-end binary validation;
         build 1078, CASM `0.1.16`
-  - [/] `8612c2a2` WP15: verification and phase closeout (active)
-  - Phase 4 is NOT done until the user explicitly approves it at WP15 closeout.
+  - [x] `8612c2a2` WP15: verification and phase closeout; build 1079,
+        CASM `0.1.17`
+  - Phase 4 approved done by the user on 2026-07-21. Phase 5 is now unblocked.
+  - Carried forward to Phase 11: `CasmOutputCreated` conflates "created" with
+    "opened an existing file"; no `CLD` at entry; no CASM Phase 4 contract
+    section in `brain/KNOWLEDGE.md`.
 
 - [x] Taskwarrior (`3e4eab43-0f48-4db5-843f-c749bcb79d8a`): CASM Phase 4 WP14: execute orchestration and end-to-end binary validation
   - [x] Create detailed implementation plan
@@ -90,7 +95,7 @@
   - Outstanding for the record only: observed values for G4.2 (`casmzpi2`
     diagnostic) and G7.1–G7.3 (assembling over an existing output file).
 
-- [/] Taskwarrior (`8612c2a2-afdd-4c8f-bf42-4947bc486f97`): CASM Phase 4 WP15: verify artifacts and obtain user runtime confirmation
+- [x] Taskwarrior (`8612c2a2-afdd-4c8f-bf42-4947bc486f97`): CASM Phase 4 WP15: verify artifacts and obtain user runtime confirmation
   - Plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
   - Activated 2026-07-21 on `feature/casm-phase4-wp15` from clean tree `55fe474`.
   - [x] Increment 1: confirm WP14 complete and its records agree
@@ -108,8 +113,13 @@
   - [x] Increment 7: advanced to `0.1.17`, `BUILD_CASM` 1078 -> 1079 exactly
         once and stable on no-change rebuild; banner `CASM V0.1.17.1079`
   - [x] Increment 8: walkthrough written with pending manual steps
-  - [ ] Increment 9: user executes the reduced smoke set plus G4.2/G7.1-G7.3 captures
-  - [ ] Increment 10: separate user decision on Phase 4 completion
+  - [x] Increment 9: user executed the smoke set, shell-integrity checks, and
+        both WP14 gap captures — all pass. G4.2 confirmed
+        `OPERAND OUT OF RANGE`; G7 falsified the predicted deletion hazard
+        (no clobber; `fileDelete`'s `checkDeviceReady` preflight bails on the
+        latched `63,FILE EXISTS`, so the delete never runs)
+  - [x] Increment 10: user approved Phase 4 done on 2026-07-21
+  - Walkthrough: `brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

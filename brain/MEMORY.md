@@ -23,7 +23,7 @@
 - **Conway memory safety & relocation crash fix**: Resolved memory collisions between code and double buffers by embedding the grid buffers as relocatable, page-aligned data tables inside the binaries. Both Kick and ca65 builds generate identical size-bounded relocatable binaries (3008 bytes, 59 relocation entries).
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055) / CASM 0.1.12 (Build 1036).
+- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055) / CASM 0.1.17 (Build 1079).
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
@@ -188,6 +188,38 @@ CASM Phase 3 Work Package 8 build 1030 adds textual and numeric token scanning t
 CASM Phase 3 Work Package 9 build 1032 adds mnemonic classification with a local 168-byte `mnemonicTable` in `lexer.s` RODATA and case-insensitive search logic in `classifyMnemonic`. Version advanced to `0.1.11`; WP9 completion was approved after user runtime confirmation on 2026-07-17.
 
 CASM Phase 3 Work Package 10 build 1036 integrates the lexer into the main application read loop, prints a temporary token dump (type names, register/directive/number subtype names, mnemonic indices, text content, line/column location), maps contiguous Phase 3 error codes in `diagnostics.s`, fixes length-checked string comparisons, and updates `GenerateCasmTestFixtures.cmake` with alternating space-separated characters to verify source column boundaries. Version advanced to `0.1.12`; WP10 completion was approved after user runtime confirmation on 2026-07-17.
+
+CASM Phase 4 (WP11-WP15) is **complete**, approved by the user on 2026-07-21 at
+`0.1.17` build 1079. WP11 added the LL(1) statement parser and
+`parseNumericValue`; WP12 the compressed opcode table and addressing-mode
+matcher; WP13 the emission engine (`CasmPc`, PRG load-address header, bounded
+64-byte staged writes, `.ORG`/`.BYTE`/`.WORD`, branch displacement); WP14
+trusted byte-for-byte binary validation; WP15 independent verification and
+closeout. Two defects were found by acceptance work rather than by
+implementation: a bare `.ORG` silently assembling as `.ORG $0000`, and an
+unreachable `CASM_MODE_ZEROPAGE_Y` that miscompiled every `LDX $10,Y` as
+absolute,Y (now guarded by build-breaking asserts).
+
+Final Phase 4 measurements: linked CODE `$1A41` + RODATA `$07C0` with `$0467`
+BSS, occupying 9,832 of the `$2800` MAIN envelope at both `$3400` and `$3500`,
+leaving 408 bytes of headroom. The R6 PRG is 11,057 bytes with 1,172 relocation
+points. WP15 changed no production source; it found three record defects (a
+missing Phase 4 parent Taskwarrior milestone, three phantom wiki UUIDs for
+WP11-WP13, and stale Phase 3 milestone text) and closed WP14's two open
+evidence gaps.
+
+Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
+on any successful write-mode open, so it conflates "CASM created this file" with
+"CASM opened an existing one" — assembling over an existing output is safe today
+only because the latched `63,FILE EXISTS` status makes `fileDelete`'s
+`checkDeviceReady` preflight bail before the delete runs. Also, CASM contains no
+`SED` and every `ADC`/`SBC` establishes carry, but it has no entry `CLD` either,
+so it assumes the caller left decimal mode clear. And `brain/KNOWLEDGE.md` has
+CASM Phase 1/2/3 contract sections but no Phase 4 one.
+
+Phase 5 (minimal expression evaluator) is unblocked. Parent contract:
+`brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`; entry work
+package WP16: `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
 
 ## C64 Hardware Gotchas (hard-won)
 

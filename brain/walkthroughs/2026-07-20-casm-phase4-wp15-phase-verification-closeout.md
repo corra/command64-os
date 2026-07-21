@@ -1,7 +1,7 @@
 ---
 feature: casm-phase4-wp15-phase-verification-closeout
 created: 2026-07-21
-status: in-progress
+status: complete
 ---
 
 # Walkthrough: CASM Phase 4 WP15 Verification and Phase Closeout
@@ -10,10 +10,9 @@ Plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 Taskwarrior: `8612c2a2-afdd-4c8f-bf42-4947bc486f97`
 Phase 4 milestone: `4796b60c-5f4a-43c7-8270-436075bb3f7b`
 
-**Status: all automated and manual gates pass; awaiting the two approval gates
-(increment 10).** Every host-side check and the full runtime session passed.
-Phase 4 is not closed and must not be marked closed until the user explicitly
-approves it, separately from approving WP15.
+**Status: COMPLETE.** Every automated and manual gate passed. WP15 is closed and
+**CASM Phase 4 is complete, approved by the user on 2026-07-21** at
+`CASM V0.1.17.1079`. Phase 5 is unblocked.
 
 ## Repository State
 
@@ -307,15 +306,19 @@ it, and Phase 4 must not be marked done until it is resolved.
 | Output and resource | S2-S12, T1-T3, G7.1-G7.3; no-change build held `BUILD_CASM` | pass |
 | Envelope and release | Increments 4-5: 408 B headroom both configs; both disks verified | pass |
 
-## Completion Gates — both PENDING
+## Completion Gates — both SATISFIED
 
-1. **WP15 completion** — every automated and manual gate now passes; requires
-   the user's explicit approval to mark WP15 complete.
-2. **Phase 4 completion** — a *separate* explicit confirmation that the phase is
-   done. Approving the runtime matrix does not imply either.
+1. **WP15 completion** — approved. Taskwarrior `8612c2a2` closed 2026-07-21.
+2. **Phase 4 completion** — separately approved by the user on 2026-07-21.
+   Milestone `4796b60c` closed; `project:command64.casm` is 37/37 complete.
 
-Phase 5 remains planned and blocked behind gate 2. On closure, the WP16 plan's
-`0.1.16` / build-1078 baseline must be amended to `0.1.17` / 1079.
+Records synchronized: `wiki/tasks/casm.md` (all seven Phase 4 acceptance items
+ticked), `brain/task.md`, `CHANGELOG.md`, `brain/MEMORY.md`, and both Phase 5
+plans (the WP16 `0.1.16` / build-1078 baseline amended to `0.1.17` / 1079).
+
+`brain/KNOWLEDGE.md` was deliberately **not** given a retroactive CASM Phase 4
+contract section, per the WP16 plan's Finding 4 — authoring one now would create
+a second source of truth for a closed phase. Deferred to Phase 11.
 
 ## Carried-Forward Observations
 
@@ -343,3 +346,6 @@ Neither blocks Phase 4; both are recorded so they are not rediscovered later.
   root cause was traced to `fileDelete`'s `checkDeviceReady` preflight bailing on
   the latched `63,FILE EXISTS` status. Both WP14 evidence gaps are now closed.
   Awaiting the two approval gates.
+- 2026-07-21: **WP15 complete and Phase 4 approved done** by the user at CASM
+  `0.1.17` build 1079. Both gates satisfied, all records synchronized, Phase 5
+  unblocked.
