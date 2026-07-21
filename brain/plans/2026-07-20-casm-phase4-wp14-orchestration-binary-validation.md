@@ -497,3 +497,67 @@ Phase 4; it unblocks WP15.
     D range/PC, E cleanup/partial-output, F CLI options). Every expected result
     is flagged as statically derived and awaiting runtime confirmation.
   - Increment gate: increment 8 is the user's runtime execution of that matrix.
+- 2026-07-21: Third trusted reference added, `casmmodes`, closing the
+  per-addressing-mode byte-coverage gap identified in the test plan.
+  - `casmmodes.seq` carries one legal statement for each of the 13
+    `CASM_MODE_*` values, in mode order. ZEROPAGE_Y uses `LDX $10,Y` because
+    that mode exists only for LDX/STX; zero-page vs absolute is driven by
+    operand width (`$10` vs `$1234`), re-exercising the promotion logic.
+  - `casmmodes.ref.hex` (30 bytes, sha256 c9315d13...d29c94f0) was hand-assembled
+    from the documented 6502 instruction set. It was deliberately NOT derived
+    from `opcodes.s`: taking the bytes from CASM's own table would make the
+    comparison circular and could copy a table defect into its own reference.
+  - Independent cross-check performed AFTER the manifest was fixed: the opcode
+    bytes in `opcodes.s` were diffed against the hand-derived ones and agree on
+    all 13 (ASL accum `$0A`; BNE `$D0`; INX `$E8`; JMP indirect `$6C`; the eight
+    LDA forms `A9 A5 B5 AD BD B9 A1 B1`; LDX zp,Y `$B6`). Two independent
+    derivations agreeing raises confidence in both. Had they disagreed, that
+    would have been recorded as a finding rather than resolved by editing the
+    manifest.
+  - Wired through `CASM_REF_NAMES`, so it generates and installs on `test.d64`
+    exactly like the other two. Disk now 24 PRG + 58 SEQ, 313 blocks free; all
+    shipping apps intact; `BUILD_CASM` unchanged at 1070 (no CASM source
+    touched).
+  - Test plan updated: new cases G2.8 (assembles) and G2.9 (COMP against the
+    reference), a per-mode offset table for localising a mismatch, traceability
+    row now byte-certified, and the coverage-gap section records the gap as
+    CLOSED while noting the remaining limit (one opcode per mode, not all 151).
+  - The assembled output must never be run: it ends in a `JMP` through an
+    uninitialised vector and a backward branch.
+- 2026-07-21: SECOND DEFECT found and fixed — `CASM_MODE_ZEROPAGE_Y` was
+  unreachable. Found by the first runtime execution of the new `casmmodes`
+  comparison, i.e. by the very artifact added to close the mode-coverage gap.
+  - Symptom: `COMP CASMMODES.PRG CASMMODES.REF` reported a mismatch at offset
+    `$0A` (CASM `$BE` vs reference `$B6`) and then a cascade of shifted bytes,
+    because CASM emitted the 3-byte `LDX absolute,Y` form where the 2-byte
+    `LDX zero-page,Y` form belongs. Offsets `0-9` matched, so `,X` promotion was
+    already correct; only `,Y` was broken.
+  - Root cause: `opcodesFindOpcode` tested the ZeroPage,Y support bit against
+    `ofMaskHi` with `1 << (CASM_MODE_ZEROPAGE_Y - 8)`. That mode is 5, so its bit
+    lives in the LOW mask byte; ca65 silently evaluates the resulting negative
+    shift to `$00` with no diagnostic, so the AND always failed and the mode was
+    dead code. Verified directly: ca65 assembles `1 << (5-8)` to `$00` and
+    `1 << 5` to `$20` without complaint. The opcode table itself was correct
+    (`$B6` present, LDX maskLo `$6C` has bit 5 set) — only the test was wrong.
+  - Severity: a miscompilation, not merely a size regression. Zero-page,Y wraps
+    within page zero (`($10+Y) & $FF`) while absolute,Y does not, so the emitted
+    code reads a different address whenever `Y > $EF`.
+  - Fix: read `ofMaskLo` with the correct bit, mirroring the `,X` path. Zero
+    code-size cost (CODE unchanged at `$1A41`, headroom still 408 bytes).
+  - Static guard (user-selected option): the four compile-time mask bits are now
+    defined once as `OF_BIT_LO_*` / `OF_BIT_HI_*` constants, each asserted to be
+    a non-zero value below 256, and the use sites name the constant instead of
+    re-deriving the shift. Both failure directions were verified by deliberately
+    breaking them: re-introducing the exact original wrong-half expression trips
+    the `OF_BIT_LO_ZEROPAGE_Y` assert, and renumbering the mode into the high
+    half trips a ca65 range error. The build is clean after restoring.
+  - Process note: this is the second defect the WP14 acceptance work has found
+    (after the bare `.ORG`), and the first found at runtime rather than by
+    reading. It vindicates the trusted-reference rule — the reference bytes were
+    hand-derived from the 6502 instruction set rather than from `opcodes.s`, so
+    they could disagree with CASM. Had the reference been generated from CASM's
+    own table, the comparison would have passed and the bug would have survived.
+  - `BUILD_CASM` is now 1077 (the negative-test cycles each bumped the counter).
+    The test plan and walkthrough were updated to expect banner `0.1.15.1077`.
+  - G2.9 must be re-run to confirm the fix; it is now the regression test for
+    this defect.

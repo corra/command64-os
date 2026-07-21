@@ -1,0 +1,53 @@
+# CASM WP14 trusted reference: casmmodes
+#
+# One legal statement per CASM_MODE_* value, so a byte-for-byte comparison
+# certifies one opcode per addressing mode. This is the coverage casmemit1 and
+# casmhello leave open: between them they only exercise implied, immediate,
+# absolute, relative, .BYTE and .WORD.
+#
+# Hand-assembled from the documented 6502 instruction set, NOT from CASM and NOT
+# by reading src/external/casm/opcodes.s -- deriving these bytes from CASM's own
+# opcode table would make the comparison circular and could copy a table defect
+# into its own reference. (opcodes.s was diffed against these bytes afterwards
+# as an independent cross-check, which is a finding if it disagrees, not a
+# reason to change this file.)
+#
+# Source (.ORG $C000) and hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   E8           INX            ; IMPLIED
+#   0A           ASL A          ; ACCUMULATOR
+#   A9 01        LDA #$01       ; IMMEDIATE
+#   A5 10        LDA $10        ; ZEROPAGE
+#   B5 10        LDA $10,X      ; ZEROPAGE_X
+#   B6 10        LDX $10,Y      ; ZEROPAGE_Y   (mode exists only for LDX/STX)
+#   AD 34 12     LDA $1234      ; ABSOLUTE
+#   BD 34 12     LDA $1234,X    ; ABSOLUTE_X
+#   B9 34 12     LDA $1234,Y    ; ABSOLUTE_Y
+#   6C 34 12     JMP ($1234)    ; INDIRECT
+#   A1 10        LDA ($10,X)    ; INDEXED_INDIRECT
+#   B1 10        LDA ($10),Y    ; INDIRECT_INDEXED
+#   D0 E4        BNE $C000      ; RELATIVE
+#
+# Relative displacement: the branch sits at $C01A and is 2 bytes, so
+# nextPc = $C01C and disp = $C000 - $C01C = -28 = $E4.
+#
+# Zero-page vs absolute selection is driven by operand width ($10 vs $1234), so
+# this fixture also re-exercises the promotion boundary.
+#
+# bytes: 30
+# sha256: c9315d139778f568e44175a2e17479098268d1aea41163db68e93c5ed29c94f0
+
+00 C0
+E8
+0A
+A9 01
+A5 10
+B5 10
+B6 10
+AD 34 12
+BD 34 12
+B9 34 12
+6C 34 12
+A1 10
+B1 10
+D0 E4

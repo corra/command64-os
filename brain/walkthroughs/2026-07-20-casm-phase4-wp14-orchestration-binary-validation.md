@@ -1,7 +1,7 @@
 # CASM Phase 4 WP14 — Orchestration and Binary Validation Walkthrough
 
 - **Date**: 2026-07-21
-- **Version**: CASM `0.1.15`, build 1070 (advances to `0.1.16` only at the
+- **Version**: CASM `0.1.15`, build 1077 (advances to `0.1.16` only at the
   approved WP14 completion gate)
 - **Plan**: `brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`
 - **Parent plan**: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
@@ -13,16 +13,20 @@
   transcribes reviewed hex manifests to binary and verifies declared byte count
   and SHA-256. It contains no 6502 knowledge, so a CASM opcode-table defect
   cannot be reproduced inside its own reference.
-- **Reviewed reference manifests.** `tests/fixtures/casm/casmemit1.ref.hex` and
-  `casmhello.ref.hex`, hand-assembled from the fixture sources independently of
-  CASM, installed on `test.d64` as PRGs for native `COMP`.
+- **Reviewed reference manifests.** `tests/fixtures/casm/casmemit1.ref.hex`,
+  `casmhello.ref.hex` and `casmmodes.ref.hex`, hand-assembled independently of
+  CASM and installed on `test.d64` as PRGs for native `COMP`. `casmmodes` covers
+  one legal statement per `CASM_MODE_*` value, byte-certifying one opcode per
+  addressing mode.
 - **Production orchestration documented.** The WP13 "temporary driver" was
   audited and found to already implement the full production contract; it was
   documented in place rather than rewritten (see Plan Adherence below).
 - **Acceptance-matrix fixtures.** 22 new fixtures covering syntax/delimiter,
   addressing/numeric, PC, and cleanup boundaries.
-- **Defect fix.** A bare `.ORG` silently assembled as `.ORG $0000`; `emitOrg`
-  now requires `CASM_OPKIND_ABSOLUTE`.
+- **Two defect fixes.** A bare `.ORG` silently assembled as `.ORG $0000`
+  (`emitOrg` now requires `CASM_OPKIND_ABSOLUTE`), and `CASM_MODE_ZEROPAGE_Y`
+  was unreachable so every `LDX $10,Y` assembled as absolute,Y (mask-half bug in
+  `opcodesFindOpcode`, now fixed and guarded by a build-breaking assert).
 
 ## Plan Adherence and Deviations
 
@@ -51,6 +55,21 @@ and `.ORG ($10)` — the same silent-origin class. It runs before the
 duplicate-`.ORG` check so a malformed `.ORG` always reports as malformed;
 `casmorg2` still reports DUPLICATE ORG.
 
+**Deviation (approved): a second defect fix, found at runtime.** The first run
+of the new `casmmodes` comparison failed at offset `$0A`: CASM emitted `$BE`
+(`LDX absolute,Y`) where the reference has `$B6` (`LDX zero-page,Y`), and every
+later byte was shifted by one because a 3-byte form replaced a 2-byte one. Root
+cause: `opcodesFindOpcode` tested the ZeroPage,Y support bit against `ofMaskHi`
+using `1 << (CASM_MODE_ZEROPAGE_Y - 8)`. That mode is 5, so its bit lives in the
+LOW mask byte, and ca65 silently evaluates the negative shift to `$00` with no
+diagnostic — the AND always failed and `CASM_MODE_ZEROPAGE_Y` was dead code.
+This is a miscompilation, not just a size regression: zero-page,Y wraps within
+page zero while absolute,Y does not, so the two differ whenever `Y > $EF`. Fixed
+to read `ofMaskLo` with the correct bit, at zero code-size cost. Guarded by
+single-definition `OF_BIT_*` constants with asserts that each is a non-zero
+byte-sized bit, so both re-introducing the wrong half and renumbering a mode now
+fail the build. Both directions were verified by deliberately breaking them.
+
 **Correction carried in:** post-DSC1 MAIN headroom was recorded as 432 bytes;
 the measured value after the `cf31a33` fix was 422, and after this WP's
 `.ORG` guard it is 408.
@@ -60,7 +79,7 @@ the measured value after the `cf31a33` fix was 422, and after this WP's
 | Check | Result |
 |---|---|
 | `casm`, `image_d64`, `test_image_d64` build | pass |
-| No-change rebuild preserves `BUILD_CASM` (1070) | pass |
+| No-change rebuild preserves `BUILD_CASM` (1077) | pass |
 | Reference manifests regenerate byte-identically to build artifacts | pass |
 | Converter rejects malformed manifests (8 guard cases) | pass |
 | `reloc.py` output byte-identical to `build/casm.prg` | pass |
@@ -68,7 +87,7 @@ the measured value after the `cf31a33` fix was 422, and after this WP's
 | `$3400` map: CODE `$3400-$4E40` (`$1A41`), RODATA `$7C0`, BSS `$467`, end `$5A67` | pass |
 | `$3500` map: same sizes, end `$5B67`; both within `$2800`, headroom 408 | pass |
 | `image.d64`: all 9 shipping apps intact, 464 blocks free | pass |
-| `test.d64`: 23 PRG + 57 SEQ, both `.ref` PRGs present, 315 blocks free | pass |
+| `test.d64`: 24 PRG + 58 SEQ, all three `.ref` PRGs present, 313 blocks free | pass |
 | `git diff --check` | pass |
 
 These checks never execute CASM. The broken `c64-testing` MCP and web emulators
@@ -166,10 +185,10 @@ Each diagnostic should print with its source line and caret (DSC1 behavior).
   `JMP START_LABEL` and label operands are deferred.
 - `casmwp11` predates emission and has no `.ORG`, so it now reports
   `ORG REQUIRED`. That is expected, not a regression.
-- No all-151-opcode certification matrix; that is Phase 11 hardening. A
-  per-addressing-mode reference PRG (a `casmmodes.ref`) was considered and not
-  added, since the plan names only the two references; it is a candidate
-  follow-up that would strengthen opcode coverage considerably.
+- No all-151-opcode certification matrix; that is Phase 11 hardening.
+  `casmmodes.ref` now certifies one opcode per addressing mode, but a defect
+  affecting only, say, `STA` absolute,Y while `LDA` absolute,Y is correct would
+  still pass.
 - MAIN headroom is down to 408 bytes. Future CASM growth has little room before
   the `$2800` envelope needs review.
 

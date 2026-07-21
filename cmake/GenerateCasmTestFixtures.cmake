@@ -351,6 +351,49 @@ file(WRITE "${OUTPUT_DIR}/casmpcend.seq" ".ORG \$FFFF\n.BYTE \$01\n")
 #   -> ADDRESS OVERFLOW ($22)
 file(WRITE "${OUTPUT_DIR}/casmpcovf.seq" ".ORG \$FFFF\n.BYTE \$01, \$02\n")
 
+# Representative legal statement for every CASM_MODE_* value, in mode order, so
+# a byte-for-byte comparison against casmmodes.ref certifies one opcode per
+# addressing mode. This closes the gap left by casmemit1/casmhello, which
+# between them only cover implied, immediate, absolute, relative, .BYTE/.WORD.
+#
+# ZEROPAGE_Y uses LDX because that mode exists only for LDX/STX. The zero-page
+# vs absolute choice is driven by operand width ($10 vs $1234), which also
+# re-exercises the promotion logic.
+#
+# DO NOT RUN the assembled output: it ends in a JMP through an uninitialised
+# vector and a backward BNE. It exists only to be assembled and compared.
+#
+# Layout (load $C000), hand-assembled independently of CASM:
+#   C000 E8        INX            ; IMPLIED
+#   C001 0A        ASL A          ; ACCUMULATOR
+#   C002 A9 01     LDA #$01       ; IMMEDIATE
+#   C004 A5 10     LDA $10        ; ZEROPAGE
+#   C006 B5 10     LDA $10,X      ; ZEROPAGE_X
+#   C008 B6 10     LDX $10,Y      ; ZEROPAGE_Y
+#   C00A AD 34 12  LDA $1234      ; ABSOLUTE
+#   C00D BD 34 12  LDA $1234,X    ; ABSOLUTE_X
+#   C010 B9 34 12  LDA $1234,Y    ; ABSOLUTE_Y
+#   C013 6C 34 12  JMP ($1234)    ; INDIRECT
+#   C016 A1 10     LDA ($10,X)    ; INDEXED_INDIRECT
+#   C018 B1 10     LDA ($10),Y    ; INDIRECT_INDEXED
+#   C01A D0 E4     BNE $C000      ; RELATIVE (nextPc $C01C, disp -28)
+file(WRITE "${OUTPUT_DIR}/casmmodes.seq"
+    ".ORG \$C000\n"
+    "INX\n"
+    "ASL A\n"
+    "LDA #\$01\n"
+    "LDA \$10\n"
+    "LDA \$10,X\n"
+    "LDX \$10,Y\n"
+    "LDA \$1234\n"
+    "LDA \$1234,X\n"
+    "LDA \$1234,Y\n"
+    "JMP (\$1234)\n"
+    "LDA (\$10,X)\n"
+    "LDA (\$10),Y\n"
+    "BNE \$C000\n"
+)
+
 # -- Output and cleanup ------------------------------------------------------
 
 # Several statements assemble and are written to the output PRG, and only then

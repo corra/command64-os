@@ -12,7 +12,7 @@ companion to the summary matrix in
 where the two disagree, this document is authoritative.
 
 - **Plan**: `brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`
-- **Build under test**: CASM `0.1.15` build 1070, branch `feature/casm-phase4-wp14`
+- **Build under test**: CASM `0.1.15` build 1077, branch `feature/casm-phase4-wp14`
 - **Image**: `build/test.d64`
 
 ## 1. Status of Expected Results
@@ -39,7 +39,7 @@ single answer; write down what actually happens.
    ```
 
 2. Attach `build/test.d64` in the supported local emulator or on hardware.
-3. Confirm the banner reports `CASM V0.1.15.1070` (`CASM` with no arguments, or
+3. Confirm the banner reports `CASM V0.1.15.1077` (`CASM` with no arguments, or
    `VER`). A different build number means the image is stale — rebuild.
 4. Do **not** use the broken `c64-testing` MCP or any web emulator; both are
    prohibited for this work package.
@@ -91,7 +91,7 @@ where the raise site makes them unambiguous, otherwise **RECORD** the column.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G0.1 | `DIR` | Directory lists shipping apps, `casmemit1.ref` and `casmhello.ref` as PRG, and the `casm*` SEQ fixtures; 315 blocks free | |
+| G0.1 | `DIR` | Directory lists shipping apps, `casmemit1.ref`, `casmhello.ref` and `casmmodes.ref` as PRG, and the `casm*` SEQ fixtures; 313 blocks free | |
 | G0.2 | `VER` | Command 64 banner | |
 | G0.3 | `CASM` | `CASM: SOURCE FILE REQUIRED` | |
 
@@ -136,10 +136,48 @@ Each expects `CASM: INPUT VALIDATED`. `DEL` the output between cases.
 | G2.5 | `CASM CASMBRP1` | branch displacement +127 (target `$C081`) | |
 | G2.6 | `CASM CASMBRN1` | branch displacement −128 (target `$BF82`) | |
 | G2.7 | `CASM CASMPCEND` | final byte lands exactly on `$FFFF` | |
+| G2.8 | `CASM CASMMODES` | `CASM: INPUT VALIDATED` — one legal statement per `CASM_MODE_*` | |
+| G2.9 | `COMP CASMMODES.PRG CASMMODES.REF` | reported identical — **byte-certifies one opcode per addressing mode** | |
 
 For G2.3, optionally `TYPE`/inspect the output: `LDA $FF` must assemble to a
 2-byte zero-page form and `LDA $0100` to a 3-byte absolute form, so the output
 is 2 (header) + 2 + 3 = 7 bytes.
+
+G2.9 is the strongest single test in this plan: it is the only case that checks
+the actual opcode byte for indexed, indirect, ZP,Y and accumulator modes rather
+than merely that they assemble. **It has already earned its keep**: on first run
+it failed at offset `$0A` with CASM emitting `$BE` (`LDX absolute,Y`) where the
+reference has `$B6` (`LDX zero-page,Y`), exposing a defect that made
+`CASM_MODE_ZEROPAGE_Y` permanently unreachable. That is now fixed, and this case
+is its regression test. Its 30 reference bytes are:
+
+```text
+casmmodes.ref (30 bytes)
+  00 C0 E8 0A A9 01 A5 10 B5 10 B6 10 AD 34 12
+  BD 34 12 B9 34 12 6C 34 12 A1 10 B1 10 D0 E4
+```
+
+Per-mode mapping, if a mismatch needs localising:
+
+| Offset | Bytes | Statement | Mode |
+|--------|-------|-----------|------|
+| 0 | `00 C0` | (PRG header, `$C000`) | — |
+| 2 | `E8` | `INX` | IMPLIED |
+| 3 | `0A` | `ASL A` | ACCUMULATOR |
+| 4 | `A9 01` | `LDA #$01` | IMMEDIATE |
+| 6 | `A5 10` | `LDA $10` | ZEROPAGE |
+| 8 | `B5 10` | `LDA $10,X` | ZEROPAGE_X |
+| 10 | `B6 10` | `LDX $10,Y` | ZEROPAGE_Y |
+| 12 | `AD 34 12` | `LDA $1234` | ABSOLUTE |
+| 15 | `BD 34 12` | `LDA $1234,X` | ABSOLUTE_X |
+| 18 | `B9 34 12` | `LDA $1234,Y` | ABSOLUTE_Y |
+| 21 | `6C 34 12` | `JMP ($1234)` | INDIRECT |
+| 24 | `A1 10` | `LDA ($10,X)` | INDEXED_INDIRECT |
+| 26 | `B1 10` | `LDA ($10),Y` | INDIRECT_INDEXED |
+| 28 | `D0 E4` | `BNE $C000` | RELATIVE |
+
+**Do not run `CASMMODES.PRG`** — it ends in a `JMP` through an uninitialised
+vector and a backward branch. It exists only to be assembled and compared.
 
 ### G3 — Syntax and delimiter diagnostics
 
@@ -275,7 +313,7 @@ Confirms the source-context rendering still works after WP14.
 | leading / trailing / doubled commas | G3.3, G3.5, G3.4 |
 | missing `.ORG` operand; trailing `.ORG` token | G3.7, G3.9 |
 | empty lines / comments around valid statements | G2.1 |
-| legal case per `CASM_MODE_*` | G2.2–G2.6, G1.1 (partial — see gaps) |
+| legal case per `CASM_MODE_*` | G2.8, G2.9 (byte-certified, all 13 modes) |
 | illegal mnemonic/mode combinations | G8.7, G8.8 |
 | immediate and ZP-indirect at `$FF` and `$100` | G2.2, G4.1, G2.4, G4.2 |
 | ZP/absolute promotion at `$00FF`/`$0100` | G2.3 |
@@ -291,12 +329,14 @@ Confirms the source-context rendering still works after WP14.
 
 ## 7. Known Coverage Gaps
 
-- **No per-addressing-mode byte-level reference.** G2 proves the mode fixtures
-  *assemble*, not that each opcode byte is correct. Only `casmemit1` and
-  `casmhello` are byte-verified, and between them they cover implied, immediate,
-  absolute, relative, `.BYTE` and `.WORD` — not indexed, indirect, ZP,Y, or
-  accumulator. A `casmmodes.ref` manifest would close this and is the single
-  highest-value follow-up. Full 151-opcode certification remains Phase 11.
+- **CLOSED**: the per-addressing-mode byte-level gap. `casmmodes.ref` (G2.8/G2.9)
+  now byte-certifies one opcode for each of the 13 `CASM_MODE_*` values,
+  covering the indexed, indirect, ZP,Y and accumulator modes that `casmemit1`
+  and `casmhello` do not reach.
+- **One opcode per mode, not all opcodes.** G2.9 certifies a representative
+  instruction per addressing mode; it does not certify all 151 opcodes. A
+  defect affecting only, say, `STA` absolute,Y while `LDA` absolute,Y is correct
+  would still pass. Full 151-opcode certification remains Phase 11 hardening.
 - `casmerr2` / `casmerr3` exist but are not scheduled above; add them to G8 if a
   fuller regression sweep is wanted.
 - Labels, expressions, `.STATIC`/`.RELOC`/`.INCLUDE`, VMM, two-pass assembly and
@@ -309,6 +349,7 @@ Confirms the source-context rendering still works after WP14.
 WP14 runtime verification is complete when:
 
 1. All G1 cases pass — the primary binary-equality gate.
+1b. G2.8 and G2.9 pass — per-addressing-mode byte certification.
 2. G3.7 and G3.8 confirm the `.ORG` fix, and G8.2 confirms no duplicate-`.ORG`
    regression.
 3. All G5 cases confirm no partial output survives a failure.
