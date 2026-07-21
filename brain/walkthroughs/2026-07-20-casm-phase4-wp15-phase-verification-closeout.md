@@ -10,9 +10,10 @@ Plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 Taskwarrior: `8612c2a2-afdd-4c8f-bf42-4947bc486f97`
 Phase 4 milestone: `4796b60c-5f4a-43c7-8270-436075bb3f7b`
 
-**Status: awaiting the user's runtime session (increment 9).** Every host-side
-gate below has passed. Phase 4 is not closed and must not be marked closed until
-the manual section is executed and separately approved.
+**Status: all automated and manual gates pass; awaiting the two approval gates
+(increment 10).** Every host-side check and the full runtime session passed.
+Phase 4 is not closed and must not be marked closed until the user explicitly
+approves it, separately from approving WP15.
 
 ## Repository State
 
@@ -159,8 +160,8 @@ cleanup — direct evidence for the "retain the original primary diagnostic" gat
 `startFatal` choke point, which calls `outputAbort` before `exitFatal`.
 `outputAbort` closes the handle, records a close failure as secondary without
 clobbering the primary, and deletes the output only when `CasmOutputCreated` is
-set. See the G7 hazard below for the one case where that last condition is
-load-bearing.
+set. See the G7 analysis below: runtime confirmed no data loss, but that
+condition turns out not to be what protects the file.
 
 ## Increment 7 — version advance (D1)
 
@@ -175,7 +176,56 @@ file on `image.d64` and `test.d64` is byte-identical to `build/casm.prg`.
 
 ---
 
-# Manual Runtime Session (increment 9) — PENDING
+# Manual Runtime Session (increment 9) — COMPLETE, ALL PASS
+
+Executed by the user on 2026-07-21 against `CASM V0.1.17.1079` from `test.d64`.
+**Every step passed.** The two open WP14 observations are now recorded, closing
+the D4 gap.
+
+Summary of the two predictions:
+
+- **G4.2 — confirmed.** The static prediction held.
+- **G7 — falsified, in the safe direction.** CASM does **not** clobber or
+  corrupt an existing output file. The predicted deletion does not occur. The
+  mechanism is analysed below, because the reason it is safe is not the reason
+  the code appears to be safe, and that distinction matters for Phase 5+.
+
+## G7 root-cause analysis (prediction falsified)
+
+The prediction was that assembling over an existing output would delete the
+original. It does not. Tracing the actual path:
+
+1. `fileOpen` builds `NAME,P,W` with **no `@` replace prefix** — as predicted.
+2. `fileOpen` **skips error-channel verification for write-mode opens**
+   (`src/command64/file.asm:207-208`, `lda OpenMode / bne foSkipReadVerify`).
+   The read path checks LFN 15 for a `"00"` status; the write path does not.
+   So the open returns a valid handle with `63,FILE EXISTS` latched on the
+   drive's error channel — also as predicted.
+3. The write consequently fails and CASM raises, routing through `startFatal`
+   -> `outputAbort` — as predicted.
+4. **Where the prediction broke:** `outputAbort` does reach `fileDelete` with
+   `CasmOutputCreated` set, but `fileDelete` calls `checkDeviceReady`
+   (`src/command64/file.asm:503`), which reads the error channel first. The
+   latched `63,FILE EXISTS` is a non-`"00"` status, so the preflight bails and
+   `fileDelete` returns carry set. `outputAbort` records that as a *secondary*
+   diagnostic via `oaRecordSecondary`, preserving the primary, and returns
+   **without deleting**.
+
+The user's file is therefore safe — but it is saved by the stale drive error
+status blocking the delete, not by CASM declining to delete a file it did not
+create. `CasmOutputCreated` is set for a file CASM merely opened. The safety
+depends on the drive still holding a non-`"00"` status at the moment
+`fileDelete` runs.
+
+**This is not a WP15 defect and not a Phase 4 blocker** — the observable
+behaviour is correct and no data is lost. It is recorded here as a latent
+fragility worth hardening later: `fileCreateOutput` should distinguish "created"
+from "opened an existing file", so the delete decision does not rely on drive
+error state. Filed as an observation for the Phase 11 hardening pass rather than
+remediated here, since WP15 may not patch production code and no failure is
+observable today.
+
+## Detailed results
 
 Run on the supported local emulator or hardware from `test.d64`. The broken
 `c64-testing` MCP and web emulators are prohibited; these steps are yours to
@@ -185,26 +235,26 @@ execute. Record the observed result for every row, including passes.
 
 | Step | Command | Expected | Observed |
 |---|---|---|---|
-| S1 | Run `CASM` with no argument | Banner `CASM V0.1.17.1079`, then a clean missing-source diagnostic; shell returns | |
-| S2 | `CASM CASMEMIT1` | `INPUT VALIDATED`, output `CASMEMIT1.PRG` | |
-| S3 | `COMP CASMEMIT1.PRG CASMEMIT1.REF` | files identical | |
-| S4 | `CASM CASMHELLO` | `INPUT VALIDATED`, output `CASMHELLO.PRG` | |
-| S5 | `COMP CASMHELLO.PRG CASMHELLO.REF` | files identical | |
-| S6 | `CASM CASMMODES` | `INPUT VALIDATED`, output `CASMMODES.PRG` | |
-| S7 | `COMP CASMMODES.PRG CASMMODES.REF` | files identical | |
-| S8 | Load and run `CASMHELLO.PRG` | prints `YES IT BUILDS! -- CASM`, returns to shell | |
-| S9 | `CASM CASMEMIT1 /O TESTOUT` | output named `TESTOUT.PRG` | |
-| S10 | `CASM CASMEMIT1 /S` | `/S` behaviour matches the default output behaviour | |
-| S11 | `CASM CASMEMIT1 /M` | map option handled; **no partial output left behind** | |
-| S12 | `CASM CASMEMIT1 /L` | listing option handled; **no partial output left behind** | |
+| S1 | Run `CASM` with no argument | Banner `CASM V0.1.17.1079`, then a clean missing-source diagnostic; shell returns | pass |
+| S2 | `CASM CASMEMIT1` | `INPUT VALIDATED`, output `CASMEMIT1.PRG` | pass |
+| S3 | `COMP CASMEMIT1.PRG CASMEMIT1.REF` | files identical | pass |
+| S4 | `CASM CASMHELLO` | `INPUT VALIDATED`, output `CASMHELLO.PRG` | pass |
+| S5 | `COMP CASMHELLO.PRG CASMHELLO.REF` | files identical | pass |
+| S6 | `CASM CASMMODES` | `INPUT VALIDATED`, output `CASMMODES.PRG` | pass |
+| S7 | `COMP CASMMODES.PRG CASMMODES.REF` | files identical | pass |
+| S8 | Load and run `CASMHELLO.PRG` | prints `YES IT BUILDS! -- CASM`, returns to shell | pass |
+| S9 | `CASM CASMEMIT1 /O TESTOUT` | output named `TESTOUT.PRG` | pass |
+| S10 | `CASM CASMEMIT1 /S` | `/S` behaviour matches the default output behaviour | pass |
+| S11 | `CASM CASMEMIT1 /M` | map option handled; **no partial output left behind** | pass |
+| S12 | `CASM CASMEMIT1 /L` | listing option handled; **no partial output left behind** | pass |
 
 ## T. Shell integrity
 
 | Step | Command | Expected | Observed |
 |---|---|---|---|
-| T1 | `DIR` after the above | directory lists correctly, no lost/open files | |
-| T2 | Run another external app (e.g. `COMP` with no args) | runs and returns normally | |
-| T3 | `CASM CASMAM1` (a failing fixture), then `CASM CASMEMIT1` twice | failure diagnoses cleanly; both later runs succeed; no handle leak | |
+| T1 | `DIR` after the above | directory lists correctly, no lost/open files | pass |
+| T2 | Run another external app (e.g. `COMP` with no args) | runs and returns normally | pass |
+| T3 | `CASM CASMAM1` (a failing fixture), then `CASM CASMEMIT1` twice | failure diagnoses cleanly; both later runs succeed; no handle leak | pass |
 
 ## G4.2 — the `casmzpi2` diagnostic (WP14 gap)
 
@@ -218,7 +268,7 @@ Fixture: `.ORG $C000` / `LDA ($100,X)` — indexed-indirect with a >8-bit operan
 
 | Step | Command | Predicted | Observed |
 |---|---|---|---|
-| G4.2 | `CASM CASMZPI2` | `CASM: OPERAND OUT OF RANGE`, source position line 2 | |
+| G4.2 | `CASM CASMZPI2` | `CASM: OPERAND OUT OF RANGE`, source position line 2 | **pass — prediction confirmed** |
 
 A different diagnostic is a finding, not a reason to amend the prediction.
 
@@ -237,9 +287,9 @@ that a failed re-assembly **scratches the user's pre-existing file**.
 
 | Step | Command | Predicted | Observed |
 |---|---|---|---|
-| G7.1 | `CASM CASMEMIT1` twice in a row | second run fails rather than silently replacing | |
-| G7.2 | After the failure, `DIR` | **check whether `CASMEMIT1.PRG` still exists** | |
-| G7.3 | If it exists, `COMP CASMEMIT1.PRG CASMEMIT1.REF` | still identical, i.e. the original survived intact | |
+| G7.1 | `CASM CASMEMIT1` twice in a row | second run fails rather than silently replacing | pass — second run reported an error |
+| G7.2 | After the failure, `DIR` | **check whether `CASMEMIT1.PRG` still exists** | pass — file still present, not deleted |
+| G7.3 | If it exists, `COMP CASMEMIT1.PRG CASMEMIT1.REF` | still identical, i.e. the original survived intact | pass — original intact, not corrupted |
 
 If G7.2 shows the pre-existing file was deleted, that is a **stop condition**:
 it goes to RCA and a separately approved remediation plan. WP15 must not patch
@@ -247,19 +297,49 @@ it, and Phase 4 must not be marked done until it is resolved.
 
 ---
 
+## Phase 4 Acceptance Matrix — result
+
+| Gate | Evidence | Result |
+|---|---|---|
+| Parser and delimiter | WP14 23-fixture matrix (D3 standing evidence); T3 rerun | pass |
+| Opcode and sizing | WP14 matrix plus `casmmodes.ref` per-mode certification (S6/S7) | pass |
+| Branch and PC | WP14 matrix (`casmbrp1/2`, `casmbrn1/2`, `casmpcend`, `casmpcovf`) | pass |
+| Output and resource | S2-S12, T1-T3, G7.1-G7.3; no-change build held `BUILD_CASM` | pass |
+| Envelope and release | Increments 4-5: 408 B headroom both configs; both disks verified | pass |
+
 ## Completion Gates — both PENDING
 
-1. **WP15 completion** — requires every gate above to pass and your explicit
-   approval to mark WP15 complete.
+1. **WP15 completion** — every automated and manual gate now passes; requires
+   the user's explicit approval to mark WP15 complete.
 2. **Phase 4 completion** — a *separate* explicit confirmation that the phase is
    done. Approving the runtime matrix does not imply either.
 
 Phase 5 remains planned and blocked behind gate 2. On closure, the WP16 plan's
 `0.1.16` / build-1078 baseline must be amended to `0.1.17` / 1079.
 
+## Carried-Forward Observations
+
+Neither blocks Phase 4; both are recorded so they are not rediscovered later.
+
+1. **`CasmOutputCreated` conflates created with opened.** See the G7 analysis.
+   The pre-existing file survives because a latched drive error blocks the
+   delete, not because CASM declines to delete a file it did not create.
+   Suggested for the Phase 11 hardening pass.
+2. **No `CLD` at entry.** CASM contains no `SED` and every `ADC`/`SBC` path
+   establishes carry, but it assumes the caller left decimal mode clear. Worth
+   reconciling against the Phase 5 contract's "decimal mode is never assumed"
+   wording.
+3. **No CASM Phase 4 contract section in `brain/KNOWLEDGE.md`.** Phases 1-3 have
+   one; Phase 4 does not. Deliberately not authored retroactively here, per the
+   WP16 plan's Finding 4. Deferred to Phase 11 documentation hardening.
+
 ## Progress
 
 - 2026-07-21: Increments 1-8 complete. Three record defects found and fixed in
-  increment 2. Version advanced to `0.1.17` build 1079. Awaiting the user's
-  runtime session for increment 9, including two static predictions to confirm
-  or falsify (G4.2 diagnostic identity, G7 pre-existing-output deletion hazard).
+  increment 2. Version advanced to `0.1.17` build 1079.
+- 2026-07-21: Increment 9 complete. User executed the full session; **all steps
+  pass**. G4.2 confirmed the static prediction. G7 **falsified** it in the safe
+  direction — no clobbering or corruption of an existing output file — and the
+  root cause was traced to `fileDelete`'s `checkDeviceReady` preflight bailing on
+  the latched `63,FILE EXISTS` status. Both WP14 evidence gaps are now closed.
+  Awaiting the two approval gates.
