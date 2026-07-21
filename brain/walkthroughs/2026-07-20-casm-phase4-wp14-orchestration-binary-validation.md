@@ -103,19 +103,25 @@ are prohibited.
 > full traceability to the acceptance matrix. The tables below are the summary
 > view; where the two differ, the test plan wins.
 
-Attach `build/test.d64`. **Every expected result below is derived from static
-reading of `parser.s`/`emit.s`, not from executing CASM.** Record actual results
-in the Result column; a mismatch is a finding, not necessarily a fixture error.
+**Result: all cases passed on 2026-07-21**, on build `0.1.15.1077` (i.e. after
+both defect fixes). The expectations below were originally derived from static
+reading of `parser.s`/`emit.s`; they are now runtime-confirmed. The detailed
+per-case record lives in
+`brain/plans/2026-07-21-casm-phase4-wp14-test-plan.md`.
+
+Two cases were "record what happens" probes rather than pass/fail assertions and
+their observed values are still to be written down: the exact diagnostic for
+`casmzpi2` (G4.2), and the re-run-over-existing-output behaviour (G7.1-G7.3).
 
 ### A. Binary equality (the primary WP14 gate)
 
 | Step | Command | Expected | Result |
 |---|---|---|---|
-| A1 | `CASM CASMEMIT1` | `INPUT VALIDATED`, output `CASMEMIT1.PRG` | |
-| A2 | `COMP CASMEMIT1.PRG CASMEMIT1.REF` | files identical | |
-| A3 | `CASM CASMHELLO` | `INPUT VALIDATED`, output `CASMHELLO.PRG` | |
-| A4 | `COMP CASMHELLO.PRG CASMHELLO.REF` | files identical | |
-| A5 | `LOAD"CASMHELLO",8` then `GO 3400` | prints `YES IT BUILDS! -- CASM`, returns to shell | |
+| A1 | `CASM CASMEMIT1` | `INPUT VALIDATED`, output `CASMEMIT1.PRG` |  pass |
+| A2 | `COMP CASMEMIT1.PRG CASMEMIT1.REF` | files identical |  pass |
+| A3 | `CASM CASMHELLO` | `INPUT VALIDATED`, output `CASMHELLO.PRG` |  pass |
+| A4 | `COMP CASMHELLO.PRG CASMHELLO.REF` | files identical |  pass |
+| A5 | `LOAD"CASMHELLO",8` then `GO 3400` | prints `YES IT BUILDS! -- CASM`, returns to shell |  pass |
 
 > A1–A4 passed on the pre-increment-5 build. They must be re-run here because
 > the `.ORG` guard changed `emit.s`.
@@ -124,37 +130,37 @@ in the Result column; a mismatch is a finding, not necessarily a fixture error.
 
 | Step | Command | Expected | Result |
 |---|---|---|---|
-| B1 | `CASM CASMCMNT` | `INPUT VALIDATED` (comments/blank lines tolerated) | |
-| B2 | `CASM CASMIMM1` | `INPUT VALIDATED` (`#$FF` is the 8-bit max) | |
-| B3 | `CASM CASMZP1` | `INPUT VALIDATED` (`$FF` zero-page, `$0100` absolute) | |
-| B4 | `CASM CASMZPI1` | `INPUT VALIDATED` (ZP-indirect at `$FF`) | |
-| B5 | `CASM CASMBRP1` | `INPUT VALIDATED` (branch +127) | |
-| B6 | `CASM CASMBRN1` | `INPUT VALIDATED` (branch −128) | |
-| B7 | `CASM CASMPCEND` | `INPUT VALIDATED` (last byte lands on `$FFFF`) | |
+| B1 | `CASM CASMCMNT` | `INPUT VALIDATED` (comments/blank lines tolerated) |  pass |
+| B2 | `CASM CASMIMM1` | `INPUT VALIDATED` (`#$FF` is the 8-bit max) |  pass |
+| B3 | `CASM CASMZP1` | `INPUT VALIDATED` (`$FF` zero-page, `$0100` absolute) |  pass |
+| B4 | `CASM CASMZPI1` | `INPUT VALIDATED` (ZP-indirect at `$FF`) |  pass |
+| B5 | `CASM CASMBRP1` | `INPUT VALIDATED` (branch +127) |  pass |
+| B6 | `CASM CASMBRN1` | `INPUT VALIDATED` (branch −128) |  pass |
+| B7 | `CASM CASMPCEND` | `INPUT VALIDATED` (last byte lands on `$FFFF`) |  pass |
 
 ### C. Syntax and delimiter diagnostics
 
 | Step | Command | Expected | Result |
 |---|---|---|---|
-| C1 | `CASM CASMBYTE0` | `SYNTAX ERROR` (empty `.BYTE`) | |
-| C2 | `CASM CASMWORD0` | `SYNTAX ERROR` (empty `.WORD`) | |
-| C3 | `CASM CASMCMA1` | `SYNTAX ERROR` (leading comma) | |
-| C4 | `CASM CASMCMA2` | `SYNTAX ERROR` (doubled comma) | |
-| C5 | `CASM CASMCMA3` | `SYNTAX ERROR` (trailing comma) | |
-| C6 | `CASM CASMBYRNG` | `OPERAND OUT OF RANGE` (`.BYTE $100`) | |
-| C7 | `CASM CASMORG3` | `SYNTAX ERROR` — **the fixed defect**; must NOT succeed | |
-| C8 | `CASM CASMORG5` | `SYNTAX ERROR` (`.ORG A`) | |
-| C9 | `CASM CASMORG4` | `EXPECTED NEWLINE` (trailing `.ORG` token) | |
+| C1 | `CASM CASMBYTE0` | `SYNTAX ERROR` (empty `.BYTE`) |  pass |
+| C2 | `CASM CASMWORD0` | `SYNTAX ERROR` (empty `.WORD`) |  pass |
+| C3 | `CASM CASMCMA1` | `SYNTAX ERROR` (leading comma) |  pass |
+| C4 | `CASM CASMCMA2` | `SYNTAX ERROR` (doubled comma) |  pass |
+| C5 | `CASM CASMCMA3` | `SYNTAX ERROR` (trailing comma) |  pass |
+| C6 | `CASM CASMBYRNG` | `OPERAND OUT OF RANGE` (`.BYTE $100`) |  pass |
+| C7 | `CASM CASMORG3` | `SYNTAX ERROR` — **the fixed defect**; must NOT succeed |  pass |
+| C8 | `CASM CASMORG5` | `SYNTAX ERROR` (`.ORG A`) |  pass |
+| C9 | `CASM CASMORG4` | `EXPECTED NEWLINE` (trailing `.ORG` token) |  pass |
 
 ### D. Addressing, range, and PC diagnostics
 
 | Step | Command | Expected | Result |
 |---|---|---|---|
-| D1 | `CASM CASMIMM2` | `OPERAND OUT OF RANGE` (`#$100`) | |
-| D2 | `CASM CASMZPI2` | a range or addressing-mode diagnostic — **record which** | |
-| D3 | `CASM CASMBRP2` | `BRANCH OUT OF RANGE` (+128) | |
-| D4 | `CASM CASMBRN2` | `BRANCH OUT OF RANGE` (−129) | |
-| D5 | `CASM CASMPCOVF` | `ADDRESS OVERFLOW` (past `$FFFF`) | |
+| D1 | `CASM CASMIMM2` | `OPERAND OUT OF RANGE` (`#$100`) |  pass |
+| D2 | `CASM CASMZPI2` | a range or addressing-mode diagnostic — **record which** |  pass |
+| D3 | `CASM CASMBRP2` | `BRANCH OUT OF RANGE` (+128) |  pass |
+| D4 | `CASM CASMBRN2` | `BRANCH OUT OF RANGE` (−129) |  pass |
+| D5 | `CASM CASMPCOVF` | `ADDRESS OVERFLOW` (past `$FFFF`) |  pass |
 
 Each diagnostic should print with its source line and caret (DSC1 behavior).
 
@@ -162,20 +168,20 @@ Each diagnostic should print with its source line and caret (DSC1 behavior).
 
 | Step | Command | Expected | Result |
 |---|---|---|---|
-| E1 | `CASM CASMPART` | `SYNTAX ERROR` after several statements assembled | |
-| E2 | `DIR` | **no** `CASMPART.PRG` — the partial output was deleted | |
-| E3 | `CASM CASMCMA2` then `DIR` | `SYNTAX ERROR`; no `CASMCMA2.PRG` left behind | |
-| E4 | `CASM CASMEMIT1` again, then `COMP` as in A2 | still identical after the failures | |
-| E5 | `DIR`, then run another app (e.g. `COMP` with no args), then `CASM CASMEMIT1` | shell intact and CASM still works after every failure | |
+| E1 | `CASM CASMPART` | `SYNTAX ERROR` after several statements assembled |  pass |
+| E2 | `DIR` | **no** `CASMPART.PRG` — the partial output was deleted |  pass |
+| E3 | `CASM CASMCMA2` then `DIR` | `SYNTAX ERROR`; no `CASMCMA2.PRG` left behind |  pass |
+| E4 | `CASM CASMEMIT1` again, then `COMP` as in A2 | still identical after the failures |  pass |
+| E5 | `DIR`, then run another app (e.g. `COMP` with no args), then `CASM CASMEMIT1` | shell intact and CASM still works after every failure |  pass |
 
 ### F. CLI options
 
 | Step | Command | Expected | Result |
 |---|---|---|---|
-| F1 | `CASM CASMEMIT1 /S` | accepted (static is the default output mode) | |
-| F2 | `CASM CASMEMIT1 /M` | `NOT IMPLEMENTED`, and `DIR` shows no output left behind | |
-| F3 | `CASM CASMEMIT1 /L` | `NOT IMPLEMENTED`, and `DIR` shows no output left behind | |
-| F4 | `CASM CASMEMIT1 /O:MYOUT.PRG` then `COMP MYOUT.PRG CASMEMIT1.REF` | identical (explicit `/O` name) | |
+| F1 | `CASM CASMEMIT1 /S` | accepted (static is the default output mode) |  pass |
+| F2 | `CASM CASMEMIT1 /M` | `NOT IMPLEMENTED`, and `DIR` shows no output left behind |  pass |
+| F3 | `CASM CASMEMIT1 /L` | `NOT IMPLEMENTED`, and `DIR` shows no output left behind |  pass |
+| F4 | `CASM CASMEMIT1 /O:MYOUT.PRG` then `COMP MYOUT.PRG CASMEMIT1.REF` | identical (explicit `/O` name) |  pass |
 
 ## Known Limitations / Follow-ups
 

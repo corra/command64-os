@@ -561,3 +561,32 @@ Phase 4; it unblocks WP15.
     The test plan and walkthrough were updated to expect banner `0.1.15.1077`.
   - G2.9 must be re-run to confirm the fix; it is now the regression test for
     this defect.
+- 2026-07-21: G2.9 CONFIRMED PASS by user runtime. `COMP CASMMODES.PRG
+  CASMMODES.REF` reports the files identical after the `CASM_MODE_ZEROPAGE_Y`
+  fix. This closes the loop on the second defect: the same comparison that
+  exposed it now certifies one correct opcode byte for each of the 13
+  `CASM_MODE_*` values, including the indexed, indirect, ZP,Y and accumulator
+  modes that `casmemit1`/`casmhello` never reach. `casmmodes.ref` is now the
+  standing regression test for that defect.
+- 2026-07-21: Increment 8 COMPLETE — user reports the full runtime matrix passes
+  on build `0.1.15.1077`, i.e. after both defect fixes. All ten groups (G0
+  environment, G1 binary equality, G2 positives incl. the per-mode certification,
+  G3 syntax/delimiter, G4 addressing/range/PC, G5 cleanup and partial-output
+  deletion, G6 CLI options, G7 stale output, G8 regression, G9 DSC1
+  presentation) are green. Recorded in the test plan's Result column and
+  summarised in the walkthrough.
+  - This confirms by execution several behaviours WP14 had only verified by
+    reading: the `outputAbort` partial-PRG delete (G5.1-G5.4), the contrast case
+    where a pre-emission failure leaves nothing to abort (G5.5), `/M` and `/L`
+    rejection before output creation (G6.4/G6.5), and that a valid run after
+    every failure still returns to an intact shell (G5.6/G5.7).
+  - Both defect fixes are runtime-confirmed: G3.7/G3.8 (bare `.ORG` and `.ORG A`
+    now rejected) and G2.9 (`CASM_MODE_ZEROPAGE_Y` now reachable), with G8.2
+    confirming no duplicate-`.ORG` regression from the guard ordering.
+  - Outstanding for the record only, not blocking: G4.2 and G7.1-G7.3 were
+    "record what happens" probes rather than pass/fail assertions, so their
+    observed values still need writing down — the exact diagnostic `casmzpi2`
+    produces, and what actually happens when CASM assembles over an existing
+    output file. The latter is the `,P,W` no-replace hazard documented in the
+    test plan's isolation protocol; knowing the real behaviour would let that
+    section be tightened or relaxed.

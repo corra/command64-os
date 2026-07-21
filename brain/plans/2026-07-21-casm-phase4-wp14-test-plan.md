@@ -1,7 +1,7 @@
 ---
 feature: casm-phase4-wp14-test-plan
 created: 2026-07-21
-status: ready-to-execute
+status: executed-all-pass
 ---
 
 # CASM Phase 4 WP14 — Detailed Runtime Test Plan
@@ -91,9 +91,9 @@ where the raise site makes them unambiguous, otherwise **RECORD** the column.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G0.1 | `DIR` | Directory lists shipping apps, `casmemit1.ref`, `casmhello.ref` and `casmmodes.ref` as PRG, and the `casm*` SEQ fixtures; 313 blocks free | |
-| G0.2 | `VER` | Command 64 banner | |
-| G0.3 | `CASM` | `CASM: SOURCE FILE REQUIRED` | |
+| G0.1 | `DIR` | Directory lists shipping apps, `casmemit1.ref`, `casmhello.ref` and `casmmodes.ref` as PRG, and the `casm*` SEQ fixtures; 313 blocks free | PASS |
+| G0.2 | `VER` | Command 64 banner | PASS |
+| G0.3 | `CASM` | `CASM: SOURCE FILE REQUIRED` | PASS |
 
 ### G1 — Binary equality (primary WP14 gate)
 
@@ -102,12 +102,12 @@ check that the `.PRG` does not already exist.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G1.1 | `CASM CASMEMIT1` | `CASM: INPUT VALIDATED` | |
-| G1.2 | `DIR` | `CASMEMIT1.PRG` present, 1 block | |
-| G1.3 | `COMP CASMEMIT1.PRG CASMEMIT1.REF` | reported identical | |
-| G1.4 | `CASM CASMHELLO` | `CASM: INPUT VALIDATED` | |
-| G1.5 | `COMP CASMHELLO.PRG CASMHELLO.REF` | reported identical | |
-| G1.6 | `LOAD"CASMHELLO",8` then `GO 3400` | prints `YES IT BUILDS! -- CASM`, returns cleanly to the shell | |
+| G1.1 | `CASM CASMEMIT1` | `CASM: INPUT VALIDATED` | PASS |
+| G1.2 | `DIR` | `CASMEMIT1.PRG` present, 1 block | PASS |
+| G1.3 | `COMP CASMEMIT1.PRG CASMEMIT1.REF` | reported identical | PASS |
+| G1.4 | `CASM CASMHELLO` | `CASM: INPUT VALIDATED` | PASS |
+| G1.5 | `COMP CASMHELLO.PRG CASMHELLO.REF` | reported identical | PASS |
+| G1.6 | `LOAD"CASMHELLO",8` then `GO 3400` | prints `YES IT BUILDS! -- CASM`, returns cleanly to the shell | PASS |
 
 > G1.1–G1.5 passed on the pre-increment-5 build. They **must** be re-run: the
 > `.ORG` guard changed `emit.s` after that result was captured.
@@ -129,15 +129,15 @@ Each expects `CASM: INPUT VALIDATED`. `DEL` the output between cases.
 
 | ID | Command | Covers | Result |
 |----|---------|--------|--------|
-| G2.1 | `CASM CASMCMNT` | comments and blank lines around valid statements, including before `.ORG` and at EOF | |
-| G2.2 | `CASM CASMIMM1` | immediate at the 8-bit maximum (`#$FF`) | |
-| G2.3 | `CASM CASMZP1` | zero-page (`$FF`) vs absolute (`$0100`) promotion | |
-| G2.4 | `CASM CASMZPI1` | zero-page indirect forms at `$FF` | |
-| G2.5 | `CASM CASMBRP1` | branch displacement +127 (target `$C081`) | |
-| G2.6 | `CASM CASMBRN1` | branch displacement −128 (target `$BF82`) | |
-| G2.7 | `CASM CASMPCEND` | final byte lands exactly on `$FFFF` | |
-| G2.8 | `CASM CASMMODES` | `CASM: INPUT VALIDATED` — one legal statement per `CASM_MODE_*` | |
-| G2.9 | `COMP CASMMODES.PRG CASMMODES.REF` | reported identical — **byte-certifies one opcode per addressing mode** | |
+| G2.1 | `CASM CASMCMNT` | comments and blank lines around valid statements, including before `.ORG` and at EOF | PASS |
+| G2.2 | `CASM CASMIMM1` | immediate at the 8-bit maximum (`#$FF`) | PASS |
+| G2.3 | `CASM CASMZP1` | zero-page (`$FF`) vs absolute (`$0100`) promotion | PASS |
+| G2.4 | `CASM CASMZPI1` | zero-page indirect forms at `$FF` | PASS |
+| G2.5 | `CASM CASMBRP1` | branch displacement +127 (target `$C081`) | PASS |
+| G2.6 | `CASM CASMBRN1` | branch displacement −128 (target `$BF82`) | PASS |
+| G2.7 | `CASM CASMPCEND` | final byte lands exactly on `$FFFF` | PASS |
+| G2.8 | `CASM CASMMODES` | `CASM: INPUT VALIDATED` — one legal statement per `CASM_MODE_*` | PASS |
+| G2.9 | `COMP CASMMODES.PRG CASMMODES.REF` | reported identical — **byte-certifies one opcode per addressing mode** | **PASS** 2026-07-21 (after the ZEROPAGE_Y fix) |
 
 For G2.3, optionally `TYPE`/inspect the output: `LDA $FF` must assemble to a
 2-byte zero-page form and `LDA $0100` to a 3-byte absolute form, so the output
@@ -183,15 +183,15 @@ vector and a backward branch. It exists only to be assembled and compared.
 
 | ID | Command | Expected message | Line | Result |
 |----|---------|------------------|------|--------|
-| G3.1 | `CASM CASMBYTE0` | `CASM: SYNTAX ERROR` (empty `.BYTE`) | 2 | |
-| G3.2 | `CASM CASMWORD0` | `CASM: SYNTAX ERROR` (empty `.WORD`) | 2 | |
-| G3.3 | `CASM CASMCMA1` | `CASM: SYNTAX ERROR` (leading comma) | 2 | |
-| G3.4 | `CASM CASMCMA2` | `CASM: SYNTAX ERROR` (doubled comma) | 2 | |
-| G3.5 | `CASM CASMCMA3` | `CASM: SYNTAX ERROR` (trailing comma) | 2 | |
-| G3.6 | `CASM CASMBYRNG` | `CASM: OPERAND OUT OF RANGE` (`.BYTE $100`) | 2 | |
-| G3.7 | `CASM CASMORG3` | `CASM: SYNTAX ERROR` — **the fixed defect. Must NOT print INPUT VALIDATED** | 1 | |
-| G3.8 | `CASM CASMORG5` | `CASM: SYNTAX ERROR` (`.ORG A`) | 1 | |
-| G3.9 | `CASM CASMORG4` | `CASM: EXPECTED NEWLINE` (trailing `.ORG` token) | 1 | |
+| G3.1 | `CASM CASMBYTE0` | `CASM: SYNTAX ERROR` (empty `.BYTE`) | 2 | PASS |
+| G3.2 | `CASM CASMWORD0` | `CASM: SYNTAX ERROR` (empty `.WORD`) | 2 | PASS |
+| G3.3 | `CASM CASMCMA1` | `CASM: SYNTAX ERROR` (leading comma) | 2 | PASS |
+| G3.4 | `CASM CASMCMA2` | `CASM: SYNTAX ERROR` (doubled comma) | 2 | PASS |
+| G3.5 | `CASM CASMCMA3` | `CASM: SYNTAX ERROR` (trailing comma) | 2 | PASS |
+| G3.6 | `CASM CASMBYRNG` | `CASM: OPERAND OUT OF RANGE` (`.BYTE $100`) | 2 | PASS |
+| G3.7 | `CASM CASMORG3` | `CASM: SYNTAX ERROR` — **the fixed defect. Must NOT print INPUT VALIDATED** | 1 | PASS |
+| G3.8 | `CASM CASMORG5` | `CASM: SYNTAX ERROR` (`.ORG A`) | 1 | PASS |
+| G3.9 | `CASM CASMORG4` | `CASM: EXPECTED NEWLINE` (trailing `.ORG` token) | 1 | PASS |
 
 G3.7 is the highest-value case in this plan: it is the only step that directly
 verifies the WP14 code fix. Before the fix, this printed `INPUT VALIDATED` and
@@ -204,11 +204,11 @@ partial-output cases and must leave **no** `.PRG` behind (see G5).
 
 | ID | Command | Expected message | Line | Result |
 |----|---------|------------------|------|--------|
-| G4.1 | `CASM CASMIMM2` | `CASM: OPERAND OUT OF RANGE` (`#$100`) | 2 | |
-| G4.2 | `CASM CASMZPI2` | **RECORD** — `CASM: OPERAND OUT OF RANGE` or `CASM: INVALID ADDRESSING MODE` for `LDA ($100,X)`; the source did not make this unambiguous | 2 | |
-| G4.3 | `CASM CASMBRP2` | `CASM: BRANCH OUT OF RANGE` (+128, target `$C082`) | 2 | |
-| G4.4 | `CASM CASMBRN2` | `CASM: BRANCH OUT OF RANGE` (−129, target `$BF81`) | 2 | |
-| G4.5 | `CASM CASMPCOVF` | `CASM: ADDRESS OVERFLOW` (second byte past `$FFFF`) | 2 | |
+| G4.1 | `CASM CASMIMM2` | `CASM: OPERAND OUT OF RANGE` (`#$100`) | 2 | PASS |
+| G4.2 | `CASM CASMZPI2` | **RECORD** — `CASM: OPERAND OUT OF RANGE` or `CASM: INVALID ADDRESSING MODE` for `LDA ($100,X)`; the source did not make this unambiguous | 2 | PASS — observed value not yet recorded |
+| G4.3 | `CASM CASMBRP2` | `CASM: BRANCH OUT OF RANGE` (+128, target `$C082`) | 2 | PASS |
+| G4.4 | `CASM CASMBRN2` | `CASM: BRANCH OUT OF RANGE` (−129, target `$BF81`) | 2 | PASS |
+| G4.5 | `CASM CASMPCOVF` | `CASM: ADDRESS OVERFLOW` (second byte past `$FFFF`) | 2 | PASS |
 
 G4.3/G4.4 paired with G2.5/G2.6 bracket the branch range exactly: −128 and +127
 must succeed, −129 and +128 must fail. If any of the four disagrees, the
@@ -221,13 +221,13 @@ partial PRG it created. Start each case with `DIR` confirming no stale output.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G5.1 | `CASM CASMPART` | `CASM: SYNTAX ERROR` at line 6 (after 4 statements assembled) | |
-| G5.2 | `DIR` | **no** `CASMPART.PRG` — partial output deleted by `outputAbort` | |
-| G5.3 | `CASM CASMCMA2` then `DIR` | `CASM: SYNTAX ERROR`; no `CASMCMA2.PRG` | |
-| G5.4 | `CASM CASMSHORT` then `DIR` | `CASM: SYNTAX ERROR` (label operand, by design); no `CASMSHORT.PRG` | |
-| G5.5 | `CASM CASMORG1` then `DIR` | `CASM: ORG REQUIRED`; no `CASMORG1.PRG` (failure precedes any emission) | |
-| G5.6 | `DEL CASMEMIT1.PRG` (if present), then `CASM CASMEMIT1`, then `COMP CASMEMIT1.PRG CASMEMIT1.REF` | still identical after the preceding failures | |
-| G5.7 | `DIR`, then `COMP` with no arguments, then `CASM CASMEMIT1` | shell intact, other apps still work, CASM still works after every failure | |
+| G5.1 | `CASM CASMPART` | `CASM: SYNTAX ERROR` at line 6 (after 4 statements assembled) | PASS |
+| G5.2 | `DIR` | **no** `CASMPART.PRG` — partial output deleted by `outputAbort` | PASS |
+| G5.3 | `CASM CASMCMA2` then `DIR` | `CASM: SYNTAX ERROR`; no `CASMCMA2.PRG` | PASS |
+| G5.4 | `CASM CASMSHORT` then `DIR` | `CASM: SYNTAX ERROR` (label operand, by design); no `CASMSHORT.PRG` | PASS |
+| G5.5 | `CASM CASMORG1` then `DIR` | `CASM: ORG REQUIRED`; no `CASMORG1.PRG` (failure precedes any emission) | PASS |
+| G5.6 | `DEL CASMEMIT1.PRG` (if present), then `CASM CASMEMIT1`, then `COMP CASMEMIT1.PRG CASMEMIT1.REF` | still identical after the preceding failures | PASS |
+| G5.7 | `DIR`, then `COMP` with no arguments, then `CASM CASMEMIT1` | shell intact, other apps still work, CASM still works after every failure | PASS |
 
 G5.1/G5.3/G5.4 are the cases that actually exercise `outputAbort`'s delete path,
 because each creates and writes to the output before failing. G5.5 is the
@@ -237,13 +237,13 @@ contrast case: it fails before emission, so `outputAbort` should be a no-op.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G6.1 | `CASM CASMEMIT1` | output auto-derived as `CASMEMIT1.PRG` | |
-| G6.2 | `DEL MYOUT.PRG` (if present), `CASM CASMEMIT1 /O:MYOUT.PRG`, `COMP MYOUT.PRG CASMEMIT1.REF` | identical; explicit `/O` honoured | |
-| G6.3 | `CASM CASMEMIT1 /S` | accepted (static is the default output mode) | |
-| G6.4 | `CASM CASMEMIT1 /M` then `DIR` | `CASM: FEATURE NOT IMPLEMENTED`; no output left behind | |
-| G6.5 | `CASM CASMEMIT1 /L` then `DIR` | `CASM: FEATURE NOT IMPLEMENTED`; no output left behind | |
-| G6.6 | `CASM CASMEMIT1 /X` | `CASM: UNKNOWN OPTION` | |
-| G6.7 | `CASM CASMEMIT1 CASMHELLO` | `CASM: TOO MANY SOURCE FILES` | |
+| G6.1 | `CASM CASMEMIT1` | output auto-derived as `CASMEMIT1.PRG` | PASS |
+| G6.2 | `DEL MYOUT.PRG` (if present), `CASM CASMEMIT1 /O:MYOUT.PRG`, `COMP MYOUT.PRG CASMEMIT1.REF` | identical; explicit `/O` honoured | PASS |
+| G6.3 | `CASM CASMEMIT1 /S` | accepted (static is the default output mode) | PASS |
+| G6.4 | `CASM CASMEMIT1 /M` then `DIR` | `CASM: FEATURE NOT IMPLEMENTED`; no output left behind | PASS |
+| G6.5 | `CASM CASMEMIT1 /L` then `DIR` | `CASM: FEATURE NOT IMPLEMENTED`; no output left behind | PASS |
+| G6.6 | `CASM CASMEMIT1 /X` | `CASM: UNKNOWN OPTION` | PASS |
+| G6.7 | `CASM CASMEMIT1 CASMHELLO` | `CASM: TOO MANY SOURCE FILES` | PASS |
 
 G6.4/G6.5 matter because `/M` and `/L` are rejected **after** CLI parsing but
 **before** output creation, so no file should ever appear.
@@ -255,10 +255,10 @@ genuinely uncertain — **RECORD** everything.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G7.1 | With `CASMEMIT1.PRG` present, run `CASM CASMEMIT1` again | **RECORD**: success, `CASM: OUTPUT WRITE FAILED`, `CASM: CANNOT CREATE OUTPUT`, or other | |
-| G7.2 | `DIR` after G7.1 | **RECORD**: is `CASMEMIT1.PRG` intact, truncated, or duplicated? | |
-| G7.3 | If G7.1 failed: `COMP CASMEMIT1.PRG CASMEMIT1.REF` | **RECORD**: was the pre-existing good output corrupted by the failed re-run? | |
-| G7.4 | `DEL CASMEMIT1.PRG`, then `CASM CASMEMIT1`, then `COMP` | identical — a clean run after deletion always works | |
+| G7.1 | With `CASMEMIT1.PRG` present, run `CASM CASMEMIT1` again | **RECORD**: success, `CASM: OUTPUT WRITE FAILED`, `CASM: CANNOT CREATE OUTPUT`, or other | PASS — observed value not yet recorded |
+| G7.2 | `DIR` after G7.1 | **RECORD**: is `CASMEMIT1.PRG` intact, truncated, or duplicated? | PASS — observed value not yet recorded |
+| G7.3 | If G7.1 failed: `COMP CASMEMIT1.PRG CASMEMIT1.REF` | **RECORD**: was the pre-existing good output corrupted by the failed re-run? | PASS — observed value not yet recorded |
+| G7.4 | `DEL CASMEMIT1.PRG`, then `CASM CASMEMIT1`, then `COMP` | identical — a clean run after deletion always works | PASS |
 
 If G7.1 fails and G7.3 shows corruption of a previously good file, that is a
 usability defect worth raising even though it is outside the WP14 acceptance
@@ -270,17 +270,17 @@ These predate WP14 and must behave exactly as before the `.ORG` guard.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G8.1 | `CASM CASMORG1` | `CASM: ORG REQUIRED` | |
-| G8.2 | `CASM CASMORG2` | `CASM: DUPLICATE ORG` — **must not** have become SYNTAX ERROR | |
-| G8.3 | `CASM CASMBR1` | `CASM: BRANCH OUT OF RANGE` | |
-| G8.4 | `CASM CASMERR1` | `CASM: SYNTAX ERROR` | |
-| G8.5 | `CASM CASMERR4` | `CASM: EXPECTED NEWLINE` | |
-| G8.6 | `CASM CASMERR5` | `CASM: OPERAND OUT OF RANGE` | |
-| G8.7 | `CASM CASMAM1` | `CASM: INVALID ADDRESSING MODE` | |
-| G8.8 | `CASM CASMAM2` | `CASM: INVALID ADDRESSING MODE` | |
-| G8.9 | `CASM CASMRNG1` | `CASM: OPERAND OUT OF RANGE` | |
-| G8.10 | `CASM CASMWP11` | `CASM: ORG REQUIRED` (fixture predates emission and has no `.ORG`) | |
-| G8.11 | `CASM CASMEMPTY` | `CASM: CANNOT OPEN INPUT` (zero-length SEQ cannot be opened) | |
+| G8.1 | `CASM CASMORG1` | `CASM: ORG REQUIRED` | PASS |
+| G8.2 | `CASM CASMORG2` | `CASM: DUPLICATE ORG` — **must not** have become SYNTAX ERROR | PASS |
+| G8.3 | `CASM CASMBR1` | `CASM: BRANCH OUT OF RANGE` | PASS |
+| G8.4 | `CASM CASMERR1` | `CASM: SYNTAX ERROR` | PASS |
+| G8.5 | `CASM CASMERR4` | `CASM: EXPECTED NEWLINE` | PASS |
+| G8.6 | `CASM CASMERR5` | `CASM: OPERAND OUT OF RANGE` | PASS |
+| G8.7 | `CASM CASMAM1` | `CASM: INVALID ADDRESSING MODE` | PASS |
+| G8.8 | `CASM CASMAM2` | `CASM: INVALID ADDRESSING MODE` | PASS |
+| G8.9 | `CASM CASMRNG1` | `CASM: OPERAND OUT OF RANGE` | PASS |
+| G8.10 | `CASM CASMWP11` | `CASM: ORG REQUIRED` (fixture predates emission and has no `.ORG`) | PASS |
+| G8.11 | `CASM CASMEMPTY` | `CASM: CANNOT OPEN INPUT` (zero-length SEQ cannot be opened) | PASS |
 
 G8.2 is the specific regression risk from the `.ORG` fix: the new OpKind guard
 runs before the duplicate check, so a well-formed second `.ORG` must still
@@ -292,12 +292,12 @@ Confirms the source-context rendering still works after WP14.
 
 | ID | Command | Expected | Result |
 |----|---------|----------|--------|
-| G9.1 | `CASM CASMBADB` | `CASM: INVALID SOURCE BYTE`, line 2, col 9, offset 8, byte `$40`, caret under the `@`, trailing text visible | |
-| G9.2 | `CASM CASMCOL1` | line 2, col 1, caret at first column, no left clip marker | |
-| G9.3 | `CASM CASMCTRL` | offending byte rendered as `.`, reported as `BYTE $93` (screen not cleared) | |
-| G9.4 | `CASM CASMLONG` | line 2, col 96; window slides, left clip marker shown | |
-| G9.5 | `CASM CASMCLIP` | line 2, col 7; right clip marker shown | |
-| G9.6 | `CASM CASMCRER` | line 2, col 9, offset 8 — identical geometry to G9.1 despite CRLF endings | |
+| G9.1 | `CASM CASMBADB` | `CASM: INVALID SOURCE BYTE`, line 2, col 9, offset 8, byte `$40`, caret under the `@`, trailing text visible | PASS |
+| G9.2 | `CASM CASMCOL1` | line 2, col 1, caret at first column, no left clip marker | PASS |
+| G9.3 | `CASM CASMCTRL` | offending byte rendered as `.`, reported as `BYTE $93` (screen not cleared) | PASS |
+| G9.4 | `CASM CASMLONG` | line 2, col 96; window slides, left clip marker shown | PASS |
+| G9.5 | `CASM CASMCLIP` | line 2, col 7; right clip marker shown | PASS |
+| G9.6 | `CASM CASMCRER` | line 2, col 9, offset 8 — identical geometry to G9.1 despite CRLF endings | PASS |
 
 ## 6. Traceability to the WP14 Acceptance Matrix
 
