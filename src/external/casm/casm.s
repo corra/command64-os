@@ -26,6 +26,7 @@
 .import sourceOpen
 .import sourceClose
 .import diagPrintString
+.import diagClearLoc
 .import exitSuccess
 .import exitFatal
 
@@ -58,6 +59,11 @@
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 start:
+    ; Invalidate the diagnostic location before anything can raise: CasmDiagLoc*
+    ; lives in uninitialized BSS, so a locationless diagnostic (I/O or stream
+    ; failure, NOT IMPLEMENTED, ...) would otherwise print a stale, garbage
+    ; "AT LINE .../COL ..." trailer left over from whatever the RAM held.
+    jsr diagClearLoc
     jsr resourcesInit
     bcs startInitFatal
     jsr cliInit

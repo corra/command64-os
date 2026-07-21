@@ -19,6 +19,7 @@
 .include "common.inc"
 
 .import CasmParserStmt
+.import diagSetLocFromStmt
 
 .export CasmInsn
 .export opcodesFindOpcode
@@ -170,10 +171,12 @@ ofHaveMode:
     rts
 
 ofModeError:
+    jsr diagSetLocFromStmt      ; the offending instruction's own line
     lda #CASM_DIAG_INVALID_ADDR_MODE
     sec
     rts
 ofRangeError:
+    jsr diagSetLocFromStmt      ; the offending instruction's own line
     lda #CASM_DIAG_OPERAND_OUT_OF_RANGE
     sec
     rts
