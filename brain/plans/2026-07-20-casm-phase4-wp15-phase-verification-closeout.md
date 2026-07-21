@@ -30,6 +30,71 @@ approved for implementation.
 - Phase 5 remains planned and blocked until the user approves the Phase 4
   walkthrough and explicitly authorizes marking Phase 4 done.
 
+## Activation Decisions (2026-07-21)
+
+WP15 was activated on 2026-07-21 after WP14 completed and merged as `55fe474`.
+Four scope decisions were taken at activation and are binding for this package.
+
+### D1 — the version bump stands, and moves earlier
+
+Verifying a work package as complete indicates a phase change, so WP15 advances
+CASM `0.1.16` to `0.1.17` per the CASM work-package version contract. WP15 ships
+a version constant; `BUILD_CASM` therefore moves past 1078 and the pre-WP15
+artifact is *not* expected to be byte-identical.
+
+The bump is **relocated from increment 9 to before the manual walkthrough**.
+This plan already requires that final checks be rerun against the candidate
+closeout build; leaving the bump at the end would force two runtime sessions to
+satisfy that rule. Bumping first means the matrix is executed exactly once,
+against the artifact that actually ships. The version gate and the Phase 4
+completion gate remain separate — approving the runtime matrix still does not
+authorize marking Phase 4 done.
+
+Consequence for Phase 5: the WP16 plan
+(`brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`)
+asserts a `0.1.16` / build-1078 baseline in its verification and stop-condition
+sections. That baseline is superseded by D1 and must be amended to `0.1.17` and
+the post-WP15 build number once WP15 closes.
+
+### D2 — branch and baseline
+
+WP15 runs on `feature/casm-phase4-wp15`, branched from `main` at `55fe474`. The
+two untracked Phase 5 planning documents that were present at activation were
+committed separately on `feature/casm-phase5-wp16` (`540a274`) so that WP15
+begins from a genuinely clean, attributable tree, as increment 3 requires.
+
+### D3 — reduced manual smoke set, with WP14 as standing evidence
+
+WP14 already executed the full 23-fixture acceptance matrix at build 1078 with
+user runtime confirmation. Re-executing it verbatim would re-verify rather than
+verify. The WP15 manual walkthrough is therefore reduced to the checks that can
+change when the version constant changes, plus the evidence WP14 left open:
+
+- CASM banner at `V0.1.17.<build>` and clean missing-source exit;
+- `casmemit1` and `casmhello` assembly with native `COMP` equality;
+- load/run `casmhello`, verify message and shell return;
+- `/O`, `/S`, `/M`, `/L` behavior;
+- shell integrity: `DIR`, another external application, and CASM twice after a
+  failure; and
+- the D4 gap captures below.
+
+WP14's matrix results are linked as standing evidence for the syntax,
+addressing, numeric, branch, PC, and directive gates. This is a deliberate
+narrowing of the "Manual Walkthrough" section below, not an oversight; that
+section is superseded to the extent the two disagree.
+
+### D4 — WP14's open evidence gaps are captured here
+
+`brain/task.md` records two WP14 items whose observed values were never written
+down. Both are folded into the WP15 manual walkthrough and must be recorded with
+actual observations, so Phase 4 closes with no unrecorded evidence:
+
+- **G4.2** — the `casmzpi2` diagnostic identifier and source position.
+- **G7.1-G7.3** — assembling over an existing output file.
+
+If either reveals a defect, the WP15 stop conditions apply: RCA and a separately
+approved remediation plan, not an opportunistic patch.
+
 ## Scope
 
 Included:
@@ -171,17 +236,21 @@ is a stop condition and remediation dependency, not WP15 scope.
    reference hashes/contents.
 6. Run the complete static acceptance audit, including carry, zero-page,
    stack, output lifecycle, and diagnostic-preservation paths.
-7. Write the in-progress WP15 walkthrough with exact pending manual steps.
-8. Ask the user to execute the saved runtime matrix and report exact results.
-9. If every gate passes and the user approves WP15, advance CASM `0.1.16` to
-   `0.1.17` as required by the CASM work-package version contract; rebuild,
-   reinspect, and ask the user to confirm the final banner/shell return.
+7. **(D1, moved up)** Advance CASM `0.1.16` to `0.1.17`; rebuild, reinspect both
+   link maps and the R6 artifact, and confirm `BUILD_CASM` advanced exactly once
+   and then held stable across a no-change rebuild.
+8. Write the in-progress WP15 walkthrough with exact pending manual steps,
+   against the `0.1.17` candidate.
+9. Ask the user to execute the D3 reduced smoke set plus the D4 gap captures,
+   and report exact results.
 10. Present the completed walkthrough and ask separately whether Phase 4 is
     done. Only after affirmative approval mark WP15 and Phase 4 complete and
     synchronize every record.
 
-The version bump and Phase completion are separate gates. Approval of the
-runtime matrix does not implicitly authorize either one.
+The version bump and Phase completion remain separate gates. Approval of the
+runtime matrix does not implicitly authorize either one. Increments 7-9 are
+reordered from the original 8-9 sequence per D1; the gate separation is
+unchanged.
 
 ## Automated Verification
 
@@ -246,3 +315,15 @@ saving this plan.
 ## Progress
 
 - 2026-07-20: Detailed plan saved. WP15 remains pending behind WP14.
+- 2026-07-21: **Activated.** WP14 completed and merged as `55fe474`; the sole
+  blocking dependency is cleared. Four activation decisions recorded above (D1
+  version bump retained and moved earlier, D2 branch/baseline, D3 reduced manual
+  smoke set, D4 WP14 gap capture). Working on `feature/casm-phase4-wp15` from a
+  clean tree at `55fe474`.
+
+  Pre-activation audit found that most of the "Record Reconciliation" list is
+  already satisfied: WP14 replaced the placeholder wiki UUIDs with the real ones,
+  retired `casmnum1`/`casmnum2` in favour of `casmemit1`/`casmhello`, corrected
+  the parent plan to a five-package split, and settled the DSC1 naming. Increment
+  2 is therefore a verification pass, not repair work. `brain/MEMORY.md` was
+  confirmed to exist, so the expected-files table stands unchanged.

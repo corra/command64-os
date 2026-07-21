@@ -47,9 +47,29 @@ correct and was borne out: the WP14 audit found the driver already satisfied the
 production contract, but the acceptance work still surfaced two real defects.
 
 **The gate therefore reduces to a single condition: Phase 4 WP15 must complete
-and the user must explicitly approve Phase 4 done.** Phase 5 implementation
-remains blocked until then. Planning and contract-freeze work for Phase 5 may
-proceed in parallel, since it changes no CASM source.
+and the user must explicitly approve Phase 4 done.**
+
+**GATE SATISFIED 2026-07-21.** WP15 completed and the user explicitly approved
+Phase 4 done at CASM `0.1.17` build 1079. Phase 4 milestone
+`4796b60c-5f4a-43c7-8270-436075bb3f7b` is closed and
+`project:command64.casm` is 37/37 complete. Phase 5 implementation is
+**unblocked**, beginning with WP16.
+
+Evidence:
+`brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`.
+
+Two Phase 4 observations WP15 carried forward are relevant to Phase 5 and should
+be read before WP17 is approved:
+
+- CASM has no entry `CLD`. It contains no `SED` and every `ADC`/`SBC` path
+  establishes carry, but it assumes the caller left decimal mode clear. The
+  frozen contract below says decimal mode is "never assumed or enabled" — that
+  wording should be reconciled with the code, or the evaluator should not rely
+  on it being stronger than it is.
+- `parseNumericValue` already enforces the unsigned `$0000..$FFFF` bound with a
+  24-bit sticky-overflow check and raises `CASM_DIAG_OPERAND_OUT_OF_RANGE`
+  (`$1E`). WP18's "move or reuse" decision inherits that behaviour and must not
+  weaken it.
 
 ## Frozen Phase 5 Contract
 
@@ -333,3 +353,12 @@ does not close Phase 4.
   Detailed WP16 plan recorded at
   `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
   Phase 5 remains blocked; WP16 itself is blocked on WP15.
+
+- 2026-07-21 (later): **Phase 4 closed with explicit user approval** at CASM
+  `0.1.17` build 1079; the Phase 5 prerequisite gate is satisfied and Phase 5 is
+  unblocked. WP15's independent audit found three record defects (a missing
+  Phase 4 parent Taskwarrior milestone, three phantom wiki UUIDs for WP11-WP13,
+  and stale Phase 3 milestone text) and closed WP14's two open evidence gaps: a
+  predicted output-file deletion hazard was **falsified** — assembling over an
+  existing output neither clobbers nor corrupts it. WP16's baseline references to
+  `0.1.16` / build 1078 are superseded by `0.1.17` / 1079.

@@ -44,12 +44,19 @@ Three of the parent plan's five gate premises were falsified by WP14:
 
 | Premise | Reality on 2026-07-21 |
 |---|---|
-| WP14 `3e4eab43` pending | Completed; merged to `main` as `55fe474`; CASM `0.1.16` build 1078 |
+| WP14 `3e4eab43` pending | Completed; merged to `main` as `55fe474`. Phase 4 subsequently closed by WP15 at CASM `0.1.17` build 1079 |
 | No Phase 4 walkthrough exists | `brain/walkthroughs/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md` |
 | Wiki/Taskwarrior UUIDs disagree | Corrected during WP14; no placeholder UUIDs remain |
 
 WP15 remains genuinely pending and is the sole remaining blocker. The parent
 plan's gate section has been rewritten accordingly.
+
+**Resolved 2026-07-21.** WP15 completed and the user explicitly approved Phase 4
+done at CASM `0.1.17` build 1079. The Phase 4 gate is satisfied; increment 2's
+stop condition no longer applies. Evidence:
+`brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`.
+WP15 also created the Phase 4 parent milestone
+`4796b60c-5f4a-43c7-8270-436075bb3f7b`, which Finding 3 below assumed absent.
 
 ### Finding 3 — Taskwarrior has no Phase 5 tasks
 
@@ -98,8 +105,12 @@ Excluded:
 - performing Phase 4's acceptance audit or ticking its acceptance list (WP15);
 - authoring a retroactive CASM Phase 4 contract section;
 - implementing the evaluator, the resolver, or any fixture; and
-- a CASM version-stage advance. WP16 ships no code, so CASM stays at `0.1.16`
+- a CASM version-stage advance. WP16 ships no code, so CASM stays at `0.1.17`
   and `BUILD_CASM` must not move.
+
+  **Baseline amended 2026-07-21 at Phase 4 closeout.** This plan was written
+  against `0.1.16` / build 1078. WP15 advanced CASM to `0.1.17` / build 1079,
+  so every `0.1.16` and `1078` reference below now reads `0.1.17` and `1079`.
 
 ## Contract to Freeze (Phase 0C.3)
 
@@ -223,7 +234,7 @@ correctness. There is no runtime matrix and no user emulator session.
 
 - `git diff --name-only` shows only files from the table above; **no**
   `src/external/casm/`, `cmake/`, or `CMakeLists.txt` entries.
-- `BUILD_CASM` is byte-identical to its pre-WP16 value (1078). WP16 must not
+- `BUILD_CASM` is byte-identical to its pre-WP16 value (1079). WP16 must not
   advance the build counter, because it changes no hashed source.
 - A build of `casm` still succeeds and `casm.prg` is byte-identical to the
   pre-WP16 artifact — proving the record work was genuinely inert.
@@ -256,7 +267,7 @@ Taskwarrior with matching wiki/brain records; the WP17 plan is drafted; every
 verification item above passes; and the user explicitly approves activating
 Phase 5.
 
-WP16 advances no version stage. CASM remains at `0.1.16` until a Phase 5 work
+WP16 advances no version stage. CASM remains at `0.1.17` until a Phase 5 work
 package ships code.
 
 ## Progress
@@ -266,3 +277,12 @@ package ships code.
   identified that no Phase 5 Taskwarrior tasks exist. No implementation is
   authorized by the creation of this document; WP16 remains blocked on Phase 4
   WP15.
+
+- 2026-07-21 (later): Phase 4 closed by WP15 with explicit user approval at CASM
+  `0.1.17` build 1079. WP16's entry gate is now satisfied and WP16 is unblocked.
+  The `0.1.16` / build-1078 baseline this plan was written against is superseded
+  throughout by `0.1.17` / 1079. Increment 2 becomes a recorded confirmation
+  rather than a stop condition. Finding 4's decision stands: no retroactive CASM
+  Phase 4 contract section is authored in `brain/KNOWLEDGE.md`; that gap, along
+  with two others WP15 recorded (`CasmOutputCreated` conflating created-vs-opened,
+  and no entry `CLD`), is deferred to Phase 11 documentation and hardening.
