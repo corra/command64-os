@@ -479,3 +479,21 @@ Phase 4; it unblocks WP15.
     `BUILD_CASM` 1069 -> 1070. Disk now 80 entries, 315 blocks free.
   - Runtime confirmation of `casmorg3`/`casmorg5` is part of increment 8; the
     fix is a static change verified by build and link inspection only.
+- 2026-07-21: Increment 7 complete (automated verification + walkthrough).
+  - All host checks pass: `casm`/`image_d64`/`test_image_d64` build; a no-change
+    rebuild preserves `BUILD_CASM` at 1070; both reference manifests regenerate
+    byte-identically to their build artifacts; `reloc.py` output is
+    byte-identical to `build/casm.prg`; `git diff --check` clean.
+  - Artifacts: load address `$3400`, `R6` footer present, 11057 bytes, 1172
+    relocation points.
+  - Link maps: `$3400` CODE `$3400-$4E40` (`$1A41`), RODATA `$7C0`, BSS `$467`,
+    end `$5A67`; `$3500` end `$5B67`. Both within `$2800`; headroom 408 bytes.
+  - Disks: `image.d64` retains all 9 shipping apps (464 blocks free);
+    `test.d64` holds 23 PRG + 57 SEQ including both `.ref` PRGs (315 blocks
+    free). Nothing displaced.
+  - Walkthrough saved at
+    `brain/walkthroughs/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`
+    with a 6-group runtime matrix (A binary equality, B positives, C syntax,
+    D range/PC, E cleanup/partial-output, F CLI options). Every expected result
+    is flagged as statically derived and awaiting runtime confirmation.
+  - Increment gate: increment 8 is the user's runtime execution of that matrix.
