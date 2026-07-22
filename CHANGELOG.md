@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6A WP24 windowed transfer and replay**: added
+  `vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` to `vmm_store.s`, bounds-
+  checking every transfer against a slot's registered ownership, the fixed
+  32-byte `CasmVmmBuffer` staging buffer, offset+count overflow, and the
+  allocation's granted page count before any `DOS_VMM_READ`/`DOS_VMM_WRITE`
+  call. Grew `CasmVmmRegistry`'s record from 3 to 4 bytes to store that
+  granted page count, closing a gap the WP22 freeze had left open. Raised
+  CASM MAIN from `$2A00` to `$2B00` (measured 123-byte overflow). Advanced
+  CASM to `0.1.26` build 1099. Implements no fixture matrix (WP25).
+
 - **CASM Phase 6A WP23 VMM allocation core**: added `vmm_store.s`
   (`vmmStoreAlloc`/`vmmStoreFree`) wiring real `DOS_ALLOC_MEM`/`DOS_FREE_MEM`
   calls behind the existing resource registry, and replaced

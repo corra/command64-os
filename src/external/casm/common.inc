@@ -114,18 +114,22 @@ CASM_FILE_REC_FLAG   = 0
 CASM_FILE_REC_HANDLE = 1
 CASM_FILE_REC_SIZE   = 2
 
-; VMM record: occupancy flag followed by the DOS_ALLOC_MEM identity returned
-; in X (segment high byte) and Y (REU bank).
+; VMM record: occupancy flag, the DOS_ALLOC_MEM identity returned in X
+; (segment high byte) and Y (REU bank), and the granted 4KB-page count
+; (1-16, WP24) needed to bounds-check windowed transfers against an
+; allocation's actual capacity -- the OS provides no such check itself.
 CASM_VMM_REC_FLAG  = 0
 CASM_VMM_REC_SEGHI = 1
 CASM_VMM_REC_BANK  = 2
-CASM_VMM_REC_SIZE  = 3
+CASM_VMM_REC_PAGES = 3
+CASM_VMM_REC_SIZE  = 4
 
 CASM_FILE_REGISTRY_BYTES = CASM_FILE_CAPACITY * CASM_FILE_REC_SIZE
 CASM_VMM_REGISTRY_BYTES  = CASM_VMM_CAPACITY * CASM_VMM_REC_SIZE
 
 .assert CASM_FILE_CAPACITY = 8, error, "CASM file registry contract changed"
 .assert CASM_VMM_CAPACITY = 8, error, "CASM VMM registry contract changed"
+.assert CASM_VMM_REC_SIZE = 4, error, "CASM VMM registry record size changed"
 
 ; Single-allocation addressing cap (Phase 0C.4, frozen by WP22): a fixed
 ; SegHi:Bank pair plus a 16-bit Off cursor can address at most 65536 bytes.
@@ -134,6 +138,22 @@ CASM_VMM_REGISTRY_BYTES  = CASM_VMM_CAPACITY * CASM_VMM_REC_SIZE
 CASM_VMM_ALLOC_MAX_BYTES = 65536
 
 .assert CASM_VMM_ALLOC_MAX_BYTES = 65536, error, "CASM VMM single-allocation cap changed"
+
+; DOS_ALLOC_MEM's granularity (WP24): CASM_VMM_REC_PAGES * CASM_VMM_PAGE_BYTES
+; is an allocation's true granted capacity, which vmmWindowRead/Write bounds-
+; check windowed transfers against.
+CASM_VMM_PAGE_BYTES = 4096
+
+.assert CASM_VMM_PAGE_BYTES = 4096, error, "CASM VMM page size changed"
+
+; Fixed base-RAM staging buffer for vmmWindowRead/vmmWindowWrite/vmmReplay
+; (WP24). Not CasmIoBuffer, which stays reserved for source input. Sized
+; generically for WP25's pattern-based fixtures, not against any real Phase
+; 6B record (not yet designed). Must fit an 8-bit byte count so the transfer
+; length can never itself overflow while being checked against this bound.
+CASM_VMM_BUFFER_SIZE = 32
+
+.assert CASM_VMM_BUFFER_SIZE <= 255, error, "CASM VMM staging buffer must fit an 8-bit byte count"
 
 ; ---------------------------------------------------------------------------
 ; Phase 2 bounded CLI and file-service contract

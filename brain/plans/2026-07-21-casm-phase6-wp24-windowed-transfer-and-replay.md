@@ -1,7 +1,7 @@
 ---
 feature: casm-phase6-wp24-windowed-transfer-and-replay
 created: 2026-07-22
-status: planned
+status: complete
 ---
 
 # Plan: CASM Phase 6A WP24 - Windowed Transfer and Replay
@@ -272,5 +272,17 @@ Re-read the root and `src`/`external`/`casm` DOX chain after source edits.
   gap, not previously resolved) and proposed growing it to 4 bytes. User
   resolved both open questions: defer the staging buffer's exact size to a
   real link measurement, and share `CASM_DIAG_VMM_TRANSFER_FAILED` between a
-  local bounds violation and a genuine OS-level rejection. Awaiting plan
-  approval before activation.
+  local bounds violation and a genuine OS-level rejection.
+- 2026-07-22 (later): User approved the plan as drafted. Activated on
+  `feature/casm-phase6-wp24` from `a60cb89`. Grew `CASM_VMM_REC_SIZE` to 4
+  bytes; implemented `vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` with the
+  shared private `vwPrepareTransfer` bounds check and the fixed 32-byte
+  `CasmVmmBuffer`. Measured a 123-byte overflow at `$2A00`; user approved
+  `$2A00` -> `$2B00` (133 bytes free). Static verification passed; user ran
+  a VICE sanity check and confirmed clean assemble/exit. Dry-ran the
+  version-only completion candidate: `0.1.26` build 1099, exactly 2 changed
+  bytes versus the candidate PRG; restored to `0.1.25` build 1098 via
+  `git checkout` and reproduced exactly. User approved completion; final
+  `0.1.26` build 1099 verified, no-change rebuild stable, both images pass.
+  WP24 is complete; WP25 (`544a04bd`) is unblocked but requires its own
+  separate plan approval before activation.

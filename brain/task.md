@@ -275,15 +275,40 @@
     - [x] Final verified increment applied: `0.1.25` build 1097 matches the
           dry-run PRG hash exactly; no-change rebuild stable across two more
           builds; both images pass
-  - [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
-        replay; depends on WP23 (complete, unblocked)
-    - Detailed plan drafted: `brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`
+  - [x] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
+        replay
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`
+    - User approved the plan as drafted, including both resolved open
+      questions (deferred staging buffer size; shared `$2B` diagnostic)
+    - Active on `feature/casm-phase6-wp24` from `a60cb89`; baseline CASM
+      `0.1.25` build 1097
     - Reconciled a real gap: the Phase 0C.4 bounds-checking mandate has no
-      registry field to read a granted size from; proposed growing
+      registry field to read a granted size from; growing
       `CASM_VMM_REC_SIZE` 3 -> 4 bytes (adds a page-count field), keeping
       `resourceRegisterVmm` the sole registry writer
-    - Not yet active: awaiting user answers to two open questions (staging
-      buffer size; bounds-violation diagnostic reuse) and plan approval
+    - [x] Implemented `vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` in
+          `vmm_store.s`; bounds-check slot range, buffer-size fit, slot
+          ownership, offset+count overflow, and granted-page count before
+          any OS call, via a shared private `vwPrepareTransfer`
+    - [x] Added `CasmVmmBuffer` (32 bytes) as the fixed staging buffer,
+          reusing already-reserved `$78-$7F` scratch for offset/count (no
+          new zero-page byte)
+    - [x] Measured MAIN overflow (123 bytes at `$2A00`); user approved
+          `$2A00` -> `$2B00` (133 bytes free)
+    - [x] Static verification: `vmm_store.o` BSS is exactly the new buffer;
+          `resources.o` BSS grew by exactly 8 bytes (registry growth);
+          zero-page and diagnostic contracts unchanged; both relocation
+          bases and both images pass
+    - [x] User ran a VICE sanity check (CASM against a trusted fixture);
+          confirmed clean assemble/exit
+    - [x] Walkthrough drafted: `brain/walkthroughs/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`
+    - [x] Completion dry-run verified (`0.1.26.1099`, 2-byte diff, no-change
+          rebuild stable); baseline `0.1.25.1098` restored via `git checkout`,
+          reproduced exactly; both images pass at restored baseline
+    - [x] User approved walkthrough and completion
+    - [x] Final verified increment applied: `0.1.26` build 1099 matches the
+          dry-run PRG hash exactly; no-change rebuild stable across two more
+          builds; both images pass
   - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
         and completion gate; depends on WP24
 

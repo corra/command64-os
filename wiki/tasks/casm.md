@@ -378,16 +378,29 @@ WP22 plan:
       `brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`.
       WP23 is complete; WP24 (`228daccc`) is unblocked but requires its own
       separate plan approval before activation.
-- [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
-      replay. Detailed plan drafted:
+- [x] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
+      replay. Plan approved as drafted:
       `brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
-      Reconciled a real gap the WP22 freeze left open: the mandated
-      windowed-transfer bounds check has no registry field to read a granted
-      size from; proposed growing `CASM_VMM_REC_SIZE` from 3 to 4 bytes
-      (adds a page-count field) while keeping `resourceRegisterVmm` the
-      registry's sole writer. Not yet active — awaiting user answers to two
-      open questions (staging buffer size; bounds-violation diagnostic
-      reuse) and plan approval.
+      Active on `feature/casm-phase6-wp24` from `a60cb89`, CASM `0.1.25`
+      build 1097 baseline. Reconciled a real gap the WP22 freeze left open:
+      the mandated windowed-transfer bounds check has no registry field to
+      read a granted size from; growing `CASM_VMM_REC_SIZE` from 3 to 4
+      bytes (adds a page-count field) while keeping `resourceRegisterVmm`
+      the registry's sole writer. Staging buffer size deferred to a real
+      link measurement; bounds-violation diagnostic shares
+      `CASM_DIAG_VMM_TRANSFER_FAILED` with a genuine OS-level rejection.
+      Implemented `vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` with a
+      dedicated 32-byte `CasmVmmBuffer`, reusing already-reserved `$78-$7F`
+      scratch (no new zero-page byte). Measured MAIN overflow (123 bytes);
+      user approved `$2A00` -> `$2B00` (133 bytes free). User ran a VICE
+      sanity check and confirmed clean assemble/exit. Completion dry-run
+      `0.1.26.1099` verified (2-byte diff, no-change rebuild stable);
+      baseline `0.1.25.1098` restored exactly. Walkthrough:
+      `brain/walkthroughs/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
+      User approved completion. Final `0.1.26` build 1099 matches the
+      dry-run PRG hash exactly; no-change rebuild stable; both images pass.
+      WP24 is complete; WP25 (`544a04bd`) is unblocked but requires its own
+      separate plan approval before activation.
 - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
       and completion gate.
 

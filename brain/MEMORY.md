@@ -348,31 +348,44 @@ WP23 detailed plan:
 `brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`. WP23
 was committed on `feature/casm-phase6-wp23` (`42968f0`).
 
-**CASM Phase 6A WP24 windowed transfer and replay** (plan drafted, pending
-approval): drafted on `feature/casm-phase6-wp24` from `feature/casm-phase6-wp23`
-at `42968f0`. Reviewing the Phase 0C.4 freeze against WP23's actual
+**CASM Phase 6A WP24 windowed transfer and replay** (complete): active on
+`feature/casm-phase6-wp24` from `a60cb89`, baseline
+`0.1.25` build 1097. Reviewing the Phase 0C.4 freeze against WP23's actual
 implementation surfaced a real, previously unresolved gap: the freeze
 requires WP24's windowed transfer to "independently track each allocation's
 granted size" and bounds-check `offset + count` against it, but
 `CasmVmmRegistry`'s 3-byte record (confirmed sufficient by WP22/WP23 only
-for allocation/free identity) has no field to read a granted size from.
-Proposed resolution: grow `CASM_VMM_REC_SIZE` from 3 to 4 bytes, adding a
+for allocation/free identity) had no field to read a granted size from.
+Resolved by growing `CASM_VMM_REC_SIZE` from 3 to 4 bytes, adding a
 granted-page-count field computed identically to `vmmAlloc`'s own
 paragraph-to-page rounding, with `resourceRegisterVmm` remaining the
 registry's sole writer (preserving the single-writer discipline WP23
-established) — and as a bonus, a 4-byte record turns the existing
-slot-to-byte-offset computation from `ASL`+`ADC` into a plain two-`ASL`
-`slot*4`. Also documented, from a working precedent already in
-`src/external/edlin/buffer.s`: `DOS_VMM_READ`/`DOS_VMM_WRITE` take their
-Seg/Off/Bank/count arguments through fixed OS zero-page cells
-(`$66`-`$6C`), not registers, unlike `DOS_ALLOC_MEM`/`DOS_FREE_MEM`. Two
-questions remain open for the user: the staging buffer's size (no existing
-buffer is safe to reuse — `CasmIoBuffer` stays reserved for source input),
-and whether a local bounds-violation should share `CASM_DIAG_VMM_TRANSFER_FAILED`
-with a genuine OS-level transfer rejection or needs its own value. WP24 plan:
-`brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
-Not yet active in Taskwarrior — awaiting the open-question answers and plan
-approval.
+established) — and as a bonus, the slot-to-byte-offset computation turned
+from `ASL`+`ADC` into a plain two-`ASL` `slot*4`. Also used, from a working
+precedent already in `src/external/edlin/buffer.s`: `DOS_VMM_READ`/
+`DOS_VMM_WRITE` take their Seg/Off/Bank/count arguments through fixed OS
+zero-page cells, not registers, unlike `DOS_ALLOC_MEM`/`DOS_FREE_MEM`. User
+resolved both open questions: staging buffer sized at implementation time
+(`CasmVmmBuffer`, 32 bytes, reusing already-reserved `$78-$7F` scratch, no
+new zero-page byte), and a local bounds violation shares
+`CASM_DIAG_VMM_TRANSFER_FAILED` with a genuine OS-level rejection.
+Implemented `vwPrepareTransfer` (private, shared bounds-check/staging),
+`vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` in `vmm_store.s`. The
+offset+count-to-page-count bounds check avoids representing 65536 as a
+16-bit value (same hazard as `vmmStoreAlloc`'s rounding) via a top-nibble
+extraction plus round-up check rather than an addition that could overflow.
+Measured MAIN overflow (123 bytes at `$2A00`); user approved `$2A00` ->
+`$2B00` (133 bytes free). User ran a VICE sanity check (CASM against a
+trusted fixture), confirmed clean assemble/exit. Completion dry-run
+`0.1.26.1099` verified (2-byte diff, no-change rebuild stable); baseline
+`0.1.25.1098` restored exactly via `git checkout`. WP24 plan:
+`brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`;
+walkthrough:
+`brain/walkthroughs/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
+User approved completion; final `0.1.26` build 1099 matched the dry run's
+exact PRG hash, no-change rebuild stable, both images pass. WP24 is
+complete; WP25 (`544a04bd`) is unblocked but requires its own separate plan
+approval before activation.
 
 ## C64 Hardware Gotchas (hard-won)
 

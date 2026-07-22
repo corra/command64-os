@@ -78,6 +78,7 @@ riVmmLoop:
     sta CasmVmmRegistry + CASM_VMM_REC_FLAG, x
     sta CasmVmmRegistry + CASM_VMM_REC_SEGHI, x
     sta CasmVmmRegistry + CASM_VMM_REC_BANK, x
+    sta CasmVmmRegistry + CASM_VMM_REC_PAGES, x
     txa
     clc
     adc #CASM_VMM_REC_SIZE
@@ -162,7 +163,8 @@ rrhBadSlot:
 ; resourceRegisterVmm
 ; Register ownership immediately after a successful DOS_ALLOC_MEM.
 ;
-; Inputs:  X = segment high byte, Y = REU bank returned by DOS_ALLOC_MEM
+; Inputs:  X = segment high byte, Y = REU bank returned by DOS_ALLOC_MEM;
+;          CasmValue1Lo = granted 4KB-page count (1-16, WP24)
 ; Outputs: C clear and X = slot (0..7) on success
 ;          C set and A = CASM_DIAG_REGISTRY_FULL on failure
 ; Clobbers: A, X, Y, CasmValue0Lo/CasmValue0Hi
@@ -193,6 +195,8 @@ rrvFound:
     sta CasmVmmRegistry + CASM_VMM_REC_SEGHI, y
     lda CasmValue0Hi
     sta CasmVmmRegistry + CASM_VMM_REC_BANK, y
+    lda CasmValue1Lo
+    sta CasmVmmRegistry + CASM_VMM_REC_PAGES, y
     inc CasmVmmCount
     lda #CASM_DIAG_NONE
     clc
@@ -205,16 +209,14 @@ rrvFound:
 ; Inputs:  X = slot returned by resourceRegisterVmm
 ; Outputs: C clear, A = CASM_DIAG_NONE for an owned or already-free slot
 ;          C set, A = CASM_DIAG_UNKNOWN for an out-of-range slot
-; Clobbers: A, Y, CasmValue0Lo
+; Clobbers: A, Y
 ; ---------------------------------------------------------------------------
 resourceReleaseVmm:
     cpx #CASM_VMM_CAPACITY
     bcs rrvBadSlot
-    stx CasmValue0Lo
     txa
     asl
-    clc
-    adc CasmValue0Lo
+    asl
     tay
     lda CasmVmmRegistry + CASM_VMM_REC_FLAG, y
     beq rrvReleased
@@ -222,6 +224,7 @@ resourceReleaseVmm:
     sta CasmVmmRegistry + CASM_VMM_REC_FLAG, y
     sta CasmVmmRegistry + CASM_VMM_REC_SEGHI, y
     sta CasmVmmRegistry + CASM_VMM_REC_BANK, y
+    sta CasmVmmRegistry + CASM_VMM_REC_PAGES, y
     lda CasmVmmCount
     beq rrvReleased
     dec CasmVmmCount

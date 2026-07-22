@@ -359,17 +359,23 @@ record that could be read alongside both namespaces.
   `_TRANSFER_FAILED`, the last raised only by WP24). Measured MAIN usage
   (10,647/10,752 bytes) fits the existing `$2A00` envelope with 105 bytes
   free — no size change, unlike the WP13/WP19 precedent of needing one.
-- **WP24 planning: the bounds-checking mandate has no field to read from
-  (reconciled, plan drafted).** The bullet above requires WP24 to
-  "independently track each allocation's granted size," but `CasmVmmRegistry`
-  still has no such field after WP23 — WP22 confirmed only that the
-  3-byte record is sufficient for allocation/free identity, not for
-  transfer bounds-checking, and left the latter unresolved. Not a
-  contradiction, just an open detail that fell to WP24 to close. Proposed
-  resolution (in the WP24 plan, pending approval): grow
-  `CASM_VMM_REC_SIZE` from 3 to 4 bytes, adding a granted-page-count field
-  computed identically to `vmmAlloc`'s own rounding, with
-  `resourceRegisterVmm` remaining the registry's sole writer.
+- **WP24 implementation (complete).** Closed the gap
+  above: grew `CASM_VMM_REC_SIZE` from 3 to 4 bytes
+  (`CASM_VMM_REC_PAGES` added), computed by `vmmStoreAlloc` identically to
+  `vmmAlloc`'s own paragraph-to-page rounding, with `resourceRegisterVmm`
+  remaining the registry's sole writer. Added `vmmWindowRead`/
+  `vmmWindowWrite`/`vmmReplay` in `vmm_store.s`, bounds-checking slot range,
+  the fixed 32-byte `CasmVmmBuffer`'s capacity, slot ownership, `offset +
+  count` overflow, and the transfer's required page count against the
+  slot's granted `CASM_VMM_REC_PAGES` — all before any `DOS_VMM_READ`/
+  `DOS_VMM_WRITE` call, via a shared private `vwPrepareTransfer`. The
+  page-count comparison avoids ever representing 65536 as a 16-bit value
+  (same hazard as `vmmStoreAlloc`'s rounding): `NeededPages = ceil((offset+
+  count)/4096)` is a top-nibble extraction plus a round-up check, never an
+  addition that could itself overflow. No new zero-page byte: reused the
+  already-reserved `$78-$7F` I/O/VMM scratch. Measured MAIN usage
+  (10,875/11,008 bytes at the approved `$2B00`, up from `$2A00`) with 133
+  bytes free.
 
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
