@@ -584,6 +584,17 @@ CASM_ADDEND_SIGN_POSITIVE = 0
 CASM_ADDEND_SIGN_NEGATIVE = 1
 CASM_ADDEND_SIGN_COUNT    = 2
 
+; Resolver callback output view. exprEvaluate passes its address in X/Y while
+; the current token is IDENTIFIER; the callback fills it before returning C
+; clear. Value bytes are meaningful only when RESOLVED is set.
+CASM_RESOLVE_FLAGS  = 0
+CASM_RESOLVE_ID_LO  = 1
+CASM_RESOLVE_ID_HI  = 2
+CASM_RESOLVE_VAL_LO = 3
+CASM_RESOLVE_VAL_HI = 4
+CASM_RESOLVE_SIZE   = 5
+CASM_RESOLVE_FLAG_MASK = CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_RELOCATABLE
+
 .assert CASM_EXPR_VAL_HI = CASM_EXPR_VAL_LO + 1, error, "CASM expression value offsets changed"
 .assert CASM_EXPR_FLAGS = CASM_EXPR_VAL_HI + 1, error, "CASM expression flags offset changed"
 .assert CASM_EXPR_EXTRACTION = CASM_EXPR_FLAGS + 1, error, "CASM expression extraction offset changed"
@@ -601,6 +612,12 @@ CASM_ADDEND_SIGN_COUNT    = 2
 .assert (CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_SYMBOL_DERIVED | CASM_EXPR_FLAG_RELOCATABLE | CASM_EXPR_FLAG_FORCE_ABS) = CASM_EXPR_FLAG_MASK, error, "CASM expression flag mask changed"
 .assert CASM_EXTRACTION_COUNT = CASM_EXTRACTION_HI + 1, error, "CASM extraction range changed"
 .assert CASM_ADDEND_SIGN_COUNT = CASM_ADDEND_SIGN_NEGATIVE + 1, error, "CASM addend sign range changed"
+.assert CASM_RESOLVE_ID_LO = CASM_RESOLVE_FLAGS + 1, error, "CASM resolver identity offset changed"
+.assert CASM_RESOLVE_ID_HI = CASM_RESOLVE_ID_LO + 1, error, "CASM resolver identity offsets changed"
+.assert CASM_RESOLVE_VAL_LO = CASM_RESOLVE_ID_HI + 1, error, "CASM resolver value offset changed"
+.assert CASM_RESOLVE_VAL_HI = CASM_RESOLVE_VAL_LO + 1, error, "CASM resolver value offsets changed"
+.assert CASM_RESOLVE_SIZE = CASM_RESOLVE_VAL_HI + 1, error, "CASM resolver output size changed"
+.assert CASM_RESOLVE_FLAG_MASK = %00000101, error, "CASM resolver flag mask changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase and cleanup state

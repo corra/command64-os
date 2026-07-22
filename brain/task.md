@@ -161,8 +161,21 @@
     - [x] Dry-run `0.1.20.1085`; restored `0.1.19.1084`
     - [x] User approved completion; final `0.1.20` build 1085 verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp18-numeric-primary.md`
-  - [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
+  - [x] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
         resolver behavior; reopened and dependent on WP18
+    - Active on `feature/casm-phase5-wp19` from WP18 commit `755fc45`
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase5-wp19-symbol-resolver.md`
+    - Baseline: `0.1.20.1085`, 10,133 MAIN bytes, 107-byte headroom
+    - Test plan, deterministic resolver, and fixtures remain WP20 scope
+    - User approved CASM MAIN expansion from `$2800` to `$2A00` after the first
+      candidate exceeded the old envelope by 214 bytes
+    - User approved shared five-byte resolver callback output ABI declarations
+    - [x] Added resolver callback/trampoline and bounded evaluator
+    - [x] Added resolved/unresolved addend and extraction classification
+    - [x] Both links and test image pass with 298-byte `$2A00` MAIN headroom
+    - [x] Dry-run `0.1.21.1089`; restored candidate `0.1.20.1088`
+    - [x] User approved completion; final `0.1.21` build 1089 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp19-symbol-resolver.md`
   - [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
         fixture harness; depends on WP19
   - [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,

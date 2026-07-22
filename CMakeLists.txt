@@ -187,7 +187,7 @@ if(Ca65_FOUND)
     # packages (lexer core, token scanning, the 168-byte mnemonic table, and the
     # diagnostics/token dump) cannot fit the 725 bytes of headroom that remained
     # at WP5. $2000 matches the DEBUG precedent and leaves room through Phase 4.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "2800")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "2A00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()

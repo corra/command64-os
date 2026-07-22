@@ -255,6 +255,12 @@ This file serves as the shared repository for architectural decisions, technical
   sign/magnitude while leaving the NUMBER token current; checked application can
   therefore stamp arithmetic overflow at the magnitude rather than the following
   delimiter. Phase 5 diagnostics `$24-$27` are now printable.
+- WP19's evaluator accepts a resolver address in X/Y and invokes it exactly once
+  while the IDENTIFIER token is current. The callback receives X/Y pointing to
+  a shared five-byte flags/identity/value output view. An indirect-JSR trampoline
+  uses a linker-asserted non-page-crossing private pointer. Unresolved values are
+  never extracted as placeholder zero: only metadata is classified, with low
+  extraction clearing relocatable and high extraction preserving it.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.

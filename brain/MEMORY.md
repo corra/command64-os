@@ -233,6 +233,14 @@ artifact has 1,207 relocation points. No zero-page or resource storage changed.
 User completion approval advanced the version-only final artifact to `0.1.20`
 build 1085 with segment and relocation measurements unchanged.
 
+CASM Phase 5 WP19 candidate build 1088 expands MAIN from `$2800` to `$2A00`.
+The evaluator adds 314 CODE bytes and seven BSS bytes: `expr.o` is 835 CODE / 23
+BSS, total CODE+RODATA is 9,311 bytes, total BSS is 1,143 bytes, and MAIN use is
+10,454 of 10,752 bytes, leaving 298 bytes at both `$3400` and `$3500` bases. The
+R6 artifact has 1,268 relocation points. No zero-page or resource storage moved.
+User completion approval advanced the version-only final artifact to `0.1.21`
+build 1089 with segment and relocation measurements unchanged.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

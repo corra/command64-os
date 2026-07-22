@@ -20,6 +20,7 @@
 .export exprCheckedAdd
 .export exprCheckedSub
 .export exprApplyAddend
+.export exprEvaluate
 
 .segment "CODE"
 
@@ -44,6 +45,195 @@
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_SIGN
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_LO
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_HI
+    rts
+.endproc
+
+; ---------------------------------------------------------------------------
+; exprEvaluate
+; Evaluate one Phase 5 expression through a caller-supplied symbol resolver.
+;
+; Inputs:    current token begins expression; X/Y = resolver address; D clear
+; Outputs:   success: result record valid, first following token current, C clear
+;            failure: A = stable diagnostic, result invalid, C set
+; Preserves: V, D, I, zero page, balanced stack, parser/emitter/resources
+; Clobbers:  A, X, Y, N, Z, C, lexer state, expression and private scratch BSS
+; Resolver:  current token is IDENTIFIER; X/Y point to five-byte output view;
+;            C clear accepts output, C set is reported as resolver failure
+; ---------------------------------------------------------------------------
+.proc exprEvaluate
+    stx CasmExprResolverAddrLo
+    sty CasmExprResolverAddrHi
+    jsr exprInit
+
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_LESS
+    beq lowPrefix
+    cmp #CASM_TOKEN_GREATER
+    bne primary
+    lda #CASM_EXTRACTION_HI
+    bne storeExtraction
+lowPrefix:
+    lda #CASM_EXTRACTION_LO
+storeExtraction:
+    sta CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    jsr lexerNext
+    bcs return
+
+primary:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_NUMBER
+    beq number
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq identifier
+malformed:
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_MALFORMED
+    sec
+return:
+    rts
+
+number:
+    jsr exprParseNumeric
+    bcs return
+    stx CasmExprResultRecord + CASM_EXPR_VAL_LO
+    sty CasmExprResultRecord + CASM_EXPR_VAL_HI
+    lda #CASM_EXPR_FLAG_RESOLVED
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+    jsr lexerNext
+    bcs return
+    jsr rejectContinuation
+    bcs return
+    jmp applyExtraction
+
+identifier:
+    ldx #<CasmExprResolverOutput
+    ldy #>CasmExprResolverOutput
+    jsr callResolver
+    bcc resolverReturned
+    jmp resolverFailed
+resolverReturned:
+    lda CasmExprResolverOutput + CASM_RESOLVE_FLAGS
+    and #($FF - CASM_RESOLVE_FLAG_MASK)
+    beq resolverValid
+    jmp resolverFailed
+resolverValid:
+
+    ldx CasmExprResolverOutput + CASM_RESOLVE_ID_LO
+    stx CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_LO
+    ldy CasmExprResolverOutput + CASM_RESOLVE_ID_HI
+    sty CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_HI
+    lda CasmExprResolverOutput + CASM_RESOLVE_FLAGS
+    ora #CASM_EXPR_FLAG_SYMBOL_DERIVED
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq unresolved
+    lda CasmExprResolverOutput + CASM_RESOLVE_VAL_LO
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprResolverOutput + CASM_RESOLVE_VAL_HI
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jmp consumeIdentifier
+unresolved:
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    ora #CASM_EXPR_FLAG_FORCE_ABS
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+consumeIdentifier:
+    jsr lexerNext
+    bcs return
+
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq addend
+    cmp #CASM_TOKEN_MINUS
+    bne symbolDone
+addend:
+    jsr exprParseAddend
+    bcs return
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq consumeAddend
+    ldx CasmExprResultRecord + CASM_EXPR_VAL_LO
+    ldy CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jsr exprApplyAddend
+    bcc addendApplied
+    jmp return
+addendApplied:
+    stx CasmExprResultRecord + CASM_EXPR_VAL_LO
+    sty CasmExprResultRecord + CASM_EXPR_VAL_HI
+consumeAddend:
+    jsr lexerNext
+    bcc symbolDone
+    jmp return
+symbolDone:
+    jsr rejectContinuation
+    bcc applyExtraction
+    jmp return
+
+applyExtraction:
+    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    beq success
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq classifyExtraction
+    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    cmp #CASM_EXTRACTION_LO
+    beq clearHigh
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+clearHigh:
+    lda #0
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+classifyExtraction:
+    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    cmp #CASM_EXTRACTION_LO
+    bne success
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #($FF - CASM_EXPR_FLAG_RELOCATABLE)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+success:
+    clc
+    rts
+
+resolverFailed:
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_RESOLVER_FAILED
+    sec
+    rts
+.endproc
+
+; Reject only tokens that unambiguously continue the bounded expression. Other
+; punctuation remains current for the future parser adapter.
+.proc rejectContinuation
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq unsupported
+    cmp #CASM_TOKEN_MINUS
+    beq unsupported
+    cmp #CASM_TOKEN_LESS
+    beq unsupported
+    cmp #CASM_TOKEN_GREATER
+    beq unsupported
+    cmp #CASM_TOKEN_NUMBER
+    beq unsupported
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq unsupported
+    clc
+    rts
+unsupported:
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_UNSUPPORTED
+    sec
+    rts
+.endproc
+
+; 6502 has no indirect JSR. Push the synthetic return address in JSR order,
+; then transfer through the callback pointer; resolver RTS returns at resume.
+.proc callResolver
+    lda #>(resume - 1)
+    pha
+    lda #<(resume - 1)
+    pha
+    jmp (CasmExprResolverAddrLo)
+resume:
     rts
 .endproc
 
@@ -394,5 +584,9 @@ CasmExprOverflow: .res 1
 CasmExprTempLo:   .res 1
 CasmExprTempHi:   .res 1
 CasmExprTempExt:  .res 1
+CasmExprResolverAddrLo: .res 1
+CasmExprResolverAddrHi: .res 1
+CasmExprResolverOutput: .res CASM_RESOLVE_SIZE
 
 .assert CasmExprResultRecordEnd - CasmExprResultRecord = CASM_EXPR_REC_SIZE, error, "CASM expression result record size changed"
+.assert <CasmExprResolverAddrLo <> $FF, lderror, "CASM resolver callback pointer crosses an NMOS 6502 indirect-jump page"

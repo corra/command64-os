@@ -295,8 +295,13 @@ Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
 - [x] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
       arithmetic core. Numeric compatibility, checked helpers, diagnostics, and
       fixtures approved complete at `0.1.20` build 1085.
-- [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
-      resolver behavior. Reopened after rollback; depends on WP18.
+- [x] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
+      resolver behavior. Active on `feature/casm-phase5-wp19` from `755fc45`;
+      test plan, deterministic resolver, and fixtures remain WP20 scope. User
+      approved expanding CASM MAIN from `$2800` to `$2A00` for the evaluator and
+      declaring the shared five-byte resolver callback output ABI. Candidate
+      build 1088 passed both links and the test image with 298-byte headroom.
+      User approved completion at `0.1.21` build 1089.
 - [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
       fixture harness. Depends on WP19.
 - [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,

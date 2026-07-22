@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 5 WP19 expression resolver candidate**: added the shared
+  five-byte resolver callback ABI and a production-neutral evaluator for numeric
+  and identifier primaries, checked symbol addends, unresolved metadata, and
+  low/high extraction. Expanded CASM's MAIN envelope from `$2800` to `$2A00`;
+  test resolver and fixture integration remain WP20 scope. Completion advanced
+  CASM to `0.1.21` build 1089.
+
 - **CASM Phase 5 WP17 expression ABI**: reserved contiguous Phase 5 diagnostics
   `$24-$27`, declared the exact nine-byte expression result ABI, and added
   bounded `exprInit`/`exprGetResult` routines with no zero-page, resources,
