@@ -243,6 +243,11 @@ This file serves as the shared repository for architectural decisions, technical
 - The evaluator emits no bytes and creates no relocation records. WP20 may pass
   resolved values into existing emission, but unresolved placeholders must not
   be emitted as zero.
+- WP17 realizes the ABI as a private nine-byte BSS record with exported
+  `exprInit` and `exprGetResult` routines. The record label is not exported and
+  the module has no imports, zero-page, RODATA, DATA, resources, or runtime
+  consumer. Diagnostics `$24-$27` are reserved but remain unprintable/unraised
+  until later packages extend `diagnostics.s` with their message contracts.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.

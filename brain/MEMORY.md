@@ -216,6 +216,14 @@ zero-page, BSS, linker, parser, emitter, file, VMM, or cleanup ownership changes
 After explicit WP16 completion approval, the version-only increment produced
 `0.1.18` build 1080 with the verified three-banner-byte delta.
 
+CASM Phase 5 WP17 build 1081 adds `expr.o`: 36 CODE bytes and exactly 9 BSS
+bytes, with no RODATA, DATA, or ZEROPAGE. Linked CODE+RODATA becomes 8,741 bytes,
+BSS becomes 1,136 bytes, and total MAIN use is 9,877 of `$2800`, leaving 363
+bytes at both link bases. The R6 artifact is 11,113 bytes with 1,182 relocation
+points. No existing storage region or zero-page allocation moved.
+User completion approval advanced the version-only final artifact to `0.1.19`
+build 1082 with all segment and relocation measurements unchanged.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

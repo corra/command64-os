@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 5 WP17 expression ABI**: reserved contiguous Phase 5 diagnostics
+  `$24-$27`, declared the exact nine-byte expression result ABI, and added
+  bounded `exprInit`/`exprGetResult` routines with no zero-page, resources,
+  parser, emitter, or runtime diagnostic changes. Completion advanced CASM to
+  `0.1.19` build 1082.
+
 - **CASM Phase 4 complete (WP15 verification and closeout)**: Independently
   audited and closed the numeric static assembler phase at CASM `0.1.17`
   build 1079. WP15 changed no CASM production source; it verified, reconciled

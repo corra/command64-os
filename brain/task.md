@@ -138,8 +138,17 @@
     - [x] User approved completion; advanced to `0.1.18` build 1080
     - [x] Final build, no-change rebuild, and release image verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`
-  - [ ] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
+  - [x] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
         storage; depends on WP16
+    - Active on `feature/casm-phase5-wp17` from WP16 commit `3b53513`
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase5-wp17-expression-abi.md`
+    - [x] Captured `0.1.18.1080` baseline and diagnostic range `$00-$23`
+    - [x] Added exact result offsets, flags, enums, diagnostics, and assertions
+    - [x] Added 36-byte CODE / 9-byte BSS `expr.o`; no imports or zero page
+    - [x] Verified both link bases, 363-byte headroom, and release image
+    - [x] Dry-run `0.1.19.1082` and no-change rebuild; restored build 1081
+    - [x] User approved completion; final `0.1.19` build 1082 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp17-expression-abi.md`
   - [ ] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
         arithmetic core; depends on WP17
   - [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and

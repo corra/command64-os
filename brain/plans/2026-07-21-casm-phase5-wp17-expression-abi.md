@@ -1,7 +1,7 @@
 ---
 feature: casm-phase5-wp17-expression-abi
 created: 2026-07-21
-status: awaiting-approval
+status: complete
 ---
 
 # Plan: CASM Phase 5 WP17 - Expression ABI and Bounded Storage
@@ -253,3 +253,15 @@ AGENTS.md changes only if a durable local contract or child index changes.
   automatic source discovery and 408-byte baseline headroom, and moved the
   version increment behind the explicit completion gate. Awaiting implementation
   approval; Taskwarrior remains pending without a start timestamp.
+- 2026-07-21: User approved implementation. Activated Taskwarrior and branch
+  `feature/casm-phase5-wp17`; source work begins from clean WP16 commit
+  `3b53513` at CASM `0.1.18` build 1080.
+- 2026-07-21: Implementation complete through the completion candidate. Added
+  exact ABI/diagnostic assertions and `expr.o` (36 CODE, 9 BSS, no other
+  segments/imports). Build 1081 uses 8,741 linked bytes, 1,136 BSS bytes, 1,182
+  relocations, and leaves 363 MAIN bytes. Release image passes. The verified
+  `0.1.19` build 1082 dry run was restored to `0.1.18` build 1081 pending user
+  completion approval.
+- 2026-07-21: User approved completion. Applied the verified stage `18` -> `19`
+  increment; build 1082, no-change rebuild, and `image_d64` pass. WP17 is
+  complete and WP18 remains pending separate plan approval.
