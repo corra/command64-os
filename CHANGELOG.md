@@ -9,6 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6A WP22 prerequisite reconciliation and Phase 0C.4 freeze**:
+  researched the OS VMM primitive contract directly from
+  `src/command64/vmm.asm` and froze it as the Phase 6A VMM record contract —
+  confirmed the existing VMM registry record needs no growth, capped a single
+  CASM VMM allocation at 65536 bytes, and documented that CASM's own windowed
+  transfer wrapper must self-enforce bounds checking the OS does not provide.
+  Deferred the MAIN-envelope-size and diagnostic-value decisions to WP23.
+  Created the CASM Phase 6A Taskwarrior milestone and WP22-WP25 child tasks
+  and advanced CASM to `0.1.24` build 1095; no VMM allocation, transfer, or
+  runtime behavior is included.
+
 - **CASM Phase 5 WP16 contract and recovery gate**: reconciled the abandoned
   Phase 5 Taskwarrior state without replacing UUIDs, reopened WP19, stopped
   premature downstream work, encoded WP16-WP21 dependencies, and froze the

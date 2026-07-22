@@ -205,6 +205,44 @@
     - [x] User approved completion; final `0.1.23` build 1094 verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp21-verification-closeout.md`
 
+- [/] Taskwarrior (`d68e6c58-ac89-44f4-81a2-40b14093585b`): CASM Phase 6A VMM
+      storage foundation. CASM-local phase numbering; distinct from the
+      unrelated, already-completed top-level "Phase 6A/6B" elsewhere in
+      `brain/KNOWLEDGE.md` — always write "CASM Phase 6A" in full.
+  - Parent plan: `brain/plans/2026-07-21-casm-phase6-vmm-storage-and-symbol-table.md`
+  - [x] `eb7541e5-c3aa-4528-bdcd-2571d96688d9`: WP22 prerequisite
+        reconciliation and Phase 0C.4 freeze
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase6-wp22-prerequisite-reconciliation.md`
+    - Active on `feature/casm-phase6-wp22` from `main` commit `dcb74bb`
+    - [x] Phase 5 baseline and completion evidence verified (`0.1.23` build 1094)
+    - [x] Researched OS VMM primitive contract directly from `src/command64/vmm.asm`
+    - [x] Confirmed `CasmVmmRegistry`'s 3-byte record already matches `DOS_FREE_MEM`'s
+          real input (SegHi/Bank); no registry growth needed
+    - [x] Froze a 65536-byte single-allocation addressing cap (16-bit `Off` cursor
+          limit from a fixed SegHi/Bank pair)
+    - [x] Documented that `DOS_VMM_READ`/`WRITE` perform no OS-side bounds checking;
+          CASM's windowed wrapper must self-enforce it
+    - [x] Deferred MAIN-envelope-size and literal diagnostic-value decisions to WP23
+    - [x] Defined the nine-case WP23-WP25 fixture matrix
+    - [x] Created CASM Phase 6A Taskwarrior milestone and WP22-WP25 child tasks
+    - [x] Synchronized `wiki/tasks/casm.md` and `brain/task.md`
+    - [x] Freeze Phase 0C.4 contract in `brain/KNOWLEDGE.md`
+    - [x] Record findings in `brain/MEMORY.md`
+    - [x] CHANGELOG.md `[Unreleased]` entry
+    - [x] Detailed WP23 plan drafted (`brain/plans/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`)
+    - [x] Version-only completion candidate dry-run verified (`0.1.24.1095`,
+          2-byte diff); baseline `0.1.23.1094` restored via `git checkout`
+    - [x] Both images verified at restored baseline; `git diff --check` clean
+    - [x] Walkthrough drafted: `brain/walkthroughs/2026-07-21-casm-phase6-wp22-prerequisite-reconciliation.md`
+    - [x] User approved completion; final `0.1.24` build 1095 verified,
+          no-change rebuild stable, both images pass
+  - [ ] `8782e75d-d935-4e15-bf3c-d0488a1533a8`: WP23 VMM allocation core;
+        depends on WP22 (unblocked, not yet activated)
+  - [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
+        replay; depends on WP23
+  - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
+        and completion gate; depends on WP24
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

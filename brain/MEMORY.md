@@ -271,6 +271,48 @@ Phase 5 (minimal expression evaluator) is unblocked. Parent contract:
 `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`; entry work
 package WP16: `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
 
+**CASM Phase 6A WP22 prerequisite reconciliation and Phase 0C.4 freeze**:
+active on `feature/casm-phase6-wp22` from `main` commit `dcb74bb`, baseline
+CASM `0.1.23` build 1094 (PRG hash
+`18d2f6cce7ffbcc7de8aa71db3da9e3b6d9ee3bb1cd07e69b072dd0d0884e703`, matching
+the WP21 closeout exactly; a no-change rebuild reproduced the identical hash).
+Researched the OS VMM primitive contract directly from `src/command64/vmm.asm`
+rather than relying on `docs/vmm-api.md` alone, and found three facts that
+materially bound Phase 6A's design: (1) `vmmAlloc` always returns
+`VmmSegLo = 0`, so an allocation's identity is exactly `(VmmSegHi, VmmBank)` —
+the same two fields the pre-existing 3-byte `CasmVmmRegistry` record already
+stores, meaning `DOS_FREE_MEM` wiring needs no registry growth; (2) the 16-bit
+`VmmOffLo/Hi` transfer cursor can only reach 65536 bytes from a fixed
+`SegHi`/`Bank` pair regardless of how many pages an allocation was actually
+granted, so WP22 froze a hard 65536-byte cap per CASM VMM allocation, with
+larger needs spanning multiple registry slots; (3) `vmmReadBlock`/
+`vmmWriteBlock` perform no bounds checking against an allocation's granted
+size — an oversized transfer silently corrupts whatever REU page follows, so
+CASM's own windowed wrapper (WP24) must self-enforce the bound the OS will
+not. Also documented that `VMM_ERR_INVALID` conflates "no REU" with
+"zero-paragraph request", and that REU contents are undefined at boot (per
+the environment-variable subsystem's prior VMM use). Deliberately deferred
+the MAIN-envelope-size and literal `CASM_DIAG_*` value decisions to WP23,
+matching how WP13/WP19 made those calls inside their own implementing
+package rather than in a preceding freeze package. Created the CASM Phase 6A
+Taskwarrior milestone (`d68e6c58`) and WP22-WP25 children
+(`eb7541e5`/`8782e75d`/`228daccc`/`544a04bd`), sequentially dependent, matching
+the Phase 5 WP16-WP21 chain pattern. Defined a nine-case fixture matrix
+binding on WP23-WP25 (allocation, reuse-after-free, registry exhaustion, REU
+exhaustion, windowed read/write, replay-after-discard, boundary offset,
+CASM-side bounds rejection, and no-REU failure). Parent contract:
+`brain/plans/2026-07-21-casm-phase6-vmm-storage-and-symbol-table.md`; WP22
+detailed plan:
+`brain/plans/2026-07-21-casm-phase6-wp22-prerequisite-reconciliation.md`.
+
+User confirmed the runtime banner at the restored `0.1.23` build 1094
+baseline, then approved WP22 completion. The verified `0.1.24` increment was
+applied for real: build 1095 reproduced the dry run's exact PRG hash
+(`66594cd2b278b78705cacddf6e0a70d41c7574f8c2e84c6a101006bdd4958e64`), a
+no-change rebuild held at 1095, and both `test_image_d64` and `image_d64`
+passed. WP22 is complete; WP23 (`8782e75d`) is unblocked in Taskwarrior but
+requires its own separate plan approval before activation.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

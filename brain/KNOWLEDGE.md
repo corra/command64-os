@@ -298,6 +298,54 @@ This file serves as the shared repository for architectural decisions, technical
 - VMM storage precedes VMM-backed symbols: Phase 6A provides bounded storage
   and Phase 6B adds the symbol table and deterministic two-pass assembly.
 
+### CASM Phase 6A VMM Storage Contract (Phase 0C.4, frozen 2026-07-21)
+
+CASM-local phase numbering. Distinct from the unrelated, already-completed
+top-level "Phase 6A: App Manager" / "Phase 6B: Binary Relocator" entries in
+the Current Status table above — always write "CASM Phase 6A" in full in any
+record that could be read alongside both namespaces.
+
+- **Allocation identity is exactly `(SegHi, Bank)`.** `vmmAlloc`
+  (`src/command64/vmm.asm`) always returns `VmmSegLo = 0`; an allocation's
+  base is fully identified by the page index (`VmmSegHi`, 0-255) and bank
+  (`VmmBank`, 0-15). `vmmFree`'s actual input is exactly those two bytes, so
+  the pre-existing 3-byte `CasmVmmRegistry` record (`flag`/`SegHi`/`Bank`)
+  does not need to grow to support real `DOS_FREE_MEM` calls.
+- **A single CASM VMM allocation is capped at 65536 bytes (16 pages).**
+  `vmmComputeAddress` computes `Address = (Seg << 4) + Off`, where `Seg` is
+  fixed at the allocation's base and `Off` (`VmmOffLo/Hi`) is a 16-bit cursor
+  CASM supplies per transfer. Since `Off` tops out at 65535, only the first
+  64KB of a larger allocation is reachable through a fixed `SegHi`/`Bank`
+  pair; storage needs beyond that use additional registry slots (up to
+  `CASM_VMM_CAPACITY = 8`, i.e. up to 512KB total), never an `Off` value at
+  or beyond the owning allocation's granted size.
+- **The OS performs no bounds checking on `DOS_VMM_READ`/`DOS_VMM_WRITE`.**
+  `vmmReadBlock`/`vmmWriteBlock` only check `vmmInitialized` before DMA-ing
+  the requested byte count; an `offset + count` that runs past an
+  allocation's granted pages silently reads or corrupts whatever REU page
+  follows. CASM's own windowed transfer wrapper (WP24) must independently
+  track each allocation's granted size and refuse any request that would
+  exceed it — the OS provides no such protection.
+- **`VMM_ERR_INVALID` is ambiguous.** `vmmAlloc` returns it both for
+  "VMM not initialized" (no REU detected at boot) and for a zero-paragraph
+  request. CASM never issues a zero-paragraph request except as an internal
+  bug, so this return code from a CASM-sized allocation is treated as
+  VMM-unavailable, not malformed input.
+- **REU contents are undefined at boot** (confirmed by the environment
+  variable subsystem's prior VMM use, `brain/walkthroughs/2026-05-14-env-var-remediation.md`).
+  Phase 6A verification must write a known pattern before ever reading it
+  back; no routine may assume implicit zero-fill.
+- **REU presence in the supported local test environment predates CASM.**
+  `SET`/`PATH` have used the same VMM primitives at runtime since
+  2026-05-14; Phase 6A is CASM's first VMM consumer, not the OS's first.
+- The MAIN-envelope-size and literal `CASM_DIAG_*` hex-value decisions for
+  Phase 6A are deliberately deferred to WP23 (the implementing package),
+  matching how Phase 4 WP13 and Phase 5 WP19 set their own MAIN sizes rather
+  than an earlier freeze package doing it for them.
+- Phase 6A gate: bounded VMM records can be written, read, and replayed
+  without depending on source or symbol semantics. Phase 6B (symbol table,
+  hashing, two-pass resolution) remains a separately gated, unstarted phase.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

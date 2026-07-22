@@ -323,3 +323,61 @@ Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
 - [x] Resolved, unresolved, relocatable, extraction, and addend cases pass.
 - [x] Existing Phase 4 reference programs remain byte-identical.
 - [x] User completed the WP21 runtime walkthrough and approved Phase 5.
+
+# CASM Phase 6A - VMM Storage Foundation
+
+Note: this is CASM-local phase numbering, distinct from the unrelated,
+already-completed top-level project phases of the same name
+("Phase 6A: App Manager", "Phase 6B: Binary Relocator") recorded elsewhere in
+`brain/KNOWLEDGE.md`. Always write "CASM Phase 6A" in full to avoid ambiguity.
+
+Parent Taskwarrior UUID: `d68e6c58-ac89-44f4-81a2-40b14093585b`
+
+Parent plan:
+`brain/plans/2026-07-21-casm-phase6-vmm-storage-and-symbol-table.md`
+WP22 plan:
+`brain/plans/2026-07-21-casm-phase6-wp22-prerequisite-reconciliation.md`
+
+## Phase 6A Work Packages
+
+- [x] `eb7541e5-c3aa-4528-bdcd-2571d96688d9`: WP22 prerequisite reconciliation
+      and Phase 0C.4 freeze. Active on `feature/casm-phase6-wp22` from
+      `dcb74bb`. Researched the OS VMM primitive contract directly from
+      `src/command64/vmm.asm`: confirmed the existing 3-byte
+      `CasmVmmRegistry` record already matches `DOS_FREE_MEM`'s real input
+      (SegHi/Bank) and needs no growth; froze a new 65536-byte single-
+      allocation addressing cap (the 16-bit `Off` cursor cannot reach further
+      from a fixed SegHi/Bank pair); confirmed the OS performs no bounds
+      checking on `DOS_VMM_READ`/`WRITE`, so CASM's windowed wrapper must
+      self-enforce it; and documented that `VMM_ERR_INVALID` is ambiguous
+      between "no REU" and "zero-paragraph request". Deferred the MAIN-
+      envelope-size and literal diagnostic-value decisions to WP23, matching
+      how WP13/WP19 made those calls inside their own implementing package.
+      Defined the nine-case fixture matrix binding on WP23-WP25. Dry-run
+      `0.1.24.1095` differed from baseline by exactly 2 bytes (version/build
+      digits only); user confirmed the runtime banner at the restored
+      baseline before approval. User approved completion; final `0.1.24`
+      build 1095 verified, no-change rebuild stable, both images pass.
+- [ ] `8782e75d-d935-4e15-bf3c-d0488a1533a8`: WP23 VMM allocation core.
+- [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
+      replay.
+- [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
+      and completion gate.
+
+## Phase 6A Acceptance
+
+- [x] Phase 0C.4 VMM record contract and task hierarchy are frozen by WP22.
+- [ ] Real `DOS_ALLOC_MEM`/`DOS_FREE_MEM` wiring replaces `cleanupVmmStub`.
+- [ ] Windowed `DOS_VMM_READ`/`DOS_VMM_WRITE` transfers are bounds-checked by
+      CASM against each allocation's granted size.
+- [ ] Bounded VMM records are written, read, and replayed without depending
+      on source or symbol semantics.
+- [ ] No-REU and allocation-exhaustion diagnostics are stable and exit
+      cleanly with no partial ownership.
+- [ ] User completes the WP25 runtime walkthrough and approves CASM
+      Phase 6A.
+
+CASM Phase 6B (symbol table and two-pass assembly) remains a separately
+gated phase; its work packages (WP26-WP31) are reserved in the parent plan
+but not yet created in Taskwarrior. CASM Phase 6B may not begin before CASM
+Phase 6A's own completion gate and explicit user approval.
