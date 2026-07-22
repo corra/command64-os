@@ -407,11 +407,13 @@ WP22 plan:
 ## Phase 6A Acceptance
 
 - [x] Phase 0C.4 VMM record contract and task hierarchy are frozen by WP22.
-- [ ] Real `DOS_ALLOC_MEM`/`DOS_FREE_MEM` wiring replaces `cleanupVmmStub`.
-- [ ] Windowed `DOS_VMM_READ`/`DOS_VMM_WRITE` transfers are bounds-checked by
-      CASM against each allocation's granted size.
+- [x] Real `DOS_ALLOC_MEM`/`DOS_FREE_MEM` wiring replaces `cleanupVmmStub`
+      (WP23).
+- [x] Windowed `DOS_VMM_READ`/`DOS_VMM_WRITE` transfers are bounds-checked by
+      CASM against each allocation's granted size (WP24).
 - [ ] Bounded VMM records are written, read, and replayed without depending
-      on source or symbol semantics.
+      on source or symbol semantics (code exists since WP24; runtime
+      verification is WP25's job).
 - [ ] No-REU and allocation-exhaustion diagnostics are stable and exit
       cleanly with no partial ownership.
 - [ ] User completes the WP25 runtime walkthrough and approves CASM
