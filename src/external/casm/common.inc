@@ -127,6 +127,14 @@ CASM_VMM_REGISTRY_BYTES  = CASM_VMM_CAPACITY * CASM_VMM_REC_SIZE
 .assert CASM_FILE_CAPACITY = 8, error, "CASM file registry contract changed"
 .assert CASM_VMM_CAPACITY = 8, error, "CASM VMM registry contract changed"
 
+; Single-allocation addressing cap (Phase 0C.4, frozen by WP22): a fixed
+; SegHi:Bank pair plus a 16-bit Off cursor can address at most 65536 bytes.
+; vmm_store.s must reject any request that would need more than this before
+; ever calling DOS_ALLOC_MEM.
+CASM_VMM_ALLOC_MAX_BYTES = 65536
+
+.assert CASM_VMM_ALLOC_MAX_BYTES = 65536, error, "CASM VMM single-allocation cap changed"
+
 ; ---------------------------------------------------------------------------
 ; Phase 2 bounded CLI and file-service contract
 ; ---------------------------------------------------------------------------
@@ -400,6 +408,14 @@ CASM_DIAG_EXPR_UNSUPPORTED = $25
 CASM_DIAG_EXPR_OVERFLOW = $26
 CASM_DIAG_RESOLVER_FAILED = $27
 CASM_DIAG_PHASE5_LAST = CASM_DIAG_RESOLVER_FAILED
+
+; CASM Phase 6A (VMM storage foundation) reservations. WP23 raises the first
+; three; the fourth is reserved for WP24's windowed transfer wrappers.
+CASM_DIAG_VMM_UNAVAILABLE     = $28  ; VMM_ERR_INVALID: no REU / not initialized
+CASM_DIAG_VMM_ALLOC_FAILED    = $29  ; VMM_ERR_NOMEM, or a rejected zero-size request
+CASM_DIAG_VMM_FREE_FAILED     = $2A  ; DOS_FREE_MEM rejected the stored handle
+CASM_DIAG_VMM_TRANSFER_FAILED = $2B  ; reserved for WP24; not raised by WP23
+CASM_DIAG_PHASE6A_LAST = CASM_DIAG_VMM_TRANSFER_FAILED
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -414,6 +430,11 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_EXPR_OVERFLOW = CASM_DIAG_EXPR_UNSUPPORTED + 1, error, "CASM Phase 5 diagnostics must remain contiguous"
 .assert CASM_DIAG_RESOLVER_FAILED = CASM_DIAG_EXPR_OVERFLOW + 1, error, "CASM Phase 5 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE5_LAST = $27, error, "CASM Phase 5 diagnostic range changed"
+.assert CASM_DIAG_VMM_UNAVAILABLE = CASM_DIAG_PHASE5_LAST + 1, error, "CASM Phase 6A diagnostics must follow Phase 5"
+.assert CASM_DIAG_VMM_ALLOC_FAILED = CASM_DIAG_VMM_UNAVAILABLE + 1, error, "CASM Phase 6A diagnostics must remain contiguous"
+.assert CASM_DIAG_VMM_FREE_FAILED = CASM_DIAG_VMM_ALLOC_FAILED + 1, error, "CASM Phase 6A diagnostics must remain contiguous"
+.assert CASM_DIAG_VMM_TRANSFER_FAILED = CASM_DIAG_VMM_FREE_FAILED + 1, error, "CASM Phase 6A diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE6A_LAST = $2B, error, "CASM Phase 6A diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

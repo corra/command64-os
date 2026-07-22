@@ -358,7 +358,26 @@ WP22 plan:
       digits only); user confirmed the runtime banner at the restored
       baseline before approval. User approved completion; final `0.1.24`
       build 1095 verified, no-change rebuild stable, both images pass.
-- [ ] `8782e75d-d935-4e15-bf3c-d0488a1533a8`: WP23 VMM allocation core.
+- [x] `8782e75d-d935-4e15-bf3c-d0488a1533a8`: WP23 VMM allocation core. Plan
+      approved as drafted (static verification only, no runtime fixtures).
+      Active on `feature/casm-phase6-wp23` from `feature/casm-phase6-wp22` at
+      `d0878d6`, CASM `0.1.24` build 1095 baseline. Created `vmm_store.s`
+      (`vmmStoreAlloc`/`vmmStoreFree`) wired to `DOS_ALLOC_MEM`/`DOS_FREE_MEM`;
+      replaced `cleanupVmmStub` with a real free in `resourcesCleanup`. No
+      16-bit byte count can exceed the 65536-byte cap after rounding, so the
+      plan's proposed `CASM_DIAG_VMM_ALLOC_TOO_LARGE` was dropped as
+      unreachable; carry-safe rounding clamps the one wraparound-prone input
+      range instead, and a zero-byte-count request is rejected locally so a
+      later `VMM_ERR_INVALID` stays unambiguous. Reserved diagnostics
+      `$28`-`$2B`. Measured MAIN usage: 10,647/10,752 bytes, 105 bytes free —
+      no size change needed. User ran a VICE sanity check (CASM against a
+      trusted fixture) confirming clean assemble/exit, then approved the
+      walkthrough and completion. Final `0.1.25` build 1097 matches the
+      dry-run PRG hash exactly; no-change rebuild stable; both images pass.
+      Walkthrough:
+      `brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`.
+      WP23 is complete; WP24 (`228daccc`) is unblocked but requires its own
+      separate plan approval before activation.
 - [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
       replay.
 - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,

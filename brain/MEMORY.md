@@ -313,6 +313,42 @@ no-change rebuild held at 1095, and both `test_image_d64` and `image_d64`
 passed. WP22 is complete; WP23 (`8782e75d`) is unblocked in Taskwarrior but
 requires its own separate plan approval before activation.
 
+**CASM Phase 6A WP23 VMM allocation core** (complete):
+active on `feature/casm-phase6-wp23` from `feature/casm-phase6-wp22` at
+`d0878d6`, baseline `0.1.24` build 1095. User approved the WP23 plan as
+drafted; the ask for a "test harness and fixtures if needed" was resolved as
+static verification only, matching the plan's own exclusion of runtime
+fixtures for this package. Created `vmm_store.s` (`vmmStoreAlloc`/
+`vmmStoreFree`) wired to `DOS_ALLOC_MEM`/`DOS_FREE_MEM`, and replaced
+`cleanupVmmStub` with a real `vmmStoreFree` call in `resources.s`. Two ABI
+questions surfaced and were resolved with the user before writing code: no
+16-bit byte count can ever need more than 4,096 paragraphs (= the 65536-byte
+cap), so the plan's proposed `CASM_DIAG_VMM_ALLOC_TOO_LARGE` rejection path
+is unreachable and was dropped — the real hazard was the "add 15, shift
+right 4" rounding trick overflowing 16-bit arithmetic for byte counts
+65,521-65,535, fixed by checking the carry and clamping to the
+proven-exact 4,096 paragraphs rather than rejecting anything; a zero-byte
+request is still rejected locally (`CASM_DIAG_VMM_ALLOC_FAILED`), which is
+what keeps a later `VMM_ERR_INVALID` unambiguous per WP22's finding. Found
+and fixed two register-clobber bugs while writing this (before any build):
+`vmmStoreFree` reusing one scratch byte for both the slot number and
+SegHi/Bank staging, and `resourcesCleanup`'s VMM loop relying on `X`
+surviving a call that documents `X` as clobbered — both fixed using the
+existing `CasmVmmSegHi`/`CasmVmmBank` staging pair and `CasmCleanupOffset`
+scratch-preservation pattern respectively. Reserved diagnostics `$28`-`$2B`
+in `common.inc` with contiguous-range asserts. Measured MAIN usage at
+10,647/10,752 bytes (105 bytes free) — no size change needed, unlike the
+WP13/WP19 precedent of requiring one; user confirmed proceeding on that
+basis. User ran a VICE sanity check (CASM against a trusted fixture),
+confirmed clean assemble/exit, and approved completion. Final `0.1.25` build
+1097 matched the dry run's exact PRG hash, a no-change rebuild held at 1097
+across two more builds, and both `test_image_d64` and `image_d64` passed.
+WP23 detailed plan:
+`brain/plans/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`; walkthrough:
+`brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`. WP24
+(`228daccc`) is unblocked in Taskwarrior but requires its own separate plan
+approval before activation.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

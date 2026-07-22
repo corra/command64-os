@@ -345,6 +345,20 @@ record that could be read alongside both namespaces.
 - Phase 6A gate: bounded VMM records can be written, read, and replayed
   without depending on source or symbol semantics. Phase 6B (symbol table,
   hashing, two-pass resolution) remains a separately gated, unstarted phase.
+- **WP23 implementation (complete).**
+  `vmm_store.s` wires `vmmStoreAlloc`/`vmmStoreFree` to `DOS_ALLOC_MEM`/
+  `DOS_FREE_MEM`. No 16-bit byte count can ever require more than 4,096
+  paragraphs (= the 65536-byte cap) after rounding, so there is no separate
+  "too large" rejection path (`CASM_DIAG_VMM_ALLOC_TOO_LARGE`, proposed in
+  the WP23 plan, was dropped as unreachable); the carry out of the rounding
+  add is used only to clamp the one wraparound-prone input range (byte counts
+  65,521-65,535) to the proven-exact 4,096 paragraphs. A zero-byte-count
+  request is rejected locally before any OS call, which is what keeps a
+  later `VMM_ERR_INVALID` unambiguous. Diagnostics `$28`-`$2B` are reserved
+  (`CASM_DIAG_VMM_UNAVAILABLE`/`_ALLOC_FAILED`/`_FREE_FAILED`/
+  `_TRANSFER_FAILED`, the last raised only by WP24). Measured MAIN usage
+  (10,647/10,752 bytes) fits the existing `$2A00` envelope with 105 bytes
+  free — no size change, unlike the WP13/WP19 precedent of needing one.
 
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.

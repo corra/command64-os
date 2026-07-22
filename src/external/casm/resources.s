@@ -3,13 +3,14 @@
 ; Copyright (c) 2026 Command64 project contributors
 ;
 ; CASM central resource ownership and terminal paths. Phase 2 closes live file
-; handles through Command 64 services. VMM records remain bounded stubs until
-; the separately approved VMM-storage phase introduces real allocations.
+; handles through Command 64 services. Phase 6A WP23 frees VMM allocations
+; through vmm_store.s's vmmStoreFree, the sole VMM cleanup path.
 
 .include "command64.inc"
 .include "common.inc"
 
 .import diagPrintFatal
+.import vmmStoreFree
 
 .export resourcesInit
 .export resourceRegisterHandle
@@ -25,6 +26,7 @@
 .export CasmCleanupGuard
 .export CasmFileCount
 .export CasmVmmCount
+.export CasmVmmRegistry
 
 .segment "BSS"
 
@@ -239,7 +241,8 @@ rrvBadSlot:
 ;
 ; Inputs:  none
 ; Outputs: C clear, A = CASM_DIAG_NONE when all owned resources were released
-;          C set, A = CASM_DIAG_CLEANUP_FAILED if any file close failed
+;          C set, A = CASM_DIAG_CLEANUP_FAILED if any file close or VMM free
+;              failed
 ; Clobbers: A, X, FileHandle and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 resourcesCleanup:
@@ -266,15 +269,17 @@ rcFileNext:
 
     ldx #0
 rcVmmLoop:
-    jsr cleanupVmmStub
-    txa
-    clc
-    adc #CASM_VMM_REC_SIZE
-    tax
-    cpx #CASM_VMM_REGISTRY_BYTES
+    stx CasmCleanupOffset
+    jsr vmmStoreFree
+    bcc rcVmmNext
+    lda #CASM_DIAG_CLEANUP_FAILED
+    sta CasmCleanupDiag
+rcVmmNext:
+    ldx CasmCleanupOffset
+    inx
+    cpx #CASM_VMM_CAPACITY
     bcc rcVmmLoop
     lda #0
-    sta CasmVmmCount
     sta CasmCleanupGuard
     lda CasmCleanupDiag
     beq rcSuccess
@@ -319,15 +324,6 @@ cfrSuccess:
 cfrFailed:
     lda #CASM_DIAG_CLEANUP_FAILED
     sec
-    rts
-
-; Input: X = VMM-record byte offset. The VMM-storage phase replaces this with
-; a real free followed by invalidation only when the free succeeds.
-cleanupVmmStub:
-    lda #CASM_RESOURCE_FREE
-    sta CasmVmmRegistry + CASM_VMM_REC_FLAG, x
-    sta CasmVmmRegistry + CASM_VMM_REC_SEGHI, x
-    sta CasmVmmRegistry + CASM_VMM_REC_BANK, x
     rts
 
 ; ---------------------------------------------------------------------------

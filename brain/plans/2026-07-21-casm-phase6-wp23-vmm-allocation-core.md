@@ -1,7 +1,7 @@
 ---
 feature: casm-phase6-wp23-vmm-allocation-core
 created: 2026-07-21
-status: planned
+status: complete
 ---
 
 # Plan: CASM Phase 6A WP23 - VMM Allocation Core
@@ -226,3 +226,17 @@ Re-read the root and `src`/`external`/`casm` DOX chain after source edits.
 
 - 2026-07-21: Drafted by WP22; WP23 remains inactive pending WP22's own
   completion approval and separate approval of this plan.
+- 2026-07-22: User approved this plan as drafted; the fixture question was
+  resolved as static verification only. Activated on `feature/casm-phase6-wp23`
+  from `feature/casm-phase6-wp22` at `d0878d6`, baseline `0.1.24` build 1095.
+  Implemented `vmm_store.s` and the `resources.s`/`common.inc` wiring;
+  resolved two ABI questions with the user (dropped the unreachable
+  `CASM_DIAG_VMM_ALLOC_TOO_LARGE` path in favor of carry-safe rounding; kept
+  the zero-byte-count local rejection). Measured MAIN usage
+  (10,647/10,752 bytes, 105 bytes free) and found no size change was needed,
+  unlike the WP13/WP19 precedent; user confirmed proceeding on that basis.
+  User ran a VICE sanity check, confirmed clean assemble/exit, and approved
+  the walkthrough and completion. Final `0.1.25` build 1097 matched the
+  verified dry run exactly; no-change rebuild stable; both images pass. WP23
+  is complete. Walkthrough:
+  `brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`.

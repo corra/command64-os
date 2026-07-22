@@ -236,8 +236,45 @@
     - [x] Walkthrough drafted: `brain/walkthroughs/2026-07-21-casm-phase6-wp22-prerequisite-reconciliation.md`
     - [x] User approved completion; final `0.1.24` build 1095 verified,
           no-change rebuild stable, both images pass
-  - [ ] `8782e75d-d935-4e15-bf3c-d0488a1533a8`: WP23 VMM allocation core;
-        depends on WP22 (unblocked, not yet activated)
+  - [x] `8782e75d-d935-4e15-bf3c-d0488a1533a8`: WP23 VMM allocation core
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`
+    - User approved the plan as drafted; fixture question resolved as static
+      verification only (no runtime fixtures in WP23, matrix remains WP25's)
+    - Active on `feature/casm-phase6-wp23` from `feature/casm-phase6-wp22`
+      commit `d0878d6`; baseline CASM `0.1.24` build 1095
+    - [x] Added `CASM_VMM_ALLOC_MAX_BYTES` and `$28`-`$2B` diagnostics with
+          contiguous-range asserts to `common.inc`
+    - [x] Created `vmm_store.s` (`vmmStoreAlloc`/`vmmStoreFree`), wired to
+          `DOS_ALLOC_MEM`/`DOS_FREE_MEM`
+    - [x] Resolved during implementation: no 16-bit byte count can exceed the
+          65536-byte cap after rounding, so `CASM_DIAG_VMM_ALLOC_TOO_LARGE` is
+          unreachable and was dropped; carry-safe rounding clamps the
+          65,521-65,535 wraparound range to 4,096 paragraphs instead
+    - [x] Zero-byte-count requests rejected locally before any OS call,
+          keeping a later `VMM_ERR_INVALID` unambiguous
+    - [x] Found and fixed two register-clobber bugs before building: slot vs.
+          SegHi/Bank staging collision in `vmmStoreFree`, and `X` clobbered
+          across `jsr vmmStoreFree` in `resourcesCleanup`'s VMM loop
+    - [x] Exported `CasmVmmRegistry`; replaced `cleanupVmmStub` with a real
+          `vmmStoreFree` call in `resourcesCleanup`; `CasmVmmCount` now
+          maintained incrementally (no bulk reset), matching `CasmFileCount`
+    - [x] Measured MAIN usage: 10,647/10,752 bytes, 105 bytes free; no size
+          change needed (unlike the WP13/WP19 precedent); user confirmed
+    - [x] Static verification: `vmm_store.o` is CODE-only (144 bytes); imports/
+          exports match exactly; both relocation bases and `test_image_d64`/
+          `image_d64` pass
+    - [x] Walkthrough drafted: `brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`
+    - [x] Completion dry-run verified (`0.1.25.1097`, 2-byte diff, no-change
+          rebuild stable); baseline `0.1.24.1096` restored via `git checkout`,
+          reproduced exactly; both images pass at restored baseline
+    - [x] User ran the VICE sanity check (CASM against a trusted fixture);
+          confirmed clean assemble/exit -- resourcesCleanup's rewired VMM
+          loop is a no-op today with no allocation call site yet
+    - [x] User approved walkthrough, no-change MAIN size decision, and
+          completion
+    - [x] Final verified increment applied: `0.1.25` build 1097 matches the
+          dry-run PRG hash exactly; no-change rebuild stable across two more
+          builds; both images pass
   - [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
         replay; depends on WP23
   - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,

@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6A WP23 VMM allocation core**: added `vmm_store.s`
+  (`vmmStoreAlloc`/`vmmStoreFree`) wiring real `DOS_ALLOC_MEM`/`DOS_FREE_MEM`
+  calls behind the existing resource registry, and replaced
+  `cleanupVmmStub`'s no-op-on-REU behavior with a real, retry-on-failure free
+  in `resourcesCleanup`. Reserved diagnostics `$28`-`$2B` in `common.inc`.
+  Measured the real MAIN-envelope usage (10,647/10,752 bytes) and found it
+  already fits `$2A00` with headroom to spare, so no MAIN size change was
+  needed. Advanced CASM to `0.1.25` build 1097. Implements no windowed
+  transfer (WP24) and no runtime fixture (WP25).
+
 - **CASM Phase 6A WP22 prerequisite reconciliation and Phase 0C.4 freeze**:
   researched the OS VMM primitive contract directly from
   `src/command64/vmm.asm` and froze it as the Phase 6A VMM record contract —
