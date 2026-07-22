@@ -402,7 +402,15 @@ WP22 plan:
       WP24 is complete; WP25 (`544a04bd`) is unblocked but requires its own
       separate plan approval before activation.
 - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
-      and completion gate.
+      and completion gate. Detailed plan drafted:
+      `brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`.
+      Reconciled the stale acceptance checklist above and a test-harness
+      build-dependency hazard (must stub `diagPrintFatal`, matching WP20's
+      lexer-stub precedent for `expr.s`). Found `vmmalloc4` (REU exhaustion)
+      is not reachable through normal allocation calls given CASM's own
+      512KB cap against a 16MB-tracked MCT. Not yet active — awaiting user
+      answers to two open questions (`vmmalloc4` construction; test target
+      naming/size) and plan approval.
 
 ## Phase 6A Acceptance
 

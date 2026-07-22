@@ -310,7 +310,21 @@
           dry-run PRG hash exactly; no-change rebuild stable across two more
           builds; both images pass
   - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
-        and completion gate; depends on WP24
+        and completion gate; depends on WP24 (complete, unblocked)
+    - Detailed plan drafted: `brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`
+    - Reconciled: stale acceptance checklist (WP23/WP24 items were
+      unchecked, now fixed), a test-harness build-dependency hazard (must
+      stub `diagPrintFatal` like WP20 did for lexer symbols instead of
+      importing the real `diagnostics.s`, which would transitively pull in
+      `lexer.s`/`source.s`), and a wording mismatch between WP22's fixture
+      matrix ("a different staging buffer") and WP24's actual single
+      `CasmVmmBuffer` design
+    - Found `vmmalloc4` (REU exhaustion) is not reachable through normal
+      allocation calls: CASM's own 512KB cap can never mark enough of the
+      16MB-tracked MCT to trigger genuine `VMM_ERR_NOMEM`
+    - Not yet active: awaiting user answers to two open questions
+      (`vmmalloc4` construction approach; test target naming/size) and plan
+      approval
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
