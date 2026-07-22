@@ -213,6 +213,65 @@ This file serves as the shared repository for architectural decisions, technical
   advanced CASM from `0.1.3` to `0.1.4`.
 - Work Package 1 synchronized the approved contracts and task hierarchy; user
   completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+
+### CASM Phase 5 Expression/Resolver Contract (Phase 0C.3, approved 2026-07-21)
+
+- Grammar is `extraction? primary addend?`, where extraction is `<` or `>`,
+  primary is a number or identifier, and addend is `+/-` followed by a number.
+  Only symbol-derived primaries accept addends; numeric arithmetic, parentheses,
+  unary negation, chaining, symbol-to-symbol arithmetic, and current-PC
+  expressions are deferred.
+- The bounded result record holds a 16-bit value; resolved, symbol-derived,
+  relocatable, and force-absolute-width flags; full/low/high extraction; an
+  opaque 16-bit symbol ID; and an addend represented as sign plus unsigned
+  16-bit magnitude.
+- Unresolved symbols retain resolver identity, relocation class, extraction,
+  and addend metadata. They force absolute-width selection so placeholder zero
+  cannot destabilize instruction size between passes.
+- Resolved arithmetic is checked against `$0000..$FFFF` and never wraps.
+  Low-byte extraction is not relocatable; high-byte extraction preserves
+  potential relocation classification for Phase 8.
+- The resolver owns symbol identity and returns resolved state, optional value,
+  and absolute/relocatable class. Phase 5 uses a deterministic fixture boundary;
+  Phase 6A owns VMM records, Phase 6B the production resolver/two-pass model,
+  and Phase 8 relocation consumption.
+- Carry clear means the result record is valid. Carry set means `A` contains a
+  stable diagnostic and callers must not consume the record.
+- Evaluator routines execute neither `SED` nor `CLD`; every `ADC`/`SBC` path
+  establishes carry explicitly. CASM's application-entry decimal-mode
+  assumption remains inherited hardening debt rather than a Phase 5 guarantee.
+- The evaluator emits no bytes and creates no relocation records. WP20 may pass
+  resolved values into existing emission, but unresolved placeholders must not
+  be emitted as zero.
+- WP17 realizes the ABI as a private nine-byte BSS record with exported
+  `exprInit` and `exprGetResult` routines. The record label is not exported and
+  the module has no imports, zero-page, RODATA, DATA, resources, or runtime
+  consumer. Diagnostics `$24-$27` are reserved but remain unprintable/unraised
+  until later packages extend `diagnostics.s` with their message contracts.
+- WP18 moves the single numeric implementation and its seven scratch bytes into
+  `expr.s` as `exprParseNumeric`, returning X/Y without importing parser state.
+  `parser.s` retains only a compatibility wrapper, so existing Phase 4 parser
+  and emitter callers remain unchanged until WP20. Addends are parsed as
+  sign/magnitude while leaving the NUMBER token current; checked application can
+  therefore stamp arithmetic overflow at the magnitude rather than the following
+  delimiter. Phase 5 diagnostics `$24-$27` are now printable.
+- WP19's evaluator accepts a resolver address in X/Y and invokes it exactly once
+  while the IDENTIFIER token is current. The callback receives X/Y pointing to
+  a shared five-byte flags/identity/value output view. An indirect-JSR trampoline
+  uses a linker-asserted non-page-crossing private pointer. Unresolved values are
+  never extracted as placeholder zero: only metadata is classified, with low
+  extraction clearing relocatable and high extraction preserving it.
+- WP20's parser adapter stamps the expression-start diagnostic location before
+  evaluation, copies only RESOLVED values into `CasmParserStmt`, and leaves the
+  first delimiter current. Production identifiers deliberately resolve to `$27`
+  until Phase 6B; a separate test PRG supplies deterministic symbols without
+  adding fixture names or hidden syntax to CASM.
+- WP21 closes the parent expression matrix with explicit `+0`, `-$0000`, and
+  repeated-extraction cases. Negative zero preserves a negative sign with zero
+  magnitude while leaving the resolved value unchanged. Harness tokens use
+  distinct columns so diagnostics certify the exact offending token position.
+  User-approved Phase 5 completion is CASM `0.1.23` build 1094; Phase 6A remains
+  inactive.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.

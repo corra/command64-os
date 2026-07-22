@@ -7,7 +7,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CASM Phase 5 WP16 contract and recovery gate**: reconciled the abandoned
+  Phase 5 Taskwarrior state without replacing UUIDs, reopened WP19, stopped
+  premature downstream work, encoded WP16-WP21 dependencies, and froze the
+  Phase 0C.3 expression/resolver contract. Added the separately gated WP17 ABI
+  plan and advanced CASM to `0.1.18` build 1080; no evaluator runtime behavior
+  is included.
+
 ### Added
+
+- **CASM Phase 5 WP21 verification and closeout**: expanded the standalone
+  expression harness from 27 to 30 cases with positive zero, negative zero, and
+  repeated-extraction coverage, plus exact offending-token column checks. The
+  completed Phase 5 advanced CASM to `0.1.23` build 1094 without changing
+  production behavior or storage.
+
+- **CASM Phase 5 WP20 expression adapter candidate**: routed instruction,
+  `.ORG`, `.BYTE`, and `.WORD` numeric-expression positions through the Phase 5
+  evaluator, retained production identifier rejection until Phase 6B, and added
+  a standalone 27-case `test_casm_expr` resolver/evaluator harness plus numeric
+  extraction and unresolved-identifier fixtures. Completion advanced CASM to
+  `0.1.22` build 1093.
+
+- **CASM Phase 5 WP19 expression resolver candidate**: added the shared
+  five-byte resolver callback ABI and a production-neutral evaluator for numeric
+  and identifier primaries, checked symbol addends, unresolved metadata, and
+  low/high extraction. Expanded CASM's MAIN envelope from `$2800` to `$2A00`;
+  test resolver and fixture integration remain WP20 scope. Completion advanced
+  CASM to `0.1.21` build 1089.
+
+- **CASM Phase 5 WP17 expression ABI**: reserved contiguous Phase 5 diagnostics
+  `$24-$27`, declared the exact nine-byte expression result ABI, and added
+  bounded `exprInit`/`exprGetResult` routines with no zero-page, resources,
+  parser, emitter, or runtime diagnostic changes. Completion advanced CASM to
+  `0.1.19` build 1082.
+
+- **CASM Phase 5 WP18 numeric and checked arithmetic core**: moved numeric
+  conversion and scratch ownership from the parser into the expression module
+  behind a compatibility wrapper, added optional sign/magnitude addend parsing,
+  checked 16-bit add/subtract/application helpers, printable Phase 5 diagnostics,
+  and trusted decimal/hex/binary boundary fixtures.
+  Completion advanced CASM to `0.1.20` build 1085.
 
 - **CASM Phase 4 complete (WP15 verification and closeout)**: Independently
   audited and closed the numeric static assembler phase at CASM `0.1.17`

@@ -16,7 +16,8 @@
 
 .import lexerNext
 .import CasmTokenRecord
-.import CasmTokenText
+.import exprEvaluate
+.import exprGetResult
 
 ; WP15 diagnostic context.
 .import diagSetLocFromToken
@@ -24,7 +25,7 @@
 
 .export CasmParserStmt
 .export parserParseStatement
-.export parseNumericValue
+.export parserParseExpressionValue
 
 .segment "BSS"
 
@@ -32,17 +33,6 @@
 ; matcher and emission engine.
 CasmParserStmt:
     .res CASM_PARSER_STMT_SIZE
-
-; Private 24-bit numeric accumulator. The extra Ext byte and the sticky
-; Overflow flag detect any value exceeding 65535 regardless of how many
-; digits follow; Overflow is monotonic within one parseNumericValue call.
-CasmParserValueLo:  .res 1
-CasmParserValueHi:  .res 1
-CasmParserValueExt: .res 1
-CasmParserOverflow: .res 1
-CasmParserTempLo:   .res 1
-CasmParserTempHi:   .res 1
-CasmParserTempExt:  .res 1
 
 .segment "CODE"
 
@@ -156,6 +146,12 @@ parseOperandSequence:
     beq posImmediateJmp
     cmp #CASM_TOKEN_NUMBER
     beq posAbsoluteJmp
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_LESS
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_GREATER
+    beq posAbsoluteJmp
     cmp #CASM_TOKEN_REGISTER
     beq posAccumulatorJmp
     cmp #CASM_TOKEN_LPAREN
@@ -183,25 +179,28 @@ posImmediate:
 @ok1:
     cmp #CASM_TOKEN_NUMBER
     beq posImmediateNumber
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_LESS
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_GREATER
+    beq posImmediateNumber
     jmp posSyntaxError
 posImmediateNumber:
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
     lda #CASM_OPKIND_IMMEDIATE
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
-    jmp posExpectTerminator
+    jmp posValidateTerminator
 
 posAbsolute:
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
-    jsr lexerNext
-    bcc @ok2
-    rts
-@ok2:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_NEWLINE
     beq posAbsoluteDone
     cmp #CASM_TOKEN_EOF
@@ -260,16 +259,19 @@ posIndirect:
 @ok1:
     cmp #CASM_TOKEN_NUMBER
     beq posIndirectNumber
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq posIndirectNumber
+    cmp #CASM_TOKEN_LESS
+    beq posIndirectNumber
+    cmp #CASM_TOKEN_GREATER
+    beq posIndirectNumber
     jmp posSyntaxError
 posIndirectNumber:
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
-    jsr lexerNext
-    bcc @ok2
-    rts
-@ok2:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_RPAREN
     beq posIndirectClose
     cmp #CASM_TOKEN_COMMA
@@ -345,6 +347,8 @@ posExpectTerminator:
     bcc @ok1
     rts
 @ok1:
+posValidateTerminator:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_NEWLINE
     beq posDone
     cmp #CASM_TOKEN_EOF
@@ -366,227 +370,49 @@ posSyntaxError:
     rts
 
 ; ---------------------------------------------------------------------------
-; parseNumericValue (private)
-; Convert the current NUMBER token's text into a 16-bit value stored in
-; CasmParserStmt.ValLo/ValHi. Hexadecimal and binary tokens carry their '$'
-; or '%' prefix as the first text byte and are skipped; decimal tokens have
-; no prefix. Values exceeding 65535 are rejected regardless of how many
-; further digits follow.
+; parserParseExpressionValue
+; Adapt the current Phase 5 expression into the Phase 4 statement value fields.
+; The production resolver rejects identifiers until Phase 6B provides symbols.
 ;
-; Inputs:    CasmTokenRecord/CasmTokenText hold a NUMBER token
-; Outputs:   C clear on success, ValLo/ValHi stored; C set with
-;            A = CASM_DIAG_OPERAND_OUT_OF_RANGE on overflow
-; Clobbers:  A, X, Y, CasmParser* scratch
+; Inputs:    current token begins expression; D clear
+; Outputs:   success: ValLo/ValHi stored, following delimiter current, C clear
+;            failure: A = stable diagnostic, C set, statement value invalid
+; Preserves: V, D, I, balanced stack, resources and emitter state
+; Clobbers:  A, X, Y, N, Z, C, CasmPtr0, lexer/evaluator scratch and result
 ; ---------------------------------------------------------------------------
-parseNumericValue:
-    lda #0
-    sta CasmParserValueLo
-    sta CasmParserValueHi
-    sta CasmParserValueExt
-    sta CasmParserOverflow
-
-    lda CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
-    cmp #CASM_NUMBER_DECIMAL
-    beq pnvDecimalStart
-    cmp #CASM_NUMBER_HEX
-    beq pnvHexStart
-    ldy #1
-    jmp pnvBinLoop
-pnvHexStart:
-    ldy #1
-    jmp pnvHexLoop
-pnvDecimalStart:
-    ldy #0
-    jmp pnvDecLoop
-
-pnvDecLoop:
-    cpy CasmTokenRecord + CASM_TOKEN_REC_LENGTH
-    beq pnvDone
-    lda CasmTokenText, y
-    sec
-    sbc #CASM_PETSCII_DIGIT_0
-    tax
-    jsr pnvMul10
-    jsr pnvAddDigit
-    iny
-    jmp pnvDecLoop
-
-pnvHexLoop:
-    cpy CasmTokenRecord + CASM_TOKEN_REC_LENGTH
-    beq pnvDone
-    lda CasmTokenText, y
-    jsr pnvHexDigitValue
-    jsr pnvMul16
-    jsr pnvAddDigit
-    iny
-    jmp pnvHexLoop
-
-pnvBinLoop:
-    cpy CasmTokenRecord + CASM_TOKEN_REC_LENGTH
-    beq pnvDone
-    lda CasmTokenText, y
-    sec
-    sbc #CASM_PETSCII_DIGIT_0
-    tax
-    jsr pnvMul2
-    jsr pnvAddDigit
-    iny
-    jmp pnvBinLoop
-
-pnvDone:
-    lda CasmParserOverflow
-    beq pnvStore
-    ; The number token is still current, and this routine is reached from both
-    ; the parser and the emission engine's operand lists, so the token record
-    ; is the correct location source for either caller.
+parserParseExpressionValue:
+    ; Preserve the expression start for post-evaluation width checks such as
+    ; .BYTE $100; exprEvaluate may leave NEWLINE/COMMA current on success.
     jsr diagSetLocFromToken
-    lda #CASM_DIAG_OPERAND_OUT_OF_RANGE
-    sec
-    rts
-pnvStore:
-    lda CasmParserValueLo
+    ldx #<parserRejectIdentifier
+    ldy #>parserRejectIdentifier
+    jsr exprEvaluate
+    bcs pevReturn
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq pevUnresolved
+    ldy #CASM_EXPR_VAL_LO
+    lda (CasmPtr0Lo), y
     sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
-    lda CasmParserValueHi
+    iny
+    lda (CasmPtr0Lo), y
     sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     clc
+pevReturn:
     rts
 
-; ---------------------------------------------------------------------------
-; pnvHexDigitValue (private)
-; Inputs:  A = PETSCII hex digit character
-; Outputs: X = digit value 0-15
-; Clobbers: A
-; ---------------------------------------------------------------------------
-pnvHexDigitValue:
-    cmp #CASM_PETSCII_DIGIT_0
-    bcc pnvhLetter
-    cmp #CASM_PETSCII_DIGIT_9 + 1
-    bcs pnvhLetter
+pevUnresolved:
+    lda #CASM_DIAG_RESOLVER_FAILED
     sec
-    sbc #CASM_PETSCII_DIGIT_0
-    tax
     rts
-pnvhLetter:
-    jsr normalizeHexChar
+
+; Production Phase 5 has no symbol table. Keep the identifier current and fail
+; without manufacturing an identity or unresolved placeholder.
+parserRejectIdentifier:
+    lda #CASM_DIAG_RESOLVER_FAILED
     sec
-    sbc #CASM_PETSCII_UPPER_A
-    clc
-    adc #10
-    tax
-    rts
-
-; ---------------------------------------------------------------------------
-; normalizeHexChar (private)
-; Fold a shifted-uppercase PETSCII letter ($C1-$DA) to its unshifted form.
-; Inputs/Outputs: A
-; ---------------------------------------------------------------------------
-normalizeHexChar:
-    cmp #CASM_PETSCII_SHIFTED_A
-    bcc nhcDone
-    cmp #CASM_PETSCII_SHIFTED_Z + 1
-    bcs nhcDone
-    and #$7F
-nhcDone:
-    rts
-
-; ---------------------------------------------------------------------------
-; pnvMul2 (private) - 24-bit accumulator *= 2. Sets CasmParserOverflow sticky
-; when the extra byte becomes nonzero.
-; ---------------------------------------------------------------------------
-pnvMul2:
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    lda CasmParserValueExt
-    beq pnvMul2Done
-    lda #1
-    sta CasmParserOverflow
-pnvMul2Done:
-    rts
-
-; ---------------------------------------------------------------------------
-; pnvMul16 (private) - 24-bit accumulator *= 16 (four left shifts).
-; ---------------------------------------------------------------------------
-pnvMul16:
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    lda CasmParserValueExt
-    beq pnvMul16Done
-    lda #1
-    sta CasmParserOverflow
-pnvMul16Done:
-    rts
-
-; ---------------------------------------------------------------------------
-; pnvMul10 (private) - 24-bit accumulator *= 10, computed as
-; (accumulator * 8) + (accumulator * 2) using CasmParserTemp* as scratch.
-; ---------------------------------------------------------------------------
-pnvMul10:
-    lda CasmParserValueLo
-    sta CasmParserTempLo
-    lda CasmParserValueHi
-    sta CasmParserTempHi
-    lda CasmParserValueExt
-    sta CasmParserTempExt
-
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-    asl CasmParserValueLo
-    rol CasmParserValueHi
-    rol CasmParserValueExt
-
-    asl CasmParserTempLo
-    rol CasmParserTempHi
-    rol CasmParserTempExt
-
-    clc
-    lda CasmParserValueLo
-    adc CasmParserTempLo
-    sta CasmParserValueLo
-    lda CasmParserValueHi
-    adc CasmParserTempHi
-    sta CasmParserValueHi
-    lda CasmParserValueExt
-    adc CasmParserTempExt
-    sta CasmParserValueExt
-
-    lda CasmParserValueExt
-    beq pnvMul10Done
-    lda #1
-    sta CasmParserOverflow
-pnvMul10Done:
-    rts
-
-; ---------------------------------------------------------------------------
-; pnvAddDigit (private) - accumulator += X (digit value 0-15).
-; ---------------------------------------------------------------------------
-pnvAddDigit:
-    clc
-    txa
-    adc CasmParserValueLo
-    sta CasmParserValueLo
-    lda CasmParserValueHi
-    adc #0
-    sta CasmParserValueHi
-    lda CasmParserValueExt
-    adc #0
-    sta CasmParserValueExt
-    beq pnvAddDigitDone
-    lda #1
-    sta CasmParserOverflow
-pnvAddDigitDone:
     rts

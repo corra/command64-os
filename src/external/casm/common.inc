@@ -393,6 +393,13 @@ CASM_DIAG_ORG_REQUIRED = $21
 CASM_DIAG_ADDRESS_OVERFLOW = $22
 CASM_DIAG_BRANCH_OUT_OF_RANGE = $23
 CASM_DIAG_PHASE4_LAST = CASM_DIAG_BRANCH_OUT_OF_RANGE
+; Phase 5 reservations. WP17 declares stable values only; diagnostics.s does
+; not print or raise these until the package that implements each failure path.
+CASM_DIAG_EXPR_MALFORMED = $24
+CASM_DIAG_EXPR_UNSUPPORTED = $25
+CASM_DIAG_EXPR_OVERFLOW = $26
+CASM_DIAG_RESOLVER_FAILED = $27
+CASM_DIAG_PHASE5_LAST = CASM_DIAG_RESOLVER_FAILED
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -402,6 +409,11 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_INVALID_ADDR_MODE = CASM_DIAG_OPERAND_OUT_OF_RANGE + 1, error, "CASM Phase 4 diagnostics must remain contiguous"
 .assert CASM_DIAG_BRANCH_OUT_OF_RANGE = CASM_DIAG_DUPLICATE_ORG + 3, error, "CASM Phase 4 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE4_LAST = $23, error, "CASM Phase 4 diagnostic range changed"
+.assert CASM_DIAG_EXPR_MALFORMED = CASM_DIAG_PHASE4_LAST + 1, error, "CASM Phase 5 diagnostics must follow Phase 4"
+.assert CASM_DIAG_EXPR_UNSUPPORTED = CASM_DIAG_EXPR_MALFORMED + 1, error, "CASM Phase 5 diagnostics must remain contiguous"
+.assert CASM_DIAG_EXPR_OVERFLOW = CASM_DIAG_EXPR_UNSUPPORTED + 1, error, "CASM Phase 5 diagnostics must remain contiguous"
+.assert CASM_DIAG_RESOLVER_FAILED = CASM_DIAG_EXPR_OVERFLOW + 1, error, "CASM Phase 5 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE5_LAST = $27, error, "CASM Phase 5 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -541,6 +553,71 @@ CASM_DIAG_LOC_BYTE    = $02
 .assert CASM_DIAG_LINE_MAX = 255, error, "CASM diagnostic line payload changed"
 .assert CASM_DIAG_WINDOW_WIDTH + CASM_DIAG_INDENT <= 40, error, "CASM diagnostic window exceeds the 40-column screen"
 .assert CASM_DIAG_LINE_BUF_SIZE = CASM_IO_BUFFER_SIZE, error, "CASM diagnostic line buffer must match the source line bound"
+
+; ---------------------------------------------------------------------------
+; Phase 5 expression result ABI
+; ---------------------------------------------------------------------------
+
+CASM_EXPR_VAL_LO        = 0
+CASM_EXPR_VAL_HI        = 1
+CASM_EXPR_FLAGS         = 2
+CASM_EXPR_EXTRACTION    = 3
+CASM_EXPR_SYMBOL_ID_LO  = 4
+CASM_EXPR_SYMBOL_ID_HI  = 5
+CASM_EXPR_ADDEND_SIGN   = 6
+CASM_EXPR_ADDEND_MAG_LO = 7
+CASM_EXPR_ADDEND_MAG_HI = 8
+CASM_EXPR_REC_SIZE      = 9
+
+CASM_EXPR_FLAG_RESOLVED       = %00000001
+CASM_EXPR_FLAG_SYMBOL_DERIVED = %00000010
+CASM_EXPR_FLAG_RELOCATABLE    = %00000100
+CASM_EXPR_FLAG_FORCE_ABS      = %00001000
+CASM_EXPR_FLAG_MASK           = %00001111
+
+CASM_EXTRACTION_FULL  = 0
+CASM_EXTRACTION_LO    = 1
+CASM_EXTRACTION_HI    = 2
+CASM_EXTRACTION_COUNT = 3
+
+CASM_ADDEND_SIGN_POSITIVE = 0
+CASM_ADDEND_SIGN_NEGATIVE = 1
+CASM_ADDEND_SIGN_COUNT    = 2
+
+; Resolver callback output view. exprEvaluate passes its address in X/Y while
+; the current token is IDENTIFIER; the callback fills it before returning C
+; clear. Value bytes are meaningful only when RESOLVED is set.
+CASM_RESOLVE_FLAGS  = 0
+CASM_RESOLVE_ID_LO  = 1
+CASM_RESOLVE_ID_HI  = 2
+CASM_RESOLVE_VAL_LO = 3
+CASM_RESOLVE_VAL_HI = 4
+CASM_RESOLVE_SIZE   = 5
+CASM_RESOLVE_FLAG_MASK = CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_RELOCATABLE
+
+.assert CASM_EXPR_VAL_HI = CASM_EXPR_VAL_LO + 1, error, "CASM expression value offsets changed"
+.assert CASM_EXPR_FLAGS = CASM_EXPR_VAL_HI + 1, error, "CASM expression flags offset changed"
+.assert CASM_EXPR_EXTRACTION = CASM_EXPR_FLAGS + 1, error, "CASM expression extraction offset changed"
+.assert CASM_EXPR_SYMBOL_ID_LO = CASM_EXPR_EXTRACTION + 1, error, "CASM expression symbol offset changed"
+.assert CASM_EXPR_SYMBOL_ID_HI = CASM_EXPR_SYMBOL_ID_LO + 1, error, "CASM expression symbol offsets changed"
+.assert CASM_EXPR_ADDEND_SIGN = CASM_EXPR_SYMBOL_ID_HI + 1, error, "CASM expression addend offset changed"
+.assert CASM_EXPR_ADDEND_MAG_LO = CASM_EXPR_ADDEND_SIGN + 1, error, "CASM expression addend magnitude offset changed"
+.assert CASM_EXPR_ADDEND_MAG_HI = CASM_EXPR_ADDEND_MAG_LO + 1, error, "CASM expression addend magnitude offsets changed"
+.assert CASM_EXPR_REC_SIZE = CASM_EXPR_ADDEND_MAG_HI + 1, error, "CASM expression record size changed"
+
+.assert (CASM_EXPR_FLAG_RESOLVED & (CASM_EXPR_FLAG_RESOLVED - 1)) = 0, error, "resolved flag must be one bit"
+.assert (CASM_EXPR_FLAG_SYMBOL_DERIVED & (CASM_EXPR_FLAG_SYMBOL_DERIVED - 1)) = 0, error, "symbol-derived flag must be one bit"
+.assert (CASM_EXPR_FLAG_RELOCATABLE & (CASM_EXPR_FLAG_RELOCATABLE - 1)) = 0, error, "relocatable flag must be one bit"
+.assert (CASM_EXPR_FLAG_FORCE_ABS & (CASM_EXPR_FLAG_FORCE_ABS - 1)) = 0, error, "force-absolute flag must be one bit"
+.assert (CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_SYMBOL_DERIVED | CASM_EXPR_FLAG_RELOCATABLE | CASM_EXPR_FLAG_FORCE_ABS) = CASM_EXPR_FLAG_MASK, error, "CASM expression flag mask changed"
+.assert CASM_EXTRACTION_COUNT = CASM_EXTRACTION_HI + 1, error, "CASM extraction range changed"
+.assert CASM_ADDEND_SIGN_COUNT = CASM_ADDEND_SIGN_NEGATIVE + 1, error, "CASM addend sign range changed"
+.assert CASM_RESOLVE_ID_LO = CASM_RESOLVE_FLAGS + 1, error, "CASM resolver identity offset changed"
+.assert CASM_RESOLVE_ID_HI = CASM_RESOLVE_ID_LO + 1, error, "CASM resolver identity offsets changed"
+.assert CASM_RESOLVE_VAL_LO = CASM_RESOLVE_ID_HI + 1, error, "CASM resolver value offset changed"
+.assert CASM_RESOLVE_VAL_HI = CASM_RESOLVE_VAL_LO + 1, error, "CASM resolver value offsets changed"
+.assert CASM_RESOLVE_SIZE = CASM_RESOLVE_VAL_HI + 1, error, "CASM resolver output size changed"
+.assert CASM_RESOLVE_FLAG_MASK = %00000101, error, "CASM resolver flag mask changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase and cleanup state

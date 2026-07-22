@@ -1,122 +1,116 @@
 ---
 feature: casm-phase5-wp16-prerequisite-reconciliation
 created: 2026-07-21
-status: planned
+revised: 2026-07-21
+status: complete
 ---
 
-# Plan: CASM Phase 5 WP16 — Prerequisite Reconciliation and Phase 0C.3 Freeze
+# Plan: CASM Phase 5 WP16 - Prerequisite Reconciliation and Phase 0C.3 Freeze
 
 ## Objective
 
-WP16 is the entry gate for Phase 5. It performs no assembler work: it confirms
-Phase 4 is genuinely closed, freezes the Phase 0C.3 expression and resolver
-contracts as a durable record, and creates the task and plan scaffolding that
-WP17-WP21 will execute against.
+WP16 is the Phase 5 entry and recovery gate. It verifies the completed Phase 4
+baseline, reconciles Taskwarrior records left by an abandoned Phase 5 attempt,
+freezes the Phase 0C.3 expression/resolver contract, creates the detailed WP17
+plan, and advances CASM from `0.1.17` to `0.1.18` as required for a completed
+CASM work package.
 
-WP16 changes **no CASM source and no build inputs**. Nothing under
-`src/external/casm/`, `cmake/`, or `CMakeLists.txt` is modified. A change to any
-of those is out of scope and requires an amended plan.
+WP16 implements no evaluator, resolver, parser adapter, or expression fixture.
+Those remain separately planned WP17-WP21 work.
 
 Parent contract:
 `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`.
 
-## Dependency Review (2026-07-21)
+## Baseline
 
-This plan was written after a dependency re-review; the findings below are the
-reason WP16's scope differs from the parent plan as originally drafted.
+- Branch point: `9e58b8a44647028bc392656cdcbff9bc99927279`.
+- Phase 4 is complete at CASM `0.1.17`, build 1079.
+- Phase 4 completion evidence:
+  `brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`.
+- The approved MAIN envelope is `$2800`; Phase 4 leaves 408 bytes headroom at
+  both `$3400` and `$3500` relocation bases.
+- WP16 starts from a clean worktree on `feature/casm-phase5-wp16-2`.
 
-### Finding 1 — WP15/WP16 ownership collision (resolved)
+## Dependency Review
 
-The parent plan gave WP16 the bullet "Close Phase 4 through its existing
-verification and user-approval gate". That is precisely Phase 4 WP15's purpose
-(Taskwarrior `8612c2a2`, "verify artifacts and obtain user runtime
-confirmation"). Two work packages in different phases cannot both own Phase 4
-closure — whichever ran second would either duplicate the audit or rubber-stamp
-it.
+### Phase 4 Ownership
 
-Resolution, recorded in the parent plan: **WP15 closes Phase 4; WP16 only
-verifies that it closed.** WP16's Phase 4 involvement is a precondition check
-with a stop condition, not an activity.
+WP15 owns Phase 4 closure. WP16 only verifies the closed gate and stops if its
+wiki, brain, Taskwarrior, artifact, or user-approval evidence disagrees. WP16
+must not repeat or retroactively alter the Phase 4 acceptance decision.
 
-### Finding 2 — the prerequisite gate had gone stale
+### Recovered Taskwarrior State
 
-Three of the parent plan's five gate premises were falsified by WP14:
+Taskwarrior is not empty. The prior attempt created these records without
+synchronizing the repository:
 
-| Premise | Reality on 2026-07-21 |
-|---|---|
-| WP14 `3e4eab43` pending | Completed; merged to `main` as `55fe474`. Phase 4 subsequently closed by WP15 at CASM `0.1.17` build 1079 |
-| No Phase 4 walkthrough exists | `brain/walkthroughs/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md` |
-| Wiki/Taskwarrior UUIDs disagree | Corrected during WP14; no placeholder UUIDs remain |
+| Work | UUID | Observed state |
+|---|---|---|
+| WP16 | `0062fd20-929d-4ffd-a2b5-032db5ec4109` | pending with start timestamp |
+| Phase 5 parent | `6b72d639-53d0-4d1a-92ba-8c4d56096388` | pending |
+| WP17 | `3b09ea77-c325-4072-90fc-9812181a4e04` | pending with start timestamp |
+| WP18 | `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b` | pending with start timestamp |
+| WP19 | `4acf22c2-8253-4673-918a-8dd38cc18221` | incorrectly completed |
+| WP20 | `41d120ed-b550-4551-9694-e66bd6f65cef` | pending with start timestamp |
+| WP21 | `225a69ce-b46c-404d-a86b-d2c4494e9c3f` | pending |
 
-WP15 remains genuinely pending and is the sole remaining blocker. The parent
-plan's gate section has been rewritten accordingly.
+The repository at the baseline contains no Phase 5 task section in
+`wiki/tasks/casm.md` or `brain/task.md`. WP16 must preserve every existing UUID,
+reopen WP19, stop downstream started tasks without completing them, encode the
+WP16 -> WP21 dependency chain, and synchronize all three record systems.
+Inventing replacement UUIDs is forbidden.
 
-**Resolved 2026-07-21.** WP15 completed and the user explicitly approved Phase 4
-done at CASM `0.1.17` build 1079. The Phase 4 gate is satisfied; increment 2's
-stop condition no longer applies. Evidence:
-`brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`.
-WP15 also created the Phase 4 parent milestone
-`4796b60c-5f4a-43c7-8270-436075bb3f7b`, which Finding 3 below assumed absent.
+### Work-Package Version Rule
 
-### Finding 3 — Taskwarrior has no Phase 5 tasks
+The earlier WP16 plan prohibited source and build changes, but
+`src/external/casm/AGENTS.md` requires every completed CASM work package to
+advance the stage. WP16 therefore includes one final source increment:
 
-`project:command64.casm` currently holds 36 tasks, 35 complete, with WP15 the
-only pending entry. **No WP16-WP21 tasks exist.** WP16 must create them; until
-it does, Phase 5 has no task-side existence and `brain/task.md` has nothing to
-synchronize against. WP16's own task must be created first, since a work package
-that creates its own tracking record cannot be tracked by it retroactively.
+- change only `VERSION_STAGE` in `src/external/casm/casm.s` from `17` to `18`;
+- allow the normal build helper to advance `BUILD_CASM` exactly once;
+- verify a second no-change build does not advance it again.
 
-### Finding 4 — KNOWLEDGE.md has no CASM Phase 4 contract section
+No other CASM source or build-system file is in scope. If the stage cannot be
+represented or the build helper changes more than expected, stop.
 
-`brain/KNOWLEDGE.md` carries "CASM Phase 1 Foundation", "CASM Phase 2 CLI/File
-ABI", and "CASM Phase 3 Source/Lexer Contract", then stops. There is no CASM
-Phase 4 section. (The "Phase 4"/"Phase 5" rows near line 59 belong to the *OS*
-project's phase table and are unrelated.)
+### Decimal-Mode Dependency
 
-WP16 adds the Phase 5 / 0C.3 contract, continuing the Phase 1-3 pattern. It does
-**not** retroactively author a Phase 4 contract section: Phase 4's contracts are
-recorded in its own plans and walkthrough, and inventing a summary now would
-create a second source of truth for a closed phase. This gap is noted for
-Phase 11 documentation hardening instead.
+The Phase 4 baseline contains no entry `CLD`. Phase 5 therefore cannot claim
+that decimal mode is not assumed. The frozen rule is narrower and testable:
 
-### Finding 5 — ordering constraint
+- Phase 5 does not execute `SED` or `CLD` in evaluator routines;
+- every evaluator `ADC`/`SBC` path establishes carry explicitly;
+- the application-level entry-mode assumption remains inherited technical debt
+  for a separately approved hardening package.
 
-WP16 cannot *complete* before WP15 completes, because "Phase 4 approved" is its
-entry gate. WP16 planning and the contract-freeze drafting may proceed now,
-since neither touches CASM source. The completion gate below enforces the
-ordering.
+WP17-WP21 must not silently broaden this into a caller-independent decimal-mode
+guarantee.
 
-## Scope
+### Evaluation and Emission Boundary
 
-Included:
+The evaluator creates no output bytes or relocation records. WP20 may pass a
+resolved expression value to existing instruction/directive emission, but that
+is adapter behavior, not evaluator ownership. Unresolved expressions remain
+metadata-only in Phase 5 and must not be emitted as placeholder zero values.
 
-- verify and record that the Phase 4 completion gate is satisfied;
-- freeze the Phase 0C.3 expression result and resolver contracts in
-  `brain/KNOWLEDGE.md`;
-- create Taskwarrior records for WP16-WP21 under `project:command64.casm`;
-- register the Phase 5 milestone in `wiki/tasks/casm.md` and `brain/task.md`;
-- draft the WP17 detailed plan and confirm the WP18-WP21 plan slugs; and
-- obtain explicit approval to activate Phase 5.
+### Downstream Order
 
-Excluded:
+```text
+WP16 contract/task freeze
+  -> WP17 ABI and bounded storage
+  -> WP18 numeric/checking core
+  -> WP19 symbol/extraction/resolver behavior
+  -> WP20 parser adapter and fixture harness
+  -> WP21 verification and completion gate
+  -> Phase 6A VMM records
+  -> Phase 6B production symbol table/two-pass resolution
+  -> Phase 8 relocation consumption
+```
 
-- any change under `src/external/casm/`;
-- any change to `cmake/` or `CMakeLists.txt`;
-- performing Phase 4's acceptance audit or ticking its acceptance list (WP15);
-- authoring a retroactive CASM Phase 4 contract section;
-- implementing the evaluator, the resolver, or any fixture; and
-- a CASM version-stage advance. WP16 ships no code, so CASM stays at `0.1.17`
-  and `BUILD_CASM` must not move.
+Only one downstream work package may be active. Approval or implementation of
+an earlier package does not approve a later package.
 
-  **Baseline amended 2026-07-21 at Phase 4 closeout.** This plan was written
-  against `0.1.16` / build 1078. WP15 advanced CASM to `0.1.17` / build 1079,
-  so every `0.1.16` and `1078` reference below now reads `0.1.17` and `1079`.
-
-## Contract to Freeze (Phase 0C.3)
-
-WP16 records the following in `brain/KNOWLEDGE.md` as an approved, durable
-contract. The content is transcribed from the parent plan's frozen contract; it
-is not re-derived or re-negotiated here.
+## Contract to Freeze
 
 ### Grammar
 
@@ -127,16 +121,15 @@ primary     := number | identifier
 addend      := ("+" | "-") number
 ```
 
-- Extraction applies to the final `primary +/- addend` value.
-- Bare numeric literals and bare symbols are valid.
-- Only a symbol-derived primary may take an addend; a numeric primary followed
-  by `+` or `-` is rejected in Phase 5.
-- Parentheses, unary negation, chained operators, symbol-to-symbol arithmetic,
-  and current-PC expressions are deferred.
-- Existing decimal/hex/binary literal spelling is unchanged; identifiers remain
-  case-sensitive.
+- Extraction applies after `primary +/- addend` evaluation.
+- Bare numeric literals and symbols are valid.
+- Only symbol-derived primaries accept an addend.
+- Numeric arithmetic, parentheses, unary negation, chained operators,
+  symbol-to-symbol arithmetic, and current-PC expressions are deferred.
+- Existing decimal/hex/binary spelling and case-sensitive identifiers remain
+  unchanged.
 
-### Result record
+### Result Record
 
 ```text
 valueLo, valueHi
@@ -147,142 +140,157 @@ addendSign
 addendMagnitudeLo, addendMagnitudeHi
 ```
 
-Rationale worth preserving, because each item is a decision that is expensive to
-rediscover:
+- Addends use sign plus unsigned 16-bit magnitude.
+- `symbolId` is an opaque resolver-owned identity.
+- Unresolved symbols retain addend and extraction metadata and set
+  `forceAbsoluteWidth`; placeholder values may not choose zero-page encoding.
+- Low extraction is not relocatable. High extraction preserves potential
+  relocation classification for Phase 8.
+- Resolved arithmetic outside `$0000..$FFFF` fails instead of wrapping.
 
-- The addend is **sign plus 16-bit magnitude**, not a signed 16-bit value, so the
-  approved `symbol-$FFFF .. symbol+$FFFF` source range is representable without
-  importing an unrelated signed-range limit.
-- `symbolId` is **opaque** and supplied by the resolver. The evaluator never
-  manufactures identities from hashes or token addresses, so symbol identity
-  stays owned by the future symbol table.
-- Unresolved symbolic operands set `forceAbsoluteWidth` so a placeholder value
-  can never select a zero-page encoding. **Instruction size must be stable
-  between passes**; this is the property two-pass assembly depends on.
-- Low-byte extraction is never an R6 relocation candidate; high-byte extraction
-  of a relocatable symbol stays classified as potentially relocatable for
-  Phase 8.
-- Decimal mode is never assumed or enabled; every `ADC`/`SBC` path establishes
-  carry explicitly.
+### Resolver and Routine ABI
 
-### Resolver boundary
+- The resolver returns identity, resolved state, optional 16-bit value, and
+  absolute/relocatable classification.
+- Carry clear means the expression result record is valid.
+- Carry set means `A` contains a stable `CASM_DIAG_*`; callers must not consume
+  the result record.
+- WP17-WP21 plans must state A/X/Y, status flags, stack, zero-page, BSS,
+  lexer-lookahead, and self-modifying-code effects before implementation.
 
-The resolver ABI returns an opaque 16-bit identity, resolved/unresolved state, a
-16-bit value when resolved, and an absolute/relocatable classification. Phase 5
-verifies against a deterministic fixture resolver; Phase 6B implements the
-production resolver over Phase 6A's VMM record store. Dependency order:
+## Scope
 
-```text
-Phase 5 evaluator contract
-  -> Phase 6A VMM records
-  -> Phase 6B symbol table and two-pass resolution
-  -> Phase 8 R6 relocation consumption
-```
+Included:
 
-### Routine result contract
+- verify Phase 4 completion and baseline artifacts;
+- repair Phase 5 task-record state without replacing valid UUIDs;
+- freeze the contract above in `brain/KNOWLEDGE.md`;
+- synchronize the Phase 5 parent and WP16-WP21 in Taskwarrior,
+  `wiki/tasks/casm.md`, and `brain/task.md`;
+- draft the detailed WP17 plan and reserve exact WP18-WP21 slugs;
+- update planning/session/changelog records required by the repository;
+- advance CASM to `0.1.18` and increment `BUILD_CASM` exactly once; and
+- produce a WP16 walkthrough and request explicit completion approval.
 
-- Carry clear: expression accepted, result record valid.
-- Carry set: `A` holds a stable `CASM_DIAG_*`; callers must not consume the
-  result.
-- Every later work-package plan must document its full A/X/Y, zero-page, BSS,
-  lexer-lookahead, and status-flag clobbers before that package is approved.
+Excluded:
 
-## Files Expected to Change
+- expression ABI declarations or evaluator implementation;
+- parser, opcode, emitter, lexer, diagnostic, fixture, CMake, or linker changes;
+- Taskwarrior completion of WP16 or activation of WP17 before user approval;
+- Phase 4 record rewriting; and
+- completion of the Phase 5 parent milestone.
 
-| File | Action | Responsibility |
-|---|---|---|
-| `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md` | Create | This plan |
-| `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md` | Modify | Corrected gate and WP16 scope (done in planning) |
-| `brain/KNOWLEDGE.md` | Modify | Phase 0C.3 expression/resolver contract |
-| `wiki/tasks/casm.md` | Modify | Phase 5 milestone and WP16-WP21 subtasks |
-| `brain/task.md` | Modify | Phase 5 active-work synchronization |
-| `brain/plans/<wp17-slug>.md` | Create | WP17 detailed plan, for separate approval |
-| Taskwarrior | Modify | Create WP16-WP21 under `project:command64.casm` |
+## Expected Files
 
-No file under `src/external/casm/`, `cmake/`, or `CMakeLists.txt` appears in this
-table. That is deliberate and is a stop condition if it changes.
+| File | Action |
+|---|---|
+| `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md` | amend and approve this plan |
+| `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md` | reconcile dependencies and boundaries |
+| `brain/plans/2026-07-21-casm-phase5-wp17-expression-abi.md` | create detailed WP17 plan |
+| `brain/KNOWLEDGE.md` | add Phase 0C.3 contract |
+| `brain/MEMORY.md` | record unchanged layout and verified artifact measurements |
+| `brain/task.md` | register Phase 5 hierarchy and WP16 progress |
+| `wiki/tasks/casm.md` | register Phase 5 hierarchy and matching UUIDs |
+| `CHANGELOG.md` | record the WP16 contract/version increment |
+| `brain/walkthroughs/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md` | create verification walkthrough |
+| `src/external/casm/casm.s` | stage `17` -> `18` only |
+| `src/external/casm/BUILD_CASM` | build-managed single increment |
+| Taskwarrior | reconcile parent and WP16-WP21 records |
+
+No `cmake/`, `CMakeLists.txt`, or other CASM source file may change.
+
+## ABI, Storage, and Runtime Effects
+
+- No expression ABI is implemented by WP16.
+- No zero-page, BSS, stack, file, VMM, lexer, parser, or output behavior changes.
+- The PRG payload must be byte-identical except for the version-stage/build
+  banner bytes and relocation metadata necessarily affected by those bytes.
+- No resource is acquired and no cleanup path changes.
 
 ## Atomic Implementation Increments
 
-1. **Create the WP16 Taskwarrior task** under `project:command64.casm` with tags
-   `casm phase5`, and capture its real UUID. Record the UUID in this plan before
-   any further increment, so no later step has to refer to a placeholder.
-2. **Verify the Phase 4 gate.** Confirm WP15 is complete, the Phase 4 acceptance
-   list in `wiki/tasks/casm.md` is ticked, and the user has explicitly approved
-   Phase 4. Record the evidence. **Stop here if any part is unsatisfied** — this
-   increment is a check, not a repair.
-3. **Freeze the contract.** Add the Phase 0C.3 section to `brain/KNOWLEDGE.md`
-   in the style of the existing CASM Phase 1/2/3 sections, including the
-   rationale notes above. Verify no existing section is disturbed.
-4. **Create WP17-WP21 Taskwarrior tasks** with their real UUIDs, and register the
-   Phase 5 milestone plus its subtasks in `wiki/tasks/casm.md` and
-   `brain/task.md`. All three records must carry identical UUIDs — the mismatch
-   that WP14 had to repair is the specific failure being avoided.
-5. **Draft the WP17 detailed plan** (expression ABI and bounded storage) and
-   confirm the slugs for WP18-WP21. WP17 is written but not approved here; its
-   approval is its own gate.
-6. **Verify and request approval.** Confirm no CASM source, cmake, or
-   `CMakeLists.txt` file changed; confirm `BUILD_CASM` is unmoved; run
-   `git diff --check`; then request explicit approval to activate Phase 5.
+1. Capture clean baseline: status, `BUILD_CASM`, version banner, both link-base
+   artifact measurements, and hashes needed for the bounded comparison.
+2. Verify Phase 4 closure across walkthrough, wiki, brain, git history, and
+   Taskwarrior. Stop rather than repair Phase 4 if any evidence disagrees.
+3. Reconcile Taskwarrior: preserve existing UUIDs, stop premature WP17/WP18/WP20
+   starts, reopen the incorrectly completed WP19, encode sequential dependencies,
+   and leave WP16 as the only active work package.
+4. Synchronize the Phase 5 parent and WP16-WP21 UUIDs/statuses into
+   `wiki/tasks/casm.md` and `brain/task.md`.
+5. Freeze the Phase 0C.3 contract in `brain/KNOWLEDGE.md`; record unchanged
+   storage ownership in `brain/MEMORY.md`.
+6. Create the detailed WP17 plan. Confirm reserved slugs for WP18-WP21, but do
+   not create speculative implementation plans for those packages.
+7. Dry-run and verify the mandatory stage increment, then restore `0.1.17.1079`.
+   Verify artifacts, documentation, task agreement, DOX scope, and whitespace;
+   write the walkthrough and request explicit completion approval.
+8. Only after explicit user approval: apply stage `17` -> `18`, build once to
+   update `BUILD_CASM`, build again to prove no-change stability, and mark WP16
+   complete. Leave the Phase 5 parent open.
+9. Separately request approval before activating WP17.
 
-Each increment is separately reviewed before the next begins.
+Each increment is reviewed before the next. A failed implementation receives a
+root-cause analysis; no repeated speculative edits are allowed.
 
 ## Verification
 
-Because WP16 ships no code, verification is record-integrity rather than build
-correctness. There is no runtime matrix and no user emulator session.
-
-- `git diff --name-only` shows only files from the table above; **no**
-  `src/external/casm/`, `cmake/`, or `CMakeLists.txt` entries.
-- `BUILD_CASM` is byte-identical to its pre-WP16 value (1079). WP16 must not
-  advance the build counter, because it changes no hashed source.
-- A build of `casm` still succeeds and `casm.prg` is byte-identical to the
-  pre-WP16 artifact — proving the record work was genuinely inert.
-- Every WP16-WP21 UUID appears identically in Taskwarrior, `wiki/tasks/casm.md`,
-  and `brain/task.md`. Cross-check by listing each UUID and grepping both files.
-- `brain/KNOWLEDGE.md` gains exactly one new section; the Phase 1/2/3 sections
-  are unchanged.
 - `git diff --check` is clean.
-
-The broken `c64-testing` MCP and web emulators remain prohibited. No step here
-requires either.
+- Changed paths are limited to the expected-files table.
+- Taskwarrior, wiki, and brain contain identical UUIDs and statuses for the
+  Phase 5 parent and WP16-WP21; WP19 exists exactly once and is pending.
+- WP16 is the only started Phase 5 child before completion approval.
+- `cmake --build build --target casm` succeeds at both relocation bases.
+- `BUILD_CASM` advances exactly once; a no-change rebuild leaves it unchanged.
+- CODE, RODATA, BSS, MAIN headroom, PRG size, and relocation count are recorded.
+- Artifact comparison confirms no functional payload change outside version
+  metadata.
+- No C64 runtime session is required because WP16 changes no runtime behavior.
+- The prohibited `c64-testing` MCP and web emulators are not used.
 
 ## Stop Conditions
 
-- WP15 is incomplete, or the user has not explicitly approved Phase 4 done.
-- Any CASM source, `cmake/`, or `CMakeLists.txt` file requires modification.
-- `BUILD_CASM` moves, or `casm.prg` is not byte-identical.
-- Freezing the contract reveals a grammar, ABI, or memory conflict with the
-  existing Phase 4 parser or numeric converter — that is a parent-contract
-  amendment, not a WP16 edit.
-- Taskwarrior is unavailable and the `task` CLI fallback also fails; record the
-  blockage and ask rather than inventing UUIDs.
-- The Phase 5 grammar is found to need parser changes that Phase 4 forbade.
+- Phase 4 completion evidence disagrees.
+- A valid existing Taskwarrior UUID would need replacement or Taskwarrior fails.
+- Any evaluator/parser/emitter/fixture/build-system change appears necessary.
+- The version increment changes more than version metadata or overflows the
+  approved MAIN envelope.
+- A grammar, resolver, storage, relocation, or decimal-mode conflict requires a
+  parent-contract change beyond the clarifications already recorded.
+- WP17 implementation would begin before WP16 completion approval.
+
+## Documentation and DOX Closeout
+
+Re-read the root, `src`, `src/external`, `src/external/casm`, `wiki`, and
+`wiki/tasks` DOX chains after edits. Update an AGENTS.md only if WP16 changes a
+durable local contract or child index; otherwise report it intentionally
+unchanged. Do not mark WP16 done until the walkthrough is presented and the user
+explicitly confirms completion.
 
 ## Completion Gate
 
-WP16 completes only when: the Phase 4 gate is verified satisfied and recorded;
-the Phase 0C.3 contract is frozen in `brain/KNOWLEDGE.md`; WP16-WP21 exist in
-Taskwarrior with matching wiki/brain records; the WP17 plan is drafted; every
-verification item above passes; and the user explicitly approves activating
-Phase 5.
-
-WP16 advances no version stage. CASM remains at `0.1.17` until a Phase 5 work
-package ships code.
+WP16 completes only when all increments pass, Phase 5 records agree, the
+Phase 0C.3 contract is durable, the WP17 plan exists but is not active, CASM is
+verified at `0.1.18`, and the user explicitly approves WP16 completion.
 
 ## Progress
 
-- 2026-07-21: Plan written after a dependency re-review that resolved the
-  WP15/WP16 ownership collision, corrected three stale gate premises, and
-  identified that no Phase 5 Taskwarrior tasks exist. No implementation is
-  authorized by the creation of this document; WP16 remains blocked on Phase 4
-  WP15.
-
-- 2026-07-21 (later): Phase 4 closed by WP15 with explicit user approval at CASM
-  `0.1.17` build 1079. WP16's entry gate is now satisfied and WP16 is unblocked.
-  The `0.1.16` / build-1078 baseline this plan was written against is superseded
-  throughout by `0.1.17` / 1079. Increment 2 becomes a recorded confirmation
-  rather than a stop condition. Finding 4's decision stands: no retroactive CASM
-  Phase 4 contract section is authored in `brain/KNOWLEDGE.md`; that gap, along
-  with two others WP15 recorded (`CasmOutputCreated` conflating created-vs-opened,
-  and no entry `CLD`), is deferred to Phase 11 documentation and hardening.
+- 2026-07-21: Original plan drafted after Phase 4 dependency review.
+- 2026-07-21: Phase 4 closed at `0.1.17` build 1079 with explicit approval.
+- 2026-07-21: Recovery review on `feature/casm-phase5-wp16-2` found partial
+  Taskwarrior creation, an incorrectly completed WP19, premature downstream starts, repository
+  record divergence, the work-package version-rule conflict, decimal-mode
+  wording ambiguity, and evaluator/emitter boundary ambiguity. Plan revised;
+  no WP16 implementation is authorized until this revision is approved.
+- 2026-07-21: Revised plan approved and implemented through its completion
+  candidate. Taskwarrior UUIDs were
+  preserved, WP19 was reopened, downstream starts were stopped, sequential
+  dependencies were recorded, and repository task records were synchronized.
+  Phase 0C.3 was frozen and the detailed WP17 plan created. The `0.1.18.1080`
+  version-only dry run passed both link bases, no-change rebuild, release image,
+  and three-byte-only artifact comparison; `0.1.17.1079` was then restored as
+  required before completion approval. WP16 and the Phase 5 parent remain open.
+- 2026-07-21: User explicitly approved WP16 completion. The verified final
+  increment advanced CASM to `0.1.18` build 1080; the immediate no-change build
+  preserved 1080 and `image_d64` passed. WP16 is complete. The Phase 5 parent
+  remains open and WP17 remains pending separate approval.

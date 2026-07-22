@@ -121,6 +121,90 @@
   - [x] Increment 10: user approved Phase 4 done on 2026-07-21
   - Walkthrough: `brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 
+- [x] Taskwarrior (`6b72d639-53d0-4d1a-92ba-8c4d56096388`): CASM Phase 5
+      minimal expression evaluator
+  - Parent plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
+  - [x] `0062fd20-929d-4ffd-a2b5-032db5ec4109`: WP16 prerequisite
+        reconciliation and Phase 0C.3 freeze
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`
+    - Active on `feature/casm-phase5-wp16-2` from baseline `9e58b8a`
+    - Existing Phase 5 Taskwarrior UUIDs preserved; WP19 reopened after rollback
+    - Premature WP17/WP18/WP20 starts stopped; sequential dependencies recorded
+    - [x] Phase 4 baseline and completion evidence verified
+    - [x] Phase 0C.3 contract frozen in `brain/KNOWLEDGE.md`
+    - [x] Wiki/brain/Taskwarrior hierarchy synchronized
+    - [x] Detailed WP17 plan drafted; WP18-WP21 slugs reserved
+    - [x] Version-only completion candidate dry-run verified; baseline restored
+    - [x] User approved completion; advanced to `0.1.18` build 1080
+    - [x] Final build, no-change rebuild, and release image verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`
+  - [x] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
+        storage; depends on WP16
+    - Active on `feature/casm-phase5-wp17` from WP16 commit `3b53513`
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase5-wp17-expression-abi.md`
+    - [x] Captured `0.1.18.1080` baseline and diagnostic range `$00-$23`
+    - [x] Added exact result offsets, flags, enums, diagnostics, and assertions
+    - [x] Added 36-byte CODE / 9-byte BSS `expr.o`; no imports or zero page
+    - [x] Verified both link bases, 363-byte headroom, and release image
+    - [x] Dry-run `0.1.19.1082` and no-change rebuild; restored build 1081
+    - [x] User approved completion; final `0.1.19` build 1082 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp17-expression-abi.md`
+  - [x] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
+        arithmetic core; depends on WP17
+    - Active on `feature/casm-phase5-wp18` from WP17 commit `2bb5e4b`
+    - Test plan: `brain/plans/2026-07-21-casm-phase5-wp18-test-plan.md`
+    - [x] Extended printable Phase 5 diagnostics through `$27`
+    - [x] Moved numeric core/scratch behind parser compatibility wrapper
+    - [x] Added optional addend parsing and checked add/sub/apply helpers
+    - [x] Added trusted `casmnum2` and three radix-overflow fixtures
+    - [x] Both links and test image pass with 107-byte MAIN headroom
+    - [x] Dry-run `0.1.20.1085`; restored `0.1.19.1084`
+    - [x] User approved completion; final `0.1.20` build 1085 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp18-numeric-primary.md`
+  - [x] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
+        resolver behavior; reopened and dependent on WP18
+    - Active on `feature/casm-phase5-wp19` from WP18 commit `755fc45`
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase5-wp19-symbol-resolver.md`
+    - Baseline: `0.1.20.1085`, 10,133 MAIN bytes, 107-byte headroom
+    - Test plan, deterministic resolver, and fixtures remain WP20 scope
+    - User approved CASM MAIN expansion from `$2800` to `$2A00` after the first
+      candidate exceeded the old envelope by 214 bytes
+    - User approved shared five-byte resolver callback output ABI declarations
+    - [x] Added resolver callback/trampoline and bounded evaluator
+    - [x] Added resolved/unresolved addend and extraction classification
+    - [x] Both links and test image pass with 298-byte `$2A00` MAIN headroom
+    - [x] Dry-run `0.1.21.1089`; restored candidate `0.1.20.1088`
+    - [x] User approved completion; final `0.1.21` build 1089 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp19-symbol-resolver.md`
+  - [x] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
+        fixture harness; depends on WP19
+    - Active on `feature/casm-phase5-wp20` from WP19 commit `56d8078`
+    - Plan: `brain/plans/2026-07-21-casm-phase5-wp20-parser-adapter.md`
+    - Test plan: `brain/plans/2026-07-21-casm-phase5-wp20-test-plan.md`
+    - Baseline: `0.1.21.1089`, 298-byte `$2A00` MAIN headroom
+    - [x] Added exact 27-case evaluator/resolver test plan
+    - [x] Migrated parser and `.BYTE`/`.WORD` paths to expression adapter
+    - [x] Removed all `parseNumericValue` callers/export
+    - [x] Added standalone `test_casm_expr` and production adapter fixtures
+    - [x] Both CASM/test links and `test_image_d64` pass; CASM headroom 243 bytes
+    - [x] User confirmed harness, adapter reference, resolver failure, and cleanup
+    - [x] Dry-run `0.1.22.1093`; restored candidate `0.1.21.1092`
+    - [x] User approved completion; final `0.1.22` build 1093 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp20-parser-adapter.md`
+  - [x] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
+        and completion gate; depends on WP20
+    - Active on `feature/casm-phase5-wp21` from WP20 commit `8afb438`
+    - Plan: `brain/plans/2026-07-21-casm-phase5-wp21-verification-closeout.md`
+    - Coverage gaps: positive zero, negative zero, repeated extraction
+    - [x] Expanded harness to 30 cases with exact token-column checks
+    - [x] Independent carry/stack/token/unresolved audit found no contract defect
+    - [x] CASM/harness no-change builds and both relocation bases pass
+    - [x] Test and release images pass with correct inventories
+    - [x] User confirmed 30-case harness, five references, and cleanup matrix
+    - [x] Dry-run `0.1.23.1094`; restored candidate `0.1.22.1093`
+    - [x] User approved completion; final `0.1.23` build 1094 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp21-verification-closeout.md`
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

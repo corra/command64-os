@@ -82,7 +82,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE4_LAST + 1
+    cmp #CASM_DIAG_PHASE5_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED
@@ -929,6 +929,10 @@ diagMessageLo:
     .byte <msgOrgRequired
     .byte <msgAddressOverflow
     .byte <msgBranchOutOfRange
+    .byte <msgExprMalformed
+    .byte <msgExprUnsupported
+    .byte <msgExprOverflow
+    .byte <msgResolverFailed
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -967,10 +971,14 @@ diagMessageHi:
     .byte >msgOrgRequired
     .byte >msgAddressOverflow
     .byte >msgBranchOutOfRange
+    .byte >msgExprMalformed
+    .byte >msgExprUnsupported
+    .byte >msgExprOverflow
+    .byte >msgResolverFailed
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE4_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE4_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE5_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE5_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -1042,6 +1050,14 @@ msgAddressOverflow:
     .byte "CASM: ADDRESS OVERFLOW", PetCr, 0
 msgBranchOutOfRange:
     .byte "CASM: BRANCH OUT OF RANGE", PetCr, 0
+msgExprMalformed:
+    .byte "CASM: MALFORMED EXPRESSION", PetCr, 0
+msgExprUnsupported:
+    .byte "CASM: EXPRESSION UNSUPPORTED", PetCr, 0
+msgExprOverflow:
+    .byte "CASM: EXPRESSION OVERFLOW", PetCr, 0
+msgResolverFailed:
+    .byte "CASM: RESOLVER FAILED", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

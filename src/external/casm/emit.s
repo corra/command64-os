@@ -22,7 +22,8 @@
 .import CasmInsn
 .import fileWrite
 .import lexerNext
-.import parseNumericValue
+.import CasmTokenRecord
+.import parserParseExpressionValue
 
 ; WP15 diagnostic context. Statement-level failures use the stamped statement
 ; location; failures inside a .BYTE/.WORD operand list use the token record,
@@ -247,17 +248,14 @@ emitByteList:
 eblRead:
     jsr lexerNext
     bcs eblRet
-    cmp #CASM_TOKEN_NUMBER
-    bne eblSyntax
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcs eblRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne eblRange
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
     bcs eblRet
-    jsr lexerNext
-    bcs eblRet
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_COMMA
     beq eblRead
     cmp #CASM_TOKEN_NEWLINE
@@ -270,7 +268,8 @@ eblSyntax:
     sec
     rts
 eblRange:
-    jsr diagSetLocFromToken     ; the out-of-range value itself
+    ; parserParseExpressionValue preserved the expression-start location before
+    ; advancing to this element's delimiter.
     lda #CASM_DIAG_OPERAND_OUT_OF_RANGE
     sec
     rts
@@ -285,9 +284,7 @@ emitWordList:
 ewlRead:
     jsr lexerNext
     bcs ewlRet
-    cmp #CASM_TOKEN_NUMBER
-    bne ewlSyntax
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcs ewlRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
@@ -295,8 +292,7 @@ ewlRead:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     jsr emitByte
     bcs ewlRet
-    jsr lexerNext
-    bcs ewlRet
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_COMMA
     beq ewlRead
     cmp #CASM_TOKEN_NEWLINE

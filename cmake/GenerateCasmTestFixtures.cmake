@@ -408,3 +408,26 @@ file(WRITE "${OUTPUT_DIR}/casmpart.seq"
     ".BYTE \$AA, \$BB, \$CC\n"
     "LDA #\n"
 )
+
+# -- Phase 5 WP18 numeric conversion fixtures -------------------------------
+file(WRITE "${OUTPUT_DIR}/casmnum2.seq"
+    ".ORG \$C000\n"
+    ".WORD 25, 26, 255, 256, 6553, 6554, 65535\n"
+    ".WORD \$00FF, \$FFFF, %11111111, %1111111111111111\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmnumerrd.seq" ".ORG \$C000\n.WORD 65536\n")
+file(WRITE "${OUTPUT_DIR}/casmnumerrh.seq" ".ORG \$C000\n.WORD \$10000\n")
+file(WRITE "${OUTPUT_DIR}/casmnumerrb.seq" ".ORG \$C000\n.WORD %11111111111111111\n")
+
+# Phase 5 WP20 production adapter fixtures. casmexprn exercises every parser and
+# directive delimiter context with numeric extraction; casmexpru proves an
+# identifier is routed to the production resolver and rejected before emission.
+file(WRITE "${OUTPUT_DIR}/casmexprn.seq"
+    ".ORG \$C000\n"
+    "LDA #<\$1234\n"
+    "LDA >\$1234\n"
+    "LDA (<\$1234),Y\n"
+    ".BYTE <\$1234, >\$1234\n"
+    ".WORD <\$1234, >\$1234\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmexpru.seq" ".ORG \$C000\nLDA ABSVAL\n")

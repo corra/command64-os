@@ -208,6 +208,56 @@ missing Phase 4 parent Taskwarrior milestone, three phantom wiki UUIDs for
 WP11-WP13, and stale Phase 3 milestone text) and closed WP14's two open
 evidence gaps.
 
+CASM Phase 5 WP16 freezes the Phase 0C.3 expression/resolver contract without
+adding runtime storage. Its completion-candidate dry run retained Phase 4's
+8,705 linked CODE+RODATA bytes, 1,127 BSS bytes, 408-byte `$2800` MAIN headroom,
+and 1,172 relocation points at both `$3400` and `$3500` link bases. No
+zero-page, BSS, linker, parser, emitter, file, VMM, or cleanup ownership changes.
+After explicit WP16 completion approval, the version-only increment produced
+`0.1.18` build 1080 with the verified three-banner-byte delta.
+
+CASM Phase 5 WP17 build 1081 adds `expr.o`: 36 CODE bytes and exactly 9 BSS
+bytes, with no RODATA, DATA, or ZEROPAGE. Linked CODE+RODATA becomes 8,741 bytes,
+BSS becomes 1,136 bytes, and total MAIN use is 9,877 of `$2800`, leaving 363
+bytes at both link bases. The R6 artifact is 11,113 bytes with 1,182 relocation
+points. No existing storage region or zero-page allocation moved.
+User completion approval advanced the version-only final artifact to `0.1.19`
+build 1082 with all segment and relocation measurements unchanged.
+
+CASM Phase 5 WP18 build 1084 relocates seven numeric scratch bytes from
+`parser.o` to `expr.o`, so total BSS remains 1,136 bytes. `expr.o` is 521 CODE / 16
+BSS; `parser.o` is 500 CODE / 6 BSS. Printable Phase 5 diagnostics and checked
+arithmetic bring linked CODE+RODATA to 8,997 bytes, total MAIN use to 10,133 of
+`$2800`, and headroom to 107 bytes at both link bases. The 11,419-byte R6
+artifact has 1,207 relocation points. No zero-page or resource storage changed.
+User completion approval advanced the version-only final artifact to `0.1.20`
+build 1085 with segment and relocation measurements unchanged.
+
+CASM Phase 5 WP19 candidate build 1088 expands MAIN from `$2800` to `$2A00`.
+The evaluator adds 314 CODE bytes and seven BSS bytes: `expr.o` is 835 CODE / 23
+BSS, total CODE+RODATA is 9,311 bytes, total BSS is 1,143 bytes, and MAIN use is
+10,454 of 10,752 bytes, leaving 298 bytes at both `$3400` and `$3500` bases. The
+R6 artifact has 1,268 relocation points. No zero-page or resource storage moved.
+User completion approval advanced the version-only final artifact to `0.1.21`
+build 1089 with segment and relocation measurements unchanged.
+
+CASM Phase 5 WP20 candidate build 1092 changes parser/emit CODE only: parser.o
+is 570 CODE / 6 BSS and emit.o is 460 CODE / 69 BSS. Total CODE+RODATA is 9,366
+bytes, BSS remains 1,143 bytes, and MAIN uses 10,509 of `$2A00`, leaving 243
+bytes at both bases. The R6 artifact has 1,271 relocation points. The separate
+`test_casm_expr` build 1003 uses 2,184 CODE+RODATA and 70 BSS bytes in a `$1000`
+envelope, leaving 1,842 bytes; it has no production resource storage.
+User completion approval advanced the version-only final CASM artifact to
+`0.1.22` build 1093 with segment and relocation measurements unchanged.
+
+CASM Phase 5 WP21 verification leaves production CASM unchanged at 9,366
+CODE+RODATA, 1,143 BSS, 10,509 of `$2A00` MAIN, 243 bytes headroom, and 1,271
+relocations. The expanded 30-case `test_casm_expr` build 1005 uses 2,310
+CODE+RODATA and 72 BSS bytes in its `$1000` envelope, leaving 1,714 bytes, with
+296 relocations. No production memory region, zero page, or resource changed.
+User completion approval advanced the version-only final CASM artifact to
+`0.1.23` build 1094 with segment and relocation measurements unchanged.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

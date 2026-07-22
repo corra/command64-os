@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
 Status: [/]
-Taskwarrior: 30 (`4796b60c`)
-Plan: `brain/plans/2026-07-17-casm-phase4-statement-parser-opcode-table.md`
+Taskwarrior: 30 (`6b72d639`)
+Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
 
 ## Goal
 
@@ -12,19 +12,14 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 4 builds the numeric static assembler on the Phase 3 lexer: a statement
-parser with a deterministic addressing-mode grammar, the compressed legal-6502
-opcode table and mode matcher, and an emission engine that tracks the program
-counter and writes plain absolute PRG output. It does not evaluate expressions,
-define symbols, resolve labels, run two passes, or emit R6 relocation records.
+Phase 5 adds a bounded expression evaluator and resolver boundary without
+implementing symbol storage, two-pass assembly, or relocation emission.
 
 **Phase 4 is complete**, approved by the user on 2026-07-21 at CASM `0.1.17`
 build 1079. WP11-WP15 are all closed.
 
-Next: **Phase 5 — minimal expression evaluator**, now unblocked. Its parent
-contract is `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
-and its entry work package WP16 is planned in
-`brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
+WP16-WP18 are complete. CASM is `0.1.20` build 1085. WP19 is next but remains
+pending a reconciled detailed plan; WP20-WP21 remain blocked.
 
 ## Phase 1 Prerequisite
 
@@ -280,3 +275,51 @@ WP15 plan: `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.
 
 **Phase 4 complete — approved by the user on 2026-07-21 at CASM `0.1.17`
 build 1079.** Milestone `4796b60c-5f4a-43c7-8270-436075bb3f7b`.
+
+# CASM Phase 5 - Minimal Expression Evaluator
+
+Parent Taskwarrior UUID: `6b72d639-53d0-4d1a-92ba-8c4d56096388`
+
+Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
+
+## Phase 5 Work Packages
+
+- [x] `0062fd20-929d-4ffd-a2b5-032db5ec4109`: WP16 prerequisite
+      reconciliation and Phase 0C.3 freeze. Recovery review preserved all
+      existing UUIDs, reopened incorrectly completed WP19, stopped premature
+      downstream starts, and encoded sequential Taskwarrior dependencies.
+      User approved completion; CASM advanced to `0.1.18` build 1080.
+- [x] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
+      storage. Added the exact nine-byte ABI and bounded accessors; user approved
+      completion at `0.1.19` build 1082.
+- [x] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
+      arithmetic core. Numeric compatibility, checked helpers, diagnostics, and
+      fixtures approved complete at `0.1.20` build 1085.
+- [x] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
+      resolver behavior. Active on `feature/casm-phase5-wp19` from `755fc45`;
+      test plan, deterministic resolver, and fixtures remain WP20 scope. User
+      approved expanding CASM MAIN from `$2800` to `$2A00` for the evaluator and
+      declaring the shared five-byte resolver callback output ABI. Candidate
+      build 1088 passed both links and the test image with 298-byte headroom.
+      User approved completion at `0.1.21` build 1089.
+- [x] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
+      fixture harness. Active on `feature/casm-phase5-wp20` from `56d8078` with
+      approved production adapter and standalone fixture-harness scope.
+      Candidate builds pass with 243-byte CASM headroom; user confirmed the
+      harness, trusted adapter reference, resolver failure, and cleanup matrix.
+      Completion approved at `0.1.22` build 1093.
+- [x] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
+      and completion gate. Active on `feature/casm-phase5-wp21` from `8afb438`.
+      Thirty-case harness, independent audit, and both images pass; consolidated
+      runtime gate passed with all five references and cleanup confirmed. The
+      `0.1.23.1094` dry run passed and was restored for approval. User approved
+      completion; final `0.1.23` build 1094 is stable and both images pass.
+
+## Phase 5 Acceptance
+
+- [x] Phase 0C.3 contract and task hierarchy are frozen by WP16.
+- [x] Expression ABI and storage remain bounded within the approved MAIN area.
+- [x] Numeric behavior remains byte-compatible with Phase 4.
+- [x] Resolved, unresolved, relocatable, extraction, and addend cases pass.
+- [x] Existing Phase 4 reference programs remain byte-identical.
+- [x] User completed the WP21 runtime walkthrough and approved Phase 5.

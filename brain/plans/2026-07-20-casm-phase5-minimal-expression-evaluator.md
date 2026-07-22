@@ -1,7 +1,7 @@
 ---
 feature: casm-phase5-minimal-expression-evaluator
 created: 2026-07-20
-status: planned
+status: complete
 ---
 
 # Plan: CASM Phase 5 Minimal Expression Evaluator
@@ -101,8 +101,10 @@ addend      := ("+" | "-") number
   outside `$0000..$FFFF`; arithmetic must not silently wrap.
 - When a symbol is unresolved, the evaluator retains the signed addend and
   defers the final range check until resolution.
-- Decimal mode must not be assumed or enabled. Every `ADC` and `SBC` path must
-  establish carry explicitly.
+- Evaluator routines do not execute `SED` or `CLD`, and every `ADC`/`SBC` path
+  establishes carry explicitly. CASM's application-entry decimal-mode
+  assumption is inherited Phase 4 technical debt, not a guarantee supplied by
+  Phase 5.
 
 ### Result Record
 
@@ -130,8 +132,9 @@ addendMagnitudeLo, addendMagnitudeHi
 - Low-byte extraction is never an R6 relocation candidate.
 - High-byte extraction of a relocatable symbol remains classified as
   potentially relocatable for Phase 8.
-- Phase 5 classifies metadata but creates no relocation entries and writes no
-  output bytes.
+- The evaluator classifies metadata but creates no relocation entries and
+  writes no output bytes. WP20 may pass resolved values to existing emission;
+  unresolved placeholders must never be emitted as zero values.
 
 ### Resolver Boundary
 
@@ -213,10 +216,12 @@ WP16 scope:
 - Record the Phase 0C.3 expression result and resolver contracts in
   `brain/KNOWLEDGE.md`, following the existing CASM Phase 1/2/3 contract
   sections.
-- Create the Taskwarrior records for WP17-WP21, which do not yet exist, and
-  register the Phase 5 milestone in `wiki/tasks/casm.md` and `brain/task.md`.
+- Reconcile the partially created Taskwarrior records from the abandoned Phase 5
+  attempt, reopen the incorrectly completed WP19 record, and register matching UUIDs for the
+  parent and WP16-WP21 in `wiki/tasks/casm.md` and `brain/task.md`.
 - Write and obtain approval for each later dedicated work-package plan.
-- Change no CASM source and no build inputs.
+- Implement no evaluator or adapter source. The final WP16 increment changes
+  only CASM's stage version, as required by the CASM work-package contract.
 
 Residual record-sync work from the original bullet is already done: the
 placeholder wiki UUIDs were corrected during WP14, so WP16 inherits no UUID
@@ -232,10 +237,15 @@ discrepancy.
 
 ### WP18: numeric primary and checked arithmetic core
 
-- Move or reuse `parseNumericValue` so parser and evaluator cannot diverge.
+- Move the numeric implementation/scratch into `expr.s` as an X/Y-returning
+  parser-independent core; retain only a thin `parser.s` compatibility wrapper
+  so existing parser/emitter callers remain stable until WP20.
 - Preserve decimal/hex/binary behavior and 16-bit overflow diagnostics.
 - Implement sign/magnitude addend parsing and resolved range checks.
-- Audit every carry-dependent arithmetic path.
+- Leave a parsed addend magnitude token current until checked application so
+  overflow diagnostics retain the correct source location.
+- Extend printable diagnostics through the already reserved Phase 5 range and
+  audit every carry-dependent arithmetic path.
 
 ### WP19: symbol, extraction, and resolver behavior
 
@@ -362,3 +372,11 @@ does not close Phase 4.
   predicted output-file deletion hazard was **falsified** — assembling over an
   existing output neither clobbers nor corrupts it. WP16's baseline references to
   `0.1.16` / build 1078 are superseded by `0.1.17` / 1079.
+
+- 2026-07-21: WP16-WP20 completed with user approval. WP21 independently
+  reconciled the parent matrix to 30 evaluator cases, verified both images and
+  unchanged production measurements, and received user confirmation for the
+  harness, all five trusted references, resolver failure, and cleanup. Phase 5
+  received explicit completion approval. Final CASM `0.1.23` build 1094 is
+  stable, both images pass, and WP21 closed before the Phase 5 parent. Phase 6A
+  remains inactive.
