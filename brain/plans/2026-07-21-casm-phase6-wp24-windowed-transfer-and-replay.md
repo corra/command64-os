@@ -72,8 +72,10 @@ planned honestly without naming them:
 - **No existing buffer is safe to reuse for VMM transfer staging.**
   `CasmIoBuffer` (256 bytes, `fileio.s`) is documented as staying reserved
   for source input; reusing it for VMM transfers would silently corrupt an
-  in-progress source read. WP24 needs its own dedicated staging buffer. Open
-  question below.
+  in-progress source read. WP24 needs its own dedicated staging buffer,
+  sized against a real link and fixture need during implementation rather
+  than fixed in advance (user decision), matching the MAIN-size decision's
+  own precedent.
 
 ## Inherited Contract
 
@@ -98,7 +100,8 @@ Included:
   (`resources.s`, `vmm_store.s`) to `slot*4`;
 - `vmmStoreAlloc` computes and passes the granted page count to
   `resourceRegisterVmm` (no change to `vmmStoreAlloc`'s own external ABI);
-- a bounded base-RAM staging buffer, sized per the open question below;
+- a bounded base-RAM staging buffer, sized against a real link and fixture
+  need during implementation rather than fixed in advance;
 - `vmmWindowRead`/`vmmWindowWrite` (names proposed, confirmed during
   implementation): given a registry slot, a 16-bit offset, and a byte count,
   bounds-check `offset + count` against the slot's `SegHi`/`Bank`/`Pages`
@@ -108,12 +111,11 @@ Included:
   through `vmmWindowWrite`, discard/zero the RAM staging copy, read it back
   through `vmmWindowRead`, leave both buffers available for the caller to
   compare;
-- reserve/raise `CASM_DIAG_VMM_TRANSFER_FAILED` (`$2B`, already reserved by
-  WP23) for a rejected `DOS_VMM_READ`/`DOS_VMM_WRITE` call, and a CASM-side
-  bounds violation (diagnostic value confirmed during implementation --
-  likely the same `$2B`, since both are "transfer failed" from the caller's
-  perspective; confirmed against the Phase 0C.4 Failure Contract's wording
-  before finalizing);
+- raise `CASM_DIAG_VMM_TRANSFER_FAILED` (`$2B`, already reserved by WP23)
+  for both a rejected `DOS_VMM_READ`/`DOS_VMM_WRITE` call and a CASM-side
+  bounds violation — one shared value for both, per user decision, matching
+  `vmmStoreAlloc`'s own precedent of collapsing a local rejection and an
+  OS-level failure into one diagnostic;
 - measure a real link at both relocation bases and propose the exact new
   MAIN size to the user (105 bytes of WP23 headroom cannot plausibly absorb
   a new staging buffer plus transfer code; treated as expected, not a design
@@ -132,22 +134,18 @@ Excluded:
   provides the code under test, WP25 owns building and running it;
 - any change to `vmmStoreAlloc`/`vmmStoreFree`'s documented external ABI.
 
-## Open Questions (need your input before this plan is final)
+## Open Questions (resolved by the user)
 
-1. **Staging buffer size.** WP25's fixture matrix needs *some* fixed-size
-   buffer to write/read/replay through, but Phase 6B's real record sizes
-   aren't designed yet (that's WP26+). Proposed: a small, generically-sized
-   buffer (e.g. 32 or 64 bytes) sufficient for WP25's pattern-based fixtures,
-   not sized against any real Phase 6B record. Confirm the size, or say if
-   you'd rather defer the exact number to implementation-time measurement.
-2. **Diagnostic reuse for the local bounds-violation.** Should a CASM-side
-   `offset + count` rejection (never reaching the OS) share
-   `CASM_DIAG_VMM_TRANSFER_FAILED` with a genuine `DOS_VMM_READ`/`WRITE`
-   rejection, or does the Phase 0C.4 Failure Contract's phrasing ("a
-   CASM-side bounds violation... is a CASM-internal fatal error") imply it
-   should be distinguishable? Reusing `$2B` keeps the diagnostic count at
-   four total for Phase 6A (matching WP22's freeze); a distinct value would
-   need a plan amendment to reserve a fifth.
+1. **Staging buffer size.** Deferred to implementation-time measurement,
+   matching the MAIN-size decision's own precedent (WP13/WP19/WP23): WP24
+   sizes the buffer against a real link and fixture need rather than
+   guessing a number now.
+2. **Diagnostic reuse for the local bounds-violation.** Resolved: a
+   CASM-side `offset + count` rejection shares `CASM_DIAG_VMM_TRANSFER_FAILED`
+   ($2B) with a genuine `DOS_VMM_READ`/`DOS_VMM_WRITE` OS-level rejection.
+   Phase 6A's diagnostic count stays at four, matching WP22's freeze and
+   `vmmStoreAlloc`'s own precedent of collapsing a local rejection and an
+   OS-level failure into one value (`CASM_DIAG_VMM_ALLOC_FAILED`).
 
 ## Expected Files
 
@@ -187,14 +185,13 @@ CASM_VMM_REC_SIZE  = 4   ; grown from 3
 - inputs: `X` = registry slot, 16-bit offset and byte count staged in
   zero-page (exact cells confirmed during implementation), buffer pointer;
 - outputs: C clear on success; C set and `A` = `CASM_DIAG_VMM_TRANSFER_FAILED`
-  on a rejected OS call or a local bounds violation (pending the open
-  question above);
+  on a rejected OS call or a local bounds violation (one shared value for
+  both);
 - clobbers: A, X, Y and OS API-defined volatile registers.
 
-Exact register/flag/scratch contracts, the staging-buffer size, and the
-bounds-violation diagnostic are confirmed and finalized during
-implementation, matching WP23's own precedent for deferring these past
-outline approval.
+Exact register/flag/scratch contracts and the staging-buffer size are
+confirmed and finalized during implementation, matching WP23's own
+precedent for deferring these past outline approval.
 
 ## Atomic Increments
 
@@ -272,5 +269,8 @@ Re-read the root and `src`/`external`/`casm` DOX chain after source edits.
 - 2026-07-22: Drafted on `feature/casm-phase6-wp24` from `feature/casm-phase6-wp23`
   at `42968f0` (CASM `0.1.25` build 1097). Reconciled the Phase 0C.4
   bounds-checking mandate against the current 3-byte registry record (a real
-  gap, not previously resolved) and proposed growing it to 4 bytes. Awaiting
-  user answers to the two open questions and plan approval.
+  gap, not previously resolved) and proposed growing it to 4 bytes. User
+  resolved both open questions: defer the staging buffer's exact size to a
+  real link measurement, and share `CASM_DIAG_VMM_TRANSFER_FAILED` between a
+  local bounds violation and a genuine OS-level rejection. Awaiting plan
+  approval before activation.
