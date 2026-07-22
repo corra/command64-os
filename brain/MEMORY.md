@@ -271,6 +271,172 @@ Phase 5 (minimal expression evaluator) is unblocked. Parent contract:
 `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`; entry work
 package WP16: `brain/plans/2026-07-21-casm-phase5-wp16-prerequisite-reconciliation.md`.
 
+**CASM Phase 6A WP22 prerequisite reconciliation and Phase 0C.4 freeze**:
+active on `feature/casm-phase6-wp22` from `main` commit `dcb74bb`, baseline
+CASM `0.1.23` build 1094 (PRG hash
+`18d2f6cce7ffbcc7de8aa71db3da9e3b6d9ee3bb1cd07e69b072dd0d0884e703`, matching
+the WP21 closeout exactly; a no-change rebuild reproduced the identical hash).
+Researched the OS VMM primitive contract directly from `src/command64/vmm.asm`
+rather than relying on `docs/vmm-api.md` alone, and found three facts that
+materially bound Phase 6A's design: (1) `vmmAlloc` always returns
+`VmmSegLo = 0`, so an allocation's identity is exactly `(VmmSegHi, VmmBank)` —
+the same two fields the pre-existing 3-byte `CasmVmmRegistry` record already
+stores, meaning `DOS_FREE_MEM` wiring needs no registry growth; (2) the 16-bit
+`VmmOffLo/Hi` transfer cursor can only reach 65536 bytes from a fixed
+`SegHi`/`Bank` pair regardless of how many pages an allocation was actually
+granted, so WP22 froze a hard 65536-byte cap per CASM VMM allocation, with
+larger needs spanning multiple registry slots; (3) `vmmReadBlock`/
+`vmmWriteBlock` perform no bounds checking against an allocation's granted
+size — an oversized transfer silently corrupts whatever REU page follows, so
+CASM's own windowed wrapper (WP24) must self-enforce the bound the OS will
+not. Also documented that `VMM_ERR_INVALID` conflates "no REU" with
+"zero-paragraph request", and that REU contents are undefined at boot (per
+the environment-variable subsystem's prior VMM use). Deliberately deferred
+the MAIN-envelope-size and literal `CASM_DIAG_*` value decisions to WP23,
+matching how WP13/WP19 made those calls inside their own implementing
+package rather than in a preceding freeze package. Created the CASM Phase 6A
+Taskwarrior milestone (`d68e6c58`) and WP22-WP25 children
+(`eb7541e5`/`8782e75d`/`228daccc`/`544a04bd`), sequentially dependent, matching
+the Phase 5 WP16-WP21 chain pattern. Defined a nine-case fixture matrix
+binding on WP23-WP25 (allocation, reuse-after-free, registry exhaustion, REU
+exhaustion, windowed read/write, replay-after-discard, boundary offset,
+CASM-side bounds rejection, and no-REU failure). Parent contract:
+`brain/plans/2026-07-21-casm-phase6-vmm-storage-and-symbol-table.md`; WP22
+detailed plan:
+`brain/plans/2026-07-21-casm-phase6-wp22-prerequisite-reconciliation.md`.
+
+User confirmed the runtime banner at the restored `0.1.23` build 1094
+baseline, then approved WP22 completion. The verified `0.1.24` increment was
+applied for real: build 1095 reproduced the dry run's exact PRG hash
+(`66594cd2b278b78705cacddf6e0a70d41c7574f8c2e84c6a101006bdd4958e64`), a
+no-change rebuild held at 1095, and both `test_image_d64` and `image_d64`
+passed. WP22 is complete; WP23 (`8782e75d`) is unblocked in Taskwarrior but
+requires its own separate plan approval before activation.
+
+**CASM Phase 6A WP23 VMM allocation core** (complete):
+active on `feature/casm-phase6-wp23` from `feature/casm-phase6-wp22` at
+`d0878d6`, baseline `0.1.24` build 1095. User approved the WP23 plan as
+drafted; the ask for a "test harness and fixtures if needed" was resolved as
+static verification only, matching the plan's own exclusion of runtime
+fixtures for this package. Created `vmm_store.s` (`vmmStoreAlloc`/
+`vmmStoreFree`) wired to `DOS_ALLOC_MEM`/`DOS_FREE_MEM`, and replaced
+`cleanupVmmStub` with a real `vmmStoreFree` call in `resources.s`. Two ABI
+questions surfaced and were resolved with the user before writing code: no
+16-bit byte count can ever need more than 4,096 paragraphs (= the 65536-byte
+cap), so the plan's proposed `CASM_DIAG_VMM_ALLOC_TOO_LARGE` rejection path
+is unreachable and was dropped — the real hazard was the "add 15, shift
+right 4" rounding trick overflowing 16-bit arithmetic for byte counts
+65,521-65,535, fixed by checking the carry and clamping to the
+proven-exact 4,096 paragraphs rather than rejecting anything; a zero-byte
+request is still rejected locally (`CASM_DIAG_VMM_ALLOC_FAILED`), which is
+what keeps a later `VMM_ERR_INVALID` unambiguous per WP22's finding. Found
+and fixed two register-clobber bugs while writing this (before any build):
+`vmmStoreFree` reusing one scratch byte for both the slot number and
+SegHi/Bank staging, and `resourcesCleanup`'s VMM loop relying on `X`
+surviving a call that documents `X` as clobbered — both fixed using the
+existing `CasmVmmSegHi`/`CasmVmmBank` staging pair and `CasmCleanupOffset`
+scratch-preservation pattern respectively. Reserved diagnostics `$28`-`$2B`
+in `common.inc` with contiguous-range asserts. Measured MAIN usage at
+10,647/10,752 bytes (105 bytes free) — no size change needed, unlike the
+WP13/WP19 precedent of requiring one; user confirmed proceeding on that
+basis. User ran a VICE sanity check (CASM against a trusted fixture),
+confirmed clean assemble/exit, and approved completion. Final `0.1.25` build
+1097 matched the dry run's exact PRG hash, a no-change rebuild held at 1097
+across two more builds, and both `test_image_d64` and `image_d64` passed.
+WP23 detailed plan:
+`brain/plans/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`; walkthrough:
+`brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`. WP23
+was committed on `feature/casm-phase6-wp23` (`42968f0`).
+
+**CASM Phase 6A WP24 windowed transfer and replay** (complete): active on
+`feature/casm-phase6-wp24` from `a60cb89`, baseline
+`0.1.25` build 1097. Reviewing the Phase 0C.4 freeze against WP23's actual
+implementation surfaced a real, previously unresolved gap: the freeze
+requires WP24's windowed transfer to "independently track each allocation's
+granted size" and bounds-check `offset + count` against it, but
+`CasmVmmRegistry`'s 3-byte record (confirmed sufficient by WP22/WP23 only
+for allocation/free identity) had no field to read a granted size from.
+Resolved by growing `CASM_VMM_REC_SIZE` from 3 to 4 bytes, adding a
+granted-page-count field computed identically to `vmmAlloc`'s own
+paragraph-to-page rounding, with `resourceRegisterVmm` remaining the
+registry's sole writer (preserving the single-writer discipline WP23
+established) — and as a bonus, the slot-to-byte-offset computation turned
+from `ASL`+`ADC` into a plain two-`ASL` `slot*4`. Also used, from a working
+precedent already in `src/external/edlin/buffer.s`: `DOS_VMM_READ`/
+`DOS_VMM_WRITE` take their Seg/Off/Bank/count arguments through fixed OS
+zero-page cells, not registers, unlike `DOS_ALLOC_MEM`/`DOS_FREE_MEM`. User
+resolved both open questions: staging buffer sized at implementation time
+(`CasmVmmBuffer`, 32 bytes, reusing already-reserved `$78-$7F` scratch, no
+new zero-page byte), and a local bounds violation shares
+`CASM_DIAG_VMM_TRANSFER_FAILED` with a genuine OS-level rejection.
+Implemented `vwPrepareTransfer` (private, shared bounds-check/staging),
+`vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` in `vmm_store.s`. The
+offset+count-to-page-count bounds check avoids representing 65536 as a
+16-bit value (same hazard as `vmmStoreAlloc`'s rounding) via a top-nibble
+extraction plus round-up check rather than an addition that could overflow.
+Measured MAIN overflow (123 bytes at `$2A00`); user approved `$2A00` ->
+`$2B00` (133 bytes free). User ran a VICE sanity check (CASM against a
+trusted fixture), confirmed clean assemble/exit. Completion dry-run
+`0.1.26.1099` verified (2-byte diff, no-change rebuild stable); baseline
+`0.1.25.1098` restored exactly via `git checkout`. WP24 plan:
+`brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`;
+walkthrough:
+`brain/walkthroughs/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
+User approved completion; final `0.1.26` build 1099 matched the dry run's
+exact PRG hash, no-change rebuild stable, both images pass. WP24 is
+complete; WP25 (`544a04bd`) is unblocked but requires its own separate plan
+approval before activation.
+
+**CASM Phase 6A WP25 verification, walkthrough, and completion gate**
+(pending completion approval): active on `feature/casm-phase6-wp25` from
+`3fd1f10`, baseline `0.1.26` build 1099. Planning reconciled three things:
+(1) `wiki/tasks/casm.md`'s Phase 6A Acceptance checklist still showed
+WP23's and WP24's completed work as unchecked — fixed directly; (2) a
+test-harness build hazard: importing `resourceRegisterVmm` pulls in the
+whole `resources.o`, whose `exitSuccess`/`exitFatal` reference
+`diagPrintFatal` (`diagnostics.s`), which itself transitively needs
+`lexer.s`/`source.s` — solved by having the WP25 test driver export its own
+stub `diagPrintFatal`, exactly matching how WP20's `casm_expr.s` already
+stubbed lexer/diagnostic symbols `expr.s` needed; (3) WP22's fixture matrix
+described `vmmwrite1`/`vmmread1` reading back "via a different staging
+buffer," but WP24 deliberately built a single shared `CasmVmmBuffer` — the
+test instead keeps its own reference-pattern copy outside `CasmVmmBuffer`
+and compares against that. `vmmalloc4`/`vmmnoreu` are manually deferred:
+CASM's own 512KB registry cap can never mark the OS's 16MB-tracked MCT
+full through normal calls, and the harness has no per-run REU toggle.
+
+Implemented `tests/src/casm_vmm/casm_vmm.s` (7 automated fixtures). This was
+the *first real execution* of any of WP23/WP24's code — both explicitly
+deferred a real call site — and it found three defects no static review or
+build had caught: (1) the test itself expected the wrong diagnostic from a
+full-registry 9th allocation (`CASM_DIAG_REGISTRY_FULL` vs.
+`vmmStoreAlloc`'s actual `CASM_DIAG_VMM_ALLOC_FAILED`), which masked the
+free loop and cascaded into 5 more failures; (2) `vwPrepareTransfer`
+(`vmm_store.s`) rejected the valid exact-65536-byte boundary transfer,
+since the offset+count 16-bit add wraps to zero with carry set at exactly
+that boundary, indistinguishable from a genuine overflow by carry alone —
+fixed by checking whether the wrapped remainder is zero; (3) `vmmReplay`
+stashed its slot in `CasmValue0Lo`, which `vwPrepareTransfer` (called
+internally by both of `vmmReplay`'s own calls) also uses as its own
+offset+count scratch — the same class of shared zero-page clobber bug WP23
+already caught twice (`vmmStoreFree`, `resourcesCleanup`'s VMM loop), now a
+third time; fixed by moving the stash to `CasmValue1Lo`. Live VICE
+debugging proved too fragile to trust in this session (a stray leftover
+breakpoint from an earlier attempt silently paused a "fresh" run, and an
+improvised direct-PC-jump bypassing the shell's loader produced misleading
+state — both self-inflicted); switched to adding temporary per-step
+diagnostic instrumentation to the failing fixture instead, which isolated
+bug 3 without further live stepping, then removed it once confirmed fixed.
+User approved fixing all three in place rather than opening a separate
+remediation plan. All 7 automated fixtures pass; completion dry-run
+`0.1.27.1102` verified (2-byte diff, no-change rebuild stable); baseline
+`0.1.26.1101` restored exactly via `git checkout`. WP25 plan:
+`brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`;
+walkthrough:
+`brain/walkthroughs/2026-07-21-casm-phase6-wp25-verification-closeout.md`.
+Awaiting user approval of the walkthrough and completion (which also closes
+the CASM Phase 6A milestone).
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.

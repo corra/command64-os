@@ -298,6 +298,107 @@ This file serves as the shared repository for architectural decisions, technical
 - VMM storage precedes VMM-backed symbols: Phase 6A provides bounded storage
   and Phase 6B adds the symbol table and deterministic two-pass assembly.
 
+### CASM Phase 6A VMM Storage Contract (Phase 0C.4, frozen 2026-07-21)
+
+CASM-local phase numbering. Distinct from the unrelated, already-completed
+top-level "Phase 6A: App Manager" / "Phase 6B: Binary Relocator" entries in
+the Current Status table above — always write "CASM Phase 6A" in full in any
+record that could be read alongside both namespaces.
+
+- **Allocation identity is exactly `(SegHi, Bank)`.** `vmmAlloc`
+  (`src/command64/vmm.asm`) always returns `VmmSegLo = 0`; an allocation's
+  base is fully identified by the page index (`VmmSegHi`, 0-255) and bank
+  (`VmmBank`, 0-15). `vmmFree`'s actual input is exactly those two bytes, so
+  the pre-existing 3-byte `CasmVmmRegistry` record (`flag`/`SegHi`/`Bank`)
+  does not need to grow to support real `DOS_FREE_MEM` calls.
+- **A single CASM VMM allocation is capped at 65536 bytes (16 pages).**
+  `vmmComputeAddress` computes `Address = (Seg << 4) + Off`, where `Seg` is
+  fixed at the allocation's base and `Off` (`VmmOffLo/Hi`) is a 16-bit cursor
+  CASM supplies per transfer. Since `Off` tops out at 65535, only the first
+  64KB of a larger allocation is reachable through a fixed `SegHi`/`Bank`
+  pair; storage needs beyond that use additional registry slots (up to
+  `CASM_VMM_CAPACITY = 8`, i.e. up to 512KB total), never an `Off` value at
+  or beyond the owning allocation's granted size.
+- **The OS performs no bounds checking on `DOS_VMM_READ`/`DOS_VMM_WRITE`.**
+  `vmmReadBlock`/`vmmWriteBlock` only check `vmmInitialized` before DMA-ing
+  the requested byte count; an `offset + count` that runs past an
+  allocation's granted pages silently reads or corrupts whatever REU page
+  follows. CASM's own windowed transfer wrapper (WP24) must independently
+  track each allocation's granted size and refuse any request that would
+  exceed it — the OS provides no such protection.
+- **`VMM_ERR_INVALID` is ambiguous.** `vmmAlloc` returns it both for
+  "VMM not initialized" (no REU detected at boot) and for a zero-paragraph
+  request. CASM never issues a zero-paragraph request except as an internal
+  bug, so this return code from a CASM-sized allocation is treated as
+  VMM-unavailable, not malformed input.
+- **REU contents are undefined at boot** (confirmed by the environment
+  variable subsystem's prior VMM use, `brain/walkthroughs/2026-05-14-env-var-remediation.md`).
+  Phase 6A verification must write a known pattern before ever reading it
+  back; no routine may assume implicit zero-fill.
+- **REU presence in the supported local test environment predates CASM.**
+  `SET`/`PATH` have used the same VMM primitives at runtime since
+  2026-05-14; Phase 6A is CASM's first VMM consumer, not the OS's first.
+- The MAIN-envelope-size and literal `CASM_DIAG_*` hex-value decisions for
+  Phase 6A are deliberately deferred to WP23 (the implementing package),
+  matching how Phase 4 WP13 and Phase 5 WP19 set their own MAIN sizes rather
+  than an earlier freeze package doing it for them.
+- Phase 6A gate: bounded VMM records can be written, read, and replayed
+  without depending on source or symbol semantics. Phase 6B (symbol table,
+  hashing, two-pass resolution) remains a separately gated, unstarted phase.
+- **WP23 implementation (complete).**
+  `vmm_store.s` wires `vmmStoreAlloc`/`vmmStoreFree` to `DOS_ALLOC_MEM`/
+  `DOS_FREE_MEM`. No 16-bit byte count can ever require more than 4,096
+  paragraphs (= the 65536-byte cap) after rounding, so there is no separate
+  "too large" rejection path (`CASM_DIAG_VMM_ALLOC_TOO_LARGE`, proposed in
+  the WP23 plan, was dropped as unreachable); the carry out of the rounding
+  add is used only to clamp the one wraparound-prone input range (byte counts
+  65,521-65,535) to the proven-exact 4,096 paragraphs. A zero-byte-count
+  request is rejected locally before any OS call, which is what keeps a
+  later `VMM_ERR_INVALID` unambiguous. Diagnostics `$28`-`$2B` are reserved
+  (`CASM_DIAG_VMM_UNAVAILABLE`/`_ALLOC_FAILED`/`_FREE_FAILED`/
+  `_TRANSFER_FAILED`, the last raised only by WP24). Measured MAIN usage
+  (10,647/10,752 bytes) fits the existing `$2A00` envelope with 105 bytes
+  free — no size change, unlike the WP13/WP19 precedent of needing one.
+- **WP24 implementation (complete).** Closed the gap
+  above: grew `CASM_VMM_REC_SIZE` from 3 to 4 bytes
+  (`CASM_VMM_REC_PAGES` added), computed by `vmmStoreAlloc` identically to
+  `vmmAlloc`'s own paragraph-to-page rounding, with `resourceRegisterVmm`
+  remaining the registry's sole writer. Added `vmmWindowRead`/
+  `vmmWindowWrite`/`vmmReplay` in `vmm_store.s`, bounds-checking slot range,
+  the fixed 32-byte `CasmVmmBuffer`'s capacity, slot ownership, `offset +
+  count` overflow, and the transfer's required page count against the
+  slot's granted `CASM_VMM_REC_PAGES` — all before any `DOS_VMM_READ`/
+  `DOS_VMM_WRITE` call, via a shared private `vwPrepareTransfer`. The
+  page-count comparison avoids ever representing 65536 as a 16-bit value
+  (same hazard as `vmmStoreAlloc`'s rounding): `NeededPages = ceil((offset+
+  count)/4096)` is a top-nibble extraction plus a round-up check, never an
+  addition that could itself overflow. No new zero-page byte: reused the
+  already-reserved `$78-$7F` I/O/VMM scratch. Measured MAIN usage
+  (10,875/11,008 bytes at the approved `$2B00`, up from `$2A00`) with 133
+  bytes free.
+- **WP25 verification (pending completion approval): first real run found
+  three defects.** WP23/WP24's code had never actually executed before
+  WP25's `test_casm_vmm` fixture harness ran it for the first time. Found:
+  (1) a test-side wrong diagnostic expectation in `vmmalloc3` (expected
+  `CASM_DIAG_REGISTRY_FULL`; `vmmStoreAlloc` actually returns
+  `CASM_DIAG_VMM_ALLOC_FAILED` for a full registry, per its own WP23 ABI),
+  which left the free loop unreached and cascaded into 5 more fixture
+  failures; (2) `vwPrepareTransfer` incorrectly rejected the valid
+  exact-65536-byte boundary case (offset+count landing exactly on the cap
+  wraps the 16-bit add to zero with carry set, indistinguishable from a
+  genuine overflow by carry alone — fixed by checking whether the wrapped
+  remainder is zero); (3) `vmmReplay` stashed its slot in `CasmValue0Lo`,
+  which `vwPrepareTransfer` (called by both of `vmmReplay`'s internal
+  calls) also uses as its own offset+count scratch — the same class of
+  shared zero-page clobber bug WP23 already caught twice
+  (`vmmStoreFree`, `resourcesCleanup`'s VMM loop), fixed by moving the
+  stash to `CasmValue1Lo`. All three fixed with explicit user approval to
+  fix in place rather than opening a separate remediation plan. All 7
+  automated fixtures (`vmmalloc1-3`, `vmmreplay1`, `vmmoffset1`,
+  `vmmbounds1`, `vmmfree1`) pass; `vmmalloc4`/`vmmnoreu` are manually
+  deferred (CASM's 512KB registry cap can never mark the OS's 16MB-tracked
+  MCT full through normal calls; the harness has no per-run REU toggle).
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

@@ -9,6 +9,51 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6A WP25 verification and completion gate**: added a
+  standalone `test_casm_vmm` runtime fixture harness (7 automated cases
+  covering allocation, reuse-after-free, registry exhaustion, windowed
+  write/read/replay, boundary offsets, bounds rejection, and free-then-reuse
+  rejection). The first real execution of WP23/WP24's `vmm_store.s` code
+  found and fixed two production defects — `vwPrepareTransfer` incorrectly
+  rejecting the valid exact-65536-byte boundary transfer, and `vmmReplay`
+  clobbering its own stashed slot via a shared zero-page scratch cell also
+  used internally by `vwPrepareTransfer` — plus one incorrect expectation in
+  the test itself. All 7 fixtures pass. `vmmalloc4` (REU exhaustion) and
+  `vmmnoreu` (no-REU diagnostic) are documented as manually deferred, not
+  automated. Advanced CASM to `0.1.27` build 1102. Closes the CASM Phase 6A
+  milestone.
+
+- **CASM Phase 6A WP24 windowed transfer and replay**: added
+  `vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` to `vmm_store.s`, bounds-
+  checking every transfer against a slot's registered ownership, the fixed
+  32-byte `CasmVmmBuffer` staging buffer, offset+count overflow, and the
+  allocation's granted page count before any `DOS_VMM_READ`/`DOS_VMM_WRITE`
+  call. Grew `CasmVmmRegistry`'s record from 3 to 4 bytes to store that
+  granted page count, closing a gap the WP22 freeze had left open. Raised
+  CASM MAIN from `$2A00` to `$2B00` (measured 123-byte overflow). Advanced
+  CASM to `0.1.26` build 1099. Implements no fixture matrix (WP25).
+
+- **CASM Phase 6A WP23 VMM allocation core**: added `vmm_store.s`
+  (`vmmStoreAlloc`/`vmmStoreFree`) wiring real `DOS_ALLOC_MEM`/`DOS_FREE_MEM`
+  calls behind the existing resource registry, and replaced
+  `cleanupVmmStub`'s no-op-on-REU behavior with a real, retry-on-failure free
+  in `resourcesCleanup`. Reserved diagnostics `$28`-`$2B` in `common.inc`.
+  Measured the real MAIN-envelope usage (10,647/10,752 bytes) and found it
+  already fits `$2A00` with headroom to spare, so no MAIN size change was
+  needed. Advanced CASM to `0.1.25` build 1097. Implements no windowed
+  transfer (WP24) and no runtime fixture (WP25).
+
+- **CASM Phase 6A WP22 prerequisite reconciliation and Phase 0C.4 freeze**:
+  researched the OS VMM primitive contract directly from
+  `src/command64/vmm.asm` and froze it as the Phase 6A VMM record contract —
+  confirmed the existing VMM registry record needs no growth, capped a single
+  CASM VMM allocation at 65536 bytes, and documented that CASM's own windowed
+  transfer wrapper must self-enforce bounds checking the OS does not provide.
+  Deferred the MAIN-envelope-size and diagnostic-value decisions to WP23.
+  Created the CASM Phase 6A Taskwarrior milestone and WP22-WP25 child tasks
+  and advanced CASM to `0.1.24` build 1095; no VMM allocation, transfer, or
+  runtime behavior is included.
+
 - **CASM Phase 5 WP16 contract and recovery gate**: reconciled the abandoned
   Phase 5 Taskwarrior state without replacing UUIDs, reopened WP19, stopped
   premature downstream work, encoded WP16-WP21 dependencies, and froze the
