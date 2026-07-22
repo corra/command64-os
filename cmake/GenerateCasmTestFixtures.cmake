@@ -408,3 +408,13 @@ file(WRITE "${OUTPUT_DIR}/casmpart.seq"
     ".BYTE \$AA, \$BB, \$CC\n"
     "LDA #\n"
 )
+
+# -- Phase 5 WP18 numeric conversion fixtures -------------------------------
+file(WRITE "${OUTPUT_DIR}/casmnum2.seq"
+    ".ORG \$C000\n"
+    ".WORD 25, 26, 255, 256, 6553, 6554, 65535\n"
+    ".WORD \$00FF, \$FFFF, %11111111, %1111111111111111\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmnumerrd.seq" ".ORG \$C000\n.WORD 65536\n")
+file(WRITE "${OUTPUT_DIR}/casmnumerrh.seq" ".ORG \$C000\n.WORD \$10000\n")
+file(WRITE "${OUTPUT_DIR}/casmnumerrb.seq" ".ORG \$C000\n.WORD %11111111111111111\n")

@@ -373,6 +373,11 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmpcovf.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmodes.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmpart.seq"
+    # WP18 numeric conversion fixtures
+    "${CASM_TEST_FIXTURE_DIR}/casmnum2.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmnumerrd.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmnumerrh.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmnumerrb.seq"
 )
 
 add_custom_command(
@@ -395,7 +400,7 @@ add_custom_target(casm_test_fixtures DEPENDS ${CASM_TEST_FIXTURES})
 # brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md.
 set(CASM_REF_DIR "${CMAKE_BINARY_DIR}/casm_refs")
 set(CASM_REF_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/tests/fixtures/casm")
-set(CASM_REF_NAMES casmemit1 casmhello casmmodes)
+set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

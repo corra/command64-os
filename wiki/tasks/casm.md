@@ -18,8 +18,8 @@ implementing symbol storage, two-pass assembly, or relocation emission.
 **Phase 4 is complete**, approved by the user on 2026-07-21 at CASM `0.1.17`
 build 1079. WP11-WP15 are all closed.
 
-WP16 and WP17 are complete. CASM is `0.1.19` build 1082. WP18 is next but
-remains pending a reconciled detailed plan; WP19-WP21 remain blocked.
+WP16-WP18 are complete. CASM is `0.1.20` build 1085. WP19 is next but remains
+pending a reconciled detailed plan; WP20-WP21 remain blocked.
 
 ## Phase 1 Prerequisite
 
@@ -292,8 +292,9 @@ Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
 - [x] `3b09ea77-c325-4072-90fc-9812181a4e04`: WP17 expression ABI and bounded
       storage. Added the exact nine-byte ABI and bounded accessors; user approved
       completion at `0.1.19` build 1082.
-- [ ] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
-      arithmetic core. Depends on WP17.
+- [x] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
+      arithmetic core. Numeric compatibility, checked helpers, diagnostics, and
+      fixtures approved complete at `0.1.20` build 1085.
 - [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
       resolver behavior. Reopened after rollback; depends on WP18.
 - [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression

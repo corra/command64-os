@@ -24,6 +24,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   parser, emitter, or runtime diagnostic changes. Completion advanced CASM to
   `0.1.19` build 1082.
 
+- **CASM Phase 5 WP18 numeric and checked arithmetic core**: moved numeric
+  conversion and scratch ownership from the parser into the expression module
+  behind a compatibility wrapper, added optional sign/magnitude addend parsing,
+  checked 16-bit add/subtract/application helpers, printable Phase 5 diagnostics,
+  and trusted decimal/hex/binary boundary fixtures.
+  Completion advanced CASM to `0.1.20` build 1085.
+
 - **CASM Phase 4 complete (WP15 verification and closeout)**: Independently
   audited and closed the numeric static assembler phase at CASM `0.1.17`
   build 1079. WP15 changed no CASM production source; it verified, reconciled

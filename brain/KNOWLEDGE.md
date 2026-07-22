@@ -248,6 +248,13 @@ This file serves as the shared repository for architectural decisions, technical
   the module has no imports, zero-page, RODATA, DATA, resources, or runtime
   consumer. Diagnostics `$24-$27` are reserved but remain unprintable/unraised
   until later packages extend `diagnostics.s` with their message contracts.
+- WP18 moves the single numeric implementation and its seven scratch bytes into
+  `expr.s` as `exprParseNumeric`, returning X/Y without importing parser state.
+  `parser.s` retains only a compatibility wrapper, so existing Phase 4 parser
+  and emitter callers remain unchanged until WP20. Addends are parsed as
+  sign/magnitude while leaving the NUMBER token current; checked application can
+  therefore stamp arithmetic overflow at the magnitude rather than the following
+  delimiter. Phase 5 diagnostics `$24-$27` are now printable.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.

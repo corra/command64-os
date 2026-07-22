@@ -1,0 +1,9 @@
+# CASM WP18 trusted reference: casmnum2
+#
+# Hand-derived little-endian words at .ORG $C000.
+# bytes: 24
+# sha256: 0849f714d73fa213b5ee72c623094ef866f759b259c4d2f45f96c1f14971259b
+
+00 C0
+19 00 1A 00 FF 00 00 01 99 19 9A 19 FF FF
+FF 00 FF FF FF 00 FF FF

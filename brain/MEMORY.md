@@ -224,6 +224,15 @@ points. No existing storage region or zero-page allocation moved.
 User completion approval advanced the version-only final artifact to `0.1.19`
 build 1082 with all segment and relocation measurements unchanged.
 
+CASM Phase 5 WP18 build 1084 relocates seven numeric scratch bytes from
+`parser.o` to `expr.o`, so total BSS remains 1,136 bytes. `expr.o` is 521 CODE / 16
+BSS; `parser.o` is 500 CODE / 6 BSS. Printable Phase 5 diagnostics and checked
+arithmetic bring linked CODE+RODATA to 8,997 bytes, total MAIN use to 10,133 of
+`$2800`, and headroom to 107 bytes at both link bases. The 11,419-byte R6
+artifact has 1,207 relocation points. No zero-page or resource storage changed.
+User completion approval advanced the version-only final artifact to `0.1.20`
+build 1085 with segment and relocation measurements unchanged.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

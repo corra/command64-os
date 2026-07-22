@@ -149,8 +149,18 @@
     - [x] Dry-run `0.1.19.1082` and no-change rebuild; restored build 1081
     - [x] User approved completion; final `0.1.19` build 1082 verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp17-expression-abi.md`
-  - [ ] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
+  - [x] `8f9467b6-e37d-4701-a4a6-6f90bd8fbf5b`: WP18 numeric primary and checked
         arithmetic core; depends on WP17
+    - Active on `feature/casm-phase5-wp18` from WP17 commit `2bb5e4b`
+    - Test plan: `brain/plans/2026-07-21-casm-phase5-wp18-test-plan.md`
+    - [x] Extended printable Phase 5 diagnostics through `$27`
+    - [x] Moved numeric core/scratch behind parser compatibility wrapper
+    - [x] Added optional addend parsing and checked add/sub/apply helpers
+    - [x] Added trusted `casmnum2` and three radix-overflow fixtures
+    - [x] Both links and test image pass with 107-byte MAIN headroom
+    - [x] Dry-run `0.1.20.1085`; restored `0.1.19.1084`
+    - [x] User approved completion; final `0.1.20` build 1085 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp18-numeric-primary.md`
   - [ ] `4acf22c2-8253-4673-918a-8dd38cc18221`: WP19 symbol, extraction, and
         resolver behavior; reopened and dependent on WP18
   - [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression

@@ -237,10 +237,15 @@ discrepancy.
 
 ### WP18: numeric primary and checked arithmetic core
 
-- Move or reuse `parseNumericValue` so parser and evaluator cannot diverge.
+- Move the numeric implementation/scratch into `expr.s` as an X/Y-returning
+  parser-independent core; retain only a thin `parser.s` compatibility wrapper
+  so existing parser/emitter callers remain stable until WP20.
 - Preserve decimal/hex/binary behavior and 16-bit overflow diagnostics.
 - Implement sign/magnitude addend parsing and resolved range checks.
-- Audit every carry-dependent arithmetic path.
+- Leave a parsed addend magnitude token current until checked application so
+  overflow diagnostics retain the correct source location.
+- Extend printable diagnostics through the already reserved Phase 5 range and
+  audit every carry-dependent arithmetic path.
 
 ### WP19: symbol, extraction, and resolver behavior
 
