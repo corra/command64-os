@@ -65,7 +65,8 @@ of this plan is required before activation or source edits, per the CASM
   calls, regardless of the real REU size (a prior remediation plan
   documents the standard VICE test setup as `-reu -reusize 512`, i.e. a
   512KB REU, but even a real 512KB REU doesn't change this: the MCT
-  bookkeeping is independent of physical REU capacity). Open question below.
+  bookkeeping is independent of physical REU capacity). Resolved below:
+  documented as manually deferred rather than automated.
 
 ## Inherited Contract
 
@@ -113,10 +114,13 @@ Included:
      (`CASM_DIAG_VMM_TRANSFER_FAILED`) before any OS call; free.
   7. `vmmfree1` — allocate, free, then confirm a transfer against the
      now-freed slot is rejected by CASM's own registry state.
-  8. `vmmalloc4` (REU/allocation exhaustion) — runs last; see Open
-     Questions.
-  9. `vmmnoreu` — documented as manually deferred, matching WP22's own
-     allowance: the supported test harness has no per-run REU toggle.
+- `vmmalloc4` (REU/allocation exhaustion) and `vmmnoreu` are both documented
+  as manually deferred, per the user's decision: automated construction of
+  either is impractical (`vmmalloc4` would require directly manipulating
+  OS-owned MCT memory rather than exercising it through a documented API;
+  `vmmnoreu` needs a per-run REU toggle the supported harness doesn't have).
+  The walkthrough records the reasoning WP22/this plan already established
+  for both, rather than treating either as silently dropped;
 - pass/fail dot printing and a final summary line, matching
   `test_casm_expr`'s reporting convention;
 - build both relocation bases and `test_image_d64`; run in VICE; record the
@@ -131,28 +135,16 @@ Excluded:
 - any symbol, hash, or Pass 1/Pass 2 code (Phase 6B);
 - activation of CASM Phase 6B (a separate gate, separately approved).
 
-## Open Questions (need your input before this plan is final)
+## Open Questions (resolved by the user)
 
-1. **`vmmalloc4` construction.** Since CASM's own allocation pattern can
-   never exhaust the MCT through normal calls, how should this fixture be
-   handled?
-   - **(a)** Have the test harness's own code deliberately pre-fill the MCT
-     (`$C000-$CFFF`, a documented, fixed OS structure — `PAGE_HEAD`/
-     `PAGE_TAIL` bytes) to simulate near-total exhaustion, then attempt one
-     more CASM-level allocation and confirm it correctly returns
-     `CASM_DIAG_VMM_ALLOC_FAILED`. This exercises the real `vmmAlloc` code
-     path against a genuinely full MCT, not a faked return value — but it
-     is unusually invasive (writing directly to OS-owned memory from a test
-     program rather than through a documented API) and must run last since
-     it leaves the MCT unusable for anything afterward.
-   - **(b)** Document `vmmalloc4` as manually deferred, alongside
-     `vmmnoreu`, with the same reasoning recorded in the walkthrough instead
-     of implemented as an automated fixture.
-2. **Test target/PRG naming.** Confirm `casm_vmm` (-> `test_casm_vmm`
-   target, matching `casm_expr` -> `test_casm_expr`) is an acceptable name,
-   and confirm starting from `TEST_PRG_SIZE = "1000"` (matching
-   `test_casm_expr`'s working envelope), measured and adjusted during
-   implementation if it overflows.
+1. **`vmmalloc4` construction.** Resolved: documented as manually deferred,
+   alongside `vmmnoreu`, rather than implemented by directly manipulating
+   OS-owned MCT memory. The walkthrough records why automated construction
+   isn't practical for either case.
+2. **Test target/PRG naming.** Confirmed: `casm_vmm` -> `test_casm_vmm`,
+   matching `casm_expr` -> `test_casm_expr`, starting at
+   `TEST_PRG_SIZE = "1000"` and measured/adjusted during implementation if
+   it overflows.
 
 ## Expected Files
 
@@ -183,8 +175,8 @@ scoping issue).
 3. Implement fixtures 1-3 (`vmmalloc1`-`vmmalloc3`) and confirm they build.
 4. Implement fixtures 4-7 (`vmmwrite1`/`vmmread1`/`vmmreplay1`,
    `vmmoffset1`, `vmmbounds1`, `vmmfree1`).
-5. Implement `vmmalloc4` per the approved resolution of Open Question 1 (or
-   document it as deferred, matching `vmmnoreu`).
+5. Document `vmmalloc4` and `vmmnoreu` as manually deferred in the
+   walkthrough, per the user's decision — no source change for either.
 6. Build both relocation bases and `test_image_d64`. Run the harness in
    VICE (ask the user); record dot/summary output.
 7. Update `wiki/tasks/casm.md`'s remaining Phase 6A Acceptance items based
@@ -252,5 +244,8 @@ is separately gated to begin, matching the parent plan's own sequencing.
   wording mismatch between WP22's fixture matrix and WP24's actual
   single-buffer design. Found that `vmmalloc4` (REU exhaustion) is not
   reachable through normal allocation calls given CASM's own 512KB cap
-  against a 16MB-tracked MCT. Awaiting user answers to the two open
-  questions and plan approval.
+  against a 16MB-tracked MCT. User resolved both open questions: document
+  `vmmalloc4` as manually deferred alongside `vmmnoreu` rather than
+  directly manipulating OS-owned MCT memory, and confirmed `casm_vmm`/
+  `test_casm_vmm` naming starting at `TEST_PRG_SIZE = "1000"`. Awaiting
+  plan approval before activation.
