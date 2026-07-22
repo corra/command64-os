@@ -345,9 +345,34 @@ confirmed clean assemble/exit, and approved completion. Final `0.1.25` build
 across two more builds, and both `test_image_d64` and `image_d64` passed.
 WP23 detailed plan:
 `brain/plans/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`; walkthrough:
-`brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`. WP24
-(`228daccc`) is unblocked in Taskwarrior but requires its own separate plan
-approval before activation.
+`brain/walkthroughs/2026-07-21-casm-phase6-wp23-vmm-allocation-core.md`. WP23
+was committed on `feature/casm-phase6-wp23` (`42968f0`).
+
+**CASM Phase 6A WP24 windowed transfer and replay** (plan drafted, pending
+approval): drafted on `feature/casm-phase6-wp24` from `feature/casm-phase6-wp23`
+at `42968f0`. Reviewing the Phase 0C.4 freeze against WP23's actual
+implementation surfaced a real, previously unresolved gap: the freeze
+requires WP24's windowed transfer to "independently track each allocation's
+granted size" and bounds-check `offset + count` against it, but
+`CasmVmmRegistry`'s 3-byte record (confirmed sufficient by WP22/WP23 only
+for allocation/free identity) has no field to read a granted size from.
+Proposed resolution: grow `CASM_VMM_REC_SIZE` from 3 to 4 bytes, adding a
+granted-page-count field computed identically to `vmmAlloc`'s own
+paragraph-to-page rounding, with `resourceRegisterVmm` remaining the
+registry's sole writer (preserving the single-writer discipline WP23
+established) — and as a bonus, a 4-byte record turns the existing
+slot-to-byte-offset computation from `ASL`+`ADC` into a plain two-`ASL`
+`slot*4`. Also documented, from a working precedent already in
+`src/external/edlin/buffer.s`: `DOS_VMM_READ`/`DOS_VMM_WRITE` take their
+Seg/Off/Bank/count arguments through fixed OS zero-page cells
+(`$66`-`$6C`), not registers, unlike `DOS_ALLOC_MEM`/`DOS_FREE_MEM`. Two
+questions remain open for the user: the staging buffer's size (no existing
+buffer is safe to reuse — `CasmIoBuffer` stays reserved for source input),
+and whether a local bounds-violation should share `CASM_DIAG_VMM_TRANSFER_FAILED`
+with a genuine OS-level transfer rejection or needs its own value. WP24 plan:
+`brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
+Not yet active in Taskwarrior — awaiting the open-question answers and plan
+approval.
 
 ## C64 Hardware Gotchas (hard-won)
 

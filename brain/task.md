@@ -276,7 +276,14 @@
           dry-run PRG hash exactly; no-change rebuild stable across two more
           builds; both images pass
   - [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
-        replay; depends on WP23
+        replay; depends on WP23 (complete, unblocked)
+    - Detailed plan drafted: `brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`
+    - Reconciled a real gap: the Phase 0C.4 bounds-checking mandate has no
+      registry field to read a granted size from; proposed growing
+      `CASM_VMM_REC_SIZE` 3 -> 4 bytes (adds a page-count field), keeping
+      `resourceRegisterVmm` the sole registry writer
+    - Not yet active: awaiting user answers to two open questions (staging
+      buffer size; bounds-violation diagnostic reuse) and plan approval
   - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
         and completion gate; depends on WP24
 

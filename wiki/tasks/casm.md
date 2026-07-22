@@ -379,7 +379,15 @@ WP22 plan:
       WP23 is complete; WP24 (`228daccc`) is unblocked but requires its own
       separate plan approval before activation.
 - [ ] `228daccc-f389-48cf-bd52-9f1ac610234a`: WP24 windowed transfer and
-      replay.
+      replay. Detailed plan drafted:
+      `brain/plans/2026-07-21-casm-phase6-wp24-windowed-transfer-and-replay.md`.
+      Reconciled a real gap the WP22 freeze left open: the mandated
+      windowed-transfer bounds check has no registry field to read a granted
+      size from; proposed growing `CASM_VMM_REC_SIZE` from 3 to 4 bytes
+      (adds a page-count field) while keeping `resourceRegisterVmm` the
+      registry's sole writer. Not yet active — awaiting user answers to two
+      open questions (staging buffer size; bounds-violation diagnostic
+      reuse) and plan approval.
 - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
       and completion gate.
 

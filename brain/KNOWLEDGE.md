@@ -359,6 +359,17 @@ record that could be read alongside both namespaces.
   `_TRANSFER_FAILED`, the last raised only by WP24). Measured MAIN usage
   (10,647/10,752 bytes) fits the existing `$2A00` envelope with 105 bytes
   free — no size change, unlike the WP13/WP19 precedent of needing one.
+- **WP24 planning: the bounds-checking mandate has no field to read from
+  (reconciled, plan drafted).** The bullet above requires WP24 to
+  "independently track each allocation's granted size," but `CasmVmmRegistry`
+  still has no such field after WP23 — WP22 confirmed only that the
+  3-byte record is sufficient for allocation/free identity, not for
+  transfer bounds-checking, and left the latter unresolved. Not a
+  contradiction, just an open detail that fell to WP24 to close. Proposed
+  resolution (in the WP24 plan, pending approval): grow
+  `CASM_VMM_REC_SIZE` from 3 to 4 bytes, adding a granted-page-count field
+  computed identically to `vmmAlloc`'s own rounding, with
+  `resourceRegisterVmm` remaining the registry's sole writer.
 
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
