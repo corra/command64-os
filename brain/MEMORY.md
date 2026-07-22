@@ -241,6 +241,15 @@ R6 artifact has 1,268 relocation points. No zero-page or resource storage moved.
 User completion approval advanced the version-only final artifact to `0.1.21`
 build 1089 with segment and relocation measurements unchanged.
 
+CASM Phase 5 WP20 candidate build 1092 changes parser/emit CODE only: parser.o
+is 570 CODE / 6 BSS and emit.o is 460 CODE / 69 BSS. Total CODE+RODATA is 9,366
+bytes, BSS remains 1,143 bytes, and MAIN uses 10,509 of `$2A00`, leaving 243
+bytes at both bases. The R6 artifact has 1,271 relocation points. The separate
+`test_casm_expr` build 1003 uses 2,184 CODE+RODATA and 70 BSS bytes in a `$1000`
+envelope, leaving 1,842 bytes; it has no production resource storage.
+User completion approval advanced the version-only final CASM artifact to
+`0.1.22` build 1093 with segment and relocation measurements unchanged.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

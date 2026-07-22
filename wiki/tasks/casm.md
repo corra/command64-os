@@ -302,8 +302,12 @@ Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
       declaring the shared five-byte resolver callback output ABI. Candidate
       build 1088 passed both links and the test image with 298-byte headroom.
       User approved completion at `0.1.21` build 1089.
-- [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
-      fixture harness. Depends on WP19.
+- [x] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
+      fixture harness. Active on `feature/casm-phase5-wp20` from `56d8078` with
+      approved production adapter and standalone fixture-harness scope.
+      Candidate builds pass with 243-byte CASM headroom; user confirmed the
+      harness, trusted adapter reference, resolver failure, and cleanup matrix.
+      Completion approved at `0.1.22` build 1093.
 - [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
       and completion gate. Depends on WP20.
 

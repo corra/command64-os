@@ -176,8 +176,21 @@
     - [x] Dry-run `0.1.21.1089`; restored candidate `0.1.20.1088`
     - [x] User approved completion; final `0.1.21` build 1089 verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp19-symbol-resolver.md`
-  - [ ] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
+  - [x] `41d120ed-b550-4551-9694-e66bd6f65cef`: WP20 parser adapter and expression
         fixture harness; depends on WP19
+    - Active on `feature/casm-phase5-wp20` from WP19 commit `56d8078`
+    - Plan: `brain/plans/2026-07-21-casm-phase5-wp20-parser-adapter.md`
+    - Test plan: `brain/plans/2026-07-21-casm-phase5-wp20-test-plan.md`
+    - Baseline: `0.1.21.1089`, 298-byte `$2A00` MAIN headroom
+    - [x] Added exact 27-case evaluator/resolver test plan
+    - [x] Migrated parser and `.BYTE`/`.WORD` paths to expression adapter
+    - [x] Removed all `parseNumericValue` callers/export
+    - [x] Added standalone `test_casm_expr` and production adapter fixtures
+    - [x] Both CASM/test links and `test_image_d64` pass; CASM headroom 243 bytes
+    - [x] User confirmed harness, adapter reference, resolver failure, and cleanup
+    - [x] Dry-run `0.1.22.1093`; restored candidate `0.1.21.1092`
+    - [x] User approved completion; final `0.1.22` build 1093 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp20-parser-adapter.md`
   - [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
         and completion gate; depends on WP20
 

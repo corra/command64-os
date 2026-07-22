@@ -16,7 +16,8 @@
 
 .import lexerNext
 .import CasmTokenRecord
-.import exprParseNumeric
+.import exprEvaluate
+.import exprGetResult
 
 ; WP15 diagnostic context.
 .import diagSetLocFromToken
@@ -24,7 +25,7 @@
 
 .export CasmParserStmt
 .export parserParseStatement
-.export parseNumericValue
+.export parserParseExpressionValue
 
 .segment "BSS"
 
@@ -145,6 +146,12 @@ parseOperandSequence:
     beq posImmediateJmp
     cmp #CASM_TOKEN_NUMBER
     beq posAbsoluteJmp
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_LESS
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_GREATER
+    beq posAbsoluteJmp
     cmp #CASM_TOKEN_REGISTER
     beq posAccumulatorJmp
     cmp #CASM_TOKEN_LPAREN
@@ -172,25 +179,28 @@ posImmediate:
 @ok1:
     cmp #CASM_TOKEN_NUMBER
     beq posImmediateNumber
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_LESS
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_GREATER
+    beq posImmediateNumber
     jmp posSyntaxError
 posImmediateNumber:
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
     lda #CASM_OPKIND_IMMEDIATE
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
-    jmp posExpectTerminator
+    jmp posValidateTerminator
 
 posAbsolute:
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
-    jsr lexerNext
-    bcc @ok2
-    rts
-@ok2:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_NEWLINE
     beq posAbsoluteDone
     cmp #CASM_TOKEN_EOF
@@ -249,16 +259,19 @@ posIndirect:
 @ok1:
     cmp #CASM_TOKEN_NUMBER
     beq posIndirectNumber
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq posIndirectNumber
+    cmp #CASM_TOKEN_LESS
+    beq posIndirectNumber
+    cmp #CASM_TOKEN_GREATER
+    beq posIndirectNumber
     jmp posSyntaxError
 posIndirectNumber:
-    jsr parseNumericValue
+    jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
-    jsr lexerNext
-    bcc @ok2
-    rts
-@ok2:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_RPAREN
     beq posIndirectClose
     cmp #CASM_TOKEN_COMMA
@@ -334,6 +347,8 @@ posExpectTerminator:
     bcc @ok1
     rts
 @ok1:
+posValidateTerminator:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_NEWLINE
     beq posDone
     cmp #CASM_TOKEN_EOF
@@ -355,19 +370,49 @@ posSyntaxError:
     rts
 
 ; ---------------------------------------------------------------------------
-; parseNumericValue
-; Compatibility adapter for existing Phase 4 parser/emitter callers.
+; parserParseExpressionValue
+; Adapt the current Phase 5 expression into the Phase 4 statement value fields.
+; The production resolver rejects identifiers until Phase 6B provides symbols.
 ;
-; Inputs:    CasmTokenRecord/CasmTokenText hold a NUMBER token
-; Outputs:   C clear on success, ValLo/ValHi stored; C set with
-;            A = CASM_DIAG_OPERAND_OUT_OF_RANGE on overflow
-; Clobbers:  A, X, Y, expression numeric scratch
+; Inputs:    current token begins expression; D clear
+; Outputs:   success: ValLo/ValHi stored, following delimiter current, C clear
+;            failure: A = stable diagnostic, C set, statement value invalid
+; Preserves: V, D, I, balanced stack, resources and emitter state
+; Clobbers:  A, X, Y, N, Z, C, CasmPtr0, lexer/evaluator scratch and result
 ; ---------------------------------------------------------------------------
-parseNumericValue:
-    jsr exprParseNumeric
-    bcs pnvReturn
-    stx CasmParserStmt + CASM_PARSER_STMT_VAL_LO
-    sty CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+parserParseExpressionValue:
+    ; Preserve the expression start for post-evaluation width checks such as
+    ; .BYTE $100; exprEvaluate may leave NEWLINE/COMMA current on success.
+    jsr diagSetLocFromToken
+    ldx #<parserRejectIdentifier
+    ldy #>parserRejectIdentifier
+    jsr exprEvaluate
+    bcs pevReturn
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq pevUnresolved
+    ldy #CASM_EXPR_VAL_LO
+    lda (CasmPtr0Lo), y
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    iny
+    lda (CasmPtr0Lo), y
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     clc
-pnvReturn:
+pevReturn:
+    rts
+
+pevUnresolved:
+    lda #CASM_DIAG_RESOLVER_FAILED
+    sec
+    rts
+
+; Production Phase 5 has no symbol table. Keep the identifier current and fail
+; without manufacturing an identity or unresolved placeholder.
+parserRejectIdentifier:
+    lda #CASM_DIAG_RESOLVER_FAILED
+    sec
     rts

@@ -18,6 +18,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 5 WP20 expression adapter candidate**: routed instruction,
+  `.ORG`, `.BYTE`, and `.WORD` numeric-expression positions through the Phase 5
+  evaluator, retained production identifier rejection until Phase 6B, and added
+  a standalone 27-case `test_casm_expr` resolver/evaluator harness plus numeric
+  extraction and unresolved-identifier fixtures. Completion advanced CASM to
+  `0.1.22` build 1093.
+
 - **CASM Phase 5 WP19 expression resolver candidate**: added the shared
   five-byte resolver callback ABI and a production-neutral evaluator for numeric
   and identifier primaries, checked symbol addends, unresolved metadata, and

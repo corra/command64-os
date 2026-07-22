@@ -254,7 +254,14 @@ if(Ca65_FOUND)
         get_filename_component(TEST_NAME "${TEST_CA65_SRC}" NAME_WE)
         set(TEST_TARGET "test_${TEST_NAME}")
         set(TMP_CA65_SRCS_${TEST_NAME} "${CA65_SHARED_INCLUDES}")
-        add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "0700")
+        set(TEST_PRG_SIZE "0700")
+        if(TEST_NAME STREQUAL "casm_expr")
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
+        add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
     endforeach()
 else()
@@ -378,6 +385,9 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrd.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrh.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrb.seq"
+    # WP20 production expression-adapter fixtures
+    "${CASM_TEST_FIXTURE_DIR}/casmexprn.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmexpru.seq"
 )
 
 add_custom_command(
@@ -400,7 +410,7 @@ add_custom_target(casm_test_fixtures DEPENDS ${CASM_TEST_FIXTURES})
 # brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md.
 set(CASM_REF_DIR "${CMAKE_BINARY_DIR}/casm_refs")
 set(CASM_REF_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/tests/fixtures/casm")
-set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2)
+set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

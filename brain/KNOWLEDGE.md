@@ -261,6 +261,11 @@ This file serves as the shared repository for architectural decisions, technical
   uses a linker-asserted non-page-crossing private pointer. Unresolved values are
   never extracted as placeholder zero: only metadata is classified, with low
   extraction clearing relocatable and high extraction preserving it.
+- WP20's parser adapter stamps the expression-start diagnostic location before
+  evaluation, copies only RESOLVED values into `CasmParserStmt`, and leaves the
+  first delimiter current. Production identifiers deliberately resolve to `$27`
+  until Phase 6B; a separate test PRG supplies deterministic symbols without
+  adding fixture names or hidden syntax to CASM.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.

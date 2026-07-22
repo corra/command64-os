@@ -1,0 +1,6 @@
+# CASM WP20 trusted numeric-expression adapter reference: casmexprn
+# PRG header $C000, then immediate/zero-page/indirect-Y extraction and lists.
+# bytes: 14
+# sha256: 325b48c21115fa9ac006a6aabfeecee08171a5d93b6746e701007bbb97e612b9
+00 C0 A9 34 A5 12 B1 34
+34 12 34 00 12 00
