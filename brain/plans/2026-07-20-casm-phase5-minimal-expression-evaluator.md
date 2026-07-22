@@ -1,7 +1,7 @@
 ---
 feature: casm-phase5-minimal-expression-evaluator
 created: 2026-07-20
-status: planned
+status: complete
 ---
 
 # Plan: CASM Phase 5 Minimal Expression Evaluator
@@ -372,3 +372,11 @@ does not close Phase 4.
   predicted output-file deletion hazard was **falsified** — assembling over an
   existing output neither clobbers nor corrupts it. WP16's baseline references to
   `0.1.16` / build 1078 are superseded by `0.1.17` / 1079.
+
+- 2026-07-21: WP16-WP20 completed with user approval. WP21 independently
+  reconciled the parent matrix to 30 evaluator cases, verified both images and
+  unchanged production measurements, and received user confirmation for the
+  harness, all five trusted references, resolver failure, and cleanup. Phase 5
+  received explicit completion approval. Final CASM `0.1.23` build 1094 is
+  stable, both images pass, and WP21 closed before the Phase 5 parent. Phase 6A
+  remains inactive.

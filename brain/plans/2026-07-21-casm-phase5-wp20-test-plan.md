@@ -101,3 +101,10 @@ record bytes, final token, and resolver count.
 
 The broken `c64-testing` MCP and web emulators are prohibited. WP20 cannot be
 completed until the user confirms the local runtime matrix.
+
+## WP21 Coverage Addendum
+
+WP21 adds three parent-contract cases omitted by the original 27-case harness:
+`ABSVAL+0`, `ABSVAL-$0000`, and repeated extraction `<<$1234`. The final Phase 5
+harness therefore contains 30 cases. This addendum changes test coverage only;
+WP20's completed production implementation remains unchanged.

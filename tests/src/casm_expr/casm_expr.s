@@ -40,8 +40,9 @@ CASE_EXPECT_HI = 3
 CASE_DIAG      = 4
 CASE_FINAL     = 5
 CASE_CALLS     = 6
-CASE_SIZE      = 7
-CASE_COUNT     = 27
+CASE_COLUMN    = 7
+CASE_SIZE      = 8
+CASE_COUNT     = 30
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -82,10 +83,14 @@ caseLoop:
     iny
     lda (TableLo), y
     sta ExpectedCalls
+    iny
+    lda (TableLo), y
+    sta ExpectedColumn
 
     lda #0
     sta ResolverCalls
     sta DiagCalls
+    sta TokenOrdinal
     jsr lexerNext
     bcs caseFail
     ldx #<fixtureResolver
@@ -107,11 +112,6 @@ caseLoop:
     cmp #1
     bne caseFail
     lda CasmTokenRecord + CASM_TOKEN_REC_LINE_HI
-    bne caseFail
-    lda CaseIndex
-    clc
-    adc #1
-    cmp CasmTokenRecord + CASM_TOKEN_REC_COLUMN
     bne caseFail
     jmp checkCommon
 
@@ -137,6 +137,9 @@ checkCommon:
     bne caseFail
     lda ResolverCalls
     cmp ExpectedCalls
+    bne caseFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    cmp ExpectedColumn
     bne caseFail
     lda #$2E
     jsr KernalChROUT
@@ -194,9 +197,8 @@ lexerNext:
     sta CasmTokenRecord + CASM_TOKEN_REC_LINE_HI
     lda #1
     sta CasmTokenRecord + CASM_TOKEN_REC_LINE_LO
-    lda CaseIndex
-    clc
-    adc #1
+    inc TokenOrdinal
+    lda TokenOrdinal
     sta CasmTokenRecord + CASM_TOKEN_REC_COLUMN
     ldx #0
 copyToken:
@@ -352,6 +354,8 @@ ExpectedDiag:   .res 1
 ExpectedFinal:  .res 1
 ExpectedCalls:  .res 1
 ActualDiag:     .res 1
+ExpectedColumn: .res 1
+TokenOrdinal:   .res 1
 
 .segment "RODATA"
 passMsg: .byte "CASM EXPR: PASS", $0D, 0
@@ -395,6 +399,14 @@ sAbsSub: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
          T1 CASM_TOKEN_MINUS, 0, $2D
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$34"
          T0 CASM_TOKEN_EOF, 0
+sAbsZero: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
+          T1 CASM_TOKEN_PLUS, 0, $2B
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+          T0 CASM_TOKEN_EOF, 0
+sAbsNegZero: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
+             T1 CASM_TOKEN_MINUS, 0, $2D
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0000"
+             T0 CASM_TOKEN_EOF, 0
 sRelAdd: TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
          T1 CASM_TOKEN_PLUS, 0, $2B
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$100"
@@ -432,6 +444,9 @@ sNumSub: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
 sNoPrimary: T1 CASM_TOKEN_LESS, 0, $3C
             T0 CASM_TOKEN_NEWLINE, 0
+sRepeatExtract: T1 CASM_TOKEN_LESS, 0, $3C
+                T1 CASM_TOKEN_LESS, 0, $3C
+                TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$1234"
 sBadAdd: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
          T1 CASM_TOKEN_PLUS, 0, $2B
          T0 CASM_TOKEN_NEWLINE, 0
@@ -465,6 +480,7 @@ EXPECT eNHI, $12,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_HI, 0,0, 0,0,0
 EXPECT eAbs, $34,$12, $03, 0, 1,0, 0,0,0
 EXPECT eAbsAdd, $35,$12, $03, 0, 1,0, 0,1,0
 EXPECT eAbsSub, 0,$12, $03, 0, 1,0, 1,$34,0
+EXPECT eAbsNegZero, $34,$12, $03, 0, 1,0, 1,0,0
 EXPECT eRelAdd, 0,$21, $07, 0, 2,0, 0,0,$01
 EXPECT eRelLo, 0,0, $03, 1, 2,0, 0,0,0
 EXPECT eRelHi, $20,0, $07, 2, 2,0, 0,0,0
@@ -474,35 +490,38 @@ EXPECT eUnrLo, 0,0, $0A, 1, 3,0, 0,0,0
 EXPECT eUnrHi, 0,0, $0E, 2, 3,0, 0,0,0
 EXPECT eUna, 0,0, $0A, 0, 4,0, 0,5,0
 
-.macro CASE script, expect, diag, final, calls
+.macro CASE script, expect, diag, final, calls, column
     .word script, expect
-    .byte diag, final, calls
+    .byte diag, final, calls, column
 .endmacro
 caseTable:
-    CASE sN0, eN0, 0, CASM_TOKEN_NEWLINE, 0
-    CASE sNMAX, eNMAX, 0, CASM_TOKEN_EOF, 0
-    CASE sNLO, eNLO, 0, CASM_TOKEN_COMMA, 0
-    CASE sNHI, eNHI, 0, CASM_TOKEN_RPAREN, 0
-    CASE sAbs, eAbs, 0, CASM_TOKEN_NEWLINE, 1
-    CASE sAbsAdd, eAbsAdd, 0, CASM_TOKEN_EOF, 1
-    CASE sAbsSub, eAbsSub, 0, CASM_TOKEN_EOF, 1
-    CASE sRelAdd, eRelAdd, 0, CASM_TOKEN_EOF, 1
-    CASE sRelLo, eRelLo, 0, CASM_TOKEN_EOF, 1
-    CASE sRelHi, eRelHi, 0, CASM_TOKEN_EOF, 1
-    CASE sUnrAdd, eUnrAdd, 0, CASM_TOKEN_EOF, 1
-    CASE sUnrSub, eUnrSub, 0, CASM_TOKEN_EOF, 1
-    CASE sUnrLo, eUnrLo, 0, CASM_TOKEN_EOF, 1
-    CASE sUnrHi, eUnrHi, 0, CASM_TOKEN_EOF, 1
-    CASE sUna, eUna, 0, CASM_TOKEN_EOF, 1
-    CASE sNumAdd, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 0
-    CASE sNumSub, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_MINUS, 0
-    CASE sNoPrimary, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 0
-    CASE sBadAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 1
-    CASE sSymAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_IDENTIFIER, 1
-    CASE sChain, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 1
-    CASE sAdjNum, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_NUMBER, 1
-    CASE sAdjId, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_IDENTIFIER, 1
-    CASE sOver, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1
-    CASE sUnder, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1
-    CASE sUnknown, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1
-    CASE sBadFlag, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1
+    CASE sN0, eN0, 0, CASM_TOKEN_NEWLINE, 0, 2
+    CASE sNMAX, eNMAX, 0, CASM_TOKEN_EOF, 0, 2
+    CASE sNLO, eNLO, 0, CASM_TOKEN_COMMA, 0, 3
+    CASE sNHI, eNHI, 0, CASM_TOKEN_RPAREN, 0, 3
+    CASE sAbs, eAbs, 0, CASM_TOKEN_NEWLINE, 1, 2
+    CASE sAbsAdd, eAbsAdd, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sAbsSub, eAbsSub, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sAbsZero, eAbs, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sAbsNegZero, eAbsNegZero, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sRelAdd, eRelAdd, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sRelLo, eRelLo, 0, CASM_TOKEN_EOF, 1, 3
+    CASE sRelHi, eRelHi, 0, CASM_TOKEN_EOF, 1, 3
+    CASE sUnrAdd, eUnrAdd, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sUnrSub, eUnrSub, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sUnrLo, eUnrLo, 0, CASM_TOKEN_EOF, 1, 3
+    CASE sUnrHi, eUnrHi, 0, CASM_TOKEN_EOF, 1, 3
+    CASE sUna, eUna, 0, CASM_TOKEN_EOF, 1, 4
+    CASE sNumAdd, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 0, 2
+    CASE sNumSub, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_MINUS, 0, 2
+    CASE sNoPrimary, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 0, 2
+    CASE sRepeatExtract, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_LESS, 0, 2
+    CASE sBadAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 1, 3
+    CASE sSymAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_IDENTIFIER, 1, 3
+    CASE sChain, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 1, 4
+    CASE sAdjNum, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_NUMBER, 1, 2
+    CASE sAdjId, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_IDENTIFIER, 1, 2
+    CASE sOver, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3
+    CASE sUnder, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3
+    CASE sUnknown, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1
+    CASE sBadFlag, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1

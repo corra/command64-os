@@ -18,6 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 5 WP21 verification and closeout**: expanded the standalone
+  expression harness from 27 to 30 cases with positive zero, negative zero, and
+  repeated-extraction coverage, plus exact offending-token column checks. The
+  completed Phase 5 advanced CASM to `0.1.23` build 1094 without changing
+  production behavior or storage.
+
 - **CASM Phase 5 WP20 expression adapter candidate**: routed instruction,
   `.ORG`, `.BYTE`, and `.WORD` numeric-expression positions through the Phase 5
   evaluator, retained production identifier rejection until Phase 6B, and added

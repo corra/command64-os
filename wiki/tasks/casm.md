@@ -308,14 +308,18 @@ Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
       Candidate builds pass with 243-byte CASM headroom; user confirmed the
       harness, trusted adapter reference, resolver failure, and cleanup matrix.
       Completion approved at `0.1.22` build 1093.
-- [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
-      and completion gate. Depends on WP20.
+- [x] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
+      and completion gate. Active on `feature/casm-phase5-wp21` from `8afb438`.
+      Thirty-case harness, independent audit, and both images pass; consolidated
+      runtime gate passed with all five references and cleanup confirmed. The
+      `0.1.23.1094` dry run passed and was restored for approval. User approved
+      completion; final `0.1.23` build 1094 is stable and both images pass.
 
 ## Phase 5 Acceptance
 
 - [x] Phase 0C.3 contract and task hierarchy are frozen by WP16.
-- [ ] Expression ABI and storage remain bounded within the approved MAIN area.
-- [ ] Numeric behavior remains byte-compatible with Phase 4.
-- [ ] Resolved, unresolved, relocatable, extraction, and addend cases pass.
-- [ ] Existing Phase 4 reference programs remain byte-identical.
-- [ ] User completes the WP21 runtime walkthrough and approves Phase 5.
+- [x] Expression ABI and storage remain bounded within the approved MAIN area.
+- [x] Numeric behavior remains byte-compatible with Phase 4.
+- [x] Resolved, unresolved, relocatable, extraction, and addend cases pass.
+- [x] Existing Phase 4 reference programs remain byte-identical.
+- [x] User completed the WP21 runtime walkthrough and approved Phase 5.

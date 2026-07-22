@@ -250,6 +250,14 @@ envelope, leaving 1,842 bytes; it has no production resource storage.
 User completion approval advanced the version-only final CASM artifact to
 `0.1.22` build 1093 with segment and relocation measurements unchanged.
 
+CASM Phase 5 WP21 verification leaves production CASM unchanged at 9,366
+CODE+RODATA, 1,143 BSS, 10,509 of `$2A00` MAIN, 243 bytes headroom, and 1,271
+relocations. The expanded 30-case `test_casm_expr` build 1005 uses 2,310
+CODE+RODATA and 72 BSS bytes in its `$1000` envelope, leaving 1,714 bytes, with
+296 relocations. No production memory region, zero page, or resource changed.
+User completion approval advanced the version-only final CASM artifact to
+`0.1.23` build 1094 with segment and relocation measurements unchanged.
+
 Carried forward to Phase 11 hardening, none blocking: `CasmOutputCreated` is set
 on any successful write-mode open, so it conflates "CASM created this file" with
 "CASM opened an existing one" — assembling over an existing output is safe today

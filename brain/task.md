@@ -121,7 +121,7 @@
   - [x] Increment 10: user approved Phase 4 done on 2026-07-21
   - Walkthrough: `brain/walkthroughs/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`
 
-- [/] Taskwarrior (`6b72d639-53d0-4d1a-92ba-8c4d56096388`): CASM Phase 5
+- [x] Taskwarrior (`6b72d639-53d0-4d1a-92ba-8c4d56096388`): CASM Phase 5
       minimal expression evaluator
   - Parent plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
   - [x] `0062fd20-929d-4ffd-a2b5-032db5ec4109`: WP16 prerequisite
@@ -191,8 +191,19 @@
     - [x] Dry-run `0.1.22.1093`; restored candidate `0.1.21.1092`
     - [x] User approved completion; final `0.1.22` build 1093 verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp20-parser-adapter.md`
-  - [ ] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
+  - [x] `225a69ce-b46c-404d-a86b-d2c4494e9c3f`: WP21 verification, walkthrough,
         and completion gate; depends on WP20
+    - Active on `feature/casm-phase5-wp21` from WP20 commit `8afb438`
+    - Plan: `brain/plans/2026-07-21-casm-phase5-wp21-verification-closeout.md`
+    - Coverage gaps: positive zero, negative zero, repeated extraction
+    - [x] Expanded harness to 30 cases with exact token-column checks
+    - [x] Independent carry/stack/token/unresolved audit found no contract defect
+    - [x] CASM/harness no-change builds and both relocation bases pass
+    - [x] Test and release images pass with correct inventories
+    - [x] User confirmed 30-case harness, five references, and cleanup matrix
+    - [x] Dry-run `0.1.23.1094`; restored candidate `0.1.22.1093`
+    - [x] User approved completion; final `0.1.23` build 1094 verified
+    - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp21-verification-closeout.md`
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

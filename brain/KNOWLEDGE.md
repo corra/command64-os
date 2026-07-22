@@ -266,6 +266,12 @@ This file serves as the shared repository for architectural decisions, technical
   first delimiter current. Production identifiers deliberately resolve to `$27`
   until Phase 6B; a separate test PRG supplies deterministic symbols without
   adding fixture names or hidden syntax to CASM.
+- WP21 closes the parent expression matrix with explicit `+0`, `-$0000`, and
+  repeated-extraction cases. Negative zero preserves a negative sign with zero
+  magnitude while leaving the resolved value unchanged. Harness tokens use
+  distinct columns so diagnostics certify the exact offending token position.
+  User-approved Phase 5 completion is CASM `0.1.23` build 1094; Phase 6A remains
+  inactive.
 - Phase 3 accepts one top-level source file, reuses the managed 256-byte input
   buffer, and bounds physical input and line numbers to checked 16-bit values.
 - Source identity begins with file ID zero and the original source filename.
