@@ -388,34 +388,54 @@ complete; WP25 (`544a04bd`) is unblocked but requires its own separate plan
 approval before activation.
 
 **CASM Phase 6A WP25 verification, walkthrough, and completion gate**
-(plan drafted, pending approval): drafted on `feature/casm-phase6-wp25`
-from `feature/casm-phase6-wp24` at `3ac7dd1`, baseline `0.1.26` build 1099.
-Reconciled three things before drafting: (1) `wiki/tasks/casm.md`'s Phase
-6A Acceptance checklist still showed WP23's and WP24's completed work as
-unchecked — fixed directly on this branch; (2) a test-harness build hazard:
-importing `resourceRegisterVmm` pulls in the whole `resources.o`, whose
-`exitSuccess`/`exitFatal` reference `diagPrintFatal`
-(`diagnostics.s`), which itself transitively needs `lexer.s`/`source.s` —
-so the WP25 test driver must export its own stub `diagPrintFatal`, exactly
-matching how WP20's `casm_expr.s` already stubbed lexer/diagnostic symbols
-`expr.s` needed rather than importing the real modules; (3) WP22's fixture
-matrix described `vmmwrite1`/`vmmread1` reading back "via a different
-staging buffer," but WP24 deliberately built a single shared
-`CasmVmmBuffer` (matching `CasmIoBuffer`'s precedent) — the test instead
-keeps its own reference-pattern copy outside `CasmVmmBuffer` and compares
-against that, the same technique `vmmReplay` itself already uses. Also
-found that `vmmalloc4` ("REU exhaustion") is not reachable through normal
-allocation calls: the OS's MCT tracks 4096 pages (16MB) independent of the
-REU's real physical size, and CASM's own registry caps total usage at
-512KB (128 pages) — nowhere near enough to mark the MCT full. Two
-questions are open for the user: whether to construct this fixture by
-having the test's own code deliberately pre-fill the MCT (a documented,
-fixed OS structure) to simulate exhaustion, or document it as manually
-deferred alongside `vmmnoreu`; and confirming the `casm_vmm`/
-`test_casm_vmm` naming and starting PRG size. WP25 plan:
-`brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`. Not yet
-active in Taskwarrior — awaiting the open-question answers and plan
-approval.
+(pending completion approval): active on `feature/casm-phase6-wp25` from
+`3fd1f10`, baseline `0.1.26` build 1099. Planning reconciled three things:
+(1) `wiki/tasks/casm.md`'s Phase 6A Acceptance checklist still showed
+WP23's and WP24's completed work as unchecked — fixed directly; (2) a
+test-harness build hazard: importing `resourceRegisterVmm` pulls in the
+whole `resources.o`, whose `exitSuccess`/`exitFatal` reference
+`diagPrintFatal` (`diagnostics.s`), which itself transitively needs
+`lexer.s`/`source.s` — solved by having the WP25 test driver export its own
+stub `diagPrintFatal`, exactly matching how WP20's `casm_expr.s` already
+stubbed lexer/diagnostic symbols `expr.s` needed; (3) WP22's fixture matrix
+described `vmmwrite1`/`vmmread1` reading back "via a different staging
+buffer," but WP24 deliberately built a single shared `CasmVmmBuffer` — the
+test instead keeps its own reference-pattern copy outside `CasmVmmBuffer`
+and compares against that. `vmmalloc4`/`vmmnoreu` are manually deferred:
+CASM's own 512KB registry cap can never mark the OS's 16MB-tracked MCT
+full through normal calls, and the harness has no per-run REU toggle.
+
+Implemented `tests/src/casm_vmm/casm_vmm.s` (7 automated fixtures). This was
+the *first real execution* of any of WP23/WP24's code — both explicitly
+deferred a real call site — and it found three defects no static review or
+build had caught: (1) the test itself expected the wrong diagnostic from a
+full-registry 9th allocation (`CASM_DIAG_REGISTRY_FULL` vs.
+`vmmStoreAlloc`'s actual `CASM_DIAG_VMM_ALLOC_FAILED`), which masked the
+free loop and cascaded into 5 more failures; (2) `vwPrepareTransfer`
+(`vmm_store.s`) rejected the valid exact-65536-byte boundary transfer,
+since the offset+count 16-bit add wraps to zero with carry set at exactly
+that boundary, indistinguishable from a genuine overflow by carry alone —
+fixed by checking whether the wrapped remainder is zero; (3) `vmmReplay`
+stashed its slot in `CasmValue0Lo`, which `vwPrepareTransfer` (called
+internally by both of `vmmReplay`'s own calls) also uses as its own
+offset+count scratch — the same class of shared zero-page clobber bug WP23
+already caught twice (`vmmStoreFree`, `resourcesCleanup`'s VMM loop), now a
+third time; fixed by moving the stash to `CasmValue1Lo`. Live VICE
+debugging proved too fragile to trust in this session (a stray leftover
+breakpoint from an earlier attempt silently paused a "fresh" run, and an
+improvised direct-PC-jump bypassing the shell's loader produced misleading
+state — both self-inflicted); switched to adding temporary per-step
+diagnostic instrumentation to the failing fixture instead, which isolated
+bug 3 without further live stepping, then removed it once confirmed fixed.
+User approved fixing all three in place rather than opening a separate
+remediation plan. All 7 automated fixtures pass; completion dry-run
+`0.1.27.1102` verified (2-byte diff, no-change rebuild stable); baseline
+`0.1.26.1101` restored exactly via `git checkout`. WP25 plan:
+`brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`;
+walkthrough:
+`brain/walkthroughs/2026-07-21-casm-phase6-wp25-verification-closeout.md`.
+Awaiting user approval of the walkthrough and completion (which also closes
+the CASM Phase 6A milestone).
 
 ## C64 Hardware Gotchas (hard-won)
 

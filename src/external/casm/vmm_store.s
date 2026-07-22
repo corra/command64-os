@@ -200,16 +200,22 @@ vsfFreeFailed:
 ; freed/unregistered slot has nothing to transfer against -- matches
 ; vmmfree1's fixture intent of rejecting stale handles via CASM's own
 ; registry state, not chance REU contents); the byte count fits the fixed
-; CasmVmmBuffer; offset+count does not overflow 16 bits; and the transfer
-; fits within the slot's granted page count. All four are CASM-internal
-; rejections, never forwarded to DOS_VMM_READ/DOS_VMM_WRITE.
+; CasmVmmBuffer; offset+count exceeding 65536 (truly out of range, not the
+; exact-cap boundary -- see below); and the transfer fits within the slot's
+; granted page count. All four are CASM-internal rejections, never
+; forwarded to DOS_VMM_READ/DOS_VMM_WRITE.
 ;
 ; The offset+count -> page-count comparison avoids ever representing 65536
 ; (the addressing cap) as a 16-bit value, the same hazard vmmStoreAlloc's
 ; rounding worked around: NeededPages = ceil((offset+count) / 4096) is
 ; computed as (top nibble of the 16-bit sum) + (1 if the low 12 bits are
 ; nonzero), which stays in 0-16 for any 16-bit sum and never needs to add a
-; rounding constant that could itself overflow.
+; rounding constant that could itself overflow. The offset+count add itself
+; can overflow 16 bits at exactly the cap (65536 wraps to zero with carry
+; set) -- a real WP25 fixture run caught an earlier version of this routine
+; treating that wrap as a rejection, when a wrapped remainder of exactly
+; zero is the one case that means the true sum is exactly 65536 (valid);
+; only a nonzero wrapped remainder means the sum truly exceeds the cap.
 ;
 ; Inputs:  X = registry slot; CasmVmmOffLo/OffHi = offset; CasmIoLenLo/Hi =
 ;          byte count
@@ -239,7 +245,10 @@ vwPrepareTransfer:
     lda CasmVmmRegistry + CASM_VMM_REC_FLAG, y
     beq vwRejected
 
-    ; offset + count must not overflow 16 bits.
+    ; offset + count: a 16-bit add can overflow at exactly the 65536-byte
+    ; cap (offset+count == 65536 wraps to zero with carry set) -- that is a
+    ; valid maximal transfer, not an out-of-range one. Only a *nonzero*
+    ; wrapped remainder means the true sum exceeds the cap.
     lda CasmVmmOffLo
     clc
     adc CasmIoLenLo
@@ -247,8 +256,15 @@ vwPrepareTransfer:
     lda CasmVmmOffHi
     adc CasmIoLenHi
     sta CasmValue0Hi
-    bcs vwRejected
+    bcc vwNoOverflow
 
+    lda CasmValue0Lo
+    ora CasmValue0Hi
+    bne vwRejected
+    lda #16
+    jmp vwPagesReady
+
+vwNoOverflow:
     ; NeededPages = ceil((offset+count) / 4096).
     lda CasmValue0Hi
     and #$0F
@@ -361,10 +377,18 @@ vwOsFailed:
 ; Outputs: C clear on success (CasmVmmBuffer holds the round-tripped read);
 ;          C set and A = CASM_DIAG_VMM_TRANSFER_FAILED if either the write
 ;              or the read-back was rejected
-; Clobbers: A, X, Y and OS API-defined volatile registers
+; Clobbers: A, X, Y, CasmValue1Lo, and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 vmmReplay:
-    stx CasmValue0Lo            ; preserve the slot across both calls
+    ; Stash the slot in CasmValue1Lo, not CasmValue0Lo: vmmWindowWrite calls
+    ; vwPrepareTransfer internally, which uses CasmValue0Lo/Hi as its own
+    ; offset+count scratch and documents both as clobbered. A first real run
+    ; of this routine caught an earlier version stashing into CasmValue0Lo,
+    ; which vwPrepareTransfer's first call promptly overwrote (with the
+    ; 16-bit offset+count sum), so the second call read back a corrupted,
+    ; out-of-range "slot" and vwPrepareTransfer's own bounds check correctly
+    ; rejected it.
+    stx CasmValue1Lo
     jsr vmmWindowWrite
     bcs vrDone
 
@@ -381,7 +405,7 @@ vrZeroLoop:
     jmp vrZeroLoop
 vrZeroDone:
 
-    ldx CasmValue0Lo            ; restore the slot
+    ldx CasmValue1Lo            ; restore the slot
     jsr vmmWindowRead
 vrDone:
     rts

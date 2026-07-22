@@ -401,16 +401,27 @@ WP22 plan:
       dry-run PRG hash exactly; no-change rebuild stable; both images pass.
       WP24 is complete; WP25 (`544a04bd`) is unblocked but requires its own
       separate plan approval before activation.
-- [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
-      and completion gate. Detailed plan drafted:
+- [x] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
+      and completion gate. Plan approved as drafted:
       `brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`.
-      Reconciled the stale acceptance checklist above and a test-harness
-      build-dependency hazard (must stub `diagPrintFatal`, matching WP20's
-      lexer-stub precedent for `expr.s`). Found `vmmalloc4` (REU exhaustion)
-      is not reachable through normal allocation calls given CASM's own
-      512KB cap against a 16MB-tracked MCT. Not yet active — awaiting user
-      answers to two open questions (`vmmalloc4` construction; test target
-      naming/size) and plan approval.
+      Active on `feature/casm-phase6-wp25` from `3fd1f10`, CASM `0.1.26`
+      build 1099 baseline. Reconciled the stale acceptance checklist above
+      and a test-harness build-dependency hazard (must stub
+      `diagPrintFatal`, matching WP20's lexer-stub precedent for `expr.s`).
+      `vmmalloc4` (REU exhaustion) and `vmmnoreu` documented as manually
+      deferred rather than automated. Implemented `tests/src/casm_vmm/casm_vmm.s`
+      (7 automated fixtures) — the first real execution of WP23/WP24's code,
+      which found and fixed 3 defects: a wrong diagnostic expectation in the
+      test's own `vmmalloc3` case, and two real `vmm_store.s` bugs
+      (`vwPrepareTransfer` rejecting the valid exact-65536-byte boundary;
+      `vmmReplay` clobbering its stashed slot via a zero-page cell
+      `vwPrepareTransfer` also uses — the same shared-scratch bug class WP23
+      caught twice already). All fixed with explicit user approval to fix in
+      place. All 7 fixtures pass. Walkthrough:
+      `brain/walkthroughs/2026-07-21-casm-phase6-wp25-verification-closeout.md`.
+      User approved completion. Final `0.1.27` build 1102 matches the
+      dry-run PRG hash exactly; no-change rebuild stable; both images pass.
+      **WP25 is complete, and with it the CASM Phase 6A milestone.**
 
 ## Phase 6A Acceptance
 
@@ -418,14 +429,20 @@ WP22 plan:
 - [x] Real `DOS_ALLOC_MEM`/`DOS_FREE_MEM` wiring replaces `cleanupVmmStub`
       (WP23).
 - [x] Windowed `DOS_VMM_READ`/`DOS_VMM_WRITE` transfers are bounds-checked by
-      CASM against each allocation's granted size (WP24).
-- [ ] Bounded VMM records are written, read, and replayed without depending
-      on source or symbol semantics (code exists since WP24; runtime
-      verification is WP25's job).
-- [ ] No-REU and allocation-exhaustion diagnostics are stable and exit
-      cleanly with no partial ownership.
-- [ ] User completes the WP25 runtime walkthrough and approves CASM
-      Phase 6A.
+      CASM against each allocation's granted size (WP24, defect-fixed by
+      WP25).
+- [x] Bounded VMM records are written, read, and replayed without depending
+      on source or symbol semantics. Verified by WP25's `test_casm_vmm`
+      fixture matrix (`vmmreplay1` covers write/read/replay together); all
+      7 automated cases pass in VICE.
+- [/] Allocation-exhaustion (registry-full) diagnostics are stable and exit
+      cleanly with no partial ownership, verified by `vmmalloc3`. No-REU
+      (`vmmnoreu`) and real REU-capacity exhaustion (`vmmalloc4`) remain
+      manually deferred, not automated — the supported harness has no
+      per-run REU toggle, and CASM's own 512KB registry cap can never mark
+      the OS's 16MB-tracked MCT full through normal calls.
+- [x] User completed the WP25 runtime walkthrough and approved CASM
+      Phase 6A. **CASM Phase 6A is complete.**
 
 CASM Phase 6B (symbol table and two-pass assembly) remains a separately
 gated phase; its work packages (WP26-WP31) are reserved in the parent plan

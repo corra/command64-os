@@ -205,10 +205,11 @@
     - [x] User approved completion; final `0.1.23` build 1094 verified
     - Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase5-wp21-verification-closeout.md`
 
-- [/] Taskwarrior (`d68e6c58-ac89-44f4-81a2-40b14093585b`): CASM Phase 6A VMM
-      storage foundation. CASM-local phase numbering; distinct from the
-      unrelated, already-completed top-level "Phase 6A/6B" elsewhere in
-      `brain/KNOWLEDGE.md` — always write "CASM Phase 6A" in full.
+- [x] Taskwarrior (`d68e6c58-ac89-44f4-81a2-40b14093585b`): CASM Phase 6A VMM
+      storage foundation (complete). CASM-local phase numbering; distinct
+      from the unrelated, already-completed top-level "Phase 6A/6B"
+      elsewhere in `brain/KNOWLEDGE.md` — always write "CASM Phase 6A" in
+      full.
   - Parent plan: `brain/plans/2026-07-21-casm-phase6-vmm-storage-and-symbol-table.md`
   - [x] `eb7541e5-c3aa-4528-bdcd-2571d96688d9`: WP22 prerequisite
         reconciliation and Phase 0C.4 freeze
@@ -309,9 +310,14 @@
     - [x] Final verified increment applied: `0.1.26` build 1099 matches the
           dry-run PRG hash exactly; no-change rebuild stable across two more
           builds; both images pass
-  - [ ] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
-        and completion gate; depends on WP24 (complete, unblocked)
-    - Detailed plan drafted: `brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`
+  - [x] `544a04bd-4ccb-47c6-9013-8af57aa37353`: WP25 verification, walkthrough,
+        and completion gate
+    - Detailed plan: `brain/plans/2026-07-21-casm-phase6-wp25-verification-closeout.md`
+    - User approved the plan as drafted, including both resolved open
+      questions (`vmmalloc4`/`vmmnoreu` manually deferred; `casm_vmm`/
+      `test_casm_vmm` naming/size confirmed)
+    - Active on `feature/casm-phase6-wp25` from `3fd1f10`; baseline CASM
+      `0.1.26` build 1099
     - Reconciled: stale acceptance checklist (WP23/WP24 items were
       unchecked, now fixed), a test-harness build-dependency hazard (must
       stub `diagPrintFatal` like WP20 did for lexer symbols instead of
@@ -319,12 +325,25 @@
       `lexer.s`/`source.s`), and a wording mismatch between WP22's fixture
       matrix ("a different staging buffer") and WP24's actual single
       `CasmVmmBuffer` design
-    - Found `vmmalloc4` (REU exhaustion) is not reachable through normal
-      allocation calls: CASM's own 512KB cap can never mark enough of the
-      16MB-tracked MCT to trigger genuine `VMM_ERR_NOMEM`
-    - Not yet active: awaiting user answers to two open questions
-      (`vmmalloc4` construction approach; test target naming/size) and plan
-      approval
+    - [x] Created `tests/src/casm_vmm/casm_vmm.s` (7 automated fixtures:
+          `vmmalloc1-3`, `vmmreplay1` covering write/read/replay,
+          `vmmoffset1`, `vmmbounds1`, `vmmfree1`); `vmmalloc4`/`vmmnoreu`
+          documented as manually deferred
+    - [x] First real run of WP23/WP24's code found three defects: a wrong
+          test expectation in `vmmalloc3` (`CASM_DIAG_REGISTRY_FULL` vs.
+          `vmmStoreAlloc`'s actual `CASM_DIAG_VMM_ALLOC_FAILED`), and two
+          production bugs in `vmm_store.s` — `vwPrepareTransfer` rejecting
+          the valid exact-65536-byte boundary case, and `vmmReplay` stashing
+          its slot in a zero-page cell `vwPrepareTransfer` itself clobbers
+          (the same shared-scratch bug class WP23 caught twice already).
+          All three fixed with explicit user approval to fix in place
+    - [x] All 7 automated fixtures pass in VICE after the fixes
+    - [x] Phase 6A Acceptance checklist closed out in `wiki/tasks/casm.md`
+          based on the actual runtime result
+    - [x] Walkthrough: `brain/walkthroughs/2026-07-21-casm-phase6-wp25-verification-closeout.md`
+    - [x] User approved completion; final `0.1.27` build 1102 matches the
+          dry-run PRG hash exactly; no-change rebuild stable; both images
+          pass. **WP25 complete; CASM Phase 6A milestone complete.**
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

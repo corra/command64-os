@@ -1,7 +1,7 @@
 ---
 feature: casm-phase6-wp25-verification-closeout
 created: 2026-07-22
-status: planned
+status: complete
 ---
 
 # Plan: CASM Phase 6A WP25 - Verification, Walkthrough, and Completion Gate
@@ -68,6 +68,48 @@ of this plan is required before activation or source edits, per the CASM
   bookkeeping is independent of physical REU capacity). Resolved below:
   documented as manually deferred rather than automated.
 
+### Real Defects Caught by the First Runtime Matrix
+
+WP23/WP24's code had never actually executed before this WP25 fixture ran
+for the first time (both explicitly deferred a real call site). The first
+real run found three defects — two in production `vmm_store.s` code, one in
+the test itself — none caught by static review or the ca65/ld65 build:
+
+- **Test defect (`vmmalloc3`).** The fixture expected a 9th allocation
+  against a full registry to return `CASM_DIAG_REGISTRY_FULL`, but
+  `vmmStoreAlloc` deliberately collapses that into `CASM_DIAG_VMM_ALLOC_FAILED`
+  (freeing the just-granted OS memory again first), per its own documented
+  WP23 ABI — `CASM_DIAG_REGISTRY_FULL` is `resourceRegisterVmm`'s internal
+  code, never surfaced by `vmmStoreAlloc` itself. The wrong expectation made
+  the fixture bail out before its free loop ran, permanently leaking all 8
+  slots and cascading into every fixture after it failing (`..fffff`).
+  Fixed by correcting the test's expectation; production code was already
+  right. User approved fixing this within WP25.
+- **Production defect (`vwPrepareTransfer`, `vmm_store.s`).** The
+  offset+count 16-bit overflow check rejected the exact-65536-byte boundary
+  case (a full-cap allocation's last valid window) along with genuinely
+  out-of-range requests, because both wrap the 16-bit add and set carry.
+  Fixed by checking whether the wrapped remainder is exactly zero (valid,
+  true sum was exactly 65536) versus nonzero (true sum exceeds the cap).
+  User approved fixing this within WP25 rather than opening a separate
+  remediation plan, given the narrow, well-understood scope.
+- **Production defect (`vmmReplay`, `vmm_store.s`).** Stashed the input
+  slot in `CasmValue0Lo` across its two internal calls to
+  `vmmWindowWrite`/`vmmWindowRead` — but both call `vwPrepareTransfer`,
+  which documents `CasmValue0Lo`/`CasmValue0Hi` as its own clobbered
+  offset+count scratch. The first call's `vwPrepareTransfer` overwrote the
+  stashed slot with the offset+count sum, so the second call read back a
+  corrupted, out-of-range "slot" that `vwPrepareTransfer`'s own bounds
+  check correctly rejected. The exact same class of shared-scratch bug WP23
+  already caught twice (`vmmStoreFree`, `resourcesCleanup`'s VMM loop), now
+  found a third time in `vmmReplay`. Fixed by stashing in `CasmValue1Lo`
+  instead, which neither `vwPrepareTransfer` nor its callees touch. Found
+  by adding temporary per-step diagnostic instrumentation to the failing
+  fixture (printing which internal check failed) after live VICE debugging
+  proved too fragile to trust in this session (a stray leftover breakpoint
+  and an improvised direct-PC-jump both produced misleading state); the
+  instrumentation was removed once the bug was confirmed fixed.
+
 ## Inherited Contract
 
 - Phase 0C.4 VMM record model and failure contract, frozen in
@@ -98,8 +140,14 @@ Included:
      match the just-freed page (proves `DOS_FREE_MEM` actually marked the
      MCT free, not just cleared CASM's registry); free again.
   3. `vmmalloc3` — allocate 8 small (1-page) requests to fill the registry;
-     verify a 9th returns `CASM_DIAG_REGISTRY_FULL` unchanged; free all 8,
-     restoring a clean registry for the remaining cases.
+     verify a 9th returns `CASM_DIAG_VMM_ALLOC_FAILED` (`vmmStoreAlloc`
+     deliberately collapses a registry-full `resourceRegisterVmm` rejection
+     into the same public diagnostic as an OS-level allocation failure, per
+     its WP23 ABI — `CASM_DIAG_REGISTRY_FULL` is `resourceRegisterVmm`'s own
+     internal-boundary code, not `vmmStoreAlloc`'s; a first real run of this
+     fixture caught an earlier draft expecting the wrong one, which masked
+     the free loop below and cascaded into every later fixture failing);
+     free all 8, restoring a clean registry for the remaining cases.
   4. `vmmwrite1`/`vmmread1`/`vmmreplay1` — allocate one small region; write
      a known pattern (kept in the test driver's own memory, not
      `CasmVmmBuffer`) via `vmmWindowWrite`; separately zero `CasmVmmBuffer`
@@ -153,6 +201,7 @@ Excluded:
 | `tests/src/casm_vmm/casm_vmm.s` | create: fixture driver |
 | `tests/src/casm_vmm/BUILD_TEST_CASM_VMM` | create: build counter (required by `add_ca65_app`) |
 | `CMakeLists.txt` | add the `casm_vmm` special case to the `TEST_CA65_SRCS` loop |
+| `src/external/casm/vmm_store.s` | unplanned: fix two real defects (`vwPrepareTransfer`'s exact-cap overflow rejection; `vmmReplay`'s clobbered slot stash) the first runtime matrix caught |
 | `src/external/casm/casm.s` | stage increment only at completion |
 | `src/external/casm/BUILD_CASM` | build-managed increment |
 | `wiki/tasks/casm.md` | Phase 6A Acceptance closeout; already partially reconciled on this branch |
@@ -161,10 +210,11 @@ Excluded:
 | `CHANGELOG.md` | synchronize status and functional record |
 | `brain/walkthroughs/2026-07-21-casm-phase6-wp25-verification-closeout.md` | verification walkthrough with the full runtime matrix |
 
-No `vmm_store.s`, `resources.s`, or `common.inc` change is expected. Any
-discovery that the production ABI needs to change stops WP25 for an
-amended plan (that would mean WP23/WP24 shipped a defect, not a WP25
-scoping issue).
+`resources.s`/`common.inc` did not need to change; `vmm_store.s` needed two
+narrow bug fixes (see Reconciliation Findings), each explicitly approved
+in place rather than triggering the "stop for an amended plan" gate below,
+since both were small, well-understood corrections to arithmetic
+correctness rather than ABI or scope changes.
 
 ## Atomic Increments
 
@@ -210,16 +260,19 @@ precedent (a test driver, not a production app).
 
 ## Stop and Completion Gates
 
-Stop if WP24 is not complete and approved, if any fixture reveals a defect
-in `vmmStoreAlloc`/`vmmStoreFree`/`vmmWindowRead`/`vmmWindowWrite`/
-`vmmReplay` (that is a production bug, not a WP25 scoping question, and
-needs its own remediation plan), or if the `vmmalloc4`/`vmmnoreu`
-deferral reasoning turns out wrong (e.g., REU can in fact be toggled
-per-run in the supported environment). WP25 completes only after the full
-matrix has run, all evidence is recorded, the user explicitly approves the
-walkthrough, and the verified post-approval increment passes. Completion
-closes the CASM Phase 6A milestone but does not activate CASM Phase 6B,
-which remains separately gated.
+Stop if WP24 is not complete and approved, if a fixture reveals a defect
+whose scope or fix isn't small and well-understood enough for the user to
+approve fixing in place (the two `vmm_store.s` defects the first runtime
+matrix actually found were both judged narrow enough to fix directly, per
+explicit user approval each time — a defect requiring an ABI change or a
+non-obvious redesign would instead need its own remediation plan), or if
+the `vmmalloc4`/`vmmnoreu` deferral reasoning turns out wrong (e.g., REU
+can in fact be toggled per-run in the supported environment). WP25
+completes only after the full matrix has run, all evidence is recorded,
+the user explicitly approves the walkthrough, and the verified
+post-approval increment passes. Completion closes the CASM Phase 6A
+milestone but does not activate CASM Phase 6B, which remains separately
+gated.
 
 ## Documentation and DOX
 
@@ -247,5 +300,19 @@ is separately gated to begin, matching the parent plan's own sequencing.
   against a 16MB-tracked MCT. User resolved both open questions: document
   `vmmalloc4` as manually deferred alongside `vmmnoreu` rather than
   directly manipulating OS-owned MCT memory, and confirmed `casm_vmm`/
-  `test_casm_vmm` naming starting at `TEST_PRG_SIZE = "1000"`. Awaiting
-  plan approval before activation.
+  `test_casm_vmm` naming starting at `TEST_PRG_SIZE = "1000"`.
+- 2026-07-22 (later): User approved the plan as drafted. Activated on
+  `feature/casm-phase6-wp25` from `3fd1f10`. Implemented
+  `tests/src/casm_vmm/casm_vmm.s` with 7 automated fixtures. The first real
+  execution of WP23/WP24's code found three defects: a wrong diagnostic
+  expectation in the test's own `vmmalloc3` case, and two real
+  `vmm_store.s` bugs (`vwPrepareTransfer` rejecting the valid exact-65536
+  boundary; `vmmReplay` clobbering its stashed slot via a zero-page cell
+  `vwPrepareTransfer` also uses). All three fixed with explicit user
+  approval to fix in place. All 7 fixtures pass. Dry-ran the version-only
+  completion candidate: `0.1.27` build 1102, exactly 2 changed bytes versus
+  the candidate PRG; restored to `0.1.26` build 1101 via `git checkout` and
+  reproduced exactly. User approved completion; final `0.1.27` build 1102
+  verified, no-change rebuild stable, both images pass. WP25 is complete,
+  and with it the CASM Phase 6A milestone closes. CASM Phase 6B remains
+  separately gated and unstarted.

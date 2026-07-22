@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6A WP25 verification and completion gate**: added a
+  standalone `test_casm_vmm` runtime fixture harness (7 automated cases
+  covering allocation, reuse-after-free, registry exhaustion, windowed
+  write/read/replay, boundary offsets, bounds rejection, and free-then-reuse
+  rejection). The first real execution of WP23/WP24's `vmm_store.s` code
+  found and fixed two production defects — `vwPrepareTransfer` incorrectly
+  rejecting the valid exact-65536-byte boundary transfer, and `vmmReplay`
+  clobbering its own stashed slot via a shared zero-page scratch cell also
+  used internally by `vwPrepareTransfer` — plus one incorrect expectation in
+  the test itself. All 7 fixtures pass. `vmmalloc4` (REU exhaustion) and
+  `vmmnoreu` (no-REU diagnostic) are documented as manually deferred, not
+  automated. Advanced CASM to `0.1.27` build 1102. Closes the CASM Phase 6A
+  milestone.
+
 - **CASM Phase 6A WP24 windowed transfer and replay**: added
   `vmmWindowRead`/`vmmWindowWrite`/`vmmReplay` to `vmm_store.s`, bounds-
   checking every transfer against a slot's registered ownership, the fixed

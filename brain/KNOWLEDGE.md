@@ -376,6 +376,28 @@ record that could be read alongside both namespaces.
   already-reserved `$78-$7F` I/O/VMM scratch. Measured MAIN usage
   (10,875/11,008 bytes at the approved `$2B00`, up from `$2A00`) with 133
   bytes free.
+- **WP25 verification (pending completion approval): first real run found
+  three defects.** WP23/WP24's code had never actually executed before
+  WP25's `test_casm_vmm` fixture harness ran it for the first time. Found:
+  (1) a test-side wrong diagnostic expectation in `vmmalloc3` (expected
+  `CASM_DIAG_REGISTRY_FULL`; `vmmStoreAlloc` actually returns
+  `CASM_DIAG_VMM_ALLOC_FAILED` for a full registry, per its own WP23 ABI),
+  which left the free loop unreached and cascaded into 5 more fixture
+  failures; (2) `vwPrepareTransfer` incorrectly rejected the valid
+  exact-65536-byte boundary case (offset+count landing exactly on the cap
+  wraps the 16-bit add to zero with carry set, indistinguishable from a
+  genuine overflow by carry alone — fixed by checking whether the wrapped
+  remainder is zero); (3) `vmmReplay` stashed its slot in `CasmValue0Lo`,
+  which `vwPrepareTransfer` (called by both of `vmmReplay`'s internal
+  calls) also uses as its own offset+count scratch — the same class of
+  shared zero-page clobber bug WP23 already caught twice
+  (`vmmStoreFree`, `resourcesCleanup`'s VMM loop), fixed by moving the
+  stash to `CasmValue1Lo`. All three fixed with explicit user approval to
+  fix in place rather than opening a separate remediation plan. All 7
+  automated fixtures (`vmmalloc1-3`, `vmmreplay1`, `vmmoffset1`,
+  `vmmbounds1`, `vmmfree1`) pass; `vmmalloc4`/`vmmnoreu` are manually
+  deferred (CASM's 512KB registry cap can never mark the OS's 16MB-tracked
+  MCT full through normal calls; the harness has no per-run REU toggle).
 
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
