@@ -551,3 +551,43 @@ file(WRITE "${OUTPUT_DIR}/brrng1.seq"
     "${CASM_BRRNG1_FILLER}"
     "LOOP: RTS\n"
 )
+
+# WP31 case-sensitivity fixture. CASM's lexer (isIdFirst/isIdCont) accepts
+# only unshifted PETSCII A-Z ($41-$5A) or shifted PETSCII A-Z ($C1-$DA) as
+# identifier bytes -- plain ASCII lowercase ($61-$7A) is rejected outright as
+# CASM_DIAG_INVALID_SOURCE_BYTE. Unlike a ca65-assembled .s harness (whose
+# quoted string literals go through ca65's -t c64 charmap automatically,
+# confirmed empirically: uppercase source letters shift to $C1-$DA, lowercase
+# source letters map to unshifted $41-$5A), this is a raw .seq text file
+# read byte-for-byte by CASM's own lexer with no charmap conversion at all --
+# a naive mixed-case ASCII fixture would fail immediately on the first
+# lowercase byte, testing nothing. The second label below is therefore built
+# directly from shifted-PETSCII byte values (unshifted L/O/O/P = $4C/$4F/
+# $4F/$50; +$80 = $CC/$CF/$CF/$D0), giving two genuinely different,
+# lexer-valid byte sequences for "the same" name.
+string(ASCII 204 CASM_SHIFT_L)
+string(ASCII 207 CASM_SHIFT_O)
+string(ASCII 208 CASM_SHIFT_P)
+set(CASM_SHIFTED_LOOP "${CASM_SHIFT_L}${CASM_SHIFT_O}${CASM_SHIFT_O}${CASM_SHIFT_P}")
+# LOOP (unshifted) defines at $C000 (NOP, 1 byte); the shifted-byte-sequence
+# label defines at $C001 (RTS, 1 byte). LDA LOOP resolves to $C000; LDA
+# <shifted> resolves to $C001 -- both FORCE_ABS'd to 3-byte absolute. If case
+# sensitivity were ever broken, this would surface as CASM_DIAG_DUPLICATE_SYMBOL
+# at the second label statement, or as both LDAs resolving to the same address.
+file(WRITE "${OUTPUT_DIR}/casmcase1.seq"
+    ".ORG \$C000\n"
+    "LOOP: NOP\n"
+    "${CASM_SHIFTED_LOOP}: RTS\n"
+    "LDA LOOP\n"
+    "LDA ${CASM_SHIFTED_LOOP}\n"
+)
+
+# WP31 maximum-length identifier fixture (31 bytes, CASM_TOKEN_TEXT_MAX).
+# The label defines at $C000 (RTS, 1 byte); LDA resolves it (FORCE_ABS'd to
+# 3-byte absolute).
+string(REPEAT "A" 31 CASM_MAXID_NAME)
+file(WRITE "${OUTPUT_DIR}/casmmaxid1.seq"
+    ".ORG \$C000\n"
+    "${CASM_MAXID_NAME}: RTS\n"
+    "LDA ${CASM_MAXID_NAME}\n"
+)

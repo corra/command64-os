@@ -466,6 +466,9 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/brfwd1.seq"
     "${CASM_TEST_FIXTURE_DIR}/brback1.seq"
     "${CASM_TEST_FIXTURE_DIR}/brrng1.seq"
+    # WP31 symbol-table behavior fixtures (through real casm.s)
+    "${CASM_TEST_FIXTURE_DIR}/casmcase1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmmaxid1.seq"
 )
 
 add_custom_command(
@@ -489,7 +492,7 @@ add_custom_target(casm_test_fixtures DEPENDS ${CASM_TEST_FIXTURES})
 set(CASM_REF_DIR "${CMAKE_BINARY_DIR}/casm_refs")
 set(CASM_REF_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/tests/fixtures/casm")
 set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
-    p1fwd1 p1back1 p1size1 brfwd1 brback1)
+    p1fwd1 p1back1 p1size1 brfwd1 brback1 casmcase1 casmmaxid1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

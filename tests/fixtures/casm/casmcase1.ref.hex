@@ -1,0 +1,40 @@
+# CASM WP31 trusted reference: casmcase1
+#
+# Independently hand-assembled from the casmcase1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Cross-check:
+#   - brain/plans/2026-07-23-casm-phase6-wp31-verification-closeout.md
+#     (Contract item 1, this fixture's byte derivation)
+#
+# Source (.ORG $C000):
+#   - LOOP: NOP                   (unshifted PETSCII: $4C $4F $4F $50)
+#   - <shifted-LOOP>: RTS         (shifted PETSCII:   $CC $CF $CF $D0)
+#   - LDA LOOP
+#   - LDA <shifted-LOOP>
+#
+# CASM's lexer accepts unshifted ($41-$5A) or shifted ($C1-$DA) PETSCII as
+# identifier bytes; the two labels above are the SAME letters ("LOOP") in
+# the two different registers, which the symbol table must treat as two
+# genuinely distinct, independently-resolving names -- proving case-sensitive
+# identity through real Pass 1/Pass 2, not just symbols.s's own isolated
+# symcase1 fixture (WP27).
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   EA           NOP        (at $C000, defines unshifted LOOP)
+#   60           RTS        (at $C001, defines shifted-byte-sequence LOOP)
+#   AD 00 C0     LDA $C000  (resolves the unshifted name; absolute -- FORCE_ABS)
+#   AD 01 C0     LDA $C001  (resolves the shifted-byte-sequence name)
+#
+# If case-sensitivity were ever broken (the two names collapsed into one
+# symbol), this would surface as CASM_DIAG_DUPLICATE_SYMBOL at the second
+# label statement, or as both LDAs resolving to the same address -- either
+# way a mismatch against this reference.
+#
+# bytes: 10
+# sha256: 402b40c061ac3da8bdd2b09e299fbb2c765c00cbde09464f8c336e81f5ac56d1
+
+00 C0
+EA
+60
+AD 00 C0
+AD 01 C0

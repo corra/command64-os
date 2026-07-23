@@ -549,11 +549,50 @@
     `image_d64` and `test_image_d64` build clean. **WP30 complete.**
   - Walkthrough:
     `brain/walkthroughs/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md`
-  - WP31 (`86d8ac7e`) is unblocked in Taskwarrior but not yet planned in
-    detail, per the CASM AGENTS.md per-work-package-plan-approval
-    requirement
-  - **CASM Phase 6B WP31 (verification, walkthrough, and completion gate)
-    is now the active CASM thread, gated on its own dedicated plan.**
+
+- [x] Taskwarrior (`86d8ac7e-0725-44b8-81ae-dcef143a20ad`): CASM Phase 6B
+      WP31 verification, walkthrough, and completion gate
+  - Branch `feature/casm-phase6-wp31`, from `feature/casm-phase6-wp30`'s
+    tip, CASM `0.1.32` build 1130 baseline
+  - Plan: `brain/plans/2026-07-23-casm-phase6-wp31-verification-closeout.md`
+  - Closed the last unchecked Phase 6B Acceptance item
+    (duplicate/undefined/case-sensitive/max-length behavior) with real
+    end-to-end proof through production `casm.s`, not just WP27/28's
+    isolated module-level proof
+  - Found a real, non-obvious byte-encoding pitfall before writing any
+    fixture: a naive mixed-case-ASCII case-sensitivity `.seq` fixture would
+    test nothing, since CASM's lexer only accepts unshifted (`$41-$5A`) or
+    shifted (`$C1-$DA`) PETSCII as identifier bytes and raw `.seq` files
+    receive no ca65 charmap conversion (unlike WP27's ca65-assembled test
+    harness). Confirmed the correct shifted-byte values empirically by
+    compiling `"Case"`/`"CASE"` directly with ca65 before constructing
+    `casmcase1.seq`'s shifted-byte label via `string(ASCII 204/207/207/208
+    ...)`
+  - Added `casmmaxid1.seq` (31-character label) for the max-length item;
+    reused `p1dup1.seq`/`p1undef1.seq` unmodified for duplicate/undefined
+    through real `casm.s` -- no new files needed there
+  - Per the user's confirmed decisions: skipped a new end-to-end
+    symbol-table-full fixture (already covered by WP27's isolated proof
+    plus the duplicate-symbol fixture's shared propagation path) and used a
+    7-fixture targeted Phase 3/4 regression sample rather than a full
+    60-fixture historical re-run, given WP30's `eiRelative` defect was
+    narrowly specific to a live-counter difference check no other Phase 4
+    diagnostic shares
+  - No production source changed at all -- unlike WP30, this WP's new
+    fixture categories found no latent defect; every case passed on the
+    first VICE run
+  - User ran the full consolidated matrix (5 standalone test harnesses, 12
+    byte-identical trusted references, 3 diagnostic fixtures through real
+    `casm.s`, 7-fixture regression sample) from `build/test.d64` and
+    `build/image.d64`: "All tests pass"
+  - Final CASM `0.1.33` build 1131, no-change rebuild stable, both
+    `image_d64` and `test_image_d64` build clean. **WP31 complete.**
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-23-casm-phase6-wp31-verification-closeout.md`
+  - **CASM Phase 6B milestone (`166e5352-5aa0-45bd-8bee-5baf0e878798`) is
+    complete.** CASM Phase 7 (VMM-backed source, multiple top-level inputs)
+    and Phase 8 (R6 relocation consumption) remain separately gated and
+    unstarted; neither is activated by this closure.
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

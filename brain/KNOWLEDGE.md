@@ -709,6 +709,61 @@ implementation and VICE verification. `feature/casm-phase6-wp30`, CASM
   `eiRelative` fix and its own branch-range trampoline added the remaining
   10 bytes; down from WP29's 151-byte close overall).
 
+### CASM Phase 6B WP31 Verification and Completion (Phase 0C.9, 2026-07-23) — Phase 6B Complete
+
+Closes the CASM Phase 6B milestone. Proved the last unchecked acceptance
+item — "duplicate, undefined, case-sensitive, and max-length behavior match
+the frozen contract" — through real production `casm.s` for the first time
+(WP27/28 had only proven it at the isolated `symbolsInsert`/`symbolsLookup`
+or standalone-harness level). `feature/casm-phase6-wp31`, CASM `0.1.33`
+build 1131.
+
+- **A raw `.seq` fixture cannot rely on ca65's charmap the way a
+  ca65-assembled `.s` test harness can.** WP27's `symcase1` fixture (`.byte
+  "Case"` / `.byte "CASE"`) works because ca65's `-t c64` charmap converts
+  quoted string literals automatically (empirically confirmed: uppercase
+  source letters shift to `$C1-$DA`, lowercase source letters map to
+  unshifted `$41-$5A`). `.seq` fixtures are raw text written directly by
+  `cmake/GenerateCasmTestFixtures.cmake`'s `file(WRITE ...)` and read
+  byte-for-byte by CASM's own lexer at runtime — no charmap ever touches
+  them. `isIdFirst`/`isIdCont` (`lexer.s`) accept only unshifted (`$41-$5A`)
+  or shifted (`$C1-$DA`) PETSCII as identifier bytes; plain ASCII lowercase
+  (`$61-$7A`) is rejected as `CASM_DIAG_INVALID_SOURCE_BYTE`. A naive
+  mixed-case-ASCII `.seq` fixture would therefore test nothing — it fails
+  immediately on the first lowercase byte. **`casmcase1.seq`** instead
+  builds its second label directly from shifted-PETSCII bytes via
+  `string(ASCII 204/207/207/208 ...)` (unshifted `L`/`O`/`P` = `$4C`/`$4F`/
+  `$50`; `+$80` = `$CC`/`$CF`/`$D0`), giving two genuinely different,
+  lexer-valid byte sequences for "the same" name (`LOOP` unshifted vs. the
+  shifted-byte-sequence variant), each resolving to a distinct address.
+- **`casmmaxid1.seq`** proves the 31-byte maximum identifier
+  (`CASM_TOKEN_TEXT_MAX`) round-trips through real Pass 1/Pass 2, built via
+  `string(REPEAT "A" 31 ...)` (no special byte construction needed —
+  unshifted uppercase is numerically identical to plain ASCII).
+- **Duplicate-symbol and undefined-symbol through real `casm.s` needed no
+  new fixtures** — `p1dup1.seq` (WP28) and `p1undef1.seq` (WP29 origin,
+  already proven through production `casm.s`) were reused directly.
+- **Symbol-table-full was deliberately not repeated as a new end-to-end
+  fixture**, per user decision: neither the master plan's fixture list nor
+  the acceptance checklist names it, and the same `casmRunPass` ->
+  `startFatalNear` propagation path a table-full failure would take is
+  already proven by the duplicate-symbol fixture.
+- **Regression against the 60 pre-existing Phase 3/4 fixtures used a
+  7-fixture targeted sample, not an exhaustive re-run**, per user decision:
+  WP30's `eiRelative` defect was narrowly specific to a live-counter
+  *difference* check (unique to relative-branch displacement); no other
+  Phase 4 diagnostic shares that shape (e.g. `.BYTE`/`.WORD`'s range check
+  tests the placeholder directly and can only under-, never over-report).
+  `casmwp11`, `casmzp1`, `casmcma2`, `casmorg3`, `casmzpi2`, `casmpcovf`,
+  `casmnumerrh` all passed unchanged against the two-pass `casm.s`.
+- **No production source changed.** Unlike WP30, this WP's new fixture
+  categories found no latent defect — every case passed on the first VICE
+  run.
+- **Phase 6B Acceptance (`wiki/tasks/casm.md`) is now fully checked; the
+  CASM Phase 6B milestone is complete.** CASM Phase 7 (VMM-backed source,
+  multiple top-level inputs) and Phase 8 (R6 relocation consumption) remain
+  separately gated and unstarted, per the master plan's own sequencing.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

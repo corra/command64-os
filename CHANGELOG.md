@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6B WP31 verification, walkthrough, and completion gate —
+  CASM Phase 6B complete** (CASM `0.1.33` build 1131): closed the last
+  unchecked Phase 6B acceptance item (duplicate/undefined/case-sensitive/
+  max-length symbol behavior) with real end-to-end proof through production
+  `casm.s`, not just WP27/28's isolated module-level proof. Found a real,
+  non-obvious byte-encoding pitfall before writing any fixture: a
+  case-sensitivity `.seq` fixture using ordinary mixed-case ASCII text would
+  test nothing, since CASM's lexer accepts only unshifted (`$41-$5A`) or
+  shifted (`$C1-$DA`) PETSCII as identifier bytes and raw `.seq` fixture
+  files receive no ca65 charmap conversion (unlike a ca65-assembled test
+  harness). Confirmed the correct shifted-byte values empirically by
+  compiling quoted strings directly with ca65, then built the fixture's
+  shifted-byte label via explicit `string(ASCII ...)` construction. Added a
+  31-character maximum-identifier-length fixture; reused existing
+  duplicate-symbol and undefined-symbol fixtures unmodified rather than
+  authoring new ones. Per confirmed scope decisions, skipped a redundant
+  end-to-end symbol-table-full fixture and used a 7-fixture targeted
+  regression sample (rather than a full 60-fixture historical re-run)
+  against the pre-existing Phase 3/4 diagnostic matrix, reasoning precisely
+  about why WP30's `eiRelative` defect was narrowly bounded and unlikely to
+  recur elsewhere. No production source changes were needed — every new
+  case passed on the first VICE run. Ran the full consolidated matrix (5
+  standalone test harnesses, 12 byte-identical trusted references, 3
+  diagnostic fixtures, 7-fixture regression sample): all passed. **All six
+  Phase 6B acceptance items are now checked; the CASM Phase 6B milestone is
+  complete.** CASM Phase 7 (VMM-backed source, multiple top-level inputs)
+  and Phase 8 (R6 relocation consumption) remain separately gated and
+  unstarted.
 - **CASM Phase 6B WP30 relative branches and Pass 1/Pass 2 disagreement
   detection** (complete, CASM `0.1.32` build 1130): implemented
   `CASM_DIAG_PASS_MISMATCH` detection (`CasmPass1FinalPc` snapshot +

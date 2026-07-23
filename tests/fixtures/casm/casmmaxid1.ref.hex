@@ -1,0 +1,26 @@
+# CASM WP31 trusted reference: casmmaxid1
+#
+# Independently hand-assembled from the casmmaxid1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Cross-check:
+#   - brain/plans/2026-07-23-casm-phase6-wp31-verification-closeout.md
+#     (Contract item 2, this fixture's byte derivation)
+#
+# Source (.ORG $C000):
+#   - <31 x 'A'>: RTS   (CASM_TOKEN_TEXT_MAX = 31, the maximum identifier length)
+#   - LDA <31 x 'A'>
+#
+# Proves the 31-byte maximum-length identifier round-trips correctly through
+# real Pass 1/Pass 2, not just symbols.s's own isolated symlen1 fixture
+# (WP27) or CasmLabelName's copy-loop boundary in isolation.
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   60           RTS        (at $C000, defines the 31-character label)
+#   AD 00 C0     LDA $C000  (resolves the 31-character label; absolute -- FORCE_ABS)
+#
+# bytes: 6
+# sha256: fb9e8dc13e79bde6b14a2bb58e351605fe1f48743c92dc357509113596ba4aba
+
+00 C0
+60
+AD 00 C0
