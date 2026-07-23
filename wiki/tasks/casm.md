@@ -486,12 +486,63 @@ WP26 plan:
       was then applied for real: final CASM `0.1.28` build 1103, no-change
       rebuild stable (a second build did not re-increment), both
       `image_d64` and `test_image_d64` build clean. **WP26 is complete.**
-- [ ] `0dd437f3-3248-4294-aee7-39bb8571f1c8`: WP27 symbol table storage and
-      hash index. Not yet planned in detail; per the CASM AGENTS.md gate, a
-      dedicated plan and task activation must wait for WP26 to complete
-      first.
+- [x] `0dd437f3-3248-4294-aee7-39bb8571f1c8`: WP27 symbol table storage and
+      hash index. Plan approved as drafted:
+      `brain/plans/2026-07-22-casm-phase6-wp27-symbol-table-storage.md`.
+      Active on `feature/casm-phase6-wp27` from `feature/casm-phase6-wp26`'s
+      tip, CASM `0.1.28` build 1112 baseline. Reconciled a real conflict
+      WP26's freeze missed: the frozen 37-byte symbol record cannot pass
+      through Phase 6A's existing 32-byte `CasmVmmBuffer` transfer window at
+      all -- `vwPrepareTransfer` rejects any request over 32 bytes outright.
+      User resolved it by padding the record to 64 bytes (power of two) and
+      growing the buffer to match, which also replaced what would have been
+      a 3-term shift-add multiply-by-37 (record-index-to-VMM-offset
+      arithmetic, run on every symbol lookup/insert) with a single 16-bit
+      shift-left-by-6. Designing the exact algorithm surfaced two further
+      corrections to the parent Phase 6 plan's own predictions: `symbols.s`
+      needs none of the zero-page `CasmPassScratch0-3` group after all (its
+      transient state is all values, not pointers, so it lives in ordinary
+      BSS instead, leaving that zero-page group free for WP28), and its
+      calling convention deliberately avoids `CasmValue0Lo/Hi` for anything
+      spanning a nested `vmmWindowRead`/`Write` call, since that exact
+      shared-scratch-clobber bug class hit `vmm_store.s` three separate
+      times during WP23-25. `symbolsLookup`'s signature matches the Phase 5
+      `exprEvaluate` resolver callback ABI exactly, so WP28 can bind it
+      directly with zero adapter code. While extending `diagnostics.s`,
+      found and fixed (with explicit user approval) a pre-existing Phase 6A
+      defect: `diagPrintFatal`'s message-selection bound never covered
+      `$28`-`$2B`, so all four Phase 6A VMM diagnostics had silently fallen
+      back to the generic "UNKNOWN" message since WP23/24 -- never caught
+      before, fixed alongside wiring the new `$2C`-`$2F` Phase 6B
+      diagnostics since the bound-check edit had to move past `$2B`
+      regardless. Implemented `src/external/casm/symbols.s`
+      (`symbolsInit`/`symbolsInsert`/`symbolsLookup`, a private
+      `symbolsFindChain` chain-walk helper, 64-byte VMM-backed records, a
+      128-bucket rotate-XOR hash index, 512-symbol capacity) -- built and
+      fixture-tested in complete isolation, no `casm.s`/`parser.s`/
+      `opcodes.s` call site yet (that is WP28). `common.inc` amended
+      (`CASM_VMM_BUFFER_SIZE` 32 -> 64, new `CASM_SYMBOL_*` constants,
+      diagnostics `$2C`-`$2F`). Added a standalone
+      `tests/src/casm_symbols/casm_symbols.s` harness with 10 fixtures
+      (`syminit1`, `symins1`, `symlook1`, `symlookmiss1`, `symdup1`,
+      `symcase1`, `symchain1`, `symlen1`, `sympad1`, `symfull1`) -- all 10
+      fully implemented and passing. Measured MAIN overflow (848 bytes);
+      user approved `$2B00` -> `$2F00` (176 bytes free after rounding). User
+      ran both `TEST_CASM_VMM` (regression check for the buffer-size
+      amendment) and `TEST_CASM_SYMBOL` (the new 10-fixture matrix) in VICE
+      from `build/test.d64`: both passed with no `F` failures. Version-only
+      completion increment applied: final CASM `0.1.29` build 1113,
+      no-change rebuild stable, both `image_d64` and `test_image_d64` build
+      clean. Walkthrough:
+      `brain/walkthroughs/2026-07-22-casm-phase6-wp27-symbol-table-storage.md`.
+      **WP27 is complete.** WP28 (`712fe7af`) is now unblocked in
+      Taskwarrior but requires its own dedicated plan drafted and approved
+      before activation, per the CASM AGENTS.md gate.
 - [ ] `712fe7af-1e41-46c9-9a19-49c2632cd15a`: WP28 Pass 1 - address
-      assignment and definitions.
+      assignment and definitions. Unblocked in Taskwarrior now that WP27 is
+      complete, but not yet planned in detail; per the CASM AGENTS.md gate,
+      a dedicated plan and task activation must be drafted and separately
+      approved before implementation begins.
 - [ ] `8e989bdf-7aed-4bfe-ae9c-3771edb7caf5`: WP29 Pass 2 - resolution and
       emission.
 - [ ] `a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`: WP30 relative branches and

@@ -446,19 +446,33 @@ record that could be read alongside both namespaces.
   its own wholesale initialization. `opcodesFindOpcode` checks this flag
   before its zero-page-shrink heuristic and takes the absolute path
   unconditionally when set, regardless of `ValHi`.
-- **Symbol records are 37-byte VMM-backed entries:** 1-byte NameLen, 31-byte
-  fixed Name slot, 2-byte Value (address assigned in Pass 1), 1-byte Flags
-  (bit 0 = DEFINED), 2-byte Next (16-bit collision-chain record index,
-  `$FFFF` = end of chain). `CASM_SYMBOL_REC_SIZE = 37`; capacity is capped at
-  `CASM_SYMBOL_MAX = 512` records (18,944 bytes total, one `vmmStoreAlloc`
-  call, well under the existing 65536-byte single-allocation cap — no change
-  to `vmm_store.s`'s ABI). Hashing is a rotate-left-1-XOR fold over the
+- **Symbol records are 64-byte VMM-backed entries** (amended by WP27 from
+  WP26's original 37-byte figure, discovered unable to pass through Phase
+  6A's existing 32-byte `CasmVmmBuffer` transfer window at all): 1-byte
+  NameLen (offset 0), 31-byte fixed Name slot (offset 1), 2-byte Value
+  (offset 32, address assigned in Pass 1), 1-byte Flags (offset 34, bit 0 =
+  DEFINED), 2-byte Next (offset 35, 16-bit collision-chain record index,
+  `$FFFF` = end of chain), and 27 bytes of reserved padding (offset 37-63,
+  explicitly zero-filled on every write). `CASM_SYMBOL_REC_SIZE = 64`;
+  capacity is capped at `CASM_SYMBOL_MAX = 512` records (512 * 64 = 32,768
+  bytes total, one `vmmStoreAlloc` call, well under the existing
+  65536-byte single-allocation cap — no change to `vmm_store.s`'s ABI beyond
+  the buffer widening noted below). Record-index-to-VMM-offset arithmetic is
+  a single unrolled 16-bit left-shift-by-6 (`recordIndex << 6`), replacing
+  what the original 37-byte figure would have required (a 3-term
+  shift-add multiply-by-37) with cheaper code executed on every symbol
+  lookup and insert. Hashing is a rotate-left-1-XOR fold over the
   identifier's exact case-sensitive bytes, masked to 7 bits across 128
   buckets (`CasmSymbolBuckets: .res 256`, `$FFFF` = empty), chosen over a
   plain byte-sum because it spreads prefix-sharing names (`LOOP1`/`LOOP2`)
   across buckets rather than collapsing them onto adjacent ones. Records are
   append-only (`CasmSymbolCount` is a bump allocator, never a free list) —
   Phase 6B never removes a symbol mid-run.
+- **`CASM_VMM_BUFFER_SIZE` (Phase 6A/WP24) amended from 32 to 64 bytes**
+  as part of this same WP27 fix — a deliberate, tracked amendment to an
+  already-shipped Phase 6A constant, not an oversight. `CasmVmmBuffer`'s
+  size follows the constant automatically; `vwPrepareTransfer`'s bounds
+  check needed no logic change, only the constant.
 - **Label definitions are their own complete, colon-terminated statement,**
   not combined with a trailing instruction in one parse call. A first-draft
   design assuming the latter was found to be broken: `CasmTokenText` is a

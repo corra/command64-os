@@ -187,8 +187,13 @@ if(Ca65_FOUND)
     # $2A00 -> $2B00 -- the grown CasmVmmRegistry record plus CasmVmmBuffer
     # and vmmWindowRead/Write/Replay overflowed $2A00 by 123 measured bytes;
     # $2B00 (+256) leaves 133 bytes headroom, the smallest round-hex step
-    # above that minimum, matching this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "2B00")
+    # above that minimum, matching this line's own precedent. WP27: $2B00 ->
+    # $2F00 -- symbols.s (the VMM-backed symbol table/hash index) plus the
+    # CASM_VMM_BUFFER_SIZE 32->64 growth and the diagnostics.s message-table
+    # fix for $28-$2F overflowed $2B00 by 848 measured bytes; $2F00 (+1024)
+    # leaves 176 bytes headroom, the smallest round-page step above that
+    # minimum, matching this line's own precedent.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "2F00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -264,6 +269,14 @@ if(Ca65_FOUND)
         endif()
         if(TEST_NAME STREQUAL "casm_vmm")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
+        if(TEST_NAME STREQUAL "casm_symbols")
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")

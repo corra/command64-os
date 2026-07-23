@@ -9,6 +9,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6B WP27 symbol table storage and hash index** (complete,
+  CASM `0.1.29` build 1113): added `src/external/casm/symbols.s`
+  (`symbolsInit`/`symbolsInsert`/`symbolsLookup`), VMM-backed 64-byte symbol
+  records over a 128-bucket rotate-left-1-XOR hash index with 512-symbol
+  capacity, built and fixture-tested in complete isolation — no `casm.s`,
+  `parser.s`, or `opcodes.s` call site yet exists (that's WP28, separately
+  gated). Amended WP26's frozen 37-byte symbol record to 64 bytes after
+  finding it could not pass through Phase 6A's existing 32-byte VMM transfer
+  buffer (`CasmVmmBuffer`) at all; the power-of-two size also replaced a
+  3-term shift-add multiply-by-37 with a single 16-bit shift-left-6 for
+  record-index-to-VMM-offset arithmetic, run on every symbol lookup and
+  insert. Found and fixed, with explicit user approval, a pre-existing Phase
+  6A defect: `diagPrintFatal`'s message-selection range never covered
+  diagnostics `$28`-`$2B`, so all four Phase 6A VMM diagnostics had silently
+  printed the generic "UNKNOWN" fallback since WP23/24 instead of real text —
+  fixed in the same pass as wiring the new Phase 6B diagnostics (`$2C`
+  `CASM_DIAG_DUPLICATE_SYMBOL`, `$2D` `CASM_DIAG_UNDEFINED_SYMBOL` reserved,
+  `$2E` `CASM_DIAG_SYMBOL_TABLE_FULL`, `$2F` `CASM_DIAG_PASS_MISMATCH`
+  reserved). Added a standalone `tests/src/casm_symbols/casm_symbols.s`
+  fixture harness (10 automated cases — `syminit1`, `symins1`, `symlook1`,
+  `symlookmiss1`, `symdup1`, `symcase1`, `symchain1` (a guaranteed 129-name
+  pigeonhole bucket collision), `symlen1`, `sympad1`, `symfull1` (a real
+  512-symbol exhaustion test, unlike Phase 6A's manually-deferred
+  REU-exhaustion case)). All 10 pass in VICE, alongside a re-run of the
+  existing `test_casm_vmm` fixtures (regression check for the buffer-size
+  growth) — also all pass. Raised CASM MAIN from `$2B00` to `$2F00`
+  (848-byte measured overflow, 176 bytes headroom after rounding to the next
+  page boundary), matching the WP13/19/23/24/26 measure-then-propose-then-
+  approve precedent. Advanced CASM from `0.1.28` build 1112 to `0.1.29`
+  build 1113; no-change rebuild verified stable, both `image_d64` and
+  `test_image_d64` build clean. See
+  `brain/plans/2026-07-22-casm-phase6-wp27-symbol-table-storage.md`.
+
 - **CASM Phase 6B WP26 prerequisite reconciliation and Phase 0C.5 freeze**
   (complete, CASM `0.1.28` build 1103): verified the CASM Phase 6A
   completion gate (`0.1.27` build 1102) and froze the Phase 0C.5

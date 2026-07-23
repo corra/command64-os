@@ -147,11 +147,17 @@ CASM_VMM_PAGE_BYTES = 4096
 .assert CASM_VMM_PAGE_BYTES = 4096, error, "CASM VMM page size changed"
 
 ; Fixed base-RAM staging buffer for vmmWindowRead/vmmWindowWrite/vmmReplay
-; (WP24). Not CasmIoBuffer, which stays reserved for source input. Sized
-; generically for WP25's pattern-based fixtures, not against any real Phase
-; 6B record (not yet designed). Must fit an 8-bit byte count so the transfer
-; length can never itself overflow while being checked against this bound.
-CASM_VMM_BUFFER_SIZE = 32
+; (WP24). Not CasmIoBuffer, which stays reserved for source input. Sized at
+; WP24 generically for WP25's pattern-based fixtures, against no real Phase
+; 6B record (not yet designed at the time). WP27 amends this to exactly the
+; real Phase 6B symbol record size (CASM_SYMBOL_REC_SIZE, below) so one
+; record fits one transfer -- reconciling the 37-byte record WP26 froze
+; against this 32-byte cap found they conflicted; the user resolved it by
+; padding the record to 64 bytes (a power of two, so record-index-to-offset
+; arithmetic is a single shift) and growing this buffer to match. Must fit
+; an 8-bit byte count so the transfer length can never itself overflow while
+; being checked against this bound.
+CASM_VMM_BUFFER_SIZE = 64
 
 .assert CASM_VMM_BUFFER_SIZE <= 255, error, "CASM VMM staging buffer must fit an 8-bit byte count"
 
@@ -436,6 +442,17 @@ CASM_DIAG_VMM_ALLOC_FAILED    = $29  ; VMM_ERR_NOMEM, or a rejected zero-size re
 CASM_DIAG_VMM_FREE_FAILED     = $2A  ; DOS_FREE_MEM rejected the stored handle
 CASM_DIAG_VMM_TRANSFER_FAILED = $2B  ; reserved for WP24; not raised by WP23
 CASM_DIAG_PHASE6A_LAST = CASM_DIAG_VMM_TRANSFER_FAILED
+
+; CASM Phase 6B (symbol table and two-pass assembly) reservations, per the
+; Phase 5/WP17 precedent: the full block is declared here even though WP27
+; raises/prints only the first and third; CASM_DIAG_UNDEFINED_SYMBOL and
+; CASM_DIAG_PASS_MISMATCH stay reserved and unprintable until WP28 and WP30
+; implement their raise paths.
+CASM_DIAG_DUPLICATE_SYMBOL  = $2C  ; symbolsInsert: exact case-sensitive name already DEFINED
+CASM_DIAG_UNDEFINED_SYMBOL  = $2D  ; reserved for WP28
+CASM_DIAG_SYMBOL_TABLE_FULL = $2E  ; symbolsInsert: CasmSymbolCount already at CASM_SYMBOL_MAX
+CASM_DIAG_PASS_MISMATCH     = $2F  ; reserved for WP30
+CASM_DIAG_PHASE6B_LAST = CASM_DIAG_PASS_MISMATCH
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -455,6 +472,11 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_VMM_FREE_FAILED = CASM_DIAG_VMM_ALLOC_FAILED + 1, error, "CASM Phase 6A diagnostics must remain contiguous"
 .assert CASM_DIAG_VMM_TRANSFER_FAILED = CASM_DIAG_VMM_FREE_FAILED + 1, error, "CASM Phase 6A diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE6A_LAST = $2B, error, "CASM Phase 6A diagnostic range changed"
+.assert CASM_DIAG_DUPLICATE_SYMBOL = CASM_DIAG_PHASE6A_LAST + 1, error, "CASM Phase 6B diagnostics must follow Phase 6A"
+.assert CASM_DIAG_UNDEFINED_SYMBOL = CASM_DIAG_DUPLICATE_SYMBOL + 1, error, "CASM Phase 6B diagnostics must remain contiguous"
+.assert CASM_DIAG_SYMBOL_TABLE_FULL = CASM_DIAG_UNDEFINED_SYMBOL + 1, error, "CASM Phase 6B diagnostics must remain contiguous"
+.assert CASM_DIAG_PASS_MISMATCH = CASM_DIAG_SYMBOL_TABLE_FULL + 1, error, "CASM Phase 6B diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE6B_LAST = $2F, error, "CASM Phase 6B diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -659,6 +681,46 @@ CASM_RESOLVE_FLAG_MASK = CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_RELOCATABLE
 .assert CASM_RESOLVE_VAL_HI = CASM_RESOLVE_VAL_LO + 1, error, "CASM resolver value offsets changed"
 .assert CASM_RESOLVE_SIZE = CASM_RESOLVE_VAL_HI + 1, error, "CASM resolver output size changed"
 .assert CASM_RESOLVE_FLAG_MASK = %00000101, error, "CASM resolver flag mask changed"
+
+; ---------------------------------------------------------------------------
+; Phase 6B symbol table contract (WP27), amending WP26's Phase 0C.5 freeze
+; ---------------------------------------------------------------------------
+
+; VMM-backed symbol record. Meaningful fields keep the exact offsets WP26
+; froze; WP27 pads the record from 37 to 64 bytes (a power of two) so it
+; fits CASM_VMM_BUFFER_SIZE exactly in one transfer and so record-index-to-
+; VMM-offset arithmetic is a single 16-bit left-shift-by-6 rather than a
+; multiply by 37. Bytes 37-63 are reserved padding, zero-filled on every
+; write.
+CASM_SYMBOL_REC_NAMELEN = 0    ; 1 byte, 1..31
+CASM_SYMBOL_REC_NAME    = 1    ; 31-byte fixed slot
+CASM_SYMBOL_REC_VAL_LO  = 32
+CASM_SYMBOL_REC_VAL_HI  = 33
+CASM_SYMBOL_REC_FLAGS   = 34   ; bit 0 = DEFINED; remaining bits reserved
+CASM_SYMBOL_REC_NEXT_LO = 35   ; collision-chain record index; $FFFF = end of chain
+CASM_SYMBOL_REC_NEXT_HI = 36
+CASM_SYMBOL_REC_SIZE    = 64
+
+CASM_SYMBOL_FLAG_DEFINED = %00000001
+
+; Bounded capacity: 512 records x 64 bytes = 32768 bytes, one vmmStoreAlloc
+; call, well under CASM_VMM_ALLOC_MAX_BYTES. 128 hash buckets (a power of
+; two, masked with $7F -- no division needed).
+CASM_SYMBOL_MAX          = 512
+CASM_SYMBOL_BUCKET_COUNT = 128
+CASM_SYMBOL_BUCKET_MASK  = $7F
+CASM_SYMBOL_CHAIN_END    = $FFFF
+
+.assert CASM_SYMBOL_REC_NAME = CASM_SYMBOL_REC_NAMELEN + 1, error, "CASM symbol record name offset changed"
+.assert CASM_SYMBOL_REC_VAL_LO = CASM_SYMBOL_REC_NAME + 31, error, "CASM symbol record value offset changed"
+.assert CASM_SYMBOL_REC_VAL_HI = CASM_SYMBOL_REC_VAL_LO + 1, error, "CASM symbol record value offsets changed"
+.assert CASM_SYMBOL_REC_FLAGS = CASM_SYMBOL_REC_VAL_HI + 1, error, "CASM symbol record flags offset changed"
+.assert CASM_SYMBOL_REC_NEXT_LO = CASM_SYMBOL_REC_FLAGS + 1, error, "CASM symbol record next offset changed"
+.assert CASM_SYMBOL_REC_NEXT_HI = CASM_SYMBOL_REC_NEXT_LO + 1, error, "CASM symbol record next offsets changed"
+.assert CASM_SYMBOL_REC_SIZE = 64, error, "CASM symbol record size changed"
+.assert CASM_SYMBOL_REC_SIZE = CASM_VMM_BUFFER_SIZE, error, "CASM symbol record must fit one VMM transfer exactly"
+.assert CASM_SYMBOL_BUCKET_COUNT = CASM_SYMBOL_BUCKET_MASK + 1, error, "CASM symbol bucket count/mask mismatch"
+.assert CASM_SYMBOL_MAX * CASM_SYMBOL_REC_SIZE <= CASM_VMM_ALLOC_MAX_BYTES, error, "CASM symbol table exceeds one VMM allocation"
 
 ; ---------------------------------------------------------------------------
 ; Phase and cleanup state

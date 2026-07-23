@@ -368,6 +368,52 @@
     separately gated and unplanned in detail, per the CASM AGENTS.md
     per-work-package-plan-approval requirement
 
+- [x] Taskwarrior (`0dd437f3-3248-4294-aee7-39bb8571f1c8`): CASM Phase 6B
+      WP27 symbol table storage and hash index
+  - Branch `feature/casm-phase6-wp27`, from `feature/casm-phase6-wp26`'s
+    tip; baseline CASM `0.1.28` build 1112
+  - Plan: `brain/plans/2026-07-22-casm-phase6-wp27-symbol-table-storage.md`
+  - Reconciled beyond WP26's freeze: the 37-byte symbol record could not
+    fit through Phase 6A's existing 32-byte `CasmVmmBuffer` window at all;
+    user chose to pad the record to 64 bytes and grow the buffer to match,
+    replacing a 3-term multiply-by-37 with a single 16-bit shift-left-6 for
+    record-index-to-VMM-offset arithmetic
+  - Found `symbols.s` needs none of the predicted `CasmPassScratch0-3`
+    zero-page group (its transient state is all values, not pointers, so it
+    lives in ordinary BSS) -- leaves that group free for WP28
+  - Calling convention deliberately avoids `CasmValue0Lo/Hi` across nested
+    `vmmWindowRead`/`Write` calls (the shared-scratch-clobber bug class that
+    hit `vmm_store.s` three times in WP23-25); `symbolsLookup`'s signature
+    matches the Phase 5 resolver callback ABI exactly for zero-adapter WP28
+    binding
+  - Found and fixed (user-approved) a pre-existing Phase 6A defect:
+    `diagPrintFatal`'s message bound never covered `$28`-`$2B`, so all four
+    Phase 6A VMM diagnostics silently fell back to "UNKNOWN" since
+    WP23/24 -- fixed alongside wiring diagnostics `$2C`-`$2F`
+  - Implemented `src/external/casm/symbols.s` (`symbolsInit`/`symbolsInsert`/
+    `symbolsLookup`, private `symbolsFindChain`, 64-byte VMM records,
+    128-bucket hash index, 512-symbol cap), built and fixture-tested in
+    isolation -- no `casm.s`/`parser.s`/`opcodes.s` call site yet (WP28)
+  - `common.inc` amended (`CASM_VMM_BUFFER_SIZE` 32 -> 64, `CASM_SYMBOL_*`
+    constants, diagnostics `$2C`-`$2F`)
+  - New `tests/src/casm_symbols/casm_symbols.s` harness: 10 fixtures
+    (`syminit1`, `symins1`, `symlook1`, `symlookmiss1`, `symdup1`,
+    `symcase1`, `symchain1`, `symlen1`, `sympad1`, `symfull1`), all passing
+  - MAIN grown `$2B00` -> `$2F00` (848-byte measured overflow, 176 bytes
+    headroom). User ran `TEST_CASM_VMM` (regression) and `TEST_CASM_SYMBOL`
+    (new matrix) in VICE from `build/test.d64`: both passed, no `F`
+    failures
+  - Final CASM `0.1.29` build 1113, no-change rebuild stable, both
+    `image_d64` and `test_image_d64` build clean. **WP27 complete.**
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-22-casm-phase6-wp27-symbol-table-storage.md`
+  - WP28 (`712fe7af`) is unblocked in Taskwarrior but not yet planned in
+    detail; WP29 (Pass 2), WP30 (branch/disagreement detection), and WP31
+    (verification) remain separately gated, per the CASM AGENTS.md
+    per-work-package-plan-approval requirement
+  - **CASM Phase 6B WP28 (Pass 1 - address assignment and definitions) is
+    now the active CASM thread, gated on its own dedicated plan.**
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval
