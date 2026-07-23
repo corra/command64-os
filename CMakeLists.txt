@@ -467,12 +467,21 @@ foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     )
 endforeach()
 
+# CASM source fixtures carry an explicit ".s" suffix in their on-disk
+# PETSCII name (e.g. "casmhello.s"), distinct from the bare-named PRG
+# binaries elsewhere on this disk (and from the ".ref" trusted-reference
+# PRGs below) -- a directory listing's TYPE column is easy to miss, so the
+# name itself should make "this is source, not a program" obvious. Applies
+# only to real CASM assembly source text; the generic testseq/edlin*
+# SEQ fixtures below are plain text content, not source code, and keep
+# their existing bare names.
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
+    set(CASM_FIXTURE_DISK_NAME "${CASM_FIXTURE_NAME}.s")
     if(CASM_FIXTURE_NAME STREQUAL "casmempty")
         add_custom_command(
             TARGET test_image_d64 POST_BUILD
-            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_NAME}" -T SEQ
+            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
                 -L "${CMAKE_BINARY_DIR}/test.d64"
             COMMENT "Appending empty CASM SEQ fixture to test.d64"
             VERBATIM
@@ -480,9 +489,9 @@ foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     else()
         add_custom_command(
             TARGET test_image_d64 POST_BUILD
-            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_NAME}" -T SEQ
+            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
                 -w "${CASM_FIXTURE}" "${CMAKE_BINARY_DIR}/test.d64"
-            COMMENT "Appending ${CASM_FIXTURE_NAME} SEQ fixture to test.d64"
+            COMMENT "Appending ${CASM_FIXTURE_DISK_NAME} SEQ fixture to test.d64"
             VERBATIM
         )
     endif()

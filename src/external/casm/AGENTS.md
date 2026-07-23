@@ -91,6 +91,14 @@ The `src/external/casm` directory owns CASM, a native Command 64
   separately planned and approved multi-digit representation must be completed
   before any work package at version `0.1.9` may be completed. That migration
   must preserve the independent build-number component.
+- CASM assembly-source SEQ fixtures (`tests/fixtures/casm/*`,
+  `cmake/GenerateCasmTestFixtures.cmake` output) carry an explicit `.s` suffix
+  in their on-disk PETSCII name when written to a D64 image (e.g.
+  `casmhello.s`), distinct from PRG binaries and from the `.ref`
+  trusted-reference PRGs — a directory listing's TYPE column is easy to miss,
+  so the name itself must make "this is source, not a program" obvious. This
+  applies only to real CASM assembly source text; other SEQ text fixtures
+  (e.g. `testseq`, `edlintest`) are not source code and keep bare names.
 
 # Work Guidance
 
