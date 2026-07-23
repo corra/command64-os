@@ -1,0 +1,35 @@
+# CASM WP29 trusted reference: p1fwd1
+#
+# Independently hand-assembled from the p1fwd1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake (originally authored for WP28's Pass 1
+# "measure engine" sizing fixtures; reused here, per the user's confirmed
+# WP29 decision, as the real-emission trusted reference for the same
+# program). NOT produced by CASM. Cross-checks:
+#   - brain/plans/2026-07-22-casm-phase6-wp28-pass1-address-assignment.md
+#     ("p1fwd1" fixture, hand-verified Pass 1 sizing)
+#   - brain/plans/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md
+#     (Contract item 3, this fixture's real-emission byte derivation)
+#
+# Source (.ORG $0010):
+#   - LDA LOOP
+#   - LOOP: NOP
+#
+# LOOP is an unresolved forward reference when "LDA LOOP" is parsed in Pass 1;
+# CASM_PARSER_STMT_FORCE_ABS (derived from CASM_EXPR_FLAG_SYMBOL_DERIVED)
+# forces the operand to absolute width (3 bytes: opcode + 2-byte address)
+# regardless of the resolver's placeholder value. By Pass 2, LOOP resolves to
+# $0013 ($0010 + 3 bytes of LDA absolute) and the same absolute width is
+# reused for real emission -- proving Pass 1's forced width and Pass 2's
+# actual emission agree.
+#
+# Hand assembly:
+#   10 00        PRG load-address header ($0010, little-endian)
+#   AD 13 00     LDA $0013   (absolute -- NOT zero-page $A5 13)
+#   EA           NOP         (at $0013, defines LOOP)
+#
+# bytes: 6
+# sha256: 9d5821446dd4e9521d402e1b0babe0ff5a2287e261355b59e65d334237f48a4f
+
+10 00
+AD 13 00
+EA

@@ -108,9 +108,16 @@ These decisions must remain stable across the base phases:
 - Every source location carries file identity and line number from the start.
 - Expression evaluation returns value, resolution state, relocation class,
   extraction type, referenced-symbol identity, and signed addend.
-- Pass 2 emits structured emission events. The PRG writer consumes them first;
-  the future listing writer consumes the same events without duplicating code
-  generation.
+- Pass 1 and Pass 2 share one dispatch driven by a single pass-mode flag
+  (measure vs. emit), gated at exactly one point in the emission engine's byte
+  writer, rather than a structured event stream: WP26's Phase 0C.5 freeze
+  (`brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`)
+  found no real consumer existed yet to design an event shape against, and
+  deferred any structured "emission event" concept to Phase 10, when the
+  listing writer's actual needs are known. WP29
+  (`brain/plans/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`)
+  implements Pass 2 against this simpler design; this bullet originally
+  described the pre-Phase-6 intent and is corrected here to match.
 - Symbols are stored in VMM and found through a bounded base-RAM hash bucket
   array with VMM collision chains.
 - Symbol records reserve flags for definition, reference, relocation, and

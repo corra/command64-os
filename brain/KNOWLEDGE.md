@@ -575,6 +575,71 @@ contract. `feature/casm-phase6-wp28`, CASM `0.1.30` build `1123`.
   not one shared table) so cross-fixture `LOOP` reuse cannot collide.
 - MAIN envelope grown `$2F00` → `$3000` for WP28 (23-byte measured overflow).
 
+### CASM Phase 6B WP29 Pass 2 Resolution and Emission (Phase 0C.7, frozen 2026-07-23)
+
+Amends Phase 0C.5/0C.6 above with as-built corrections from WP29's actual
+implementation, not a restatement of the prior contract.
+`feature/casm-phase6-wp29`, CASM `0.1.30` build 1125 baseline.
+
+- **`casm.s`'s `start` is now a real two-pass orchestrator sharing one
+  private dispatch, `casmRunPass`.** Pass 1 runs `sourceOpen`/`lexerInit`/
+  `symbolsInit`/`emitInit` with `CasmPassMode = CASM_PASS_MODE_MEASURE` and
+  creates no output file; on success, Pass 2 calls `sourceRewind`/
+  `lexerInit` again, `fileCreateOutput` (moved here from before Pass 1),
+  `emitInit`, sets `CasmPassMode = CASM_PASS_MODE_EMIT`, and re-drives the
+  identical `casmRunPass` dispatch for real. `casmRunPass` itself only
+  branches on `CasmPassMode` for the label-statement case
+  (`CASM_TOKEN_IDENTIFIER`): `MEASURE` calls `symbolsInsert`, `EMIT` does
+  nothing (the label was already defined in Pass 1). Every other statement
+  type (`MNEMONIC`/`DIRECTIVE`) was already fully pass-transparent from
+  WP28's own work (`emitRawByte`'s single gate, `parserParseExpressionValue`'s
+  pass-mode-aware resolver handling) — no `symbols.s`/`parser.s`/`opcodes.s`/
+  `emit.s` changes were needed for WP29 at all.
+- **A real ca65 branch-range defect surfaced during the rewrite, not
+  anticipated by the plan.** Adding the Pass 1/Pass 2 body and the
+  `casmRunPass` routine between the early init-failure checks and the
+  original single `startFatal` tail pushed three `bcs` branches past the
+  ±127-byte relative-branch range. Fixed with two near trampolines rather
+  than one: `startInitFatal` (kept immediately after the init-only checks
+  it serves — `resourcesInit` through the initial `lexerInit`) and a new
+  `startFatalNear` (placed immediately after the Pass 1/Pass 2 body, before
+  `casmRunPass`, serving every failure branch inside that body). Both do a
+  plain `jmp startFatal`, which has no range limit. This is the same class
+  of fix `source.s`'s WP15 comment and WP28's `p1size1` cleanup already
+  document for this codebase — flagged here so a future WP expanding
+  `casm.s` further expects to re-hit it.
+- **Three already-hand-verified WP28 fixtures (`p1fwd1`, `p1back1`,
+  `p1size1`) were reused directly as WP29's trusted-reference source, per
+  user decision** — no new `.seq` fixtures were authored. Their real-emission
+  byte derivations are recorded in each `tests/fixtures/casm/*.ref.hex`
+  manifest's own header comment. `p1undef1` (also reused, unmodified) is
+  WP29's one end-to-end "real `casm.s` fails cleanly on Pass 2 undefined
+  symbol" fixture; the full duplicate/case-sensitivity/table-full
+  error-fixture matrix through production `casm.s` remains WP31's scope.
+- **Relative-branch displacement computation needed zero code changes.**
+  `emitInstruction`'s `eiRelative` path already computed displacement purely
+  from `CasmParserStmt.VAL_LO/VAL_HI` against `CasmPc`, with no dependency on
+  whether that value came from a literal or a resolved symbol expression —
+  confirmed by direct inspection during WP29 planning, not assumed. WP30's
+  remaining scope is range-check verification and Pass 1/Pass 2 disagreement
+  detection (`CASM_DIAG_PASS_MISMATCH`), not further branch-displacement
+  plumbing.
+- **The master plan and `AGENTS.md` previously described a structured
+  "Pass 2 emission events" design (2026-07-16) that WP26 had already
+  overridden (2026-07-22) without updating either document.** WP29 corrected
+  both to state the frozen single-`CasmPassMode`-flag design, cross-
+  referencing WP26's plan as the decision record.
+- MAIN measured directly via `ld65 -m` after the rewrite: CODE `$2070`
+  (8304) + RODATA `$090C` (2316) + BSS `$05ED` (1517) = 12137 of 12288
+  bytes — **151 bytes headroom, no MAIN size increase needed** (down from
+  WP28's 233-byte headroom; the ~82-byte growth is `casmRunPass` plus the
+  new imports, in line with the "modest, no new module" prediction).
+- Regression floor: the five pre-existing Phase 4/5 trusted references
+  (`casmemit1`, `casmhello`, `casmmodes`, `casmnum2`, `casmexprn`, none using
+  a label) still match byte-for-byte after the two-pass rewrite, confirming
+  the control-flow change altered no observable output for non-symbol
+  programs.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

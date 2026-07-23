@@ -460,12 +460,58 @@
     `image_d64` and `test_image_d64` build clean. **WP28 complete.**
   - Walkthrough:
     `brain/walkthroughs/2026-07-22-casm-phase6-wp28-pass1-address-assignment.md`
-  - WP29 (`8e989bdf`) is unblocked in Taskwarrior but not yet planned in
-    detail; WP30 (branch/disagreement detection) and WP31 (verification)
-    remain separately gated, per the CASM AGENTS.md
-    per-work-package-plan-approval requirement
-  - **CASM Phase 6B WP29 (Pass 2 - resolution and emission) is now the
-    active CASM thread, gated on its own dedicated plan.**
+
+- [x] Taskwarrior (`8e989bdf-7aed-4bfe-ae9c-3771edb7caf5`): CASM Phase 6B
+      WP29 Pass 2 - resolution and emission
+  - Branch `feature/casm-phase6-wp29`, from `feature/casm-phase6-wp28`'s
+    tip, CASM `0.1.30` build 1123 baseline
+  - Plan: `brain/plans/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`
+  - Direct research found WP29's real scope narrower than the parent plan's
+    prose: WP28 already bound `symbolsLookup` as the production resolver and
+    made `parserParseExpressionValue` pass-mode-aware, so WP29 needed zero
+    changes to `symbols.s`/`parser.s`/`opcodes.s`/`emit.s` -- purely a
+    `casm.s` orchestration rewrite
+  - Rewrote `start` as a two-pass driver sharing one new private dispatch,
+    `casmRunPass`: Pass 1 runs `CASM_PASS_MODE_MEASURE` to `EOF` with no
+    output file (labels insert via `symbolsInsert`); Pass 2 calls
+    `sourceRewind`/`lexerInit` again, moves `fileCreateOutput` here (from
+    its old pre-Pass-1 position), sets `CASM_PASS_MODE_EMIT`, and re-drives
+    the identical dispatch for real (labels are a no-op the second time)
+  - Building surfaced a real ca65 branch-range error (three `bcs` branches
+    pushed past +/-127 bytes) -- fixed with two near trampolines
+    (`startInitFatal` for pre-Pass-1 failures, `startFatalNear` for Pass
+    1/Pass 2 failures) rather than widening one, the same class of fix this
+    codebase has hit before
+  - Per the user's confirmed decisions: reused WP28's already-hand-verified
+    `p1fwd1`/`p1back1`/`p1size1` fixtures directly as the new
+    trusted-reference source (3 new `tests/fixtures/casm/*.ref.hex`
+    manifests, no new `.seq` files) and reused `p1undef1` unmodified as the
+    one end-to-end "real `casm.s` Pass 2 fails cleanly on undefined symbol"
+    fixture
+  - Corrected a real discrepancy found during dependency review: the master
+    plan and `AGENTS.md` both still described a structured "Pass 2 emission
+    events" design (2026-07-16) that WP26 had already overridden
+    (2026-07-22) without either document being updated -- both corrected in
+    place, cross-referencing WP26's plan
+  - Confirmed by direct inspection that relative-branch displacement
+    computation needs zero code changes (already consumes resolved symbol
+    values via `CasmParserStmt.VAL_LO/HI` regardless of origin) -- WP30's
+    remaining work is range-check verification and disagreement detection
+  - Measured MAIN directly via `ld65 -m`: 12137 of 12288 bytes, 151 bytes
+    headroom, no size increase needed. User ran the full VICE matrix (5
+    pre-existing Phase 4/5 trusted references as a non-symbol regression
+    check, 3 new label references, 1 undefined-symbol failure case) from
+    `build/test.d64` and `build/image.d64`: all passed ("All tests pass")
+  - Final CASM `0.1.31` build 1126, no-change rebuild stable, both
+    `image_d64` and `test_image_d64` build clean. **WP29 complete.**
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`
+  - WP30 (`a9a117d2`) is unblocked in Taskwarrior but not yet planned in
+    detail; WP31 (verification) remains separately gated, per the CASM
+    AGENTS.md per-work-package-plan-approval requirement
+  - **CASM Phase 6B WP30 (relative branches and Pass 1/Pass 2 disagreement
+    detection) is now the active CASM thread, gated on its own dedicated
+    plan.**
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

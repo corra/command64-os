@@ -592,8 +592,52 @@ WP26 plan:
       **WP28 is complete.** WP29 (`8e989bdf`) is now unblocked in
       Taskwarrior but requires its own dedicated plan drafted and approved
       before activation, per the CASM AGENTS.md gate.
-- [ ] `8e989bdf-7aed-4bfe-ae9c-3771edb7caf5`: WP29 Pass 2 - resolution and
-      emission.
+- [x] `8e989bdf-7aed-4bfe-ae9c-3771edb7caf5`: WP29 Pass 2 - resolution and
+      emission. Plan approved as drafted:
+      `brain/plans/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`.
+      Active on `feature/casm-phase6-wp29` from `feature/casm-phase6-wp28`'s
+      tip, CASM `0.1.30` build 1123 baseline. Direct research against the
+      current source found WP29's real scope narrower than the parent plan's
+      prose suggested: WP28 had already bound `symbolsLookup` as the
+      production resolver and made `parserParseExpressionValue` pass-mode-
+      aware, so WP29 needed zero changes to `symbols.s`/`parser.s`/
+      `opcodes.s`/`emit.s` -- it is purely a `casm.s` orchestration rewrite.
+      Rewrote `start` as a true two-pass driver sharing one new private
+      dispatch routine, `casmRunPass`: Pass 1 runs
+      `CASM_PASS_MODE_MEASURE` to `EOF` with no output file (labels insert
+      via `symbolsInsert`); on success, Pass 2 calls `sourceRewind`/
+      `lexerInit` again, moves `fileCreateOutput` to this point (previously
+      called before Pass 1), sets `CASM_PASS_MODE_EMIT`, and re-drives the
+      identical dispatch for real (labels are a no-op the second time).
+      Building surfaced a real ca65 branch-range error (three `bcs`
+      branches pushed past +/-127 bytes by the new code) -- fixed with two
+      near trampolines (`startInitFatal` for pre-Pass-1 failures,
+      `startFatalNear` for Pass 1/Pass 2 failures), the same class of fix
+      this codebase has hit before. Per the user's confirmed decisions:
+      reused WP28's already-hand-verified `p1fwd1`/`p1back1`/`p1size1`
+      fixtures directly as the new trusted-reference source (three new
+      `tests/fixtures/casm/*.ref.hex` manifests, no new `.seq` files) and
+      reused `p1undef1` unmodified as the one end-to-end "real `casm.s`
+      Pass 2 fails cleanly on an undefined symbol" fixture. Also corrected,
+      per the user's confirmed decision, a real discrepancy found during
+      dependency review: both the master plan's Foundational Design
+      Constraints and `AGENTS.md`'s Local Contracts still described a
+      structured "Pass 2 emission events" design from 2026-07-16 that WP26
+      had already overridden on 2026-07-22 (single `CasmPassMode` flag,
+      events deferred to Phase 10) without either document being updated --
+      both corrected in place, cross-referencing WP26's plan. Measured MAIN
+      directly via `ld65 -m`: 12137 of 12288 bytes used, 151 bytes headroom
+      -- no size increase needed. User ran the full VICE matrix (the five
+      pre-existing Phase 4/5 trusted references as a non-symbol regression
+      check, the three new label references, and the `p1undef1` failure
+      case) from `build/test.d64` and `build/image.d64`: all passed.
+      Version-only completion increment applied: final CASM `0.1.31` build
+      1126, no-change rebuild stable, both `image_d64` and `test_image_d64`
+      build clean. Walkthrough:
+      `brain/walkthroughs/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`.
+      **WP29 is complete.** WP30 (`a9a117d2`) is now unblocked in
+      Taskwarrior but requires its own dedicated plan drafted and approved
+      before activation, per the CASM AGENTS.md gate.
 - [ ] `a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`: WP30 relative branches and
       Pass 1/Pass 2 disagreement detection.
 - [ ] `86d8ac7e-0725-44b8-81ae-dcef143a20ad`: WP31 verification, walkthrough,
@@ -603,16 +647,15 @@ WP26 plan:
 
 - [ ] Symbol table duplicate, undefined, case-sensitive, and max-length
       behavior match the frozen contract.
-- [ ] Pass 1 assigns addresses and definitions without emitting output.
-- [ ] Pass 2 resolves symbols and emits final output.
+- [x] Pass 1 assigns addresses and definitions without emitting output.
+- [x] Pass 2 resolves symbols and emits final output.
 - [ ] Relative branches are computed from resolved symbols.
 - [ ] A Pass 1/Pass 2 disagreement is treated as fatal.
-- [ ] Static programs with forward and backward references match trusted
+- [x] Static programs with forward and backward references match trusted
       reference binaries byte-for-byte.
 
-WP26 is complete and approved (CASM `0.1.28` build 1103). CASM Phase 6B may
-not begin real symbol-table or pass-source work (WP27+) before each of
-those work packages has its own dedicated plan drafted and separately
-approved, per the CASM AGENTS.md per-work-package-plan gate -- WP26's
-completion unblocks WP27's plan, it does not authorize WP27's
-implementation.
+WP26-WP29 are complete and approved (CASM `0.1.31` build 1126). CASM Phase
+6B may not proceed with WP30's real source work before it has its own
+dedicated plan drafted and separately approved, per the CASM AGENTS.md
+per-work-package-plan gate -- WP29's completion unblocks WP30's plan, it
+does not authorize WP30's implementation.

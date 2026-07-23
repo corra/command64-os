@@ -1,0 +1,35 @@
+# CASM WP29 trusted reference: p1back1
+#
+# Independently hand-assembled from the p1back1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake (originally authored for WP28's Pass 1
+# "measure engine" sizing fixtures; reused here, per the user's confirmed
+# WP29 decision, as the real-emission trusted reference for the same
+# program). NOT produced by CASM. Cross-checks:
+#   - brain/plans/2026-07-22-casm-phase6-wp28-pass1-address-assignment.md
+#     ("p1back1" fixture, hand-verified Pass 1 sizing)
+#   - brain/plans/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md
+#     (Contract item 3, this fixture's real-emission byte derivation)
+#
+# Source (.ORG $0010):
+#   - LOOP: NOP
+#   - LDA LOOP
+#
+# LOOP is defined ($0010, deliberately a zero-page-eligible value) before
+# "LDA LOOP" is even parsed. This is the fixture that would fail if
+# CASM_PARSER_STMT_FORCE_ABS were ever derived from CASM_EXPR_FLAG_FORCE_ABS
+# (set only on the unresolved sub-path) instead of the frozen
+# CASM_EXPR_FLAG_SYMBOL_DERIVED (set on any resolver success, resolved or
+# not): a resolved, small-valued backward reference must still emit
+# absolute-width (3 bytes), never shrink to zero-page (2 bytes).
+#
+# Hand assembly:
+#   10 00        PRG load-address header ($0010, little-endian)
+#   EA           NOP         (at $0010, defines LOOP)
+#   AD 10 00     LDA $0010   (absolute -- NOT zero-page $A5 10)
+#
+# bytes: 6
+# sha256: 2bc0fea1c6026259d994e64f7dab53395e4fa1dcfce251592bec5ab3ea719240
+
+10 00
+EA
+AD 10 00

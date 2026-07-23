@@ -3,18 +3,20 @@
 ; Copyright (c) 2026 Command64 project contributors
 ;
 ; CASM native 6502/6510 assembler entry point. Owns the production assembly
-; orchestration (Phase 4 WP14): initialize resources/CLI/file-IO/source/lexer,
-; derive and create the output PRG, run the single-pass compiler loop
-; (parse -> match -> emit) to EOF, finalize the output, and route every success
-; and failure through central cleanup. Handle ownership, partial-output abort,
-; and single-close semantics are documented at start and startParseLoop below.
+; orchestration: initialize resources/CLI/file-IO/source/lexer/symbol table,
+; run a real two-pass assembly (Phase 6B WP29) -- Pass 1 measures addresses and
+; defines labels with no output file; Pass 2 rewinds the source, creates the
+; output PRG, and emits for real, now that every label resolves through the
+; WP27 symbol table -- finalize the output, and route every success and
+; failure through central cleanup. Handle ownership, partial-output abort, and
+; single-close semantics are documented at start and casmRunPass below.
 
 .include "command64.inc"
 .include "common.inc"
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "30"
+.define VERSION_STAGE "31"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -36,8 +38,14 @@
 .import lexerInit
 .import parserParseStatement
 .import CasmParserStmt
+.import CasmLabelName
+.import CasmLabelNameLen
 .import opcodesFindOpcode
 .import diagPrintPhase2Ready
+
+.import sourceRewind
+.import symbolsInit
+.import symbolsInsert
 
 .import CasmOutputName
 .import fileCreateOutput
@@ -46,6 +54,8 @@
 .import emitInstruction
 .import emitDirective
 .import emitFinalize
+.import CasmPc
+.import CasmPassMode
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -97,70 +107,133 @@ start:
 startOptionsReady:
     jsr cliDeriveOutputName
     bcs startInitFatal
+
+    jsr symbolsInit
+    bcs startInitFatal
     jsr sourceOpen
     bcs startInitFatal
-
     jsr lexerInit
     bcs startInitFatal
-
-    ; Create the output PRG and initialize the emission engine.
-    ldx #<CasmOutputName
-    ldy #>CasmOutputName
-    jsr fileCreateOutput
-    bcs startInitFatal
-    jsr emitInit
-    bcs startInitFatal
-    jmp startParseLoop
+    jmp startPass1
 
 startInitFatal:
     ; Trampoline: initialization branches are out of direct range of the
-    ; fatal tail below.
+    ; fatal tail below. Kept immediately after the init-only checks that use
+    ; it (everything through the initial lexerInit) -- Pass 1/Pass 2 failures
+    ; below use their own nearby startFatalNear trampoline instead, since this
+    ; one is now too far from them to reach in a single branch.
     jmp startFatal
 
-    ; Production compiler loop (Phase 4 WP14). Single pass: parse one statement,
-    ; then dispatch by type -- a MNEMONIC is matched by the opcode table and
-    ; emitted, a DIRECTIVE is handled by the emission engine, a NEWLINE emits
-    ; nothing, and EOF finalizes. Every syntax, addressing-mode, operand-range,
-    ; and emission diagnostic returns C set with A = CASM_DIAG_* and funnels
-    ; through startFatal. On success the output is left registry-owned for a
-    ; checked close during cleanup; INPUT VALIDATED prints only after the final
-    ; buffered write (emitFinalize) succeeds.
-    ;
-    ; The WP14 audit kept this loop in casm.s rather than extracting a
-    ; compiler.s module: it is bounded dispatch glue over the already-modular
-    ; parser/opcode/emit ABIs, tightly coupled to the entry init sequence and
-    ; the startInitFatal/startFatal trampolines, so a separate module would add
-    ; an export boundary without clarifying one. It also must not anticipate the
-    ; later Pass 1/Pass 2 architecture.
-startParseLoop:
-    jsr parserParseStatement
-    bcs startFatal
-    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
-    cmp #CASM_TOKEN_MNEMONIC
-    beq startEmitInsn
-    cmp #CASM_TOKEN_DIRECTIVE
-    beq startEmitDir
-    cmp #CASM_TOKEN_EOF
-    beq startAssembled
-    jmp startParseLoop          ; NEWLINE: nothing to emit
-startEmitInsn:
-    jsr opcodesFindOpcode
-    bcs startFatal
-    jsr emitInstruction
-    bcs startFatal
-    jmp startParseLoop
-startEmitDir:
-    jsr emitDirective
-    bcs startFatal
-    jmp startParseLoop
+startPass1:
+    ; Pass 1 (WP29): measure addresses and define labels. No output file
+    ; exists yet -- emitOrg's header write and every emitRawByte call
+    ; automatically no-op under CASM_PASS_MODE_MEASURE (emit.s), so it is
+    ; safe to drive the full dispatch here before fileCreateOutput ever runs.
+    jsr emitInit
+    bcs startFatalNear
+    lda #CASM_PASS_MODE_MEASURE
+    sta CasmPassMode
+    jsr casmRunPass
+    bcs startFatalNear          ; outputAbort is a safe no-op: no output
+                                 ; file was ever created this pass
 
-startAssembled:
+    ; Pass 2 (WP29): rewind the identical source, recreate the output PRG,
+    ; and re-drive the same dispatch for real now that every label the
+    ; source defines is in the symbol table.
+    jsr sourceRewind
+    bcs startFatalNear
+    jsr lexerInit
+    bcs startFatalNear
+    ldx #<CasmOutputName
+    ldy #>CasmOutputName
+    jsr fileCreateOutput
+    bcs startFatalNear
+    jsr emitInit
+    bcs startFatalNear
+    lda #CASM_PASS_MODE_EMIT
+    sta CasmPassMode
+    jsr casmRunPass
+    bcs startFatalNear
+
     jsr emitFinalize
-    bcs startFatal
+    bcs startFatalNear
     jsr diagPrintPhase2Ready
     jsr sourceClose
-    bcs startFatal
+    bcs startFatalNear
     jmp exitSuccess
+
+startFatalNear:
+    ; Trampoline: Pass 1/Pass 2 failure branches are out of direct range of
+    ; the fatal tail below (past the full casmRunPass routine).
+    jmp startFatal
+
+; ---------------------------------------------------------------------------
+; casmRunPass (private)
+; The single per-statement dispatch shared by both passes (WP29, per the
+; Phase 0C.5 freeze): parse one statement, then dispatch by type -- a label
+; (IDENTIFIER) inserts into the symbol table only under CASM_PASS_MODE_MEASURE
+; (Pass 2 has nothing to do for a label: it was already defined in Pass 1), a
+; MNEMONIC is matched by the opcode table and emitted, a DIRECTIVE is handled
+; by the emission engine, a NEWLINE emits nothing, and EOF ends the pass
+; cleanly. Every routine this calls is already pass-mode-correct on its own
+; (emitRawByte's single CasmPassMode gate, parserParseExpressionValue's
+; pass-mode-aware resolver handling) -- this loop itself branches on
+; CasmPassMode only for the label case. On success the output is left
+; registry-owned for a checked close during cleanup; INPUT VALIDATED prints
+; only after the final buffered write (emitFinalize) succeeds.
+;
+; Inputs:    CasmPassMode set by the caller for this pass; lexer/source READY
+; Outputs:   C clear at CASM_TOKEN_EOF; C set with A = CASM_DIAG_* on any
+;            parse, symbol-table, addressing-mode, or emission failure
+; Clobbers:  A, X, Y, CasmParser*/CasmLabelName* scratch, lexer/source/emit/
+;            symbol volatile state
+; ---------------------------------------------------------------------------
+casmRunPass:
+    jsr parserParseStatement
+    bcs crpFail
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq crpLabel
+    cmp #CASM_TOKEN_MNEMONIC
+    beq crpInsn
+    cmp #CASM_TOKEN_DIRECTIVE
+    beq crpDir
+    cmp #CASM_TOKEN_EOF
+    beq crpDone
+    jmp casmRunPass              ; NEWLINE: nothing to do
+
+crpLabel:
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_MEASURE
+    bne casmRunPass              ; EMIT: nothing to do for a label statement
+    lda CasmLabelNameLen
+    ldx #<CasmLabelName
+    ldy #>CasmLabelName
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldx CasmPc
+    ldy CasmPc + 1
+    jsr symbolsInsert
+    bcs crpFail
+    jmp casmRunPass
+
+crpInsn:
+    jsr opcodesFindOpcode
+    bcs crpFail
+    jsr emitInstruction
+    bcs crpFail
+    jmp casmRunPass
+
+crpDir:
+    jsr emitDirective
+    bcs crpFail
+    jmp casmRunPass
+
+crpDone:
+    clc
+    rts
+crpFail:
+    rts                          ; C already set, A = CASM_DIAG_*
 
 startFatal:
     ; Best-effort delete of any partial output while preserving the primary

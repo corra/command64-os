@@ -61,8 +61,14 @@ The `src/external/casm` directory owns CASM, a native Command 64
   rewind.
 - Keep Pass 1 and Pass 2 deterministic; Pass 2 reparses a rewindable source
   stream rather than relying on an unbounded in-memory syntax tree.
-- Emit structured events in Pass 2 so PRG, listing, and map consumers do not
-  duplicate instruction generation.
+- Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
+  by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
+  point in the emission engine's byte writer -- not a structured event
+  stream. A future listing/map consumer (Phase 10) designs its own event
+  shape against its real needs at that time rather than reusing a
+  speculative one built now. See
+  `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
+  (Phase 0C.5 freeze) for the decision record.
 - Do not implement a phase until the user approves that phase's prerequisite
   contract gate. Phase 0A governs the scaffold; Phase 0B governs Phase 2 CLI
   and file services; later language/storage contracts remain Phase 0C work.

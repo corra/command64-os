@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6B WP29 Pass 2 — resolution and emission** (complete, CASM
+  `0.1.31` build 1126): rewrote `casm.s`'s single-pass `start` as a real
+  two-pass orchestrator sharing one new private dispatch, `casmRunPass`.
+  Pass 1 drives WP28's measure engine to completion with no output file
+  created; Pass 2 rewinds the identical source (`sourceRewind`/`lexerInit`),
+  creates the output PRG (moved here from before Pass 1), switches to
+  `CASM_PASS_MODE_EMIT`, and re-drives the identical dispatch for real, now
+  that every label resolves through the WP27 symbol table. Needed zero
+  changes to `symbols.s`/`parser.s`/`opcodes.s`/`emit.s` — WP28 had already
+  built and fixture-tested everything those modules needed. Building
+  surfaced a real ca65 branch-range error (three `bcs` branches pushed past
+  ±127 bytes by the new code), fixed with two near trampolines
+  (`startInitFatal`, `startFatalNear`) rather than widening one. Added three
+  new trusted-reference manifests
+  (`tests/fixtures/casm/p1fwd1.ref.hex`/`p1back1.ref.hex`/`p1size1.ref.hex`),
+  reusing WP28's already-hand-verified fixture sources directly rather than
+  authoring parallel copies; `p1back1` proves a resolved, small-valued
+  backward reference still emits absolute-width rather than shrinking to
+  zero-page. Reused `p1undef1` unmodified as the one end-to-end fixture
+  proving a genuinely undefined symbol fails cleanly through the real
+  `casm.s` Pass 2 path (diagnostic print, output abort, no partial PRG left
+  on disk). Corrected a real discrepancy found during planning: the master
+  plan and `AGENTS.md` both still described a structured "Pass 2 emission
+  events" design predating WP26's approved single-`CasmPassMode`-flag
+  contract — both corrected in place. MAIN measured at 12137 of 12288
+  bytes (151 bytes headroom), no size increase needed. User ran the full
+  VICE matrix (5 pre-existing trusted references as a non-symbol regression
+  check, 3 new label references, 1 undefined-symbol failure case): all
+  passed.
 - **CASM Phase 6B WP28 Pass 1 — address assignment and definitions**
   (complete, CASM `0.1.30` build 1123): wired WP27's symbol table into a
   real two-pass foundation. Added `CASM_PASS_MODE_MEASURE` /
