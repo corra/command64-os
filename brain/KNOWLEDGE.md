@@ -640,6 +640,75 @@ implementation, not a restatement of the prior contract.
   the control-flow change altered no observable output for non-symbol
   programs.
 
+### CASM Phase 6B WP30 Branches and Disagreement Detection (Phase 0C.8, frozen 2026-07-23)
+
+Amends Phase 0C.5-0C.7 above with as-built corrections from WP30's actual
+implementation and VICE verification. `feature/casm-phase6-wp30`, CASM
+`0.1.32` build 1130.
+
+- **Relative-branch addressing-mode selection needed no code change.**
+  `opcodesFindOpcode` resolves any branch mnemonic to `CASM_MODE_RELATIVE`
+  before it ever reaches the zero-page/absolute decision that consults
+  `CASM_PARSER_STMT_FORCE_ABS` — confirmed by direct inspection specifically
+  for this plan, not carried forward unverified from WP29's note.
+- **A real, previously-latent defect: `eiRelative` computed the branch range
+  check even in `CASM_PASS_MODE_MEASURE`, using the resolver's `$0000`
+  placeholder for a still-unresolved forward reference.** This produced a
+  spurious `CASM_DIAG_BRANCH_OUT_OF_RANGE` in Pass 1 regardless of the real,
+  in-range Pass 2 distance — exposed by `brfwd1` (`.ORG $C000` / `BNE LOOP`
+  / `NOP` / `NOP` / `LOOP: RTS`, LOOP resolving to `$C004`, displacement
+  `+2`), the first fixture ever to use a label as a branch target. Latent
+  since Phase 4 (`eiRelative` predates Phase 6B); `brback1` (backward
+  reference) never triggered it since its label is already resolved before
+  the branch is parsed, and `brrng1` (deliberately out-of-range) "passed"
+  before the fix only coincidentally — the *right* diagnostic for the
+  *wrong* reason (Pass 1's spurious error, not Pass 2's real one). **Fixed**
+  by adding a `CasmPassMode` check to `eiRelative`: `MEASURE` mode skips the
+  range check entirely (the operand byte's value doesn't matter either,
+  since `emitRawByte`'s single gate never writes it) and falls through
+  directly to the existing `emitByte` call; `EMIT` mode enforces the range
+  exactly as before. Mirrors the same tolerate-in-MEASURE/enforce-in-EMIT
+  pattern already established for `CASM_DIAG_UNDEFINED_SYMBOL`
+  (`parser.s`'s `pevUnresolved`). Surfaced to the user with the exact root
+  cause and proposed fix before any source was touched, since it was not in
+  the approved plan's scope — a real material deviation, not a planned
+  change.
+- **A genuine Pass 1/Pass 2 disagreement is believed unreachable through any
+  legitimate CASM source today.** `CASM_PARSER_STMT_FORCE_ABS` derives from
+  `CASM_EXPR_FLAG_SYMBOL_DERIVED`, set identically in both passes regardless
+  of resolution (`symbolsLookup` never returns `C` set for "not found");
+  branch mnemonics never consult `FORCE_ABS` at all (item 1 above). No
+  combination of forward/backward reference or branch/non-branch operand
+  can currently produce a different size in Pass 2 than Pass 1.
+  `CASM_DIAG_PASS_MISMATCH` is implemented as a defensive internal
+  invariant against future defects (e.g., a later phase's macro/include
+  expansion breaking this determinism), not a demonstrated user-reachable
+  path — matching the master plan's own hedged wording ("if one can be
+  triggered deterministically").
+- **The disagreement check lives in `emit.s`, not `casm.s`, specifically so
+  it can be unit-tested.** `casm.s`'s own `HEADER`/entry point can never be
+  linked by a standalone test harness (every existing harness excludes it
+  for exactly this reason), so `CasmPass1FinalPc` (2-byte BSS) and
+  `emitCheckPassAgreement` (compares `CasmPc` against it; `C` clear on
+  match, `C` set + `CASM_DIAG_PASS_MISMATCH` on mismatch, clearing any stale
+  diagnostic location first) are exported from `emit.s`, which already owns
+  `CasmPc`. `casm.s` only calls it at the two right points (snapshot after
+  Pass 1, check after Pass 2) and owns no comparison logic itself. A new
+  standalone `test_casm_passcheck` harness pokes both cells directly
+  (no real two-pass assembly) and proves both directions — the only
+  positive proof of the fatal path, since no real fixture can reach it.
+- **New fixtures close the "no fixture has ever used a label as a branch
+  target" gap:** `brfwd1`/`brback1` (byte-exact trusted references, forward
+  and backward) and `brrng1` (reuses Phase 4's exact `casmbrp2` boundary —
+  displacement `+128`, one past the `+127` maximum — with a label operand
+  instead of a literal).
+- MAIN measured directly via `ld65 -m` after both fixes: CODE `$20A4`
+  (8356) + RODATA `$090C` (2316) + BSS `$05EF` (1519) = 12191 of 12288
+  bytes — **97 bytes headroom, no MAIN size increase needed** (down from
+  107 bytes measured after the disagreement-check wiring alone, before the
+  `eiRelative` fix and its own branch-range trampoline added the remaining
+  10 bytes; down from WP29's 151-byte close overall).
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

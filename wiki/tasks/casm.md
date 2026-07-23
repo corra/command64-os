@@ -638,8 +638,51 @@ WP26 plan:
       **WP29 is complete.** WP30 (`a9a117d2`) is now unblocked in
       Taskwarrior but requires its own dedicated plan drafted and approved
       before activation, per the CASM AGENTS.md gate.
-- [ ] `a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`: WP30 relative branches and
-      Pass 1/Pass 2 disagreement detection.
+- [x] `a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`: WP30 relative branches and
+      Pass 1/Pass 2 disagreement detection. Plan approved as drafted:
+      `brain/plans/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md`.
+      Active on `feature/casm-phase6-wp30` from `feature/casm-phase6-wp29`'s
+      tip, CASM `0.1.31` build 1126 baseline. Planning-time inspection
+      confirmed `opcodesFindOpcode` resolves any branch mnemonic to
+      `CASM_MODE_RELATIVE` before ever consulting `CASM_PARSER_STMT_FORCE_ABS`,
+      so relative-branch resolution needed no `opcodes.s` changes -- WP30's
+      only planned production code was `CASM_DIAG_PASS_MISMATCH` detection
+      (`CasmPass1FinalPc` + `emitCheckPassAgreement`, co-located in `emit.s`
+      per the user's confirmed decision so a new standalone
+      `test_casm_passcheck` harness could prove the fatal path fires, since
+      `casm.s` itself can never be linked by any test harness).
+      Per the user's confirmed decision, added three new fixtures closing a
+      real coverage gap (no prior fixture, Phase 4 included, had ever used a
+      label as a branch target): `brfwd1`/`brback1` (new trusted references)
+      and `brrng1` (reuses Phase 4's exact `casmbrp2` boundary with a label
+      operand). `brfwd1` immediately exposed a real, previously-latent
+      defect: `eiRelative` computed the `-128..127` range check even in
+      `CASM_PASS_MODE_MEASURE`, using the `$0000` placeholder
+      `pevMeasureUnresolved` stores for a still-unresolved forward
+      reference -- producing a spurious `CASM_DIAG_BRANCH_OUT_OF_RANGE` in
+      Pass 1 regardless of the real, in-range Pass 2 distance. Latent since
+      Phase 4 (`eiRelative` predates Phase 6B); `brrng1` had been passing
+      before the fix only coincidentally (the right diagnostic for the
+      wrong reason). Presented the exact root cause and proposed fix to the
+      user before touching source, since it was not in the approved plan's
+      scope; fixed with explicit approval by making `eiRelative`
+      pass-mode-aware (skip the range check entirely in `MEASURE` mode,
+      mirroring the existing `CASM_DIAG_UNDEFINED_SYMBOL` pattern). The fix
+      itself pushed one existing branch out of ca65's +/-127-byte range,
+      fixed with a `bcc :+ / jmp eiRet / :` trampoline. Measured MAIN
+      directly via `ld65 -m`: 12191 of 12288 bytes used, 97 bytes headroom
+      -- no size increase needed. User ran the full VICE matrix twice (round
+      1 caught the `brfwd1` defect; round 2, after the fix, added a
+      regression check against Phase 4's literal-target branch fixtures
+      `casmbrp1`/`brp2`/`brn1`/`brn2` since they exercise the same
+      `eiRelative` path the fix touched): both rounds confirmed "All tests
+      pass." Version-only completion increment applied: final CASM
+      `0.1.32` build 1130, no-change rebuild stable, both `image_d64` and
+      `test_image_d64` build clean. Walkthrough:
+      `brain/walkthroughs/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md`.
+      **WP30 is complete.** WP31 (`86d8ac7e`) is now unblocked in
+      Taskwarrior but requires its own dedicated plan drafted and approved
+      before activation, per the CASM AGENTS.md gate.
 - [ ] `86d8ac7e-0725-44b8-81ae-dcef143a20ad`: WP31 verification, walkthrough,
       and completion gate.
 
@@ -649,13 +692,13 @@ WP26 plan:
       behavior match the frozen contract.
 - [x] Pass 1 assigns addresses and definitions without emitting output.
 - [x] Pass 2 resolves symbols and emits final output.
-- [ ] Relative branches are computed from resolved symbols.
-- [ ] A Pass 1/Pass 2 disagreement is treated as fatal.
+- [x] Relative branches are computed from resolved symbols.
+- [x] A Pass 1/Pass 2 disagreement is treated as fatal.
 - [x] Static programs with forward and backward references match trusted
       reference binaries byte-for-byte.
 
-WP26-WP29 are complete and approved (CASM `0.1.31` build 1126). CASM Phase
-6B may not proceed with WP30's real source work before it has its own
+WP26-WP30 are complete and approved (CASM `0.1.32` build 1130). CASM Phase
+6B may not proceed with WP31's real source work before it has its own
 dedicated plan drafted and separately approved, per the CASM AGENTS.md
-per-work-package-plan gate -- WP29's completion unblocks WP30's plan, it
-does not authorize WP30's implementation.
+per-work-package-plan gate -- WP30's completion unblocks WP31's plan, it
+does not authorize WP31's implementation.

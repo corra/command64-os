@@ -303,6 +303,30 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "3200")
         endif()
+        if(TEST_NAME STREQUAL "casm_passcheck")
+            # WP30: exercises emitCheckPassAgreement in isolation (no real
+            # two-pass assembly). Reuses casm_pass1's exact source list --
+            # emit.s transitively references parser.s/expr.s/symbols.s/
+            # fileio.s/lexer.s/state.s even though this harness's own test
+            # logic never calls sourceOpen/lexerInit/parserParseStatement;
+            # ld65 links whole object files, so every symbol emit.s
+            # references must still resolve.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "3200")
+        endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
     endforeach()
@@ -438,6 +462,10 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/p1undef1.seq"
     "${CASM_TEST_FIXTURE_DIR}/p1dup1.seq"
     "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
+    # WP30 relative-branch fixtures
+    "${CASM_TEST_FIXTURE_DIR}/brfwd1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/brback1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/brrng1.seq"
 )
 
 add_custom_command(
@@ -461,7 +489,7 @@ add_custom_target(casm_test_fixtures DEPENDS ${CASM_TEST_FIXTURES})
 set(CASM_REF_DIR "${CMAKE_BINARY_DIR}/casm_refs")
 set(CASM_REF_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/tests/fixtures/casm")
 set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
-    p1fwd1 p1back1 p1size1)
+    p1fwd1 p1back1 p1size1 brfwd1 brback1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

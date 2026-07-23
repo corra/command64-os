@@ -506,12 +506,54 @@
     `image_d64` and `test_image_d64` build clean. **WP29 complete.**
   - Walkthrough:
     `brain/walkthroughs/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`
-  - WP30 (`a9a117d2`) is unblocked in Taskwarrior but not yet planned in
-    detail; WP31 (verification) remains separately gated, per the CASM
-    AGENTS.md per-work-package-plan-approval requirement
-  - **CASM Phase 6B WP30 (relative branches and Pass 1/Pass 2 disagreement
-    detection) is now the active CASM thread, gated on its own dedicated
-    plan.**
+
+- [x] Taskwarrior (`a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`): CASM Phase 6B
+      WP30 relative branches and Pass 1/Pass 2 disagreement detection
+  - Branch `feature/casm-phase6-wp30`, from `feature/casm-phase6-wp29`'s
+    tip, CASM `0.1.31` build 1126 baseline
+  - Plan: `brain/plans/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md`
+  - Confirmed by direct inspection that `opcodesFindOpcode` resolves any
+    branch mnemonic to `CASM_MODE_RELATIVE` before ever consulting
+    `CASM_PARSER_STMT_FORCE_ABS`, so relative-branch resolution needed no
+    `opcodes.s` changes -- the only planned production code was
+    `CASM_DIAG_PASS_MISMATCH` detection
+  - Per the user's confirmed decisions: co-located `CasmPass1FinalPc` +
+    `emitCheckPassAgreement` in `emit.s` (not `casm.s`, which can never be
+    linked by a standalone harness) so a new `test_casm_passcheck` unit
+    harness could prove the fatal path fires directly; added 3 new
+    relative-branch fixtures (`brfwd1`, `brback1`, `brrng1`) closing a real
+    gap -- no prior fixture, Phase 4 included, had ever used a label as a
+    branch target
+  - `brfwd1` immediately exposed a real, previously-latent defect (not a
+    fixture-authoring mistake): `eiRelative` computed the `-128..127` range
+    check even in `CASM_PASS_MODE_MEASURE`, using the `$0000` placeholder
+    `pevMeasureUnresolved` stores for a still-unresolved forward reference
+    -- producing spurious `CASM_DIAG_BRANCH_OUT_OF_RANGE` in Pass 1
+    regardless of the real, in-range Pass 2 distance. Latent since Phase 4;
+    `brrng1` had been passing before the fix only coincidentally (right
+    diagnostic, wrong reason -- Pass 1's spurious error, not Pass 2's real
+    one)
+  - Presented the exact root cause and proposed fix to the user before
+    touching source (not in the approved plan's scope); fixed with
+    explicit approval by making `eiRelative` pass-mode-aware, mirroring the
+    existing `CASM_DIAG_UNDEFINED_SYMBOL` tolerate-in-MEASURE/
+    enforce-in-EMIT pattern. The fix itself pushed an existing branch past
+    ca65's +/-127-byte range, fixed with a `bcc :+ / jmp eiRet / :`
+    trampoline
+  - Measured MAIN directly via `ld65 -m`: 12191 of 12288 bytes, 97 bytes
+    headroom, no size increase needed. User ran the full VICE matrix twice
+    (round 1 caught the `brfwd1` defect; round 2, post-fix, added a
+    regression check against Phase 4's literal-target branch fixtures
+    `casmbrp1`/`brp2`/`brn1`/`brn2`): both rounds confirmed "All tests pass"
+  - Final CASM `0.1.32` build 1130, no-change rebuild stable, both
+    `image_d64` and `test_image_d64` build clean. **WP30 complete.**
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md`
+  - WP31 (`86d8ac7e`) is unblocked in Taskwarrior but not yet planned in
+    detail, per the CASM AGENTS.md per-work-package-plan-approval
+    requirement
+  - **CASM Phase 6B WP31 (verification, walkthrough, and completion gate)
+    is now the active CASM thread, gated on its own dedicated plan.**
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

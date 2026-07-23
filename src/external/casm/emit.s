@@ -31,12 +31,19 @@
 .import diagSetLocFromToken
 .import diagSetLocFromStmt
 
+; WP30: emitCheckPassAgreement's failure is not "at" any particular source
+; line (it fires after Pass 2 reaches EOF), so it clears any stale location
+; left over from the last real statement rather than inheriting it.
+.import diagClearLoc
+
 .export emitInit
 .export emitInstruction
 .export emitDirective
 .export emitFinalize
+.export emitCheckPassAgreement
 .export CasmPc
 .export CasmPassMode
+.export CasmPass1FinalPc
 
 .segment "BSS"
 
@@ -46,6 +53,13 @@ CasmPcOverflow: .res 1   ; latched when the PC advances past $FFFF
 CasmEmitLen:    .res 1   ; staged byte count in CasmEmitBuffer
 CasmPassMode:   .res 1   ; CASM_PASS_MODE_MEASURE or CASM_PASS_MODE_EMIT
 CasmEmitBuffer: .res CASM_EMIT_BUFFER_SIZE
+
+; WP30: CasmPc snapshotted by the orchestration driver (casm.s) at the end of
+; Pass 1, compared against the final CasmPc at the end of Pass 2 by
+; emitCheckPassAgreement below. Lives here (not casm.s) so a standalone test
+; harness can poke both cells directly and prove the comparison itself works
+; -- casm.s's own HEADER/entry point can never be linked by a harness.
+CasmPass1FinalPc: .res 2
 
 .segment "CODE"
 
@@ -80,6 +94,37 @@ emitFinalize:
     jmp emitFlush
 
 ; ---------------------------------------------------------------------------
+; emitCheckPassAgreement
+; Compare CasmPc against CasmPass1FinalPc (the value the orchestration driver
+; snapshotted at the end of Pass 1). A genuine disagreement is not believed
+; reachable through any legitimate CASM source under the current grammar --
+; CASM_PARSER_STMT_FORCE_ABS is derived from CASM_EXPR_FLAG_SYMBOL_DERIVED,
+; which is set identically in both passes regardless of resolution state, and
+; branch mnemonics never consult it at all -- this exists as a defensive
+; internal invariant, not a demonstrated user-reachable path.
+; Inputs:  CasmPc = the final program counter just reached (either pass);
+;          CasmPass1FinalPc = the value snapshotted at the end of Pass 1
+; Outputs: C clear if they match; C set with A = CASM_DIAG_PASS_MISMATCH if
+;          they differ (locationless -- calls diagClearLoc first, since this
+;          failure is not "at" any specific source line)
+; Clobbers: A, processor flags
+; ---------------------------------------------------------------------------
+emitCheckPassAgreement:
+    lda CasmPc
+    cmp CasmPass1FinalPc
+    bne ecpaMismatch
+    lda CasmPc + 1
+    cmp CasmPass1FinalPc + 1
+    bne ecpaMismatch
+    clc
+    rts
+ecpaMismatch:
+    jsr diagClearLoc
+    lda #CASM_DIAG_PASS_MISMATCH
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; emitInstruction
 ; Emit a matched instruction: opcode followed by its operand bytes per
 ; CasmInsn.Length/Mode, using CasmParserStmt.Val.
@@ -89,7 +134,10 @@ emitFinalize:
 ; ---------------------------------------------------------------------------
 emitInstruction:
     jsr emitRequireOrg
-    bcs eiRet
+    bcc :+
+    jmp eiRet                    ; WP30: pushed out of branch range by the
+                                  ; new eiRelative pass-mode check below
+:
     lda CasmInsn + CASM_INSN_OPCODE
     jsr emitByte
     bcs eiRet
@@ -136,6 +184,21 @@ eiRelative:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     sbc CasmEmitScratch1
     sta CasmEmitScratch3          ; displacement high (sign)
+
+    ; WP30: a still-unresolved forward reference carries a $0000 placeholder
+    ; in MEASURE mode (parser.s's pevMeasureUnresolved), which computes a
+    ; meaningless displacement against this pass's real CasmPc -- almost
+    ; always wildly out of range regardless of the real (Pass 2) resolved
+    ; distance. Skip the range check entirely in MEASURE mode: the operand
+    ; byte's value doesn't matter either, since emitRawByte's single gate
+    ; never writes it. Enforce the range for real only in EMIT mode, once
+    ; every symbol is genuinely resolved -- mirrors the same tolerate-in-
+    ; MEASURE/enforce-in-EMIT pattern already used for
+    ; CASM_DIAG_UNDEFINED_SYMBOL (parser.s's pevUnresolved).
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_MEASURE
+    beq eiRelEmit
+
     ; Valid range -128..+127: high==$00 with low<$80, or high==$FF with low>=$80.
     lda CasmEmitScratch3
     beq eiRelPos

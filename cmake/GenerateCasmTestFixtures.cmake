@@ -510,3 +510,44 @@ file(WRITE "${OUTPUT_DIR}/p1size1.seq"
     "DATA: .BYTE \$01, \$02, \$03\n"
     "VALS: .WORD \$ABCD, \$1234\n"
 )
+
+# WP30 relative-branch fixtures. No prior fixture (Phase 4's casmbrp1/brp2/
+# brn1/brn2 included) has ever used a label as a branch target -- all four
+# use raw literal addresses. brfwd1/brback1 prove real Pass 2 emission of a
+# branch resolved from a real forward/backward label (trusted references in
+# tests/fixtures/casm/); brrng1 proves CASM_DIAG_BRANCH_OUT_OF_RANGE still
+# fires when the operand is a resolved label rather than a literal delta.
+
+# Forward branch to a label. BNE is 2 bytes at $C000-$C001 (nextPc=$C002);
+# two NOPs occupy $C002-$C003; LOOP resolves to $C004. Displacement = +2.
+file(WRITE "${OUTPUT_DIR}/brfwd1.seq"
+    ".ORG \$C000\n"
+    "BNE LOOP\n"
+    "NOP\n"
+    "NOP\n"
+    "LOOP: RTS\n"
+)
+
+# Backward branch to a label. LOOP is defined at $C000 (two NOPs occupy
+# $C000-$C001); BNE is 2 bytes at $C002-$C003 (nextPc=$C004). Displacement =
+# $C000 - $C004 = -4.
+file(WRITE "${OUTPUT_DIR}/brback1.seq"
+    ".ORG \$C000\n"
+    "LOOP: NOP\n"
+    "NOP\n"
+    "BNE LOOP\n"
+)
+
+# Out-of-range branch to a label, reusing Phase 4's casmbrp2 boundary exactly
+# ($C082, displacement +128, one past the +127 maximum) rather than deriving
+# a new one: BNE is 2 bytes at $C000-$C001 (nextPc=$C002); 128 one-byte NOPs
+# place LOOP at exactly $C002 + 128 = $C082.
+#   -> BRANCH OUT OF RANGE ($23), same diagnostic casmbrp2 already proves for
+#      a literal target
+string(REPEAT "NOP\n" 128 CASM_BRRNG1_FILLER)
+file(WRITE "${OUTPUT_DIR}/brrng1.seq"
+    ".ORG \$C000\n"
+    "BNE LOOP\n"
+    "${CASM_BRRNG1_FILLER}"
+    "LOOP: RTS\n"
+)

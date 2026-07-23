@@ -1,0 +1,31 @@
+# CASM WP30 trusted reference: brback1
+#
+# Independently hand-assembled from the brback1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Cross-check:
+#   - brain/plans/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md
+#     (Contract item 1, this fixture's byte derivation)
+#
+# Source (.ORG $C000):
+#   - LOOP: NOP
+#   - NOP
+#   - BNE LOOP
+#
+# LOOP is defined ($C000) before "BNE LOOP" is even parsed -- a resolved
+# backward reference. As with brfwd1, the branch mnemonic never consults
+# CASM_PARSER_STMT_FORCE_ABS; CASM_MODE_RELATIVE is selected unconditionally.
+# Two NOPs occupy $C000-$C001. BNE is 2 bytes at $C002-$C003; nextPc = $C004.
+# Displacement = $C000 - $C004 = -4 = $FC.
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   EA           NOP      (at $C000, defines LOOP)
+#   EA           NOP
+#   D0 FC        BNE -4   (backward reference, resolved to LOOP = $C000)
+#
+# bytes: 6
+# sha256: 9a54f34c5d76c1e3848debce327af5bb644a8e837b7511e9e1000631ec729980
+
+00 C0
+EA
+EA
+D0 FC

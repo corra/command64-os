@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "31"
+.define VERSION_STAGE "32"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -54,8 +54,10 @@
 .import emitInstruction
 .import emitDirective
 .import emitFinalize
+.import emitCheckPassAgreement
 .import CasmPc
 .import CasmPassMode
+.import CasmPass1FinalPc
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -137,6 +139,13 @@ startPass1:
     bcs startFatalNear          ; outputAbort is a safe no-op: no output
                                  ; file was ever created this pass
 
+    ; WP30: snapshot Pass 1's final program counter for the end-of-Pass-2
+    ; agreement check below.
+    lda CasmPc
+    sta CasmPass1FinalPc
+    lda CasmPc + 1
+    sta CasmPass1FinalPc + 1
+
     ; Pass 2 (WP29): rewind the identical source, recreate the output PRG,
     ; and re-drive the same dispatch for real now that every label the
     ; source defines is in the symbol table.
@@ -153,6 +162,13 @@ startPass1:
     lda #CASM_PASS_MODE_EMIT
     sta CasmPassMode
     jsr casmRunPass
+    bcs startFatalNear
+
+    ; WP30: a genuine disagreement is not believed reachable through any
+    ; legitimate source under the current grammar (see emitCheckPassAgreement's
+    ; own header comment) -- this is a defensive internal-consistency check,
+    ; not a demonstrated user-reachable path.
+    jsr emitCheckPassAgreement
     bcs startFatalNear
 
     jsr emitFinalize

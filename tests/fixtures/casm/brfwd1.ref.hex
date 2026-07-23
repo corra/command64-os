@@ -1,0 +1,36 @@
+# CASM WP30 trusted reference: brfwd1
+#
+# Independently hand-assembled from the brfwd1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Cross-check:
+#   - brain/plans/2026-07-23-casm-phase6-wp30-branches-and-disagreement-detection.md
+#     (Contract item 1, this fixture's byte derivation)
+#
+# Source (.ORG $C000):
+#   - BNE LOOP
+#   - NOP
+#   - NOP
+#   - LOOP: RTS
+#
+# LOOP is an unresolved forward reference when "BNE LOOP" is parsed in
+# Pass 1. Unlike a zero-page-eligible operand, a branch mnemonic never
+# consults CASM_PARSER_STMT_FORCE_ABS at all -- opcodesFindOpcode resolves
+# any branch mnemonic to CASM_MODE_RELATIVE unconditionally, before it ever
+# reaches the zero-page/absolute decision. BNE is 2 bytes (opcode + operand)
+# at $C000-$C001; nextPc = $C002. Two NOPs occupy $C002-$C003. LOOP resolves
+# to $C004. Displacement = $C004 - $C002 = +2.
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   D0 02        BNE +2   (forward reference, resolved to LOOP = $C004)
+#   EA           NOP
+#   EA           NOP
+#   60           RTS      (at $C004, defines LOOP)
+#
+# bytes: 7
+# sha256: 1a6c37fd059d422613793871d150a198c47bf178bd02828673a691cd0fbd7ced
+
+00 C0
+D0 02
+EA
+EA
+60

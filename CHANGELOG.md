@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6B WP30 relative branches and Pass 1/Pass 2 disagreement
+  detection** (complete, CASM `0.1.32` build 1130): implemented
+  `CASM_DIAG_PASS_MISMATCH` detection (`CasmPass1FinalPc` snapshot +
+  `emitCheckPassAgreement` comparison, co-located in `emit.s` rather than
+  `casm.s` so a new standalone `test_casm_passcheck` unit harness could
+  prove the fatal path fires directly — `casm.s`'s own entry point can
+  never be linked by any test harness). Confirmed by direct inspection that
+  relative-branch addressing-mode selection (`opcodesFindOpcode`) needed no
+  changes — branch mnemonics resolve to `CASM_MODE_RELATIVE` before ever
+  consulting `CASM_PARSER_STMT_FORCE_ABS`. Added three new fixtures closing
+  a real gap: no prior fixture, Phase 4 included, had ever used a label as
+  a relative-branch target. The first of them, `brfwd1` (a forward
+  reference), immediately exposed a genuine, previously-latent defect:
+  `eiRelative` computed the `-128..127` range check even in
+  `CASM_PASS_MODE_MEASURE`, using the resolver's `$0000` placeholder for a
+  still-unresolved forward reference — producing a spurious
+  `CASM_DIAG_BRANCH_OUT_OF_RANGE` in Pass 1 regardless of the real, in-range
+  Pass 2 distance. Latent since Phase 4 (this code predates Phase 6B
+  entirely). Fixed, with explicit user approval (surfaced as a material
+  deviation before any source was touched), by making `eiRelative`
+  pass-mode-aware — `MEASURE` mode now skips the range check entirely,
+  mirroring the existing `CASM_DIAG_UNDEFINED_SYMBOL` tolerate-in-MEASURE/
+  enforce-in-EMIT pattern. Re-verified the full matrix twice, adding a
+  regression check against Phase 4's literal-target branch fixtures
+  (`casmbrp1`/`brp2`/`brn1`/`brn2`) to confirm the fix didn't disturb
+  already-shipped behavior: all passed both rounds. MAIN measured at 12191
+  of 12288 bytes (97 bytes headroom), no size increase needed.
 - **CASM Phase 6B WP29 Pass 2 — resolution and emission** (complete, CASM
   `0.1.31` build 1126): rewrote `casm.s`'s single-pass `start` as a real
   two-pass orchestrator sharing one new private dispatch, `casmRunPass`.
