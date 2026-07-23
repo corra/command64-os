@@ -344,6 +344,29 @@
     - [x] User approved completion; final `0.1.27` build 1102 matches the
           dry-run PRG hash exactly; no-change rebuild stable; both images
           pass. **WP25 complete; CASM Phase 6A milestone complete.**
+  - **CASM Phase 6A closed 2026-07-22 at CASM `0.1.27` build 1102. CASM
+    Phase 6B WP26 (below) is now the active CASM thread.**
+
+- [x] Taskwarrior (`58c94a92-48f8-4039-8dcc-44f42d193d3c`): CASM Phase 6B
+      WP26 prerequisite reconciliation and Phase 0C.5 freeze
+  - Branch `feature/casm-phase6-wp26`
+  - Plan: `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
+  - Status: complete; documentation/task-tracking only, no symbol-table or
+    pass source written -- the only source change was the version-only
+    completion increment
+  - Plan required two review iterations before implementation began: fixed
+    a bug where the first draft's label-statement design would have
+    clobbered the label name via the shared transient token buffer
+    (`CasmTokenText`), and tightened the Pass 1/Pass 2 mode-gating design to
+    a single check point in `emitRawByte` rather than two redundant checks
+  - Dry-ran the version bump (2-byte diff versus baseline, confined to the
+    version/build banner digits), then applied it for real: final CASM
+    `0.1.28` build 1103, no-change rebuild stable, both `image_d64` and
+    `test_image_d64` build clean. **WP26 complete.**
+  - WP27 (symbol table storage), WP28 (Pass 1), WP29 (Pass 2), WP30
+    (branch/disagreement detection), and WP31 (verification) remain
+    separately gated and unplanned in detail, per the CASM AGENTS.md
+    per-work-package-plan-approval requirement
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

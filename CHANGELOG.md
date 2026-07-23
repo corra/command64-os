@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6B WP26 prerequisite reconciliation and Phase 0C.5 freeze**
+  (complete, CASM `0.1.28` build 1103): verified the CASM Phase 6A
+  completion gate (`0.1.27` build 1102) and froze the Phase 0C.5
+  symbol-table/two-pass contract that WP27-WP31 will implement against.
+  Found two discrepancies beyond the parent Phase 6 plan's own dependency
+  review: `opcodesFindOpcode` has no channel at all to the Phase 5
+  force-absolute-width flag (not merely unaudited), and the statement
+  grammar has no label-definition production yet — a first-draft label
+  design would have silently corrupted label names via CASM's shared
+  transient token buffer, caught and fixed before any implementation began.
+  Frozen decisions confirmed by the user: a single `CasmPassMode` flag gated
+  at one point rather than a structured event-bus architecture;
+  `CasmParserStmt` growing from 6 to 7 bytes to carry a force-absolute-width
+  flag; a 128-bucket/512-symbol VMM-backed hash table for the symbol store.
+  Made no changes to CASM's source or runtime behavior beyond the
+  version-only completion increment — documentation and task-tracking only;
+  WP27 (symbol table storage) remains separately gated pending its own
+  approved plan. See
+  `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`.
+
 - **CASM Phase 6A WP25 verification and completion gate**: added a
   standalone `test_casm_vmm` runtime fixture harness (7 automated cases
   covering allocation, reuse-after-free, registry exhaustion, windowed

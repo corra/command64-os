@@ -399,6 +399,101 @@ record that could be read alongside both namespaces.
   deferred (CASM's 512KB registry cap can never mark the OS's 16MB-tracked
   MCT full through normal calls; the harness has no per-run REU toggle).
 
+### CASM Phase 6B Symbol Table and Two-Pass Contract (Phase 0C.5, frozen 2026-07-22)
+
+CASM-local phase numbering. Distinct from the unrelated, already-completed
+top-level "Phase 6A: App Manager" / "Phase 6B: Binary Relocator" entries in
+the Current Status table above — always write "CASM Phase 6B" in full in any
+record that could be read alongside both namespaces.
+
+- **Pass-mode threading is a single flag gated at exactly one point.**
+  `CasmPassMode` (new BSS byte in `emit.s`, not zero page — the `$70-$8F`
+  budget is already fully committed) takes `CASM_PASS_MODE_MEASURE` (`$00`)
+  or `CASM_PASS_MODE_EMIT` (`$01`). `emitRawByte` is the sole routine that
+  touches `CasmEmitBuffer`/`fileWrite`, so one check at its top is sufficient:
+  MEASURE mode returns success without writing. `emitByte`'s `CasmPc` advance
+  and overflow checks live above that call and still run unconditionally
+  in both modes, and `emitFinalize`/`emitFlush` need no change since
+  `CasmEmitLen` never increments in MEASURE mode. `casm.s` factors its
+  existing per-statement dispatch (parse -> classify -> match/emit) so two
+  driven passes share it: Pass 1 runs MEASURE to `EOF` inserting labels and
+  creating no output file; Pass 2 calls `sourceRewind`/`lexerInit` again,
+  switches to EMIT, and re-drives the same dispatch for real. `parser.s` and
+  `opcodes.s` need no pass-mode awareness except `parserParseExpressionValue`,
+  which must consult `CasmPassMode` to decide whether an unresolved symbol is
+  acceptable (Pass 1, placeholder `$0000`, never emitted) or fatal (Pass 2,
+  `CASM_DIAG_UNDEFINED_SYMBOL`). This is not an event bus for a future
+  listing consumer — that is explicitly deferred to Phase 10.
+- **The resolver callback stays pass-agnostic.** `exprEvaluate` already sets
+  `CASM_EXPR_FLAG_FORCE_ABS` automatically whenever the resolver reports
+  `RESOLVED` clear — pre-existing Phase 5 behavior, not a Phase 6B addition.
+  The Phase 6B resolver (`symbolsLookup`, bound in place of
+  `parserRejectIdentifier`) only needs to report "found and defined" or
+  "not found" identically in both passes; only
+  `parserParseExpressionValue`'s `pevUnresolved` branch becomes
+  pass-mode-aware.
+- **`CasmParserStmt` grows from 6 to 7 bytes.** A new
+  `CASM_PARSER_STMT_FLAGS` byte (offset 6, bit 0 =
+  `CASM_PARSER_STMT_FORCE_ABS`) is added; `CASM_PARSER_STMT_SIZE`'s assert
+  updates to 7. Exactly three existing wholesale-write sites in `parser.s`
+  must each initialize the new byte explicitly, or it is live uninitialized
+  BSS the first time it is read: `ppsEmpty` (the NEWLINE/EOF empty
+  statement, sets `Flags = 0`), `ppsMnemonic` (sets `Flags = 0` before
+  dispatching into the operand grammar), and `parserParseExpressionValue`
+  (the production write site, copies `CASM_EXPR_FLAG_FORCE_ABS` from the
+  Phase 5 result in the same branch that already copies `ValLo`/`ValHi`);
+  the new label-statement write site (below) also zeroes `Flags` as part of
+  its own wholesale initialization. `opcodesFindOpcode` checks this flag
+  before its zero-page-shrink heuristic and takes the absolute path
+  unconditionally when set, regardless of `ValHi`.
+- **Symbol records are 37-byte VMM-backed entries:** 1-byte NameLen, 31-byte
+  fixed Name slot, 2-byte Value (address assigned in Pass 1), 1-byte Flags
+  (bit 0 = DEFINED), 2-byte Next (16-bit collision-chain record index,
+  `$FFFF` = end of chain). `CASM_SYMBOL_REC_SIZE = 37`; capacity is capped at
+  `CASM_SYMBOL_MAX = 512` records (18,944 bytes total, one `vmmStoreAlloc`
+  call, well under the existing 65536-byte single-allocation cap — no change
+  to `vmm_store.s`'s ABI). Hashing is a rotate-left-1-XOR fold over the
+  identifier's exact case-sensitive bytes, masked to 7 bits across 128
+  buckets (`CasmSymbolBuckets: .res 256`, `$FFFF` = empty), chosen over a
+  plain byte-sum because it spreads prefix-sharing names (`LOOP1`/`LOOP2`)
+  across buckets rather than collapsing them onto adjacent ones. Records are
+  append-only (`CasmSymbolCount` is a bump allocator, never a free list) —
+  Phase 6B never removes a symbol mid-run.
+- **Label definitions are their own complete, colon-terminated statement,**
+  not combined with a trailing instruction in one parse call. A first-draft
+  design assuming the latter was found to be broken: `CasmTokenText` is a
+  single transient buffer `lexerNext` overwrites unconditionally on every
+  call, so a second `lexerNext` to check for a trailing instruction would
+  destroy the label's name before any caller could read it back out.
+  Instead, the label's name and length are copied into new persistent
+  `CasmLabelName`/`CasmLabelNameLen` cells before any further token is read
+  — mirroring the existing `CasmStmtLoc*` precedent of keeping new state
+  parallel to `CasmParserStmt` rather than growing it further. The driver
+  calls `parserParseStatement` again for whatever follows on the same
+  physical line. Label insertion (`symbolsInsert` with the current `CasmPc`)
+  happens only in the pass-orchestration driver during
+  `CASM_PASS_MODE_MEASURE`, never inside `parser.s`, which gains no import
+  of `CasmPc` or `symbolsInsert` and stays a pure grammar module.
+- **New diagnostics `$2C`-`$2F`, contiguous after Phase 6A's
+  `CASM_DIAG_PHASE6A_LAST = $2B`:** `CASM_DIAG_DUPLICATE_SYMBOL` (`$2C`),
+  `CASM_DIAG_UNDEFINED_SYMBOL` (`$2D`), `CASM_DIAG_SYMBOL_TABLE_FULL`
+  (`$2E`), `CASM_DIAG_PASS_MISMATCH` (`$2F`, `CASM_DIAG_PHASE6B_LAST` — a
+  terminal internal error routed through the existing `exitFatal` path,
+  never a recoverable diagnostic).
+- MAIN envelope growth is flagged as near-certain — Phase 6B adds a symbol
+  table, a 256-byte hash-bucket array, two-pass orchestration in `casm.s`,
+  and label-statement parsing, all substantially larger in scope than Phase
+  6A — but is deliberately not pre-sized here: each implementing WP (WP27
+  for the bucket array and storage, WP28/WP29 for pass orchestration)
+  measures its own overflow and proposes its own justified size, per the
+  WP13/WP19/WP23/WP24 precedent this contract does not break.
+- Phase 6B gate: static programs with forward and backward references match
+  trusted reference binaries byte for byte.
+- **WP26 is a documentation/task-tracking work package only.** No
+  symbol-table or pass source exists yet; the only source change is a
+  version-only completion increment. WP27 (symbol storage) is separately
+  gated and requires its own approved plan before implementation begins.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

@@ -448,3 +448,71 @@ CASM Phase 6B (symbol table and two-pass assembly) remains a separately
 gated phase; its work packages (WP26-WP31) are reserved in the parent plan
 but not yet created in Taskwarrior. CASM Phase 6B may not begin before CASM
 Phase 6A's own completion gate and explicit user approval.
+
+# CASM Phase 6B - Symbol Table and Two-Pass Assembly
+
+Note: this is CASM-local phase numbering, distinct from the unrelated,
+already-completed top-level project phase of the same name ("Phase 6B:
+Binary Relocator") recorded elsewhere in `brain/KNOWLEDGE.md`. Always write
+"CASM Phase 6B" in full to avoid ambiguity.
+
+Parent Taskwarrior UUID: `166e5352-5aa0-45bd-8bee-5baf0e878798` -
+"CASM Phase 6B: Symbol table and two-pass assembly". Depends on WP26-WP31
+below. Not yet complete.
+
+Parent plan:
+`brain/plans/2026-07-21-casm-phase6-vmm-storage-and-symbol-table.md`
+WP26 plan:
+`brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
+
+## Phase 6B Work Packages
+
+- [x] `58c94a92-48f8-4039-8dcc-44f42d193d3c`: WP26 prerequisite reconciliation
+      and Phase 0C.5 freeze. Implemented on `feature/casm-phase6-wp26` from
+      `main` at `da0cc3c`. Verified the CASM Phase 6A completion gate, then
+      found and resolved two discrepancies beyond the parent Phase 6 plan's
+      own review: `opcodesFindOpcode` has no channel through which a caller
+      can force absolute-width addressing at all, and the statement grammar
+      has no label-definition production, so a naive design would have
+      clobbered the label name via the shared transient token buffer. Froze
+      the Phase 0C.5 contract after the user confirmed three architectural
+      decisions: a single `CasmPassMode` flag gated at one point in
+      `emitRawByte` (not an event bus); `CasmParserStmt` growing from 6 to 7
+      bytes (not a parallel cell); and a 128-bucket/512-symbol VMM-backed
+      hash table. No symbol-table or pass source was written -- the only
+      source change is the version-only completion increment. Version-bump
+      dry-run confirmed a `0.1.27` -> `0.1.28` stage bump changes exactly 2
+      bytes (version/build digits) versus the baseline; the real increment
+      was then applied for real: final CASM `0.1.28` build 1103, no-change
+      rebuild stable (a second build did not re-increment), both
+      `image_d64` and `test_image_d64` build clean. **WP26 is complete.**
+- [ ] `0dd437f3-3248-4294-aee7-39bb8571f1c8`: WP27 symbol table storage and
+      hash index. Not yet planned in detail; per the CASM AGENTS.md gate, a
+      dedicated plan and task activation must wait for WP26 to complete
+      first.
+- [ ] `712fe7af-1e41-46c9-9a19-49c2632cd15a`: WP28 Pass 1 - address
+      assignment and definitions.
+- [ ] `8e989bdf-7aed-4bfe-ae9c-3771edb7caf5`: WP29 Pass 2 - resolution and
+      emission.
+- [ ] `a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`: WP30 relative branches and
+      Pass 1/Pass 2 disagreement detection.
+- [ ] `86d8ac7e-0725-44b8-81ae-dcef143a20ad`: WP31 verification, walkthrough,
+      and completion gate.
+
+## Phase 6B Acceptance
+
+- [ ] Symbol table duplicate, undefined, case-sensitive, and max-length
+      behavior match the frozen contract.
+- [ ] Pass 1 assigns addresses and definitions without emitting output.
+- [ ] Pass 2 resolves symbols and emits final output.
+- [ ] Relative branches are computed from resolved symbols.
+- [ ] A Pass 1/Pass 2 disagreement is treated as fatal.
+- [ ] Static programs with forward and backward references match trusted
+      reference binaries byte-for-byte.
+
+WP26 is complete and approved (CASM `0.1.28` build 1103). CASM Phase 6B may
+not begin real symbol-table or pass-source work (WP27+) before each of
+those work packages has its own dedicated plan drafted and separately
+approved, per the CASM AGENTS.md per-work-package-plan gate -- WP26's
+completion unblocks WP27's plan, it does not authorize WP27's
+implementation.
