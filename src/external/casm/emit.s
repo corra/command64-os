@@ -36,6 +36,7 @@
 .export emitDirective
 .export emitFinalize
 .export CasmPc
+.export CasmPassMode
 
 .segment "BSS"
 
@@ -43,6 +44,7 @@ CasmPc:         .res 2   ; next emit address (program counter)
 CasmOrgSet:     .res 1   ; 0 until the initial .ORG is processed
 CasmPcOverflow: .res 1   ; latched when the PC advances past $FFFF
 CasmEmitLen:    .res 1   ; staged byte count in CasmEmitBuffer
+CasmPassMode:   .res 1   ; CASM_PASS_MODE_MEASURE or CASM_PASS_MODE_EMIT
 CasmEmitBuffer: .res CASM_EMIT_BUFFER_SIZE
 
 .segment "CODE"
@@ -50,6 +52,13 @@ CasmEmitBuffer: .res CASM_EMIT_BUFFER_SIZE
 ; ---------------------------------------------------------------------------
 ; emitInit
 ; Reset emission state for a fresh assembly. Does not create the output file.
+; CasmPassMode is explicitly set to CASM_PASS_MODE_EMIT here rather than left
+; to whatever BSS happens to hold at cold-start: CASM_PASS_MODE_EMIT is $01
+; and CASM_PASS_MODE_MEASURE is $00, so uninitialized-to-zero BSS would
+; silently default to MEASURE and produce no output. casm.s's current single
+; caller of emitInit still expects one unconditional real-emission pass, so
+; this keeps that behavior exact while giving a future two-pass orchestration
+; an explicit point to override the mode before each pass.
 ; Outputs: C clear
 ; ---------------------------------------------------------------------------
 emitInit:
@@ -57,6 +66,8 @@ emitInit:
     sta CasmOrgSet
     sta CasmPcOverflow
     sta CasmEmitLen
+    lda #CASM_PASS_MODE_EMIT
+    sta CasmPassMode
     clc
     rts
 
@@ -356,10 +367,22 @@ ebFail:
 ; emitRawByte (private)
 ; Append one byte to the staging buffer, flushing when full. Does not touch the
 ; program counter (used for the PRG header and by emitByte).
+; In CASM_PASS_MODE_MEASURE, the byte in A is silently discarded and no buffer
+; state changes -- MEASURE mode exists to compute sizes/addresses without
+; producing output, and this is the single gate all emission paths funnel
+; through (emitByte's PC/overflow tracking still runs unconditionally above
+; its call here, so addresses stay correct in both modes). The input byte is
+; stashed in X across the CasmPassMode check (X is otherwise unused until
+; CasmEmitLen is loaded below) so the pass-mode load does not clobber it.
 ; Inputs:  A = byte
 ; Outputs: C clear on success; C set with A = write diagnostic on failure
 ; ---------------------------------------------------------------------------
 emitRawByte:
+    tax
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_MEASURE
+    beq erbDone
+    txa
     ldx CasmEmitLen
     sta CasmEmitBuffer, x
     inx

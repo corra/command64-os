@@ -9,6 +9,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 6B WP28 Pass 1 — address assignment and definitions**
+  (complete, CASM `0.1.30` build 1123): wired WP27's symbol table into a
+  real two-pass foundation. Added `CASM_PASS_MODE_MEASURE` /
+  `CASM_PASS_MODE_EMIT` gated at exactly one point — `emitRawByte` in
+  `emit.s` — where measure mode skips the actual byte write but still
+  advances `CasmPc`. Added label-statement grammar to `parser.s`
+  (colon-terminated `LABEL:` identifier statements) that insert into the
+  symbol table via `symbolsInsert`, with duplicate detection. Wired
+  `expr.s`'s resolver callback to call `symbolsLookup` for real (previously
+  a stub, `parserRejectIdentifier`), so identifiers in expressions now
+  resolve against the VMM-backed symbol table WP27 built. Added
+  `CASM_PARSER_STMT_FORCE_ABS`, growing `CasmParserStmt` from 6 to 7 bytes,
+  to force absolute-width addressing for symbol-derived operands so a label
+  used as a branch/zero-page-eligible operand always assembles to the same
+  width in both passes. Caught and fixed two defects during implementation,
+  before any test run: the force-absolute flag was originally going to
+  derive from `CASM_EXPR_FLAG_FORCE_ABS` (set only when unresolved), which
+  would have let Pass 1/Pass 2 disagree on size for already-resolved
+  backward references — corrected to derive from
+  `CASM_EXPR_FLAG_SYMBOL_DERIVED` (set on any resolver success, resolved or
+  not); and `emit.s`'s pass-mode gate as originally spec'd would have
+  clobbered the byte to emit with `CasmPassMode`'s own value — fixed to
+  stash the byte in X first. Added a standalone `test_casm_pass1` runtime
+  fixture harness (`tests/src/casm_pass1/casm_pass1.s`, 7 automated cases:
+  label+bare, label+mnemonic on the same line, forward reference, backward
+  reference, undefined symbol under measure-mode tolerance, duplicate-label
+  detection, and a comprehensive fixture combining a forward reference, 3
+  labels, and `.BYTE`/`.WORD` directives). Found and fixed two test-fixture
+  defects during VICE verification, not implementation defects: a
+  zero-page collision in `tests/src/casm_expr/casm_expr.s` (its mock
+  lexer's `ScriptLo`/`ScriptHi` cursor at `$70`/`$71` collided with
+  `expr.s`'s new use of `CasmPtr0Lo`/`Hi` at the same address, fixed by
+  moving the test's cursor to `$7C`/`$7D`); and the generated `p1size1`
+  fixture used lowercase `.byte`/`.word` directive keywords, which CASM's
+  lexer's `isIdFirst`/`isIdCont` never accept (only uppercase, unshifted
+  `$41`-`$5A` or shifted PETSCII `$C1`-`$DA`), raising
+  `CASM_DIAG_INVALID_SOURCE_BYTE` on the `b` — fixed by capitalizing to
+  `.BYTE`/`.WORD` to match every other fixture's convention. All 7
+  `casm_pass1` fixtures pass in VICE, alongside a re-run of `test_casm_expr`
+  (regression check) — also all pass. Raised CASM MAIN from `$2F00` to
+  `$3000` to fit the added code. Advanced CASM from `0.1.29` build 1113 to
+  `0.1.30` build 1123. See
+  `brain/plans/2026-07-22-casm-phase6-wp28-pass1-address-assignment.md`.
+
 - **CASM Phase 6B WP27 symbol table storage and hash index** (complete,
   CASM `0.1.29` build 1113): added `src/external/casm/symbols.s`
   (`symbolsInit`/`symbolsInsert`/`symbolsLookup`), VMM-backed 64-byte symbol

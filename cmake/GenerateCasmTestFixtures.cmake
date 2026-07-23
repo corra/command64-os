@@ -431,3 +431,82 @@ file(WRITE "${OUTPUT_DIR}/casmexprn.seq"
     ".WORD <\$1234, >\$1234\n"
 )
 file(WRITE "${OUTPUT_DIR}/casmexpru.seq" ".ORG \$C000\nLDA ABSVAL\n")
+
+# WP28 Pass 1 measure-engine fixtures. Each is opened directly via
+# CasmSourceName by the standalone test_casm_pass1 harness, not through
+# casm.s's own CLI — these are not meant to be assembled by the production
+# casm.s entry point, only driven by casm_pass1.s's own Pass-1-only loop.
+
+# Bare label definition; LOOP must resolve to $C000 with no bytes emitted.
+file(WRITE "${OUTPUT_DIR}/p1label1.seq"
+    ".ORG \$C000\n"
+    "LOOP:\n"
+)
+
+# Label followed by an instruction on the same physical line (the label
+# statement itself is colon-terminated and self-contained; the following
+# instruction is a separate statement parsed by the next
+# parserParseStatement call). LOOP resolves to $C000; final CasmPc = $C001
+# (one byte for NOP).
+file(WRITE "${OUTPUT_DIR}/p1labelinsn1.seq"
+    ".ORG \$C000\n"
+    "LOOP: NOP\n"
+)
+
+# Forward reference: LOOP is referenced before its own definition. When "LDA
+# LOOP" is processed, LOOP is not yet in the symbol table, so it must be
+# sized as absolute (3 bytes) regardless of its eventual value. Final CasmPc
+# = $0014 (3 bytes LDA absolute + 1 byte NOP after LOOP resolves to $0013).
+file(WRITE "${OUTPUT_DIR}/p1fwd1.seq"
+    ".ORG \$0010\n"
+    "LDA LOOP\n"
+    "LOOP: NOP\n"
+)
+
+# Backward reference with a deliberately tiny .ORG so LOOP's resolved address
+# ($0010) has a zero high byte -- the exact case that would incorrectly
+# shrink to zero-page addressing if CASM_PARSER_STMT_FORCE_ABS were derived
+# from CASM_EXPR_FLAG_FORCE_ABS (only set when unresolved) instead of
+# CASM_EXPR_FLAG_SYMBOL_DERIVED (set whenever a symbol resolves at all). By
+# the time "LDA LOOP" runs, LOOP is already resolved (defined one line
+# earlier, value $0010) -- it must still size as absolute (3 bytes), not
+# zero-page (2 bytes). Final CasmPc = $0014 (1 byte NOP + 3 bytes LDA
+# absolute, starting from $0010).
+file(WRITE "${OUTPUT_DIR}/p1back1.seq"
+    ".ORG \$0010\n"
+    "LOOP: NOP\n"
+    "LDA LOOP\n"
+)
+
+# Genuinely undefined symbol (GHOST is never defined anywhere in this file).
+# In CASM_PASS_MODE_MEASURE this must be tolerated, not a fixture failure:
+# LDA GHOST sizes as absolute (3 bytes, FORCE_ABS forces it regardless of the
+# zero placeholder value), and no diagnostic is raised. Final CasmPc =
+# $0013.
+file(WRITE "${OUTPUT_DIR}/p1undef1.seq"
+    ".ORG \$0010\n"
+    "LDA GHOST\n"
+)
+
+# Duplicate label definition. The harness's own p1dup1 driver (not the
+# shared runMeasurePass helper) expects the second "LOOP:" statement's
+# symbolsInsert call to return CASM_DIAG_DUPLICATE_SYMBOL and treats that as
+# the fixture's success condition.
+file(WRITE "${OUTPUT_DIR}/p1dup1.seq"
+    ".ORG \$0010\n"
+    "LOOP: NOP\n"
+    "LOOP: NOP\n"
+)
+
+# Comprehensive Pass 1 sanity check: forward reference, backward-referenced
+# labels, and .byte/.word directives together. Hand-verified final CasmPc =
+# $C010; LOOP resolves to $C003, DATA to $C009, VALS to $C00C.
+file(WRITE "${OUTPUT_DIR}/p1size1.seq"
+    ".ORG \$C000\n"
+    "JMP LOOP\n"
+    "LOOP: LDA #\$01\n"
+    "STA \$D020\n"
+    "RTS\n"
+    "DATA: .BYTE \$01, \$02, \$03\n"
+    "VALS: .WORD \$ABCD, \$1234\n"
+)

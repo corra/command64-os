@@ -192,8 +192,12 @@ if(Ca65_FOUND)
     # CASM_VMM_BUFFER_SIZE 32->64 growth and the diagnostics.s message-table
     # fix for $28-$2F overflowed $2B00 by 848 measured bytes; $2F00 (+1024)
     # leaves 176 bytes headroom, the smallest round-page step above that
-    # minimum, matching this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "2F00")
+    # minimum, matching this line's own precedent. WP28: $2F00 -> $3000 --
+    # CasmParserStmt's growth to 7 bytes, the new CasmLabelName/
+    # CasmLabelNameLen buffer, and CasmPassMode overflowed $2F00 by 23
+    # measured bytes; $3000 (+256) leaves 233 bytes headroom, the smallest
+    # round-page step above that minimum, matching this line's own precedent.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3000")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -281,6 +285,23 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
+        endif()
+        if(TEST_NAME STREQUAL "casm_pass1")
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "3200")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
@@ -409,6 +430,14 @@ set(CASM_TEST_FIXTURES
     # WP20 production expression-adapter fixtures
     "${CASM_TEST_FIXTURE_DIR}/casmexprn.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmexpru.seq"
+    # WP28 Pass 1 measure-engine fixtures
+    "${CASM_TEST_FIXTURE_DIR}/p1label1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1labelinsn1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1fwd1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1back1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1undef1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1dup1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
 )
 
 add_custom_command(

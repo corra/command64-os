@@ -20,8 +20,18 @@
 .export CasmTokenRecord
 .export CasmTokenText
 
-ScriptLo  = $70
-ScriptHi  = $71
+; WP28: moved off $70/$71 (CasmPtr0Lo/CasmPtr0Hi). expr.s's exprEvaluate
+; identifier branch now stages the resolver's name pointer through
+; CasmPtr0Lo/Hi for the duration of each resolver call -- this harness's own
+; ScriptLo/ScriptHi (a long-lived cursor spanning the whole exprEvaluate
+; call, unlike the resolver's transient use) previously happened to alias
+; that exact address, so a resolver call for any identifier-bearing fixture
+; silently clobbered this cursor before the following lexerNext call (e.g.
+; consumeIdentifier's), corrupting every token read for the rest of that
+; fixture. $7C/$7D are untouched by expr.s (confirmed: its only zero-page
+; use is CasmPtr0Lo/Hi and CasmExprScratch0 = $84).
+ScriptLo  = $7C
+ScriptHi  = $7D
 TableLo   = $72
 TableHi   = $73
 ExpectLo  = $74

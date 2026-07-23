@@ -106,8 +106,20 @@ number:
     jmp applyExtraction
 
 identifier:
+    ; WP28: stage the resolver's name-pointer/length arguments. This is the
+    ; only point in exprEvaluate's control flow that reliably has them: the
+    ; current token is still IDENTIFIER here (consumeIdentifier's lexerNext,
+    ; which would overwrite CasmTokenText, has not run yet), and A cannot be
+    ; pre-staged by any caller further out since exprEvaluate's own entry
+    ; dispatch (the </>/NUMBER/IDENTIFIER checks above) already clobbers A
+    ; for its own purposes before this branch is even reached.
+    lda #<CasmTokenText
+    sta CasmPtr0Lo
+    lda #>CasmTokenText
+    sta CasmPtr0Hi
     ldx #<CasmExprResolverOutput
     ldy #>CasmExprResolverOutput
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
     jsr callResolver
     bcc resolverReturned
     jmp resolverFailed
@@ -147,7 +159,9 @@ consumeIdentifier:
     bne symbolDone
 addend:
     jsr exprParseAddend
-    bcs return
+    bcc :+
+    jmp return
+:
     lda CasmExprResultRecord + CASM_EXPR_FLAGS
     and #CASM_EXPR_FLAG_RESOLVED
     beq consumeAddend
@@ -227,11 +241,21 @@ unsupported:
 
 ; 6502 has no indirect JSR. Push the synthetic return address in JSR order,
 ; then transfer through the callback pointer; resolver RTS returns at resume.
+;
+; WP28: A must survive this preamble -- the caller (exprEvaluate's identifier
+; branch) sets A to the resolver's nameLen argument immediately before this
+; call, but the return-address push below clobbers A twice before the actual
+; indirect jump. Stash it in CasmExprScratch0 (private to this module, not
+; live across any other call in this window) and restore it immediately
+; before the jump, so the resolver receives the caller's A unchanged. X/Y
+; need no such handling: this routine never touches them.
 .proc callResolver
+    sta CasmExprScratch0
     lda #>(resume - 1)
     pha
     lda #<(resume - 1)
     pha
+    lda CasmExprScratch0
     jmp (CasmExprResolverAddrLo)
 resume:
     rts

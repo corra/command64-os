@@ -136,6 +136,13 @@ opcodesFindOpcode:
     lda ofMaskLo
     and #OF_BIT_LO_ZEROPAGE_X
     beq @useAbsX
+    ; A symbol-derived operand (resolved or not) must never shrink to
+    ; zero-page: a forward reference's placeholder value can spuriously read
+    ; as $00 in ValHi on an early pass, and the addressing mode -- and thus
+    ; instruction length -- must not vary between passes once it is chosen.
+    lda CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    and #CASM_PARSER_STMT_FORCE_ABS
+    bne @useAbsX
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne @useAbsX
     lda #CASM_MODE_ZEROPAGE_X
@@ -157,6 +164,9 @@ opcodesFindOpcode:
     lda ofMaskLo
     and #OF_BIT_LO_ZEROPAGE_Y
     beq @useAbsY
+    lda CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    and #CASM_PARSER_STMT_FORCE_ABS
+    bne @useAbsY
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne @useAbsY
     lda #CASM_MODE_ZEROPAGE_Y
@@ -179,6 +189,9 @@ opcodesFindOpcode:
     lda ofMaskLo
     and #OF_BIT_LO_ZEROPAGE
     beq @useAbs
+    lda CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    and #CASM_PARSER_STMT_FORCE_ABS
+    bne @useAbs
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne @useAbs
     lda #CASM_MODE_ZEROPAGE

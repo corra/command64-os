@@ -485,13 +485,25 @@ CASM_DIAG_UNKNOWN        = $FF
 ; CasmParserStmt record layout. A fixed-size BSS record populated by
 ; parserParseStatement (parser.s) for the downstream addressing-mode matcher
 ; and emission engine.
+;
+; CASM_PARSER_STMT_FLAGS (WP28) carries CASM_PARSER_STMT_FORCE_ABS, derived
+; from the Phase 5 expression result's CASM_EXPR_FLAG_SYMBOL_DERIVED bit
+; (not CASM_EXPR_FLAG_FORCE_ABS) -- any operand derived from a symbol
+; reference forces absolute width, whether or not that symbol resolved.
+; Deriving it from FORCE_ABS alone (only set when unresolved) would let a
+; resolved backward reference with a small address disagree in size with an
+; unresolved forward reference to the same label between Pass 1 and Pass 2 --
+; exactly the failure mode the master plan's high-risk section warns about.
 CASM_PARSER_STMT_TYPE        = 0
 CASM_PARSER_STMT_SUBTYPE     = 1
 CASM_PARSER_STMT_OPKIND      = 2
 CASM_PARSER_STMT_VAL_LO      = 3
 CASM_PARSER_STMT_VAL_HI      = 4
 CASM_PARSER_STMT_REG_SUBTYPE = 5
-CASM_PARSER_STMT_SIZE        = 6
+CASM_PARSER_STMT_FLAGS       = 6
+CASM_PARSER_STMT_SIZE        = 7
+
+CASM_PARSER_STMT_FORCE_ABS = %00000001
 
 ; Operand category recorded in CasmParserStmt.OpKind.
 CASM_OPKIND_IMPLIED          = 0
@@ -505,7 +517,8 @@ CASM_OPKIND_INDEXED_INDIRECT = 7  ; (ZP,X)
 CASM_OPKIND_INDIRECT_INDEXED = 8  ; (ZP),Y
 CASM_OPKIND_COUNT            = 9
 
-.assert CASM_PARSER_STMT_SIZE = 6, error, "CASM parser statement record size changed"
+.assert CASM_PARSER_STMT_SIZE = 7, error, "CASM parser statement record size changed"
+.assert (CASM_PARSER_STMT_FORCE_ABS & (CASM_PARSER_STMT_FORCE_ABS - 1)) = 0, error, "force-absolute flag must be one bit"
 .assert CASM_OPKIND_COUNT = CASM_OPKIND_INDIRECT_INDEXED + 1, error, "CASM operand kind range changed"
 
 ; ---------------------------------------------------------------------------
@@ -721,6 +734,16 @@ CASM_SYMBOL_CHAIN_END    = $FFFF
 .assert CASM_SYMBOL_REC_SIZE = CASM_VMM_BUFFER_SIZE, error, "CASM symbol record must fit one VMM transfer exactly"
 .assert CASM_SYMBOL_BUCKET_COUNT = CASM_SYMBOL_BUCKET_MASK + 1, error, "CASM symbol bucket count/mask mismatch"
 .assert CASM_SYMBOL_MAX * CASM_SYMBOL_REC_SIZE <= CASM_VMM_ALLOC_MAX_BYTES, error, "CASM symbol table exceeds one VMM allocation"
+
+; ---------------------------------------------------------------------------
+; Phase 6B two-pass contract (WP28)
+; ---------------------------------------------------------------------------
+
+; Single pass-mode flag, gated at exactly one point (the top of emitRawByte,
+; emit.s). MEASURE never writes output bytes; EMIT behaves as every prior
+; phase's single-pass emission always has.
+CASM_PASS_MODE_MEASURE = $00
+CASM_PASS_MODE_EMIT    = $01
 
 ; ---------------------------------------------------------------------------
 ; Phase and cleanup state

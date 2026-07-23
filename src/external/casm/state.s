@@ -154,7 +154,8 @@ CasmDiagLocByte:   .res 1
 ; Statement-start location, stamped by parserParseStatement. The emission
 ; engine raises diagnostics after the statement's tokens are consumed, so the
 ; token record no longer points at the statement. Kept separate rather than
-; grown into CasmParserStmt, whose 6-byte size is an asserted shared ABI.
+; grown into CasmParserStmt, whose size is an asserted shared ABI (7 bytes as
+; of WP28's CASM_PARSER_STMT_FLAGS addition).
 CasmStmtLocLineLo: .res 1
 CasmStmtLocLineHi: .res 1
 CasmStmtLocColumn: .res 1

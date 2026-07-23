@@ -508,6 +508,73 @@ record that could be read alongside both namespaces.
   version-only completion increment. WP27 (symbol storage) is separately
   gated and requires its own approved plan before implementation begins.
 
+### CASM Phase 6B WP28 Pass 1 Measure Engine (Phase 0C.6, frozen 2026-07-23)
+
+Amends Phase 0C.5 above with as-built corrections found during WP28's actual
+implementation and VICE verification, not a restatement of the whole prior
+contract. `feature/casm-phase6-wp28`, CASM `0.1.30` build `1123`.
+
+- **`CASM_PARSER_STMT_FORCE_ABS` derives from `CASM_EXPR_FLAG_SYMBOL_DERIVED`,
+  never from `CASM_EXPR_FLAG_FORCE_ABS`.** Phase 0C.5's resolver description
+  above ("`exprEvaluate` already sets `CASM_EXPR_FLAG_FORCE_ABS`
+  automatically whenever the resolver reports `RESOLVED` clear") is correct
+  Phase 5 behavior but is the wrong signal for this flag: `FORCE_ABS` is only
+  set when the symbol is *unresolved*, so deriving `CASM_PARSER_STMT_FORCE_ABS`
+  from it would force absolute width for forward references only, and let an
+  already-*resolved* backward reference fall through to the zero-page-shrink
+  heuristic in Pass 1 — the exact Pass1/Pass2 size disagreement this whole
+  flag exists to prevent, since Pass 2 re-resolves the same symbol as
+  resolved from the very first statement. `CASM_EXPR_FLAG_SYMBOL_DERIVED` is
+  set on *any* resolver success (resolved or not) and is the correct signal:
+  once an operand's value came from a symbol at all, both passes must commit
+  to the same (absolute) width regardless of resolution state. Caught during
+  WP28 planning, before implementation.
+- **`emitRawByte`'s pass-mode gate must stash the byte before checking
+  `CasmPassMode`**, not check the mode first and then reload — a first-draft
+  instruction ordering would have clobbered the byte-to-emit with
+  `CasmPassMode`'s own value before storing it. Caught by the implementing
+  subagent before any test ran.
+- **`callResolver` (`expr.s`) clobbers `A` in its own return-address-push
+  preamble.** Any value staged in `A` before calling it (e.g. the identifier's
+  name length, passed to the resolver ABI) must be stashed across the call
+  (`CasmExprScratch0` here) and reloaded after `callResolver`'s `PHA`
+  sequence, not assumed to survive it.
+- **Label-name comparisons must never go through ca65's default `-t c64`
+  quoted-string-literal charmap.** `ca65 -t c64` shifts uppercase ASCII
+  letters in `.byte "STRING"` literals by `+$80` into PETSCII's shifted range
+  (`"LOOP"` assembles to `$CC,$CF,$CF,$D0`, not `$4C,$4F,$4F,$50`), but the
+  lexer's raw source-byte stream (via `cc1541 -w`-written fixture content) is
+  never converted — `cc1541 -w` is a zero-conversion passthrough. Any
+  hand-written comparison string that must byte-match lexer-read identifier
+  text (as `test_casm_pass1.s`'s `nameLOOP`/`nameDATA`/`nameVALS` do, against
+  `symbolsLookup`) must be declared as explicit unshifted `.byte $XX, ...` hex
+  values, never a quoted string literal. This does not contradict
+  `mnemonicTable`/`dirOrgStr`-style directive/mnemonic keyword tables in
+  `lexer.s` itself, which also use quoted literals: those compare through
+  `compareTokenText`, which calls `normalizeChar` on both sides first,
+  absorbing the shift. Fixture *filenames* (`p1size1Name`, etc.) are also
+  unaffected for a different reason — `cc1541 -f` encodes disk directory
+  names with the same shifted convention ca65 applies, so both sides of
+  `sourceOpen`'s filename comparison already agree.
+- **The lexer's `isIdFirst`/`isIdCont` never accept lowercase ASCII.**
+  Identifier and directive-name characters must be unshifted uppercase
+  (`$41`-`$5A`) or shifted PETSCII (`$C1`-`$DA`) — lowercase ASCII
+  (`$61`-`$7A`) falls through to `CASM_DIAG_INVALID_SOURCE_BYTE`. A
+  CMake-generated test fixture that writes `.byte`/`.word` in lowercase (every
+  other fixture and the production directive tables use uppercase
+  `.BYTE`/`.WORD`) will fail this way; the failing byte and its 1-indexed
+  source line are readable post-failure via `CasmDiagLocByte`/
+  `CasmDiagLocLineLo`/`CasmDiagLocLineHi` (`diagnostics.s`), which is how this
+  was root-caused rather than guessed.
+- **`test_casm_pass1`** (`tests/src/casm_pass1/`) is the new WP28 harness:
+  7 fixtures (`p1label1`, `p1labelinsn1`, `p1fwd1`, `p1back1`, `p1undef1`,
+  `p1dup1`, `p1size1`) covering label-only, label+mnemonic-same-line, forward
+  reference, backward reference, undefined-symbol Pass-1 tolerance, duplicate
+  detection, and a combined label/forward-ref/`.BYTE`/`.WORD` fixture. Each
+  fixture calls `symbolsInit` fresh (an isolated symbol table per fixture,
+  not one shared table) so cross-fixture `LOOP` reuse cannot collide.
+- MAIN envelope grown `$2F00` → `$3000` for WP28 (23-byte measured overflow).
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

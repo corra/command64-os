@@ -538,11 +538,60 @@ WP26 plan:
       **WP27 is complete.** WP28 (`712fe7af`) is now unblocked in
       Taskwarrior but requires its own dedicated plan drafted and approved
       before activation, per the CASM AGENTS.md gate.
-- [ ] `712fe7af-1e41-46c9-9a19-49c2632cd15a`: WP28 Pass 1 - address
-      assignment and definitions. Unblocked in Taskwarrior now that WP27 is
-      complete, but not yet planned in detail; per the CASM AGENTS.md gate,
-      a dedicated plan and task activation must be drafted and separately
-      approved before implementation begins.
+- [x] `712fe7af-1e41-46c9-9a19-49c2632cd15a`: WP28 Pass 1 - address
+      assignment and definitions. Plan approved as drafted:
+      `brain/plans/2026-07-22-casm-phase6-wp28-pass1-address-assignment.md`.
+      Active on `feature/casm-phase6-wp28` from `feature/casm-phase6-wp27`'s
+      tip, per this project's branch-per-WP convention. Wired WP27's
+      VMM-backed symbol table into a real two-pass foundation: added
+      `CASM_PASS_MODE_MEASURE`/`CASM_PASS_MODE_EMIT`, gated at exactly one
+      point in `emitRawByte` (`emit.s`) -- measure mode skips the actual
+      byte write but still advances `CasmPc`. Added label-statement grammar
+      to `parser.s` (colon-terminated `LABEL:` identifier statements) that
+      insert into the symbol table via `symbolsInsert`, with duplicate
+      detection. Wired `expr.s`'s resolver callback to call `symbolsLookup`
+      for real (previously a stub, `parserRejectIdentifier`), so
+      identifiers in expressions now resolve against the symbol table
+      WP27 built. Added `CASM_PARSER_STMT_FORCE_ABS`, growing
+      `CasmParserStmt` from 6 to 7 bytes, to force absolute-width
+      addressing for symbol-derived operands so a label used as a
+      branch/zero-page-eligible operand always assembles to the same
+      width in both passes -- preventing a Pass 1/Pass 2 size
+      disagreement. Caught and fixed two defects during implementation,
+      before any test run: the force-absolute flag was originally going to
+      derive from `CASM_EXPR_FLAG_FORCE_ABS` (set only when unresolved),
+      which would have let Pass 1/Pass 2 disagree on size for
+      already-resolved backward references -- corrected to derive from
+      `CASM_EXPR_FLAG_SYMBOL_DERIVED` (set on any resolver success,
+      resolved or not); and `emit.s`'s pass-mode gate as originally
+      spec'd would have clobbered the byte to emit with `CasmPassMode`'s
+      own value -- fixed to stash the byte in X first. Added a standalone
+      `tests/src/casm_pass1/casm_pass1.s` harness with 7 fixtures (label +
+      bare, label + mnemonic on the same line, forward reference,
+      backward reference, undefined symbol under measure-mode tolerance,
+      duplicate-label detection, and a comprehensive fixture combining a
+      forward reference, 3 labels, and `.BYTE`/`.WORD` directives). Found
+      and fixed two test-fixture defects during VICE verification, not
+      implementation defects: a zero-page collision in
+      `tests/src/casm_expr/casm_expr.s` (its own mock lexer's
+      `ScriptLo`/`ScriptHi` cursor at `$70`/`$71` collided with `expr.s`'s
+      new use of `CasmPtr0Lo`/`Hi` at the same address -- fixed by moving
+      the test's cursor to `$7C`/`$7D`); and the generated `p1size1`
+      fixture used lowercase `.byte`/`.word` directive keywords, which
+      CASM's lexer's `isIdFirst`/`isIdCont` never accept (only uppercase,
+      unshifted `$41`-`$5A` or shifted PETSCII `$C1`-`$DA`), raising
+      `CASM_DIAG_INVALID_SOURCE_BYTE` on the `b` -- fixed by capitalizing
+      to `.BYTE`/`.WORD` to match every other fixture's convention. User
+      ran all 7 `casm_pass1` fixtures and a `test_casm_expr` regression
+      re-run in VICE from `build/test.d64`: both passed with no `F`
+      failures. Measured MAIN overflow; user approved `$2F00` -> `$3000`.
+      Version-only completion increment applied: final CASM `0.1.30`
+      build 1123, no-change rebuild stable, both `image_d64` and
+      `test_image_d64` build clean. Walkthrough:
+      `brain/walkthroughs/2026-07-22-casm-phase6-wp28-pass1-address-assignment.md`.
+      **WP28 is complete.** WP29 (`8e989bdf`) is now unblocked in
+      Taskwarrior but requires its own dedicated plan drafted and approved
+      before activation, per the CASM AGENTS.md gate.
 - [ ] `8e989bdf-7aed-4bfe-ae9c-3771edb7caf5`: WP29 Pass 2 - resolution and
       emission.
 - [ ] `a9a117d2-b4e5-4f5c-8df1-19239b1e4cf7`: WP30 relative branches and
