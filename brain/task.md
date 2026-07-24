@@ -639,6 +639,57 @@
     clean. WP32 complete.** WP33-WP36 each require their own dedicated plan
     and approval before activation.
 
+- [x] Taskwarrior (`25e69c58-b1cf-4c43-8aa9-5ae79b015375`): CASM Phase 7
+      WP33 VMM-backed source load and traversal equivalence
+  - Plan: `brain/plans/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`
+  - Active on `feature/casm-phase7-wp33` from `main` at `ab7445b`
+  - Implemented Phase 0C.10 Contract items 1-3: new `sourceLoad` pre-pass
+    (opens `CasmSourceName`, streams it in 256-byte OS blocks, writes each
+    into a 65535-byte VMM allocation through up to four 64-byte
+    `vmmWindowWrite` chunks); VMM-backed `sourceRefill` (chunked
+    `vmmWindowRead` into `CasmIoBuffer`); simplified
+    `sourceOpen`/`sourceRewind`/`sourceClose` (pure cursor resets, no OS
+    calls). `sourceFetchPhysical` and every byte-classification/
+    newline-normalization routine needed zero changes -- confirmed by
+    tracing that they only consult the block index/length window and a
+    delivered-byte offset, meaningful identically regardless of data
+    source
+  - Per the user's confirmed scoping decision, WP33 stayed single-file
+    only: no `CasmSourceNames` array or file table yet, since no WP33
+    fixture could exercise them with more than one input (deferred to
+    WP34)
+  - New `casmvmm65`/`casmvmm128` fixtures target the internal 64-byte VMM
+    chunk boundary `casm256` (always four full chunks) never exercised.
+    MAIN bumped `$3000` -> `$3200` (`casm`) and `$3200` -> `$3300`
+    (`casm_pass1`/`casm_passcheck`, both link `source.s` whole)
+  - Two real defects found through user runtime testing and fixed
+    (matching the WP25/WP30 precedent -- a genuinely new fixture category
+    surfacing a latent defect, not just proving new code correct):
+    - `sourceRefill`'s VMM-read copy omitted the `<CasmIoBuffer` low-byte
+      term (`CasmIoBuffer` links at `$5FDA`, not page-aligned), so every
+      refill wrote 218 bytes before the real buffer, corrupting whatever
+      BSS state sat there -- surfaced as two seemingly unrelated symptoms
+      (`casmemit1`: spurious `OUTPUT WRITE FAILED` plus a real drive-level
+      `32, SYNTAX ERROR`; `casmhello`: spurious `DUPLICATE ORG`) depending
+      on which fixture's chunk offsets hit which cell. Fixed by adding the
+      missing term as its own correctly-carried addition
+    - `test_casm_pass1` never freed `sourceLoad`'s new per-fixture VMM
+      allocation (only `symbolsInit`'s was accounted for pre-WP33), so the
+      8-slot VMM registry filled after 4 of 7 fixtures (`....`) and the
+      rest failed with the registry already full (`fff`). Fixed by calling
+      `resourcesCleanup` after each fixture in `casm_pass1.s`
+  - User ran the full verification matrix after both fixes: standalone
+    harnesses, all 12 byte-identical trusted references, all 7 Phase 3
+    traversal fixtures, and both new chunk-boundary fixtures all matched
+    their hand-derived expected results
+  - Final CASM `0.1.35` build 1137, no-change rebuild stable, both
+    `image_d64` and `test_image_d64` build clean. MAIN headroom 273 of
+    12800 bytes
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`
+  - **WP33 is complete.** WP34 (multi-file CLI and file-boundary
+    provenance) remains separately gated and unstarted.
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

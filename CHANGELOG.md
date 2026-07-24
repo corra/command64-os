@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 7 WP33 VMM-backed source load and traversal equivalence**
+  (CASM `0.1.35` build 1137): implemented a new `sourceLoad` pre-pass that
+  streams the input file into one VMM allocation before Pass 1, a
+  VMM-backed `sourceRefill` that fills `CasmIoBuffer` through chunked
+  64-byte `vmmWindowRead` transfers instead of reading the OS file
+  directly, and simplified `sourceOpen`/`sourceRewind`/`sourceClose` down
+  to pure cursor resets with no OS calls. Scoped to single file only, per
+  a confirmed decision to defer the multi-file loop and file table to
+  WP34 rather than build them ahead of a fixture that could exercise more
+  than one input. `sourceFetchPhysical` and every byte-classification/
+  newline-normalization routine needed no changes at all. Found and fixed
+  two real defects via user runtime testing: `sourceRefill`'s VMM-read
+  copy omitted `CasmIoBuffer`'s low-byte link address entirely (it is not
+  page-aligned), writing every chunk 218 bytes before the real buffer and
+  corrupting unrelated state in a way that produced two seemingly
+  unrelated symptoms on two different fixtures; and the standalone
+  `test_casm_pass1` harness exhausted the 8-slot VMM registry partway
+  through its 7 fixtures because it never freed `sourceLoad`'s new
+  per-fixture allocation, fixed by calling `resourcesCleanup` between
+  fixtures. The full verification matrix (both standalone harnesses, all
+  12 byte-identical trusted references, all 7 Phase 3 traversal
+  diagnostics, and two new 64-byte VMM chunk-boundary fixtures) passed
+  after both fixes. MAIN bumped `$3000` -> `$3200`. CASM Phase 7 WP34
+  (multi-file CLI and file-boundary provenance) remains separately gated
+  and unstarted.
 - **CASM Phase 7 WP32 prerequisite reconciliation and Phase 0C.10 freeze**
   (CASM `0.1.34` build 1132): verified the CASM Phase 6B completion gate,
   then found the master plan's stated Phase 7 rationale ("sources larger

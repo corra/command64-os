@@ -771,8 +771,61 @@ own sequencing -- neither is activated by this closure.
       the only source change is the version-only completion increment.
       Final CASM `0.1.34` build 1132, no-change rebuild stable, both
       `image_d64` and `test_image_d64` build clean. **WP32 is complete.**
-- [ ] WP33 VMM-backed single-file load and traversal equivalence. Requires
-      its own dedicated plan and approval per AGENTS.md.
+- [x] WP33 VMM-backed single-file load and traversal equivalence. Plan
+      approved as drafted:
+      `brain/plans/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`.
+      Active on `feature/casm-phase7-wp33` from `main` at `ab7445b`.
+      Implemented Contract items 1-3 of the Phase 0C.10 freeze: a new
+      `sourceLoad` pre-pass (opens `CasmSourceName`, streams it in 256-byte
+      OS blocks, writes each into a 65535-byte VMM allocation through up to
+      four 64-byte `vmmWindowWrite` chunks); a VMM-backed `sourceRefill`
+      (chunked `vmmWindowRead` into `CasmIoBuffer` instead of a direct OS
+      read); and simplified `sourceOpen`/`sourceRewind`/`sourceClose` (pure
+      cursor resets, no OS calls -- `CASM_DIAG_SOURCE_REWIND_FAILED` becomes
+      declared-but-unreachable, not removed). `sourceFetchPhysical` and
+      every byte-classification/newline-normalization routine needed zero
+      changes, confirmed by tracing that they only ever consult the block
+      index/length window and a delivered-byte offset, both meaningful
+      identically regardless of where `CasmIoBuffer`'s contents came from.
+      Two new fixtures (`casmvmm65`/`casmvmm128`) target the new internal
+      64-byte VMM chunk boundary that `casm256` (always four full chunks)
+      never exercised. MAIN bumped `$3000` -> `$3200` (236-byte overflow at
+      the old size) for `casm`, and `$3200` -> `$3300` for the
+      `casm_pass1`/`casm_passcheck` standalone harnesses (both link
+      `source.s` whole).
+
+      Two real defects were found through user runtime testing and fixed,
+      matching the WP25/WP30 precedent that a genuinely new fixture
+      category can surface a latent defect, not just prove new code
+      correct:
+      - `sourceRefill`'s VMM-read copy omitted the `<CasmIoBuffer` low-byte
+        term entirely (`CasmIoBuffer` links at `$5FDA`, not page-aligned),
+        so every refill wrote 218 bytes before the real buffer, corrupting
+        whatever BSS state happened to sit there. This produced two
+        seemingly unrelated symptoms depending on which fixture's chunk
+        offsets hit which cell: `casmemit1` failed with a spurious
+        `OUTPUT WRITE FAILED` plus a real drive-level `32, SYNTAX ERROR`;
+        `casmhello` failed with a spurious `DUPLICATE ORG`. Fixed by adding
+        the missing term as its own correctly-carried addition, mirroring
+        `sourceLoad`'s already-correct write-side pointer computation.
+      - `test_casm_pass1` never freed `sourceLoad`'s new per-fixture VMM
+        allocation (only `symbolsInit`'s was ever accounted for
+        pre-WP33), so the 8-slot VMM registry filled exactly after 4 of 7
+        fixtures (`....`) and the remaining three failed with the registry
+        already full (`fff`). Fixed by calling `resourcesCleanup` after
+        each fixture in `casm_pass1.s`, freeing both VMM slots before the
+        next fixture allocates its own.
+
+      User ran the full verification matrix after both fixes:
+      `TEST_CASM_PASS1` and `TEST_CASM_PASSCHECK` both pass; all 12
+      byte-identical trusted references pass; all 7 Phase 3 traversal
+      fixtures and both new `casmvmm65`/`casmvmm128` chunk-boundary
+      fixtures produced their hand-derived expected diagnostics. Final CASM
+      `0.1.35` build 1137, no-change rebuild stable, both `image_d64` and
+      `test_image_d64` build clean. MAIN headroom 273 of 12800 bytes.
+      Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`.
+      **WP33 is complete.**
 - [ ] WP34 multi-file CLI and file-boundary provenance. Requires its own
       dedicated plan and approval per AGENTS.md.
 - [ ] WP35 diagnostic filename integration. Requires its own dedicated plan

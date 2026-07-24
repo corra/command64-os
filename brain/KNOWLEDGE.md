@@ -842,6 +842,112 @@ increment.
   file-boundary provenance; WP35 diagnostic filename integration; WP36
   verification, walkthrough, and Phase 7 completion gate.
 
+### CASM Phase 7 WP33 VMM-Backed Source Load (Phase 0C.11, 2026-07-24)
+
+Amends Phase 0C.10 above with as-built detail from WP33's actual
+implementation, per
+`brain/plans/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`. Final
+CASM `0.1.35` build 1137.
+
+- **Scope stayed single-file only, per the user's confirmed decision**:
+  `sourceLoad` opens exactly `CasmSourceName`; no `CasmSourceNames` array or
+  `CasmSourceFileTable` yet. Building the N-file loop before `CasmSourceNames`
+  can ever hold more than one entry would have been untested-by-construction
+  complexity, matching the project's repeated precedent against building
+  ahead of a real consumer (WP26 deferred "emission events" the same way).
+- **`sourceFetchPhysical` needed zero changes.** Confirmed by direct
+  tracing: it only ever consults `CasmSourceBlockLenLo/Hi`/
+  `CasmSourceBlockIndexLo/Hi` (the block window into `CasmIoBuffer`) and
+  `CasmSourceOffsetLo/Hi` (a delivered-byte counter), both meaningful
+  identically regardless of whether the block came from disk or VMM. Only
+  the private `sourceRefill` plus `sourceOpen`/`sourceRewind`/`sourceClose`
+  (and the new `sourceLoad`) touch the OS/VMM boundary.
+- **New persistent state lives in `source.s`'s own `.segment "BSS"`**, not
+  `state.s`'s frozen Phase 3 subrecords (`CasmSourceVmmSlot`,
+  `CasmSourceLoadedLenLo/Hi`, `CasmSourceVmmCursorLo/Hi` -- 5 bytes),
+  mirroring WP28's `CasmLabelName` precedent: new state kept parallel to a
+  size-asserted shared ABI rather than crammed into it.
+- **`CasmSourceVmmCursorLo/Hi` is reused for two different purposes at two
+  different times, never simultaneously**: during `sourceLoad` it is the
+  next VMM *write* offset; `sourceOpen`/`sourceRewind` reset it to 0 and
+  every subsequent `sourceRefill` advances it as the next VMM *read*
+  offset. Safe because loading always completes fully before any refill
+  begins.
+- **`sourceOpen`/`sourceRewind`/`sourceClose` all lost failure paths**, not
+  just changed what they call: with no OS call left in any of the three,
+  each can only fail on a bad precondition state now.
+  `CASM_DIAG_SOURCE_REWIND_FAILED` ($14) became entirely unreachable
+  through any code path -- **left declared, not removed or renumbered**,
+  since `common.inc`'s diagnostic identifiers are a stable,
+  sequentially-asserted-contiguous contract (matches Phase 5/WP17's
+  precedent for reserved-but-unraised diagnostics).
+  `CASM_DIAG_INPUT_CLOSE_FAILED` stayed reachable but moved call sites,
+  from `sourceRewind`/`sourceClose` to `sourceLoad`'s own
+  `inputStreamClose` call.
+- **Two real defects found through user runtime testing, both only because
+  a genuinely new fixture category exercised a code path for the first
+  time** -- a recurring pattern now seen at WP25, WP30, and WP33:
+  1. **`sourceRefill`'s VMM-read copy omitted the `<CasmIoBuffer` low-byte
+     term entirely.** `CasmIoBuffer` links at `$5FDA` -- **not
+     page-aligned** (`<CasmIoBuffer = $DA`, not `$00`). The buggy pointer
+     computation added only `#>CasmIoBuffer` (the page) to
+     `base + chunkDestOffset`, never `#<CasmIoBuffer` (the byte offset
+     within that page), so every VMM-backed refill wrote its chunk 218
+     bytes before the real buffer, corrupting whatever BSS state happened
+     to sit there. This produced two seemingly unrelated symptoms
+     depending on which fixture's chunk offsets hit which cell:
+     `casmemit1.s` failed with a spurious `CASM: OUTPUT WRITE FAILED` at
+     line 9 col 14 plus a real Commodore drive-level `32, SYNTAX ERROR`
+     status (consistent with a corrupted output filename reaching
+     `DOS_OPEN_FILE`); `casmhello.s` failed with a spurious
+     `CASM: DUPLICATE ORG` at line 1 col 1 (consistent with `CasmOrgSet`,
+     an `emit.s` BSS cell, getting clobbered). Same defect, different
+     collateral damage per file -- not two separate bugs. **Fix**: add the
+     missing term as its own correctly-carried addition
+     (`clc` / `adc CasmLexerScratch1` / `clc` / `adc #<CasmIoBuffer` --
+     the intermediate `clc` matters, since `base + chunkDestOffset` alone
+     never carries per its own established bound, but chaining the
+     `<CasmIoBuffer` add onto a stale carry from that first add would
+     still be wrong), mirroring `sourceLoad`'s already-correct write-side
+     pointer computation, which already had the `#<CasmIoBuffer` term.
+  2. **`test_casm_pass1` never freed `sourceLoad`'s new per-fixture VMM
+     allocation.** The harness calls `symbolsInit` *and* now `sourceLoad`
+     once per fixture across 7 fixtures in one continuous process, with no
+     explicit cleanup between them (by design, pre-WP33: "7 calls total,
+     one per fixture, well within `CASM_VMM_CAPACITY == 8`"). WP33 doubled
+     that to 14 allocations needed against 8 slots -- the registry filled
+     exactly after 4 fixtures (`....`) and the remaining three
+     (`p1undef1`, `p1dup1`, `p1size1`) failed with the registry already
+     full (`fff`). **Fix**: `casm_pass1.s`'s main loop now calls
+     `resourcesCleanup` after each fixture's `reportCase`, freeing both
+     that fixture's symbol-table and source VMM slots before the next
+     fixture allocates its own -- steady-state usage is at most 2 slots at
+     a time, not 14 accumulated. This is a test-harness-only fix; no
+     production `casm.s` behavior is affected (production calls
+     `sourceLoad` exactly once per run and relies on the existing generic
+     `resourcesCleanup` sweep at `exitSuccess`/`exitFatal`, unchanged).
+- **`sourceClose` does not explicitly free `CasmSourceVmmSlot`.** Matches
+  the symbol table's own established precedent (WP27's symbol allocation
+  is never freed explicitly either) -- both rely on the generic
+  `resourcesCleanup` sweep at final exit, not a per-module free.
+- MAIN measured via `ld65 -m`: CODE `$21EF` (8687), RODATA `$090C` (2316),
+  and BSS `$5F4` (1524) sum to 12527 of 12800 bytes -- **273 bytes
+  headroom** (`$3000` -> `$3200`, a 512-byte bump against a 236-byte
+  overflow at the old size). `casm_pass1`/`casm_passcheck` (which link
+  `source.s` whole) independently bumped `$3200` -> `$3300`.
+- **Verification matrix, all passing**: `TEST_CASM_PASS1` (all 7
+  sub-fixtures) and `TEST_CASM_PASSCHECK`; all 12 byte-identical trusted
+  references (`casmemit1`, `casmhello`, `casmmodes`, `casmnum2`,
+  `casmexprn`, `p1fwd1`, `p1back1`, `p1size1`, `brfwd1`, `brback1`,
+  `casmcase1`, `casmmaxid1`); all 7 Phase 3 traversal fixtures
+  (`casmempty`, `casmshort`, `casm256`, `casmmulti`, `casmcr`, `casmcrlf`,
+  `casmsplit`) against hand-derived expected diagnostics (a first real run
+  through two-pass `casm.s` for most of these, not a regression
+  re-confirmation -- no prior WP ever selected them for its own regression
+  sample); both new `casmvmm65`/`casmvmm128` chunk-boundary fixtures.
+- **CASM Phase 7 WP33 is complete.** WP34 (multi-file CLI and
+  file-boundary provenance) remains separately gated and unstarted.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

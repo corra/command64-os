@@ -466,3 +466,32 @@ separately gated per `AGENTS.md`.
   WP34. Created `feature/casm-phase7-wp33` from `main` at `ab7445b`.
   Awaiting user approval before Taskwarrior child-task creation or any
   source edit.
+- 2026-07-24: Approved and implemented. Contract items 1-3 landed as
+  designed; the correction to this plan's own Verification section (the
+  seven Phase 3 traversal fixtures had no real "before" baseline, so
+  their check became hand-derived expected results, not a regression
+  re-confirmation) was made before any runtime testing. Committed a WIP
+  checkpoint (`84f8b6b`) at the user's request before completing
+  verification, so a known-good rollback point existed independent of
+  test outcome.
+- 2026-07-24: User runtime testing found two real defects, both fixed
+  after presenting root cause: (1) `sourceRefill`'s VMM-read pointer
+  computation omitted the `<CasmIoBuffer` low-byte term (the buffer is
+  not page-aligned), corrupting unrelated BSS state in a way that
+  produced two seemingly unrelated failures (`casmemit1`'s spurious
+  output-write failure, `casmhello`'s spurious duplicate-org) depending on
+  which fixture's chunk offsets hit which cell; (2) `test_casm_pass1`
+  exhausted the 8-slot VMM registry after 4 of its 7 fixtures because it
+  never freed `sourceLoad`'s new per-fixture allocation, fixed by calling
+  `resourcesCleanup` between fixtures in the harness. After both fixes,
+  the user ran the complete verification matrix (both standalone
+  harnesses, all 12 byte-identical trusted references, all 7 Phase 3
+  traversal fixtures, both new chunk-boundary fixtures) and confirmed
+  every case matched its expected result. Applied the version-only
+  completion increment: final CASM `0.1.35` build 1137, no-change rebuild
+  stable, both `image_d64` and `test_image_d64` build clean, MAIN headroom
+  273 of 12800 bytes. Recorded the Phase 0C.11 as-built amendment in
+  `brain/KNOWLEDGE.md`, updated `wiki/tasks/casm.md`/`brain/task.md`/
+  `CHANGELOG.md`/Taskwarrior, and drafted the walkthrough. **WP33 is
+  complete.** WP34 (multi-file CLI and file-boundary provenance) remains
+  separately gated and unstarted.
