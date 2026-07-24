@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 7 WP32 prerequisite reconciliation and Phase 0C.10 freeze**
+  (CASM `0.1.34` build 1132): verified the CASM Phase 6B completion gate,
+  then found the master plan's stated Phase 7 rationale ("sources larger
+  than the RAM window", "byte-at-a-time OS calls") is stale — `source.s`
+  already streams any file size in bounded 256-byte OS blocks. The only
+  confirmed hard gap is CLI-level: a second top-level source filename is
+  hard-rejected today. Asked the user whether to still build a VMM-cached
+  source model despite the stale rationale (confirmed yes, for the real
+  remaining benefit of eliminating Pass 2's forced second physical disk
+  read) and what capacity to freeze for multiple source names (confirmed an
+  8-slot array, matching this codebase's existing bounded-capacity
+  convention). Froze the Phase 0C.10 contract: one pre-pass VMM load stage,
+  a 65535-byte combined multi-file cap (not 65536, since `vmmStoreAlloc`
+  cannot represent that count in 16 bits), VMM-backed refill filling the
+  existing 256-byte `CasmIoBuffer` through up to four 64-byte transfers
+  (the existing 64-byte VMM transfer buffer cannot grow without breaking
+  the Phase 6B symbol-record contract), file-boundary identity/line resets
+  driving an already-reserved Phase 3 placeholder field, and diagnostic
+  filename printing conditional on more than one source file. Found no new
+  diagnostic identifier is expected for Phase 7 — a contrast with every
+  prior phase. No symbol-table, source, or CLI source was written; only the
+  version-only completion increment. CASM Phase 7 WP33-WP36 remain
+  separately gated and unstarted.
 - **CASM Phase 6B WP31 verification, walkthrough, and completion gate —
   CASM Phase 6B complete** (CASM `0.1.33` build 1131): closed the last
   unchecked Phase 6B acceptance item (duplicate/undefined/case-sensitive/

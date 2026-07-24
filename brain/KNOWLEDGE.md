@@ -764,6 +764,84 @@ build 1131.
   multiple top-level inputs) and Phase 8 (R6 relocation consumption) remain
   separately gated and unstarted, per the master plan's own sequencing.
 
+### CASM Phase 7 WP32 VMM-Backed Source and Multi-File Contract (Phase 0C.10, frozen 2026-07-23)
+
+Freezes the contract WP33-WP36 implement against, per
+`brain/plans/2026-07-23-casm-phase7-wp32-prerequisite-reconciliation.md`.
+WP32 itself implements no runtime behavior — version-only completion
+increment.
+
+- **The master plan's stated Phase 7 rationale is stale and was corrected,
+  not implemented as written.** "Sources larger than the RAM window" and
+  "byte-at-a-time OS calls" do not describe a real problem: `source.s`'s
+  `sourceFetchPhysical`/`sourceRefill` already stream any file size in
+  bounded 256-byte OS blocks. The only confirmed hard gap is CLI-level:
+  `cli.s`'s `cliCopySource` hard-rejects a second positional source token
+  (`CASM_DIAG_EXTRA_SOURCE`) — Phase 2's deliberate, documented single-file
+  scope, not a defect.
+- **User-confirmed decision: CASM still adopts a VMM-cached source model**,
+  despite the original rationale being stale, for its real remaining
+  benefit — today's `sourceRewind` closes and reopens the file, forcing a
+  second full physical disk read every Pass 2; a VMM cache loaded once
+  before Pass 1 makes Pass 2's rewind a pure VMM-offset reset with no OS
+  calls, and gives multiple files one uniform replayable stream (also the
+  natural foundation for Phase 9's include processing).
+- **One pre-pass load stage** (new, runs after CLI parsing and before Pass
+  1) opens each of `CasmSourceCount` (1..8) `CasmSourceNames` entries in
+  order, streams each through the existing `fileRead` in 256-byte blocks,
+  and `vmmWindowWrite`s each block into one VMM allocation at a running
+  combined offset, recording each file's `{VmmOffset, VmmLength}` span in a
+  new 8-entry `CasmSourceFileTable` (32 bytes, base RAM). A synthetic LF
+  byte is written between files whose preceding file didn't already end in
+  a newline — an ordinary stream byte needing no special read-time
+  handling.
+- **Combined multi-file source content is capped at 65535 bytes total**,
+  not 65536: `vmmStoreAlloc` cannot actually request 65536 bytes (it wraps
+  to `$0000` in the 16-bit `X/Y` count, indistinguishable from an explicit
+  zero-size rejection). This generalizes, rather than tightens, the
+  existing single-file 65535-byte limit (`CasmInputTotalLo/Hi` in
+  `fileio.s` already overflows there today).
+- **`CASM_VMM_BUFFER_SIZE` (64 bytes) cannot grow to match `CasmIoBuffer`
+  (256 bytes)** without breaking the WP27 symbol-record contract
+  (`CASM_VMM_BUFFER_SIZE = CASM_SYMBOL_REC_SIZE`, and
+  `CASM_SYMBOL_MAX * CASM_SYMBOL_REC_SIZE <= CASM_VMM_ALLOC_MAX_BYTES` would
+  break if the record size grew to match). VMM-backed refill therefore
+  fills the existing 256-byte `CasmIoBuffer` window through up to four
+  sequential 64-byte `vmmWindowRead` calls, leaving `CasmIoBuffer`'s size,
+  `sourceNextLine`'s LINE-mode payload logic, and every downstream
+  byte-classification/newline-normalization routine unchanged.
+- **`CasmSourceNames` grows from one 64-byte buffer to an 8-slot x 64-byte
+  array** (user-confirmed capacity, matching this codebase's existing
+  `CASM_FILE_CAPACITY`/`CASM_VMM_CAPACITY = 8` convention). Costs 512 new
+  BSS bytes against 97 bytes of current MAIN headroom (12191 of 12288, `ld65
+  -m` measured, unchanged since WP31) — a MAIN size bump is a near
+  certainty, not sized by WP32.
+- **File-identity and per-file line numbering reset at each recorded file
+  boundary during refill**: `CasmSourceFileId` (an unused Phase-3
+  placeholder until now) increments, `CasmSourceLineLo/Hi` resets to 1, and
+  `CasmSourceColumn` resets to 1 when the VMM-backed refill's running read
+  offset reaches the next file table entry's start.
+- **Diagnostic filename printing is confirmed-conditional on
+  `CasmSourceCount > 1`** — the 40-column diagnostic window
+  (`CASM_DIAG_WINDOW_WIDTH + CASM_DIAG_INDENT` already fills all 40
+  columns) cannot also print a 63-byte filename inline. A single-file
+  assembly's diagnostic text is therefore unchanged from today. New
+  `CasmStmtLocFileId`/`CasmDiagLocFileId` cells carry the identity to the
+  three existing `diagSetLocFrom*` write sites in `diagnostics.s`.
+- **No new `CASM_DIAG_*` identifier is expected.** Every Phase 7 failure
+  mode reuses an existing diagnostic: combined-size overflow reuses
+  `CASM_DIAG_SOURCE_OFFSET_OVERFLOW`; a 9th source token reuses
+  `CASM_DIAG_EXTRA_SOURCE`, whose message text ("CASM: TOO MANY SOURCE
+  FILES") is already plural and generic; VMM/file failures during the load
+  stage reuse the existing `CASM_DIAG_VMM_*`/`CASM_DIAG_INPUT_*` families —
+  a contrast with every prior phase (6A added 4 diagnostics, 6B added 4).
+- **Proposed WP breakdown** (each separately gated, not authorized by
+  WP32): WP33 VMM-backed single-file load and traversal equivalence
+  (proven byte-identical against every existing single-file trusted
+  reference before the OS-refill path is retired); WP34 multi-file CLI and
+  file-boundary provenance; WP35 diagnostic filename integration; WP36
+  verification, walkthrough, and Phase 7 completion gate.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

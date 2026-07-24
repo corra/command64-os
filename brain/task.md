@@ -594,6 +594,51 @@
     and Phase 8 (R6 relocation consumption) remain separately gated and
     unstarted; neither is activated by this closure.
 
+- [x] Taskwarrior (`035c0295-ae69-4795-b85d-a0c113e80cb8`): CASM Phase 7
+      WP32 prerequisite reconciliation and Phase 0C.10 freeze
+  - Plan:
+    `brain/plans/2026-07-23-casm-phase7-wp32-prerequisite-reconciliation.md`
+  - Verified the CASM Phase 6B completion gate (`0.1.33` build 1131, 97
+    bytes MAIN headroom, `ld65 -m` measurement matched WP31's own figure
+    exactly, confirming no source has moved since Phase 6B closed)
+  - Found the master plan's stated Phase 7 rationale is stale: "sources
+    larger than the RAM window" and "byte-at-a-time OS calls" describe a
+    problem `source.s` doesn't have -- it already streams any file size in
+    bounded 256-byte OS blocks. The only confirmed hard gap is CLI-level:
+    `cli.s`'s `cliCopySource` hard-rejects a second positional source token
+  - Asked the user two architectural questions given that finding: whether
+    to still build a VMM-cached source model despite the stale rationale
+    (for the real remaining benefit of eliminating Pass 2's forced second
+    physical disk read on `sourceRewind`), and what capacity to freeze for
+    `CasmSourceNames`. Both recommended options confirmed: VMM-cached
+    whole-source load; 8-slot x 64-byte array (matching the existing
+    `CASM_FILE_CAPACITY`/`CASM_VMM_CAPACITY = 8` convention)
+  - Froze the Phase 0C.10 contract: one pre-pass load stage populating a
+    single VMM allocation from every input file in order; a 65535-byte
+    (not 65536 -- `vmmStoreAlloc` cannot represent that count in 16 bits)
+    combined multi-file cap, generalizing rather than tightening today's
+    existing single-file limit; VMM-backed refill filling the existing
+    256-byte `CasmIoBuffer` through up to four 64-byte transfers, since
+    `CASM_VMM_BUFFER_SIZE` cannot grow without breaking the WP27
+    symbol-record contract; file-boundary identity/line resets driving the
+    already-unused `CasmSourceFileId` placeholder from Phase 3; and
+    diagnostic filename printing conditional on more than one source file,
+    keeping single-file diagnostic text byte-identical to today's
+  - Found no new `CASM_DIAG_*` identifier is expected for Phase 7 -- a
+    contrast with every prior phase (6A added 4, 6B added 4); every new
+    failure mode reuses an existing diagnostic, including
+    `CASM_DIAG_EXTRA_SOURCE` whose message text is already plural
+  - No symbol-table, source, or CLI source was written -- the only source
+    change is the version-only completion increment
+  - Proposed WP33 (VMM-backed load/traversal equivalence), WP34 (multi-file
+    CLI/provenance), WP35 (diagnostic filename integration), WP36
+    (verification/closeout); none authorized by WP32 itself
+  - **CASM Phase 7 milestone (`1a0d0dc8-3267-4885-aa83-adf923d56422`,
+    depending on WP32-WP36) created. Final CASM `0.1.34` build 1132,
+    no-change rebuild stable, both `image_d64` and `test_image_d64` build
+    clean. WP32 complete.** WP33-WP36 each require their own dedicated plan
+    and approval before activation.
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval
