@@ -1106,6 +1106,84 @@ consolidated verification.
   now checked.** WP36 (verification, walkthrough, and Phase 7 completion
   gate) remains separately gated and unstarted.
 
+### CASM Phase 7 WP36 Verification and Closeout (Phase 7 milestone close, 2026-07-24)
+
+Closing note for the Phase 7 arc (Phase 0C.10 through 0C.13 above). WP36
+implemented no ABI, storage, or CLI change -- it bundled the full
+accumulated WP32-35 fixture/harness matrix into one consolidated
+verification run and closed two real gaps a fresh trace found against the
+master plan's own Phase 7 gate text before implementation began:
+
+- **No fixture had ever proven a large, under-cap input actually assembles
+  successfully.** The master plan's gate text ("small inputs remain
+  byte-identical, while large and multiple inputs assemble successfully
+  with correct diagnostics") was only half-covered by the four Phase 7
+  Acceptance items WP32 derived from it -- none of the four is a large
+  input that assembles *successfully*; every existing "large" fixture was
+  either invalid syntax (`casm256`/`casmmulti`/`casmvmm65`/`casmvmm128`,
+  pure `sourceRefill` traversal proof) or deliberately over the 65535-byte
+  cap (`casmmfovf1`/`casmmfovf2`, the failure path). Closed with a new
+  fixture pair, `casmbiga.s`/`casmbigb.s` (3000 `NOP` statements each, 6000
+  total, spanning `$C000`..`$D747`) and its trusted reference
+  `tests/fixtures/casm/casmbig1.ref.hex` (`00 C0` header + `EA` x 6000,
+  sha256-checked) -- generated from one reviewed single-opcode repetition
+  rule rather than a hand-typed manifest, per the user's confirmed
+  verification method (the manifest format has no repeat directive, and
+  hand-typing thousands of tokens would not have made the reference more
+  trustworthy). File B has no `.ORG`, continuing the combined PC from file
+  A -- the same convention `casmmf1`-`casmmf3` established -- so
+  `casmbig1` closes both the "large" and "multiple" halves of the gate text
+  in one fixture.
+- **WP31's targeted 7-fixture Phase 3/4 diagnostic-category regression
+  sample had never been re-run since Phase 7 replaced the entire
+  source-loading layer those fixtures depend on to reach the lexer/parser
+  at all.** WP33's own plan explicitly used a *different* fixture set and
+  noted there was no "same as before" baseline to re-confirm at that point;
+  WP34 and WP35's verification sections each used their own different,
+  narrower samples. Closed by re-running `casmwp11`/`casmzp1`/`casmcma2`/
+  `casmorg3`/`casmzpi2`/`casmpcovf`/`casmnumerrh` unmodified as part of this
+  WP's consolidated matrix -- all seven reproduced their established WP31
+  outcomes exactly, through the fully VMM-backed, multi-file-capable source
+  layer.
+
+**A real implementation-time discrepancy surfaced and was corrected with
+the user's approval, not silently worked around.** `casmbiga.seq`/
+`casmbigb.seq`'s raw source text (12011/12000 bytes -- source text is far
+larger than its 1-byte-per-`NOP` assembled output, a distinction the
+original plan's sizing didn't weigh against disk capacity) did not fit on
+`test.d64` alongside every other CASM/OS fixture: only 110 blocks were free
+before the change, 96 were consumed by the new pair, leaving no room for
+the trailing `edlinfull` fixture (64 blocks) and failing the build with
+"Disk full." Fixed by moving `casmbiga.s`/`casmbigb.s` and `casmbig1`'s
+`COMP` verification (plus `comp.prg` itself, needed for that verification)
+onto the existing `casm_overflow_test_d64` disk image -- the same dedicated
+image `casmmfovf1`/`casmmfovf2` already used for an identical "too large
+for test.d64" reason -- rather than inventing a third disk image or
+shrinking the fixture to a size too small to meaningfully demonstrate
+"large." `casmbig1` stayed in `CASM_REF_NAMES` (so the shared
+`hex_manifest_to_bin.py`/`casm_reference_fixtures` machinery builds it
+unchanged) but was excluded from the generic `CASM_REF_NAMES` ->
+`test.d64` append loop, since its matching `.seq` inputs live only on
+`casm_overflow_test_d64`.
+
+No production source defect was found -- unlike WP25/WP30, this WP's new
+fixture and the re-run regression sample both passed on the first VICE run.
+User ran the full consolidated matrix (5 standalone harnesses -- `TEST_CASM_VMM`,
+`TEST_CASM_SYMBOL`, `TEST_CASM_PASS1`, `TEST_CASM_PASSCHECK`,
+`TEST_CASM_EXPR` -- 16 byte-identical trusted references including the new
+`casmbig1`, 7 diagnostic-fixture scenarios, and the 7-fixture Phase 3/4
+regression sample) and confirmed: "all tests pass." Final CASM `0.1.38`
+build 1142, no-change rebuild stable, all three disk images (`image_d64`,
+`test_image_d64`, `casm_overflow_test_d64`) build clean. MAIN headroom 189
+of 13568 bytes, unchanged from WP35's close (WP36 added no production
+code).
+
+**CASM Phase 7 WP36 is complete, and with it the CASM Phase 7 milestone
+closes.** All five Phase 7 Acceptance items are checked (`wiki/tasks/casm.md`).
+CASM Phase 8 (native R6 relocation consumption) remains separately gated
+and unstarted, per the master plan's own sequencing -- this closure does
+not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

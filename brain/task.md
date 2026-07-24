@@ -788,6 +788,49 @@
     checked.** WP36 (verification, walkthrough, and Phase 7 completion
     gate) remains separately gated and unstarted.
 
+- [x] Taskwarrior (`c69b675f-def4-4fbb-a767-e32794e77af5`): CASM Phase 7
+      WP36 verification, walkthrough, and completion gate
+  - Plan:
+    `brain/plans/2026-07-24-casm-phase7-wp36-verification-closeout.md`
+  - Active on `feature/casm-phase7-wp36` from `feature/casm-phase7-wp35`'s
+    tip
+  - Bundled the full accumulated WP32-35 fixture/harness matrix; found and
+    closed two real gaps before implementation: (1) no fixture had ever
+    proven a large, under-cap input actually assembles successfully -- the
+    master plan's own gate text ("large ... inputs assemble successfully")
+    was only half-covered by the four checked Acceptance items, since every
+    existing "large" fixture was either invalid syntax or deliberately over
+    the cap; (2) WP31's 7-fixture Phase 3/4 diagnostic regression sample had
+    never been re-run since Phase 7 replaced the entire source-loading
+    layer those fixtures depend on
+  - Closed gap 1 with a new fixture pair, `casmbiga.s`/`casmbigb.s` (3000
+    `NOP` statements each) and trusted reference `casmbig1.ref.hex`
+    (`00 C0` + `EA` x 6000) -- generated from one reviewed single-opcode
+    repetition rule per the user's confirmed verification method, closing
+    both the "large" and "multiple" halves of the gate text in one fixture.
+    Closed gap 2 by re-running WP31's same 7 fixtures unmodified
+  - Real implementation-time discrepancy found and fixed with user
+    approval: `casmbiga.seq`/`casmbigb.seq`'s raw source text (12011/12000
+    bytes) did not fit on `test.d64` (only 110 blocks free, 96 needed,
+    leaving no room for the trailing `edlinfull` fixture). Fixed by moving
+    both files plus `casmbig1`'s `COMP` verification (and `comp.prg` itself)
+    onto the existing `casm_overflow_test_d64` disk image -- the same
+    dedicated image `casmmfovf1`/`casmmfovf2` already used for identical
+    "too large for test.d64" reasons
+  - User ran the full consolidated matrix (5 standalone harnesses, 16
+    byte-identical trusted references including the new `casmbig1`, 7
+    diagnostic-fixture scenarios, the 7-fixture Phase 3/4 regression sample)
+    and confirmed: "all tests pass." No production source defect found
+  - Final CASM `0.1.38` build 1142, no-change rebuild stable, all three
+    disk images (`image_d64`, `test_image_d64`, `casm_overflow_test_d64`)
+    build clean. MAIN headroom 189 of 13568 bytes (unchanged)
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-24-casm-phase7-wp36-verification-closeout.md`
+  - **WP36 is complete. CASM Phase 7 milestone
+    (`1a0d0dc8-3267-4885-aa83-adf923d56422`) is complete.** CASM Phase 8
+    (native R6 relocation consumption) remains separately gated and
+    unstarted; neither this closure nor any individual WP activates it.
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

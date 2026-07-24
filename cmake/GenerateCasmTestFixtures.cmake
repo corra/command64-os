@@ -695,6 +695,25 @@ file(WRITE "${OUTPUT_DIR}/casmmfdiag2.seq"
     "NOP\n"
 )
 
+# casmbiga/casmbigb: WP36 large, under-cap, two-file successful-assembly
+# fixture. Closes a gap in the master plan's Phase 7 gate text ("large ...
+# inputs assemble successfully") that no prior fixture actually proved --
+# every earlier "large" fixture was either invalid syntax (pure
+# sourceRefill traversal/chunk-boundary proof, e.g. casm256/casmvmm128) or
+# deliberately over the 65535-byte combined cap (casmmfovf1/casmmfovf2, the
+# failure path). 3000 NOP statements per file (6000 total, roughly 9% of
+# the cap) -- file A opens .ORG $C000; file B has no .ORG, continuing the
+# combined PC, matching casmmf1-3's convention. See
+# tests/fixtures/casm/casmbig1.ref.hex for the hand-derived trusted
+# reference (00 C0 header + EA x 6000, generated from one reviewed
+# repetition rule rather than hand-typed).
+string(REPEAT "NOP\n" 3000 CASM_BIG_BODY)
+file(WRITE "${OUTPUT_DIR}/casmbiga.seq"
+    ".ORG \$C000\n"
+    "${CASM_BIG_BODY}"
+)
+file(WRITE "${OUTPUT_DIR}/casmbigb.seq" "${CASM_BIG_BODY}")
+
 # casmmfovf1/casmmfovf2: combined multi-file source exceeding the
 # 65535-byte cap (neither file alone does -- only their combined total
 # does), firing during sourceLoad's own load phase, before any lexing.

@@ -921,8 +921,63 @@ own sequencing -- neither is activated by this closure.
       headroom 189 of 13568 bytes (no bump needed). Walkthrough:
       `brain/walkthroughs/2026-07-24-casm-phase7-wp35-diagnostic-filename-integration.md`.
       **WP35 is complete.**
-- [ ] WP36 verification, walkthrough, and Phase 7 completion gate. Requires
-      its own dedicated plan and approval per AGENTS.md.
+- [x] WP36 verification, walkthrough, and Phase 7 completion gate. Plan
+      approved as drafted:
+      `brain/plans/2026-07-24-casm-phase7-wp36-verification-closeout.md`.
+      Active on `feature/casm-phase7-wp36` from `feature/casm-phase7-wp35`'s
+      tip. Bundled the full accumulated WP32-35 fixture/harness matrix into
+      one consolidated verification run and closed two gaps a fresh trace
+      found before implementation:
+
+      1. **No fixture had ever proven a large, under-cap input actually
+         assembles successfully** -- the master plan's own Phase 7 gate text
+         ("large ... inputs assemble successfully with correct diagnostics")
+         was only half-covered by the four checked Acceptance items below;
+         every existing "large" fixture was either invalid syntax (pure
+         `sourceRefill` traversal/chunk-boundary proof) or deliberately over
+         the 65535-byte cap (the failure path). Closed with a new fixture
+         pair, `casmbiga.s`/`casmbigb.s` (3000 `NOP` statements each, 6000
+         total), and its trusted reference `casmbig1.ref.hex` (`00 C0`
+         header + `EA` x 6000) -- generated from one reviewed
+         single-opcode repetition rule rather than a hand-typed manifest,
+         per the user's confirmed verification method. `casmbig1` closes
+         both halves of the gate text ("large" and "multiple") in one
+         fixture.
+      2. **WP31's targeted 7-fixture Phase 3/4 diagnostic-category
+         regression sample (`casmwp11`/`casmzp1`/`casmcma2`/`casmorg3`/
+         `casmzpi2`/`casmpcovf`/`casmnumerrh`) had never been re-run since
+         Phase 7 replaced the entire source-loading layer those fixtures
+         depend on to reach the lexer/parser at all** -- confirmed by
+         reading WP33's own plan (which explicitly used a *different*
+         fixture set and noted no "same as before" baseline existed yet)
+         and re-checking WP34/35's verification sections. Closed by
+         re-running the same 7 fixtures, unmodified, as part of this WP's
+         consolidated matrix.
+
+      A real implementation-time discrepancy against the plan surfaced and
+      was corrected with the user's approval: `casmbiga.seq`/`casmbigb.seq`'s
+      raw source text (12011/12000 bytes -- source text is far larger than
+      its 1-byte-per-`NOP` assembled output) did not fit on `test.d64`
+      alongside every other CASM/OS fixture (only 110 blocks were free;
+      96 were needed, leaving no room for the trailing `edlinfull`
+      fixture). Fixed by moving `casmbiga.s`/`casmbigb.s` and `casmbig1`'s
+      `COMP` verification (plus `comp.prg` itself) onto the existing
+      `casm_overflow_test_d64` disk image -- the same dedicated image
+      `casmmfovf1`/`casmmfovf2` already used for exactly the same
+      "too large for test.d64" reason -- rather than inventing a third disk
+      image or shrinking the fixture to a size too small to meaningfully
+      demonstrate "large."
+
+      User ran the full consolidated matrix (5 standalone harnesses, 16
+      byte-identical trusted references including the new `casmbig1`, 7
+      diagnostic-fixture scenarios, the 7-fixture Phase 3/4 regression
+      sample) and confirmed: "all tests pass." No production source defect
+      was found. Final CASM `0.1.38` build 1142, no-change rebuild stable,
+      all three disk images (`image_d64`, `test_image_d64`,
+      `casm_overflow_test_d64`) build clean. MAIN headroom 189 of 13568
+      bytes (unchanged -- WP36 added no production code). Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase7-wp36-verification-closeout.md`.
+      **WP36 is complete, and with it the CASM Phase 7 milestone closes.**
 
 ## Phase 7 Acceptance
 
@@ -937,8 +992,11 @@ own sequencing -- neither is activated by this closure.
 - [x] A combined multi-file source exceeding 65535 bytes fails cleanly with
       the existing overflow diagnostic; a 9th top-level source file is
       rejected with the existing `CASM_DIAG_EXTRA_SOURCE` diagnostic. (WP34)
+- [x] A large, under-cap input assembles successfully, closing the master
+      plan's own gate-text wording literally, not just its four
+      operationalized items above. (WP36, `casmbig1`)
 
-**All four items are checked. WP32-WP35 are complete and approved (CASM
-`0.1.37` build 1141).** WP36 (verification, walkthrough, and Phase 7
-completion gate) remains separately gated and unstarted -- neither this
-closure nor any individual WP activates it.
+**All five items are checked. WP32-WP36 are complete and approved (CASM
+`0.1.38` build 1142). CASM Phase 7 is complete.** CASM Phase 8 (native R6
+relocation consumption) remains separately gated and unstarted, per the
+master plan's own sequencing -- this closure does not activate it.

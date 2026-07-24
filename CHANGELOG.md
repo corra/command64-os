@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 7 WP36 verification, walkthrough, and completion gate**
+  (CASM `0.1.38` build 1142): closes CASM Phase 7 ("VMM-backed source and
+  multiple top-level inputs"). Bundled the full accumulated WP32-35
+  fixture/harness matrix into one consolidated verification run and closed
+  two real gaps found by tracing the master plan's own gate text before
+  implementation: no fixture had ever proven a large, under-cap input
+  actually assembles successfully (closed with a new large multi-file
+  fixture, `casmbig1` -- 6000 `NOP`s across two files, its trusted
+  reference generated from one reviewed single-opcode repetition rule
+  rather than a hand-typed manifest), and WP31's targeted Phase 3/4
+  diagnostic regression sample had never been re-run since Phase 7 replaced
+  the entire source-loading layer those fixtures depend on (closed by
+  re-running the same 7 fixtures unmodified). No production source defect
+  was found; every case passed on the first verification run. MAIN headroom
+  unchanged at 189 of 13568 bytes. All five Phase 7 Acceptance items are
+  now checked; CASM Phase 8 (native R6 relocation consumption) remains
+  separately gated and unstarted.
 - **CASM Phase 7 WP35 diagnostic filename integration** (CASM `0.1.37`
   build 1141): a fatal diagnostic raised during a multi-file assembly now
   prints which top-level source file it came from ("IN FILE \<name\>", on
