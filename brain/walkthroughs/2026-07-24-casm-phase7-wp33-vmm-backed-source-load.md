@@ -8,7 +8,7 @@ status: complete
 
 Plan: `brain/plans/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`
 
-Taskwarrior: `25e69c58-b1cf-4c43-8aa9-5ae79b015375` (WP33); part of the CASM
+Taskwarrior: `ac152eb9-f202-41e3-bdf5-8ce5af9a8a88` (WP33); part of the CASM
 Phase 7 milestone `1a0d0dc8-3267-4885-aa83-adf923d56422`.
 
 ## Outcome
@@ -207,7 +207,7 @@ The user confirmed: "tests pass."
   Packages.
 - `brain/task.md`: WP33 entry added and closed.
 - `CHANGELOG.md`: Unreleased entry added.
-- Taskwarrior: WP33 (`25e69c58-b1cf-4c43-8aa9-5ae79b015375`) completed.
+- Taskwarrior: WP33 (`ac152eb9-f202-41e3-bdf5-8ce5af9a8a88`) completed.
 
 ## Completion
 

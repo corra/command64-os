@@ -679,6 +679,22 @@ file(WRITE "${OUTPUT_DIR}/casmmfcr2.seq"
     "${CASM_MF_LF}@${CASM_MF_LF}"
 )
 
+# casmmfdiag1/casmmfdiag2: WP35 first-file diagnostic filename fixture.
+# The invalid byte is in the FIRST file (CasmDiagLocFileId == 0), the
+# complement of casmmfcr1/casmmfcr2's non-first-file case -- proves the
+# filename prints correctly for file index 0 too, not just a nonzero index.
+# File 2's content is never reached: the invalid byte fires while still
+# lexing file 1, before file 2's own content is ever read.
+#   -> IN FILE CASMMFDIAG1.S
+#      INVALID SOURCE BYTE ($19) AT LINE 2, COL 1 (OFFSET 0)
+file(WRITE "${OUTPUT_DIR}/casmmfdiag1.seq"
+    ".ORG \$C000\n"
+    "@\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmmfdiag2.seq"
+    "NOP\n"
+)
+
 # casmmfovf1/casmmfovf2: combined multi-file source exceeding the
 # 65535-byte cap (neither file alone does -- only their combined total
 # does), firing during sourceLoad's own load phase, before any lexing.

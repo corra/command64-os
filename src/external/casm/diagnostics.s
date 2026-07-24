@@ -25,15 +25,26 @@
 .import CasmLookaheadLineHi
 .import CasmLookaheadColumn
 .import CasmLookaheadByte
+.import CasmLookaheadFileId
 
 .import CasmDiagLocValid
 .import CasmDiagLocLineLo
 .import CasmDiagLocLineHi
 .import CasmDiagLocColumn
 .import CasmDiagLocByte
+.import CasmDiagLocFileId
 .import CasmStmtLocLineLo
 .import CasmStmtLocLineHi
 .import CasmStmtLocColumn
+.import CasmStmtLocFileId
+
+; WP35: multi-file diagnostic filename lookup (cli.s). Both standalone
+; harnesses that link the real diagnostics.s already carry stand-in copies
+; of these three names, as a side effect of WP34's own sourceLoad fix --
+; confirmed by tracing, not assumed.
+.import CasmSourceCount
+.import cliSourceSlotLo
+.import cliSourceSlotHi
 
 .import CasmDiagLineBufA
 .import CasmDiagLineBufB
@@ -156,6 +167,8 @@ diagSetLocFromLookahead:
     sta CasmDiagLocColumn
     lda CasmLookaheadByte
     sta CasmDiagLocByte
+    lda CasmLookaheadFileId
+    sta CasmDiagLocFileId
     lda #CASM_DIAG_LOC_BYTE
     sta CasmDiagLocValid
     rts
@@ -178,6 +191,8 @@ diagSetLocFromToken:
     sta CasmDiagLocLineHi
     lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
     sta CasmDiagLocColumn
+    lda CasmTokenRecord + CASM_TOKEN_REC_FILE_ID
+    sta CasmDiagLocFileId
     lda #CASM_DIAG_LOC_VALID
     sta CasmDiagLocValid
     rts
@@ -201,6 +216,8 @@ diagSetLocFromStmt:
     sta CasmDiagLocLineHi
     lda CasmStmtLocColumn
     sta CasmDiagLocColumn
+    lda CasmStmtLocFileId
+    sta CasmDiagLocFileId
     lda #CASM_DIAG_LOC_VALID
     sta CasmDiagLocValid
     rts
@@ -222,6 +239,8 @@ diagStampStmtLoc:
     sta CasmStmtLocLineHi
     lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
     sta CasmStmtLocColumn
+    lda CasmTokenRecord + CASM_TOKEN_REC_FILE_ID
+    sta CasmStmtLocFileId
     rts
 
 ; ---------------------------------------------------------------------------
@@ -661,6 +680,29 @@ diagPrintSourceContext:
     bne @haveLoc
     rts
 @haveLoc:
+    ; WP35: print which file this location belongs to, only when more than
+    ; one top-level source was given -- keeps single-file diagnostic text
+    ; byte-identical to every prior phase's. cliSourceSlotLo/Hi (cli.s,
+    ; already exported for sourceLoad's own reuse) is indexed directly by
+    ; CasmDiagLocFileId to get a ready-to-print null-terminated pointer.
+    lda CasmSourceCount
+    cmp #2
+    bcc @skipFileName
+    ldx #<msgInFile
+    ldy #>msgInFile
+    jsr diagPrintString
+    ldx CasmDiagLocFileId
+    lda cliSourceSlotLo, x
+    pha
+    lda cliSourceSlotHi, x
+    tay
+    pla
+    tax
+    jsr diagPrintString
+    ldx #<msgCR
+    ldy #>msgCR
+    jsr diagPrintString
+@skipFileName:
     ldx #<msgAtLine
     ldy #>msgAtLine
     jsr diagPrintString
@@ -1168,6 +1210,9 @@ msgLocColPrefix:  .byte " C:", 0
 msgCR:            .byte PetCr, 0
 
 ; WP15 source context strings.
+; WP35: printed only when CasmSourceCount > 1, on its own line before
+; msgAtLine.
+msgInFile:       .byte "IN FILE ", 0
 msgAtLine:       .byte "AT LINE ", 0
 msgColPrefix:    .byte ", COL ", 0
 msgOffsetPrefix: .byte " (OFFSET ", 0

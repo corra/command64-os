@@ -317,3 +317,29 @@ separately gated per `AGENTS.md`.
   file first) was confirmed. Created `feature/casm-phase7-wp35` from
   `feature/casm-phase7-wp34`'s tip (`20b0b98`). Awaiting user approval
   before Taskwarrior child-task creation or any source edit.
+- 2026-07-24: Approved and implemented exactly as planned, with no
+  material deviations. `test_casm_pass1`/`test_casm_passcheck` needed
+  zero source changes, confirmed by a successful build/link rather than
+  assumed, exactly as predicted. User ran the full verification matrix
+  (single-file diagnostic text regression, byte-identical trusted
+  references, both new filename fixtures, both standalone harnesses) and
+  confirmed: "all test pass." Applied the version-only completion
+  increment: final CASM `0.1.37` build 1141, no-change rebuild stable, all
+  three disk images build clean, MAIN headroom 189 of 13568 bytes (no
+  bump needed). While updating closeout docs, found and fixed a
+  documentation-only bookkeeping error dating back to WP32: the
+  Taskwarrior UUID citations for WP32-WP35 in `brain/task.md`,
+  `wiki/tasks/casm.md`, and two prior walkthroughs had been
+  cross-assigned to the wrong work packages since a bulk `task ... uuids`
+  query's output order was assumed (incorrectly) to match input order.
+  The actual Taskwarrior task data itself was never affected -- every
+  task's own annotations always matched its real description correctly;
+  only the UUID strings quoted in prose were wrong. Corrected all five
+  citations to the verified mapping (WP32=`25e69c58`, WP33=`ac152eb9`,
+  WP34=`035c0295`, WP35=`7fedccb3`, WP36=`c69b675f`, unchanged). Recorded
+  the Phase 0C.13 as-built amendment in `brain/KNOWLEDGE.md`, updated
+  `wiki/tasks/casm.md` (checking the final Phase 7 Acceptance item --
+  all four are now checked), `brain/task.md`, `CHANGELOG.md`, Taskwarrior,
+  and drafted the walkthrough. **WP35 is complete.** WP36 (verification,
+  walkthrough, and Phase 7 completion gate) remains separately gated and
+  unstarted.

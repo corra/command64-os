@@ -52,9 +52,11 @@
 .export CasmDiagLocLineHi
 .export CasmDiagLocColumn
 .export CasmDiagLocByte
+.export CasmDiagLocFileId
 .export CasmStmtLocLineLo
 .export CasmStmtLocLineHi
 .export CasmStmtLocColumn
+.export CasmStmtLocFileId
 
 .segment "BSS"
 
@@ -150,6 +152,14 @@ CasmDiagLocLineLo: .res 1
 CasmDiagLocLineHi: .res 1
 CasmDiagLocColumn: .res 1
 CasmDiagLocByte:   .res 1
+; WP35: which top-level source file this location belongs to (index into
+; cli.s's CasmSourceNames/cliSourceSlotLo/Hi). Grown in place rather than
+; kept external like CasmLabelName/the WP33/34 VMM state: unlike
+; CasmParserStmt (three separate wholesale-record writers WP28 avoided
+; disturbing), every field in this block has exactly one clear write site,
+; and CasmDiagStateEnd's size assert is this module's own bookkeeping, not
+; a cross-module ABI another file sizes against.
+CasmDiagLocFileId: .res 1
 
 ; Statement-start location, stamped by parserParseStatement. The emission
 ; engine raises diagnostics after the statement's tokens are consumed, so the
@@ -159,11 +169,12 @@ CasmDiagLocByte:   .res 1
 CasmStmtLocLineLo: .res 1
 CasmStmtLocLineHi: .res 1
 CasmStmtLocColumn: .res 1
+CasmStmtLocFileId: .res 1
 CasmDiagStateEnd:
 
 .assert CasmDiagLineBufB - CasmDiagLineBufA = CASM_DIAG_LINE_BUF_SIZE, error, "CASM diagnostic line buffer A size changed"
 .assert CasmDiagLineSel - CasmDiagLineBufB = CASM_DIAG_LINE_BUF_SIZE, error, "CASM diagnostic line buffer B size changed"
-.assert CasmDiagStateEnd - CasmDiagStateStart = 530, error, "CASM diagnostic state must be exactly 530 bytes"
+.assert CasmDiagStateEnd - CasmDiagStateStart = 532, error, "CASM diagnostic state must be exactly 532 bytes"
 
 .assert CasmTokenText - CasmTokenRecord = CASM_TOKEN_REC_TEXT, error, "CASM token text offset does not match shared ABI"
 .assert CasmTokenRecordEnd - CasmTokenRecord = CASM_TOKEN_REC_SIZE, error, "CASM token record must be exactly 39 bytes"

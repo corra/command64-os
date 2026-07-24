@@ -594,7 +594,7 @@
     and Phase 8 (R6 relocation consumption) remain separately gated and
     unstarted; neither is activated by this closure.
 
-- [x] Taskwarrior (`035c0295-ae69-4795-b85d-a0c113e80cb8`): CASM Phase 7
+- [x] Taskwarrior (`25e69c58-b1cf-4c43-8aa9-5ae79b015375`): CASM Phase 7
       WP32 prerequisite reconciliation and Phase 0C.10 freeze
   - Plan:
     `brain/plans/2026-07-23-casm-phase7-wp32-prerequisite-reconciliation.md`
@@ -639,7 +639,7 @@
     clean. WP32 complete.** WP33-WP36 each require their own dedicated plan
     and approval before activation.
 
-- [x] Taskwarrior (`25e69c58-b1cf-4c43-8aa9-5ae79b015375`): CASM Phase 7
+- [x] Taskwarrior (`ac152eb9-f202-41e3-bdf5-8ce5af9a8a88`): CASM Phase 7
       WP33 VMM-backed source load and traversal equivalence
   - Plan: `brain/plans/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`
   - Active on `feature/casm-phase7-wp33` from `main` at `ab7445b`
@@ -690,7 +690,7 @@
   - **WP33 is complete.** WP34 (multi-file CLI and file-boundary
     provenance) remains separately gated and unstarted.
 
-- [x] Taskwarrior (`7fedccb3-8464-4b4d-a49e-2ac200e99dd4`): CASM Phase 7
+- [x] Taskwarrior (`035c0295-ae69-4795-b85d-a0c113e80cb8`): CASM Phase 7
       WP34 multi-file CLI and file-boundary provenance
   - Plan:
     `brain/plans/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`
@@ -745,6 +745,48 @@
     `brain/walkthroughs/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`
   - **WP34 is complete.** WP35 (diagnostic filename integration) remains
     separately gated and unstarted.
+
+- [x] Taskwarrior (`7fedccb3-8464-4b4d-a49e-2ac200e99dd4`): CASM Phase 7
+      WP35 diagnostic filename integration
+  - Plan:
+    `brain/plans/2026-07-24-casm-phase7-wp35-diagnostic-filename-integration.md`
+  - Active on `feature/casm-phase7-wp35` from `feature/casm-phase7-wp34`'s
+    tip
+  - Implemented Phase 0C.10 Contract item 5: `state.s`'s `CasmDiagState`
+    block grew in place by 2 bytes (`CasmDiagLocFileId`/
+    `CasmStmtLocFileId`, assert 530 -> 532) -- lower-risk than an
+    external-block precedent like `CasmLabelName`'s, since every field
+    here has exactly one clear write site, unlike `CasmParserStmt`'s
+    wholesale writers; all three `diagSetLocFrom*` routines plus
+    `diagStampStmtLoc` (`diagnostics.s`) now carry file identity;
+    `diagPrintSourceContext` prints `IN FILE <name>` on its own line
+    before `AT LINE...`, gated on `CasmSourceCount > 1`, reusing WP34's
+    exported `cliSourceSlotLo/Hi` table for the lookup
+  - Found WP32's original rationale for the gating decision ("the
+    40-column diagnostic window is already full") described a different
+    print statement than the one this WP actually touches -- the trailer
+    already silently wraps past 40 columns in its own worst case today.
+    The real, still-valid reason to gate on `CasmSourceCount > 1` is
+    single-file text stability, not a column budget; corrected the stated
+    rationale without changing the decision
+  - `test_casm_pass1`/`test_casm_passcheck` needed zero source changes --
+    confirmed by successful build/link: both already carried the exact
+    stand-in symbols this WP's new imports needed, as a side effect of
+    WP34's own harness fix
+  - New fixture pair `casmmfdiag1`/`casmmfdiag2` (invalid byte in the
+    first file) complements the existing `casmmfcr1`/`casmmfcr2`
+    non-first-file case, proving file index 0 prints correctly too
+  - User ran the full verification matrix (single-file diagnostic text
+    regression, byte-identical trusted references, both new filename
+    fixtures, both standalone harnesses) and confirmed: "all test pass"
+  - Final CASM `0.1.37` build 1141, no-change rebuild stable, all three
+    disk images build clean. MAIN headroom 189 of 13568 bytes (no bump
+    needed)
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-24-casm-phase7-wp35-diagnostic-filename-integration.md`
+  - **WP35 is complete. All four Phase 7 Acceptance items are now
+    checked.** WP36 (verification, walkthrough, and Phase 7 completion
+    gate) remains separately gated and unstarted.
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

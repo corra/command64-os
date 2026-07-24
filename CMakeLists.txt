@@ -481,6 +481,9 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmmfg.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmfcr1.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmfcr2.seq"
+    # WP35 diagnostic filename fixture (first-file case)
+    "${CASM_TEST_FIXTURE_DIR}/casmmfdiag1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmmfdiag2.seq"
     # casmmfovf1/casmmfovf2 (combined-overflow boundary) are NOT listed here:
     # they are large enough (40000/30000 bytes) that they do not fit on
     # test.d64 alongside every other CASM/OS fixture. See

@@ -1039,6 +1039,73 @@ Final CASM `0.1.36` build 1139.
   integration) and WP36 (verification/closeout) remain separately gated
   and unstarted.
 
+### CASM Phase 7 WP35 Diagnostic Filename Integration (Phase 0C.13, 2026-07-24)
+
+Amends Phase 0C.10 above with as-built detail from WP35's actual
+implementation, per
+`brain/plans/2026-07-24-casm-phase7-wp35-diagnostic-filename-integration.md`.
+Final CASM `0.1.37` build 1141. Closes the last unchecked item in
+`wiki/tasks/casm.md`'s Phase 7 Acceptance list -- all four are now
+checked, though Phase 7 itself does not close until WP36's own
+consolidated verification.
+
+- **WP32's original rationale for gating filename printing on
+  `CasmSourceCount > 1` ("the 40-column diagnostic window is already
+  full") described a different print statement than the one this WP
+  touches.** `CASM_DIAG_WINDOW_WIDTH`/`CASM_DIAG_INDENT` bound the
+  *rendered source line and caret* (`diagPrintLineAndCaret`); the "AT
+  LINE n, COL c (OFFSET o)" trailer this WP extends
+  (`diagPrintSourceContext`) already has no such budget and already
+  silently wraps past 40 columns in its own worst case today (~45
+  characters: 5 line digits + 6 + 3 column digits + 10 + 3 offset digits +
+  1 + optional 9-character byte suffix). **The real, still-valid reason
+  to gate on `CasmSourceCount > 1` is keeping every single-file
+  diagnostic's exact printed text byte-identical to every prior phase's**,
+  not a column budget -- the gating decision itself was unchanged, only
+  its stated justification was corrected, the same class of correction
+  WP26/WP33 each made to a stale prior-WP rationale.
+- **`CasmDiagState`'s size assert (`state.s`) was grown in place** (530 ->
+  532 bytes: `CasmDiagLocFileId` after `CasmDiagLocByte`,
+  `CasmStmtLocFileId` after `CasmStmtLocColumn`), not kept in a separate
+  external block the way `CasmLabelName` (WP28) and the WP33/34 VMM state
+  were. Reasoned explicitly: `CasmDiagState`'s assert is this module's own
+  bookkeeping, not a cross-module ABI another file sizes against (unlike
+  `CASM_TOKEN_REC_SIZE`), and every field in the block -- old and new --
+  has exactly one clear write site, unlike `CasmParserStmt`'s three
+  separate wholesale-record writers that motivated keeping
+  `CasmLabelName` external in the first place.
+- **The filename-pointer lookup needed no new mechanism**: WP34's
+  `cliSourceSlotLo`/`cliSourceSlotHi` compile-time table (`cli.s`,
+  originally exported for `sourceLoad`'s own reuse) indexes directly by a
+  file identifier to a ready-to-print null-terminated pointer --
+  `diagPrintSourceContext` imports and indexes the same table by
+  `CasmDiagLocFileId`, using the identical
+  `ldx / lda,x / pha / lda,x / tay / pla / tax` staging pattern already
+  established in `sourceLoad`.
+- **Both standalone harnesses that link the real `diagnostics.s`
+  (`test_casm_pass1`, `test_casm_passcheck`) needed zero source changes**,
+  confirmed by successful build/link rather than assumed: WP34 already
+  gave both stand-in copies of `CasmSourceNames`/`CasmSourceCount`/
+  `cliSourceSlotLo`/`Hi` (neither links `cli.s`) for `sourceLoad`'s own
+  sake, and this WP's new `diagnostics.s` imports resolve against those
+  same stand-ins with no further changes.
+- **New fixture `casmmfdiag1`/`casmmfdiag2`** (invalid byte in the first
+  file, `CasmDiagLocFileId == 0`) complements the existing
+  `casmmfcr1`/`casmmfcr2` non-first-file case, proving the filename
+  prints correctly for file index 0 too, not just a nonzero index.
+- MAIN unaffected: measured via `ld65 -m` at 189 of 13568 bytes headroom
+  (CODE `$234E` (9038) + RODATA `$925` (2341) + BSS `$7D0` (2000) = 13379)
+  -- no size bump needed, matching the WP's small scope.
+- **Verification matrix, all passing** (user confirmed "all test pass"):
+  single-file diagnostic text regression (byte-identical to before this
+  WP); byte-identical trusted references unaffected; `casmmfcr1`/
+  `casmmfcr2` now reports `IN FILE CASMMFCR2.S` before its existing `AT
+  LINE 2, COL 1` trailer; `casmmfdiag1`/`casmmfdiag2` reports `IN FILE
+  CASMMFDIAG1.S`; both standalone harnesses still pass.
+- **CASM Phase 7 WP35 is complete. All four Phase 7 Acceptance items are
+  now checked.** WP36 (verification, walkthrough, and Phase 7 completion
+  gate) remains separately gated and unstarted.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

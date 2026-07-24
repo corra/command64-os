@@ -742,7 +742,7 @@ own sequencing -- neither is activated by this closure.
 
 ## Phase 7 Work Packages
 
-- [x] `035c0295-ae69-4795-b85d-a0c113e80cb8`: WP32 prerequisite
+- [x] `25e69c58-b1cf-4c43-8aa9-5ae79b015375`: WP32 prerequisite
       reconciliation and Phase 0C.10 freeze. Plan approved as drafted:
       `brain/plans/2026-07-23-casm-phase7-wp32-prerequisite-reconciliation.md`.
       Verified the CASM Phase 6B completion gate (`0.1.33` build 1131, 97
@@ -879,8 +879,48 @@ own sequencing -- neither is activated by this closure.
       headroom 261 of 13568 bytes. Walkthrough:
       `brain/walkthroughs/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`.
       **WP34 is complete.**
-- [ ] WP35 diagnostic filename integration. Requires its own dedicated plan
-      and approval per AGENTS.md.
+- [x] WP35 diagnostic filename integration. Plan approved as drafted:
+      `brain/plans/2026-07-24-casm-phase7-wp35-diagnostic-filename-integration.md`.
+      Active on `feature/casm-phase7-wp35` from `feature/casm-phase7-wp34`'s
+      tip. Implemented Phase 0C.10 Contract item 5: `state.s`'s
+      `CasmDiagState` block grew in place by 2 bytes
+      (`CasmDiagLocFileId`/`CasmStmtLocFileId`, assert updated 530 -> 532
+      -- lower-risk than the `CasmLabelName`-style external-block
+      precedent, since every field here has exactly one clear write site,
+      unlike `CasmParserStmt`'s wholesale writers); all three
+      `diagSetLocFrom*` routines and `diagStampStmtLoc`
+      (`diagnostics.s`) now carry file identity alongside line/column;
+      `diagPrintSourceContext` prints `IN FILE <name>` on its own line
+      before `AT LINE...`, gated on `CasmSourceCount > 1`, reusing WP34's
+      exported `cliSourceSlotLo/Hi` table for the filename lookup (no new
+      lookup mechanism needed).
+
+      Found WP32's original rationale for gating filename printing ("the
+      40-column diagnostic window is already full") described a
+      different print statement than the one this WP touches -- the
+      trailer this WP extends already silently wraps past 40 columns in
+      its own worst case today. The real, still-valid reason to gate on
+      `CasmSourceCount > 1` is keeping single-file diagnostic text
+      byte-identical, not a hard column budget; the gating decision itself
+      was unchanged, only its stated justification was corrected.
+
+      `test_casm_pass1`/`test_casm_passcheck` needed **zero source
+      changes** -- confirmed by successful build/link, not assumed: both
+      already carried the exact stand-in symbols
+      (`CasmSourceCount`/`cliSourceSlotLo/Hi`) this WP's new imports
+      needed, as a direct side effect of WP34's own harness fix. New
+      fixture pair `casmmfdiag1`/`casmmfdiag2` (invalid byte in the
+      *first* file, complementing the existing `casmmfcr1`/`casmmfcr2`
+      non-first-file case) proves the filename prints correctly for file
+      index 0 too. User ran the full verification matrix (single-file
+      diagnostic text regression, byte-identical trusted references,
+      both new filename fixtures, both standalone harnesses) and
+      confirmed: "all test pass." Final CASM `0.1.37` build 1141,
+      no-change rebuild stable, all three disk images (`image_d64`,
+      `test_image_d64`, `casm_overflow_test_d64`) build clean. MAIN
+      headroom 189 of 13568 bytes (no bump needed). Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase7-wp35-diagnostic-filename-integration.md`.
+      **WP35 is complete.**
 - [ ] WP36 verification, walkthrough, and Phase 7 completion gate. Requires
       its own dedicated plan and approval per AGENTS.md.
 
@@ -892,11 +932,13 @@ own sequencing -- neither is activated by this closure.
 - [x] Multiple ordered top-level source files assemble into one combined
       symbol scope, with correct file and line provenance across
       boundaries. (WP34)
-- [ ] Diagnostics raised in a non-first file report the correct filename,
-      line, and column.
+- [x] Diagnostics raised in a non-first file report the correct filename,
+      line, and column. (WP35)
 - [x] A combined multi-file source exceeding 65535 bytes fails cleanly with
       the existing overflow diagnostic; a 9th top-level source file is
       rejected with the existing `CASM_DIAG_EXTRA_SOURCE` diagnostic. (WP34)
 
-WP32-WP34 complete. WP35 (diagnostic filename integration) and WP36
-(verification/closeout) remain unstarted and separately gated.
+**All four items are checked. WP32-WP35 are complete and approved (CASM
+`0.1.37` build 1141).** WP36 (verification, walkthrough, and Phase 7
+completion gate) remains separately gated and unstarted -- neither this
+closure nor any individual WP activates it.

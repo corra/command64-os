@@ -9,6 +9,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 7 WP35 diagnostic filename integration** (CASM `0.1.37`
+  build 1141): a fatal diagnostic raised during a multi-file assembly now
+  prints which top-level source file it came from ("IN FILE \<name\>", on
+  its own line before the existing "AT LINE n, COL c" trailer), gated on
+  more than one source file being given so single-file diagnostic text
+  stays byte-identical to every prior release. Reused the existing
+  filename lookup table added for multi-file loading rather than building
+  a new mechanism. Found the previous phase's stated reason for gating
+  this on multiple files ("the diagnostic display is already full")
+  actually described a different, unrelated print statement -- the one
+  this change extends already wraps past the screen width in its own
+  worst case today; the real and still-valid reason is keeping
+  single-file output unchanged, not a space constraint. Both standalone
+  test harnesses needed zero source changes, confirmed by a successful
+  build rather than assumed, since the prior phase's own fix already gave
+  them what this one needed. Closes the last unchecked CASM Phase 7
+  acceptance item; CASM Phase 7 WP36 (verification and completion gate)
+  remains separately gated and unstarted.
 - **CASM Phase 7 WP34 multi-file CLI and file-boundary provenance** (CASM
   `0.1.36` build 1139): CASM now accepts up to 8 ordered top-level source
   filenames on one command line, all loaded into one combined VMM stream

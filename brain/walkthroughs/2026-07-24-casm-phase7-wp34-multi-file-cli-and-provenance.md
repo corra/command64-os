@@ -8,7 +8,7 @@ status: complete
 
 Plan: `brain/plans/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`
 
-Taskwarrior: `7fedccb3-8464-4b4d-a49e-2ac200e99dd4` (WP34); part of the CASM
+Taskwarrior: `035c0295-ae69-4795-b85d-a0c113e80cb8` (WP34); part of the CASM
 Phase 7 milestone `1a0d0dc8-3267-4885-aa83-adf923d56422`.
 
 ## Outcome
@@ -160,7 +160,7 @@ The user confirmed: "all test pass."
   (3 of 4 items now checked; diagnostic filename reporting remains WP35's).
 - `brain/task.md`: WP34 entry added and closed.
 - `CHANGELOG.md`: Unreleased entry added.
-- Taskwarrior: WP34 (`7fedccb3-8464-4b4d-a49e-2ac200e99dd4`) completed.
+- Taskwarrior: WP34 (`035c0295-ae69-4795-b85d-a0c113e80cb8`) completed.
 
 ## Completion
 
