@@ -826,8 +826,59 @@ own sequencing -- neither is activated by this closure.
       Walkthrough:
       `brain/walkthroughs/2026-07-24-casm-phase7-wp33-vmm-backed-source-load.md`.
       **WP33 is complete.**
-- [ ] WP34 multi-file CLI and file-boundary provenance. Requires its own
-      dedicated plan and approval per AGENTS.md.
+- [x] WP34 multi-file CLI and file-boundary provenance. Plan approved as
+      drafted:
+      `brain/plans/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`.
+      Active on `feature/casm-phase7-wp34` from `feature/casm-phase7-wp33`'s
+      tip. Implemented Contract items 4, 6, and 7 of the Phase 0C.10
+      freeze: `cli.s` grew `CasmSourceNames`/`CasmSourceLens` (8 slots x 64
+      bytes)/`CasmSourceCount`, with `cliCopySource` writing through a
+      compile-time slot-address lookup table (`cliSourceSlotLo/Hi`, since
+      64 does not divide evenly into 256) rather than a runtime multiply;
+      `source.s`'s `sourceLoad` became an outer loop over every top-level
+      file, recording each one's start offset into a new 16-byte
+      `CasmSourceFileTable` (offsets only -- a file's end is implicitly the
+      next file's start, halving the size from the original 4-bytes/entry
+      sketch) and inserting one synthetic LF between files whose content
+      doesn't already end in a newline; `sourceRefill` gained a
+      file-boundary check (`srCheckFileBoundary`) that resets
+      `CasmSourceFileId`/line/column and, per the user's confirmed
+      decision, unconditionally clears the pending-CR latch at every
+      boundary so a bare-CR-ending file can never phantom-collapse with a
+      following file's leading LF. A new explicit combined-cap check
+      (`slCheckCap`, reusing `CASM_DIAG_SOURCE_OFFSET_OVERFLOW`) was
+      required since the per-file cap `sourceLoad` gets from
+      `inputStreamOpen` resets every file -- correcting the scope of
+      WP33's "free" finding, which only held for exactly one file.
+      `fileio.s`'s `inputStreamOpen` was generalized from a hardcoded
+      single-buffer pointer to a caller-supplied X/Y pointer (its only
+      caller, `sourceLoad`, already needed to select a different file each
+      loop iteration). `test_casm_pass1`/`test_casm_passcheck` needed their
+      own small stand-in copies of the new `cli.s`-owned symbols (neither
+      links `cli.s`), caught before it became a link failure rather than a
+      silent regression. A single-file assembly (`CasmSourceCount == 1`)
+      takes an identical code path to WP33's, confirmed by every existing
+      single-file trusted reference and both standalone harnesses
+      re-passing unmodified. MAIN bumped `$3200` -> `$3500` (a 507-byte
+      overflow at the old size). Six new multi-file fixtures
+      (`casmmf1`/`casmmf2`/`casmmf3`, two-file forward-reference,
+      two-file-with-synthetic-newline, and three-file cases; plus
+      `casmmfcr1`/`casmmfcr2` for the cross-file pending-CR regression)
+      plus a combined-overflow pair (`casmmfovf1`/`casmmfovf2`, 40000/30000
+      bytes) that needed its own dedicated `casm_overflow_test.d64` disk
+      image -- the real 65535-byte cap cannot be exercised with less
+      content, and the shared `test.d64` had no room left for it. User ran
+      the full verification matrix (both standalone harnesses, all 12
+      pre-existing byte-identical references, all 3 new multi-file
+      references, the cross-file pending-CR fixture, the 9th-source-file
+      rejection, and the combined-overflow boundary) and confirmed: "all
+      test pass." `AGENTS.md`'s stale "Phase 2 accepts one unquoted source
+      filename" contract corrected. Final CASM `0.1.36` build 1139,
+      no-change rebuild stable, all three disk images (`image_d64`,
+      `test_image_d64`, `casm_overflow_test_d64`) build clean. MAIN
+      headroom 261 of 13568 bytes. Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`.
+      **WP34 is complete.**
 - [ ] WP35 diagnostic filename integration. Requires its own dedicated plan
       and approval per AGENTS.md.
 - [ ] WP36 verification, walkthrough, and Phase 7 completion gate. Requires
@@ -835,15 +886,17 @@ own sequencing -- neither is activated by this closure.
 
 ## Phase 7 Acceptance
 
-- [ ] Small (single-file) inputs remain byte-identical through the new
+- [x] Small (single-file) inputs remain byte-identical through the new
       VMM-backed source path before the old OS-refill path is retired.
-- [ ] Multiple ordered top-level source files assemble into one combined
+      (WP33)
+- [x] Multiple ordered top-level source files assemble into one combined
       symbol scope, with correct file and line provenance across
-      boundaries.
+      boundaries. (WP34)
 - [ ] Diagnostics raised in a non-first file report the correct filename,
       line, and column.
-- [ ] A combined multi-file source exceeding 65535 bytes fails cleanly with
+- [x] A combined multi-file source exceeding 65535 bytes fails cleanly with
       the existing overflow diagnostic; a 9th top-level source file is
-      rejected with the existing `CASM_DIAG_EXTRA_SOURCE` diagnostic.
+      rejected with the existing `CASM_DIAG_EXTRA_SOURCE` diagnostic. (WP34)
 
-Not yet started beyond WP32's contract freeze.
+WP32-WP34 complete. WP35 (diagnostic filename integration) and WP36
+(verification/closeout) remain unstarted and separately gated.

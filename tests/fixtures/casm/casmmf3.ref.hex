@@ -1,0 +1,32 @@
+# CASM WP34 trusted reference: casmmf3 (three top-level source files)
+#
+# Independently hand-assembled from the casmmfe.seq/casmmff.seq/casmmfg.seq
+# fixture triple in cmake/GenerateCasmTestFixtures.cmake. NOT produced by
+# CASM. Assemble with: CASM CASMMFE.S CASMMFF.S CASMMFG.S /O:CASMMF3.PRG
+#
+# Proves the multi-file loop generalizes past exactly two files: two chained
+# forward references, each crossing its own file boundary.
+#
+# File E (.ORG $C000):
+#   JMP FILEF           ; forward reference, absolute (JMP has no other
+#                        ; non-indirect mode, so this is always 3 bytes
+#                        ; regardless of FORCE_ABS)
+# File F:
+#   label FILEF, opcode JMP FILEG -- FILEF resolves to $C000 + 3 = $C003;
+#   JMP FILEG is itself a forward reference, 3 bytes
+# File G:
+#   label FILEG, opcode RTS -- FILEG resolves to $C003 + 3 = $C006
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   4C 03 C0     JMP $C003   (resolves to FILEF)
+#   4C 06 C0     JMP $C006   (at $C003, defines FILEF; resolves to FILEG)
+#   60           RTS         (at $C006, defines FILEG)
+#
+# bytes: 9
+# sha256: 3f526371624cfec4af9386d47e9e14f4f38a6ec84a484d58cea91b702bb38544
+
+00 C0
+4C 03 C0
+4C 06 C0
+60

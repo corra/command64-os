@@ -9,6 +9,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 7 WP34 multi-file CLI and file-boundary provenance** (CASM
+  `0.1.36` build 1139): CASM now accepts up to 8 ordered top-level source
+  filenames on one command line, all loaded into one combined VMM stream
+  before Pass 1 begins. `cli.s` grew an 8-slot filename array, writing
+  through a compile-time slot-address lookup table rather than a runtime
+  multiply (64 does not divide evenly into 256). `source.s`'s `sourceLoad`
+  became a loop over every file, recording each one's start offset and
+  inserting a synthetic newline between files whose content doesn't
+  already end in one; `sourceRefill` gained a file-boundary check that
+  resets file identity and line/column numbering, and unconditionally
+  clears the pending-CR newline latch at every boundary so a file ending
+  in a bare CR can never phantom-collapse with the next file's leading
+  LF. A new explicit check enforces the combined 65535-byte source cap,
+  which is not free once more than one file exists (only a single file's
+  own per-file counter came free from the existing file-open wrapper).
+  `fileio.s`'s file-open helper was generalized to accept a caller-supplied
+  filename pointer instead of a hardcoded single buffer. Found and fixed a
+  cross-module gap before it caused a regression: two standalone test
+  harnesses needed their own small stand-in copies of the new multi-file
+  symbols, since neither links the CLI module. A single-file assembly
+  takes an identical code path to the prior release by construction, not
+  a separately-proven equivalence, confirmed by every existing trusted
+  reference and both standalone harnesses re-passing unmodified. New
+  fixtures cover cross-file forward symbol resolution, the synthetic
+  newline insertion, three-file chaining, the cross-file pending-CR
+  regression, a 9th-source rejection, and the combined-overflow boundary
+  (the last of which needed its own dedicated disk image -- proving the
+  real 65535-byte cap requires more fixture content than the shared test
+  disk had room for). MAIN bumped `$3200` -> `$3500`. CASM Phase 7 WP35
+  (diagnostic filename integration) remains separately gated and
+  unstarted.
 - **CASM Phase 7 WP33 VMM-backed source load and traversal equivalence**
   (CASM `0.1.35` build 1137): implemented a new `sourceLoad` pre-pass that
   streams the input file into one VMM allocation before Pass 1, a

@@ -759,6 +759,17 @@ CASM_SOURCE_VMM_MAX_BYTES = 65535
 .assert CASM_SOURCE_VMM_MAX_BYTES = 65535, error, "CASM source VMM allocation cap changed"
 
 ; ---------------------------------------------------------------------------
+; Phase 7 WP34 multi-file CLI contract
+; ---------------------------------------------------------------------------
+
+; Maximum ordered top-level source filenames CASM accepts on one command
+; line (Phase 0C.10/0C.12), matching this codebase's existing bounded-
+; capacity convention (CASM_FILE_CAPACITY = CASM_VMM_CAPACITY = 8).
+CASM_SOURCE_COUNT_MAX = 8
+
+.assert CASM_SOURCE_COUNT_MAX = 8, error, "CASM source count cap changed"
+
+; ---------------------------------------------------------------------------
 ; Phase and cleanup state
 ; ---------------------------------------------------------------------------
 

@@ -948,6 +948,97 @@ CASM `0.1.35` build 1137.
 - **CASM Phase 7 WP33 is complete.** WP34 (multi-file CLI and
   file-boundary provenance) remains separately gated and unstarted.
 
+### CASM Phase 7 WP34 Multi-File CLI and Provenance (Phase 0C.12, 2026-07-24)
+
+Amends Phase 0C.10/0C.11 above with as-built detail from WP34's actual
+implementation, per
+`brain/plans/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`.
+Final CASM `0.1.36` build 1139.
+
+- **`CasmSourceFileTable` records only each file's start offset (2
+  bytes/entry, 16 bytes total for 8 entries), not a separate length** --
+  halved from the informal 4-bytes/entry sketch once tracing showed a
+  file's end is implicitly the next file's start, or
+  `CasmSourceLoadedLenLo/Hi` (the grand total) for the last file.
+- **The combined 65535-byte cap is genuinely not free once more than one
+  file exists**, correcting the scope of WP33's own "free" finding (true
+  only for exactly one file, since `inputStreamOpen` resets its per-file
+  counter for every file it opens). `slCheckCap`
+  (`CasmSourceVmmCursorLo/Hi + CasmIoLenLo/Hi` against
+  `CASM_SOURCE_VMM_MAX_BYTES`) is a new explicit check, reusing
+  `CASM_DIAG_SOURCE_OFFSET_OVERFLOW` -- collapses to a single carry-flag
+  test since the cap is exactly the largest 16-bit value (a 16-bit add
+  that doesn't carry is always within it; one that does always exceeds
+  it).
+- **`cliCopySource` writes through a compile-time slot-address lookup
+  table (`cliSourceSlotLo/Hi`, exported for `source.s`'s `sourceLoad` to
+  reuse), not a runtime multiply** -- `CASM_FILENAME_BUFFER_SIZE` (64)
+  does not divide evenly into 256, so `CasmSourceCount * 64` cannot be
+  folded into a single indexed-addressing byte the way a power-of-two
+  stride could. The indirect write itself needed care: `(zp),Y` requires
+  Y as the index, but Y is the established `CommandBuffer` cursor
+  throughout `cli.s`'s call chain and cannot double as the destination
+  index too -- resolved by advancing the destination pointer itself one
+  byte at a time (Y fixed at 0 for each store) rather than indexing it,
+  stashing the real Y around each store via `CasmCliDestIndex` (a
+  previously-declared but never-used `cli.s` scratch alias).
+- **`fileio.s`'s `inputStreamOpen` generalized from a hardcoded single
+  `CasmSourceName` pointer to a caller-supplied X/Y pointer**, matching
+  `fileOpenInput`'s own convention exactly -- its sole caller,
+  `sourceLoad`, already needed to select a different file each loop
+  iteration.
+- **User-confirmed correctness fix: the pending-CR newline latch clears
+  unconditionally at every file-boundary transition**
+  (`srCheckFileBoundary`). Without it, a file ending in a bare CR
+  immediately followed by a file starting with LF would phantom-collapse
+  across the file boundary -- the leading file's blank first line would be
+  silently swallowed rather than counted, shifting every subsequent line
+  number in that file by one. Proven by a dedicated fixture
+  (`casmmfcr1`/`casmmfcr2`) asserting the post-boundary diagnostic reports
+  LINE 2, not LINE 1.
+- **A single-file assembly (`CasmSourceCount == 1`) takes an identical
+  code path to WP33's by construction, not by a separate equivalence
+  proof.** `srCheckFileBoundary`'s and `srComputeRemaining`'s new terms are
+  both gated on `CasmSourceFileId + 1 < CasmSourceCount`, false on every
+  call when there is only one file -- confirmed by every existing
+  single-file trusted reference and both standalone harnesses re-passing
+  unmodified.
+- **`test_casm_pass1`/`test_casm_passcheck` needed their own stand-in
+  copies of the new `cli.s`-owned symbols** (`CasmSourceNames`,
+  `CasmSourceCount`, `cliSourceSlotLo/Hi`) since neither links `cli.s` --
+  caught during implementation, before it became a link failure (or worse,
+  a silent behavioral regression) rather than after.
+- **The real 65535-byte combined-source cap cannot be exercised with less
+  than ~64KB of actual fixture content** (the check is architecturally
+  "combined > 65535"), and the shared `test.d64` had no room left for
+  fixtures that large alongside every other CASM/OS fixture already
+  packaged there. Per the user's confirmed decision, `casmmfovf1.seq`/
+  `casmmfovf2.seq` (40000/30000 bytes) get their own dedicated
+  `casm_overflow_test_d64` disk image (`casm.prg` + the two fixtures only)
+  rather than being dropped from WP34's verification or forcing a redesign
+  of `test.d64`'s packaging.
+- MAIN bumped `$3200` -> `$3500` (507-byte overflow at the old size).
+  `casm_pass1` (`$3300` -> `$3500`) and `casm_passcheck` (`$3200` ->
+  `$3500`), both linking `source.s` whole, needed their own independent
+  bumps for the same reason.
+- **Verification matrix, all passing** (user confirmed "all test pass"
+  across two sessions): `TEST_CASM_PASS1` (all 7) and
+  `TEST_CASM_PASSCHECK`; all 12 pre-existing byte-identical trusted
+  references (confirming the single-file path is unaffected); 3 new
+  multi-file byte-identical references (`casmmf1` two-file forward
+  reference, `casmmf2` two-file with a required synthetic newline,
+  `casmmf3` three-file chained references); the cross-file pending-CR
+  fixture; 9th-source-file rejection (`CASM_DIAG_EXTRA_SOURCE`, no new
+  fixture needed -- any 9 filename-shaped tokens suffice since parsing
+  fails before any file opens); the combined-overflow boundary
+  (`CASM_DIAG_SOURCE_OFFSET_OVERFLOW`, no location trailer since it fires
+  before any `diagSetLocFrom*` call ever runs).
+- `AGENTS.md`'s "Phase 2 accepts one unquoted source filename" contract
+  corrected to describe the WP34 multi-file grammar.
+- **CASM Phase 7 WP34 is complete.** WP35 (diagnostic filename
+  integration) and WP36 (verification/closeout) remain separately gated
+  and unstarted.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

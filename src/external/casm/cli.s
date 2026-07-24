@@ -5,6 +5,17 @@
 ; Bounded Phase 2 command-line parsing. This module reads the OS-owned
 ; CommandBuffer without modifying it and copies accepted filename tokens into
 ; fixed-capacity CASM buffers.
+;
+; WP34 (Phase 7) grows the single source filename into an ordered
+; CASM_SOURCE_COUNT_MAX-slot array (CasmSourceNames/CasmSourceLens,
+; CasmSourceCount tracks how many are populated). cliCopySource writes to a
+; runtime-selected slot via a compile-time slot-address lookup table
+; (cliSourceSlotLo/Hi) rather than a runtime multiply -- CASM_FILENAME_BUFFER_SIZE
+; (64) does not divide evenly into 256, so a per-slot table avoids any 16-bit
+; multiply-by-64 arithmetic. cliDeriveOutputName always reads slot 0, a
+; compile-time-constant base, so it keeps its original direct-indexed form
+; unchanged. The table is exported: source.s's sourceLoad reuses it
+; unchanged to open each file in turn, rather than duplicating it.
 
 .include "command64.inc"
 .include "common.inc"
@@ -13,19 +24,36 @@
 .export cliParse
 .export cliDeriveOutputName
 
-.export CasmSourceName
+.export CasmSourceNames
+.export CasmSourceLens
+.export CasmSourceCount
 .export CasmOutputName
-.export CasmSourceLen
 .export CasmOutputLen
 .export CasmCliOptions
+.export cliSourceSlotLo
+.export cliSourceSlotHi
 
 .segment "BSS"
 
-CasmSourceName: .res CASM_FILENAME_BUFFER_SIZE
-CasmOutputName: .res CASM_FILENAME_BUFFER_SIZE
-CasmSourceLen:  .res 1
-CasmOutputLen:  .res 1
-CasmCliOptions: .res 1
+CasmSourceNames: .res CASM_SOURCE_COUNT_MAX * CASM_FILENAME_BUFFER_SIZE
+CasmSourceLens:  .res CASM_SOURCE_COUNT_MAX
+CasmSourceCount: .res 1
+CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
+CasmOutputLen:   .res 1
+CasmCliOptions:  .res 1
+
+.segment "RODATA"
+
+; Compile-time slot base addresses for cliCopySource's indirect write,
+; indexed by CasmSourceCount (0..CASM_SOURCE_COUNT_MAX-1).
+cliSourceSlotLo:
+    .repeat CASM_SOURCE_COUNT_MAX, I
+    .byte <(CasmSourceNames + (I * CASM_FILENAME_BUFFER_SIZE))
+    .endrepeat
+cliSourceSlotHi:
+    .repeat CASM_SOURCE_COUNT_MAX, I
+    .byte >(CasmSourceNames + (I * CASM_FILENAME_BUFFER_SIZE))
+    .endrepeat
 
 .segment "CODE"
 
@@ -41,15 +69,28 @@ CasmCliOptions: .res 1
 ; ---------------------------------------------------------------------------
 cliInit:
     lda #0
-    sta CasmSourceLen
+    sta CasmSourceCount
     sta CasmOutputLen
     sta CasmCliOptions
-    ldx #CASM_FILENAME_BUFFER_SIZE - 1
+    ldx #CASM_SOURCE_COUNT_MAX - 1
+ciClearLens:
+    sta CasmSourceLens, x
+    dex
+    bpl ciClearLens
+    ; CasmSourceNames is CASM_SOURCE_COUNT_MAX * CASM_FILENAME_BUFFER_SIZE
+    ; (512) bytes -- too large for an 8-bit index, so two 256-byte passes
+    ; sharing one wrapping X counter clear it instead.
+    ldx #0
 ciClearNames:
-    sta CasmSourceName, x
+    sta CasmSourceNames, x
+    sta CasmSourceNames + 256, x
+    inx
+    bne ciClearNames
+    ldx #CASM_FILENAME_BUFFER_SIZE - 1
+ciClearOutput:
     sta CasmOutputName, x
     dex
-    bpl ciClearNames
+    bpl ciClearOutput
     lda #CASM_PARSE_OK
     clc
     rts
@@ -104,7 +145,7 @@ cpOption:
     jmp cpNextToken
 
 cpFinish:
-    lda CasmSourceLen
+    lda CasmSourceCount
     beq cpSourceRequired
     lda #CASM_PARSE_OK
     clc
@@ -143,18 +184,36 @@ cssBound:
 
 ; ---------------------------------------------------------------------------
 ; cliCopySource (private)
-; Copy one non-empty positional token into CasmSourceName.
+; Copy one non-empty positional token into the next free
+; CasmSourceNames slot (CasmSourceCount, 0-based), via the compile-time
+; cliSourceSlotLo/Hi lookup table -- CASM_FILENAME_BUFFER_SIZE (64) does not
+; divide evenly into 256, so the slot's base address is looked up rather
+; than computed with a runtime multiply.
 ;
 ; Inputs:    Y = first source-token byte
 ; Outputs:   C clear with Y at delimiter; C set with A = CASM_DIAG_* on error
 ; Preserves: none
-; Clobbers:  A, X, Y, processor flags
-; Scratch:   none
+; Clobbers:  A, X, Y, processor flags, CasmPtr0Lo/Hi
+; Scratch:   CasmPtr0Lo/Hi (destination slot pointer, advanced one byte at a
+;            time rather than indexed -- Y is the established CommandBuffer
+;            cursor throughout cli.s's call chain and cannot double as the
+;            indirect-store index too, so the pointer itself walks the
+;            destination instead); CasmCliDestIndex (stashes Y across the
+;            one instant a byte is stored, since (zp),Y addressing has no
+;            index-register alternative -- both free here: cliParse's call
+;            chain makes no OS_API call and no other CASM module has
+;            started running yet)
 ; ---------------------------------------------------------------------------
 cliCopySource:
-    lda CasmSourceLen
-    bne ccsExtra
-    ldx #0
+    lda CasmSourceCount
+    cmp #CASM_SOURCE_COUNT_MAX
+    bcs ccsExtra
+    tax
+    lda cliSourceSlotLo, x
+    sta CasmPtr0Lo
+    lda cliSourceSlotHi, x
+    sta CasmPtr0Hi
+    ldx #0                    ; X = destination length counter (0..63)
 ccsLoop:
     cpy #CASM_COMMAND_BUFFER_SIZE
     bcs ccsTooLong
@@ -164,14 +223,35 @@ ccsLoop:
     beq ccsDone
     cpx #CASM_FILENAME_MAX
     bcs ccsTooLong
-    sta CasmSourceName, x
+    ; A already holds the byte to copy. Stash Y (the CommandBuffer cursor)
+    ; so (CasmPtr0Lo),Y can use Y as the destination index for this one
+    ; instruction, then restore it; the pointer itself advances by one byte
+    ; afterward rather than being indexed, since Y cannot represent both
+    ; positions at once.
+    sty CasmCliDestIndex
+    ldy #0
+    sta (CasmPtr0Lo), y
+    inc CasmPtr0Lo
+    bne ccsPtrDone
+    inc CasmPtr0Hi
+ccsPtrDone:
+    ldy CasmCliDestIndex
     inx
     iny
     jmp ccsLoop
 ccsDone:
+    ; Y currently holds the CommandBuffer delimiter position, which the
+    ; caller requires preserved on return -- stash it across the
+    ; null-terminator and length-array writes below.
+    sty CasmCliDestIndex
     lda #0
-    sta CasmSourceName, x
-    stx CasmSourceLen
+    ldy #0
+    sta (CasmPtr0Lo), y
+    ldy CasmSourceCount
+    txa
+    sta CasmSourceLens, y
+    inc CasmSourceCount
+    ldy CasmCliDestIndex
     clc
     lda #CASM_PARSE_OK
     rts
@@ -318,7 +398,10 @@ crteBad:
 ; source filename. Only a dot after the last device-prefix colon is treated as
 ; an extension separator.
 ;
-; Inputs:    parsed CasmSourceName/CasmSourceLen/CasmCliOptions
+; Inputs:    parsed CasmSourceNames[0]/CasmSourceLens[0]/CasmSourceCount/
+;            CasmCliOptions -- always derives from the first source slot
+;            (WP34), matching the master plan's "otherwise CASM derives the
+;            name from the first source file" CLI grammar text
 ; Outputs:   C clear, A = CASM_PARSE_OK, bounded CasmOutputName/CasmOutputLen
 ;            C set, A = CASM_DIAG_* on failure
 ; Preserves: Y
@@ -336,15 +419,15 @@ cliDeriveOutputName:
     rts
 
 cdonDerive:
-    lda CasmSourceLen
+    lda CasmSourceCount
     beq cdonSourceRequired
     lda #$FF
     sta CasmCliScratch
     ldx #0
 cdonCopyLoop:
-    cpx CasmSourceLen
+    cpx CasmSourceLens + 0
     beq cdonCopied
-    lda CasmSourceName, x
+    lda CasmSourceNames + 0, x
     sta CasmOutputName, x
     cmp #CASM_PETSCII_COLON
     bne cdonCheckDot
@@ -370,7 +453,7 @@ cdonCopied:
     jmp cdonWritePrg
 
 cdonAppendExtension:
-    ldx CasmSourceLen
+    ldx CasmSourceLens + 0
     cpx #CASM_FILENAME_MAX - 3
     bcs cdonTooLong
     lda #CASM_PETSCII_DOT

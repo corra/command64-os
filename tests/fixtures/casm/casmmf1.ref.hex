@@ -1,0 +1,25 @@
+# CASM WP34 trusted reference: casmmf1 (two top-level source files)
+#
+# Independently hand-assembled from the casmmfa.seq/casmmfb.seq fixture
+# pair in cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+# Assemble with: CASM CASMMFA.S CASMMFB.S /O:CASMMF1.PRG
+#
+# File A (.ORG $C000):
+#   LDA VALB           ; VALB is not yet defined -- forces absolute (3
+#                       ; bytes), per the master plan's symbolic-operand
+#                       ; width rule
+# File B (concatenated immediately after, file A already ends in a real
+# newline so no synthetic separator is inserted):
+#   label VALB, opcode RTS -- VALB resolves to $C000 + 3 = $C003
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   AD 03 C0     LDA $C003   (forced absolute; resolves to VALB)
+#   60           RTS         (at $C003, defines VALB)
+#
+# bytes: 6
+# sha256: 1bde11e4f1365bb36ea2796cf98498ba297d5b9fc6566438bf15608b42edcb08
+
+00 C0
+AD 03 C0
+60

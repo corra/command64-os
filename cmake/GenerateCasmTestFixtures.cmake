@@ -610,3 +610,81 @@ file(WRITE "${OUTPUT_DIR}/casmmaxid1.seq"
     "${CASM_MAXID_NAME}: RTS\n"
     "LDA ${CASM_MAXID_NAME}\n"
 )
+
+# ---------------------------------------------------------------------------
+# WP34 multi-file top-level input fixtures. Each pair/triple is opened
+# together through real casm.s's CLI (e.g. "CASM CASMMFA.S CASMMFB.S
+# /O:CASMMF1.PRG"), not the standalone test_casm_pass1 harness -- proving
+# the multi-file CLI grammar itself, not just sourceLoad's internal loop.
+# ---------------------------------------------------------------------------
+
+# casmmf1: two files, file A already ends in a real newline (no synthetic
+# newline needed). VALB is defined in file B and referenced (forward, across
+# the file boundary) in file A -- proves cross-file symbol resolution.
+# Expected (hand-derived, see casmmf1.ref.hex): LDA VALB forces absolute (3
+# bytes, forward reference); VALB resolves to $C000+3=$C003.
+file(WRITE "${OUTPUT_DIR}/casmmfa.seq"
+    ".ORG \$C000\n"
+    "LDA VALB\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmmfb.seq"
+    "VALB: RTS\n"
+)
+
+# casmmf2: same logical program as casmmf1, but file C has NO trailing
+# newline -- proves the synthetic inter-file LF sourceLoad inserts keeps
+# "LDA VALD" and "VALD: RTS" from silently concatenating onto one line.
+# Expected bytes are identical to casmmf1's (see casmmf2.ref.hex).
+file(WRITE "${OUTPUT_DIR}/casmmfc.seq"
+    ".ORG \$C000\n"
+    "LDA VALD"
+)
+file(WRITE "${OUTPUT_DIR}/casmmfd.seq"
+    "VALD: RTS\n"
+)
+
+# casmmf3: three files, chained forward references across two boundaries --
+# proves the file loop generalizes past exactly two files.
+# Expected (see casmmf3.ref.hex): JMP FILEF (3 bytes) -> FILEF resolves to
+# $C003; JMP FILEG (3 bytes) at $C003 -> FILEG resolves to $C006; RTS at
+# $C006.
+file(WRITE "${OUTPUT_DIR}/casmmfe.seq"
+    ".ORG \$C000\n"
+    "JMP FILEF\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmmff.seq"
+    "FILEF: JMP FILEG\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmmfg.seq"
+    "FILEG: RTS\n"
+)
+
+# casmmfcr1/casmmfcr2: cross-file pending-CR latch regression (WP34,
+# user-confirmed fix). File 1 ends in a bare CR (no LF); file 2 begins with
+# a bare LF (its own leading blank line) followed by an invalid byte. If the
+# pending-CR latch ever leaked across the file boundary, that leading LF
+# would be silently swallowed as the tail of a phantom CRLF spanning both
+# files -- the blank line's own newline would never be counted, and the
+# invalid byte on the next line would misreport as LINE 1 instead of LINE 2.
+# Assembled PC/bytes cannot distinguish this (a swallowed blank-line newline
+# is a no-op either way -- casmRunPass does nothing for a bare NEWLINE
+# token); only the reported diagnostic location proves the fix.
+#   -> INVALID SOURCE BYTE ($19) AT LINE 2, COL 1 (OFFSET 0)
+string(ASCII 13 CASM_MF_CR)
+string(ASCII 10 CASM_MF_LF)
+file(WRITE "${OUTPUT_DIR}/casmmfcr1.seq"
+    ".ORG \$C000${CASM_MF_CR}"
+)
+file(WRITE "${OUTPUT_DIR}/casmmfcr2.seq"
+    "${CASM_MF_LF}@${CASM_MF_LF}"
+)
+
+# casmmfovf1/casmmfovf2: combined multi-file source exceeding the
+# 65535-byte cap (neither file alone does -- only their combined total
+# does), firing during sourceLoad's own load phase, before any lexing.
+#   -> SOURCE OFFSET OVERFLOW ($15), no location trailer (raised before any
+#      diagSetLocFrom* call ever runs)
+string(REPEAT "A" 40000 CASM_MF_OVF1)
+string(REPEAT "A" 30000 CASM_MF_OVF2)
+file(WRITE "${OUTPUT_DIR}/casmmfovf1.seq" "${CASM_MF_OVF1}")
+file(WRITE "${OUTPUT_DIR}/casmmfovf2.seq" "${CASM_MF_OVF2}")

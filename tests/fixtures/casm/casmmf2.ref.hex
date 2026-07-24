@@ -1,0 +1,27 @@
+# CASM WP34 trusted reference: casmmf2 (two top-level source files,
+# synthetic inter-file newline required)
+#
+# Independently hand-assembled from the casmmfc.seq/casmmfd.seq fixture
+# pair in cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+# Assemble with: CASM CASMMFC.S CASMMFD.S /O:CASMMF2.PRG
+#
+# File C (.ORG $C000) has NO trailing newline after "LDA VALD" -- sourceLoad
+# must insert one synthetic LF between the files, or "LDA VALD" and
+# "VALD: RTS" would silently concatenate onto one (invalid) line. The
+# logical program is otherwise identical to casmmf1's:
+#   LDA VALD           ; forward reference -- forces absolute (3 bytes)
+# File D:
+#   label VALD, opcode RTS -- VALD resolves to $C000 + 3 = $C003
+#
+# Hand assembly (byte-identical to casmmf1's, proving the synthetic
+# separator produces the same result as an author-supplied newline would):
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   AD 03 C0     LDA $C003   (forced absolute; resolves to VALD)
+#   60           RTS         (at $C003, defines VALD)
+#
+# bytes: 6
+# sha256: 1bde11e4f1365bb36ea2796cf98498ba297d5b9fc6566438bf15608b42edcb08
+
+00 C0
+AD 03 C0
+60

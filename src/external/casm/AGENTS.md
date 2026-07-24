@@ -22,10 +22,17 @@ The `src/external/casm` directory owns CASM, a native Command 64
   preserved values, and clobbered registers.
 - Keep base-RAM storage bounded. Allocate large source, symbol, relocation,
   and metadata stores through Command 64 VMM services.
-- Phase 2 accepts one unquoted source filename, uses 63-byte filename payloads
-  plus null terminators, and transfers input through a 256-byte bounded buffer.
-  It parses `/O`, `/S`, `/M`, and `/L` without creating production output;
-  output runtime behavior begins with the numeric static-output phase.
+- CASM accepts up to `CASM_SOURCE_COUNT_MAX` (8) ordered unquoted top-level
+  source filenames on one command line (Phase 7 WP34; Phase 2 originally
+  accepted exactly one), uses 63-byte filename payloads plus null
+  terminators per slot, and transfers input through a 256-byte bounded
+  buffer. It parses `/O`, `/S`, `/M`, and `/L` without creating production
+  output; output runtime behavior begins with the numeric static-output
+  phase. Every top-level source is loaded into one combined VMM stream
+  (`sourceLoad`, `source.s`) before Pass 1 begins; a synthetic newline is
+  inserted between files whose content does not already end in one, and
+  file identity/line numbering reset at each file boundary during
+  traversal.
 - Register every acquired file handle and VMM allocation with the central
   resource owner immediately after acquisition.
 - Route every successful and fatal termination path through central cleanup

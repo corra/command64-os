@@ -12,7 +12,6 @@
 
 .import resourceRegisterHandle
 .import resourceReleaseHandle
-.import CasmSourceName
 .import CasmOutputName
 
 .export fileIoInit
@@ -374,9 +373,18 @@ fdFailed:
 
 ; ---------------------------------------------------------------------------
 ; inputStreamOpen
-; Open CasmSourceName and reset the checked 16-bit consumed-byte count.
+; Open the caller-supplied filename and reset the checked 16-bit
+; consumed-byte count (per-file: WP34's sourceLoad calls this once per
+; top-level source, and each file's own fetched total starts fresh).
 ;
-; Inputs:    CasmSourceName = parsed null-terminated filename
+; WP34: generalized from a hardcoded single CasmSourceName pointer (Phase 2
+; through WP33) to a caller-supplied X/Y pointer, matching fileOpenInput's
+; own convention exactly, now that cli.s owns an ordered array of source
+; names rather than one fixed buffer. sourceLoad is this routine's only
+; caller and already loads X/Y with the current file's slot pointer before
+; calling it.
+;
+; Inputs:    X/Y = null-terminated filename pointer (low/high)
 ; Outputs:   C clear, A = CASM_DIAG_NONE on success; C set with diagnostic
 ; Preserves: none
 ; Clobbers:  A, X, Y and fileOpenInput clobbers
@@ -386,8 +394,6 @@ inputStreamOpen:
     lda #0
     sta CasmInputTotalLo
     sta CasmInputTotalHi
-    ldx #<CasmSourceName
-    ldy #>CasmSourceName
     jmp fileOpenInput
 
 ; ---------------------------------------------------------------------------

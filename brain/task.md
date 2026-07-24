@@ -690,6 +690,62 @@
   - **WP33 is complete.** WP34 (multi-file CLI and file-boundary
     provenance) remains separately gated and unstarted.
 
+- [x] Taskwarrior (`7fedccb3-8464-4b4d-a49e-2ac200e99dd4`): CASM Phase 7
+      WP34 multi-file CLI and file-boundary provenance
+  - Plan:
+    `brain/plans/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`
+  - Active on `feature/casm-phase7-wp34` from `feature/casm-phase7-wp33`'s
+    tip
+  - Implemented Phase 0C.10 Contract items 4, 6, 7: `cli.s` grew
+    `CasmSourceNames`/`CasmSourceLens` (8 slots) /`CasmSourceCount`,
+    `cliCopySource` writing through a compile-time slot-address lookup
+    table (`cliSourceSlotLo/Hi`) since 64 doesn't divide evenly into 256;
+    `source.s`'s `sourceLoad` became an outer file loop recording each
+    file's start offset into a new 16-byte `CasmSourceFileTable`
+    (offsets only -- halved from the original 4-bytes/entry sketch since a
+    file's end is implicitly the next file's start) and inserting a
+    synthetic LF between files that don't already end in a newline;
+    `sourceRefill` gained a file-boundary check resetting
+    `CasmSourceFileId`/line/column and, per the user's confirmed decision,
+    unconditionally clearing the pending-CR latch at every boundary so a
+    bare-CR-ending file can never phantom-collapse with a following file's
+    leading LF
+  - Found the combined 65535-byte cap is genuinely not free once more than
+    one file exists (correcting the scope of WP33's own "free" finding,
+    which only held for `N=1`) -- added an explicit `slCheckCap` check
+  - Generalized `fileio.s`'s `inputStreamOpen` from a hardcoded
+    single-buffer pointer to a caller-supplied X/Y pointer (needed since
+    `sourceLoad` now selects a different file each loop iteration)
+  - Caught that `test_casm_pass1`/`test_casm_passcheck` would silently
+    fail to link under the new signature (neither links `cli.s`) before it
+    became a real problem -- both gained their own small stand-in copies
+    of the new `cli.s`-owned symbols
+  - A single-file assembly (`CasmSourceCount == 1`) takes an identical
+    code path to WP33's by construction (the boundary check's gating
+    condition), confirmed by every existing single-file trusted reference
+    and both standalone harnesses re-passing unmodified
+  - MAIN bumped `$3200` -> `$3500` (507-byte overflow at the old size)
+  - New fixtures: `casmmf1`/`casmmf2`/`casmmf3` (two/two-with-synthetic-
+    newline/three-file cross-file symbol resolution, byte-identical
+    trusted references), `casmmfcr1`/`casmmfcr2` (cross-file pending-CR
+    regression). `casmmfovf1`/`casmmfovf2` (combined-overflow boundary,
+    40000/30000 bytes) needed their own dedicated `casm_overflow_test.d64`
+    disk image -- per the user's confirmed decision, the real cap cannot
+    be exercised with less content and `test.d64` had no room left
+  - User ran the full verification matrix (both standalone harnesses, all
+    12 pre-existing plus 3 new byte-identical references, the cross-file
+    pending-CR fixture, 9th-source-file rejection, combined-overflow
+    boundary) across two sessions and confirmed: "all test pass"
+  - Corrected `AGENTS.md`'s stale "Phase 2 accepts one unquoted source
+    filename" contract
+  - Final CASM `0.1.36` build 1139, no-change rebuild stable, all three
+    disk images (`image_d64`, `test_image_d64`, `casm_overflow_test_d64`)
+    build clean. MAIN headroom 261 of 13568 bytes
+  - Walkthrough:
+    `brain/walkthroughs/2026-07-24-casm-phase7-wp34-multi-file-cli-and-provenance.md`
+  - **WP34 is complete.** WP35 (diagnostic filename integration) remains
+    separately gated and unstarted.
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

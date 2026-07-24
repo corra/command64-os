@@ -81,6 +81,12 @@
 .import vmmWindowWrite
 .import CasmVmmBuffer
 
+; Phase 2 CLI ordered source list (WP34: multi-file top-level inputs).
+.import CasmSourceNames
+.import CasmSourceCount
+.import cliSourceSlotLo
+.import cliSourceSlotHi
+
 .export sourceInit
 .export sourceLoad
 .export sourceOpen
@@ -92,7 +98,7 @@
 .export sourceDrainLineTail
 
 ; ---------------------------------------------------------------------------
-; WP33 VMM-backed source load state
+; WP33/WP34 VMM-backed source load state
 ;
 ; Deliberately its own segment, not state.s's frozen Phase 3 source
 ; subrecord (CasmSourceStateStart/End, asserted exactly 16 bytes) --
@@ -100,14 +106,26 @@
 ; parallel to a size-asserted shared ABI rather than crammed into it.
 ;
 ; CasmSourceVmmSlot is the registry slot sourceLoad's vmmStoreAlloc call
-; grants. CasmSourceLoadedLenLo/Hi is the total byte count sourceLoad wrote
-; into that allocation, fixed once loading finishes. CasmSourceVmmCursorLo/Hi
-; is a running 16-bit offset reused for two different purposes at two
-; different times, never simultaneously: during sourceLoad it is the next
-; VMM *write* offset; sourceOpen/sourceRewind reset it to 0 and every
-; VMM-backed sourceRefill afterward advances it as the next VMM *read*
-; offset. Safe because loading always completes fully before any refill
-; begins.
+; grants. CasmSourceLoadedLenLo/Hi is the total combined byte count
+; sourceLoad wrote into that allocation across every file, fixed once
+; loading finishes. CasmSourceVmmCursorLo/Hi is a running 16-bit offset
+; reused for two different purposes at two different times, never
+; simultaneously: during sourceLoad it is the next VMM *write* offset
+; (running across every file, never reset between them); sourceOpen/
+; sourceRewind reset it to 0 and every VMM-backed sourceRefill afterward
+; advances it as the next VMM *read* offset. Safe because loading always
+; completes fully before any refill begins.
+;
+; WP34 additions: CasmSourceFileTable records only each file's *start*
+; offset (2 bytes/entry, CASM_SOURCE_COUNT_MAX entries) -- a file's end is
+; implicitly the next file's start, or CasmSourceLoadedLenLo/Hi for the
+; last file, so no separate length field is needed. CasmSourceLoadIndex is
+; sourceLoad's own file-loop counter, deliberately separate from the
+; traversal-owned CasmSourceFileId (state.s) even though their reset timing
+; would make aliasing safe, to avoid any ambiguity between "which file is
+; being loaded" and "which file is being traversed". CasmSourceLoadLastByte
+; tracks the most recently written byte so sourceLoad can decide whether a
+; synthetic inter-file newline is needed.
 ; ---------------------------------------------------------------------------
 .segment "BSS"
 
@@ -116,6 +134,9 @@ CasmSourceLoadedLenLo:  .res 1
 CasmSourceLoadedLenHi:  .res 1
 CasmSourceVmmCursorLo:  .res 1
 CasmSourceVmmCursorHi:  .res 1
+CasmSourceFileTable:    .res CASM_SOURCE_COUNT_MAX * 2
+CasmSourceLoadIndex:    .res 1
+CasmSourceLoadLastByte: .res 1
 
 .segment "CODE"
 
@@ -144,37 +165,48 @@ sourceInit:
     sta CasmSourceLoadedLenHi
     sta CasmSourceVmmCursorLo
     sta CasmSourceVmmCursorHi
+    sta CasmSourceLoadIndex
+    sta CasmSourceLoadLastByte
+    ldx #(CASM_SOURCE_COUNT_MAX * 2) - 1
+siClearFileTable:
+    sta CasmSourceFileTable, x
+    dex
+    bpl siClearFileTable
     lda #CASM_DIAG_NONE
     clc
     rts
 
 ; ---------------------------------------------------------------------------
-; sourceLoad (WP33)
-; Stream the single parsed input file (CasmSourceName) into one VMM
-; allocation, single-file only (Phase 7 WP33's confirmed scope -- the
-; multi-file loop and CasmSourceFileTable are WP34's job). Opens the file
-; through the Phase 2 wrapper, reads it in 256-byte CasmIoBuffer blocks via
-; the existing inputStreamRead, and writes each block into the VMM
-; allocation through up to four 64-byte vmmWindowWrite chunks (vmmWindowRead/
-; Write always transfer through the fixed CasmVmmBuffer, so each chunk is
-; staged there via a local copy first). Does not touch CasmSourceState --
-; the caller's following sourceOpen call commits READY.
+; sourceLoad (WP33, WP34: multi-file)
+; Stream every parsed input file (CasmSourceNames[0 .. CasmSourceCount-1],
+; cli.s) into one combined VMM allocation, in order. Opens each file through
+; the Phase 2 wrapper, reads it in 256-byte CasmIoBuffer blocks via the
+; existing inputStreamRead, and writes each block into the VMM allocation
+; through up to four 64-byte vmmWindowWrite chunks (vmmWindowRead/Write
+; always transfer through the fixed CasmVmmBuffer, so each chunk is staged
+; there via a local copy first). Records each file's start offset into
+; CasmSourceFileTable and, between files (never after the last), inserts one
+; synthetic LF byte if the file's last written byte was not already a
+; newline. Does not touch CasmSourceState -- the caller's following
+; sourceOpen call commits READY.
 ;
-; The single-file 65535-byte cap is inherited for free: inputStreamRead's
-; underlying inputStreamReadInto already advances a checked 16-bit
-; CasmInputTotalLo/Hi and raises CASM_DIAG_SOURCE_OFFSET_OVERFLOW at exactly
-; 65535 bytes, so no separate overflow check is written here.
+; Unlike WP33's single-file cap (inherited for free from inputStreamRead's
+; own per-file CasmInputTotalLo/Hi check), the *combined* 65535-byte cap
+; across all files is not free once more than one file exists -- that
+; per-file counter resets for every file inputStreamOpen opens. slCheckCap
+; below is the explicit combined-cap check this requires.
 ;
 ; A failure at any step leaves whatever was already registered (the VMM
 ; slot, the input file handle) for the central resource owner's generic
 ; cleanup sweep to release -- no manual unwind is performed here, matching
 ; every other CASM init-path failure.
 ;
-; Inputs:    source state CLOSED; parsed CasmSourceName; initialized Phase 2
-;            file services (input CLOSED)
+; Inputs:    source state CLOSED; parsed CasmSourceNames/CasmSourceCount;
+;            initialized Phase 2 file services (input CLOSED)
 ; Outputs:   A = CASM_DIAG_NONE, C clear on success; CasmSourceVmmSlot holds
-;            the granted registry slot; CasmSourceLoadedLenLo/Hi holds the
-;            total bytes loaded; CasmSourceVmmCursorLo/Hi reset to 0
+;            the granted registry slot; CasmSourceFileTable holds each
+;            file's start offset; CasmSourceLoadedLenLo/Hi holds the total
+;            combined bytes loaded; CasmSourceVmmCursorLo/Hi reset to 0
 ;            A = CASM_DIAG_*, C set on failure
 ; Preserves: none
 ; Clobbers:  A, X, Y, CasmSourceScratch0/1, CasmLexerScratch0/1, CasmIoBuffer,
@@ -199,30 +231,50 @@ sourceLoad:
     lda #0
     sta CasmSourceVmmCursorLo
     sta CasmSourceVmmCursorHi
+    sta CasmSourceLoadIndex
+    jmp slFileLoop
 
-    jsr inputStreamOpen
-    bcs slFailNear
-    jmp slReadLoop
-
-; Trampolines: sourceLoad's early checks and its read loop are both out of
-; direct branch range of the shared bad-state/failure/done tails defined
-; near the end of the routine.
+; Trampolines: sourceLoad's early checks are out of direct branch range of
+; the shared bad-state/failure tails defined near the end of the routine.
 slBadStateNear:
     jmp slBadState
 slFailNear:
     jmp slFail
-slLoadDoneNear:
-    jmp slLoadDone
+
+slFileLoop:
+    ; Record this file's start offset (CasmSourceFileTable, 2 bytes/entry).
+    ldx CasmSourceLoadIndex
+    txa
+    asl
+    tax
+    lda CasmSourceVmmCursorLo
+    sta CasmSourceFileTable, x
+    lda CasmSourceVmmCursorHi
+    sta CasmSourceFileTable + 1, x
+
+    ; This file's slot pointer, via cli.s's shared lookup table.
+    ldy CasmSourceLoadIndex
+    lda cliSourceSlotLo, y
+    tax
+    lda cliSourceSlotHi, y
+    tay
+    jsr inputStreamOpen
+    bcs slFailNear
 
 slReadLoop:
     jsr inputStreamRead
     bcs slFailNear
     cmp #CASM_STREAM_EOF
-    beq slLoadDoneNear
+    beq slFileDoneNear
 
     ; DATA: CasmIoLenLo/Hi = 1..256 bytes now in CasmIoBuffer (256 encodes as
-    ; Hi=1/Lo=0). Stage the block's remaining-to-write counter and the chunk
-    ; source offset, then drain it in <=64-byte chunks.
+    ; Hi=1/Lo=0). Reject before committing to write this block if it would
+    ; push the combined total past the cap.
+    jsr slCheckCap
+    bcs slFailNear
+
+    ; Stage the block's remaining-to-write counter and the chunk source
+    ; offset, then drain it in <=64-byte chunks.
     lda CasmIoLenLo
     sta CasmSourceScratch0
     lda CasmIoLenHi
@@ -271,24 +323,20 @@ slWriteCopyLoop:
     jmp slWriteCopyLoop
 slWriteCopyDone:
 
-    lda CasmSourceVmmCursorLo
-    sta CasmVmmOffLo
-    lda CasmSourceVmmCursorHi
-    sta CasmVmmOffHi
-    ldx CasmSourceVmmSlot
-    jsr vmmWindowWrite
+    ; Track the last byte of this chunk for the inter-file synthetic-newline
+    ; decision below (only consulted once this file's read loop reaches
+    ; EOF; cheap to keep current on every chunk).
+    ldy CasmIoLenLo
+    dey
+    lda CasmVmmBuffer, y
+    sta CasmSourceLoadLastByte
+
+    jsr slVmmWrite
     bcs slWriteFailNear
 
-    ; Advance the VMM write cursor and the chunk source offset by chunkLen;
-    ; decrement the block's remaining-to-write counter by the same amount.
-    lda CasmSourceVmmCursorLo
-    clc
-    adc CasmIoLenLo
-    sta CasmSourceVmmCursorLo
-    lda CasmSourceVmmCursorHi
-    adc CasmIoLenHi
-    sta CasmSourceVmmCursorHi
-
+    ; Advance the chunk source offset by chunkLen; decrement the block's
+    ; remaining-to-write counter by the same amount (slVmmWrite already
+    ; advanced the combined VMM cursor).
     lda CasmLexerScratch0
     clc
     adc CasmIoLenLo
@@ -303,9 +351,50 @@ slWriteCopyDone:
     sta CasmSourceScratch1
     jmp slWriteChunkLoop
 
-slLoadDone:
+slWriteFailNear:
+    jmp slFail
+slFileDoneNear:
+    jmp slFileDone
+
+slFileDone:
     jsr inputStreamClose
-    bcs slFail
+    bcs slWriteFailNear
+
+    ; Synthetic inter-file newline: only between files (never after the
+    ; last) and only when this file's last byte was not already a newline.
+    lda CasmSourceLoadIndex
+    clc
+    adc #1
+    cmp CasmSourceCount
+    bcs slAdvanceIndex            ; this was the last file -- no trailing newline
+
+    lda CasmSourceLoadLastByte
+    cmp #CASM_PETSCII_CR
+    beq slAdvanceIndex
+    cmp #CASM_PETSCII_LF
+    beq slAdvanceIndex
+
+    lda #1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr slCheckCap
+    bcs slWriteFailNear
+    lda #CASM_PETSCII_LF
+    sta CasmVmmBuffer + 0
+    jsr slVmmWrite
+    bcs slWriteFailNear
+
+slAdvanceIndex:
+    inc CasmSourceLoadIndex
+    lda CasmSourceLoadIndex
+    cmp CasmSourceCount
+    bcc slFileLoopNear
+    jmp slAllDone
+slFileLoopNear:
+    jmp slFileLoop
+
+slAllDone:
     lda CasmSourceVmmCursorLo
     sta CasmSourceLoadedLenLo
     lda CasmSourceVmmCursorHi
@@ -317,10 +406,6 @@ slLoadDone:
     clc
     rts
 
-slWriteFailNear:
-    ; Trampoline: the write-chunk loop above is out of direct branch range of
-    ; the shared failure tail.
-    jmp slFail
 slBadState:
     lda #CASM_DIAG_STREAM_STATE_FAILED
     sec
@@ -329,6 +414,71 @@ slFail:
     ; A already holds the failing call's own diagnostic; whatever it already
     ; registered (VMM slot, file handle) is released by central cleanup.
     sec
+    rts
+
+; ---------------------------------------------------------------------------
+; slCheckCap (private, WP34)
+; Verify CasmSourceVmmCursorLo/Hi + CasmIoLenLo/Hi does not exceed
+; CASM_SOURCE_VMM_MAX_BYTES (65535), the combined multi-file cap. Because
+; that cap is exactly the largest 16-bit value, a 16-bit add of cursor+count
+; that does not carry is always within the cap (result <= 65535 by
+; construction) and one that does carry always exceeds it (true sum >=
+; 65536): no comparison beyond the carry flag itself is needed. Does not
+; modify the cursor.
+;
+; Inputs:    CasmIoLenLo/Hi = byte count about to be written
+; Outputs:   C clear if the advance is within the cap; C set with
+;            A = CASM_DIAG_SOURCE_OFFSET_OVERFLOW otherwise
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+slCheckCap:
+    lda CasmSourceVmmCursorLo
+    clc
+    adc CasmIoLenLo
+    lda CasmSourceVmmCursorHi
+    adc CasmIoLenHi
+    bcs slcOverflow
+    clc
+    rts
+slcOverflow:
+    lda #CASM_DIAG_SOURCE_OFFSET_OVERFLOW
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; slVmmWrite (private, WP33/WP34)
+; Write CasmIoLenLo/Hi bytes already staged in CasmVmmBuffer at the current
+; combined cursor (CasmSourceVmmCursorLo/Hi), then advance the cursor by
+; that count. Shared by the main per-file chunk-write loop and the
+; synthetic inter-file newline, the two places sourceLoad transfers staged
+; bytes into the VMM allocation. The caller must already have checked the
+; combined cap (slCheckCap) before calling.
+;
+; Inputs:    CasmIoLenLo/Hi = byte count staged in CasmVmmBuffer
+; Outputs:   C clear on success; CasmSourceVmmCursorLo/Hi advanced
+;            C set, A = CASM_DIAG_VMM_TRANSFER_FAILED on failure (cursor
+;            unchanged)
+; Clobbers:  A, X, Y, CasmVmmOffLo/Hi and vmmWindowWrite's own volatile state
+; ---------------------------------------------------------------------------
+slVmmWrite:
+    lda CasmSourceVmmCursorLo
+    sta CasmVmmOffLo
+    lda CasmSourceVmmCursorHi
+    sta CasmVmmOffHi
+    ldx CasmSourceVmmSlot
+    jsr vmmWindowWrite
+    bcs slvwFail
+
+    lda CasmSourceVmmCursorLo
+    clc
+    adc CasmIoLenLo
+    sta CasmSourceVmmCursorLo
+    lda CasmSourceVmmCursorHi
+    adc CasmIoLenHi
+    sta CasmSourceVmmCursorHi
+    clc
+    rts
+slvwFail:
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1057,7 +1207,84 @@ sourceResetTraversal:
     rts
 
 ; ---------------------------------------------------------------------------
-; sourceRefill (private, WP33: VMM-backed)
+; srCheckFileBoundary (private, WP34)
+; If a next file exists (CasmSourceFileId + 1 < CasmSourceCount) and the
+; read cursor has reached exactly its recorded start offset
+; (CasmSourceFileTable), commit the file-boundary transition before this
+; refill computes anything else: CasmSourceFileId increments,
+; CasmSourceLineLo/Hi resets to 1, CasmSourceColumn resets to 1, and
+; CasmSourcePendingCr clears (user-confirmed: a bare-CR-ending file must
+; never phantom-collapse with a following file's leading LF). Gated so a
+; single-file source (CasmSourceCount == 1) never takes the true branch,
+; degrading exactly to a no-op -- WP33's behavior.
+;
+; A single equality check is sufficient, never needing a "did we skip past
+; it" case: srComputeRemaining's 3-way min (below) caps every refill's
+; transfer at the next file boundary, so the cursor always lands exactly on
+; it between refills, never beyond.
+;
+; Inputs:    none
+; Outputs:   none (commits the transition on a boundary; no-op otherwise)
+; Clobbers:  A, X, processor flags
+; ---------------------------------------------------------------------------
+srCheckFileBoundary:
+    lda CasmSourceFileId
+    clc
+    adc #1
+    cmp CasmSourceCount
+    bcs srcfbDone                ; no next file -- nothing to check
+
+    ; A still holds FileId+1 (unchanged by cmp); X = its file-table offset.
+    asl
+    tax
+    lda CasmSourceVmmCursorLo
+    cmp CasmSourceFileTable, x
+    bne srcfbDone
+    lda CasmSourceVmmCursorHi
+    cmp CasmSourceFileTable + 1, x
+    bne srcfbDone
+
+    inc CasmSourceFileId
+    lda #<CASM_SOURCE_LINE_INITIAL
+    sta CasmSourceLineLo
+    lda #>CASM_SOURCE_LINE_INITIAL
+    sta CasmSourceLineHi
+    lda #CASM_SOURCE_COLUMN_INITIAL
+    sta CasmSourceColumn
+    lda #0
+    sta CasmSourcePendingCr
+srcfbDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; srMin (private, WP33/WP34)
+; CasmSourceScratch0/1 = min(CasmSourceScratch0/1, CasmValue0Lo/Hi). Shared
+; by srComputeRemaining's two cap terms (loaded-content remaining, and
+; WP34's next-file-boundary distance) so the 16-bit comparison exists in
+; exactly one place.
+;
+; Inputs:    CasmSourceScratch0/1, CasmValue0Lo/Hi
+; Outputs:   CasmSourceScratch0/1 = the smaller of the two
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+srMin:
+    lda CasmValue0Hi
+    cmp CasmSourceScratch1
+    bcc srMinValueSmaller
+    bne srMinDone
+    lda CasmValue0Lo
+    cmp CasmSourceScratch0
+    bcs srMinDone
+srMinValueSmaller:
+    lda CasmValue0Lo
+    sta CasmSourceScratch0
+    lda CasmValue0Hi
+    sta CasmSourceScratch1
+srMinDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceRefill (private, WP33: VMM-backed; WP34: file-boundary-aware)
 ; Refill from the loaded VMM allocation only when the current block is
 ; exhausted (the caller guarantees index == length). Install a validated
 ; 1-256-byte block, or commit a length-checked first EOF, or fail into
@@ -1065,15 +1292,20 @@ sourceResetTraversal:
 ;
 ; requestLen (how much this refill could take, 1-256, identical to the old
 ; OS-direct computation) is capped by remaining (how much loaded content is
-; left: CasmSourceLoadedLenLo/Hi - CasmSourceVmmCursorLo/Hi) to give
-; transferLen, the actual byte count for this refill. transferLen == 0 is
-; combined-content EOF. Otherwise the block's final index/length is
-; precomputed once from the original transferLen (needed because base +
-; transferLen can be exactly 256, which does not fit an 8-bit running
-; destination-offset counter), then transferLen bytes are moved from VMM
-; into CasmIoBuffer + base through up to four 64-byte vmmWindowRead chunks
-; (vmmWindowRead always fills the fixed CasmVmmBuffer, so each chunk is
-; copied out to its real destination after the transfer).
+; left: CasmSourceLoadedLenLo/Hi - CasmSourceVmmCursorLo/Hi) and, when a
+; next file exists, by the distance to that file's recorded start offset
+; (CasmSourceFileTable) -- a 3-way min via the shared srMin helper -- to
+; give transferLen, the actual byte count for this refill. The boundary cap
+; is what guarantees a single installed block never spans two files, which
+; is what makes srCheckFileBoundary's top-of-routine equality check
+; sufficient. transferLen == 0 is combined-content EOF. Otherwise the
+; block's final index/length is precomputed once from the original
+; transferLen (needed because base + transferLen can be exactly 256, which
+; does not fit an 8-bit running destination-offset counter), then
+; transferLen bytes are moved from VMM into CasmIoBuffer + base through up
+; to four 64-byte vmmWindowRead chunks (vmmWindowRead always fills the
+; fixed CasmVmmBuffer, so each chunk is copied out to its real destination
+; after the transfer).
 ;
 ; Inputs:    index == length
 ; Outputs:   Data: A = CASM_STREAM_DATA, C clear; block installed, index 0
@@ -1088,6 +1320,7 @@ sourceResetTraversal:
 ;            (chunk destination offset within this refill's transfer region)
 ; ---------------------------------------------------------------------------
 sourceRefill:
+    jsr srCheckFileBoundary
     jsr sourceComputeBase
     sta CasmLexerScratch0        ; base: needed again after computing requestLen
     beq srFullRequest            ; base 0 -> whole buffer -> requestLen = 256
@@ -1115,21 +1348,28 @@ srComputeRemaining:
     lda CasmSourceLoadedLenHi
     sbc CasmSourceVmmCursorHi
     sta CasmValue0Hi
+    jsr srMin                    ; transferLen = min(requestLen, remaining)
 
-    ; transferLen = min(requestLen [Scratch0/1], remaining [Value0Lo/Hi]);
-    ; result replaces Scratch0/1 in place.
-    lda CasmValue0Hi
-    cmp CasmSourceScratch1
-    bcc srRemainingSmaller       ; remaining hi < requestLen hi
-    bne srTransferLenReady       ; remaining hi > requestLen hi -> requestLen wins
-    lda CasmValue0Lo
-    cmp CasmSourceScratch0
-    bcs srTransferLenReady       ; remaining lo >= requestLen lo -> requestLen wins
-srRemainingSmaller:
-    lda CasmValue0Lo
-    sta CasmSourceScratch0
-    lda CasmValue0Hi
-    sta CasmSourceScratch1
+    ; WP34: also cap at the next file boundary, if one exists -- keeps a
+    ; single installed block from ever spanning two files (srCheckFileBoundary
+    ; relies on this). Gated so a single-file source (CasmSourceCount == 1)
+    ; never computes this term, degrading exactly to WP33's 2-way min.
+    lda CasmSourceFileId
+    clc
+    adc #1
+    cmp CasmSourceCount
+    bcs srTransferLenReady        ; no next file -- transferLen already final
+    asl
+    tax
+    lda CasmSourceFileTable, x
+    sec
+    sbc CasmSourceVmmCursorLo
+    sta CasmValue0Lo
+    lda CasmSourceFileTable + 1, x
+    sbc CasmSourceVmmCursorHi
+    sta CasmValue0Hi
+    jsr srMin
+
 srTransferLenReady:
     lda CasmSourceScratch0
     ora CasmSourceScratch1

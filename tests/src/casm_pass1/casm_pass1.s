@@ -13,13 +13,22 @@
 ; HEADER/entry point (which would conflict with this harness's own), and
 ; cli.s is unnecessary for a harness that opens each fixture directly by
 ; name rather than through casm.s's own command-line parsing -- this file
-; declares its own CasmSourceName/CasmOutputName buffers (see the BSS
+; declares its own CasmSourceNames/CasmOutputName buffers (see the BSS
 ; segment below) instead of pulling in all of cli.s's CLI-parsing
 ; dependency chain just for those two globals. fileio.s imports both names
-; even though only CasmSourceName is ever written here: fileio.s's
+; even though only CasmSourceNames is ever written here: fileio.s's
 ; outputAbort references CasmOutputName directly, and ld65 links whole
 ; object files, so the symbol must resolve even though outputAbort itself
 ; is never called from this harness.
+;
+; WP34 correction: sourceLoad now loops over CasmSourceNames/CasmSourceCount
+; (cli.s's WP34 multi-file arrays) instead of a single CasmSourceName/
+; CasmSourceLen pair. This harness's own CasmSourceNames declares only one
+; slot (CASM_FILENAME_BUFFER_SIZE bytes) -- sufficient, since it always sets
+; CasmSourceCount = 1 before calling sourceLoad, so the loop only ever
+; touches slot 0. It declares no CasmSourceLens: sourceLoad never reads
+; per-file lengths (only a null-terminated pointer), and this harness never
+; calls cliDeriveOutputName, the only routine that does.
 ;
 ; Each fixture drives sourceOpen/lexerInit/emitInit(+override to
 ; CASM_PASS_MODE_MEASURE)/parserParseStatement in a loop over one .seq
@@ -94,7 +103,10 @@
 .import symbolsInsert
 .import symbolsLookup
 
-.export CasmSourceName   ; this harness's own copy -- NOT linking cli.s, see header
+.export CasmSourceNames  ; this harness's own copy -- NOT linking cli.s, see header
+.export CasmSourceCount  ; this harness's own copy -- always set to 1
+.export cliSourceSlotLo  ; this harness's own single-entry copy, see BSS section
+.export cliSourceSlotHi  ; this harness's own single-entry copy, see BSS section
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
 
 .segment "HEADER"
@@ -189,12 +201,14 @@ runMeasurePass:
     ldy #0
 rmpCopyLoop:
     lda (CasmPtr1Lo), y
-    sta CasmSourceName, y
+    sta CasmSourceNames, y
     beq rmpCopyDone
     iny
     cpy #CASM_FILENAME_BUFFER_SIZE
     bcc rmpCopyLoop
 rmpCopyDone:
+    lda #1
+    sta CasmSourceCount
 
     jsr sourceLoad
     bcc rmpLoadOk
@@ -553,12 +567,14 @@ p1dpInitOk:
     ldy #0
 p1dpCopyLoop:
     lda (CasmPtr1Lo), y
-    sta CasmSourceName, y
+    sta CasmSourceNames, y
     beq p1dpCopyDone
     iny
     cpy #CASM_FILENAME_BUFFER_SIZE
     bcc p1dpCopyLoop
 p1dpCopyDone:
+    lda #1
+    sta CasmSourceCount
 
     jsr sourceLoad
     bcc p1dpLoadOk
@@ -782,7 +798,7 @@ passMsg:
 failMsg:
     .byte "CASM PASS1: FAIL", PetCr, 0
 
-; Fixture filenames, opened directly via CasmSourceName rather than through
+; Fixture filenames, opened directly via CasmSourceNames rather than through
 ; casm.s's CLI. Uppercase ASCII string literals produce byte values
 ; numerically identical to unshifted PETSCII for A-Z ($41-$5A) -- the exact
 ; byte range cc1541 -f writes into the directory entry when given a
@@ -837,8 +853,19 @@ ResolveView:    .res CASM_RESOLVE_SIZE
 ; own driver knows which "LOOP:" occurrence it is on.
 P1dpLabelCount: .res 1
 
-; This harness's own copies of the two filename buffers fileio.s imports
-; (CasmSourceName/CasmOutputName) -- normally provided by cli.s, which this
-; harness does not link. See the file header for the full rationale.
-CasmSourceName: .res CASM_FILENAME_BUFFER_SIZE
-CasmOutputName: .res CASM_FILENAME_BUFFER_SIZE
+; This harness's own copies of the filename buffers fileio.s/source.s
+; import (CasmSourceNames/CasmSourceCount/CasmOutputName) -- normally
+; provided by cli.s, which this harness does not link. See the file header
+; for the full rationale.
+CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
+CasmSourceCount: .res 1
+CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
+
+.segment "RODATA"
+
+; sourceLoad indexes this by CasmSourceLoadIndex (cli.s's real
+; CASM_SOURCE_COUNT_MAX-entry table generalizes this) -- this harness always
+; sets CasmSourceCount = 1, so only index 0 is ever read; one entry pointing
+; at the harness's own single CasmSourceNames slot is sufficient.
+cliSourceSlotLo: .byte <(CasmSourceNames + 0)
+cliSourceSlotHi: .byte >(CasmSourceNames + 0)

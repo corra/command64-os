@@ -31,11 +31,13 @@
 ; nothing to clean up -- it exits via DOS_EXIT directly with no registration
 ; or cleanup path.
 ;
-; Declares its own CasmSourceName/CasmOutputName buffers (normally provided
-; by cli.s, which this harness does not link) for the same reason
-; casm_pass1.s does: fileio.s's outputAbort references both names directly,
-; and ld65 links whole object files, so they must resolve even though
-; outputAbort is never called from here.
+; Declares its own CasmSourceNames/CasmSourceCount/cliSourceSlotLo/Hi/
+; CasmOutputName stand-ins (normally provided by cli.s, which this harness
+; does not link): fileio.s's outputAbort references CasmOutputName
+; directly, and source.o's sourceLoad/sourceRefill (linked in, though never
+; called from here) reference the WP34 multi-file symbols -- ld65 links
+; whole object files, so every symbol a linked routine references must
+; resolve even when that routine is never called from this harness.
 
 .include "command64.inc"
 .include "../../../src/external/casm/common.inc"
@@ -50,7 +52,10 @@
 .import CasmPass1FinalPc
 .import emitCheckPassAgreement
 
-.export CasmSourceName   ; fileio.s's outputAbort references this by name
+.export CasmSourceNames  ; source.o's sourceLoad references this by name
+.export CasmSourceCount  ; source.o's sourceLoad references this by name
+.export cliSourceSlotLo  ; source.o's sourceLoad references this by name
+.export cliSourceSlotHi  ; source.o's sourceLoad references this by name
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
 
 .segment "HEADER"
@@ -157,8 +162,16 @@ failMsg:
 
 FailCount: .res 1
 
-; This harness's own copies of the two filename buffers fileio.s imports
-; (CasmSourceName/CasmOutputName) -- normally provided by cli.s, which this
-; harness does not link. See the file header for the full rationale.
-CasmSourceName: .res CASM_FILENAME_BUFFER_SIZE
-CasmOutputName: .res CASM_FILENAME_BUFFER_SIZE
+; This harness's own copies of the filename buffers fileio.s/source.s
+; import -- normally provided by cli.s, which this harness does not link.
+; See the file header for the full rationale. Never actually populated or
+; read: this harness calls neither sourceLoad nor cliCopySource, so a
+; single unpopulated slot exists purely to satisfy the linker.
+CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
+CasmSourceCount: .res 1
+CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
+
+.segment "RODATA"
+
+cliSourceSlotLo: .byte <(CasmSourceNames + 0)
+cliSourceSlotHi: .byte >(CasmSourceNames + 0)
