@@ -39,12 +39,23 @@
 ; 7 fixture routines below (including p1dup1's own custom driver), giving
 ; each an isolated table -- p1dup1's two "LOOP:" inserts still collide only
 ; with each other, exactly as intended, just without leaking into any
-; other fixture. symbolsInit's own vmmStoreAlloc call is cheap (32768 bytes
-; each; 7 calls total, one per fixture, well within
-; CASM_VMM_CAPACITY == 8 registry slots) and this harness exits via
-; DOS_EXIT without any explicit cleanup, matching test_casm_vmm/
-; test_casm_symbols's own precedent of not bothering to free VMM
-; allocations in a short-lived test PRG.
+; other fixture.
+;
+; WP33 correction: each fixture now also calls sourceLoad (a second
+; vmmStoreAlloc per fixture, alongside symbolsInit's), so 7 fixtures need
+; 14 total allocations against CASM_VMM_CAPACITY == 8 registry slots --
+; unlike the pre-WP33 "7 calls total, no explicit cleanup needed" design
+; this comment previously described. A real run of this harness after
+; sourceLoad landed caught exactly this: the first four fixtures (8
+; allocations, exactly filling the registry) passed, and the remaining
+; three failed with the registry already full. The main loop below now
+; calls resourcesCleanup once after each fixture's reportCase, freeing
+; that fixture's symbol-table and source VMM slots before the next
+; fixture allocates its own -- steady-state usage is at most 2 slots at a
+; time, not 14 accumulated. resourcesCleanup is safe to call this often:
+; it is explicitly repeat-safe (CasmCleanupGuard-gated), and this
+; harness's file handle is already closed by sourceClose before each
+; call, so the file-cleanup half is always a no-op here.
 ;
 ; Every check against a same-routine failure uses inline "sec / rts" at the
 ; point of failure (matching test_casm_vmm.s/test_casm_symbols.s's own
@@ -62,8 +73,10 @@
 
 .import __MAIN_START__
 .import resourcesInit
+.import resourcesCleanup
 .import fileIoInit
 .import sourceInit
+.import sourceLoad
 .import sourceOpen
 .import sourceClose
 .import lexerInit
@@ -101,16 +114,22 @@ start:
 
     jsr p1label1
     jsr reportCase
+    jsr resourcesCleanup
     jsr p1labelinsn1
     jsr reportCase
+    jsr resourcesCleanup
     jsr p1fwd1
     jsr reportCase
+    jsr resourcesCleanup
     jsr p1back1
     jsr reportCase
+    jsr resourcesCleanup
     jsr p1undef1
     jsr reportCase
+    jsr resourcesCleanup
     jsr p1dup1
     jsr reportCase
+    jsr resourcesCleanup
     jsr p1size1
     jsr reportCase
 
@@ -177,6 +196,11 @@ rmpCopyLoop:
     bcc rmpCopyLoop
 rmpCopyDone:
 
+    jsr sourceLoad
+    bcc rmpLoadOk
+    sec
+    rts
+rmpLoadOk:
     jsr sourceOpen
     bcc rmpSourceOk
     sec
@@ -536,6 +560,11 @@ p1dpCopyLoop:
     bcc p1dpCopyLoop
 p1dpCopyDone:
 
+    jsr sourceLoad
+    bcc p1dpLoadOk
+    sec
+    rts
+p1dpLoadOk:
     jsr sourceOpen
     bcc p1dpOpenOk
     sec

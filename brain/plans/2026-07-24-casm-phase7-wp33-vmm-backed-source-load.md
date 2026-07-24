@@ -312,31 +312,81 @@ Excluded from WP33 (each is a later, separately-gated package):
 
 ## Verification and Fixture Strategy
 
-1. **Byte-identical trusted-reference re-run**: all 12 `CASM_REF_NAMES`
-   fixtures via `CASM <name>.S` then `COMP <name>.PRG <name>.REF`, unchanged
-   from their existing trusted references.
-2. **Diagnostic-identical traversal re-run**: `casmempty`, `casmshort`,
-   `casm256`, `casmmulti`, `casmcr`, `casmcrlf`, `casmsplit` -- each
-   produces the same diagnostic at the same line/column as before the
-   rewrite (`casmempty` specifically re-confirms the "zero-size SEQ cannot
-   open" behavior, per [[project-casm-zero-size-seq-open]], is unaffected
-   by moving the open call from `sourceOpen` into `sourceLoad`).
-3. **New 64-byte chunk-boundary fixtures**: sized so at least one
-   `sourceRefill` call needs a full four-chunk transfer and at least one
-   needs a partial final chunk that is not a multiple of 64 bytes,
-   confirmed against either a trusted-reference PRG (if the content is a
-   valid tiny program) or the same diagnostic-identical proof used for the
-   Phase 3 traversal fixtures, whichever the drafted content naturally
-   supports.
-4. **Static/manual confirmation that the old direct-disk refill path is
-   fully removed**, not left compiled-but-unreachable, once every fixture
-   above passes.
-5. Build both relocation bases and `test_image_d64`; confirm a no-change
-   rebuild holds `BUILD_CASM` stable before any source edit and increments
-   exactly once after.
-6. Every failing case is investigated before completion is requested. A
-   newly-discovered defect is presented to the user with its root cause and
-   a proposed fix before any source is touched, matching WP30's precedent.
+**Correction to this plan's own earlier framing**: the seven Phase 3
+traversal fixtures below were designed for the pre-WP15 temporary
+token-dump mode and have never actually been run through the real two-pass
+`casm.s` before (they are not part of any prior WP's regression sample --
+WP31's targeted 7-fixture sample was a *different* set:  `casmwp11`,
+`casmzp1`, `casmcma2`, `casmorg3`, `casmzpi2`, `casmpcovf`,
+`casmnumerrh`). There is no "same as before" baseline to re-confirm for
+most of them. This section instead hand-derives the expected outcome for
+each, mirroring WP31's own per-fixture verification rigor, and the runtime
+matrix confirms those derivations rather than a regression.
+
+### Test Procedure
+
+Prerequisite: `build/image.d64` (contains `casm.prg`, `comp.prg`) and
+`build/test.d64` (contains every fixture `.seq`, every trusted `.ref` PRG,
+and the standalone `TEST_CASM_*` harnesses) are current -- rebuild both if
+any source changed since your last build. Mount both in the supported local
+emulator per your usual CASM testing setup.
+
+**1. Standalone harnesses (regression -- confirm still pass unmodified):**
+
+Run `TEST_CASM_PASS1` and `TEST_CASM_PASSCHECK` from `test.d64`. Both now
+exercise `sourceLoad` internally (`casm_pass1.s`'s two driver routines gained
+their own `jsr sourceLoad` immediately before `jsr sourceOpen`, mirroring
+`casm.s`'s own change) -- confirm each harness still reports its existing
+all-pass result with no new failure.
+
+**2. Byte-identical trusted references (12 total) -- `CASM <name>.S` then
+`COMP <name>.PRG <name>.REF`, expect IDENTICAL for every one:**
+
+`casmemit1`, `casmhello`, `casmmodes`, `casmnum2`, `casmexprn`, `p1fwd1`,
+`p1back1`, `p1size1`, `brfwd1`, `brback1`, `casmcase1`, `casmmaxid1`.
+
+**3. Phase 3 traversal fixtures -- first real run through two-pass `casm.s`,
+hand-derived expected results (not a "same as before" check):**
+
+| Fixture | Content | Expected result |
+| --- | --- | --- |
+| `casmempty` | 0 bytes | `CASM: CANNOT OPEN INPUT` -- `fileOpenInput`'s own `DOS_OPEN_FILE` call rejects a zero-size SEQ before `sourceLoad`'s read loop ever starts ([[project-casm-zero-size-seq-open]]); unaffected by WP33 since this is the same call site, just reached from `sourceLoad` instead of `sourceOpen` |
+| `casmshort` | `.ORG`/`LDA`/`STA`/`LDA`/`JMP START_LABEL` | Assembles through `.ORG`, `LDA #10`, `STA $0400,X`, `LDA %10101010` (zero-page, value $AA) cleanly; `START_LABEL` is never defined anywhere in the file, so Pass 1 sizes `JMP START_LABEL` as absolute (3 bytes, tolerated unresolved) but Pass 2 raises `CASM: UNDEFINED SYMBOL` at the `JMP` statement -- no output PRG survives (`outputAbort` deletes the partial file) |
+| `casm256` | 256 `A` bytes, no newline | Lexer's identifier scan hits its 31-byte cap on the 32nd `A` -- `CASM: TOKEN TOO LONG` at line 1, col 32 (offset 31) |
+| `casmmulti` | 513 `B` bytes, no newline | Same token-length cap, same shape -- `CASM: TOKEN TOO LONG` at line 1, col 32 (offset 31) |
+| `casmcr` | `LINE1<CR>LINE2<CR>` | `LINE1` (5-char identifier) is followed by a newline, not `:` -- a label statement requires the colon immediately (`parser.s`'s `ppsLabel`) -- `CASM: SYNTAX ERROR AT LINE 1, COL 6 (OFFSET 5)` |
+| `casmcrlf` | `LINE1<CR><LF>LINE2<CR><LF>` | Same shape as `casmcr`; CRLF collapses to one newline at the same column as the CR-only case -- `CASM: SYNTAX ERROR AT LINE 1, COL 6 (OFFSET 5)`, **identical location to `casmcr`** (proves CRLF normalization doesn't shift the reported column) |
+| `casmsplit` | 255 `A` bytes + CRLF + `END` | The identifier scan hits `TOKEN TOO LONG` at column 32 long before reaching the CRLF at byte 255 -- same `CASM: TOKEN TOO LONG` at line 1, col 32 (offset 31) as `casm256`; the CRLF-across-block-boundary behavior this fixture was originally built to exercise is masked by the unrelated, pre-existing lexer length cap, which is not a WP33 regression (unchanged lexer code) |
+
+**4. New 64-byte VMM chunk-boundary fixtures -- same token-length-cap shape
+as `casm256`, proving the new chunked refill delivers identical bytes at
+the 64-byte-multiple boundary as it does elsewhere:**
+
+| Fixture | Content | Expected result |
+| --- | --- | --- |
+| `casmvmm65` | 65 `A` bytes (one full 64-byte VMM chunk + 1-byte partial), no newline | `CASM: TOKEN TOO LONG` at line 1, col 32 (offset 31) -- identical shape to `casm256`; a wrong byte anywhere in bytes 1-31 (spanning the chunk 0/1 boundary at byte 64 is not even reached before the 32nd-byte cutoff, but the chunk arithmetic itself is exercised during `sourceLoad`'s write and every `sourceRefill` read regardless of where the diagnostic fires) |
+| `casmvmm128` | 128 `A` bytes (exactly two full 64-byte VMM chunks, no partial), no newline | Same: `CASM: TOKEN TOO LONG` at line 1, col 32 (offset 31) |
+
+If either new fixture instead hangs, crashes, or reports a different
+diagnostic (e.g. a VMM transfer failure), that is a direct signal of a
+chunk-loop defect, since nothing else about these two differs from
+`casm256`'s already-understood shape.
+
+**5. Static/manual confirmation** that the old direct-disk refill code path
+is fully removed from `source.s`, not left compiled-but-unreachable (visual
+check, already done during implementation: `inputStreamReadInto` is no
+longer imported or referenced anywhere in the file).
+
+**6. Build verification** (already done, recorded here for the walkthrough):
+both relocation bases and `test_image_d64` build clean; a no-change rebuild
+holds `BUILD_CASM` stable at 1135; MAIN headroom is 276 of 12800 bytes
+(`$3200`, up from `$3000` -- a 236-byte overflow at the old size made the
+bump necessary). `casm_pass1`/`casm_passcheck`'s own MAIN envelope grew
+`$3200` -> `$3300` for the same reason (both link `source.s` whole).
+
+Every failing case is investigated before completion is requested. A
+newly-discovered defect is presented to the user with its root cause and a
+proposed fix before any source is touched, matching WP30's precedent.
 
 ## Atomic Implementation Increments
 

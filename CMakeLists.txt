@@ -197,7 +197,7 @@ if(Ca65_FOUND)
     # CasmLabelNameLen buffer, and CasmPassMode overflowed $2F00 by 23
     # measured bytes; $3000 (+256) leaves 233 bytes headroom, the smallest
     # round-page step above that minimum, matching this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3000")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3200")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -301,7 +301,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3200")
+            set(TEST_PRG_SIZE "3300")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -395,6 +395,8 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
     "${CASM_TEST_FIXTURE_DIR}/casm256.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmulti.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmvmm65.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmvmm128.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmcr.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmcrlf.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmsplit.seq"

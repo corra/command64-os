@@ -24,6 +24,25 @@ file(WRITE "${OUTPUT_DIR}/casm256.seq" "${CASM_EXACT_BLOCK}")
 string(REPEAT "B" 513 CASM_MULTI_BLOCK)
 file(WRITE "${OUTPUT_DIR}/casmmulti.seq" "${CASM_MULTI_BLOCK}")
 
+# WP33 VMM-backed refill chunk-boundary fixtures. sourceRefill now transfers
+# each up-to-256-byte OS block from the loaded VMM allocation through up to
+# four 64-byte vmmWindowRead chunks -- an internal boundary casm256 (exactly
+# 256 bytes, always four full chunks) does not exercise, since it never
+# produces a partial final chunk. Neither fixture contains valid CASM syntax
+# (like casm256/casmmulti, they exist to exercise traversal, not assembly);
+# equivalence is proved by the same diagnostic/line/column those two already
+# establish, not a trusted-reference PRG.
+#
+# 65 bytes: one full 64-byte chunk plus a 1-byte final partial chunk.
+string(REPEAT "A" 65 CASM_VMM_CHUNK_65)
+file(WRITE "${OUTPUT_DIR}/casmvmm65.seq" "${CASM_VMM_CHUNK_65}")
+
+# 128 bytes: exactly two full 64-byte chunks and no partial remainder at
+# all -- proves the chunk loop terminates cleanly on an exact multiple
+# smaller than casm256's 256-byte (four-chunk) case.
+string(REPEAT "A" 128 CASM_VMM_CHUNK_128)
+file(WRITE "${OUTPUT_DIR}/casmvmm128.seq" "${CASM_VMM_CHUNK_128}")
+
 # WP5 newline-normalization fixtures. Explicit CR ($0D) and LF ($0A) bytes are
 # built with string(ASCII ...) so no host newline translation can distort them.
 # Coordinate values are not runtime-observable until WP10's token dump; these

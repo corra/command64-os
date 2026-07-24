@@ -746,6 +746,19 @@ CASM_PASS_MODE_MEASURE = $00
 CASM_PASS_MODE_EMIT    = $01
 
 ; ---------------------------------------------------------------------------
+; Phase 7 WP33 VMM-backed source load contract
+; ---------------------------------------------------------------------------
+
+; True single vmmStoreAlloc request ceiling (Phase 0C.10/0C.11): 65536 cannot
+; be represented in a 16-bit X/Y byte count -- it wraps to $0000,
+; indistinguishable from an explicit zero-size rejection. sourceLoad requests
+; exactly this many bytes; the allocation internally rounds up to a full
+; 16-page/65536-byte grant, matching every other VMM consumer's rounding.
+CASM_SOURCE_VMM_MAX_BYTES = 65535
+
+.assert CASM_SOURCE_VMM_MAX_BYTES = 65535, error, "CASM source VMM allocation cap changed"
+
+; ---------------------------------------------------------------------------
 ; Phase and cleanup state
 ; ---------------------------------------------------------------------------
 

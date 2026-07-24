@@ -28,6 +28,7 @@
 .import CasmCliOptions
 .import fileIoInit
 .import sourceInit
+.import sourceLoad
 .import sourceOpen
 .import sourceClose
 .import diagPrintString
@@ -111,6 +112,8 @@ startOptionsReady:
     bcs startInitFatal
 
     jsr symbolsInit
+    bcs startInitFatal
+    jsr sourceLoad
     bcs startInitFatal
     jsr sourceOpen
     bcs startInitFatal

@@ -20,8 +20,19 @@
 ;
 ; Rewind and the bounded line API remain WP6; the lexer remains WP7. This
 ; translation unit imports the WP3 source subrecord and the Phase 2 file
-; wrappers. It defines no BSS, writes no lexer state, and calls no OS service
-; except through inputStreamOpen/inputStreamRead/inputStreamClose.
+; wrappers. It writes no lexer state and calls no OS service except through
+; inputStreamOpen/inputStreamRead/inputStreamClose.
+;
+; WP33 (Phase 7) adds sourceLoad, a new pre-pass that streams the parsed
+; input file into one VMM allocation before any traversal begins. sourceOpen
+; and sourceRewind no longer perform any OS call -- both simply reset the
+; traversal cursor to the start of the already-loaded VMM content, and
+; sourceRefill fills CasmIoBuffer through chunked VMM reads instead of a
+; direct OS read. sourceFetchPhysical and every byte-classification/
+; newline-normalization routine below are unchanged: they only ever consult
+; the block index/length window into CasmIoBuffer and the checked delivered-
+; byte offset, both meaningful identically regardless of where CasmIoBuffer's
+; contents came from.
 
 .include "common.inc"
 
@@ -61,14 +72,17 @@
 ; Phase 2 managed file services and shared transfer state.
 .import inputStreamOpen
 .import inputStreamRead
-.import inputStreamReadInto
 .import inputStreamClose
 .import CasmIoBuffer
-.import CasmInputState
-.import CasmInputTotalLo
-.import CasmInputTotalHi
+
+; Phase 6A VMM allocation and windowed transfer (WP33: VMM-backed source).
+.import vmmStoreAlloc
+.import vmmWindowRead
+.import vmmWindowWrite
+.import CasmVmmBuffer
 
 .export sourceInit
+.export sourceLoad
 .export sourceOpen
 .export sourceNextByte
 .export sourceNextLine
@@ -76,6 +90,32 @@
 .export sourceRewind
 .export sourceClose
 .export sourceDrainLineTail
+
+; ---------------------------------------------------------------------------
+; WP33 VMM-backed source load state
+;
+; Deliberately its own segment, not state.s's frozen Phase 3 source
+; subrecord (CasmSourceStateStart/End, asserted exactly 16 bytes) --
+; mirrors WP28's CasmLabelName precedent (parser.s) exactly: new state kept
+; parallel to a size-asserted shared ABI rather than crammed into it.
+;
+; CasmSourceVmmSlot is the registry slot sourceLoad's vmmStoreAlloc call
+; grants. CasmSourceLoadedLenLo/Hi is the total byte count sourceLoad wrote
+; into that allocation, fixed once loading finishes. CasmSourceVmmCursorLo/Hi
+; is a running 16-bit offset reused for two different purposes at two
+; different times, never simultaneously: during sourceLoad it is the next
+; VMM *write* offset; sourceOpen/sourceRewind reset it to 0 and every
+; VMM-backed sourceRefill afterward advances it as the next VMM *read*
+; offset. Safe because loading always completes fully before any refill
+; begins.
+; ---------------------------------------------------------------------------
+.segment "BSS"
+
+CasmSourceVmmSlot:      .res 1
+CasmSourceLoadedLenLo:  .res 1
+CasmSourceLoadedLenHi:  .res 1
+CasmSourceVmmCursorLo:  .res 1
+CasmSourceVmmCursorHi:  .res 1
 
 .segment "CODE"
 
@@ -98,48 +138,226 @@ sourceInit:
     lda #CASM_SOURCE_STATE_CLOSED
     sta CasmSourceState
     jsr sourceResetTraversal
+    lda #0
+    sta CasmSourceVmmSlot
+    sta CasmSourceLoadedLenLo
+    sta CasmSourceLoadedLenHi
+    sta CasmSourceVmmCursorLo
+    sta CasmSourceVmmCursorHi
     lda #CASM_DIAG_NONE
     clc
     rts
 
 ; ---------------------------------------------------------------------------
-; sourceOpen
-; Open the parsed source through the Phase 2 wrapper. Only a successful open
-; commits READY state and BYTE mode and resets the traversal cursor. An invalid
-; state returns CASM_DIAG_STREAM_STATE_FAILED without an OS call; an open
-; failure leaves the source CLOSED/NONE and does not alter Phase 2's central
-; ownership outcome.
+; sourceLoad (WP33)
+; Stream the single parsed input file (CasmSourceName) into one VMM
+; allocation, single-file only (Phase 7 WP33's confirmed scope -- the
+; multi-file loop and CasmSourceFileTable are WP34's job). Opens the file
+; through the Phase 2 wrapper, reads it in 256-byte CasmIoBuffer blocks via
+; the existing inputStreamRead, and writes each block into the VMM
+; allocation through up to four 64-byte vmmWindowWrite chunks (vmmWindowRead/
+; Write always transfer through the fixed CasmVmmBuffer, so each chunk is
+; staged there via a local copy first). Does not touch CasmSourceState --
+; the caller's following sourceOpen call commits READY.
 ;
-; Inputs:    initialized source state (CLOSED); parsed CasmSourceName;
-;            initialized Phase 2 file services (input CLOSED)
-; Outputs:   A = CASM_DIAG_NONE, C clear on success; state READY, API BYTE
+; The single-file 65535-byte cap is inherited for free: inputStreamRead's
+; underlying inputStreamReadInto already advances a checked 16-bit
+; CasmInputTotalLo/Hi and raises CASM_DIAG_SOURCE_OFFSET_OVERFLOW at exactly
+; 65535 bytes, so no separate overflow check is written here.
+;
+; A failure at any step leaves whatever was already registered (the VMM
+; slot, the input file handle) for the central resource owner's generic
+; cleanup sweep to release -- no manual unwind is performed here, matching
+; every other CASM init-path failure.
+;
+; Inputs:    source state CLOSED; parsed CasmSourceName; initialized Phase 2
+;            file services (input CLOSED)
+; Outputs:   A = CASM_DIAG_NONE, C clear on success; CasmSourceVmmSlot holds
+;            the granted registry slot; CasmSourceLoadedLenLo/Hi holds the
+;            total bytes loaded; CasmSourceVmmCursorLo/Hi reset to 0
 ;            A = CASM_DIAG_*, C set on failure
 ; Preserves: none
-; Clobbers:  A, X, Y, source scratch, inputStreamOpen/OS volatile state
+; Clobbers:  A, X, Y, CasmSourceScratch0/1, CasmLexerScratch0/1, CasmIoBuffer,
+;            CasmVmmBuffer, fileio.s/vmm_store.s volatile state
+; Scratch:   CasmSourceScratch0/1 (16-bit remaining-in-block counter),
+;            CasmLexerScratch0 (chunk source offset within the current
+;            block) -- both source.s- and lexer.s-aliased cells are free
+;            here: sourceLoad runs before lexerInit is ever called and
+;            returns before any lexer call could observe them
+; ---------------------------------------------------------------------------
+sourceLoad:
+    lda CasmSourceState
+    cmp #CASM_SOURCE_STATE_CLOSED
+    bne slBadStateNear
+
+    ldx #<CASM_SOURCE_VMM_MAX_BYTES
+    ldy #>CASM_SOURCE_VMM_MAX_BYTES
+    jsr vmmStoreAlloc
+    bcs slFailNear
+    stx CasmSourceVmmSlot
+
+    lda #0
+    sta CasmSourceVmmCursorLo
+    sta CasmSourceVmmCursorHi
+
+    jsr inputStreamOpen
+    bcs slFailNear
+    jmp slReadLoop
+
+; Trampolines: sourceLoad's early checks and its read loop are both out of
+; direct branch range of the shared bad-state/failure/done tails defined
+; near the end of the routine.
+slBadStateNear:
+    jmp slBadState
+slFailNear:
+    jmp slFail
+slLoadDoneNear:
+    jmp slLoadDone
+
+slReadLoop:
+    jsr inputStreamRead
+    bcs slFailNear
+    cmp #CASM_STREAM_EOF
+    beq slLoadDoneNear
+
+    ; DATA: CasmIoLenLo/Hi = 1..256 bytes now in CasmIoBuffer (256 encodes as
+    ; Hi=1/Lo=0). Stage the block's remaining-to-write counter and the chunk
+    ; source offset, then drain it in <=64-byte chunks.
+    lda CasmIoLenLo
+    sta CasmSourceScratch0
+    lda CasmIoLenHi
+    sta CasmSourceScratch1
+    lda #0
+    sta CasmLexerScratch0
+
+slWriteChunkLoop:
+    lda CasmSourceScratch0
+    ora CasmSourceScratch1
+    beq slReadLoop               ; block fully written -> read the next one
+
+    lda CasmSourceScratch1
+    bne slWriteChunkFull         ; remaining hi != 0 -> remaining > 255
+    lda CasmSourceScratch0
+    cmp #CASM_VMM_BUFFER_SIZE + 1
+    bcs slWriteChunkFull         ; remaining >= 64 -> full chunk
+    sta CasmIoLenLo               ; partial final chunk: chunkLen = remaining
+    lda #0
+    sta CasmIoLenHi
+    jmp slWriteChunkStage
+slWriteChunkFull:
+    lda #CASM_VMM_BUFFER_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+
+slWriteChunkStage:
+    ; Source pointer = CasmIoBuffer + CasmLexerScratch0.
+    lda CasmLexerScratch0
+    clc
+    adc #<CasmIoBuffer
+    sta CasmIoPtrLo
+    lda #>CasmIoBuffer
+    adc #0
+    sta CasmIoPtrHi
+
+    ; Stage this chunk into CasmVmmBuffer (vmmWindowWrite's fixed source).
+    ldy #0
+slWriteCopyLoop:
+    cpy CasmIoLenLo
+    beq slWriteCopyDone
+    lda (CasmIoPtrLo), y
+    sta CasmVmmBuffer, y
+    iny
+    jmp slWriteCopyLoop
+slWriteCopyDone:
+
+    lda CasmSourceVmmCursorLo
+    sta CasmVmmOffLo
+    lda CasmSourceVmmCursorHi
+    sta CasmVmmOffHi
+    ldx CasmSourceVmmSlot
+    jsr vmmWindowWrite
+    bcs slWriteFailNear
+
+    ; Advance the VMM write cursor and the chunk source offset by chunkLen;
+    ; decrement the block's remaining-to-write counter by the same amount.
+    lda CasmSourceVmmCursorLo
+    clc
+    adc CasmIoLenLo
+    sta CasmSourceVmmCursorLo
+    lda CasmSourceVmmCursorHi
+    adc CasmIoLenHi
+    sta CasmSourceVmmCursorHi
+
+    lda CasmLexerScratch0
+    clc
+    adc CasmIoLenLo
+    sta CasmLexerScratch0
+
+    lda CasmSourceScratch0
+    sec
+    sbc CasmIoLenLo
+    sta CasmSourceScratch0
+    lda CasmSourceScratch1
+    sbc CasmIoLenHi
+    sta CasmSourceScratch1
+    jmp slWriteChunkLoop
+
+slLoadDone:
+    jsr inputStreamClose
+    bcs slFail
+    lda CasmSourceVmmCursorLo
+    sta CasmSourceLoadedLenLo
+    lda CasmSourceVmmCursorHi
+    sta CasmSourceLoadedLenHi
+    lda #0
+    sta CasmSourceVmmCursorLo
+    sta CasmSourceVmmCursorHi
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+slWriteFailNear:
+    ; Trampoline: the write-chunk loop above is out of direct branch range of
+    ; the shared failure tail.
+    jmp slFail
+slBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+slFail:
+    ; A already holds the failing call's own diagnostic; whatever it already
+    ; registered (VMM slot, file handle) is released by central cleanup.
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceOpen
+; Reset the traversal cursor to the start of the already-loaded VMM content
+; (WP33: sourceLoad performs the real OS/VMM work above; sourceOpen itself
+; makes no OS call and cannot fail except on a bad precondition state).
+;
+; Inputs:    source state CLOSED; content already loaded via sourceLoad
+; Outputs:   A = CASM_DIAG_NONE, C clear; state READY, API BYTE
+;            A = CASM_DIAG_STREAM_STATE_FAILED, C set on a bad precondition
+; Preserves: none
+; Clobbers:  A, X, Y, source scratch
 ; Scratch:   none
 ; ---------------------------------------------------------------------------
 sourceOpen:
     lda CasmSourceState
     cmp #CASM_SOURCE_STATE_CLOSED
     bne soBadState
-    lda CasmInputState
-    cmp #CASM_FILE_STATE_CLOSED
-    bne soBadState
-    jsr inputStreamOpen
-    bcs soOpenFailed
-    ; Successful open: commit READY/BYTE, then reset the traversal cursor so a
-    ; later WP6 reopen can share the same reset path.
     lda #CASM_SOURCE_STATE_READY
     sta CasmSourceState
     lda #CASM_SOURCE_API_BYTE
     sta CasmSourceApiMode
+    lda #0
+    sta CasmSourceVmmCursorLo
+    sta CasmSourceVmmCursorHi
     jsr sourceResetTraversal
     lda #CASM_DIAG_NONE
     clc
-    rts
-soOpenFailed:
-    ; A already holds the wrapper diagnostic; leave source CLOSED/NONE.
-    sec
     rts
 soBadState:
     lda #CASM_DIAG_STREAM_STATE_FAILED
@@ -535,9 +753,10 @@ dlaFull:
 
 ; ---------------------------------------------------------------------------
 ; sourceRewind
-; Close and reopen the source, then reset every source-owned field so a second
-; traversal is byte-, newline-, and location-identical to the first. The reopen
-; also resets the managed fetched total, so the EOF count invariant holds again.
+; Reset every source-owned field so a second traversal of the already-loaded
+; VMM content is byte-, newline-, and location-identical to the first (WP33:
+; no OS call -- the content was loaded once by sourceLoad and is never
+; re-read from disk). Textually the same reset sourceOpen performs.
 ;
 ; Lookahead invalidation is deliberately not performed here: lookahead is lexer
 ; state and this module writes none. WP7 owns invalidating CasmLookahead* after
@@ -545,50 +764,28 @@ dlaFull:
 ;
 ; Inputs:    source state READY or EOF
 ; Outputs:   Success: A = CASM_DIAG_NONE, C clear; state READY, API BYTE, reset
-;            Fail:    A = CASM_DIAG_INPUT_CLOSE_FAILED (close; source ERROR and
-;                     the handle retained in CLOSE_FAILED for central retry),
-;                     CASM_DIAG_SOURCE_REWIND_FAILED (reopen; source CLOSED/NONE
-;                     with no leaked handle), or CASM_DIAG_STREAM_STATE_FAILED;
-;                     C set
+;            Fail:    A = CASM_DIAG_STREAM_STATE_FAILED, C set, on a bad
+;                     precondition state
 ; Preserves: none
-; Clobbers:  A, X, Y, wrapper/OS volatile state
+; Clobbers:  A, X, Y, source scratch
 ; ---------------------------------------------------------------------------
 sourceRewind:
     lda CasmSourceState
     cmp #CASM_SOURCE_STATE_READY
-    beq srwClose
+    beq srwReset
     cmp #CASM_SOURCE_STATE_EOF
     bne srwBadState
-srwClose:
-    jsr inputStreamClose
-    bcs srwCloseFailed
-    jsr inputStreamOpen
-    bcs srwReopenFailed
+srwReset:
     lda #CASM_SOURCE_STATE_READY
     sta CasmSourceState
     lda #CASM_SOURCE_API_BYTE
     sta CasmSourceApiMode
+    lda #0
+    sta CasmSourceVmmCursorLo
+    sta CasmSourceVmmCursorHi
     jsr sourceResetTraversal
     lda #CASM_DIAG_NONE
     clc
-    rts
-srwCloseFailed:
-    ; The close diagnostic is the primary failure and must not be masked by the
-    ; rewind code; inputStreamClose retained ownership in CLOSE_FAILED.
-    lda #CASM_SOURCE_STATE_ERROR
-    sta CasmSourceState
-    lda #CASM_DIAG_INPUT_CLOSE_FAILED
-    sec
-    rts
-srwReopenFailed:
-    ; The close succeeded, so no handle is leaked. Report the rewind-specific
-    ; primary and leave the source closed.
-    lda #CASM_SOURCE_STATE_CLOSED
-    sta CasmSourceState
-    lda #CASM_SOURCE_API_NONE
-    sta CasmSourceApiMode
-    lda #CASM_DIAG_SOURCE_REWIND_FAILED
-    sec
     rts
 srwBadState:
     lda #CASM_DIAG_STREAM_STATE_FAILED
@@ -785,27 +982,20 @@ sanOverflow:
 
 ; ---------------------------------------------------------------------------
 ; sourceClose
-; Close the source through the Phase 2 wrapper. Permitted in CLOSED, READY,
-; EOF, and ERROR. CLOSED is repeat-safe. A successful close commits CLOSED/NONE
-; and clears block/result state. A failed close leaves the source ERROR and the
-; Phase 2 handle registered in CLOSE_FAILED so a later sourceClose or central
-; cleanup can retry. It does not overwrite a caller's earlier primary
-; diagnostic; callers with a primary failure jump to central fatal cleanup.
+; Commit the source CLOSED/NONE and clear block/result state (WP33: no OS
+; call -- the input file was already closed by sourceLoad once loading
+; finished, and the loaded VMM allocation is released generically by the
+; central resource owner's cleanup sweep, matching the symbol table's own
+; established precedent of never freeing its VMM allocation explicitly).
+; Permitted in CLOSED, READY, EOF, and ERROR; CLOSED is repeat-safe.
 ;
 ; Inputs:    initialized source state
-; Outputs:   A = CASM_DIAG_NONE, C clear, Z set on success; source CLOSED/NONE
-;            A = CASM_DIAG_INPUT_CLOSE_FAILED, C set on failure; source ERROR
-;            and managed ownership retained
+; Outputs:   A = CASM_DIAG_NONE, C clear, Z set; source CLOSED/NONE
 ; Preserves: none
-; Clobbers:  A, X, Y, inputStreamClose/OS volatile state
+; Clobbers:  A
 ; Scratch:   none
 ; ---------------------------------------------------------------------------
 sourceClose:
-    lda CasmSourceState
-    cmp #CASM_SOURCE_STATE_CLOSED
-    beq scAlreadyClosed
-    jsr inputStreamClose
-    bcs scFailed
     lda #CASM_SOURCE_STATE_CLOSED
     sta CasmSourceState
     lda #CASM_SOURCE_API_NONE
@@ -816,15 +1006,8 @@ sourceClose:
     sta CasmSourceBlockIndexLo
     sta CasmSourceBlockIndexHi
     sta CasmSourceResultByte
-scAlreadyClosed:
     lda #CASM_DIAG_NONE
     clc
-    rts
-scFailed:
-    lda #CASM_SOURCE_STATE_ERROR
-    sta CasmSourceState
-    lda #CASM_DIAG_INPUT_CLOSE_FAILED
-    sec
     rts
 
 ; ---------------------------------------------------------------------------
@@ -874,91 +1057,214 @@ sourceResetTraversal:
     rts
 
 ; ---------------------------------------------------------------------------
-; sourceRefill (private)
-; Refill from the managed input only when the current block is exhausted (the
-; caller guarantees index == length). Install a validated 1-256-byte block, or
-; commit a count-validated first EOF, or fail into source ERROR.
+; sourceRefill (private, WP33: VMM-backed)
+; Refill from the loaded VMM allocation only when the current block is
+; exhausted (the caller guarantees index == length). Install a validated
+; 1-256-byte block, or commit a length-checked first EOF, or fail into
+; source ERROR.
+;
+; requestLen (how much this refill could take, 1-256, identical to the old
+; OS-direct computation) is capped by remaining (how much loaded content is
+; left: CasmSourceLoadedLenLo/Hi - CasmSourceVmmCursorLo/Hi) to give
+; transferLen, the actual byte count for this refill. transferLen == 0 is
+; combined-content EOF. Otherwise the block's final index/length is
+; precomputed once from the original transferLen (needed because base +
+; transferLen can be exactly 256, which does not fit an 8-bit running
+; destination-offset counter), then transferLen bytes are moved from VMM
+; into CasmIoBuffer + base through up to four 64-byte vmmWindowRead chunks
+; (vmmWindowRead always fills the fixed CasmVmmBuffer, so each chunk is
+; copied out to its real destination after the transfer).
 ;
 ; Inputs:    index == length
 ; Outputs:   Data: A = CASM_STREAM_DATA, C clear; block installed, index 0
 ;            EOF:  A = CASM_SOURCE_EOF, C clear; state EOF, result byte cleared
 ;            Fail: A = CASM_DIAG_*, C set; state ERROR
 ; Preserves: none
-; Clobbers:  A, X, Y, inputStreamRead/OS volatile state
+; Clobbers:  A, X, Y, source scratch, CasmVmmBuffer, vmmWindowRead volatile
+;            state
+; Scratch:   CasmSourceScratch0/1 (requestLen, then reused as the 16-bit
+;            remaining-to-transfer counter), CasmLexerScratch0 (this
+;            refill's fixed base, from sourceComputeBase), CasmLexerScratch1
+;            (chunk destination offset within this refill's transfer region)
 ; ---------------------------------------------------------------------------
 sourceRefill:
-    ; Refill only the transfer region above the protected line payload. In BYTE
-    ; mode the base is 0, so this is a full-buffer read and the installed cursor
-    ; is identical to the pre-WP6 form.
     jsr sourceComputeBase
-    beq srFullBlock             ; base 0 -> whole buffer
-    ; LINE mode with an accumulated payload: read into CasmIoBuffer + base with
-    ; length 256 - base, preserving CasmIoBuffer[0 .. base-1].
-    pha
+    sta CasmLexerScratch0        ; base: needed again after computing requestLen
+    beq srFullRequest            ; base 0 -> whole buffer -> requestLen = 256
+    ; LINE mode with an accumulated payload: requestLen = 256 - base,
+    ; preserving CasmIoBuffer[0 .. base-1].
     eor #$FF
     clc
     adc #$01                    ; A = 256 - base (base is 1..255)
-    sta CasmIoLenLo
+    sta CasmSourceScratch0
     lda #0
-    sta CasmIoLenHi
-    pla
-    clc
-    adc #<CasmIoBuffer
-    tax
-    lda #>CasmIoBuffer
-    adc #0
-    tay
-    jmp srDoRead
-srFullBlock:
+    sta CasmSourceScratch1
+    jmp srComputeRemaining
+srFullRequest:
     lda #<CASM_IO_BUFFER_SIZE
-    sta CasmIoLenLo
+    sta CasmSourceScratch0
     lda #>CASM_IO_BUFFER_SIZE
-    sta CasmIoLenHi
-    ldx #<CasmIoBuffer
-    ldy #>CasmIoBuffer
-srDoRead:
-    jsr inputStreamReadInto
-    bcs srReadFailed
-    cmp #CASM_STREAM_EOF
-    beq srEof
+    sta CasmSourceScratch1       ; requestLen = 256 ($0100)
 
-    ; DATA: a zero-length DATA result is inconsistent.
-    lda CasmIoLenLo
-    ora CasmIoLenHi
-    beq srInvalidBlock
+srComputeRemaining:
+    ; remaining = CasmSourceLoadedLenLo/Hi - CasmSourceVmmCursorLo/Hi (16-bit).
+    lda CasmSourceLoadedLenLo
+    sec
+    sbc CasmSourceVmmCursorLo
+    sta CasmValue0Lo
+    lda CasmSourceLoadedLenHi
+    sbc CasmSourceVmmCursorHi
+    sta CasmValue0Hi
 
-    ; Install absolute cursor positions: index = base, length = base + count.
-    ; The base is recomputed from persistent state because zero-page source
-    ; scratch does not survive the OS read above.
-    jsr sourceComputeBase
+    ; transferLen = min(requestLen [Scratch0/1], remaining [Value0Lo/Hi]);
+    ; result replaces Scratch0/1 in place.
+    lda CasmValue0Hi
+    cmp CasmSourceScratch1
+    bcc srRemainingSmaller       ; remaining hi < requestLen hi
+    bne srTransferLenReady       ; remaining hi > requestLen hi -> requestLen wins
+    lda CasmValue0Lo
+    cmp CasmSourceScratch0
+    bcs srTransferLenReady       ; remaining lo >= requestLen lo -> requestLen wins
+srRemainingSmaller:
+    lda CasmValue0Lo
+    sta CasmSourceScratch0
+    lda CasmValue0Hi
+    sta CasmSourceScratch1
+srTransferLenReady:
+    lda CasmSourceScratch0
+    ora CasmSourceScratch1
+    bne srHaveData
+    jmp srEof                    ; transferLen == 0: combined content exhausted
+
+srHaveData:
+    ; Precompute the block's final index/length now, from the original
+    ; (not-yet-decremented) transferLen: index = base; length = base +
+    ; transferLen. Doing this before the chunk loop below avoids needing an
+    ; 8-bit running destination-offset counter to ever represent 256.
+    lda CasmLexerScratch0
     sta CasmSourceBlockIndexLo
     lda #0
     sta CasmSourceBlockIndexHi
     lda CasmSourceBlockIndexLo
     clc
-    adc CasmIoLenLo
+    adc CasmSourceScratch0
     sta CasmSourceBlockLenLo
-    lda #0
-    adc CasmIoLenHi
+    lda CasmSourceBlockIndexHi
+    adc CasmSourceScratch1
     sta CasmSourceBlockLenHi
 
     ; Validate the installed end position is 1-256; length 256 encodes as $0100.
     lda CasmSourceBlockLenHi
-    beq srInstallDone           ; end 1-255
+    beq srLenOk                 ; end 1-255
     cmp #$01
-    bne srInvalidBlock          ; end > 256
+    bne srInvalidBlockNear      ; end > 256 -- cursor-math defect, not external input
     lda CasmSourceBlockLenLo
-    bne srInvalidBlock          ; $01xx with low != 0 -> end > 256
+    bne srInvalidBlockNear
+    jmp srLenOk
+srInvalidBlockNear:
+    ; Trampoline: srInvalidBlock's shared tail is out of direct branch range
+    ; from here.
+    jmp srInvalidBlock
+srLenOk:
+    lda #0
+    sta CasmLexerScratch1        ; chunk destination offset within this refill
+
+srReadChunkLoop:
+    lda CasmSourceScratch0
+    ora CasmSourceScratch1
+    beq srInstallDone            ; all chunks for this refill transferred
+
+    lda CasmSourceScratch1
+    bne srReadChunkFull          ; remaining hi != 0 -> remaining > 255
+    lda CasmSourceScratch0
+    cmp #CASM_VMM_BUFFER_SIZE + 1
+    bcs srReadChunkFull          ; remaining >= 64 -> full chunk
+    sta CasmIoLenLo               ; partial final chunk: chunkLen = remaining
+    lda #0
+    sta CasmIoLenHi
+    jmp srReadChunkStage
+srReadChunkFull:
+    lda #CASM_VMM_BUFFER_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+
+srReadChunkStage:
+    lda CasmSourceVmmCursorLo
+    sta CasmVmmOffLo
+    lda CasmSourceVmmCursorHi
+    sta CasmVmmOffHi
+    ldx CasmSourceVmmSlot
+    jsr vmmWindowRead
+    bcs srReadFailedNear
+
+    ; Copy CasmIoLenLo bytes from CasmVmmBuffer into
+    ; CasmIoBuffer + base + chunk-destination-offset. base + offset is
+    ; always <= 255 (base <= 255, and the offset never reaches this chunk's
+    ; own length before it is added below), so that sum alone cannot carry
+    ; -- but CasmIoBuffer's own link address is not page-aligned ($DA low
+    ; byte), so its low byte must be added as its own carried step, not
+    ; folded into the CasmIoBuffer,y addressing mode's fixed high byte. A
+    ; real WP33 fixture run caught an earlier version of this routine
+    ; omitting the <CasmIoBuffer term entirely, which pointed every copy
+    ; 218 bytes before the real buffer and corrupted unrelated BSS state.
+    lda CasmLexerScratch0
+    clc
+    adc CasmLexerScratch1
+    clc
+    adc #<CasmIoBuffer
+    sta CasmIoPtrLo
+    lda #>CasmIoBuffer
+    adc #0
+    sta CasmIoPtrHi
+    ldy #0
+srCopyFromVmmLoop:
+    cpy CasmIoLenLo
+    beq srCopyFromVmmDone
+    lda CasmVmmBuffer, y
+    sta (CasmIoPtrLo), y
+    iny
+    jmp srCopyFromVmmLoop
+srCopyFromVmmDone:
+
+    ; Advance the VMM read cursor and the chunk destination offset by
+    ; chunkLen; decrement this refill's remaining-to-transfer counter.
+    lda CasmSourceVmmCursorLo
+    clc
+    adc CasmIoLenLo
+    sta CasmSourceVmmCursorLo
+    lda CasmSourceVmmCursorHi
+    adc CasmIoLenHi
+    sta CasmSourceVmmCursorHi
+
+    lda CasmLexerScratch1
+    clc
+    adc CasmIoLenLo
+    sta CasmLexerScratch1
+
+    lda CasmSourceScratch0
+    sec
+    sbc CasmIoLenLo
+    sta CasmSourceScratch0
+    lda CasmSourceScratch1
+    sbc CasmIoLenHi
+    sta CasmSourceScratch1
+    jmp srReadChunkLoop
+
 srInstallDone:
     lda #CASM_STREAM_DATA
     clc
     rts
 
+srReadFailedNear:
+    ; Trampoline: the chunk loop above is out of direct branch range of the
+    ; shared failure tail.
+    jmp srReadFailed
+
 ; ---------------------------------------------------------------------------
 ; sourceComputeBase (private)
 ; Return the protected buffer prefix: 0 in BYTE mode, or the accumulated line
-; payload length in LINE mode. Derived from persistent state so it is valid
-; both before and after an OS read.
+; payload length in LINE mode.
 ;
 ; Inputs:    none
 ; Outputs:   A = base, Z set when the base is 0
@@ -976,19 +1282,14 @@ scbLine:
     rts
 
 srEof:
-    ; First EOF: the consumed cursor must be exhausted and the returned offset
-    ; must equal the managed fetched total before EOF is committed.
+    ; Combined VMM content exhausted (transferLen computed as 0 above). The
+    ; consumed cursor must already be exhausted before EOF is committed --
+    ; guaranteed by the caller (sourceFetchPhysical), checked defensively.
     lda CasmSourceBlockIndexLo
     cmp CasmSourceBlockLenLo
     bne srEofMismatch
     lda CasmSourceBlockIndexHi
     cmp CasmSourceBlockLenHi
-    bne srEofMismatch
-    lda CasmSourceOffsetLo
-    cmp CasmInputTotalLo
-    bne srEofMismatch
-    lda CasmSourceOffsetHi
-    cmp CasmInputTotalHi
     bne srEofMismatch
     lda #CASM_SOURCE_STATE_EOF
     sta CasmSourceState
@@ -1005,8 +1306,8 @@ srEofMismatch:
     rts
 
 srReadFailed:
-    ; Preserve the wrapper diagnostic (read failure or mapped offset overflow)
-    ; while recording the source ERROR state.
+    ; Preserve the wrapper diagnostic (vmmWindowRead failure) while
+    ; recording the source ERROR state.
     pha
     lda #CASM_SOURCE_STATE_ERROR
     sta CasmSourceState
