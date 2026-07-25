@@ -52,7 +52,12 @@
 ; exprEvaluate
 ; Evaluate one Phase 5 expression through a caller-supplied symbol resolver.
 ;
-; Inputs:    current token begins expression; X/Y = resolver address; D clear
+; Inputs:    current token begins expression; X/Y = resolver address;
+;            A = relocatable-mode flag (0 = not relocatable, nonzero =
+;            relocatable; WP39 -- the caller's whole-assembly mode, not a
+;            per-symbol property, so a resolved identifier's classification
+;            depends on this input rather than anything the resolver itself
+;            reports); D clear
 ; Outputs:   success: result record valid, first following token current, C clear
 ;            failure: A = stable diagnostic, result invalid, C set
 ; Preserves: V, D, I, zero page, balanced stack, parser/emitter/resources
@@ -61,6 +66,7 @@
 ;            C clear accepts output, C set is reported as resolver failure
 ; ---------------------------------------------------------------------------
 .proc exprEvaluate
+    sta CasmExprRelocatableModeIn
     stx CasmExprResolverAddrLo
     sty CasmExprResolverAddrHi
     jsr exprInit
@@ -136,6 +142,15 @@ resolverValid:
     sty CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_HI
     lda CasmExprResolverOutput + CASM_RESOLVE_FLAGS
     ora #CASM_EXPR_FLAG_SYMBOL_DERIVED
+    ; WP39: apply the caller's whole-assembly relocatable-mode input
+    ; unconditionally alongside SYMBOL_DERIVED, not gated on RESOLVED below
+    ; -- an unresolved Pass 1 forward reference and its resolved Pass 2
+    ; counterpart must classify identically, mirroring FORCE_ABS's own
+    ; SYMBOL_DERIVED-not-RESOLVED precedent (parser.s).
+    ldy CasmExprRelocatableModeIn
+    beq evNotRelocatable
+    ora #CASM_EXPR_FLAG_RELOCATABLE
+evNotRelocatable:
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
     and #CASM_EXPR_FLAG_RESOLVED
     beq unresolved
@@ -611,6 +626,11 @@ CasmExprTempExt:  .res 1
 CasmExprResolverAddrLo: .res 1
 CasmExprResolverAddrHi: .res 1
 CasmExprResolverOutput: .res CASM_RESOLVE_SIZE
+
+; WP39: the incoming A (relocatable-mode flag) stashed before exprInit
+; clobbers A. Private -- expr.s stays fully decoupled from emit.s; the
+; caller (parser.s) reads CasmRelocatableMode itself and passes it in here.
+CasmExprRelocatableModeIn: .res 1
 
 .assert CasmExprResultRecordEnd - CasmExprResultRecord = CASM_EXPR_REC_SIZE, error, "CASM expression result record size changed"
 .assert <CasmExprResolverAddrLo <> $FF, lderror, "CASM resolver callback pointer crosses an NMOS 6502 indirect-jump page"

@@ -9,6 +9,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 8 WP39 relocation classification** (CASM `0.1.41` build
+  1147): `CASM_EXPR_FLAG_RELOCATABLE` is now a real, correctly-produced
+  classification -- previously wired end to end in the ABI but never set
+  by any producer. A new `CASM_PARSER_STMT_RELOCATABLE` bit is derived
+  from it, mirroring `CASM_PARSER_STMT_FORCE_ABS`'s own derivation. No
+  relocation table or emission-site change yet -- WP40 consumes this
+  classification. Found and closed a real ordering hazard during planning:
+  a no-`.ORG` source whose very first statement is a bare instruction with
+  a symbol operand (`JMP TARGET`, no leading label) would have its operand
+  classified *before* relocatable mode was locked in, since
+  `parserParseStatement` evaluates the operand inline, ahead of
+  `emitInstruction`'s own mode-commit call from WP38. Resolved by moving
+  the commit trigger into `parserParseExpressionValue` itself, skipped
+  specifically for `.ORG`'s own operand (which can itself reference a
+  symbol, so an unconditional trigger would make `.ORG` spuriously reject
+  itself as a duplicate). `exprEvaluate` gained a new input parameter
+  (relocatable-mode flag) rather than `expr.s` importing emitter state
+  directly, keeping the expression evaluator and its standalone test
+  harness fully decoupled from the emission engine. `test_casm_expr`'s
+  fixture matrix grew from 30 to 34 cases, independently proving the
+  classification in isolation; a new end-to-end fixture
+  (`casmordhaz1`) proves the ordering-hazard fix assembles correctly,
+  deliberately producing byte-identical output to the existing
+  `casmnoorg1` fixture. MAIN headroom 68 of 13568 bytes (down from 128).
+  User confirmed the full verification matrix: "All tests pass."
 - **CASM Phase 8 WP38 default relocatable origin and `/S` wiring** (CASM
   `0.1.40` build 1145): `.ORG` is now optional. An assembly with no `.ORG`
   defaults to relocatable mode at `$3400`; `/S` forces static mode and

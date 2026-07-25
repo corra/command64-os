@@ -767,3 +767,17 @@ file(WRITE "${OUTPUT_DIR}/casmorglate1.seq"
     "START:\n"
     ".ORG \$C000\n"
 )
+
+# WP39 ordering-hazard fixture: no .ORG, and unlike casmnoorg1 (which starts
+# with a label), the very first statement here is a bare instruction with a
+# forward symbol operand. parserParseStatement evaluates JMP's operand
+# expression inline, before casmRunPass ever dispatches to emitInstruction
+# -- the exact ordering hazard WP39 closes via a commit call inside
+# parserParseExpressionValue itself. Byte-identical to casmnoorg1's output
+# (same addresses, same opcode) -- the point is proving the first-statement
+# shape assembles correctly, not a different result.
+file(WRITE "${OUTPUT_DIR}/casmordhaz1.seq"
+    "    JMP TARGET\n"
+    "TARGET:\n"
+    "    NOP\n"
+)

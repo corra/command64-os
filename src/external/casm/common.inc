@@ -511,6 +511,13 @@ CASM_PARSER_STMT_SIZE        = 7
 
 CASM_PARSER_STMT_FORCE_ABS = %00000001
 
+; WP39: CASM_PARSER_STMT_RELOCATABLE, derived at the same parser.s site as
+; FORCE_ABS (parserParseExpressionValue), from the expression result's
+; CASM_EXPR_FLAG_RELOCATABLE bit -- unconditionally alongside SYMBOL_DERIVED,
+; not gated on RESOLVED, for the identical Pass 1/Pass 2 agreement reason
+; FORCE_ABS already documents above.
+CASM_PARSER_STMT_RELOCATABLE = %00000010
+
 ; Operand category recorded in CasmParserStmt.OpKind.
 CASM_OPKIND_IMPLIED          = 0
 CASM_OPKIND_ACCUMULATOR      = 1
@@ -525,6 +532,7 @@ CASM_OPKIND_COUNT            = 9
 
 .assert CASM_PARSER_STMT_SIZE = 7, error, "CASM parser statement record size changed"
 .assert (CASM_PARSER_STMT_FORCE_ABS & (CASM_PARSER_STMT_FORCE_ABS - 1)) = 0, error, "force-absolute flag must be one bit"
+.assert (CASM_PARSER_STMT_RELOCATABLE & (CASM_PARSER_STMT_RELOCATABLE - 1)) = 0, error, "relocatable flag must be one bit"
 .assert CASM_OPKIND_COUNT = CASM_OPKIND_INDIRECT_INDEXED + 1, error, "CASM operand kind range changed"
 
 ; ---------------------------------------------------------------------------

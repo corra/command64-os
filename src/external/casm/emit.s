@@ -48,6 +48,7 @@
 .export CasmPc
 .export CasmPassMode
 .export CasmPass1FinalPc
+.export CasmRelocatableMode
 
 .segment "BSS"
 
@@ -58,6 +59,14 @@ CasmPc:         .res 2   ; next emit address (program counter)
 ; (reject a second/late .ORG) and emitMarkStarted (the shared guard for
 ; every other qualifying statement kind).
 CasmOutputStarted: .res 1
+; WP39: records *which* mode CasmOutputStarted committed to -- 0 for an
+; explicit .ORG (static), 1 for the implicit default (relocatable).
+; CasmOutputStarted alone cannot answer "is this assembly relocatable" for
+; a later statement's expression classification, since it does not record
+; which of the two commit sites (emitOrg vs. emitMarkStarted) set it. Reset
+; every pass in emitInit; read by parser.s (parserParseExpressionValue) and
+; passed into exprEvaluate as an input, not imported by expr.s directly.
+CasmRelocatableMode: .res 1
 CasmPcOverflow: .res 1   ; latched when the PC advances past $FFFF
 CasmEmitLen:    .res 1   ; staged byte count in CasmEmitBuffer
 CasmPassMode:   .res 1   ; CASM_PASS_MODE_MEASURE or CASM_PASS_MODE_EMIT
@@ -96,6 +105,7 @@ CasmPass1FinalPc: .res 2
 emitInit:
     lda #0
     sta CasmOutputStarted
+    sta CasmRelocatableMode
     sta CasmPcOverflow
     sta CasmEmitLen
     lda #CASM_PASS_MODE_EMIT
@@ -340,6 +350,7 @@ eoSet:
     sta CasmOutputStarted
     lda #0
     sta CasmPcOverflow
+    sta CasmRelocatableMode     ; WP39: explicit .ORG -> static, not relocatable
     ; Write the 2-byte load address as the PRG header (no PC advance).
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitRawByte
@@ -446,6 +457,10 @@ ewlRet:
 ; emitOrg does not call this routine -- it performs its own explicit-origin
 ; header write and sets CasmOutputStarted directly, to avoid writing the
 ; header twice.
+;
+; WP39: the implicit-default path also sets CasmRelocatableMode = 1
+; (emitOrg's own success path sets it 0), so a later statement's expression
+; classification can tell which mode this pass committed to.
 ; Outputs: C clear on success (including the already-started no-op case);
 ;          C set with A = CASM_DIAG_ORG_REQUIRED or a write diagnostic on
 ;          failure
@@ -463,6 +478,7 @@ emitMarkStarted:
 emsDefault:
     lda #1
     sta CasmOutputStarted
+    sta CasmRelocatableMode     ; WP39: implicit default -> relocatable
     lda CasmPc
     jsr emitRawByte
     bcs emsFail

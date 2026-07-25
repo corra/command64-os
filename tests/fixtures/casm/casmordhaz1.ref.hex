@@ -1,0 +1,32 @@
+# CASM WP39 trusted reference: casmordhaz1
+#
+# Independently hand-assembled from the casmordhaz1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake (no .ORG, a bare instruction with a
+# forward symbol operand as the very first statement). NOT produced by
+# CASM. Proves the ordering-hazard fix (WP39): unlike casmnoorg1, which
+# starts with a label, this source's first statement is JMP TARGET itself
+# -- parserParseStatement evaluates TARGET's expression inline, before
+# casmRunPass ever dispatches to emitInstruction, so this is the one shape
+# WP38's four commit sites alone could not reach. Cross-check:
+#   - brain/plans/2026-07-24-casm-phase8-wp39-relocation-classification.md
+#
+# Source (no .ORG):
+#   - JMP TARGET
+#   - TARGET: NOP
+#
+# Deliberately byte-identical to casmnoorg1.ref.hex: same addresses, same
+# opcode, same default origin -- the point of this fixture is proving the
+# *first-statement-is-a-bare-instruction* shape assembles correctly, not a
+# different result.
+#
+# Hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   4C 03 34     JMP $3403           (forward reference, resolved to TARGET)
+#   EA           NOP                 (at $3403, defines TARGET)
+#
+# bytes: 6
+# sha256: 4ad897d7df37ccd9b52ae860d3daafec809563104941c9363d6560b8a04c52ff
+
+00 34
+4C 03 34
+EA

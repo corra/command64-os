@@ -51,8 +51,13 @@ CASE_DIAG      = 4
 CASE_FINAL     = 5
 CASE_CALLS     = 6
 CASE_COLUMN    = 7
-CASE_SIZE      = 8
-CASE_COUNT     = 30
+; WP39: per-case input to exprEvaluate's new A (relocatable-mode) parameter.
+; 0 for every pre-WP39 case, preserving their exact expected results
+; unchanged (the new code only ORs RELOCATABLE in additionally -- a no-op
+; against 0 -- so it cannot affect any case that doesn't opt in).
+CASE_RELOC_MODE = 8
+CASE_SIZE      = 9
+CASE_COUNT     = 34
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -96,6 +101,9 @@ caseLoop:
     iny
     lda (TableLo), y
     sta ExpectedColumn
+    iny
+    lda (TableLo), y
+    sta CaseRelocModeIn
 
     lda #0
     sta ResolverCalls
@@ -105,6 +113,7 @@ caseLoop:
     bcs caseFail
     ldx #<fixtureResolver
     ldy #>fixtureResolver
+    lda CaseRelocModeIn
     jsr exprEvaluate
     php
     sta ActualDiag
@@ -366,6 +375,7 @@ ExpectedCalls:  .res 1
 ActualDiag:     .res 1
 ExpectedColumn: .res 1
 TokenOrdinal:   .res 1
+CaseRelocModeIn: .res 1
 
 .segment "RODATA"
 passMsg: .byte "CASM EXPR: PASS", $0D, 0
@@ -480,6 +490,16 @@ sUnder: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
 sUnknown: TN CASM_TOKEN_IDENTIFIER, 0, "absval"
 sBadFlag: TN CASM_TOKEN_IDENTIFIER, 0, "BADFLAG"
 
+; WP39: ABSVAL's fixtureResolver entry (resolveAbs) never sets
+; CASM_EXPR_FLAG_RELOCATABLE itself -- unlike RELVAL/UNRES, which already
+; exercised the pre-WP39 resolver-reports-it-directly path. <ABSVAL isolates
+; the new relocMode-input path from extraction-clearing, distinct from
+; sRelLo (which would test the same clearing behavior but confounded with
+; the resolver's own already-set bit).
+sAbsLo: T1 CASM_TOKEN_LESS, 0, $3C
+        TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
+        T0 CASM_TOKEN_EOF, 0
+
 .macro EXPECT name, vlo, vhi, flags, extract, idlo, idhi, sign, maglo, maghi
 name: .byte vlo, vhi, flags, extract, idlo, idhi, sign, maglo, maghi
 .endmacro
@@ -500,38 +520,62 @@ EXPECT eUnrLo, 0,0, $0A, 1, 3,0, 0,0,0
 EXPECT eUnrHi, 0,0, $0E, 2, 3,0, 0,0,0
 EXPECT eUna, 0,0, $0A, 0, 4,0, 0,5,0
 
-.macro CASE script, expect, diag, final, calls, column
+; WP39: relocMode=1 expectations. Each mirrors its relocMode=0 counterpart
+; above with CASM_EXPR_FLAG_RELOCATABLE ($04) added to the flags byte,
+; except eAbsRelocLo, where LO-extraction clears it back out regardless
+; (applyExtraction's clear runs after the resolver-merge OR, unconditionally
+; for LO -- confirmed by re-reading the exact instruction order in expr.s).
+EXPECT eAbsReloc, $34,$12, $07, 0, 1,0, 0,0,0
+EXPECT eAbsAddReloc, $35,$12, $07, 0, 1,0, 0,1,0
+EXPECT eAbsRelocLo, $34,0, $03, 1, 1,0, 0,0,0
+EXPECT eUnaReloc, 0,0, $0E, 0, 4,0, 0,5,0
+
+.macro CASE script, expect, diag, final, calls, column, relocmode
     .word script, expect
-    .byte diag, final, calls, column
+    .byte diag, final, calls, column, relocmode
 .endmacro
 caseTable:
-    CASE sN0, eN0, 0, CASM_TOKEN_NEWLINE, 0, 2
-    CASE sNMAX, eNMAX, 0, CASM_TOKEN_EOF, 0, 2
-    CASE sNLO, eNLO, 0, CASM_TOKEN_COMMA, 0, 3
-    CASE sNHI, eNHI, 0, CASM_TOKEN_RPAREN, 0, 3
-    CASE sAbs, eAbs, 0, CASM_TOKEN_NEWLINE, 1, 2
-    CASE sAbsAdd, eAbsAdd, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sAbsSub, eAbsSub, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sAbsZero, eAbs, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sAbsNegZero, eAbsNegZero, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sRelAdd, eRelAdd, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sRelLo, eRelLo, 0, CASM_TOKEN_EOF, 1, 3
-    CASE sRelHi, eRelHi, 0, CASM_TOKEN_EOF, 1, 3
-    CASE sUnrAdd, eUnrAdd, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sUnrSub, eUnrSub, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sUnrLo, eUnrLo, 0, CASM_TOKEN_EOF, 1, 3
-    CASE sUnrHi, eUnrHi, 0, CASM_TOKEN_EOF, 1, 3
-    CASE sUna, eUna, 0, CASM_TOKEN_EOF, 1, 4
-    CASE sNumAdd, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 0, 2
-    CASE sNumSub, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_MINUS, 0, 2
-    CASE sNoPrimary, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 0, 2
-    CASE sRepeatExtract, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_LESS, 0, 2
-    CASE sBadAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 1, 3
-    CASE sSymAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_IDENTIFIER, 1, 3
-    CASE sChain, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 1, 4
-    CASE sAdjNum, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_NUMBER, 1, 2
-    CASE sAdjId, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_IDENTIFIER, 1, 2
-    CASE sOver, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3
-    CASE sUnder, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3
-    CASE sUnknown, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1
-    CASE sBadFlag, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1
+    ; WP39: every pre-existing case passes relocMode=0, preserving its exact
+    ; expected result -- the new resolver-merge OR is additive against an
+    ; already-set bit (RELVAL/UNRES cases) or a no-op against a clear one
+    ; (every other case), confirmed by re-reading the exact instruction
+    ; sequence before adding this parameter, not assumed.
+    CASE sN0, eN0, 0, CASM_TOKEN_NEWLINE, 0, 2, 0
+    CASE sNMAX, eNMAX, 0, CASM_TOKEN_EOF, 0, 2, 0
+    CASE sNLO, eNLO, 0, CASM_TOKEN_COMMA, 0, 3, 0
+    CASE sNHI, eNHI, 0, CASM_TOKEN_RPAREN, 0, 3, 0
+    CASE sAbs, eAbs, 0, CASM_TOKEN_NEWLINE, 1, 2, 0
+    CASE sAbsAdd, eAbsAdd, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sAbsSub, eAbsSub, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sAbsZero, eAbs, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sAbsNegZero, eAbsNegZero, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sRelAdd, eRelAdd, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sRelLo, eRelLo, 0, CASM_TOKEN_EOF, 1, 3, 0
+    CASE sRelHi, eRelHi, 0, CASM_TOKEN_EOF, 1, 3, 0
+    CASE sUnrAdd, eUnrAdd, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sUnrSub, eUnrSub, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sUnrLo, eUnrLo, 0, CASM_TOKEN_EOF, 1, 3, 0
+    CASE sUnrHi, eUnrHi, 0, CASM_TOKEN_EOF, 1, 3, 0
+    CASE sUna, eUna, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sNumAdd, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 0, 2, 0
+    CASE sNumSub, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_MINUS, 0, 2, 0
+    CASE sNoPrimary, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 0, 2, 0
+    CASE sRepeatExtract, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_LESS, 0, 2, 0
+    CASE sBadAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 1, 3, 0
+    CASE sSymAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_IDENTIFIER, 1, 3, 0
+    CASE sChain, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 1, 4, 0
+    CASE sAdjNum, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_NUMBER, 1, 2, 0
+    CASE sAdjId, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_IDENTIFIER, 1, 2, 0
+    CASE sOver, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3, 0
+    CASE sUnder, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3, 0
+    CASE sUnknown, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1, 0
+    CASE sBadFlag, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1, 0
+
+    ; WP39: relocMode=1 cases, proving exprEvaluate's new input classifies a
+    ; symbol reference as relocatable even when the resolver itself does not
+    ; report it (ABSVAL's fixtureResolver entry never sets
+    ; CASM_EXPR_FLAG_RELOCATABLE) -- the production gap this WP closes.
+    CASE sAbs, eAbsReloc, 0, CASM_TOKEN_NEWLINE, 1, 2, 1
+    CASE sAbsAdd, eAbsAddReloc, 0, CASM_TOKEN_EOF, 1, 4, 1
+    CASE sAbsLo, eAbsRelocLo, 0, CASM_TOKEN_EOF, 1, 3, 1
+    CASE sUna, eUnaReloc, 0, CASM_TOKEN_EOF, 1, 4, 1

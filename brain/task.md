@@ -919,6 +919,50 @@
     - Walkthrough:
       `brain/walkthroughs/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md`
     - **WP38 is complete**, approved by the user
+  - [x] `4a26fc20-3fcf-4d77-b41b-a46704af1491` WP39 relocation
+        classification
+    - Plan:
+      `brain/plans/2026-07-24-casm-phase8-wp39-relocation-classification.md`
+    - Active on `feature/casm-phase8-wp39` from `feature/casm-phase8-wp38`'s
+      tip
+    - `CASM_EXPR_FLAG_RELOCATABLE` is now a real, correctly-produced
+      classification; a new `CASM_PARSER_STMT_RELOCATABLE` bit is derived
+      from it at the same site `FORCE_ABS` already is. No relocation table
+      or emission-site change -- WP40 consumes the classification
+    - Found and closed a real ordering hazard: `parserParseStatement`
+      evaluates an instruction's operand expression inline, before
+      `casmRunPass` ever dispatches to `emitInstruction`, so a no-`.ORG`
+      source whose first statement is a bare instruction with a symbol
+      operand (`JMP TARGET`, no leading label) would classify that symbol
+      before relocatable mode was locked in -- WP38's own `casmnoorg1`
+      fixture didn't catch this since it starts with a label
+    - Resolved by moving the commit trigger into
+      `parserParseExpressionValue` itself, skipped for `.ORG`'s own
+      operand (which can itself reference a symbol per WP28's design; an
+      unconditional trigger would make `.ORG` spuriously reject itself as
+      a duplicate)
+    - Added `CasmRelocatableMode` (`emit.s`), since `CasmOutputStarted`
+      alone cannot record *which* mode was chosen
+    - User confirmed two module-boundary design decisions: `parser.s`
+      calling `emit.s`'s `emitMarkStarted` directly, and extending
+      `exprEvaluate`'s input ABI with a new relocatable-mode parameter
+      rather than having `expr.s` import `emit.s` state directly (keeping
+      `expr.s`/`test_casm_expr` decoupled from `emit.s`)
+    - `test_casm_expr`'s `CASE` table grew a 9th per-case field; all 30
+      pre-existing cases pass `relocMode = 0` unchanged; four new
+      `relocMode = 1` cases added, including a new `<ABSVAL` script
+      isolating the new input-driven path from extraction-clearing
+    - New end-to-end fixture `casmordhaz1` proves the ordering-hazard fix,
+      deliberately byte-identical to `casmnoorg1`'s output
+    - User ran the full verification matrix (`TEST_CASM_EXPR`'s 34 cases,
+      the ordering-hazard fixture, full regression sample) and confirmed:
+      "All tests pass"
+    - Final CASM `0.1.41` build 1147, no-change rebuild stable, all three
+      disk images build clean. MAIN headroom 68 of 13568 bytes (down from
+      128; this WP cost 60 bytes, no bump needed)
+    - Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase8-wp39-relocation-classification.md`
+    - **WP39 is complete**, approved by the user
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

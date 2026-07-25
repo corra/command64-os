@@ -1338,6 +1338,88 @@ no size bump needed. User confirmed the full runtime verification matrix:
 **CASM Phase 8 WP38 is complete.** WP39 (relocation classification)
 remains separately gated and unstarted; this closure does not activate it.
 
+### CASM Phase 8 WP39 Relocation Classification (Phase 0C.16, 2026-07-24)
+
+Amends Phase 0C.14/0C.15 above with as-built detail from WP39's actual
+implementation. Plan:
+`brain/plans/2026-07-24-casm-phase8-wp39-relocation-classification.md`.
+Walkthrough:
+`brain/walkthroughs/2026-07-24-casm-phase8-wp39-relocation-classification.md`.
+
+`CASM_EXPR_FLAG_RELOCATABLE` is now a real, correctly-produced
+classification -- previously wired end to end in the ABI (Phase 5/6B
+foresight) but never set by any producer. A new `CASM_PARSER_STMT_RELOCATABLE`
+bit (`CasmParserStmt.Flags` bit 1) is derived from it at the same
+`parser.s` site `CASM_PARSER_STMT_FORCE_ABS` already is. No relocation
+table exists yet and no emission site was touched -- WP40 consumes the
+classification; this WP only makes it correct.
+
+**A real ordering hazard, invisible from the Phase 0C.14 freeze alone, was
+found and closed.** `parserParseStatement` evaluates an instruction's
+operand expression *inline* (via `parseOperandSequence` ->
+`parserParseExpressionValue` -> `exprEvaluate`), before `casmRunPass` ever
+dispatches to `emitInstruction` -- the site WP38's mode-commit call lives
+at. So a no-`.ORG` source whose very first statement is a bare instruction
+with a symbol operand (`JMP TARGET`, no leading label) would classify that
+symbol *before* relocatable mode was locked in. WP38's own `casmnoorg1`
+fixture didn't catch this because it starts with a label, whose own
+`crpLabel` commit call runs first. `.BYTE`/`.WORD` were never at risk:
+their operands are deferred past `emitByteList`/`emitWordList`'s own
+commit calls. Resolved by moving the commit trigger into
+`parserParseExpressionValue` itself, reaching every statement kind through
+the one shared adapter -- **skipped specifically when the current
+statement is `.ORG`** (`.ORG`'s own operand already goes through the
+identical expression path and can itself reference a symbol per WP28's
+design; calling the commit unconditionally would write the default-origin
+header and lock `CasmOutputStarted` before `emitOrg` runs, causing it to
+reject its own `.ORG` as a spurious duplicate).
+
+**A second new flag was needed beyond `CasmOutputStarted`.**
+`CasmOutputStarted` only records *that* output began, not *which* mode was
+chosen -- insufficient for a later statement's classification. New
+exported `CasmRelocatableMode` (`emit.s`): reset 0 in `emitInit`, set 0 by
+`emitOrg`'s success path, set 1 by `emitMarkStarted`'s implicit-default
+path.
+
+**Two module-boundary design decisions, both confirmed by the user:**
+`parser.s` now calls `emit.s`'s `emitMarkStarted` directly (extending the
+existing precedent that `parser.s` already reads `emit.s`'s
+`CasmPassMode`), rather than duplicating the origin/header-write state
+machine; and `exprEvaluate`'s input ABI grew a new `A` = relocatable-mode
+parameter rather than `expr.s` importing `emit.s` state directly --
+keeping `expr.s` and its standalone `test_casm_expr` harness fully
+decoupled from `emit.s`, avoiding a repeat of WP38's `CasmCliOptions`
+stand-in-symbol friction. `CASM_EXPR_FLAG_RELOCATABLE` is OR'd in
+unconditionally alongside `SYMBOL_DERIVED` (not gated on `RESOLVED`),
+mirroring `FORCE_ABS`'s own Pass 1/Pass 2 agreement precedent.
+
+`test_casm_expr.s`'s `CASE` table gained a 9th per-case field
+(`CASE_RELOC_MODE`); all 30 pre-existing cases pass `relocMode = 0`
+(confirmed safe: the new OR is additive against an already-resolver-set
+bit for the pre-existing `RELVAL`/`UNRES` cases, or a no-op against a
+clear one for every other case). Four new `relocMode = 1` cases isolate
+the new input-driven path from the pre-existing resolver-driven one --
+notably a new `<ABSVAL` script (`ABSVAL`'s mock resolver never sets
+`RELOCATABLE` itself, unlike `RELVAL`), proving extraction-clearing works
+against the new path specifically rather than being confounded with the
+resolver's own bit.
+
+New end-to-end fixture `casmordhaz1` (no `.ORG`, `JMP TARGET` as the
+literal first statement, no leading label) proves the ordering-hazard fix
+assembles correctly -- deliberately byte-identical to `casmnoorg1`'s
+output, since the point is proving the first-statement shape works, not a
+different result. No end-to-end fixture can directly observe the
+classification bit itself (no table/footer exists until WP40); the real
+proof is `test_casm_expr`'s isolated harness.
+
+MAIN headroom: 68 of 13568 bytes (down from 128; this WP cost 60 bytes),
+no size bump needed. User confirmed the full runtime verification matrix:
+"All tests pass." Final CASM `0.1.41` build 1147.
+
+**CASM Phase 8 WP39 is complete.** WP40 (relocation table storage and
+emission-site hooks) remains separately gated and unstarted; this closure
+does not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

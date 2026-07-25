@@ -24,6 +24,16 @@
 .import CasmPassMode
 .import symbolsLookup
 
+; WP39: emitMarkStarted and CasmRelocatableMode are emit.s-owned state this
+; module already has a read precedent for (CasmPassMode, above).
+; parserParseExpressionValue commits the relocatable/static mode decision
+; (skipped for .ORG's own operand) before every symbol reference is
+; classified, closing an ordering hazard emitInstruction/emitByteList/
+; emitWordList/crpLabel's own commit calls cannot reach on their own -- see
+; brain/plans/2026-07-24-casm-phase8-wp39-relocation-classification.md.
+.import emitMarkStarted
+.import CasmRelocatableMode
+
 ; WP15 diagnostic context.
 .import diagSetLocFromToken
 .import diagStampStmtLoc
@@ -469,9 +479,17 @@ posSyntaxError:
 ; following address (the exact Pass 1/Pass 2 mismatch risk the master plan
 ; warns about).
 ;
+; WP39: CASM_PARSER_STMT_RELOCATABLE (bit 1) is derived the same way, from
+; CASM_EXPR_FLAG_RELOCATABLE. Before evaluating the expression, this routine
+; also commits the relocatable/static mode decision via emitMarkStarted
+; (skipped for .ORG's own operand) and passes CasmRelocatableMode into
+; exprEvaluate as an input, so the resolver-merge classification always
+; sees a settled mode -- see emitMarkStarted's own header comment (emit.s)
+; and brain/plans/2026-07-24-casm-phase8-wp39-relocation-classification.md.
+;
 ; Inputs:    current token begins expression; D clear
-; Outputs:   success: ValLo/ValHi stored, Flags' FORCE_ABS bit set correctly,
-;                      following delimiter current, C clear
+; Outputs:   success: ValLo/ValHi stored, Flags' FORCE_ABS/RELOCATABLE bits
+;                      set correctly, following delimiter current, C clear
 ;            failure: A = stable diagnostic, C set, statement value invalid
 ; Preserves: V, D, I, balanced stack, resources and emitter state
 ; Clobbers:  A, X, Y, N, Z, C, CasmPtr0, lexer/evaluator scratch and result
@@ -480,8 +498,32 @@ parserParseExpressionValue:
     ; Preserve the expression start for post-evaluation width checks such as
     ; .BYTE $100; exprEvaluate may leave NEWLINE/COMMA current on success.
     jsr diagSetLocFromToken
+
+    ; WP39: commit the relocatable/static mode decision before this operand's
+    ; expression is evaluated, closing an ordering hazard where a bare
+    ; instruction's symbol operand (the very first statement of a no-.ORG
+    ; source) would otherwise be classified before any of
+    ; emitInstruction/emitByteList/emitWordList/crpLabel's own commit calls
+    ; run -- parserParseStatement evaluates the operand inline, before
+    ; casmRunPass ever dispatches to one of those. Skipped for .ORG's own
+    ; operand: calling it here would write the default-origin header and
+    ; lock CasmOutputStarted before emitOrg gets a chance to run, causing
+    ; emitOrg to reject its own .ORG as a spurious duplicate.
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    cmp #CASM_TOKEN_DIRECTIVE
+    bne pevMarkStarted
+    lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
+    cmp #CASM_DIRECTIVE_ORG
+    beq pevSkipMark
+pevMarkStarted:
+    jsr emitMarkStarted
+    bcc pevSkipMark
+    rts
+pevSkipMark:
+
     ldx #<symbolsLookup
     ldy #>symbolsLookup
+    lda CasmRelocatableMode
     jsr exprEvaluate
     bcs pevReturn
     jsr exprGetResult
@@ -501,6 +543,19 @@ pevNotForceAbs:
     lda #0
 pevStoreForceAbs:
     sta CasmParserStmt + CASM_PARSER_STMT_FLAGS
+
+    ; WP39: derive RELOCATABLE the same way, from CASM_EXPR_FLAG_RELOCATABLE
+    ; -- unconditionally alongside SYMBOL_DERIVED's own classification above,
+    ; not gated on RESOLVED below, for the identical Pass 1/Pass 2 agreement
+    ; reason. OR'd into the Flags byte just stored, not overwriting FORCE_ABS.
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RELOCATABLE
+    beq pevNotRelocatable
+    lda CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    ora #CASM_PARSER_STMT_RELOCATABLE
+    sta CasmParserStmt + CASM_PARSER_STMT_FLAGS
+pevNotRelocatable:
 
     ldy #CASM_EXPR_FLAGS
     lda (CasmPtr0Lo), y
