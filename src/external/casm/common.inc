@@ -224,6 +224,14 @@ CASM_OPT_ALL    = CASM_OPT_OUTPUT | CASM_OPT_STATIC | CASM_OPT_MAP | CASM_OPT_LI
 ; freeze.
 CASM_DEFAULT_ORIGIN = $3400
 
+; WP40 (Phase 0C.14/17): the relocation table's frozen capacity, per the
+; user's confirmed Phase 0C.14 decision -- 4096 16-bit little-endian
+; offsets, 8192 bytes total, one VMM allocation.
+CASM_RELOC_MAX = 4096
+CASM_RELOC_TABLE_BYTES = CASM_RELOC_MAX * 2
+.assert CASM_RELOC_TABLE_BYTES = 8192, error, "CASM relocation table byte size changed"
+.assert CASM_RELOC_TABLE_BYTES <= CASM_VMM_ALLOC_MAX_BYTES, error, "CASM relocation table exceeds one VMM allocation"
+
 ; Stable parser results. Public CLI routines return carry clear with
 ; CASM_PARSE_OK or carry set with a CASM_DIAG_* value; these identifiers are
 ; available for internal dispatch and static fixtures.
@@ -459,6 +467,10 @@ CASM_DIAG_UNDEFINED_SYMBOL  = $2D  ; reserved for WP28
 CASM_DIAG_SYMBOL_TABLE_FULL = $2E  ; symbolsInsert: CasmSymbolCount already at CASM_SYMBOL_MAX
 CASM_DIAG_PASS_MISMATCH     = $2F  ; reserved for WP30
 CASM_DIAG_PHASE6B_LAST = CASM_DIAG_PASS_MISMATCH
+
+; CASM Phase 8 WP40: relocation table capacity.
+CASM_DIAG_RELOC_TABLE_FULL = $30  ; relocRecord: entry count already at CASM_RELOC_MAX
+CASM_DIAG_PHASE8_LAST = CASM_DIAG_RELOC_TABLE_FULL
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -483,6 +495,8 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_SYMBOL_TABLE_FULL = CASM_DIAG_UNDEFINED_SYMBOL + 1, error, "CASM Phase 6B diagnostics must remain contiguous"
 .assert CASM_DIAG_PASS_MISMATCH = CASM_DIAG_SYMBOL_TABLE_FULL + 1, error, "CASM Phase 6B diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE6B_LAST = $2F, error, "CASM Phase 6B diagnostic range changed"
+.assert CASM_DIAG_RELOC_TABLE_FULL = CASM_DIAG_PHASE6B_LAST + 1, error, "CASM Phase 8 diagnostics must follow Phase 6B"
+.assert CASM_DIAG_PHASE8_LAST = $30, error, "CASM Phase 8 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

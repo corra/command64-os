@@ -780,3 +780,53 @@ file(WRITE "${OUTPUT_DIR}/casmordhaz1.seq"
     "TARGET:\n"
     "    NOP\n"
 )
+
+# WP40 relocation emission-site fixtures. Program bytes only -- no R6 table
+# or footer exists yet (WP41), so these prove the new emitMaybeRecordHi/Lo
+# hooks do not corrupt normal emission, not the table's contents.
+#
+# casmrelop1: one instance of each site from the WP40 plan's Dependency
+# Review items 1-4 that records a byte under the *normal* (non-extraction)
+# shape -- JMP LABEL (absolute, VAL_HI relocatable), LDA #>DATA (immediate,
+# VAL_LO relocatable), LDX #<DATA (immediate, LOW extraction -- negative
+# case, never relocatable), .WORD DATA (VAL_HI relocatable), .BYTE >DATA
+# (VAL_LO relocatable). DATA = $340A (MID's three instructions plus the
+# .WORD/.BYTE bytes after JMP's 3 bytes at $3400): high byte $34, low byte
+# $0A.
+#   00 34        PRG load-address header ($3400)
+#   4C 03 34     JMP MID              (MID = $3403)
+#   A9 34        LDA #>DATA           (DATA's high byte, $34)
+#   A2 0A        LDX #<DATA           (DATA's low byte, $0A -- never relocatable)
+#   0A 34        .WORD DATA           (little-endian: $0A, $34)
+#   34           .BYTE >DATA          (DATA's high byte, $34)
+#   EA           NOP                  (at $340A, defines DATA)
+file(WRITE "${OUTPUT_DIR}/casmrelop1.seq"
+    "START:\n"
+    "    JMP MID\n"
+    "MID:\n"
+    "    LDA #>DATA\n"
+    "    LDX #<DATA\n"
+    "    .WORD DATA\n"
+    "    .BYTE >DATA\n"
+    "DATA:\n"
+    "    NOP\n"
+)
+
+# casmrelop2: the two-sided extraction cases found during this WP's own
+# research (plan Dependency Review items 1-2) -- LDA >TARGET (absolute mode
+# via FORCE_ABS promotion, not immediate) and .WORD >TARGET both put the
+# real relocatable byte in the VAL_LO position with VAL_HI as
+# applyExtraction's zero pad, the opposite of the normal case casmrelop1
+# covers. TARGET = $3405 (LDA >TARGET's 3 bytes after START at $3400):
+# high byte $34.
+#   00 34        PRG load-address header ($3400)
+#   AD 34 00     LDA >TARGET          (TARGET's high byte $34 in ValLo; $00 pad)
+#   34 00        .WORD >TARGET        (same: $34 in ValLo, $00 pad in ValHi)
+#   EA           NOP                  (at $3405, defines TARGET)
+file(WRITE "${OUTPUT_DIR}/casmrelop2.seq"
+    "START:\n"
+    "    LDA >TARGET\n"
+    "    .WORD >TARGET\n"
+    "TARGET:\n"
+    "    NOP\n"
+)

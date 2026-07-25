@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "41"
+.define VERSION_STAGE "42"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -60,6 +60,7 @@
 .import CasmPc
 .import CasmPassMode
 .import CasmPass1FinalPc
+.import relocInit
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -160,6 +161,12 @@ startPass1:
     ldx #<CasmOutputName
     ldy #>CasmOutputName
     jsr fileCreateOutput
+    bcs startFatalNear
+    ; WP40: allocate the relocation table once, before Pass 2's real
+    ; emission begins, unconditionally regardless of static/relocatable
+    ; mode -- a static assembly's table simply stays empty (Phase 0C.14/17
+    ; freeze; see reloc.s).
+    jsr relocInit
     bcs startFatalNear
     jsr emitInit
     bcs startFatalNear

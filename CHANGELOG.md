@@ -9,6 +9,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 8 WP40 relocation table storage and emission-site hooks**
+  (CASM `0.1.42` build 1154): a new module, `reloc.s`, owns a VMM-backed,
+  append-only relocation table (8192 bytes, 4096 entries), allocated
+  unconditionally every Pass 2 run and consumed by six new emission-site
+  hooks across `emit.s`. Program bytes are unaffected -- this adds a
+  side-channel recording, not a code-generation change; no R6 footer
+  exists yet (WP41 appends the table to the output file). Re-tracing every
+  byte-emission call site (not trusting the original four-site plan at
+  face value) found a real correctness gap: two of the four sites
+  (`emitInstruction`'s absolute-family branch, `.WORD`) emit a low-byte/
+  high-byte pair for one value, and `>` extraction turns out to be valid
+  syntax at both (`LDA >LABEL`, `.WORD >LABEL`), so a naive "record the
+  high byte when relocatable" check would have wrongly marked a genuine
+  constant `$00` padding byte as needing a page-delta patch at load time.
+  Resolved using the high byte's own zero/nonzero state to tell a real
+  full-value high byte from an extracted-value low byte sitting next to a
+  zero pad, with no new ABI field needed. A new standalone `test_casm_reloc`
+  harness is the only real proof of the table's correctness at this stage
+  (no footer exists yet for any end-to-end fixture to observe it) --
+  its capacity test does a genuine fill of all 4096 entries, not a poked
+  shortcut. MAIN size bumped `$3500` -> `$3600` (144 bytes measured
+  overflow). User confirmed the full verification matrix: "all tests
+  pass."
+- Separately, removed the `casmempty.s` zero-block CASM test fixture from
+  `test.d64`'s build: its directory entry, created via `cc1541 -L`, sets
+  track/sector to 0 -- a value normally reserved as an end-of-chain
+  marker, not a valid file start -- suspected of corrupting `test.d64`.
+  No equivalent zero-block fixture remains on the disk.
 - **CASM Phase 8 WP39 relocation classification** (CASM `0.1.41` build
   1147): `CASM_EXPR_FLAG_RELOCATABLE` is now a real, correctly-produced
   classification -- previously wired end to end in the ABI but never set

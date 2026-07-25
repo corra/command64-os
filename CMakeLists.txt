@@ -197,7 +197,11 @@ if(Ca65_FOUND)
     # CasmLabelNameLen buffer, and CasmPassMode overflowed $2F00 by 23
     # measured bytes; $3000 (+256) leaves 233 bytes headroom, the smallest
     # round-page step above that minimum, matching this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3500")
+    # WP40: $3500 -> $3600 -- reloc.s (the VMM-backed relocation table) plus
+    # the six new emit.s call sites overflowed $3500 by 145 measured bytes;
+    # $3600 (+256) leaves 111 bytes headroom, the smallest round-page step
+    # above that minimum, matching this line's own precedent.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3600")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -286,6 +290,14 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_reloc")
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
@@ -300,8 +312,9 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3500")
+            set(TEST_PRG_SIZE "3600")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -324,8 +337,9 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3500")
+            set(TEST_PRG_SIZE "3600")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
@@ -489,6 +503,9 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmorglate1.seq"
     # WP39 relocation classification: ordering-hazard fixture
     "${CASM_TEST_FIXTURE_DIR}/casmordhaz1.seq"
+    # WP40 relocation table and emission-site hooks
+    "${CASM_TEST_FIXTURE_DIR}/casmrelop1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmrelop2.seq"
     # casmmfovf1/casmmfovf2 (combined-overflow boundary) and casmbiga/
     # casmbigb (WP36 large, under-cap, two-file successful-assembly
     # fixture) are NOT listed here: their raw source text (40000/30000
@@ -522,7 +539,8 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     p1fwd1 p1back1 p1size1 brfwd1 brback1 casmcase1 casmmaxid1
     casmmf1 casmmf2 casmmf3 casmbig1
     casmorg1 casmorgexpl1 casmnoorg1
-    casmordhaz1)
+    casmordhaz1
+    casmrelop1 casmrelop2)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

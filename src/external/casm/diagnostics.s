@@ -93,7 +93,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE6B_LAST + 1
+    cmp #CASM_DIAG_PHASE8_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED
@@ -983,6 +983,7 @@ diagMessageLo:
     .byte <msgUndefinedSymbol
     .byte <msgSymbolTableFull
     .byte <msgPassMismatch
+    .byte <msgRelocTableFull
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -1033,10 +1034,11 @@ diagMessageHi:
     .byte >msgUndefinedSymbol
     .byte >msgSymbolTableFull
     .byte >msgPassMismatch
+    .byte >msgRelocTableFull
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE6B_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE6B_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE8_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE8_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -1132,6 +1134,8 @@ msgSymbolTableFull:
     .byte "CASM: SYMBOL TABLE FULL", PetCr, 0
 msgPassMismatch:
     .byte "CASM: PASS 1/2 MISMATCH", PetCr, 0
+msgRelocTableFull:
+    .byte "CASM: RELOC TABLE FULL", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

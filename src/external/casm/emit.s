@@ -27,6 +27,7 @@
 .import CasmTokenRecord
 .import parserParseExpressionValue
 .import CasmCliOptions
+.import relocRecord
 
 ; WP15 diagnostic context. Statement-level failures use the stamped statement
 ; location; failures inside a .BYTE/.WORD operand list use the token record,
@@ -182,15 +183,31 @@ emitInstruction:
 :
     lda CasmInsn + CASM_INSN_OPCODE
     jsr emitByte
-    bcs eiRet
+    bcs eiOpcodeFail             ; WP40: pushed out of branch range by the
+                                  ; new length-3 relocation hooks below
     lda CasmInsn + CASM_INSN_LENGTH
     cmp #1
-    beq eiDone
+    beq eiLenOneDone             ; WP40: same reason
     cmp #2
     beq eiTwoByte
-    ; length 3: 16-bit operand, little-endian
+    jmp eiLenThree
+eiOpcodeFail:
+    jmp eiRet
+eiLenOneDone:
+    jmp eiDone
+eiLenThree:
+    ; length 3: 16-bit operand, little-endian. Covers CASM_MODE_ABSOLUTE/
+    ; _X/_Y/_INDIRECT uniformly (WP37 finding, unchanged) -- one shared
+    ; hook, no per-mode branching. WP40: emitMaybeRecordLo/Hi disambiguate
+    ; a genuine full value (ValHi is the real relocatable byte) from a
+    ; >-extracted value stored in ValLo (ValHi is applyExtraction's zero
+    ; pad) using ValHi's own zero/nonzero state -- see this WP's plan.
+    jsr emitMaybeRecordLo
+    bcs eiRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
+    bcs eiRet
+    jsr emitMaybeRecordHi
     bcs eiRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     jsr emitByte
@@ -202,6 +219,20 @@ eiTwoByte:
     lda CasmInsn + CASM_INSN_MODE
     cmp #CASM_MODE_RELATIVE
     beq eiRelative
+    ; WP40: only CASM_MODE_IMMEDIATE may ever hold a relocatable byte here --
+    ; the other length-2 modes sharing this code path (zero-page family,
+    ; indexed-indirect, indirect-indexed) must never be recorded, even
+    ; though a relocatable symbol can structurally reach indexed-indirect/
+    ; indirect-indexed via explicit >-extraction (ofRequire8Bit in
+    ; opcodes.s permits it) -- the master plan explicitly excludes those
+    ; pointer bytes. Zero-page/_X/_Y are excluded defensively; they are
+    ; already structurally unreachable for any symbol-derived operand
+    ; (FORCE_ABS always promotes them to the absolute family instead).
+    cmp #CASM_MODE_IMMEDIATE
+    bne eiTwoByteEmit
+    jsr emitMaybeRecordLo
+    bcs eiRet
+eiTwoByteEmit:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
     bcs eiRet
@@ -378,6 +409,12 @@ eblRead:
     bcs eblRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne eblRange
+    ; WP40: eblRange above already guarantees ValHi == 0 here, so the only
+    ; way RELOCATABLE can be set on this single emitted byte is explicit
+    ; >-extraction (ValLo holds the real relocatable byte) -- checking
+    ; RELOCATABLE alone is already equivalent to the fuller ValHi==0 rule.
+    jsr emitMaybeRecordLo
+    bcs eblRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
     bcs eblRet
@@ -412,8 +449,17 @@ ewlRead:
     bcs ewlRet
     jsr parserParseExpressionValue
     bcs ewlRet
+    ; WP40: same ValHi-zero/nonzero disambiguation as emitInstruction's
+    ; length-3 branch -- .WORD >LABEL is valid syntax (parserParseExpressionValue
+    ; is shared with every other operand context), so ValLo can equally
+    ; hold the real relocatable byte here, with ValHi as applyExtraction's
+    ; zero pad.
+    jsr emitMaybeRecordLo
+    bcs ewlRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
+    bcs ewlRet
+    jsr emitMaybeRecordHi
     bcs ewlRet
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     jsr emitByte
@@ -489,6 +535,53 @@ emsOk:
     clc
     rts
 emsFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; emitMaybeRecordHi (private)
+; WP40: record the current byte position (CasmPc) in the relocation table
+; iff CASM_PARSER_STMT_RELOCATABLE is set and CasmParserStmt.ValHi != 0 --
+; the full, non-extracted value case, where ValHi holds the real
+; relocatable byte. Called immediately before the emitByte call that writes
+; that same ValHi byte, so CasmPc still equals its address.
+; Outputs: C clear on success (including the no-op case); C set with
+;          A = CASM_DIAG_* on failure
+; ---------------------------------------------------------------------------
+emitMaybeRecordHi:
+    lda CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    and #CASM_PARSER_STMT_RELOCATABLE
+    beq emrhOk
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    beq emrhOk
+    jmp relocRecord
+emrhOk:
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; emitMaybeRecordLo (private)
+; WP40: record the current byte position (CasmPc) in the relocation table
+; iff CASM_PARSER_STMT_RELOCATABLE is set and CasmParserStmt.ValHi == 0 --
+; the explicit >-extraction case, where ValLo holds the real relocatable
+; byte and ValHi is applyExtraction's zero pad (expr.s). A genuine
+; relocatable address's real high byte can never be zero while running in
+; EMIT mode (CASM_DEFAULT_ORIGIN is $3400), so ValHi == 0 alongside
+; RELOCATABLE reliably means extraction happened, never a coincidental
+; full-value match -- see this WP's plan (Dependency Review items 1-2) for
+; the full reasoning. Called immediately before the emitByte call that
+; writes that same ValLo byte.
+; Outputs: C clear on success (including the no-op case); C set with
+;          A = CASM_DIAG_* on failure
+; ---------------------------------------------------------------------------
+emitMaybeRecordLo:
+    lda CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    and #CASM_PARSER_STMT_RELOCATABLE
+    beq emrlOk
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    bne emrlOk
+    jmp relocRecord
+emrlOk:
+    clc
     rts
 
 ; ---------------------------------------------------------------------------

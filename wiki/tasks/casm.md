@@ -1136,6 +1136,53 @@ WP37 plan:
       `brain/walkthroughs/2026-07-24-casm-phase8-wp39-relocation-classification.md`.
       **WP39 is complete.**
 
+- [x] `2175e962-2221-4308-8e3b-920065852d2d`: WP40 relocation table storage
+      and emission-site hooks. Plan approved as drafted:
+      `brain/plans/2026-07-24-casm-phase8-wp40-relocation-table-and-emission-hooks.md`.
+      Active on `feature/casm-phase8-wp40` from `feature/casm-phase8-wp39`'s
+      tip. New module `reloc.s`: `relocInit` allocates the 8192-byte
+      (4096-entry) table unconditionally every Pass 2 run (VMM cost only,
+      not MAIN); `relocRecord` no-ops under `CASM_PASS_MODE_MEASURE` and
+      otherwise appends `CasmPc - CASM_DEFAULT_ORIGIN` via one immediate
+      `vmmWindowWrite` per entry, deliberately not batched (the shared
+      `CasmVmmBuffer` is also used transiently by `symbolsLookup` between a
+      statement's relocatable operands, risking the same shared-scratch-
+      clobber bug class this codebase has hit three times before).
+      Re-tracing every byte-emission call site (not trusting WP37's
+      original four-site enumeration) found a real correctness gap:
+      `emitInstruction`'s absolute-family branch and `emitWordList` both
+      emit a `VAL_LO`/`VAL_HI` pair, and `<`/`>` extraction is
+      grammatically reachable at both (`LDA >LABEL`, `.WORD >LABEL`), so a
+      naive "record `VAL_HI` when relocatable" check would wrongly mark a
+      genuine constant `$00` padding byte as needing a page-delta patch.
+      Resolved with two new `emit.s` helpers (`emitMaybeRecordHi`/`Lo`)
+      using `VAL_HI`'s own zero/nonzero state to disambiguate, no new ABI
+      field needed. Wired at six call sites across four logical emission
+      points, with `eiTwoByte` additionally gated on
+      `CasmInsn.Mode == CASM_MODE_IMMEDIATE` (re-verified, not re-assumed,
+      that this guard is still needed: `ofRequire8Bit` is shared with
+      indexed-indirect/indirect-indexed addressing, so `LDA (>LABEL),Y` is
+      equally reachable and must never be recorded). New diagnostic
+      `CASM_DIAG_RELOC_TABLE_FULL` at `$30`; `diagPrintFatal`'s selection
+      bound extended to cover it. New standalone `test_casm_reloc` harness
+      is the only real proof of `relocRecord`'s correctness at this stage
+      (no R6 footer exists until WP41 to observe the table any other way);
+      its `relocfull1` case does a genuine fill of all 4096 entries, not a
+      poked shortcut. Two new end-to-end fixtures (`casmrelop1`,
+      `casmrelop2`) prove the new hooks do not corrupt program bytes.
+      User ran the full verification matrix (`TEST_CASM_RELOC`'s 4 cases,
+      both new fixtures, and a full regression sample including 5
+      standalone harnesses) and confirmed: "all tests pass." Final CASM
+      `0.1.42` build 1154, no-change rebuild stable, all three disk images
+      build clean. MAIN size bumped `$3500` -> `$3600` (144 bytes
+      overflow; 106 bytes headroom at the new size). Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase8-wp40-relocation-table-and-emission-hooks.md`.
+      Separately from this WP's own scope, `casmempty.s` was removed from
+      `test.d64`'s build during this session (`cc1541 -L`'s zero
+      track/sector directory entry suspected of corrupting the disk),
+      committed independently before this WP's own commit.
+      **WP40 is complete.**
+
 ## Phase 8 Acceptance
 
 - [ ] Relocatable output is the default; `/S` forces static output, still

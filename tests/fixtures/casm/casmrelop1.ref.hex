@@ -1,0 +1,42 @@
+# CASM WP40 trusted reference: casmrelop1
+#
+# Independently hand-assembled from the casmrelop1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves the
+# new emitMaybeRecordHi/Lo hooks (WP40) do not change any program byte --
+# no R6 table or footer exists yet (WP41), so this cannot verify the
+# table's contents, only that normal emission is unaffected. One instance
+# of each site from the WP40 plan's Dependency Review items 1-4 recording
+# under the *normal* (non-extraction) shape. Cross-check:
+#   - brain/plans/2026-07-24-casm-phase8-wp40-relocation-table-and-emission-hooks.md
+#
+# Source (no .ORG):
+#   - START: JMP MID
+#   - MID: LDA #>DATA / LDX #<DATA / .WORD DATA / .BYTE >DATA
+#   - DATA: NOP
+#
+# START = $3400 (no bytes). JMP MID is 3 bytes ($3400-$3402); MID = $3403.
+# LDA #>DATA is 2 bytes ($3403-$3404, immediate, ValLo = DATA's high byte).
+# LDX #<DATA is 2 bytes ($3405-$3406, immediate, ValLo = DATA's low byte --
+# never relocatable). .WORD DATA is 2 bytes ($3407-$3408, little-endian
+# full value). .BYTE >DATA is 1 byte ($3409, ValLo = DATA's high byte).
+# DATA = $340A (immediately after), where NOP ($EA) is emitted.
+#
+# Hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   4C 03 34     JMP $3403                    (MID)
+#   A9 34        LDA #$34                     (DATA's high byte, $340A -> $34)
+#   A2 0A        LDX #$0A                     (DATA's low byte, $340A -> $0A)
+#   0A 34        .WORD $340A                  (little-endian: $0A, $34)
+#   34           .BYTE $34                    (DATA's high byte again)
+#   EA           NOP                          (at $340A, defines DATA)
+#
+# bytes: 13
+# sha256: b6de4129adf26b56d880e88ba29e3cb035f787e54db4166718979367daf74c7b
+
+00 34
+4C 03 34
+A9 34
+A2 0A
+0A 34
+34
+EA

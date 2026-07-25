@@ -1420,6 +1420,89 @@ no size bump needed. User confirmed the full runtime verification matrix:
 emission-site hooks) remains separately gated and unstarted; this closure
 does not activate it.
 
+### CASM Phase 8 WP40 Relocation Table and Emission-Site Hooks (Phase 0C.17, 2026-07-25)
+
+Amends Phase 0C.14-0C.16 above with as-built detail from WP40's actual
+implementation. Plan:
+`brain/plans/2026-07-24-casm-phase8-wp40-relocation-table-and-emission-hooks.md`.
+Walkthrough:
+`brain/walkthroughs/2026-07-24-casm-phase8-wp40-relocation-table-and-emission-hooks.md`.
+
+A new module, `reloc.s`, owns the relocation table: `relocInit` allocates
+`CASM_RELOC_TABLE_BYTES` (8192, 4096 entries) via `vmmStoreAlloc`
+unconditionally every Pass 2 run, regardless of static/relocatable mode
+(VMM cost only, not the MAIN envelope -- a static assembly's table simply
+stays empty, since `CASM_PARSER_STMT_RELOCATABLE` is never set outside
+relocatable mode). `relocRecord` no-ops under `CASM_PASS_MODE_MEASURE`
+(mirroring `emitRawByte`'s own single-gate precedent -- the table does not
+exist during Pass 1) and otherwise appends `CasmPc - CASM_DEFAULT_ORIGIN`
+via one immediate `vmmWindowWrite` per entry, deliberately not staged/
+batched: the only shared transfer window (`CasmVmmBuffer`) is also used
+transiently by `symbolsLookup` between a statement's relocatable operands,
+so holding entries in it across calls would risk the same shared-scratch-
+clobber bug class this codebase has hit three times before (WP23-25).
+
+**Re-tracing every byte-emission call site (not trusting WP37's original
+four-site enumeration) found a real correctness gap.** `emitInstruction`'s
+absolute-family branch and `emitWordList` both emit a `VAL_LO`/`VAL_HI`
+pair for one logical value, and `<`/`>` extraction turns out to be
+grammatically reachable at both (`LDA >LABEL` and `.WORD >LABEL` are valid
+syntax today, not only `.BYTE >LABEL`/`LDA #>LABEL`) -- confirmed by
+re-reading `parseOperandSequence`'s dispatch table directly. A naive
+"record `VAL_HI` when relocatable" check would have wrongly marked a
+genuine constant `$00` byte (the padding `applyExtraction` leaves behind)
+as needing a page-delta patch, corrupting it at load time. Resolved with
+two new private `emit.s` helpers using `VAL_HI`'s own zero/nonzero state,
+already available with no new ABI field: `emitMaybeRecordHi` (record iff
+`RELOCATABLE` set and `VAL_HI != 0` -- the full, non-extracted value) and
+`emitMaybeRecordLo` (record iff `RELOCATABLE` set and `VAL_HI == 0` -- the
+`>`-extraction case). A genuine relocatable address can never legitimately
+have a zero high byte in EMIT mode (`CASM_DEFAULT_ORIGIN` is `$3400`), so
+this disambiguation is sound, not heuristic.
+
+Six call sites wired: `emitInstruction`'s shared length-3 branch (both
+helpers, covering `CASM_MODE_ABSOLUTE`/`_X`/`_Y`/`_INDIRECT` uniformly,
+unchanged from WP37's finding); `eiTwoByte`, additionally gated on
+`CasmInsn.Mode == CASM_MODE_IMMEDIATE` -- re-verified rather than
+re-assumed that this guard is still needed, since `ofRequire8Bit`
+(`opcodes.s`) is shared with indexed-indirect/indirect-indexed addressing,
+so `LDA (>LABEL),Y` is equally reachable and must never be recorded per
+the master plan's explicit pointer-byte exclusion; `emitByteList` (`Lo`
+only); `emitWordList` (both helpers).
+
+New diagnostic `CASM_DIAG_RELOC_TABLE_FULL` at `$30` (the next free
+identifier); `diagPrintFatal`'s selection bound extended from
+`CASM_DIAG_PHASE6B_LAST` to the new `CASM_DIAG_PHASE8_LAST`.
+
+New standalone `test_casm_reloc` harness (mirroring the `test_casm_symbols`/
+`test_casm_vmm` isolated-module-first precedent) is the only real proof of
+`relocRecord`'s correctness at this stage -- no R6 footer exists until
+WP41 for any end-to-end fixture to observe the table's actual contents.
+Its `relocfull1` case does a genuine fill of all 4096 entries (not a
+poked shortcut), matching `casm_vmm.s`'s `vmmalloc3` precedent, before
+confirming the 4097th is rejected. Two new end-to-end fixtures
+(`casmrelop1` covering the normal shape at each site, `casmrelop2`
+covering the newly-found two-sided extraction cases) prove only that the
+new hooks do not corrupt program bytes, since the table itself remains
+unobservable until WP41.
+
+MAIN size bumped `$3500` -> `$3600` (144 bytes measured overflow; 106
+bytes headroom at the new size). `test_casm_pass1`/`test_casm_passcheck`
+needed `reloc.s` added to their own source lists, found via a real link
+failure, not assumed. User confirmed the full runtime verification
+matrix: "all tests pass." Final CASM `0.1.42` build 1154.
+
+**Separately from WP40's own scope**, `casmempty.s` was removed from
+`test.d64`'s build during this session (commit `cad491a`, committed
+independently before WP40's own commit): its zero-block directory entry,
+created via `cc1541 -L`, sets track/sector to 0 -- a value normally
+reserved as an end-of-chain marker, not a valid file start -- suspected of
+corrupting `test.d64`. See `tests/AGENTS.md` and `wiki/tasks/casm.md`'s
+Verification Policy section for the corrected contract.
+
+**CASM Phase 8 WP40 is complete.** WP41 (native R6 footer serialization)
+remains separately gated and unstarted; this closure does not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
