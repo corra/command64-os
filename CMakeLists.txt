@@ -201,7 +201,11 @@ if(Ca65_FOUND)
     # the six new emit.s call sites overflowed $3500 by 145 measured bytes;
     # $3600 (+256) leaves 111 bytes headroom, the smallest round-page step
     # above that minimum, matching this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3600")
+    # WP41: $3600 -> $3700 -- relocFinalize (the R6 footer/table writer)
+    # overflowed $3600 by 103 measured bytes; $3700 (+256) leaves 153 bytes
+    # headroom, the smallest round-page step above that minimum, matching
+    # this line's own precedent.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3700")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -314,7 +318,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3600")
+            set(TEST_PRG_SIZE "3700")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -339,7 +343,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3600")
+            set(TEST_PRG_SIZE "3700")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})

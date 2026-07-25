@@ -1007,6 +1007,47 @@
       track/sector directory entry suspected of corrupting the disk),
       committed independently (`cad491a`) before this WP's own commit
     - **WP40 is complete**, approved by the user
+  - [x] `005c8fec-684d-4f0d-a171-c7519081bef2` WP41 native R6 footer
+        serialization
+    - Plan:
+      `brain/plans/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`
+    - Active on `feature/casm-phase8-wp41` from `feature/casm-phase8-wp40`'s
+      tip
+    - `reloc.s` gains `relocFinalize`, called unconditionally from `casm.s`
+      right after `emitFinalize` succeeds; no-ops for a static assembly,
+      otherwise appends the accumulated table (chunked through the
+      existing `CasmVmmBuffer` window) and the 6-byte R6 footer (base
+      address, entry count, `"R6"` magic as explicit hex) in one final
+      write, matching `tools/reloc.py`'s exact byte layout -- the first WP
+      to make the relocation table observable end to end
+    - Found that five existing trusted references (`casmorg1`,
+      `casmnoorg1`, `casmordhaz1`, `casmrelop1`, `casmrelop2`) go stale the
+      instant this WP lands (each gains a real footer it didn't have
+      before); updated all five with hand-derived footers, verified
+      byte-for-byte and hash-for-hash before any runtime test.
+      `casmorgexpl1.ref.hex`'s stale "byte-identical to casmorg1" comment
+      corrected -- the divergence is the intended outcome of R6 existing,
+      not a regression
+    - MAIN size bumped `$3600` -> `$3700` (103 bytes overflow; 153 bytes
+      headroom at the new size)
+    - First verification pass: user reported `TEST_CASM_PASS1` failing all
+      7 fixtures ("fffffff"). Root-caused to `test_casm_reloc.s` (WP40)
+      never calling `resourcesCleanup` before `DOS_EXIT`, permanently
+      leaking two VMM/REU allocations and starving the next test's own
+      allocation in the same VICE session. Fixed
+    - Audited every other standalone harness for the same defect class;
+      found `test_casm_symbols.s` (WP27, outside this WP's original scope)
+      with the identical gap (`symbolsInit`'s VMM allocation never freed);
+      fixed identically with the user's approval
+    - Second verification pass: user confirmed "all tests pass" across the
+      full matrix (`TEST_CASM_RELOC`, `TEST_CASM_SYMBOLS`,
+      `TEST_CASM_PASS1`, `TEST_CASM_PASSCHECK`, all five updated
+      relocatable fixtures via `COMP`, static regression sample)
+    - Final CASM `0.1.43` build 1156, no-change rebuild stable, all three
+      disk images build clean
+    - Walkthrough:
+      `brain/walkthroughs/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`
+    - **WP41 is complete**, approved by the user
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

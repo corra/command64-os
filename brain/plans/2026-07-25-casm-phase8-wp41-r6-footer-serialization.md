@@ -295,3 +295,14 @@ completion, together with the version-only increment and
   window. Scoped runtime relocation-loading verification (loading at a
   non-default page and confirming correct execution) explicitly to WP42,
   matching WP37's own original phase breakdown.
+- 2026-07-25: Implemented as planned, no material deviations. MAIN size
+  bumped `$3600` -> `$3700` (103 bytes measured overflow; 153 bytes
+  headroom at the new size). First verification pass found `test_casm_pass1`
+  failing all 7 fixtures ("fffffff"), root-caused to `test_casm_reloc.s`
+  (WP40) never calling `resourcesCleanup` before `DOS_EXIT`, permanently
+  leaking two VMM/REU allocations across the session and starving the next
+  test's own allocation. Fixed, and an audit of every other standalone
+  harness for the same defect class found `test_casm_symbols.s` (WP27, out
+  of this WP's original scope but the identical bug) with the same gap;
+  fixed identically with the user's approval. Second verification pass: "all
+  tests pass." Final CASM `0.1.43` build 1156.

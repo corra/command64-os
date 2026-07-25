@@ -22,6 +22,15 @@
 ; for the same reason casm_vmm.s/casm_symbols.s already do: resources.s's
 ; exitSuccess/exitFatal reference it, and ld65 links whole object files, so
 ; it must resolve even though this harness never calls exitSuccess/exitFatal.
+;
+; WP41: reloc.s now also references CasmRelocatableMode (emit.s) and
+; fileWrite (fileio.s) via relocFinalize -- unreachable from this harness's
+; own fixtures (none of which call relocFinalize; the real proof of its
+; correctness is the end-to-end fixture matrix per the WP41 plan, since it
+; needs a real open output file), but must still resolve at link time.
+; CasmRelocatableMode gets its own small stand-in, matching CasmPc/
+; CasmPassMode above; fileWrite is a trivial stub, matching diagPrintFatal's
+; own precedent below.
 
 .include "command64.inc"
 .include "../../../src/external/casm/common.inc"
@@ -33,6 +42,7 @@
 
 .import __MAIN_START__
 .import resourcesInit
+.import resourcesCleanup
 .import relocInit
 .import relocRecord
 .import CasmRelocVmmSlot
@@ -42,6 +52,8 @@
 .export diagPrintFatal
 .export CasmPc
 .export CasmPassMode
+.export CasmRelocatableMode
+.export fileWrite
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -64,6 +76,21 @@ start:
     jsr reportCase
     jsr relocfull1
     jsr reportCase
+
+    ; WP41 fix: relocinit1/relocfull1 each allocate their own VMM slot via
+    ; relocInit (relocinit1's shared by relocrecord1/relocmeasure1;
+    ; relocfull1's own fresh one) and neither is ever freed within this
+    ; harness's own fixtures, unlike casm_vmm.s's self-contained
+    ; alloc-then-free-within-one-fixture pattern. Without this call, both
+    ; leak permanently at the OS/REU level (DOS_ALLOC_MEM's tracked
+    ; capacity, not just this program's own 8-slot registry, which a fresh
+    ; DOS_EXIT does not implicitly release) -- a real defect a later WP41
+    ; runtime verification pass caught: a subsequent, unrelated test
+    ; harness run in the same VICE session failed every one of its own
+    ; VMM allocations after this harness ran without freeing first.
+    ; resourcesCleanup frees every registered VMM slot generically, exactly
+    ; the mechanism casm.s's own exitSuccess/exitFatal already rely on.
+    jsr resourcesCleanup
 
     lda #$0D
     jsr KernalChROUT
@@ -311,6 +338,16 @@ rf1Fail:
 diagPrintFatal:
     rts
 
+; ---------------------------------------------------------------------------
+; fileWrite (stub)
+; reloc.s's relocFinalize references this; unreachable from this harness's
+; own fixtures (none call relocFinalize). See the file header for the full
+; rationale.
+; ---------------------------------------------------------------------------
+fileWrite:
+    clc
+    rts
+
 .segment "RODATA"
 
 passMsg:
@@ -325,3 +362,4 @@ LoopLo:    .res 1
 LoopHi:    .res 1
 CasmPc:         .res 2
 CasmPassMode:   .res 1
+CasmRelocatableMode: .res 1

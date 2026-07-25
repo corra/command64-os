@@ -232,6 +232,13 @@ CASM_RELOC_TABLE_BYTES = CASM_RELOC_MAX * 2
 .assert CASM_RELOC_TABLE_BYTES = 8192, error, "CASM relocation table byte size changed"
 .assert CASM_RELOC_TABLE_BYTES <= CASM_VMM_ALLOC_MAX_BYTES, error, "CASM relocation table exceeds one VMM allocation"
 
+; WP41 (Phase 0C.14/18): the R6 footer's ASCII magic, matching
+; tools/reloc.py's MAGIC = b"R6" exactly. Explicit bytes, not a ca65
+; character literal, since this is raw binary file-format data that must
+; not depend on this file's charmap.
+CASM_R6_MAGIC_0 = $52  ; 'R'
+CASM_R6_MAGIC_1 = $36  ; '6'
+
 ; Stable parser results. Public CLI routines return carry clear with
 ; CASM_PARSE_OK or carry set with a CASM_DIAG_* value; these identifiers are
 ; available for internal dispatch and static fixtures.

@@ -41,6 +41,7 @@
 
 .import __MAIN_START__
 .import resourcesInit
+.import resourcesCleanup
 .import symbolsInit
 .import symbolsInsert
 .import symbolsLookup
@@ -83,6 +84,14 @@ start:
     jsr reportCase
     jsr symfull1
     jsr reportCase
+
+    ; WP41 fix (same defect class found in casm_reloc.s): syminit1's
+    ; symbolsInit allocates the symbol table's VMM storage and this harness
+    ; never freed it before DOS_EXIT, leaking it permanently at the OS/REU
+    ; level (DOS_ALLOC_MEM's tracked capacity, not just this program's own
+    ; 8-slot registry, which a fresh DOS_EXIT does not implicitly release).
+    ; resourcesCleanup frees every registered VMM slot generically.
+    jsr resourcesCleanup
 
     lda #$0D
     jsr KernalChROUT

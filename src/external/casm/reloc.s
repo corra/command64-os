@@ -18,24 +18,43 @@
 ; transiently by symbolsLookup between a statement's relocatable operands,
 ; so holding state in it across calls would risk the same shared-scratch-
 ; clobber bug class this codebase has hit before (WP23-25).
+;
+; WP41: relocFinalize appends the accumulated table plus the R6 footer to
+; the output file, gated on CasmRelocatableMode so static output is
+; unaffected. Lives here rather than a new output.s module: this file
+; already owns every piece of state a footer write needs.
 
 .include "command64.inc"
 .include "common.inc"
 
 .import vmmStoreAlloc
+.import vmmWindowRead
 .import vmmWindowWrite
 .import CasmVmmBuffer
 .import CasmPc
 .import CasmPassMode
+.import CasmRelocatableMode
+.import fileWrite
 
 .export relocInit
 .export relocRecord
+.export relocFinalize
 .export CasmRelocVmmSlot
 
 .segment "BSS"
 
 CasmRelocVmmSlot: .res 1   ; registry slot from relocInit's vmmStoreAlloc
 CasmRelocCount:   .res 2   ; entries written so far (0..CASM_RELOC_MAX)
+
+; WP41: relocFinalize's own private table-copy loop state. Distinct from
+; CasmVmmOffLo/OffHi (common.inc zero-page scratch, used transiently within
+; each vmmWindowRead/fileWrite call) since the loop must survive across
+; those calls.
+RelocFinalizeRemainingLo: .res 1
+RelocFinalizeRemainingHi: .res 1
+RelocFinalizeOffsetLo:    .res 1
+RelocFinalizeOffsetHi:    .res 1
+RelocFinalizeChunkLen:    .res 1
 
 .segment "CODE"
 
@@ -121,4 +140,128 @@ rrNotFull:
 rrDone:
     clc
 rrRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; relocFinalize
+; Append the recorded relocation table and R6 footer to the output file,
+; called immediately after emitFinalize succeeds. No-ops (C clear)
+; immediately if CasmRelocatableMode is 0 -- a static assembly's output
+; stays exactly the plain PRG it is today.
+;
+; Table entries are copied back through the same CASM_VMM_BUFFER_SIZE
+; window vmmWindowRead/vmmWindowWrite already use, in up to
+; CASM_VMM_BUFFER_SIZE-byte chunks (at most 128 for a full 4096-entry
+; table): vmmWindowRead into CasmVmmBuffer, then fileWrite that same
+; chunk immediately, no staging across chunks. The 6-byte footer
+; (CASM_DEFAULT_ORIGIN, CasmRelocCount, the R6 magic -- all little-endian,
+; matching tools/reloc.py's exact layout) is then staged into the same
+; now-free CasmVmmBuffer and written with one final fileWrite call. No
+; seeking: emitFinalize already left the file position immediately after
+; the last program byte.
+;
+; Outputs: C clear on success (including the static no-op case); C set
+;          with A = CASM_DIAG_VMM_TRANSFER_FAILED,
+;          CASM_DIAG_OUTPUT_WRITE_FAILED, or CASM_DIAG_OUTPUT_SHORT_WRITE
+;          on failure
+; Clobbers: A, X, Y, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi, CasmVmmBuffer
+; ---------------------------------------------------------------------------
+relocFinalize:
+    lda CasmRelocatableMode
+    bne rfRelocatable
+    clc
+    rts
+rfRelocatable:
+    ; RemainingLo/Hi = CasmRelocCount * 2 (single 16-bit left-shift-by-1).
+    lda CasmRelocCount
+    sta RelocFinalizeRemainingLo
+    lda CasmRelocCount + 1
+    sta RelocFinalizeRemainingHi
+    asl RelocFinalizeRemainingLo
+    rol RelocFinalizeRemainingHi
+
+    lda #0
+    sta RelocFinalizeOffsetLo
+    sta RelocFinalizeOffsetHi
+
+rfLoop:
+    lda RelocFinalizeRemainingLo
+    ora RelocFinalizeRemainingHi
+    beq rfTableDone
+
+    ; ChunkLen = min(Remaining, CASM_VMM_BUFFER_SIZE).
+    lda RelocFinalizeRemainingHi
+    bne rfChunkMax
+    lda RelocFinalizeRemainingLo
+    cmp #CASM_VMM_BUFFER_SIZE + 1
+    bcs rfChunkMax
+    sta RelocFinalizeChunkLen
+    jmp rfChunkReady
+rfChunkMax:
+    lda #CASM_VMM_BUFFER_SIZE
+    sta RelocFinalizeChunkLen
+rfChunkReady:
+
+    lda RelocFinalizeOffsetLo
+    sta CasmVmmOffLo
+    lda RelocFinalizeOffsetHi
+    sta CasmVmmOffHi
+    lda RelocFinalizeChunkLen
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmRelocVmmSlot
+    jsr vmmWindowRead
+    bcs rfRet
+
+    lda RelocFinalizeChunkLen
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx #<CasmVmmBuffer
+    ldy #>CasmVmmBuffer
+    jsr fileWrite
+    bcs rfRet
+
+    lda RelocFinalizeOffsetLo
+    clc
+    adc RelocFinalizeChunkLen
+    sta RelocFinalizeOffsetLo
+    lda RelocFinalizeOffsetHi
+    adc #0
+    sta RelocFinalizeOffsetHi
+
+    lda RelocFinalizeRemainingLo
+    sec
+    sbc RelocFinalizeChunkLen
+    sta RelocFinalizeRemainingLo
+    lda RelocFinalizeRemainingHi
+    sbc #0
+    sta RelocFinalizeRemainingHi
+    jmp rfLoop
+
+rfTableDone:
+    lda #<CASM_DEFAULT_ORIGIN
+    sta CasmVmmBuffer + 0
+    lda #>CASM_DEFAULT_ORIGIN
+    sta CasmVmmBuffer + 1
+    lda CasmRelocCount
+    sta CasmVmmBuffer + 2
+    lda CasmRelocCount + 1
+    sta CasmVmmBuffer + 3
+    lda #CASM_R6_MAGIC_0
+    sta CasmVmmBuffer + 4
+    lda #CASM_R6_MAGIC_1
+    sta CasmVmmBuffer + 5
+
+    lda #6
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx #<CasmVmmBuffer
+    ldy #>CasmVmmBuffer
+    jsr fileWrite
+    bcs rfRet
+    clc
+rfRet:
     rts

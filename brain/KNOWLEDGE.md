@@ -1503,6 +1503,81 @@ Verification Policy section for the corrected contract.
 **CASM Phase 8 WP40 is complete.** WP41 (native R6 footer serialization)
 remains separately gated and unstarted; this closure does not activate it.
 
+### CASM Phase 8 WP41 Native R6 Footer Serialization (Phase 0C.18, 2026-07-25)
+
+Amends Phase 0C.14-0C.17 above with as-built detail from WP41's actual
+implementation. Plan:
+`brain/plans/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`.
+Walkthrough:
+`brain/walkthroughs/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`.
+
+`reloc.s` gains `relocFinalize`, called unconditionally from `casm.s`
+immediately after `emitFinalize` succeeds. No-ops (`C` clear) if
+`CasmRelocatableMode` is 0 (static assembly), so static output stays
+exactly the plain PRG it always was. Otherwise it copies
+`CasmRelocCount * 2` bytes of table content from VMM to the output file in
+`<= 64`-byte chunks (`vmmWindowRead` then an immediate `fileWrite` per
+chunk, reusing `reloc.s`'s existing `CasmVmmBuffer` transfer window --
+no new buffer), then stages and writes the 6-byte R6 footer
+(`CASM_DEFAULT_ORIGIN` little-endian, `CasmRelocCount` little-endian, the
+ASCII magic `"R6"` as explicit hex `$52 $36`, not a ca65 character literal)
+in one final `fileWrite` call, matching `tools/reloc.py`'s exact byte
+layout. This is the WP that makes the relocation table observable for the
+first time -- WP39 and WP40 both deferred their own end-to-end proof to
+"once the footer exists."
+
+A real, easy-to-miss consequence of the master plan's own gate text
+("static fixtures remain ordinary PRGs") is that five existing
+relocatable-mode trusted references built across WP38-WP40 (`casmorg1`,
+`casmnoorg1`, `casmordhaz1`, `casmrelop1`, `casmrelop2`) all go stale the
+instant this WP lands, since each now gains a real footer it didn't have
+before. All five were updated with hand-derived footers, verified
+byte-for-byte and hash-for-hash against `hex_manifest_to_bin.py`'s own
+independent computation before any runtime test. `casmorgexpl1.ref.hex`
+(explicit `.ORG`, stays static) needed only a comment correction: its
+WP38-era claim of being "deliberately byte-identical" to `casmorg1.ref.hex`
+breaks by design once `casmorg1` gains a footer -- the correct, intended
+outcome of R6 relocation existing at all, not a regression.
+
+MAIN size bumped `$3600` -> `$3700` (103 bytes measured overflow; 153
+bytes headroom at the new size, measured via `ld65 -m` as CODE + RODATA +
+BSS against the MEMORY area's declared size -- BSS occupies address space
+within `MAIN` even though it contributes no file bytes, so headroom must
+account for it, not just the PRG's on-disk byte count).
+`test_casm_pass1`/`test_casm_passcheck` (which link `reloc.s` whole)
+bumped identically.
+
+**Two real, pre-existing VMM-leak defects were found and fixed during this
+WP's own verification**, both the same bug class: a standalone test
+harness allocates VMM storage but never calls `resourcesCleanup` before
+`DOS_EXIT`, leaking the allocation permanently at the OS/REU tracking
+level -- not just the harness's own 8-slot registry, which a fresh
+`DOS_EXIT` does not implicitly release. The user's first verification pass
+reported `TEST_CASM_PASS1` failing all 7 fixtures ("fffffff"), matching
+this codebase's own historical VMM-registry-exhaustion symptom (WP33).
+Root-caused to `test_casm_reloc.s` (new in WP40): its `relocinit1` and
+`relocfull1` fixtures each allocate their own VMM slot and neither is ever
+freed, exhausting REU capacity for whatever test ran next in the same VICE
+session. Fixed by adding a `resourcesCleanup` call before its final
+PASS/FAIL print and `DOS_EXIT`. Auditing every other standalone harness
+for the same defect class (rather than assuming this was isolated) found
+`test_casm_symbols.s` (WP27, unrelated to this WP's own scope) with the
+identical gap -- `syminit1`'s `symbolsInit` call allocates the symbol
+table's VMM storage and it was never freed either. Fixed identically, with
+the user's explicit approval to extend this WP's scope to cover it, since
+it is the same well-precedented one-line fix and leaving a known leak in
+place would just reproduce the same confusing symptom later.
+`test_casm_vmm.s` (explicit `vmmStoreFree` within each fixture) and
+`test_casm_expr.s` (no VMM allocation at all) were confirmed already safe.
+
+User confirmed the full runtime verification matrix across two passes (the
+second after both leak fixes): "all tests pass." Final CASM `0.1.43` build
+1156, no-change rebuild stable, all three disk images build clean.
+
+**CASM Phase 8 WP41 is complete.** WP42 (verification, walkthrough, and
+Phase 8 completion gate) remains separately gated and unstarted; this
+closure does not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

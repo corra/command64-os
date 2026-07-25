@@ -1183,6 +1183,45 @@ WP37 plan:
       committed independently before this WP's own commit.
       **WP40 is complete.**
 
+- [x] `005c8fec-684d-4f0d-a171-c7519081bef2`: WP41 native R6 footer
+      serialization. Plan approved as drafted:
+      `brain/plans/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`.
+      Active on `feature/casm-phase8-wp41` from `feature/casm-phase8-wp40`'s
+      tip. `reloc.s` gains `relocFinalize`, called unconditionally from
+      `casm.s` right after `emitFinalize` succeeds; no-ops for a static
+      assembly, otherwise appends the accumulated table (chunked through
+      the existing `CasmVmmBuffer` window, no new buffer) and the 6-byte
+      R6 footer (base address, entry count, `"R6"` magic as explicit hex,
+      matching `tools/reloc.py` exactly) in one final write. This is the
+      WP that makes the relocation table observable for the first time --
+      WP39/WP40 both deferred their own end-to-end proof to "once the
+      footer exists." Found, by checking the master plan's gate text
+      against every fixture built since WP38 rather than assuming only new
+      fixtures were needed, that five existing trusted references
+      (`casmorg1`, `casmnoorg1`, `casmordhaz1`, `casmrelop1`, `casmrelop2`)
+      go stale the instant this WP lands and need hand-derived footers, all
+      verified byte-for-byte and hash-for-hash before any runtime test;
+      `casmorgexpl1.ref.hex`'s stale "byte-identical to casmorg1" comment
+      corrected (the divergence is the intended outcome of R6 existing,
+      not a regression). MAIN size bumped `$3600` -> `$3700` (103 bytes
+      overflow; 153 bytes headroom at the new size). The user's first
+      verification pass found `TEST_CASM_PASS1` failing all 7 fixtures
+      ("fffffff"); root-caused to `test_casm_reloc.s` (WP40) never calling
+      `resourcesCleanup` before `DOS_EXIT`, permanently leaking two VMM/REU
+      allocations and starving the next test's own allocation in the same
+      VICE session. Fixed. Auditing every other standalone harness for the
+      same defect class found `test_casm_symbols.s` (WP27, outside this
+      WP's original scope) with the identical gap; fixed identically with
+      the user's approval, rather than leaving a known leak in place.
+      Second verification pass: user confirmed "all tests pass" across the
+      full matrix (`TEST_CASM_RELOC`, `TEST_CASM_SYMBOLS`,
+      `TEST_CASM_PASS1`, `TEST_CASM_PASSCHECK`, all five updated
+      relocatable fixtures via `COMP`, and the static regression sample).
+      Final CASM `0.1.43` build 1156, no-change rebuild stable, all three
+      disk images build clean. Walkthrough:
+      `brain/walkthroughs/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`.
+      **WP41 is complete.**
+
 ## Phase 8 Acceptance
 
 - [ ] Relocatable output is the default; `/S` forces static output, still

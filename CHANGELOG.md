@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 8 WP41 native R6 footer serialization** (CASM `0.1.43`
+  build 1156): `reloc.s` gains `relocFinalize`, called unconditionally
+  right after `emitFinalize` succeeds. No-ops for a static assembly (an
+  explicit `.ORG`); otherwise appends WP40's accumulated relocation table
+  (chunked through the existing shared VMM transfer window, no new buffer)
+  and a 6-byte R6 footer -- base address, entry count, `"R6"` magic as
+  explicit hex, matching `tools/reloc.py`'s byte layout exactly -- in one
+  final write. This is the first WP where the relocation table becomes
+  observable end to end; WP39 and WP40 both had to defer their own proof
+  to "once the footer exists." Five existing trusted references
+  (`casmorg1`, `casmnoorg1`, `casmordhaz1`, `casmrelop1`, `casmrelop2`)
+  went stale the instant this WP landed -- each gains a real footer it
+  didn't have before -- and were updated with hand-derived footers,
+  verified byte-for-byte and hash-for-hash before any runtime test.
+  `casmorgexpl1.ref.hex` (explicit `.ORG`, stays static) needed only a
+  comment correction: its prior "byte-identical to casmorg1" claim was
+  pre-R6 only, and the divergence now is the intended outcome of R6
+  relocation existing, not a regression. MAIN size bumped `$3600` ->
+  `$3700` (103 bytes measured overflow; 153 bytes headroom at the new
+  size). Two pre-existing VMM-leak defects were found and fixed during
+  this WP's own verification -- `test_casm_reloc.s` (WP40) and
+  `test_casm_symbols.s` (WP27) each allocated VMM storage in a standalone
+  test harness without ever calling `resourcesCleanup` before `DOS_EXIT`,
+  permanently leaking the allocation at the OS/REU tracking level and
+  starving whichever test ran next in the same emulator session (this is
+  what caused `TEST_CASM_PASS1` to fail all 7 fixtures on the first
+  verification pass). Both fixed by adding the missing cleanup call,
+  matching every other standalone harness's established pattern. User
+  confirmed the full verification matrix across two passes: "all tests
+  pass."
 - **CASM Phase 8 WP40 relocation table storage and emission-site hooks**
   (CASM `0.1.42` build 1154): a new module, `reloc.s`, owns a VMM-backed,
   append-only relocation table (8192 bytes, 4096 entries), allocated

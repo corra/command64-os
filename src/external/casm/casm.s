@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "42"
+.define VERSION_STAGE "43"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -61,6 +61,7 @@
 .import CasmPassMode
 .import CasmPass1FinalPc
 .import relocInit
+.import relocFinalize
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -183,6 +184,10 @@ startPass1:
     bcs startFatalNear
 
     jsr emitFinalize
+    bcs startFatalNear
+    ; WP41: append the relocation table and R6 footer, unconditionally --
+    ; relocFinalize itself no-ops for a static assembly (Phase 0C.14/18).
+    jsr relocFinalize
     bcs startFatalNear
     jsr diagPrintPhase2Ready
     jsr sourceClose
