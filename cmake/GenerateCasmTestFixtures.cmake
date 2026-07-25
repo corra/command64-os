@@ -723,3 +723,47 @@ string(REPEAT "A" 40000 CASM_MF_OVF1)
 string(REPEAT "A" 30000 CASM_MF_OVF2)
 file(WRITE "${OUTPUT_DIR}/casmmfovf1.seq" "${CASM_MF_OVF1}")
 file(WRITE "${OUTPUT_DIR}/casmmfovf2.seq" "${CASM_MF_OVF2}")
+
+# WP38 default relocatable origin fixtures. casmorg1.seq already exists
+# (Phase 4 WP13: "LDA #$01", no .ORG) and is reused unmodified here as the
+# primary positive case -- its expected outcome flips from the historical
+# CASM_DIAG_ORG_REQUIRED (Phase 4, .ORG was mandatory) to a successful
+# relocatable assembly at CASM_DEFAULT_ORIGIN ($3400). This is the intended
+# effect of WP38, not a regression; see
+# brain/plans/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md.
+#
+# casmorgexpl1: the same single instruction with an explicit .ORG $3400.
+# Its trusted reference is byte-identical to casmorg1's, proving the
+# implicit default and an explicit .ORG at the same address produce
+# identical output through the same emitRawByte header-write path, not
+# merely "it doesn't crash."
+file(WRITE "${OUTPUT_DIR}/casmorgexpl1.seq"
+    ".ORG \$3400\n"
+    "LDA #\$01\n"
+)
+
+# casmnoorg1: no .ORG, with a forward-referenced label -- proves the full
+# two-pass label-resolution pipeline (not just emitMarkStarted's own state
+# machine) agrees with the implicit default origin in both passes.
+# START: JMP TARGET / TARGET: NOP. START=$3400 (no bytes). JMP is 3 bytes at
+# $3400-$3402, opcode $4C. TARGET=$3403 (JMP's operand, little-endian: 03
+# 34). NOP ($EA) at $3403.
+file(WRITE "${OUTPUT_DIR}/casmnoorg1.seq"
+    "START:\n"
+    "    JMP TARGET\n"
+    "TARGET:\n"
+    "    NOP\n"
+)
+
+# casmorglate1: a label (the implicit-default trigger) followed by a later
+# .ORG. Closes the latent gap found during WP38 planning -- crpLabel never
+# guarded against this before, so "a label before .ORG" was silently
+# accepted rather than rejected. Now fails with CASM_DIAG_DUPLICATE_ORG
+# (reused for the late-.ORG case per the user's confirmed WP38 decision --
+# structurally ".ORG arrived after output had already started," whether the
+# earlier event was itself an .ORG or not).
+#   -> DUPLICATE ORG
+file(WRITE "${OUTPUT_DIR}/casmorglate1.seq"
+    "START:\n"
+    ".ORG \$C000\n"
+)

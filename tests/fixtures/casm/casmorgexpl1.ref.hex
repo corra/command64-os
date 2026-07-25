@@ -1,0 +1,20 @@
+# CASM WP38 trusted reference: casmorgexpl1
+#
+# Independently hand-assembled from the casmorgexpl1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake (".ORG $3400" / "LDA #$01"). NOT
+# produced by CASM. Deliberately byte-identical to casmorg1.ref.hex (the
+# same instruction with no .ORG at all): this is the real cross-check that
+# WP38's implicit default-origin priming and header write produce exactly
+# the same output as an explicit .ORG at the same address, not just "it
+# doesn't crash." Cross-check:
+#   - brain/plans/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md
+#
+# Source (.ORG $3400) and hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   A9 01        LDA #$01
+#
+# bytes: 4
+# sha256: 52f7bcbf5b30fcc1fe893cc06d63dee077996d9e5d02f129b4a96e57c85eff8a
+
+00 34
+A9 01

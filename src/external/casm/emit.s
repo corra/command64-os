@@ -10,7 +10,9 @@
 ;
 ; A single forward pass is sufficient: Phase 4 has no symbols or forward
 ; references, so every operand is a literal and the program counter is known at
-; each instruction. Output is a plain absolute PRG (no relocation trailer).
+; each instruction. Output is a plain PRG; WP38 (Phase 8) adds the optional
+; default relocatable origin, but no relocation table or R6 trailer exists
+; yet (WP39-WP41).
 ;
 ; Bytes are staged in the bounded CasmEmitBuffer and flushed through fileWrite;
 ; the 256-byte CasmIoBuffer stays reserved for input, which is live during the
@@ -24,6 +26,7 @@
 .import lexerNext
 .import CasmTokenRecord
 .import parserParseExpressionValue
+.import CasmCliOptions
 
 ; WP15 diagnostic context. Statement-level failures use the stamped statement
 ; location; failures inside a .BYTE/.WORD operand list use the token record,
@@ -41,6 +44,7 @@
 .export emitDirective
 .export emitFinalize
 .export emitCheckPassAgreement
+.export emitMarkStarted
 .export CasmPc
 .export CasmPassMode
 .export CasmPass1FinalPc
@@ -48,7 +52,12 @@
 .segment "BSS"
 
 CasmPc:         .res 2   ; next emit address (program counter)
-CasmOrgSet:     .res 1   ; 0 until the initial .ORG is processed
+; WP38: renamed from CasmOrgSet and broadened from "an explicit .ORG has
+; been processed" to "a label, a byte, or an explicit .ORG has already been
+; processed this pass" -- 0 until the first such event. Read by emitOrg
+; (reject a second/late .ORG) and emitMarkStarted (the shared guard for
+; every other qualifying statement kind).
+CasmOutputStarted: .res 1
 CasmPcOverflow: .res 1   ; latched when the PC advances past $FFFF
 CasmEmitLen:    .res 1   ; staged byte count in CasmEmitBuffer
 CasmPassMode:   .res 1   ; CASM_PASS_MODE_MEASURE or CASM_PASS_MODE_EMIT
@@ -73,15 +82,38 @@ CasmPass1FinalPc: .res 2
 ; caller of emitInit still expects one unconditional real-emission pass, so
 ; this keeps that behavior exact while giving a future two-pass orchestration
 ; an explicit point to override the mode before each pass.
+;
+; WP38: also primes CasmPc every pass, closing a cross-pass hazard that only
+; stayed safe while .ORG was mandatory-and-first: an explicit .ORG (if given)
+; always overwrites CasmPc unconditionally before any label or byte (emitOrg),
+; so priming a default value here first and letting .ORG overwrite it second
+; is equivalent to today's behavior whenever .ORG is actually given. Under
+; /S, CasmPc is left at zero instead -- static mode has no configured
+; default, and a first statement reached with no .ORG yet is rejected by
+; emitMarkStarted before CasmPc's value could matter.
 ; Outputs: C clear
 ; ---------------------------------------------------------------------------
 emitInit:
     lda #0
-    sta CasmOrgSet
+    sta CasmOutputStarted
     sta CasmPcOverflow
     sta CasmEmitLen
     lda #CASM_PASS_MODE_EMIT
     sta CasmPassMode
+
+    lda CasmCliOptions
+    and #CASM_OPT_STATIC
+    bne eiStatic
+    lda #<CASM_DEFAULT_ORIGIN
+    sta CasmPc
+    lda #>CASM_DEFAULT_ORIGIN
+    sta CasmPc + 1
+    clc
+    rts
+eiStatic:
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
     clc
     rts
 
@@ -133,7 +165,7 @@ ecpaMismatch:
 ; Clobbers: A, X, Y, CasmEmitScratch0-3, fileWrite volatile state
 ; ---------------------------------------------------------------------------
 emitInstruction:
-    jsr emitRequireOrg
+    jsr emitMarkStarted
     bcc :+
     jmp eiRet                    ; WP30: pushed out of branch range by the
                                   ; new eiRelative pass-mode check below
@@ -265,8 +297,10 @@ edWord:
 
 ; ---------------------------------------------------------------------------
 ; emitOrg (private)
-; Set the program counter and write the PRG load-address header. Rejects a
-; second .ORG.
+; Set the program counter and write the PRG load-address header, forcing
+; static mode at the given address. Rejects a .ORG that arrives after output
+; has already started -- either a genuine second .ORG, or (WP38) one arriving
+; after an implicit default-origin statement already ran.
 ; ---------------------------------------------------------------------------
 emitOrg:
     ; .ORG requires a plain numeric operand. The statement grammar is shared
@@ -284,9 +318,16 @@ emitOrg:
     sec
     rts
 eoKindOk:
-    lda CasmOrgSet
+    ; WP38: CasmOutputStarted now also catches a late .ORG arriving after an
+    ; implicit default origin already began output (emitMarkStarted), not
+    ; only a genuine second .ORG -- both are, structurally, ".ORG arrived
+    ; after output had already started," and CASM_DIAG_DUPLICATE_ORG's
+    ; existing message text does not claim the earlier event was itself an
+    ; .ORG. Reuse confirmed during WP38 planning rather than adding a new
+    ; diagnostic identifier.
+    lda CasmOutputStarted
     beq eoSet
-    jsr diagSetLocFromStmt      ; the offending second .ORG
+    jsr diagSetLocFromStmt      ; the offending .ORG
     lda #CASM_DIAG_DUPLICATE_ORG
     sec
     rts
@@ -296,7 +337,7 @@ eoSet:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     sta CasmPc + 1
     lda #1
-    sta CasmOrgSet
+    sta CasmOutputStarted
     lda #0
     sta CasmPcOverflow
     ; Write the 2-byte load address as the PRG header (no PC advance).
@@ -317,7 +358,7 @@ eoFail:
 ; least one value is required. .BYTE values must fit 8 bits.
 ; ---------------------------------------------------------------------------
 emitByteList:
-    jsr emitRequireOrg
+    jsr emitMarkStarted
     bcs eblRet
 eblRead:
     jsr lexerNext
@@ -353,7 +394,7 @@ eblRet:
     rts
 
 emitWordList:
-    jsr emitRequireOrg
+    jsr emitMarkStarted
     bcs ewlRet
 ewlRead:
     jsr lexerNext
@@ -384,18 +425,54 @@ ewlRet:
     rts
 
 ; ---------------------------------------------------------------------------
-; emitRequireOrg (private)
-; Outputs: C clear when .ORG has been seen; C set with A = ORG_REQUIRED else.
+; emitMarkStarted
+; WP38: the shared guard for every statement kind that establishes output has
+; begun -- MNEMONIC/.BYTE/.WORD emission (emitInstruction/emitByteList/
+; emitWordList) and label definitions (casm.s's crpLabel). No-ops immediately
+; once output has already started -- the common case for every statement
+; past the first, whether output began via an explicit .ORG (emitOrg sets
+; CasmOutputStarted directly) or via this routine's own implicit-default
+; path below.
+;
+; On the first qualifying statement of a pass: under /S with no .ORG yet,
+; fails with CASM_DIAG_ORG_REQUIRED, exactly the prior mandatory-.ORG
+; behavior, now reached only in this narrower case. Otherwise, this is the
+; first statement of a relocatable (non-/S) assembly with no .ORG -- write
+; the 2-byte PRG header from CasmPc, already primed to CASM_DEFAULT_ORIGIN by
+; emitInit, through the same emitRawByte path emitOrg's own header write
+; uses, so it inherits the existing CASM_PASS_MODE_MEASURE no-op gate with no
+; new pass-mode branching here.
+;
+; emitOrg does not call this routine -- it performs its own explicit-origin
+; header write and sets CasmOutputStarted directly, to avoid writing the
+; header twice.
+; Outputs: C clear on success (including the already-started no-op case);
+;          C set with A = CASM_DIAG_ORG_REQUIRED or a write diagnostic on
+;          failure
 ; ---------------------------------------------------------------------------
-emitRequireOrg:
-    lda CasmOrgSet
-    bne eroOk
+emitMarkStarted:
+    lda CasmOutputStarted
+    bne emsOk
+    lda CasmCliOptions
+    and #CASM_OPT_STATIC
+    beq emsDefault
     jsr diagSetLocFromStmt      ; the first statement needing an origin
     lda #CASM_DIAG_ORG_REQUIRED
     sec
     rts
-eroOk:
+emsDefault:
+    lda #1
+    sta CasmOutputStarted
+    lda CasmPc
+    jsr emitRawByte
+    bcs emsFail
+    lda CasmPc + 1
+    jsr emitRawByte
+    bcs emsFail
+emsOk:
     clc
+    rts
+emsFail:
     rts
 
 ; ---------------------------------------------------------------------------

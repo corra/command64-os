@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "39"
+.define VERSION_STAGE "40"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -56,6 +56,7 @@
 .import emitDirective
 .import emitFinalize
 .import emitCheckPassAgreement
+.import emitMarkStarted
 .import CasmPc
 .import CasmPassMode
 .import CasmPass1FinalPc
@@ -222,9 +223,18 @@ casmRunPass:
     jmp casmRunPass              ; NEWLINE: nothing to do
 
 crpLabel:
+    ; WP38: mark output started (and, on the very first qualifying statement
+    ; of a relocatable assembly, write the default-origin header) before the
+    ; pass-mode branch below, not after -- this must run identically in both
+    ; passes so a later .ORG is rejected in Pass 1 exactly when it will also
+    ; be rejected in Pass 2. Skipping this call in EMIT mode (mirroring the
+    ; "nothing else to do for a label" skip just below) would let Pass 2
+    ; silently disagree with Pass 1 whenever a label is the first statement.
+    jsr emitMarkStarted
+    bcs crpFail
     lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
-    bne casmRunPass              ; EMIT: nothing to do for a label statement
+    bne casmRunPass              ; EMIT: nothing else to do for a label statement
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName

@@ -1051,6 +1051,44 @@ WP37 plan:
       all three disk images (`image_d64`, `test_image_d64`,
       `casm_overflow_test_d64`) build clean. **WP37 is complete.**
 
+- [x] `e8d31694-0602-42bd-8234-416f3af5b31a`: WP38 optional `.ORG`, default
+      relocatable origin, and `/S` wiring. Plan approved as drafted:
+      `brain/plans/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md`.
+      Active on `feature/casm-phase8-wp38` from `feature/casm-phase8-wp37`'s
+      tip. `.ORG` is now optional; absence defaults to relocatable mode at
+      `CASM_DEFAULT_ORIGIN` ($3400); `/S` forces static mode and still
+      requires an explicit `.ORG`. Found and closed two mechanism gaps
+      during planning: `emitInit` never primed `CasmPc` (safe only while
+      `.ORG` was mandatory-and-first), and `crpLabel` never guarded against
+      a label preceding `.ORG` at all -- a latent gap since Phase 4 no
+      fixture had ever exercised. Both closed by one unified mechanism:
+      `CasmOrgSet` renamed `CasmOutputStarted` and broadened to "a label, a
+      byte, or an explicit `.ORG` has already been processed this pass";
+      a new exported `emitMarkStarted` (replacing `emitRequireOrg`) is the
+      shared guard for `emitInstruction`/`emitByteList`/`emitWordList`
+      (renamed call target only) and a new call added to `crpLabel`, run
+      unconditionally before the pass-mode branch so both passes agree
+      identically on a late `.ORG`. The late-`.ORG` case reuses
+      `CASM_DIAG_DUPLICATE_ORG` per the user's confirmed decision -- no new
+      diagnostic identifier. `test_casm_pass1`/`test_casm_passcheck` needed
+      their own `CasmCliOptions` stand-in, found via a real link failure
+      during implementation. Reused the existing `casmorg1` fixture
+      (Phase 4 WP13, no `.ORG`) as the primary positive case -- its
+      expected outcome flips from `CASM_DIAG_ORG_REQUIRED` to a successful
+      relocatable assembly, the intended effect of this WP. Added
+      `casmorgexpl1` (byte-identical trusted reference to `casmorg1`,
+      proving implicit-default and explicit-`.ORG $3400` equivalence),
+      `casmnoorg1` (forward-referenced label under the implicit origin), and
+      `casmorglate1` (label then `.ORG`, closing the latent gap). User ran
+      the full verification matrix (7 new-behavior checks, 3 new-rejection
+      checks, 5 regression spot-checks including both standalone harnesses)
+      and confirmed: "All tests pass." Final CASM `0.1.40` build 1145,
+      no-change rebuild stable, all three disk images build clean. MAIN
+      headroom 128 of 13568 bytes (down from 189; this WP cost 61 bytes, no
+      bump needed). Walkthrough:
+      `brain/walkthroughs/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md`.
+      **WP38 is complete.**
+
 ## Phase 8 Acceptance
 
 - [ ] Relocatable output is the default; `/S` forces static output, still

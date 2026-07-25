@@ -1,0 +1,23 @@
+# CASM WP38 trusted reference: casmorg1
+#
+# Independently hand-assembled from the casmorg1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake ("LDA #$01", no .ORG). NOT produced
+# by CASM. This fixture predates WP38 (Phase 4 WP13) and was originally a
+# diagnostic-only fixture expecting CASM_DIAG_ORG_REQUIRED, since .ORG was
+# mandatory at the time -- see brain/walkthroughs/2026-07-17-casm-phase4-wp13-directives-emission.md.
+# WP38 makes .ORG optional and defaults a no-.ORG assembly to relocatable
+# mode at CASM_DEFAULT_ORIGIN ($3400), so casmorg1 now assembles
+# successfully and gains a real trusted reference. This is the intended
+# effect of WP38, not a regression. Cross-check:
+#   - brain/plans/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md
+#
+# Source (no .ORG) and hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian -- the
+#                default relocatable origin, no PC advance)
+#   A9 01        LDA #$01
+#
+# bytes: 4
+# sha256: 52f7bcbf5b30fcc1fe893cc06d63dee077996d9e5d02f129b4a96e57c85eff8a
+
+00 34
+A9 01

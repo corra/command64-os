@@ -57,6 +57,9 @@
 .export cliSourceSlotLo  ; source.o's sourceLoad references this by name
 .export cliSourceSlotHi  ; source.o's sourceLoad references this by name
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
+.export CasmCliOptions   ; WP38: emit.o's emitInit references this by name;
+                          ; never populated or read here either -- this
+                          ; harness never calls emitInit
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -170,6 +173,7 @@ FailCount: .res 1
 CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
+CasmCliOptions:  .res 1
 
 .segment "RODATA"
 

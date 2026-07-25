@@ -484,6 +484,10 @@ set(CASM_TEST_FIXTURES
     # WP35 diagnostic filename fixture (first-file case)
     "${CASM_TEST_FIXTURE_DIR}/casmmfdiag1.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmfdiag2.seq"
+    # WP38 default relocatable origin fixtures
+    "${CASM_TEST_FIXTURE_DIR}/casmorgexpl1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmnoorg1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/casmorglate1.seq"
     # casmmfovf1/casmmfovf2 (combined-overflow boundary) and casmbiga/
     # casmbigb (WP36 large, under-cap, two-file successful-assembly
     # fixture) are NOT listed here: their raw source text (40000/30000
@@ -515,7 +519,8 @@ set(CASM_REF_DIR "${CMAKE_BINARY_DIR}/casm_refs")
 set(CASM_REF_MANIFEST_DIR "${CMAKE_SOURCE_DIR}/tests/fixtures/casm")
 set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     p1fwd1 p1back1 p1size1 brfwd1 brback1 casmcase1 casmmaxid1
-    casmmf1 casmmf2 casmmf3 casmbig1)
+    casmmf1 casmmf2 casmmf3 casmbig1
+    casmorg1 casmorgexpl1 casmnoorg1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

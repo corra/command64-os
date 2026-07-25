@@ -218,6 +218,12 @@ CASM_OPT_MAP    = %00000100
 CASM_OPT_LIST   = %00001000
 CASM_OPT_ALL    = CASM_OPT_OUTPUT | CASM_OPT_STATIC | CASM_OPT_MAP | CASM_OPT_LIST
 
+; WP38 (Phase 0C.14/15): the page-aligned origin a relocatable assembly (no
+; .ORG, no /S) starts at. Matches CASM's own add_ca65_app base link and
+; every external app's base-linked relocation page, per the Phase 0C.14
+; freeze.
+CASM_DEFAULT_ORIGIN = $3400
+
 ; Stable parser results. Public CLI routines return carry clear with
 ; CASM_PARSE_OK or carry set with a CASM_DIAG_* value; these identifiers are
 ; available for internal dispatch and static fixtures.

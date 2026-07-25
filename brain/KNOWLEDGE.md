@@ -1264,6 +1264,80 @@ completion gate.
 **CASM Phase 8 WP37 is complete.** WP38 remains separately gated and
 unstarted; this freeze does not activate it.
 
+### CASM Phase 8 WP38 Default Origin and `/S` Wiring (Phase 0C.15, 2026-07-24)
+
+Amends Phase 0C.14 above with as-built detail from WP38's actual
+implementation. Plan:
+`brain/plans/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md`.
+Walkthrough:
+`brain/walkthroughs/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md`.
+
+`.ORG` is now optional. `CASM_DEFAULT_ORIGIN = $3400` (`common.inc`) is the
+default relocatable origin when it is absent; `/S` forces static mode and
+still requires an explicit `.ORG`.
+
+Two mechanism gaps surfaced during planning, beyond what the Phase 0C.14
+freeze itself flagged as open:
+
+- `emitInit` never primed `CasmPc` -- safe only while `.ORG` was
+  mandatory-and-first, since `emitOrg` unconditionally overwrote it before
+  anything else ran. `emitInit` now conditionally primes `CasmPc` to
+  `CASM_DEFAULT_ORIGIN` unless `/S` is set (in which case it stays zero
+  until an explicit `.ORG` sets it, or the first qualifying statement is
+  rejected).
+- `crpLabel` (`casm.s`) never guarded against a label preceding `.ORG` at
+  all -- a latent gap since Phase 4 that no fixture had ever exercised,
+  since every prior fixture always put `.ORG` first.
+
+Both are closed by one unified mechanism: `CasmOrgSet` (`emit.s`) is
+renamed `CasmOutputStarted` and broadened from "an explicit `.ORG` has been
+processed" to "a label, a byte, or an explicit `.ORG` has already been
+processed this pass." A new exported `emitMarkStarted` (replacing
+`emitRequireOrg`) is the shared guard for all four qualifying call sites --
+`emitInstruction`, `emitByteList`, `emitWordList` (unchanged call shape,
+just a renamed target), and a new call added to `crpLabel`, deliberately
+run unconditionally before the pass-mode branch so Pass 1 and Pass 2 agree
+identically on whether a later `.ORG` is late. On the first qualifying
+statement of a relocatable (non-`/S`) assembly with no `.ORG` yet,
+`emitMarkStarted` writes the 2-byte header from `CasmPc` through the same
+`emitRawByte` pair `emitOrg` itself uses, inheriting the existing
+`CASM_PASS_MODE_MEASURE` no-op gate with no new pass-mode branching.
+`emitOrg` itself does not call `emitMarkStarted` (to avoid writing the
+header twice); it checks/sets `CasmOutputStarted` directly, matching its
+prior structure exactly.
+
+**The late-`.ORG` case reuses `CASM_DIAG_DUPLICATE_ORG`** rather than a new
+diagnostic identifier, per the user's confirmed decision -- both a genuine
+second `.ORG` and a `.ORG` arriving after an implicit default origin
+already started output are structurally "`.ORG` arrived after output had
+already started," and the existing message text does not claim the earlier
+event was itself an `.ORG`.
+
+Two standalone test harnesses (`test_casm_pass1`, `test_casm_passcheck`)
+needed their own `CasmCliOptions` stand-in BSS byte, since `emit.s` now
+references it and `ld65` links whole object files -- found by a real link
+attempt during implementation, not predicted in the WP37 freeze.
+
+`casmorg1` (an existing Phase 4 WP13 fixture, `LDA #$01` with no `.ORG`)
+was reused unmodified as the primary positive fixture: its expected outcome
+flips from `CASM_DIAG_ORG_REQUIRED` (historical) to a successful
+relocatable assembly at `$3400` -- the intended effect of this WP, not a
+regression. `casmorgexpl1` (the same instruction with an explicit
+`.ORG $3400`) has a deliberately byte-identical trusted reference, giving a
+real, automated proof that the implicit default and an explicit `.ORG` at
+the same address produce identical output. `casmnoorg1` (a no-`.ORG`
+forward-referenced label) proves the full two-pass label-resolution
+pipeline agrees with the implicit origin, not just `emitMarkStarted`'s own
+state machine in isolation. `casmorglate1` (a label followed by a later
+`.ORG`) proves the closed latent gap.
+
+MAIN headroom: 128 of 13568 bytes (down from 189; this WP cost 61 bytes),
+no size bump needed. User confirmed the full runtime verification matrix:
+"All tests pass." Final CASM `0.1.40` build 1145.
+
+**CASM Phase 8 WP38 is complete.** WP39 (relocation classification)
+remains separately gated and unstarted; this closure does not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

@@ -1,0 +1,30 @@
+# CASM WP38 trusted reference: casmnoorg1
+#
+# Independently hand-assembled from the casmnoorg1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake (no .ORG, forward-referenced label).
+# NOT produced by CASM. Proves the full two-pass label-resolution pipeline
+# agrees with the implicit default origin in both passes, not just
+# emitMarkStarted's own state machine in isolation. Cross-check:
+#   - brain/plans/2026-07-24-casm-phase8-wp38-default-origin-and-static-override.md
+#
+# Source (no .ORG):
+#   - START: JMP TARGET
+#   - TARGET: NOP
+#
+# START is defined at CasmPc = $3400 (a label emits no bytes, but is the
+# first qualifying statement, triggering the implicit default-origin header
+# write). JMP is a 3-byte absolute instruction (opcode $4C) at
+# $3400-$3402. TARGET is defined immediately after, at $3403 -- the
+# operand JMP resolves to. NOP ($EA) follows at $3403.
+#
+# Hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   4C 03 34     JMP $3403           (forward reference, resolved to TARGET)
+#   EA           NOP                 (at $3403, defines TARGET)
+#
+# bytes: 6
+# sha256: 4ad897d7df37ccd9b52ae860d3daafec809563104941c9363d6560b8a04c52ff
+
+00 34
+4C 03 34
+EA

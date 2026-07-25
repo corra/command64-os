@@ -108,6 +108,10 @@
 .export cliSourceSlotLo  ; this harness's own single-entry copy, see BSS section
 .export cliSourceSlotHi  ; this harness's own single-entry copy, see BSS section
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
+.export CasmCliOptions   ; WP38: emitInit now reads this; harness's own copy,
+                          ; zero-initialized BSS (non-static) -- every fixture's
+                          ; own explicit .ORG overwrites emitInit's priming
+                          ; regardless, so this default is inert either way
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -225,7 +229,7 @@ rmpSourceOk:
     sec
     rts
 rmpLexOk:
-    jsr emitInit             ; resets CasmPc/CasmOrgSet/CasmPcOverflow/CasmEmitLen
+    jsr emitInit             ; resets CasmPc/CasmOutputStarted/CasmPcOverflow/CasmEmitLen
                               ; -- and CasmPassMode to CASM_PASS_MODE_EMIT, which
                               ; MUST be overridden back to MEASURE immediately
                               ; below, every time, since emitInit's default
@@ -860,6 +864,7 @@ P1dpLabelCount: .res 1
 CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
+CasmCliOptions:  .res 1
 
 .segment "RODATA"
 

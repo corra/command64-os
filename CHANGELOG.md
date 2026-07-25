@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 8 WP38 default relocatable origin and `/S` wiring** (CASM
+  `0.1.40` build 1145): `.ORG` is now optional. An assembly with no `.ORG`
+  defaults to relocatable mode at `$3400`; `/S` forces static mode and
+  still requires an explicit `.ORG`. A late `.ORG` (arriving after a label,
+  byte, or another `.ORG` already started output) reuses the existing
+  `CASM: DUPLICATE ORG` diagnostic rather than a new identifier. Closed a
+  latent gap found during planning: a label preceding `.ORG` was never
+  rejected before this WP, despite the master plan's documented "`.org` ...
+  before any label or emitted byte" rule -- no fixture had ever exercised
+  it since every prior fixture put `.ORG` first. The existing `casmorg1`
+  fixture (Phase 4 WP13, `LDA #$01` with no `.ORG`) is reused unmodified as
+  the primary positive case; its expected outcome flips from the historical
+  `CASM: ORG REQUIRED` to a successful relocatable assembly -- the intended
+  effect of this WP, not a regression. A new byte-identical trusted
+  reference (`casmorgexpl1`, the same instruction with an explicit
+  `.ORG $3400`) proves the implicit default and an explicit origin produce
+  identical output, not just "it doesn't crash." No relocation table or R6
+  footer exists yet -- output remains a plain PRG either way. MAIN headroom
+  128 of 13568 bytes (down from 189; this WP cost 61 bytes). User confirmed
+  the full verification matrix: "All tests pass."
 - **CASM Phase 8 WP37 prerequisite reconciliation and Phase 0C.14 freeze**
   (CASM `0.1.39` build 1143): opens CASM Phase 8 ("Native R6 Relocation").
   No functional change -- froze the contract WP38-WP42 implement against.
