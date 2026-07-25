@@ -831,6 +831,52 @@
     (native R6 relocation consumption) remains separately gated and
     unstarted; neither this closure nor any individual WP activates it.
 
+- [/] Taskwarrior (`c50df549-a7ae-4859-bd16-45a843425ce6`): CASM Phase 8
+      native R6 relocation
+  - [x] `285322e5-ef7e-468e-bf53-b19b110dccb0` WP37 prerequisite
+        reconciliation and Phase 0C.14 freeze
+    - Plan:
+      `brain/plans/2026-07-24-casm-phase8-wp37-prerequisite-reconciliation.md`
+    - Active on `feature/casm-phase8-wp37` from `main` at `07b5062` --
+      `feature/casm-phase7-wp36` was merged to `main` first, per the user's
+      confirmed decision, since `main` had not been advanced past WP32 and
+      this project's convention merges a phase's closeout WP to `main`
+      before the next phase's first WP branches from it
+    - Verified the CASM Phase 7 completion gate (`0.1.38` build 1142, 189
+      bytes MAIN headroom)
+    - Found the default is inverted today (`.ORG` required, not merely
+      absent) -- there is no relocatable output path at all yet
+    - Found most of the relocatable-value ABI (`CASM_EXPR_FLAG_RELOCATABLE`)
+      already exists end to end from Phase 5/6B foresight with only a
+      producer missing; the producer belongs in `expr.s` (gated on a
+      whole-assembly relocatable-mode flag), not `symbols.s`, since no
+      named-constant symbol kind exists before Phase 12 and every current
+      symbol is a label
+    - Found, by tracing every `VAL_HI`/extracted-`VAL_LO` write in
+      `emit.s`, that four emission sites (not one) need the relocation
+      hook: `emitInstruction`'s shared length-3 branch (covers absolute/
+      absolute,X/absolute,Y/indirect uniformly), `emitWordList`, and two
+      easy-to-miss cases -- `emitByteList`'s `.BYTE >label` (already parses
+      successfully today as a silent non-relocatable constant) and
+      `eiTwoByte`'s `CASM_MODE_IMMEDIATE` case (`LDA #>label`, which must
+      be distinguished from the zero-page modes sharing its code path)
+    - Found, mirroring WP32's precedent, that `symbol +/- constant`
+      addends are always safely representable under the R6 common-page-
+      delta model by associativity, so no new "unrepresentable expression"
+      diagnostic is expected -- only a relocation-table-capacity one
+    - User confirmed three architectural decisions: default relocatable
+      origin `$3400`; `/S`-only scope this phase (deferring `.STATIC`/
+      `.RELOC` source directives); 4096-entry/8192-byte relocation table
+      capacity cap
+    - Taskwarrior milestone (`c50df549`) and WP37-WP42 child tasks created,
+      chained by dependency; Phase 0C.14 contract recorded in
+      `brain/KNOWLEDGE.md`; `wiki/tasks/casm.md` updated with the Phase 8
+      section
+    - Version-only completion increment applied: final CASM `0.1.39` build
+      1143, no-change rebuild stable, R6 footer of `casm.prg` itself
+      unchanged in shape (base `$3400`, 1554 relocation entries), all three
+      disk images build clean. **WP37 is complete**; awaiting user approval
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval

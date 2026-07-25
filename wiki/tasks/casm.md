@@ -1000,3 +1000,68 @@ own sequencing -- neither is activated by this closure.
 `0.1.38` build 1142). CASM Phase 7 is complete.** CASM Phase 8 (native R6
 relocation consumption) remains separately gated and unstarted, per the
 master plan's own sequencing -- this closure does not activate it.
+
+# CASM Phase 8 - Native R6 Relocation
+
+Parent Taskwarrior UUID: `c50df549-a7ae-4859-bd16-45a843425ce6` -
+"CASM Phase 8: Native R6 relocation". Depends on WP37-WP42 below.
+
+Parent plan:
+`brain/plans/2026-07-16-casm-assembler-implementation-plan.md` (Phase 8
+section)
+WP37 plan:
+`brain/plans/2026-07-24-casm-phase8-wp37-prerequisite-reconciliation.md`
+
+## Phase 8 Work Packages
+
+- [x] `285322e5-ef7e-468e-bf53-b19b110dccb0`: WP37 prerequisite
+      reconciliation and Phase 0C.14 freeze. Plan approved as drafted:
+      `brain/plans/2026-07-24-casm-phase8-wp37-prerequisite-reconciliation.md`.
+      Active on `feature/casm-phase8-wp37` from `main` at `07b5062`
+      (Phase 7's `feature/casm-phase7-wp36` merged to `main` first, per the
+      user's confirmed decision, matching this project's established
+      phase-transition convention). Verified the CASM Phase 7 completion
+      gate (`0.1.38` build 1142, 189 bytes MAIN headroom). Found the
+      default is inverted today (`.ORG` required, not merely absent) and
+      that most of the relocatable-value ABI already exists end to end
+      from Phase 5/6B foresight with only a producer missing -- the
+      producer belongs in `expr.s` (gated on a whole-assembly relocatable-
+      mode flag), not `symbols.s`, since no named-constant symbol kind
+      exists before Phase 12 and every current symbol is a label. Found by
+      tracing every `VAL_HI`/extracted-`VAL_LO` write in `emit.s` that four
+      emission sites (not one) need the relocation hook, including two
+      easy-to-miss cases: `.BYTE >label` already parses successfully today
+      as a silent non-relocatable constant, and `LDA #>label` shares its
+      code path with zero-page modes and must be distinguished from them.
+      Found, mirroring WP32's precedent, that `symbol +/- constant`
+      addends are always safely representable under the R6 common-page-
+      delta model by associativity, so no new "unrepresentable expression"
+      diagnostic is expected -- only a relocation-table-capacity one.
+      User confirmed three architectural decisions: default relocatable
+      origin `$3400` (matches CASM's own link address and every external
+      app's `add_ca65_app` convention); `/S`-only scope this phase,
+      deferring `.STATIC`/`.RELOC` source preamble directives; and a
+      4096-entry/8192-byte relocation table capacity cap. Proposed WP38-
+      WP42 breakdown recorded in the plan and in `brain/KNOWLEDGE.md`'s
+      Phase 0C.14 section. Taskwarrior milestone (`c50df549`) and WP37-WP42
+      child tasks (`285322e5`-WP37 through WP42, chained by dependency)
+      created. Version-only completion increment applied: final CASM
+      `0.1.39` build 1143, no-change rebuild stable, R6 footer of `casm.prg`
+      itself unchanged in shape (base `$3400`, 1554 relocation entries),
+      all three disk images (`image_d64`, `test_image_d64`,
+      `casm_overflow_test_d64`) build clean. **WP37 is complete.**
+
+## Phase 8 Acceptance
+
+- [ ] Relocatable output is the default; `/S` forces static output, still
+      requiring an explicit `.ORG`.
+- [ ] Every relocatable high byte (absolute/indexed/indirect operands,
+      `.WORD` symbols, and `>symbol` high-byte extraction) is recorded at
+      its correct code offset; constants, branches, `<symbol`, and
+      zero-page operands are excluded.
+- [ ] Relocation-table-capacity overflow is checked and diagnosed cleanly.
+- [ ] The native R6 table and footer match `tools/reloc.py`'s byte layout
+      exactly; CASM never invokes `tools/reloc.py` at runtime.
+- [ ] Command 64 loads and runs generated R6 fixtures at several
+      page-aligned addresses; static fixtures remain ordinary PRGs.
+- [ ] The user completes the Phase 8 runtime walkthrough and approves.

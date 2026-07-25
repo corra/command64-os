@@ -9,6 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 8 WP37 prerequisite reconciliation and Phase 0C.14 freeze**
+  (CASM `0.1.39` build 1143): opens CASM Phase 8 ("Native R6 Relocation").
+  No functional change -- froze the contract WP38-WP42 implement against.
+  Found the current default is inverted (`.ORG` is required, not merely
+  absent) and that most of the relocatable-value ABI
+  (`CASM_EXPR_FLAG_RELOCATABLE`) already exists end to end from Phase 5/6B
+  foresight with only a producer missing, which belongs in `expr.s` rather
+  than `symbols.s` since relocatability is a whole-assembly-mode property,
+  not a per-symbol one, given no named-constant symbol kind exists before
+  Phase 12. Traced every high-byte emission site in `emit.s` and found four
+  need the relocation hook, not one -- including two easy-to-miss cases,
+  `.BYTE >label` (already parses today as a silent non-relocatable
+  constant) and `LDA #>label` (shares its code path with zero-page modes).
+  Found that `symbol +/- constant` addends are always safely representable
+  under the R6 common-page-delta model, so no new "unrepresentable
+  expression" diagnostic is expected, only a relocation-table-capacity one.
+  User confirmed the default relocatable origin (`$3400`), scope (`/S`
+  only this phase, deferring `.STATIC`/`.RELOC` source directives), and the
+  relocation table capacity (4096 entries / 8192 bytes).
 - **CASM Phase 7 WP36 verification, walkthrough, and completion gate**
   (CASM `0.1.38` build 1142): closes CASM Phase 7 ("VMM-backed source and
   multiple top-level inputs"). Bundled the full accumulated WP32-35

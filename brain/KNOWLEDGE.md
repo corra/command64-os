@@ -1184,6 +1184,86 @@ CASM Phase 8 (native R6 relocation consumption) remains separately gated
 and unstarted, per the master plan's own sequencing -- this closure does
 not activate it.
 
+### CASM Phase 8 WP37 Native R6 Relocation Contract (Phase 0C.14, frozen 2026-07-24)
+
+Plan: `brain/plans/2026-07-24-casm-phase8-wp37-prerequisite-reconciliation.md`.
+WP37 implemented no ABI, storage, or CLI change -- it verified the Phase 7
+completion gate (`0.1.38` build 1142, 189 bytes MAIN headroom), reconciled
+the master plan's Phase 8 text against the current source, and froze the
+contract WP38-WP42 implement against. Key findings and decisions:
+
+- **The default is inverted today, not merely absent.** `.ORG` is currently
+  *required* (`CASM_DIAG_ORG_REQUIRED` fires on any byte-emitting statement
+  before it); there is no relocatable output path at all. WP38 must flip
+  this: `.ORG` becomes optional and forces static when present; absence
+  defaults to relocatable mode at the frozen origin.
+- **The relocatable-value ABI already exists end to end from Phase 5/6B
+  foresight, with only a producer missing.** `CASM_EXPR_FLAG_RELOCATABLE`
+  already flows unchanged from a resolver's output flags into the
+  expression result (`expr.s`), is already correctly cleared on `<`
+  low-byte extraction and preserved on `>` high-byte extraction and
+  `symbol +/- constant` addends -- `symbols.s` just never sets it
+  (its own comment: "symbols are always absolute, never RELOCATABLE").
+- **No `symbols.s` change is needed to fix that.** Relocatability is a
+  property of the whole assembly's output mode, not of any individual
+  symbol, since no named-constant symbol kind exists before Phase 12 --
+  every definable symbol today is a label (an address). The producer
+  belongs in `expr.s`, at the existing resolver-merge point, gated on a
+  whole-assembly relocatable-mode flag, keeping `symbols.s` unaware of
+  output-mode concepts.
+- **`symbol +/- constant` addends are always safely representable** under
+  the R6 common-page-delta model by simple associativity of page-aligned
+  address arithmetic; the current grammar has no symbol-symbol arithmetic.
+  Mirroring WP32's precedent for Phase 7, **no new "unrepresentable
+  expression" diagnostic is expected** -- only a relocation-table-capacity
+  one. Next free `CASM_DIAG_*` value is `$30`.
+- **Four emission sites need the relocation hook, found by tracing every
+  `VAL_HI`/extracted-`VAL_LO` write in `emit.s`, not assumed from the
+  addressing-mode table:** `emitInstruction`'s shared length-3 branch
+  (covers `CASM_MODE_ABSOLUTE`/`_X`/`_Y`/`_INDIRECT` uniformly --
+  `opcodes.s`'s `modeLength` table confirms all four are length 3, so one
+  hook needs no per-mode branching); `emitWordList`'s `VAL_HI` emission;
+  `emitByteList`'s single `VAL_LO` emission when the element used `>`
+  extraction (`.BYTE >label` already parses successfully today as a
+  silent, incorrectly non-relocatable constant -- a real, previously
+  unnoticed gap); and `emitInstruction`'s `eiTwoByte` branch, but only for
+  `CASM_MODE_IMMEDIATE` (`LDA #>label` shares its code path with
+  zero-page/indexed-indirect/indirect-indexed modes and must be
+  distinguished from them, which must never be relocatable).
+- **`CasmParserStmt.Flags` already reserves 7 unused bits beyond
+  `CASM_PARSER_STMT_FORCE_ABS`** (added by WP28 for exactly this kind of
+  extension). A new `CASM_PARSER_STMT_RELOCATABLE` bit (bit 1), derived at
+  the same `parser.s` site as `FORCE_ABS`, reaches all four emission sites
+  above through the shared `parserParseExpressionValue` call with no
+  per-caller duplication.
+- **User-confirmed decisions (2026-07-24):** default relocatable origin is
+  `$3400` (matches CASM's own link address and every external app's
+  `add_ca65_app` base-link convention); `.STATIC`/`.RELOC` source preamble
+  directives remain out of scope this phase (only CLI `/S` becomes
+  meaningful; `/S` still requires an explicit `.ORG`, since static mode has
+  no configured default); the relocation table is a flat VMM-backed
+  append-only list of 16-bit offsets capped at 4096 entries / 8192 bytes
+  (ample headroom under the existing 65535-byte single-allocation ceiling,
+  and against `CASM_VMM_CAPACITY = 8` with only 2 of 8 slots normally in
+  use today).
+- **R6 footer contract** matches `tools/reloc.py` exactly (table of 16-bit
+  LE offsets, 2-byte LE base address, 2-byte LE count, ASCII magic `"R6"`);
+  CASM never invokes `reloc.py` at runtime and never diffs two builds --
+  the base-address field is simply the frozen origin written directly. The
+  insertion point in `casm.s`'s `start` routine is immediately after
+  `emitFinalize` succeeds and before `diagPrintPhase2Ready`, gated on
+  relocatable mode; static-mode output is unaffected.
+
+Proposed WP breakdown (each requires its own dedicated plan and approval
+per `AGENTS.md`, not authorized by WP37 alone): WP38 optional `.ORG` /
+default origin / `/S` wiring; WP39 relocation classification (expr/parser
+ABI); WP40 relocation table storage and the four emission-site hooks; WP41
+native R6 footer serialization; WP42 verification, walkthrough, and Phase 8
+completion gate.
+
+**CASM Phase 8 WP37 is complete.** WP38 remains separately gated and
+unstarted; this freeze does not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
