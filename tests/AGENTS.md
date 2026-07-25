@@ -29,11 +29,14 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - Build `test_image_d64` regularly to verify the full test disk still
   includes all primary test programs, plus any intentional Kick-specific
   tests.
-- The test-image build generates CASM SEQ fixtures `casmempty` (0 bytes),
-  `casmshort` (17 bytes), `casm256` (256 bytes), and `casmmulti` (513 bytes)
-  for manual stream-boundary verification. The zero-block `casmempty` directory
-  entry is expected to fail open through Commodore DOS; the other three must
-  validate successfully.
+- The test-image build generates CASM SEQ fixtures `casmshort` (17 bytes),
+  `casm256` (256 bytes), and `casmmulti` (513 bytes) for manual
+  stream-boundary verification; all three must validate successfully. A
+  zero-block `casmempty` fixture existed through early CASM Phase 2/3
+  development but was removed from the build (`cc1541 -L`, used to create
+  its directory entry with no file content, sets track/sector to 0 --
+  suspected of corrupting `test.d64`); no equivalent zero-block fixture
+  remains on the disk.
 
 ## Child DOX Index
 

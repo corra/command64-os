@@ -8,7 +8,6 @@ endif()
 
 file(MAKE_DIRECTORY "${OUTPUT_DIR}")
 
-file(WRITE "${OUTPUT_DIR}/casmempty.seq" "")
 file(WRITE "${OUTPUT_DIR}/casmshort.seq"
     ".ORG \$2000\n"
     "    LDA #10\n"

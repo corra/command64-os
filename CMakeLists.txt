@@ -391,7 +391,6 @@ set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKE
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
-    "${CASM_TEST_FIXTURE_DIR}/casmempty.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
     "${CASM_TEST_FIXTURE_DIR}/casm256.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmmulti.seq"
@@ -635,23 +634,13 @@ endforeach()
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
     set(CASM_FIXTURE_DISK_NAME "${CASM_FIXTURE_NAME}.s")
-    if(CASM_FIXTURE_NAME STREQUAL "casmempty")
-        add_custom_command(
-            TARGET test_image_d64 POST_BUILD
-            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
-                -L "${CMAKE_BINARY_DIR}/test.d64"
-            COMMENT "Appending empty CASM SEQ fixture to test.d64"
-            VERBATIM
-        )
-    else()
-        add_custom_command(
-            TARGET test_image_d64 POST_BUILD
-            COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
-                -w "${CASM_FIXTURE}" "${CMAKE_BINARY_DIR}/test.d64"
-            COMMENT "Appending ${CASM_FIXTURE_DISK_NAME} SEQ fixture to test.d64"
-            VERBATIM
-        )
-    endif()
+    add_custom_command(
+        TARGET test_image_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
+            -w "${CASM_FIXTURE}" "${CMAKE_BINARY_DIR}/test.d64"
+        COMMENT "Appending ${CASM_FIXTURE_DISK_NAME} SEQ fixture to test.d64"
+        VERBATIM
+    )
 endforeach()
 
 # Add test SEQ file to test.d64

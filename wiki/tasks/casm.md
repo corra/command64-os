@@ -118,9 +118,13 @@ Approved 2026-07-16 before Phase 2 source implementation.
   on hardware.
 - Do not mark the milestone done before the user confirms the walkthrough.
 
-The generated `test.d64` provides `casmempty`, `casmshort`, `casm256`, and
-`casmmulti` SEQ fixtures for the zero-block limitation, short,
-exact-256-byte, and multi-block input cases.
+The generated `test.d64` provides `casmshort`, `casm256`, and `casmmulti`
+SEQ fixtures for the short, exact-256-byte, and multi-block input cases.
+The zero-block `casmempty` fixture (`CANNOT OPEN INPUT` via Commodore DOS,
+per Phase 2 Acceptance above) was later removed from the build: `cc1541
+-L`, used to create its directory entry with no file content, sets
+track/sector to 0, suspected of corrupting `test.d64`. No equivalent
+zero-block fixture remains on the disk.
 
 The Phase 2 walkthrough and confirmed CLI matrix are recorded in
 `brain/walkthroughs/2026-07-16-casm-phase2-cli-file-services.md`.
