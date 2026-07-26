@@ -52,7 +52,13 @@ apiHandler:
     cmp #DOS_VMM_READ
     beq ahVmmRead
     cmp #DOS_VMM_WRITE
-    beq ahVmmWrite
+    bne apiNotVmmWrite
+    jmp ahVmmWrite
+apiNotVmmWrite:
+    cmp #DOS_RELEASE_L15
+    bne apiNotRelease
+    jmp ahReleaseL15
+apiNotRelease:
 
     // Unknown function — return with error (C=1)
     sec
@@ -205,5 +211,31 @@ ahVmmWrite:
     sec
     rts
 _avwOk:
+    clc
+    rts
+
+ahReleaseL15:
+    // Ensures KERNAL LFN 15 is genuinely closed and forgets the OS's
+    // persistent-open cache for it (L15Device/ensureL15Open, file.asm).
+    // Actively closes LFN 15 itself if the cache believes it's open --
+    // this is NOT just "tell the OS you closed it yourself" (an earlier,
+    // weaker version of this primitive was exactly that, and it wasn't
+    // enough: a caller like LABEL needs this BEFORE its own first OPEN of
+    // LFN 15 too, when the channel may still be genuinely open from any
+    // prior DOS_SEND_COMMAND/checkDeviceReady/readErrorChannel-based
+    // command -- LOAD, DIR, VOL, DELETE, RENAME, PATH -- run earlier in
+    // the same session; at that point the caller hasn't opened or closed
+    // anything itself yet, so a pure flag reset would leave the channel
+    // genuinely open and the caller's own OPEN would still conflict).
+    // Safe to call whether or not anything is actually cached open.
+    // Input: None
+    // Output: Carry = 0 (always)
+    lda #15
+    jsr KernalCLOSE     // Safe even if LFN 15 isn't actually open -- real
+                        // KERNAL CLOSE on an unopened logical file is
+                        // always a harmless no-op (labelExit already
+                        // relies on this same fact).
+    lda #0
+    sta L15Device
     clc
     rts

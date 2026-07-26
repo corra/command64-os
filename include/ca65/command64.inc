@@ -63,6 +63,7 @@ DOS_PARSE_PREFIX = $57 ; Parse target device prefix from ZP pointer
 DOS_SEND_COMMAND = $58 ; Send raw command-channel string, read drive response
 DOS_VMM_READ     = $59 ; Block-read bytes from a DOS_ALLOC_MEM'd REU segment
 DOS_VMM_WRITE    = $5A ; Block-write bytes to a DOS_ALLOC_MEM'd REU segment
+DOS_RELEASE_L15  = $5B ; Close LFN 15 and clear the OS command-channel cache
 
 ; --- PETSCII Control Characters ---
 PetCr   = $0D ; Carriage return

@@ -192,6 +192,14 @@ padLabel:
     bne padLabel
 
 openChannels:
+    ; Ensure LFN 15 is genuinely free before claiming it: any prior
+    ; LOAD/DIR/VOL/DELETE/RENAME/PATH in this session may have left it
+    ; open and cached by the OS's own ensureL15Open (file.asm). Without
+    ; this, the very first OPEN below can fail with "FILE ALREADY OPEN"
+    ; even though LABEL hasn't touched LFN 15 itself yet.
+    lda #DOS_RELEASE_L15
+    jsr OS_API
+
     lda #0
     jsr KernalSETNAM
     lda #CMD_CHANNEL
@@ -200,6 +208,7 @@ openChannels:
     jsr KernalSETLFS
     jsr KernalOPEN
     bcc openCmdOk
+    sta LastErrCode
     jmp openErr
 openCmdOk:
 
@@ -225,6 +234,7 @@ sendInitDone:
     jsr KernalSETLFS
     jsr KernalOPEN
     bcc openDataOk
+    sta LastErrCode
     lda #CMD_CHANNEL
     jsr KernalCLOSE
     jmp openErr
@@ -371,13 +381,44 @@ openErr:
     ldy #>devMsg
     lda #DOS_PRINT_STR
     jsr OS_API
+    jsr printErrCode
     jmp labelExit
+
+; ---------------------------------------------------------------------------
+; printErrCode
+; Prints LastErrCode (the real KERNAL error number from the failed OPEN,
+; e.g. 2 = FILE ALREADY OPEN, 5 = DEVICE NOT PRESENT) as two decimal
+; digits followed by CR. devMsg no longer claims a specific cause on its
+; own -- the real KERNAL code distinguishes a genuine device absence from
+; any other OPEN failure (see brain/plans/label-l15-cache-release.md).
+; ---------------------------------------------------------------------------
+printErrCode:
+    lda LastErrCode
+    ldx #$2F
+pecTens:
+    inx
+    sec
+    sbc #10
+    bcs pecTens
+    adc #10
+    pha
+    txa
+    jsr KernalChROUT
+    pla
+    clc
+    adc #'0'
+    jsr KernalChROUT
+    lda #$0D
+    jsr KernalChROUT
+    rts
 
 labelExit:
     lda #CMD_CHANNEL
     jsr KernalCLOSE
     lda #DATA_CHANNEL
     jsr KernalCLOSE
+    lda #DOS_RELEASE_L15
+    jsr OS_API
     lda SavedDevice
     sta CurrentDevice
     rts
@@ -425,10 +466,13 @@ promptMsg:
     .byte $29, $3F, $20
     .byte $00
 
+; "DRIVE ERROR " -- no trailing CR/message-specific claim: printErrCode
+; appends the real two-digit KERNAL error code and CR itself, so this
+; string never has to hardcode (and potentially misstate) a specific
+; cause the way the old "DEVICE NOT PRESENT" text always did.
 devMsg:
-    .byte $44, $45, $56, $49, $43, $45, $20, $4E, $4F, $54, $20, $50, $52
-    .byte $45, $53, $45, $4E, $54
-    .byte $0D, $00
+    .byte $44, $52, $49, $56, $45, $20, $45, $52, $52, $4F, $52, $20
+    .byte $00
 
 ; "LABEL V" prefix is the same proven-correct hex as the other message
 ; strings above; VERSION_MAJOR/MINOR/STAGE and BUILD_NUMBER are real
@@ -446,3 +490,10 @@ statusBuf:
 
 labelBuf:
     .res 16, $A0
+
+; Real KERNAL error code from the most recent failed KernalOPEN (see
+; openErr/printErrCode) -- must be stashed immediately on return from
+; KernalOPEN, before any other KERNAL call (e.g. the CMD_CHANNEL cleanup
+; KernalCLOSE on a failed DATA_CHANNEL open) has a chance to clobber A.
+LastErrCode:
+    .res 1

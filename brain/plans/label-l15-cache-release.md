@@ -53,11 +53,11 @@ program would. Sequence:
    persistence mechanism).
 
 This plan implements the user's chosen remediation: a new, general-purpose
-kernel primitive, `DOS_RELEASE_L15`, that any external program calls after
-independently closing LFN 15 itself, to tell the OS's cache the channel is
-closed. `LABEL` becomes its first caller. Also fixes Bug 1 (the misleading
-message) while in the area, since it's small, well-understood, and directly
-surfaced by this investigation -- see Scope.
+kernel primitive, `DOS_RELEASE_L15`, that actively closes LFN 15 and clears
+the OS's cache. An external program calls it before claiming LFN 15 directly
+and after finishing direct use. `LABEL` becomes its first caller. Also fixes
+Bug 1 (the misleading message) while in the area, since it's small,
+well-understood, and directly surfaced by this investigation -- see Scope.
 
 ## Dependency Review
 
@@ -88,17 +88,10 @@ surfaced by this investigation -- see Scope.
    treats `0` as "not open" -- real device numbers are always 8-11, so `0`
    is never a valid cached device and is already the implicit "closed"
    sentinel). No new sentinel or state byte is needed.
-4. **Single call site is sufficient, placed in `labelExit`, not at entry.**
-   Re-traced every exit path in `label.s`: `noArgErr`, `tooLongErr`,
-   `openErr` (both the CMD_CHANNEL-fails and DATA_CHANNEL-fails branches),
-   `cancelExit`, and the success path all funnel through `labelExit`, which
-   *already* unconditionally closes LFN 15 there (even on paths where
-   `LABEL` itself never opened it, e.g. `cancelExit` -- a harmless no-op
-   `KernalCLOSE` on an unopened LFN either way). Placing the new call
-   immediately after that existing `KernalCLOSE` covers every exit path
-   uniformly with one addition, and needs no entry-side change: nothing
-   else runs between `LABEL`'s own open/use/close of LFN 15, so `L15Device`
-   cannot become stale *during* `LABEL`'s run, only after it exits.
+4. **Entry and exit calls are both required.** The entry call actively closes
+   LFN 15 before `LABEL` claims it, because prior OS disk activity may have
+   left the channel genuinely open. Every exit path funnels through
+   `labelExit`, where the second call clears the cache after direct use.
 5. **`sendSA15Command` deliberately never closes LFN 15** (`file.asm:930-939`)
    -- confirmed by reading its full body, not assumed -- so any prior
    `DOS_SEND_COMMAND`/`checkDeviceReady`/`readErrorChannel` call in the same
@@ -135,8 +128,8 @@ Included:
   `L15Device` directly (it's a plain global label in the same Kick
   assembly, already referenced across files with no import ceremony,
   matching every other cross-file OS-core reference in this codebase).
-- `src/external/label/label.s`: call `DOS_RELEASE_L15` once, in `labelExit`,
-  immediately after the existing `KernalCLOSE #CMD_CHANNEL`.
+- `src/external/label/label.s`: call `DOS_RELEASE_L15` before the first direct
+  LFN 15 open and again in `labelExit` after direct use.
 - **Bug 1 fix, bundled in** (small, directly discovered by this
   investigation, same file): `openErr` currently discards the real KERNAL
   error code. Change it to print the actual two-digit decimal error number
@@ -172,18 +165,15 @@ Excluded:
 `DOS_RELEASE_L15` (new function number `$5B`):
 
 - **Input:** None.
-- **Output:** `Carry` = 0 (always succeeds -- this is a pure local state
-  reset, no KERNAL I/O of its own).
-- **Behavior:** Sets `L15Device` to `0` (the existing "not open" sentinel).
-  Does **not** itself call `KernalCLOSE` -- the caller is expected to have
-  already closed LFN 15 for real (as `LABEL` already does, unconditionally,
-  immediately before this call). Calling it when LFN 15 was never actually
-  open, or was already closed, is always safe (idempotent: resets an
-  already-`0` value to `0`).
-- **Contract for callers:** call this immediately after closing KERNAL LFN
-  15 yourself, so the next `checkDeviceReady`/`readErrorChannel`/
-  `sendSA15Command`/`DOS_SEND_COMMAND` call correctly reopens it instead of
-  trusting a stale cache.
+- **Output:** `Carry` = 0 (always succeeds).
+- **Behavior:** Calls `KernalCLOSE` for LFN 15, then sets `L15Device` to `0`
+  (the existing "not open" sentinel). Calling it when LFN 15 was never open
+  or was already closed is safe because KERNAL CLOSE is a harmless no-op for
+  an unopened logical file.
+- **Contract for callers:** call this before directly opening KERNAL LFN 15
+  and again after direct use. The first call releases a channel retained by
+  prior OS activity; the second ensures the next cached OS operation reopens
+  it instead of trusting stale state.
 
 `label.s` change: `labelExit` becomes:
 ```
@@ -232,11 +222,9 @@ See Dependency Review items 1-7 above for the full reasoning. Summary:
 
 1. New primitive, not a migration to `DOS_SEND_COMMAND` -- smaller, general,
    matches what was approved.
-2. Single call site (`labelExit`, after the existing close), not an
-   entry-side call too -- sufficient because nothing else runs concurrently
-   during `LABEL`'s own lifetime to desync the cache mid-run.
-3. The primitive itself does no KERNAL I/O -- it only resets `L15Device`,
-   keeping it trivially safe to call even when nothing was actually open.
+2. Two call sites: before `LABEL`'s first direct open and after direct use.
+3. The primitive actively closes LFN 15, then resets `L15Device`; both steps
+   are safe even when nothing was open.
 4. Bundle the `openErr` real-error-code fix into this same plan (not a
    separate one) -- small, directly discovered here, and leaving it
    unfixed would keep misdiagnosing *any* future OPEN failure in `LABEL`,
@@ -331,3 +319,59 @@ applied, requiring investigation before completion.
   persistent drive unavailability. User selected the new-kernel-primitive
   remediation over migrating `LABEL` to `DOS_SEND_COMMAND` or a
   message-only fix. Awaiting approval before implementation begins.
+- 2026-07-25 (later): Approved as drafted. Activated on
+  `feature/label-l15-cache-release` from `main`'s tip. Implemented
+  `DOS_RELEASE_L15` exactly as planned. Two branch-range trampolines
+  needed in `api.asm`'s dispatch chain (`beq ahVmmWrite`/`beq
+  ahReleaseL15` both fell out of 6502 branch range once the new dispatch
+  line was added) -- the same class of fix this codebase hits at nearly
+  every dispatch-table or emission-code addition. `label.s`'s `openErr`
+  fix needed a small new `printErrCode` routine (a standard two-digit
+  decimal-conversion idiom) and a `LastErrCode` scratch byte, stashed
+  immediately on return from each failed `KernalOPEN` before anything else
+  (notably the DATA_CHANNEL-fail branch's own `KernalCLOSE`) could clobber
+  `A`. `tests/src/l15release/l15release.s` added, mirroring
+  `tests/src/sendcmd/sendcmd.s`'s style; discovered automatically by the
+  existing `tests/src/*/*.s` glob, no `CMakeLists.txt` registration
+  needed. Building `test_image_d64` then found a real capacity limit the
+  plan hadn't accounted for: `test.d64` sits at the 1541 directory
+  track's hard 144-entry ceiling (not a byte-space limit -- 139 blocks
+  were still free), and adding `test_l15release.prg` bumped `edlinfull`
+  off. Presented the exact numbers and three options to the user; approved:
+  ship `test_l15release` on the existing `casm_overflow_test_d64` disk
+  instead (mechanically just "a D64 with spare directory entries," despite
+  its CASM-flavored name/docs), removed from `TEST_IMAGE_PRG_TARGETS` via
+  `list(REMOVE_ITEM ...)` so it isn't double-packaged. All three disk
+  images build clean; `command64`/`label` both no-change-rebuild stable.
+  `wiki/api-reference.md` and `wiki/tasks/dos-release-l15.md` written.
+  Awaiting user runtime verification (standalone test + end-to-end
+  reproduction) before completion.
+- 2026-07-25 (later still): First verification pass found a real gap this
+  plan's Dependency Review item 4 got wrong. `test_l15release` passed
+  after fixing a test-harness-only bug (step 3 needed to actually close
+  LFN 15 before calling `DOS_RELEASE_L15`, since the first, weaker version
+  of the primitive only reset a flag and trusted the caller had already
+  closed the real channel). But `LABEL` itself still failed with the new
+  "DRIVE ERROR 02" message. Root cause: the plan's reasoning that "nothing
+  runs during LABEL's own lifetime to desync the cache mid-run, only a
+  single exit-side call is needed" missed the much more common case --
+  `LABEL`'s own *first* `OPEN` of LFN 15 can conflict with a channel left
+  genuinely open by *any prior* disk command in the same session (`LOAD`/
+  `DIR`/`VOL`/etc., which is how a user finds `LABEL.PRG` to run it at
+  all), before `LABEL` has touched LFN 15 itself. An exit-only call can
+  never fix that, since it only runs after `LABEL` is done. Fixed by
+  strengthening `DOS_RELEASE_L15` to actively `KernalCLOSE` LFN 15 itself
+  (safe unconditionally -- CLOSE on an unopened LFN is always a harmless
+  no-op, the same fact `labelExit` already relied on) rather than assuming
+  the caller already closed it, and adding a second call site at the
+  *start* of `label.s`'s `openChannels`, before its own first `OPEN`.
+  This pushed `command64`'s tightly-packed Utils/Api/Loader/Path/Vmm/File
+  segment cluster into the fixed `$1000` `ApiStub` boundary -- a real,
+  separate build failure, not this bug. Trimmed `ahReleaseL15` to an
+  unconditional close (removing a now-redundant `L15Device` check-and-skip
+  branch) to fit; **command64 now builds with exactly 1 free byte before
+  `$1000`**, flagged to the user as a fragile, worth-tracking state (no
+  established "bump the size" precedent exists for this fixed, external-
+  ABI-facing address the way CASM's MAIN segment has). All three disk
+  images rebuilt clean; `command64`/`label` both no-change-rebuild stable
+  again. Awaiting a second verification pass.

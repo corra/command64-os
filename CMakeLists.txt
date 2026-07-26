@@ -406,6 +406,12 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 # 6. Disk images
 set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${CASM_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
+# test_l15release ships on casm_overflow_test_d64 instead (see that target's
+# own comment) -- test.d64 sits at the 1541 directory track's hard 144-entry
+# ceiling, and adding one more entry there would bump an unrelated fixture
+# off. Remove it from the generic test.d64 packaging list so it isn't
+# double-packaged.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_l15release)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -601,11 +607,19 @@ add_dependencies(test_image_d64 casm_reference_fixtures)
 # carries comp.prg and the casmbig1.ref trusted-reference PRG -- excluded
 # from the generic CASM_REF_NAMES -> test.d64 loop below since its matching
 # .seq inputs live only on this disk, not test.d64.
+#
+# test_l15release also lives here, despite having nothing to do with CASM:
+# test.d64 sits at the 1541 directory track's hard 144-entry ceiling (not a
+# byte-space limit -- 139 blocks were still free), so adding it there would
+# have bumped an unrelated fixture off. This disk is mechanically just "a
+# D64 with spare directory entries," not CASM-exclusive in practice, and
+# reusing it was smaller-blast-radius than standing up a new disk image
+# for one 4-block test PRG. See brain/plans/label-l15-cache-release.md.
 add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp
+    PRGS casm comp test_l15release
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)

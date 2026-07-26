@@ -42,6 +42,7 @@
 .label DOS_SEND_COMMAND = $58  // Send raw command-channel string, read drive response
 .label DOS_VMM_READ    = $59  // Block-read bytes from a DOS_ALLOC_MEM'd REU segment
 .label DOS_VMM_WRITE   = $5A  // Block-write bytes to a DOS_ALLOC_MEM'd REU segment
+.label DOS_RELEASE_L15 = $5B  // Close LFN 15 and clear the OS command-channel cache
 
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return

@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **LABEL "device not present" + persistent drive lockup**: `LABEL` opens
+  KERNAL logical file 15 (the command channel) directly for its BAM
+  direct-access protocol, with no visibility into the OS's own
+  persistent-open cache for LFN 15 (`ensureL15Open`/`L15Device` in
+  `file.asm`, which backs `LOAD`/`DIR`/`VOL`/`DELETE`/`RENAME`/`PATH`/
+  `DOS_SEND_COMMAND`). Any prior disk operation in the same session left
+  LFN 15 genuinely open and cached; `LABEL`'s own `KernalOPEN` of LFN 15
+  then failed with KERNAL error 2 ("FILE ALREADY OPEN"), which `LABEL`
+  misreported as "DEVICE NOT PRESENT" regardless of the actual error code.
+  Worse, `LABEL` always closed LFN 15 on exit without telling the cache,
+  so every subsequent `checkDeviceReady`-gated drive operation then
+  believed LFN 15 was still open, skipped reopening it, and failed --
+  presenting as the drive being permanently gone until a full reset.
+  Fixed with a new kernel primitive, `DOS_RELEASE_L15` ($5B), that actively
+  closes LFN 15 and clears the cache. `LABEL` calls it before claiming LFN
+  15 and after direct use, so prior OS activity cannot block its first open
+  and the next OS caller reopens the channel for real. `LABEL`'s error
+  message now prints the actual KERNAL error code instead of a hardcoded,
+  often-wrong claim.
+  See `brain/plans/label-l15-cache-release.md`.
+
 ### Changed
 
 - **CASM Phase 8 WP42 verification and completion gate -- CASM Phase 8 is
