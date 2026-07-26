@@ -1284,6 +1284,53 @@ WP37 plan:
       (WP42)
 
 **All six items are checked. WP37-WP42 are complete and approved (CASM
-`0.1.44` build 1157). CASM Phase 8 is complete.** CASM Phase 9 (`.include`
-processing) remains separately gated and unstarted, per the master plan's
-own sequencing -- this closure does not activate it.
+`0.1.44` build 1157). CASM Phase 8 is complete.** That closure did not
+activate the separately gated CASM Phase 9 (`.include` processing); Phase 9
+was later activated through WP43 below.
+
+# CASM Phase 9 - Include Processing
+
+Parent Taskwarrior UUID: `687ada7e-4175-41b4-93f3-9e8df85c1a5c`.
+
+Parent plan:
+`brain/plans/2026-07-25-casm-phase9-include-processing.md`.
+
+## Phase 9 Work Packages
+
+- [/] `2826144e-b7c6-4372-8e1d-74cfff242d1a`: WP43 prerequisite
+      reconciliation and Phase 0C.19 freeze. Dedicated plan approved and active:
+      `brain/plans/2026-07-25-casm-phase9-wp43-prerequisite-reconciliation.md`.
+      Records-only implementation and automated verification pass at CASM
+      `0.1.44` build 1159; no functional include or
+      version change. Awaiting explicit completion approval before the
+      version-only `0.1.45` increment.
+- [ ] `2682d04b-05b0-4828-b88f-852234e3d006`: WP44 quoted include operand
+      grammar.
+- [ ] `199b4da7-987a-44cf-a84d-b4e0b786f5d0`: WP45 physical file catalog and
+      dynamic source loading.
+- [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d`: WP46 frame stack, nested
+      traversal, and cycle detection.
+- [ ] `579096d9-ce77-44db-96a9-c32654238949`: WP47 ordered include graph and
+      Pass 2 replay.
+- [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095`: WP48 included-source diagnostics
+      and tracebacks.
+- [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693`: WP49 verification, walkthrough,
+      and Phase 9 completion gate.
+
+## Phase 9 Acceptance
+
+- [ ] `.INCLUDE` accepts one quoted 1-63-byte raw PETSCII filename and rejects
+      malformed operands deterministically.
+- [ ] Explicit child devices override inherited parent devices; no search path
+      or fallback probing occurs.
+- [ ] Nested includes support 16 active levels, detect direct/indirect cycles,
+      and permit sequential reinclusion.
+- [ ] Up to 32 distinct physical files and 128 include events are bounded and
+      diagnosed; distinct source bytes remain capped at 65,535.
+- [ ] Pass 2 opens no source files and exactly replays Pass 1's event graph.
+- [ ] Included labels, branches, static output, and relocatable R6 output match
+      equivalent flattened trusted references.
+- [ ] Included diagnostics identify the physical location and parent include
+      traceback.
+- [ ] The user completes the runtime walkthrough and explicitly approves Phase
+      9 completion.

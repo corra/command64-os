@@ -1640,9 +1640,32 @@ tests pass." Final CASM `0.1.44` build 1157, no-change rebuild stable, all
 three disk images build clean. All six Phase 8 Acceptance items checked in
 `wiki/tasks/casm.md`.
 
-**CASM Phase 8 (Native R6 Relocation) is complete.** CASM Phase 9
-(`.include` processing) remains separately gated and unstarted; this
-closure does not activate it.
+**CASM Phase 8 (Native R6 Relocation) is complete.** That closure did not
+activate the separately gated CASM Phase 9 (`.include` processing); Phase 9
+was later activated through WP43 below.
+
+## CASM Phase 9 WP43 Include Contract (Phase 0C.19, Frozen 2026-07-25)
+
+Phase 9 extends Phase 7's immutable VMM source model rather than replacing it
+with a live stack of open files. Pass 1 transiently loads each distinct include
+once into the existing source VMM store, closes the handle, and records an
+ordered include event. Pass 2 performs no source filesystem I/O and replays the
+recorded physical spans, validating parent/site/child correspondence.
+
+The approved bounds are: quoted-only 1-63-byte raw PETSCII filenames with no
+escapes; explicit device prefix or inherited parent device; no search path; 16
+active include levels; 32 distinct physical files; 128 include events; one 8KB
+VMM metadata allocation; and 65,535 distinct source bytes combined across all
+top-level and included files. Repeated includes expand repeatedly while sharing
+one physical byte copy. Device plus folded PETSCII filename defines identity;
+cycle detection scans only active frames, so sequential reinclusion is legal.
+
+Top-level inputs remain independent depth-zero roots in one symbol/output scope.
+Every include entry/return and root transition is a logical statement boundary,
+so missing physical newlines never concatenate source. Diagnostics identify the
+physical file/location and print the bounded parent include-site traceback.
+Implementation is split across WP44-WP49, each separately planned and approved.
+Parent plan: `brain/plans/2026-07-25-casm-phase9-include-processing.md`.
 
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.

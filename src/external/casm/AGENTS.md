@@ -68,6 +68,13 @@ The `src/external/casm` directory owns CASM, a native Command 64
   rewind.
 - Keep Pass 1 and Pass 2 deterministic; Pass 2 reparses a rewindable source
   stream rather than relying on an unbounded in-memory syntax tree.
+- Phase 9 include work follows the approved parent plan
+  `brain/plans/2026-07-25-casm-phase9-include-processing.md`: quoted 1-63-byte
+  raw-PETSCII filenames, inherited parent devices unless explicitly prefixed,
+  immutable Pass 1 VMM loading, filesystem-free Pass 2 event replay, 16 include
+  levels, 32 physical files, 128 include events, and a 65,535-byte combined
+  distinct-source cap. This is a planned contract until WP44-WP49 implement it;
+  do not describe `.INCLUDE` as currently operational before then.
 - Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
   by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
   point in the emission engine's byte writer -- not a structured event

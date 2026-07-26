@@ -358,11 +358,13 @@ This gate completes the CASM 0.1 minimum native assembler.
 
 ### Phase 9: Include Processing
 
-- Add `.include` through a bounded native source-frame stack.
+- Add `.include` through a bounded VMM-span source-frame stack; input handles
+  are transiently opened, loaded, and closed rather than retained by frames.
 - Define Command 64 device-prefix and include-path resolution.
 - Preserve included filename, line, and include-site provenance.
 - Detect missing files, maximum depth, and direct or indirect cycles.
-- Close every include handle during normal and fatal unwinding.
+- Close each transient include-load handle immediately after loading; retain
+  central ownership for fatal cleanup if close fails.
 - Record enough include-graph information in Pass 1 to replay the same source
   graph deterministically in Pass 2.
 

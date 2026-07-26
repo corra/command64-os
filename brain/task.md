@@ -1085,6 +1085,31 @@
     - **WP42 is complete, and with it the CASM Phase 8 milestone closes**,
       approved by the user
 
+- [/] `687ada7e-4175-41b4-93f3-9e8df85c1a5c` CASM Phase 9: include processing
+  - Parent plan:
+    `brain/plans/2026-07-25-casm-phase9-include-processing.md`
+  - [/] `2826144e-b7c6-4372-8e1d-74cfff242d1a` WP43 prerequisite
+        reconciliation and Phase 0C.19 freeze
+    - Dedicated plan:
+      `brain/plans/2026-07-25-casm-phase9-wp43-prerequisite-reconciliation.md`
+    - Records-only implementation and automated verification pass at CASM
+      `0.1.44` build 1159; awaiting explicit completion approval before the
+      version-only `0.1.45` increment
+    - Branch `feature/casm-phase9-wp43`, child of Stage 9 parent branch
+      `feature/casm-stage9` at baseline `b279365`
+  - [ ] `2682d04b-05b0-4828-b88f-852234e3d006` WP44 quoted include operand
+        grammar
+  - [ ] `199b4da7-987a-44cf-a84d-b4e0b786f5d0` WP45 physical file catalog and
+        dynamic source loading
+  - [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d` WP46 frame stack, nested
+        traversal, and cycle detection
+  - [ ] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and
+        Pass 2 replay
+  - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics
+        and tracebacks
+  - [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693` WP49 verification, walkthrough,
+        and Phase 9 completion gate
+
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
   - [x] Write detailed implementation plan for approval
