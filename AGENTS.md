@@ -116,7 +116,11 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
 ### Testing
 
 1.
-    + Don't: **NEVER** Test code using `c64-testing` MCP server when available **IT IS BROKEN**.
+    + Do: Use a VICE MCP only under `.agents/workflows/vice-mcp-testing.md`, including its
+      Command64 boot prerequisite, bounded observation/recovery rules, and evidence-based
+      failure classification.
+    + Don't: Launch Command64 applications from BASIC or with VICE Autostart; boot
+      Command64 first and launch applications by name from its shell.
     + Don't: **NEVER** Use a web based emulator as a fall back.
     + Do: **ALWAYS**  Ask user to perform tests when an MCP server is unavailable.
 
@@ -129,7 +133,7 @@ TODO: Pare down [Do's & Dont's]
 ## MCPs
 
 + `codebase-memory-mcp`: Used for searching the codebase
-+ `c64-testing`: Used for testing the codebase
++ `c64-testing`: VICE automation used only under `.agents/workflows/vice-mcp-testing.md`
 + `task-warrior-mcp`: Used for managing tasks
 + `sequential-thinking-mcp`: Used for sequential thinking
 

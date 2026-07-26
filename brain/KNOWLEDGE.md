@@ -1733,6 +1733,27 @@ and one `include.s`'s own header comments explicitly warned about -- this
 routine fell into it anyway, underscoring that the warning alone doesn't
 prevent the mistake; only tracing every clobbering call site does.
 
+### Agent-driven VICE testing contract
+
+- Agent-driven VICE tests must boot Command64 from the selected D64 before launching an
+  application. The first screen line `Command 64-DOS Version` proves OS startup.
+- Applications are launched by name from the Command64 shell, never through BASIC or
+  VICE Autostart after the OS is resident. A prompt matching `c64[<device>]:>` proves a
+  normal return to the shell; the device number is variable.
+- `image.d64` is the clean OS image, `test.d64` contains existing harnesses but has no
+  free directory entries, and `casm_overflow_test.d64` carries newer harnesses and
+  fixtures. Other dedicated images may be selected by their test documentation.
+- Agents use bounded observations and one clean recovery. Timeouts are not product
+  failures without independent evidence; results distinguish product, harness, setup,
+  and inconclusive outcomes. See `.agents/workflows/vice-mcp-testing.md`.
+- Application commands use their documented Command64 names, not the physically truncated
+  16-character D64 rendering. The `test_casm_passcheck` canary is launched by its full
+  name using the MCP's `_` → PETSCII `$A4` conversion and newline-to-Return behavior.
+- Observation deadlines are workload-specific. The 63-block `test_casm_passcheck` load
+  exceeded short two- and five-second windows under true-drive emulation but subsequently
+  completed with `CASM PASSCHECK: PASS`; its controlled canary budget is up to 60 seconds
+  before the first assertion observation, without polling.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

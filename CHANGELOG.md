@@ -32,6 +32,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **VICE MCP agent testing contract**: replaced the blanket MCP prohibition with a
+  state- and evidence-driven workflow. Agents must boot Command64 from the selected D64,
+  verify `Command 64-DOS Version`, launch applications by name from the shell, require a
+  `c64[<device>]:>` prompt for shell-return proof, avoid application Autostart, bound
+  polling and recovery, and distinguish product failures from harness/setup failures and
+  inconclusive outcomes. The workflow now also requires inspecting actual 16-character
+  application names and uses explicit ASCII-to-PETSCII keyboard input; the controlled
+  canary is launched by its full name, `test_casm_passcheck`. Live testing confirmed
+  `CASM PASSCHECK: PASS`; the workflow now requires workload-specific deadlines so slow
+  true-drive loads are not misclassified from short generic delays.
 - **CASM Phase 9 WP45 physical file catalog and dynamic source loading**
   (CASM `0.1.47` build 1171): added a standalone `include.s` module (8KB
   metadata VMM store, device resolution via the OS's own `DOS_PARSE_PREFIX`,
