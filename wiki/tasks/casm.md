@@ -1222,17 +1222,68 @@ WP37 plan:
       `brain/walkthroughs/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`.
       **WP41 is complete.**
 
+- [x] `186aadb1-462d-48d1-87bb-e1c9af6c75e1`: WP42 verification, walkthrough,
+      and Phase 8 completion gate. Plan approved as drafted:
+      `brain/plans/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`.
+      Active on `feature/casm-phase8-wp42` from `feature/casm-phase8-wp41`'s
+      tip. Traced the master plan's literal Phase 8 gate text against every
+      WP38-WP41 verification section and found the one real gap every prior
+      WP had deferred here: no relocatable fixture had ever been loaded
+      away from its assembled address and actually run -- every one was
+      checked exclusively via `COMP` against a byte reference, proving the
+      file correct but never that the OS's existing `aptRelocate` loader
+      (`src/command64/loader.asm`) correctly consumes CASM's native R6
+      output. Closed it with a new fixture, `casmreloc1` -- its one
+      relocatable byte reuses the already-proven immediate high-byte-
+      extraction shape (`LDY #>label`, established correct by `casmrelop2`
+      in WP40), so it tests `aptRelocate`'s consumption rather than
+      introducing a new classification risk. Also re-ran WP31's 7-fixture
+      Phase 3/4 diagnostic regression sample, unrun since WP36 despite
+      WP39 materially changing the expression-evaluation core those
+      fixtures depend on (`exprEvaluate`'s new parameter,
+      `parserParseExpressionValue`'s new commit-trigger site) -- all 7
+      reproduced their established outcomes correctly. User ran the full
+      consolidated matrix (6 standalone harnesses, 22 byte-identical
+      references including `casmreloc1`, 8 diagnostic scenarios, the
+      7-fixture regression sample, static-fixture regression, and --
+      the new part -- `casmreloc1` loaded and run at `$3400` (zero-delta
+      control), `$4000`, and `$5000`, printing the same correct message at
+      every address) and confirmed: "All tests pass." One non-reproducible
+      anomaly noted during this WP: a single report of `TEST_CASM_PASS1`
+      failing with the same VMM/REU-exhaustion signature WP41 twice
+      diagnosed and fixed, despite a fresh VICE reset before the run and no
+      further leak found on re-inspection of `casm_pass1.s`/
+      `casm_passcheck.s` (both confirmed correct). Did not reproduce on a
+      full from-scratch re-run in order; recorded as an open, unresolved,
+      non-blocking observation rather than a confirmed defect, since no
+      root cause could be identified or fixed. Checked all six Phase 8
+      Acceptance items. Final CASM `0.1.44` build 1157, no-change rebuild
+      stable, all three disk images build clean. Walkthrough:
+      `brain/walkthroughs/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`.
+      **WP42 is complete, and with it the CASM Phase 8 milestone closes.**
+
 ## Phase 8 Acceptance
 
-- [ ] Relocatable output is the default; `/S` forces static output, still
-      requiring an explicit `.ORG`.
-- [ ] Every relocatable high byte (absolute/indexed/indirect operands,
+- [x] Relocatable output is the default; `/S` forces static output, still
+      requiring an explicit `.ORG`. (WP38)
+- [x] Every relocatable high byte (absolute/indexed/indirect operands,
       `.WORD` symbols, and `>symbol` high-byte extraction) is recorded at
       its correct code offset; constants, branches, `<symbol`, and
-      zero-page operands are excluded.
-- [ ] Relocation-table-capacity overflow is checked and diagnosed cleanly.
-- [ ] The native R6 table and footer match `tools/reloc.py`'s byte layout
-      exactly; CASM never invokes `tools/reloc.py` at runtime.
-- [ ] Command 64 loads and runs generated R6 fixtures at several
-      page-aligned addresses; static fixtures remain ordinary PRGs.
-- [ ] The user completes the Phase 8 runtime walkthrough and approves.
+      zero-page operands are excluded. (WP39/WP40)
+- [x] Relocation-table-capacity overflow is checked and diagnosed cleanly.
+      (WP40)
+- [x] The native R6 table and footer match `tools/reloc.py`'s byte layout
+      exactly; CASM never invokes `tools/reloc.py` at runtime. (WP41)
+- [x] Command 64 loads and runs generated R6 fixtures at several
+      page-aligned addresses; static fixtures remain ordinary PRGs. (WP42:
+      `casmreloc1` loaded and run at `$3400`/`$4000`/`$5000` via the OS's
+      existing `aptRelocate` loader -- the first time any CASM-generated
+      R6 output was actually loaded away from its assembled address and
+      executed, rather than only byte-compared.)
+- [x] The user completes the Phase 8 runtime walkthrough and approves.
+      (WP42)
+
+**All six items are checked. WP37-WP42 are complete and approved (CASM
+`0.1.44` build 1157). CASM Phase 8 is complete.** CASM Phase 9 (`.include`
+processing) remains separately gated and unstarted, per the master plan's
+own sequencing -- this closure does not activate it.

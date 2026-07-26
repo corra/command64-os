@@ -830,3 +830,48 @@ file(WRITE "${OUTPUT_DIR}/casmrelop2.seq"
     "TARGET:\n"
     "    NOP\n"
 )
+
+# WP42 runtime relocation-loading proof. Unlike casmrelop1/casmrelop2 (which
+# exist only to prove CASM's own classification/recording, verified
+# exclusively via COMP against a byte reference), casmreloc1 exists to be
+# loaded away from its assembled address and actually run, proving the OS's
+# existing aptRelocate loader (src/command64/loader.asm) correctly consumes
+# CASM's native R6 footer for the first time. Its one relocatable byte is
+# the extracted high byte of a DOS_PRINT_STR message pointer (LDY #>MSG,
+# the same immediate-extraction shape casmrelop2 already established is
+# correctly recorded) -- if aptRelocate fails to patch it when loaded at a
+# non-default page, the pointer targets stale, wrong-page memory and the
+# program visibly prints garbage instead of the expected message; if it
+# patches correctly, the same message prints regardless of load address.
+# Message bytes are explicit hex, matching casmhello's own convention, to
+# avoid any PETSCII/ASCII charmap ambiguity in raw output bytes.
+#
+# MSG = $340E (START's 14 bytes: two 2-byte immediate loads, LDA #DOS_PRINT_STR,
+# JSR OS_API, LDA #DOS_EXIT, JSR OS_API): high byte $34, low byte $0E.
+#   00 34              PRG load-address header ($3400)
+#   A2 0E              LDX #<MSG            (MSG's low byte, $0E -- never relocatable)
+#   A0 34              LDY #>MSG            (MSG's high byte, $34 -- RELOCATABLE)
+#   A9 09              LDA #$09             (DOS_PRINT_STR)
+#   20 00 10           JSR $1000            (OS_API, fixed -- never relocatable)
+#   A9 4C              LDA #$4C             (DOS_EXIT)
+#   20 00 10           JSR $1000
+#   43 41 53 4D 20     MSG: "CASM "
+#   52 45 4C 4F 43 20       "RELOC "
+#   52 55 4E 53 20          "RUNS "
+#   4F 4B                   "OK"
+#   0D 00                   CR, NUL
+file(WRITE "${OUTPUT_DIR}/casmreloc1.seq"
+    "START:\n"
+    "    LDX #<MSG\n"
+    "    LDY #>MSG\n"
+    "    LDA #\$09\n"
+    "    JSR \$1000\n"
+    "    LDA #\$4C\n"
+    "    JSR \$1000\n"
+    "MSG:\n"
+    "    .BYTE \$43, \$41, \$53, \$4D, \$20\n"
+    "    .BYTE \$52, \$45, \$4C, \$4F, \$43, \$20\n"
+    "    .BYTE \$52, \$55, \$4E, \$53, \$20\n"
+    "    .BYTE \$4F, \$4B\n"
+    "    .BYTE \$0D, \$00\n"
+)

@@ -1578,6 +1578,72 @@ second after both leak fixes): "all tests pass." Final CASM `0.1.43` build
 Phase 8 completion gate) remains separately gated and unstarted; this
 closure does not activate it.
 
+### CASM Phase 8 WP42 Verification and Completion Gate (Phase 0C.19, 2026-07-25)
+
+Amends Phase 0C.14-0C.18 above with the final consolidated verification
+that closes CASM Phase 8. Plan:
+`brain/plans/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`.
+Walkthrough:
+`brain/walkthroughs/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`.
+
+Every relocatable fixture verified across WP38-WP41 (`casmorg1`,
+`casmnoorg1`, `casmordhaz1`, `casmrelop1`, `casmrelop2`) was checked
+exclusively via `COMP` against a hand-derived byte reference at CASM's own
+default assembly address -- proving the *file* was byte-correct, never that
+the OS's existing `aptRelocate` loader (`src/command64/loader.asm`, unchanged
+since Phase 6B) correctly *consumes* CASM's native R6 footer. The master
+plan's own Phase 8 gate text ("Command 64 loads and runs generated R6
+fixtures at several page-aligned addresses") had never actually been
+exercised. Closed with a new fixture, `casmreloc1`: its one relocatable
+byte is the extracted high byte of a `DOS_PRINT_STR` message pointer
+(`LDY #>MSG`) -- the same immediate high-byte-extraction shape `casmrelop2`
+(WP40) already established is correctly recorded, so the fixture tests
+`aptRelocate`'s patch arithmetic against CASM's specific footer layout,
+not a new CASM classification case. `casmreloc1` was loaded and run at
+three page-aligned addresses: `$3400` (a deliberate zero-delta control,
+exercising `aptRelocate`'s own `aptRelocateStoreEnd` short-circuit branch
+that no `COMP`-only fixture ever reaches through the loader), `$4000`, and
+`$5000` (genuinely relocated). The same message printed correctly at all
+three, proving `aptRelocate` correctly patches CASM's native R6 output for
+the first time.
+
+Also re-ran WP31's 7-fixture Phase 3/4 diagnostic regression sample
+(`casmwp11`, `casmzp1`, `casmcma2`, `casmorg3`, `casmzpi2`, `casmpcovf`,
+`casmnumerrh`), unrun since WP36 despite WP39 making a real, material
+change to the exact expression-evaluation core those fixtures depend on
+(`exprEvaluate`'s new relocatable-mode parameter, `parserParseExpressionValue`'s
+new commit-trigger call site) -- all 7 reproduced their established
+outcomes correctly.
+
+**One non-reproducible anomaly was noted and is recorded here rather than
+silently dropped.** During this WP's verification, the user reported
+`TEST_CASM_PASS1` failing with the same VMM/REU-exhaustion signature
+("fffffff" across all fixtures) that WP41 diagnosed and fixed twice
+(`test_casm_reloc.s`, `test_casm_symbols.s`). Unlike WP41's case, this did
+not follow a stale VICE session: the user resets VICE for every build.
+Re-inspection of `casm_pass1.s` and `casm_passcheck.s` found both already
+correctly call `resourcesCleanup`/have no VMM allocation to leak, ruling
+out a defect in either harness itself. The user could not recall the exact
+test sequence that preceded the failure, and a subsequent full
+from-scratch re-run of the entire consolidated matrix, taken in order,
+passed clean with no failure. No root cause was identified, and no fix was
+applied -- per this project's discipline of only changing source in
+response to a confirmed, understood defect, this is recorded as an open,
+unresolved, non-blocking observation for future awareness, not treated as
+fixed.
+
+User confirmed the full consolidated matrix (6 standalone harnesses, 22
+byte-identical trusted references including `casmreloc1`, 8 diagnostic
+scenarios, the 7-fixture Phase 3/4 regression sample, static-fixture
+regression, and the new three-address runtime relocation proof): "All
+tests pass." Final CASM `0.1.44` build 1157, no-change rebuild stable, all
+three disk images build clean. All six Phase 8 Acceptance items checked in
+`wiki/tasks/casm.md`.
+
+**CASM Phase 8 (Native R6 Relocation) is complete.** CASM Phase 9
+(`.include` processing) remains separately gated and unstarted; this
+closure does not activate it.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

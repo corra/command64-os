@@ -400,3 +400,29 @@ gated per the master plan.
   addresses) to satisfy the gate text's plural "several" with a
   deliberately chosen, not arbitrary, address set. Awaiting user approval
   before implementation begins.
+- 2026-07-25 (later): Approved as drafted. Activated on
+  `feature/casm-phase8-wp42` from `feature/casm-phase8-wp41`'s tip
+  (`7fe550f`). Implemented `casmreloc1.seq`/`casmreloc1.ref.hex` exactly as
+  planned (44 bytes, sha256 confirmed via `hex_manifest_to_bin.py`).
+  `test_image_d64` built clean (81 -> 79 blocks free). First verification
+  pass: user reported "pass," then corrected it -- `TEST_CASM_PASS1` had
+  actually failed with the same VMM/REU-exhaustion signature WP41 twice
+  diagnosed and fixed. Investigated: ruled out a stale VICE session (user
+  resets for every build) and re-confirmed both `casm_pass1.s` and
+  `casm_passcheck.s` handle cleanup correctly, finding no defect in
+  either. The user could not recall the exact preceding test sequence and
+  had not reproduced it since first reporting it. Asked the user to re-run
+  the full consolidated matrix once more in order; it passed clean with no
+  failure anywhere. Recorded the anomaly as an open, unresolved,
+  non-blocking observation in `brain/KNOWLEDGE.md` rather than treating it
+  as fixed, per this project's discipline of only changing source in
+  response to a confirmed, understood defect. Applied the version-only
+  completion increment: final CASM `0.1.44` build 1157, no-change rebuild
+  stable, MAIN headroom unchanged (153/14080), all three disk images build
+  clean. Updated `wiki/tasks/casm.md` (WP42 checked, all six Phase 8
+  Acceptance items checked, Phase 8 milestone closing text), `brain/task.md`,
+  `brain/KNOWLEDGE.md` (Phase 0C.19), `CHANGELOG.md`, and Taskwarrior (WP42
+  and the CASM Phase 8 milestone both completed). Drafted the walkthrough:
+  `brain/walkthroughs/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`.
+  **WP42 is complete, and with it the CASM Phase 8 milestone closes.** CASM
+  Phase 9 remains separately gated and unstarted.

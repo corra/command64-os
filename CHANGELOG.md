@@ -9,6 +9,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 8 WP42 verification and completion gate -- CASM Phase 8 is
+  complete** (CASM `0.1.44` build 1157): closes the one gap every prior
+  Phase 8 WP deferred -- no relocatable fixture had ever been loaded away
+  from its assembled address and actually run, only `COMP`'d against a
+  byte reference. A new fixture, `casmreloc1`, was loaded and run through
+  the OS's existing `aptRelocate` loader at `$3400` (a zero-delta control),
+  `$4000`, and `$5000`, printing the same correct message at every
+  address -- proving `aptRelocate` correctly consumes CASM's native R6
+  output for the first time. Its one relocatable byte reuses the
+  already-proven immediate high-byte-extraction shape from WP40's
+  `casmrelop2`, so it tests the loader's consumption rather than
+  introducing a new CASM classification case. Also re-ran WP31's 7-fixture
+  Phase 3/4 diagnostic regression sample, unrun since WP36 despite WP39
+  materially changing the expression-evaluation core those fixtures
+  depend on -- all 7 reproduced their established outcomes correctly. One
+  non-reproducible anomaly was noted (a single `TEST_CASM_PASS1` failure
+  with the same VMM-exhaustion signature WP41 twice fixed, despite a fresh
+  VICE reset and no further leak found in either `casm_pass1.s` or
+  `casm_passcheck.s`) and is recorded as an open, unresolved, non-blocking
+  observation rather than a confirmed defect, since it did not reproduce
+  on a full from-scratch re-run. User confirmed the full consolidated
+  matrix: "All tests pass." All six Phase 8 Acceptance items are checked;
+  CASM Phase 9 (`.include` processing) remains separately gated and
+  unstarted.
 - **CASM Phase 8 WP41 native R6 footer serialization** (CASM `0.1.43`
   build 1156): `reloc.s` gains `relocFinalize`, called unconditionally
   right after `emitFinalize` succeeds. No-ops for a static assembly (an

@@ -1,0 +1,66 @@
+# CASM WP42 trusted reference: casmreloc1
+#
+# Independently hand-assembled from the casmreloc1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Unlike
+# casmrelop1/casmrelop2 (which exist only to prove CASM's own
+# classification/recording, verified exclusively via COMP against this
+# kind of byte reference), casmreloc1 is the vehicle for WP42's own new
+# verification -- loading this exact file away from $3400 and actually
+# running it, to prove the OS's existing aptRelocate loader
+# (src/command64/loader.asm) correctly consumes CASM's native R6 footer
+# for the first time. This reference only proves the *file* is correct --
+# the runtime proof is a separate, later step in the same WP.
+# Cross-check:
+#   - brain/plans/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md
+#
+# Source (no .ORG):
+#   - START: LDX #<MSG / LDY #>MSG / LDA #$09 / JSR $1000 / LDA #$4C / JSR $1000
+#   - MSG: "CASM RELOC RUNS OK", CR, NUL
+#
+# START = $3400 (no bytes). LDX #<MSG is 2 bytes ($3400-$3401, immediate,
+# low-byte extraction -- never relocatable). LDY #>MSG is 2 bytes
+# ($3402-$3403, immediate, high-byte extraction -- the fixture's one
+# relocatable entry). LDA #$09 is 2 bytes ($3404-$3405, DOS_PRINT_STR,
+# a plain constant, never relocatable). JSR $1000 is 3 bytes
+# ($3406-$3408, OS_API, a plain numeric literal, never relocatable).
+# LDA #$4C is 2 bytes ($3409-$340A, DOS_EXIT). JSR $1000 is 3 bytes
+# ($340B-$340D). MSG = $340E (immediately after): high byte $34, low
+# byte $0E. Program offset (CasmPc - $3400): LDY #>MSG's ValLo=3.
+#
+# Hand assembly:
+#   00 34              PRG load-address header ($3400, little-endian)
+#   A2 0E              LDX #$0E                     (MSG's low byte)
+#   A0 34              LDY #$34                     (MSG's high byte)
+#   A9 09              LDA #$09                     (DOS_PRINT_STR)
+#   20 00 10           JSR $1000                    (OS_API)
+#   A9 4C              LDA #$4C                     (DOS_EXIT)
+#   20 00 10           JSR $1000                    (OS_API)
+#   43 41 53 4D 20     .BYTE "CASM "
+#   52 45 4C 4F 43 20  .BYTE "RELOC "
+#   52 55 4E 53 20     .BYTE "RUNS "
+#   4F 4B              .BYTE "OK"
+#   0D 00              .BYTE CR, NUL
+#   03 00              R6 table entry: offset 3 (LDY #>MSG's extracted byte)
+#   00 34              R6 footer: base address ($3400, little-endian)
+#   01 00              R6 footer: relocation entry count (1)
+#   52 36              R6 footer: ASCII magic "R6"
+#
+# bytes: 44
+# sha256: f888ce5af9343849705b7c375fa51c0bd841d50461e7271f7e9c112006940654
+
+00 34
+A2 0E
+A0 34
+A9 09
+20 00 10
+A9 4C
+20 00 10
+43 41 53 4D 20
+52 45 4C 4F 43 20
+52 55 4E 53 20
+4F 4B
+0D 00
+03 00
+00 34
+01 00
+52 36

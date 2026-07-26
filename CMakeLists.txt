@@ -510,6 +510,8 @@ set(CASM_TEST_FIXTURES
     # WP40 relocation table and emission-site hooks
     "${CASM_TEST_FIXTURE_DIR}/casmrelop1.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmrelop2.seq"
+    # WP42 runtime relocation-loading proof
+    "${CASM_TEST_FIXTURE_DIR}/casmreloc1.seq"
     # casmmfovf1/casmmfovf2 (combined-overflow boundary) and casmbiga/
     # casmbigb (WP36 large, under-cap, two-file successful-assembly
     # fixture) are NOT listed here: their raw source text (40000/30000
@@ -544,7 +546,8 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmmf1 casmmf2 casmmf3 casmbig1
     casmorg1 casmorgexpl1 casmnoorg1
     casmordhaz1
-    casmrelop1 casmrelop2)
+    casmrelop1 casmrelop2
+    casmreloc1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")

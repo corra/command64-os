@@ -1048,6 +1048,42 @@
     - Walkthrough:
       `brain/walkthroughs/2026-07-25-casm-phase8-wp41-r6-footer-serialization.md`
     - **WP41 is complete**, approved by the user
+  - [x] `186aadb1-462d-48d1-87bb-e1c9af6c75e1` WP42 verification,
+        walkthrough, and Phase 8 completion gate
+    - Plan:
+      `brain/plans/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`
+    - Active on `feature/casm-phase8-wp42` from `feature/casm-phase8-wp41`'s
+      tip
+    - Found the one real gap every prior Phase 8 WP had deferred here: no
+      relocatable fixture had ever been loaded away from its assembled
+      address and actually run -- every one was checked exclusively via
+      `COMP` against a byte reference, never proving the OS's existing
+      `aptRelocate` loader correctly consumes CASM's native R6 output
+    - Closed it with a new fixture, `casmreloc1`, whose one relocatable
+      byte reuses the already-proven immediate high-byte-extraction shape
+      (`LDY #>label`, established correct by `casmrelop2` in WP40) -- tests
+      `aptRelocate`'s consumption, not a new CASM classification case
+    - Also re-ran WP31's 7-fixture Phase 3/4 diagnostic regression sample,
+      unrun since WP36 despite WP39 materially changing the expression-
+      evaluation core those fixtures depend on; all 7 reproduced correctly
+    - User ran the full consolidated matrix (6 standalone harnesses, 22
+      byte-identical references including `casmreloc1`, 8 diagnostic
+      scenarios, the 7-fixture regression sample, static-fixture
+      regression, and `casmreloc1` loaded and run at `$3400`/`$4000`/`$5000`)
+      and confirmed: "All tests pass"
+    - One non-reproducible anomaly noted: a single report of
+      `TEST_CASM_PASS1` failing with the same VMM/REU-exhaustion signature
+      WP41 diagnosed twice, despite a fresh VICE reset and no further leak
+      found on re-inspection of `casm_pass1.s`/`casm_passcheck.s`. Did not
+      reproduce on a full from-scratch re-run; recorded as an open,
+      unresolved, non-blocking observation, not a confirmed defect
+    - Checked all six Phase 8 Acceptance items
+    - Final CASM `0.1.44` build 1157, no-change rebuild stable, all three
+      disk images build clean
+    - Walkthrough:
+      `brain/walkthroughs/2026-07-25-casm-phase8-wp42-verification-and-completion-gate.md`
+    - **WP42 is complete, and with it the CASM Phase 8 milestone closes**,
+      approved by the user
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
