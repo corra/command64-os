@@ -1667,6 +1667,22 @@ physical file/location and print the bounded parent include-site traceback.
 Implementation is split across WP44-WP49, each separately planned and approved.
 Parent plan: `brain/plans/2026-07-25-casm-phase9-include-processing.md`.
 
+WP43 completed with user approval at CASM `0.1.45` build 1160. Its only source
+change was the version-stage increment; the include contract above remains
+planned rather than operational. Two builds held 1160 stable, all three disk
+images passed, and the 15,239-byte artifact retained its `$3400` load address
+and 1657-entry R6 footer. WP44 remains separately gated.
+
+WP44 completed with user approval at CASM `0.1.46` build 1166. It implements
+quoted include grammar without semantic
+loading. `lexerScanIncludeOperand` consumes 1-63 original PETSCII bytes from
+`$20-$7E`/`$A0-$FE` except quote, stores them in a dedicated 65-byte
+parser-owned record, and preserves newline/EOF lookahead. Diagnostics `$31-$33`
+cover expected/invalid/too-long filenames. `casmRunPass` intercepts valid
+includes before emitter or I/O effects and temporarily returns NOT IMPLEMENTED.
+The user-approved MAIN envelope is `$3A00`; CASM build 1166 is 15,800 bytes with
+1722 R6 entries. The corrected 14-case `test_casm_includ` runtime passes.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).

@@ -75,6 +75,10 @@ The `src/external/casm` directory owns CASM, a native Command 64
   levels, 32 physical files, 128 include events, and a 65,535-byte combined
   distinct-source cap. This is a planned contract until WP44-WP49 implement it;
   do not describe `.INCLUDE` as currently operational before then.
+- WP44 implements only the quoted include operand grammar: 1-63 original
+  printable PETSCII bytes are stored outside the frozen token record, and valid
+  syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
+  effects. Do not describe include loading or traversal as operational.
 - Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
   by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
   point in the emission engine's byte writer -- not a structured event

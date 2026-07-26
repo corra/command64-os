@@ -86,6 +86,8 @@ WP44 remains blocked pending its own detailed plan.
 
 ## Completion Gate
 
-After user approval, apply the version-only stage increment from `0.1.44` to
-`0.1.45`, rebuild and verify stability, synchronize closeout records, and mark
-WP43 complete. Do not activate WP44 automatically.
+User approved completion. The version-only stage increment from `0.1.44` to
+`0.1.45` advanced the content-hash build once to 1160. A no-change rebuild held
+1160, all three disk images passed, and the artifact remained 15,239 bytes with
+load address `$3400` and R6 footer `00 34 79 06 52 36`. WP43 is complete. WP44
+was not activated.

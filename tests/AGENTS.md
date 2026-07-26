@@ -37,6 +37,9 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   its directory entry with no file content, sets track/sector to 0 --
   suspected of corrupting `test.d64`); no equivalent zero-block fixture
   remains on the disk.
+- `test_casm_include` is packaged only on `casm_overflow_test_d64` under the
+  16-character disk name `test_casm_includ`; `test.d64` has no directory entry
+  available for it.
 
 ## Child DOX Index
 

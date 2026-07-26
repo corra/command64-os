@@ -205,7 +205,11 @@ if(Ca65_FOUND)
     # overflowed $3600 by 103 measured bytes; $3700 (+256) leaves 153 bytes
     # headroom, the smallest round-page step above that minimum, matching
     # this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3700")
+    # WP44: $3700 -> $3A00 -- the approved 65-byte include operand state plus
+    # three grammar diagnostics overflowed $3700 by 16 measured bytes before
+    # scanner/dispatch code. The reviewed +768-byte envelope covers the full
+    # quoted-operand work package without approaching the user-space ceiling.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3A00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -318,7 +322,10 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3700")
+            # WP44: this whole-object harness inherits CASM's 65-byte include
+            # operand state and scanner/diagnostic growth; $3700 overflowed by
+            # 161 measured bytes. Match production CASM's approved $3A00.
+            set(TEST_PRG_SIZE "3A00")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -343,7 +350,17 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "3700")
+            # Same whole-object source set and WP44 envelope requirement as
+            # casm_pass1 above.
+            set(TEST_PRG_SIZE "3A00")
+        endif()
+        if(TEST_NAME STREQUAL "casm_include")
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1200")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
@@ -412,6 +429,9 @@ set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKE
 # off. Remove it from the generic test.d64 packaging list so it isn't
 # double-packaged.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_l15release)
+# WP44's include harness is intentionally packaged on casm_overflow_test_d64:
+# test.d64 is already at the 1541 directory-entry ceiling.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_include)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -619,7 +639,7 @@ add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp test_l15release
+    PRGS casm comp test_l15release test_casm_include
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)

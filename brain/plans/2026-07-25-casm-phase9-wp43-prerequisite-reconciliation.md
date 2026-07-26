@@ -1,7 +1,7 @@
 ---
 feature: casm-phase9-wp43-prerequisite-reconciliation
 created: 2026-07-25
-status: active
+status: complete
 ---
 
 # Plan: CASM Phase 9 WP43 - Prerequisite Reconciliation and Phase 0C.19 Freeze
@@ -237,3 +237,9 @@ explicitly approves completion. Completion does not activate WP44.
   `feature/casm-stage9` at updated `main` commit `b279365`, and retained the
   WP43 working state on child branch `feature/casm-phase9-wp43`. Revalidated
   two no-change CASM builds at `0.1.44` build 1159.
+- 2026-07-25 (completion): User approved WP43 completion. Applied the sole
+  authorized source change, `VERSION_STAGE` 44 -> 45; the content-hash build
+  advanced once to 1160 and a second build held stable. All three disk images
+  pass. `build/casm.prg` remains 15,239 bytes with load address `$3400` and R6
+  footer `00 34 79 06 52 36`. Taskwarrior and durable records closed WP43;
+  WP44 remains pending separate plan approval and activation.

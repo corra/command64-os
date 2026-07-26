@@ -320,8 +320,16 @@ emitDirective:
     beq edWord
     cmp #CASM_DIRECTIVE_UNKNOWN
     beq edSyntax
-    ; .STATIC / .RELOC / .INCLUDE: out of scope this phase.
+    cmp #CASM_DIRECTIVE_INCLUDE
+    beq edInternal
+    ; .STATIC / .RELOC: out of scope this phase.
     lda #CASM_DIAG_NOT_IMPLEMENTED
+    sec
+    rts
+edInternal:
+    ; Includes alter the token source and are owned by casmRunPass. Reaching
+    ; the emitter indicates an internal dispatch error, not unsupported syntax.
+    lda #CASM_DIAG_UNKNOWN
     sec
     rts
 edSyntax:

@@ -32,6 +32,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 9 WP44 quoted include operand grammar** (CASM `0.1.46` build
+  1166): added bounded `.INCLUDE "filename"` scanning for 1-63
+  original PETSCII bytes, dedicated filename state, diagnostics `$31-$33`, and
+  a parser/pass-driver path that returns `FEATURE NOT IMPLEMENTED` before any
+  include file I/O or emitter effect. Added the 14-case `test_casm_include`
+  harness on `casm_overflow_test.d64`; user runtime verification passes.
+- **CASM Phase 9 WP43 prerequisite reconciliation and Phase 0C.19 freeze**
+  (CASM `0.1.45` build 1160): reconciled the original live include-handle
+  design with Phase 7's immutable VMM source pipeline and froze the bounded
+  Phase 9 contract: quoted 1-63-byte raw-PETSCII filenames, parent-device
+  inheritance, filesystem-free Pass 2 replay, 16 include levels, 32 physical
+  files, 128 include events, one 8KB metadata store, and a 65,535-byte distinct
+  source cap. This is a records-only work package; `.INCLUDE` remains
+  unimplemented until the separately planned WP44-WP49 packages.
 - **CASM Phase 8 WP42 verification and completion gate -- CASM Phase 8 is
   complete** (CASM `0.1.44` build 1157): closes the one gap every prior
   Phase 8 WP deferred -- no relocatable fixture had ever been loaded away

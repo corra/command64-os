@@ -184,6 +184,7 @@ CASM_PETSCII_NULL  = $00
 CASM_PETSCII_TAB   = $09
 CASM_PETSCII_LF    = $0A
 CASM_PETSCII_CR    = $0D
+CASM_PETSCII_QUOTE = $22
 CASM_PETSCII_HASH  = $23
 CASM_PETSCII_PERCENT = $25
 CASM_PETSCII_LPAREN = $28
@@ -211,6 +212,20 @@ CASM_PETSCII_O     = $4F
 CASM_PETSCII_P     = $50
 CASM_PETSCII_R     = $52
 CASM_PETSCII_S     = $53
+
+; Phase 9 WP44 quoted include operand grammar. Filename payload bytes preserve
+; their original PETSCII spelling; quote is the delimiter and is therefore not
+; part of either accepted printable range.
+CASM_INCLUDE_FILENAME_MAX         = 63
+CASM_INCLUDE_FILENAME_BUFFER_SIZE = CASM_INCLUDE_FILENAME_MAX + 1
+CASM_INCLUDE_PRINT_LO_MIN          = $20
+CASM_INCLUDE_PRINT_LO_MAX          = $7E
+CASM_INCLUDE_PRINT_HI_MIN          = $A0
+CASM_INCLUDE_PRINT_HI_MAX          = $FE
+
+.assert CASM_INCLUDE_FILENAME_BUFFER_SIZE = 64, error, "CASM include filename buffer changed"
+.assert CASM_PETSCII_QUOTE >= CASM_INCLUDE_PRINT_LO_MIN, error, "CASM include quote below printable range"
+.assert CASM_PETSCII_QUOTE <= CASM_INCLUDE_PRINT_LO_MAX, error, "CASM include quote above printable range"
 
 CASM_OPT_OUTPUT = %00000001
 CASM_OPT_STATIC = %00000010
@@ -478,6 +493,11 @@ CASM_DIAG_PHASE6B_LAST = CASM_DIAG_PASS_MISMATCH
 ; CASM Phase 8 WP40: relocation table capacity.
 CASM_DIAG_RELOC_TABLE_FULL = $30  ; relocRecord: entry count already at CASM_RELOC_MAX
 CASM_DIAG_PHASE8_LAST = CASM_DIAG_RELOC_TABLE_FULL
+; CASM Phase 9 WP44 quoted include operand grammar.
+CASM_DIAG_INCLUDE_FILENAME_EXPECTED = $31
+CASM_DIAG_INVALID_INCLUDE_FILENAME  = $32
+CASM_DIAG_INCLUDE_FILENAME_TOO_LONG = $33
+CASM_DIAG_PHASE9_WP44_LAST = CASM_DIAG_INCLUDE_FILENAME_TOO_LONG
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -504,6 +524,10 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_PHASE6B_LAST = $2F, error, "CASM Phase 6B diagnostic range changed"
 .assert CASM_DIAG_RELOC_TABLE_FULL = CASM_DIAG_PHASE6B_LAST + 1, error, "CASM Phase 8 diagnostics must follow Phase 6B"
 .assert CASM_DIAG_PHASE8_LAST = $30, error, "CASM Phase 8 diagnostic range changed"
+.assert CASM_DIAG_INCLUDE_FILENAME_EXPECTED = CASM_DIAG_PHASE8_LAST + 1, error, "CASM Phase 9 diagnostics must follow Phase 8"
+.assert CASM_DIAG_INVALID_INCLUDE_FILENAME = CASM_DIAG_INCLUDE_FILENAME_EXPECTED + 1, error, "CASM WP44 diagnostics must remain contiguous"
+.assert CASM_DIAG_INCLUDE_FILENAME_TOO_LONG = CASM_DIAG_INVALID_INCLUDE_FILENAME + 1, error, "CASM WP44 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE9_WP44_LAST = $33, error, "CASM WP44 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

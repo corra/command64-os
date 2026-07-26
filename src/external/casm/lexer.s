@@ -28,6 +28,8 @@
 .import CasmLookaheadColumn
 .import CasmTokenRecord
 .import CasmTokenText
+.import CasmIncludeFilename
+.import CasmIncludeFilenameLen
 
 ; Source layer: the byte stream and its in-place location fields.
 .import sourceNextByte
@@ -40,11 +42,13 @@
 ; WP15 diagnostic context.
 .import CasmDiagCapture
 .import diagSetLocFromLookahead
+.import diagSetLocFromLookaheadPos
 .import diagSetLocFromToken
 
 .export lexerInit
 .export lexerNext
 .export lexerGetToken
+.export lexerScanIncludeOperand
 
 .segment "CODE"
 
@@ -253,6 +257,181 @@ lexerGetToken:
     ldx #<CasmTokenRecord
     ldy #>CasmTokenRecord
     clc
+    rts
+
+; ---------------------------------------------------------------------------
+; lexerScanIncludeOperand
+; Scan the quoted filename following an already-consumed .INCLUDE directive.
+; The stable token record is preserved; payload bytes go to the dedicated
+; parser-owned 64-byte buffer. The statement terminator remains buffered so
+; normal statement iteration retains its existing newline/EOF behavior.
+;
+; Inputs:    lexer READY; lookahead points at, or can fetch, the first source
+;            result after the .INCLUDE token
+; Outputs:   success: 1..63 original PETSCII bytes plus null in
+;                     CasmIncludeFilename, length committed, A =
+;                     CASM_DIAG_NONE, C clear
+;            failure: lexer ERROR, A = include grammar diagnostic or
+;                     CASM_DIAG_EXPECTED_NEWLINE, C set; operand invalid
+; Preserves: token record, balanced stack, resources and pass/emitter state
+; Clobbers:  A, X, Y, flags, CasmLexerScratch0/1, lookahead, source volatile
+;            state, CasmIncludeFilename/CasmIncludeFilenameLen
+; ---------------------------------------------------------------------------
+lexerScanIncludeOperand:
+    lda #0
+    sta CasmLexerScratch0       ; working payload length; commit only on success
+    sta CasmIncludeFilenameLen
+
+lsioLeading:
+    jsr lexerFill
+    bcc :+
+    jmp lsioPropagatedFail
+:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    beq :+
+    jmp lsioExpectedPos
+:
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_SPACE
+    beq lsioConsumeLeading
+    cmp #CASM_PETSCII_TAB
+    beq lsioConsumeLeading
+    cmp #CASM_PETSCII_QUOTE
+    beq :+
+    jmp lsioExpectedByte
+:
+
+    ; Preserve the opening quote's exact location for empty and unterminated
+    ; operands before consuming it and advancing the live source cursor.
+    jsr diagSetLocFromLookahead
+    jsr lexerConsume
+
+lsioPayload:
+    jsr lexerFill
+    bcc :+
+    jmp lsioPropagatedFail
+:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    beq :+
+    jmp lsioInvalidAtOpening
+:
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_QUOTE
+    beq lsioClose
+
+    ; Printable raw PETSCII is $20-$7E or $A0-$FE. Quote was handled above as
+    ; the delimiter; controls, $7F-$9F, and $FF fail at the offending byte.
+    cmp #CASM_INCLUDE_PRINT_LO_MIN
+    bcs :+
+    jmp lsioInvalidByte
+:
+    cmp #CASM_INCLUDE_PRINT_LO_MAX + 1
+    bcc lsioAppend
+    cmp #CASM_INCLUDE_PRINT_HI_MIN
+    bcs :+
+    jmp lsioInvalidByte
+:
+    cmp #CASM_INCLUDE_PRINT_HI_MAX + 1
+    bcs lsioInvalidByte
+
+lsioAppend:
+    ldx CasmLexerScratch0
+    cpx #CASM_INCLUDE_FILENAME_MAX
+    bcc :+
+    jmp lsioTooLong
+:
+    sta CasmIncludeFilename, x
+    inc CasmLexerScratch0
+    jsr lexerConsume
+    jmp lsioPayload
+
+lsioClose:
+    lda CasmLexerScratch0
+    beq lsioInvalidAtOpening
+    jsr lexerConsume
+
+lsioTrailing:
+    jsr lexerFill
+    bcs lsioPropagatedFail
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    bne lsioSuccess
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_SPACE
+    beq lsioConsumeTrailing
+    cmp #CASM_PETSCII_TAB
+    beq lsioConsumeTrailing
+    cmp #CASM_PETSCII_SEMICOLON
+    beq lsioCommentStart
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_EXPECTED_NEWLINE
+    jmp lsioFailWithA
+
+lsioConsumeLeading:
+    jsr lexerConsume
+    jmp lsioLeading
+
+lsioConsumeTrailing:
+    jsr lexerConsume
+    jmp lsioTrailing
+
+lsioCommentStart:
+    jsr lexerConsume
+lsioComment:
+    jsr lexerFill
+    bcs lsioPropagatedFail
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    bne lsioSuccess
+    jsr lexerConsume
+    jmp lsioComment
+
+lsioSuccess:
+    ldx CasmLexerScratch0
+    lda #0
+    sta CasmIncludeFilename, x
+    stx CasmIncludeFilenameLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lsioExpectedPos:
+    jsr diagSetLocFromLookaheadPos
+    lda #CASM_DIAG_INCLUDE_FILENAME_EXPECTED
+    jmp lsioFailWithA
+
+lsioExpectedByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INCLUDE_FILENAME_EXPECTED
+    jmp lsioFailWithA
+
+lsioInvalidByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INVALID_INCLUDE_FILENAME
+    jmp lsioFailWithA
+
+lsioInvalidAtOpening:
+    lda #CASM_DIAG_INVALID_INCLUDE_FILENAME
+    jmp lsioFailWithA
+
+lsioTooLong:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INCLUDE_FILENAME_TOO_LONG
+    jmp lsioFailWithA
+
+lsioPropagatedFail:
+    ; lexerFill already latched lexer ERROR and returned the source diagnostic.
+    sec
+    rts
+
+lsioFailWithA:
+    pha
+    lda #CASM_LEXER_STATE_ERROR
+    sta CasmLexerState
+    pla
+    sec
     rts
 
 ; ---------------------------------------------------------------------------

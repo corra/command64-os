@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "44"
+.define VERSION_STAGE "46"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -33,6 +33,7 @@
 .import sourceClose
 .import diagPrintString
 .import diagClearLoc
+.import diagSetLocFromStmt
 .import exitSuccess
 .import exitFatal
 
@@ -266,6 +267,16 @@ crpInsn:
     jmp casmRunPass
 
 crpDir:
+    lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
+    cmp #CASM_DIRECTIVE_INCLUDE
+    bne crpEmitDir
+    ; WP44 validates and stores the operand but deliberately performs no source
+    ; I/O. WP45 replaces this temporary semantic boundary with child loading.
+    jsr diagSetLocFromStmt
+    lda #CASM_DIAG_NOT_IMPLEMENTED
+    sec
+    rts
+crpEmitDir:
     jsr emitDirective
     bcs crpFail
     jmp casmRunPass

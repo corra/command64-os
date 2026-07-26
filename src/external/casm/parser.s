@@ -17,6 +17,7 @@
 .include "common.inc"
 
 .import lexerNext
+.import lexerScanIncludeOperand
 .import CasmTokenRecord
 .import CasmTokenText
 .import exprEvaluate
@@ -43,6 +44,8 @@
 .export parserParseExpressionValue
 .export CasmLabelName
 .export CasmLabelNameLen
+.export CasmIncludeFilename
+.export CasmIncludeFilenameLen
 
 .segment "BSS"
 
@@ -61,6 +64,16 @@ CasmParserStmt:
 ; terminator byte that is never written here, kept only for the size match).
 CasmLabelName:    .res 32
 CasmLabelNameLen: .res 1
+
+; WP44: .INCLUDE filenames exceed the frozen 31-byte token payload. Keep the
+; original PETSCII bytes in parser-owned bounded state for the later semantic
+; include work packages; the scanner appends a null for diagnostic/file APIs.
+CasmIncludeFilename:    .res CASM_INCLUDE_FILENAME_BUFFER_SIZE
+CasmIncludeFilenameLen: .res 1
+CasmIncludeFilenameEnd:
+
+.assert CasmIncludeFilenameLen - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE, error, "CASM include filename buffer layout changed"
+.assert CasmIncludeFilenameEnd - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM include filename state must be exactly 65 bytes"
 
 .segment "CODE"
 
@@ -82,7 +95,9 @@ CasmLabelNameLen: .res 1
 ; ---------------------------------------------------------------------------
 parserParseStatement:
     jsr lexerNext
-    bcs ppsFail
+    bcc :+
+    jmp ppsFail
+:
 
     ; WP15: record where this statement began. The emission engine raises
     ; after the statement's tokens are consumed, by which point the token
@@ -133,6 +148,8 @@ ppsMnemonic:
     cmp #CASM_TOKEN_DIRECTIVE
     bne ppsGrammar
     lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
+    cmp #CASM_DIRECTIVE_INCLUDE
+    beq ppsInclude
     cmp #CASM_DIRECTIVE_BYTE
     beq ppsDeferOperands
     cmp #CASM_DIRECTIVE_WORD
@@ -140,6 +157,18 @@ ppsMnemonic:
 ppsGrammar:
     jmp parseOperandSequence
 ppsDeferOperands:
+    lda #CASM_OPKIND_IMPLIED
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
+
+ppsInclude:
+    ; The dedicated scanner consumes the complete quoted operand and trailer,
+    ; leaving NEWLINE/EOF buffered. Include semantics remain the pass driver's
+    ; responsibility; this parser path performs no file or emitter operation.
+    jsr lexerScanIncludeOperand
+    bcs ppsFail
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE

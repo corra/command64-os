@@ -14,6 +14,7 @@
 .export diagDumpToken
 .export diagClearLoc
 .export diagSetLocFromLookahead
+.export diagSetLocFromLookaheadPos
 .export diagSetLocFromToken
 .export diagSetLocFromStmt
 .export diagStampStmtLoc
@@ -93,7 +94,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE8_LAST + 1
+    cmp #CASM_DIAG_PHASE9_WP44_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED
@@ -170,6 +171,30 @@ diagSetLocFromLookahead:
     lda CasmLookaheadFileId
     sta CasmDiagLocFileId
     lda #CASM_DIAG_LOC_BYTE
+    sta CasmDiagLocValid
+    rts
+
+; ---------------------------------------------------------------------------
+; diagSetLocFromLookaheadPos
+; Record only the pending lookahead result's position. Unlike
+; diagSetLocFromLookahead, this does not attach an offending byte; it is used
+; when NEWLINE or EOF marks a missing include operand.
+;
+; Inputs:    valid lookahead
+; Outputs:   CasmDiagLoc* populated; CasmDiagLocValid = CASM_DIAG_LOC_VALID
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+diagSetLocFromLookaheadPos:
+    lda CasmLookaheadLineLo
+    sta CasmDiagLocLineLo
+    lda CasmLookaheadLineHi
+    sta CasmDiagLocLineHi
+    lda CasmLookaheadColumn
+    sta CasmDiagLocColumn
+    lda CasmLookaheadFileId
+    sta CasmDiagLocFileId
+    lda #CASM_DIAG_LOC_VALID
     sta CasmDiagLocValid
     rts
 
@@ -984,6 +1009,9 @@ diagMessageLo:
     .byte <msgSymbolTableFull
     .byte <msgPassMismatch
     .byte <msgRelocTableFull
+    .byte <msgIncludeFilenameExpected
+    .byte <msgInvalidIncludeFilename
+    .byte <msgIncludeFilenameTooLong
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -1035,10 +1063,13 @@ diagMessageHi:
     .byte >msgSymbolTableFull
     .byte >msgPassMismatch
     .byte >msgRelocTableFull
+    .byte >msgIncludeFilenameExpected
+    .byte >msgInvalidIncludeFilename
+    .byte >msgIncludeFilenameTooLong
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE8_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE8_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE9_WP44_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE9_WP44_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -1136,6 +1167,12 @@ msgPassMismatch:
     .byte "CASM: PASS 1/2 MISMATCH", PetCr, 0
 msgRelocTableFull:
     .byte "CASM: RELOC TABLE FULL", PetCr, 0
+msgIncludeFilenameExpected:
+    .byte "CASM: INCLUDE FILENAME EXPECTED", PetCr, 0
+msgInvalidIncludeFilename:
+    .byte "CASM: INVALID INCLUDE FILENAME", PetCr, 0
+msgIncludeFilenameTooLong:
+    .byte "CASM: INCLUDE FILENAME TOO LONG", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

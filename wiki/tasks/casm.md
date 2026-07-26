@@ -1297,15 +1297,18 @@ Parent plan:
 
 ## Phase 9 Work Packages
 
-- [/] `2826144e-b7c6-4372-8e1d-74cfff242d1a`: WP43 prerequisite
-      reconciliation and Phase 0C.19 freeze. Dedicated plan approved and active:
+- [x] `2826144e-b7c6-4372-8e1d-74cfff242d1a`: WP43 prerequisite
+      reconciliation and Phase 0C.19 freeze. Dedicated plan:
       `brain/plans/2026-07-25-casm-phase9-wp43-prerequisite-reconciliation.md`.
-      Records-only implementation and automated verification pass at CASM
-      `0.1.44` build 1159; no functional include or
-      version change. Awaiting explicit completion approval before the
-      version-only `0.1.45` increment.
-- [ ] `2682d04b-05b0-4828-b88f-852234e3d006`: WP44 quoted include operand
-      grammar.
+      User approved completion. Final CASM `0.1.45` build 1160; no-change build
+      stable, all three disk images pass, and no functional include behavior was
+      added. WP44 remains pending separate plan approval and activation.
+- [x] `2682d04b-05b0-4828-b88f-852234e3d006`: WP44 quoted include operand
+      grammar. Detailed plan approved and active at
+      `brain/plans/2026-07-25-casm-phase9-wp44-quoted-include-operand-grammar.md`;
+      user-approved complete at CASM `0.1.46` build 1166. The corrected 14-case
+      `test_casm_includ` runtime, stable no-change build, legacy whole-object
+      harnesses, and all three disk images pass. WP45 remains pending.
 - [ ] `199b4da7-987a-44cf-a84d-b4e0b786f5d0`: WP45 physical file catalog and
       dynamic source loading.
 - [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d`: WP46 frame stack, nested

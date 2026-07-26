@@ -437,6 +437,13 @@ walkthrough:
 Awaiting user approval of the walkthrough and completion (which also closes
 the CASM Phase 6A milestone).
 
+**CASM Phase 9 WP44 MAIN envelope amendment**: the WP43 baseline used 13,927
+of 14,080 bytes in a `$3700` MAIN envelope, leaving 153 bytes. WP44's initial
+65-byte quoted-include operand state plus three diagnostic messages/table
+entries produced a measured 16-byte overflow before scanner/dispatch code.
+The user approved increasing MAIN from `$3700` to `$3A00` (+768 bytes). The
+application still starts at `$3400`; no zero-page or OS memory region moved.
+
 ## C64 Hardware Gotchas (hard-won)
 
 - **Segment Overlaps**: Proactive realignment of segments (64-byte padding) required as shell code grows.
