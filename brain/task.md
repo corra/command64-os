@@ -1142,8 +1142,64 @@
       `brain/walkthroughs/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`
     - User approved completion; final CASM `0.1.47` build 1171, no-change
       rebuild stable, all three disk images pass. **WP45 complete.**
-  - [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d` WP46 frame stack, nested
+  - [x] `005a1819-eda6-4fa5-89e1-5848a5076a7d` WP46 frame stack, nested
         traversal, and cycle detection
+    - Detailed plan approved and active:
+      `brain/plans/2026-07-26-casm-phase9-wp46-frame-stack-nested-traversal-and-cycle-detection.md`
+    - Standalone `source.s` frame stack plus a dedicated `tests/src/casm_frame`
+      harness only, per user-confirmed scope; no `casmRunPass` call site yet
+    - Also fixes a pre-existing WP34 diagnostic-echo file-identity gap
+      (`diagResolveView` matched cached lines by number only)
+    - Implementation complete: 16-slot frame stack (`sourceFramePush`,
+      depth/cycle checks before any mutation), fully automatic pop via a
+      rewired `sourceRefill` (`srEofOrPop`/`sourceFramePopInternal`,
+      private), and `sourceResetBoundaryEcho` shared by both the extended
+      `srCheckFileBoundary` and the new push/pop paths. Two new
+      diagnostics `$35-$36` (depth exceeded, cycle detected)
+    - Linking the new frame stack overflowed production `casm`'s `$3E00`
+      MAIN envelope by 221 measured bytes; user chose the tighter "exactly
+      what's needed" amendment to `$4000` (292 bytes headroom). Build 1173
+      passes, no-change stable
+    - New 8-case `tests/src/casm_frame` harness (build 1001) packaged on
+      `casm_overflow_test_d64` with 10 new real-CASM-syntax fixtures
+      (`casmfrp1`-`4`, `casmfrc1`-`3`, `casmfrcr1`, `casmfrr1`-`2`)
+    - `test_casm_pass1`/`test_casm_passcheck`/`test_casm_catalog` (all link
+      `source.s` whole) needed matching envelope bumps; all other
+      standalone harnesses and all three disk images build clean
+    - Walkthrough:
+      `brain/walkthroughs/2026-07-26-casm-phase9-wp46-frame-stack-nested-traversal-and-cycle-detection.md`
+    - User runtime testing found four real production defects, each masking
+      the next: (1) `lexerFill` captured token provenance *before*
+      `sourceNextByte`, going stale exactly when that call resolved a
+      child's EOF and popped -- fixed with new `CasmSourceResult*` fields
+      captured inside `sourceFetchPhysical` (`state.s`/`source.s`/
+      `lexer.s`, plus the matching contract in `casm_include.s`'s stand-in
+      `sourceNextByte`); (2) that capture clobbered `A` at `sfpEof`,
+      destroying the `CASM_SOURCE_EOF` return; (3) depth-0 traversal had no
+      end cap of its own and overran into `.INCLUDE` children appended
+      mid-traversal (`CasmSourceLoadedLen` grows) -- fixed with a fixed
+      `CasmSourceTopLevelEndLo/Hi` snapshot taken at `sourceLoad`'s
+      completion; (4) `sourceFramePush` saved `CasmSourceVmmCursor` (the
+      bulk-refill read head, already at the file's end for any
+      sub-256-byte fixture) rather than the logical parse position --
+      fixed to `cursor - (blockLen - blockIndex)`
+    - Fix 4 exposed that `frSinglePushPop` had been *passing for the wrong
+      reason*: the pop re-read the child's bytes while the parent's line
+      counter read 4, so re-read `C1`/`C2` were stamped lines 4/5,
+      coincidentally matching the expected `P3=4, P4=5`. Two independent
+      bugs were cancelling into a green test
+    - Incidental: CODE growth pushed `CasmExprResolverAddrLo` onto a
+      `$xxFF` low byte, tripping `expr.s`'s NMOS 6502 JMP-indirect
+      page-wrap `.assert`; fixed with one pad byte in `expr.s` itself
+    - All 8 cases confirmed passing by the user on the clean,
+      instrumentation-removed binary (`test_casm_frame` build 1023), which
+      fits the original `$4000` envelope -- the temporary `$4200` bump was
+      reverted, so no envelope amendment ships
+    - User approved completion. Final CASM `0.1.48` build 1191; no-change
+      rebuild stable; full suite and all three disk images pass;
+      `git diff --check` clean. **WP46 complete.** WP47 is unblocked in
+      Taskwarrior by dependency but not activated -- it remains pending
+      separate plan approval
   - [ ] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and
         Pass 2 replay
   - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics

@@ -150,6 +150,27 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Treat resource cleanup, source provenance, expression relocation class, and
   instruction-size stability as foundational interfaces rather than late
   error handling.
+- `CasmSourceVmmCursorLo/Hi` is the **bulk-refill read head, not the logical
+  parse position**. `sourceRefill` installs up to 256 bytes per call, so for
+  a source file smaller than the buffer the cursor already sits at that
+  file's end while the lexer is still parsing its middle. The parse position
+  is `cursor - (CasmSourceBlockLen - CasmSourceBlockIndex)`. Anything needing
+  "where is the parser right now" (include-event recording especially) must
+  apply that correction; WP46's frame push saved the raw cursor and silently
+  skipped all remaining parent content after every pop.
+- A delivered byte's provenance lives in `CasmSourceResultFileId`/`LineLo`/
+  `Hi`/`Column` (`state.s`), written by `sourceFetchPhysical` at
+  `sfpHaveByte`/`sfpEof`. Read those **after** calling `sourceNextByte`;
+  never snapshot `CasmSourceFileId`/`LineLo`/`Hi`/`Column` before the call,
+  because that call may resolve a child frame's EOF and pop mid-flight, so
+  the byte returned belongs to the restored parent. Any stand-in
+  `sourceNextByte` (e.g. `tests/src/casm_include/casm_include.s`, which links
+  no `source.s`) must populate the same fields.
+- Depth-0 traversal is bounded by `CasmSourceTopLevelEndLo/Hi`, a fixed
+  snapshot taken when `sourceLoad` completes -- not by
+  `CasmSourceLoadedLenLo/Hi`, which keeps growing as `sourceAppendFile`
+  appends `.INCLUDE` children mid-traversal. Nested frames use their own
+  `CasmFrameEndOffsetLo/Hi`.
 - Use `command64.inc` for OS API and KERNAL symbols; do not duplicate shared
   numeric constants locally.
 - Do not add one-off host scripts. Integrate reusable development tooling into

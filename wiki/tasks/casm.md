@@ -1309,7 +1309,7 @@ Parent plan:
       user-approved complete at CASM `0.1.46` build 1166. The corrected 14-case
       `test_casm_includ` runtime, stable no-change build, legacy whole-object
       harnesses, and all three disk images pass. WP45 remains pending.
-- [ ] `199b4da7-987a-44cf-a84d-b4e0b786f5d0`: WP45 physical file catalog and
+- [x] `199b4da7-987a-44cf-a84d-b4e0b786f5d0`: WP45 physical file catalog and
       dynamic source loading. Detailed plan approved and active at
       `brain/plans/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`.
       Standalone `include.s` module plus a dedicated `test_casm_catalog`
@@ -1327,8 +1327,40 @@ Parent plan:
       `brain/walkthroughs/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`.
       **WP45 complete.** WP46 remains pending separate plan approval and
       activation.
-- [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d`: WP46 frame stack, nested
-      traversal, and cycle detection.
+- [x] `005a1819-eda6-4fa5-89e1-5848a5076a7d`: WP46 frame stack, nested
+      traversal, and cycle detection. Detailed plan approved and active at
+      `brain/plans/2026-07-26-casm-phase9-wp46-frame-stack-nested-traversal-and-cycle-detection.md`.
+      Standalone `source.s` frame stack (`sourceFramePush`, automatic pop
+      via a rewired `sourceRefill`) plus a dedicated `tests/src/casm_frame`
+      harness only; `casmRunPass` keeps returning
+      `CASM_DIAG_NOT_IMPLEMENTED` at `.INCLUDE` until WP47 wires real
+      dispatch. Implementation complete: the 8-case `tests/src/casm_frame`
+      harness, all standalone/whole-object regressions, and all three disk
+      images pass statically; MAIN grown `$3E00` -> `$4000` (221-byte
+      measured overflow, user-approved). Also fixes a pre-existing WP34
+      diagnostic-echo file-identity gap. User runtime testing found four
+      real production defects, each masking the next: (1) `lexerFill`
+      captured token provenance *before* `sourceNextByte`, going stale
+      exactly when that call resolved a child's EOF and popped -- fixed
+      with new `CasmSourceResult*` fields captured inside
+      `sourceFetchPhysical`; (2) that capture clobbered `A` at `sfpEof`,
+      destroying the `CASM_SOURCE_EOF` return; (3) depth-0 traversal had
+      no end cap of its own and overran into `.INCLUDE` children appended
+      mid-traversal -- fixed with a fixed `CasmSourceTopLevelEndLo/Hi`
+      snapshot; (4) `sourceFramePush` saved `CasmSourceVmmCursor` (the
+      bulk-refill read head, already at the file's end for any
+      sub-256-byte fixture) rather than the logical parse position --
+      fixed to `cursor - (blockLen - blockIndex)`. Fix 4 exposed that
+      `frSinglePushPop` had been passing for the wrong reason, two
+      cancelling bugs producing coincidentally correct line numbers. All
+      8 cases confirmed passing on the clean, instrumentation-removed
+      binary, which fits the original `$4000` envelope (no envelope
+      amendment ships). User approved completion. Final CASM `0.1.48`
+      build 1191; no-change rebuild stable; all three disk images pass.
+      Walkthrough:
+      `brain/walkthroughs/2026-07-26-casm-phase9-wp46-frame-stack-nested-traversal-and-cycle-detection.md`.
+      **WP46 complete.** WP47 remains pending separate plan approval and
+      activation.
 - [ ] `579096d9-ce77-44db-96a9-c32654238949`: WP47 ordered include graph and
       Pass 2 replay.
 - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095`: WP48 included-source diagnostics

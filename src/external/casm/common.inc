@@ -266,6 +266,14 @@ CASM_DEVICE_MAX = 11
 
 .assert CASM_DEVICE_MAX - CASM_DEVICE_MIN + 1 = 4, error, "CASM device range changed"
 
+; Phase 9 WP46 nested-include frame stack contract (Phase 0C.19: "16 include
+; levels beyond a depth-zero top-level root"). Depth 0 means no nested frame
+; is active (traversing a top-level root exactly as before Phase 9); depths
+; 1..CASM_INCLUDE_MAX_DEPTH index the frame-stack arrays (source.s).
+CASM_INCLUDE_MAX_DEPTH = 16
+
+.assert CASM_INCLUDE_MAX_DEPTH = 16, error, "CASM include max nesting depth changed"
+
 .assert CASM_INCLUDE_PHYS_REC_DEVICE = CASM_INCLUDE_PHYS_REC_FLAG + 1, error, "CASM include physical record device offset changed"
 .assert CASM_INCLUDE_PHYS_REC_NAMELEN = CASM_INCLUDE_PHYS_REC_DEVICE + 1, error, "CASM include physical record namelen offset changed"
 .assert CASM_INCLUDE_PHYS_REC_RESERVED0 = CASM_INCLUDE_PHYS_REC_NAMELEN + 1, error, "CASM include physical record reserved offset changed"
@@ -574,6 +582,10 @@ CASM_DIAG_PHASE9_WP44_LAST = CASM_DIAG_INCLUDE_FILENAME_TOO_LONG
 ; CASM_DIAG_SYMBOL_TABLE_FULL/CASM_DIAG_REGISTRY_FULL precedent.
 CASM_DIAG_INCLUDE_CATALOG_FULL = $34
 CASM_DIAG_PHASE9_WP45_LAST = CASM_DIAG_INCLUDE_CATALOG_FULL
+; CASM Phase 9 WP46 frame stack, nested traversal, and cycle detection.
+CASM_DIAG_INCLUDE_DEPTH_EXCEEDED = $35
+CASM_DIAG_INCLUDE_CYCLE_DETECTED = $36
+CASM_DIAG_PHASE9_WP46_LAST = CASM_DIAG_INCLUDE_CYCLE_DETECTED
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -606,6 +618,9 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_PHASE9_WP44_LAST = $33, error, "CASM WP44 diagnostic range changed"
 .assert CASM_DIAG_INCLUDE_CATALOG_FULL = CASM_DIAG_PHASE9_WP44_LAST + 1, error, "CASM Phase 9 WP45 diagnostics must follow WP44"
 .assert CASM_DIAG_PHASE9_WP45_LAST = $34, error, "CASM WP45 diagnostic range changed"
+.assert CASM_DIAG_INCLUDE_DEPTH_EXCEEDED = CASM_DIAG_PHASE9_WP45_LAST + 1, error, "CASM Phase 9 WP46 diagnostics must follow WP45"
+.assert CASM_DIAG_INCLUDE_CYCLE_DETECTED = CASM_DIAG_INCLUDE_DEPTH_EXCEEDED + 1, error, "CASM WP46 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE9_WP46_LAST = $36, error, "CASM WP46 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

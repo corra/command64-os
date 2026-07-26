@@ -31,13 +31,17 @@
 .import CasmIncludeFilename
 .import CasmIncludeFilenameLen
 
-; Source layer: the byte stream and its in-place location fields.
+; Source layer: the byte stream and the just-delivered byte's own true
+; provenance (WP46 fix -- captured by sourceFetchPhysical itself, after any
+; refill/pop/root-transition triggered by this fetch already committed, not
+; snapshotted here before the call; see source.s's CasmSourceResultFileId
+; field comment).
 .import sourceNextByte
 .import CasmSourceResultByte
-.import CasmSourceFileId
-.import CasmSourceLineLo
-.import CasmSourceLineHi
-.import CasmSourceColumn
+.import CasmSourceResultFileId
+.import CasmSourceResultLineLo
+.import CasmSourceResultLineHi
+.import CasmSourceResultColumn
 
 ; WP15 diagnostic context.
 .import CasmDiagCapture
@@ -436,11 +440,17 @@ lsioFailWithA:
 
 ; ---------------------------------------------------------------------------
 ; lexerFill (private)
-; Ensure the one-result lookahead is valid. Provenance is captured before the
-; byte is consumed by reading the source's in-place location fields (the
-; documented sourceGetLocation accessor surface); the column-exhausted latch
-; (source column 0) is clamped to CASM_SOURCE_COLUMN_MAX, and actual column
-; overflow stays enforced by sourceNextByte.
+; Ensure the one-result lookahead is valid. Provenance is captured AFTER the
+; fetch, from sourceFetchPhysical's own CasmSourceResultFileId/LineLo/Hi/
+; Column (WP46 fix) -- not snapshotted from the source's in-place location
+; fields before calling sourceNextByte. Capturing before the call is correct
+; for an ordinary byte, where nothing changes out from under it, but is
+; stale whenever this same call is the one that resolves a child frame's
+; EOF and triggers an automatic pop: the pre-call snapshot would describe
+; the abandoned child's position, not the parent's restored position the
+; delivered byte actually belongs to. CasmSourceResultColumn already
+; carries the column-exhausted-latch clamp to CASM_SOURCE_COLUMN_MAX; actual
+; column overflow stays enforced by sourceNextByte.
 ;
 ; Inputs:    lexer READY
 ; Outputs:   C clear when a result is buffered; C set with A = source diagnostic
@@ -451,20 +461,17 @@ lsioFailWithA:
 lexerFill:
     lda CasmLookaheadValid
     bne lfValid
-    lda CasmSourceFileId
-    sta CasmLookaheadFileId
-    lda CasmSourceLineLo
-    sta CasmLookaheadLineLo
-    lda CasmSourceLineHi
-    sta CasmLookaheadLineHi
-    lda CasmSourceColumn
-    bne lfColumnStore
-    lda #CASM_SOURCE_COLUMN_MAX  ; exhausted latch -> report the max column
-lfColumnStore:
-    sta CasmLookaheadColumn
     jsr sourceNextByte
     bcs lfFail
     sta CasmLookaheadResult
+    lda CasmSourceResultFileId
+    sta CasmLookaheadFileId
+    lda CasmSourceResultLineLo
+    sta CasmLookaheadLineLo
+    lda CasmSourceResultLineHi
+    sta CasmLookaheadLineHi
+    lda CasmSourceResultColumn
+    sta CasmLookaheadColumn
     lda CasmSourceResultByte
     sta CasmLookaheadByte
     lda #1

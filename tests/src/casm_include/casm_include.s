@@ -25,6 +25,10 @@
 .import CasmSourceLineLo
 .import CasmSourceLineHi
 .import CasmSourceColumn
+.import CasmSourceResultFileId
+.import CasmSourceResultLineLo
+.import CasmSourceResultLineHi
+.import CasmSourceResultColumn
 .import CasmDiagLocValid
 .import CasmDiagLocLineLo
 .import CasmDiagLocLineHi
@@ -228,6 +232,15 @@ caseFail:
 
 ; Length-bounded embedded source backend. CR is normalized to NEWLINE; every
 ; other byte, including null, is returned as a source BYTE.
+;
+; WP46 fix: stamps CasmSourceResultFileId/LineLo/Hi/Column with this
+; delivered result's own provenance -- the position *before* this byte's
+; own column/line advance below, matching source.s's sfpHaveByte/sfpEof
+; convention -- since lexerFill now reads these instead of snapshotting
+; CasmSourceFileId/LineLo/Hi/Column itself before calling sourceNextByte.
+; This stub has no frame-pop concept at all (a single flat embedded
+; script), so the distinction never actually matters here, but the
+; contract is the same one every sourceNextByte-shaped provider must honor.
 sourceNextByte:
     ldy ScriptPos
     cpy ScriptLen
@@ -236,12 +249,16 @@ sourceNextByte:
     inc ScriptPos
     cmp #CASM_PETSCII_CR
     beq @newline
+    pha
+    jsr stampResultLoc
+    pla
     sta CasmSourceResultByte
     inc CasmSourceColumn
     lda #CASM_SOURCE_BYTE
     clc
     rts
 @newline:
+    jsr stampResultLoc
     inc CasmSourceLineLo
     bne :+
     inc CasmSourceLineHi
@@ -252,8 +269,24 @@ sourceNextByte:
     clc
     rts
 @eof:
+    jsr stampResultLoc
     lda #CASM_SOURCE_EOF
     clc
+    rts
+
+; Copies the current (pre-advance) CasmSourceFileId/LineLo/Hi/Column into
+; the CasmSourceResult* fields lexerFill now reads. Preserves A.
+stampResultLoc:
+    pha
+    lda CasmSourceFileId
+    sta CasmSourceResultFileId
+    lda CasmSourceLineLo
+    sta CasmSourceResultLineLo
+    lda CasmSourceLineHi
+    sta CasmSourceResultLineHi
+    lda CasmSourceColumn
+    sta CasmSourceResultColumn
+    pla
     rts
 
 diagSetLocFromLookahead:

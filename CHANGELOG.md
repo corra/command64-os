@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM diagnostics reported the wrong line for the statement following an
+  `.include`**: the lexer captured a token's file/line/column *before*
+  fetching its first byte. That is correct for an ordinary byte, but the
+  fetch that resolves an included file's end also restores the parent
+  file's position -- so the first statement back in the parent was
+  attributed to the included file's abandoned last line. Provenance is now
+  captured after the fetch, from the source layer that knows which file the
+  delivered byte actually came from. Affects reported line numbers only; no
+  assembled output changes. Groundwork for `.include`, which remains
+  unimplemented (`FEATURE NOT IMPLEMENTED`) pending its production wiring.
 - **LABEL "device not present" + persistent drive lockup**: `LABEL` opens
   KERNAL logical file 15 (the command channel) directly for its BAM
   direct-access protocol, with no visibility into the OS's own

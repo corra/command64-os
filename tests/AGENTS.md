@@ -12,6 +12,11 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - Tests must be executable under VICE or on real hardware.
 - All modifications to test code must not break existing test coverage.
 - Test environments and manual/automated test procedures must be safe (e.g. avoiding memory segment collisions with resident utilities like DEBUG or the Shell, or clobbering system-critical zero-page locations) unless they are explicitly intended to be unsafe (destructively testing boundaries).
+- Agent-driven VICE tests must follow `.agents/workflows/vice-mcp-testing.md`.
+- Command64 must be booted and identified by first-line text `Command 64-DOS Version`
+  before a test application is launched by name from its shell.
+- A normal return is proven by a shell prompt matching `c64[<device>]:>`; the decimal
+  device number is variable.
 
 ## Work Guidance
 
@@ -22,6 +27,11 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - Keep KickAssembler tests only when no ca65 port exists or when the test is
   explicitly covering Kick-specific behavior such as the relocation pipeline.
 - Use the compiled shell load commands or CMake-built test PRGs to run test programs.
+- Select the disk by test needs: `image.d64` is the clean OS image, `test.d64` contains
+  existing harnesses but has no free directory entries, and `casm_overflow_test.d64`
+  carries newer harnesses and fixtures.
+- Use the documented Command64 application name; do not substitute a physically truncated
+  16-character D64 directory rendering for the user-facing command.
 - Log success/failure of each test case.
 
 ## Verification
@@ -45,6 +55,15 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   raw-content fixtures (`casmcat1`-`casmcat5`, bare lowercase disk names --
   not CASM source, so they skip the `.s`-suffix convention `CASM_TEST_FIXTURES`
   uses on `test_image_d64`).
+- `test_casm_frame` (WP46 nested-include frame stack) joins them there too,
+  needing no truncation at 14 characters, alongside ten real-CASM-syntax
+  fixtures (`casmfrp1`-`casmfrp4`, `casmfrc1`-`casmfrc3`, `casmfrcr1`,
+  `casmfrr1`-`casmfrr2`). Those fixtures use bare lowercase disk names
+  despite being real CASM source: they reference each other by exact operand
+  text, so they replicate WP45's already-proven pairing rather than risk a
+  second naming mismatch. Running it needs both drives -- boot `test.d64` on
+  device 8, then switch to device 9 (`9:` at the shell) where
+  `casm_overflow_test.d64` is attached.
 
 ## Child DOX Index
 

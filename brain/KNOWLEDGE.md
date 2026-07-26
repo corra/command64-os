@@ -1733,6 +1733,75 @@ and one `include.s`'s own header comments explicitly warned about -- this
 routine fell into it anyway, underscoring that the warning alone doesn't
 prevent the mistake; only tracing every clobbering call site does.
 
+### CASM Phase 9 WP46 Frame Stack: four runtime-only defects (2026-07-26)
+
+WP46 added the 16-level nested-include frame stack, `sourceFramePush`, and
+automatic pop inside `sourceRefill`. It built clean, passed static review,
+and still failed every real-traversal case on first run. Four production
+defects were involved, each masking the next. All four were found only by
+running real fixtures on real hardware -- none was reachable by reading
+the code.
+
+**1. `CasmSourceVmmCursorLo/Hi` is the bulk-refill read head, not the
+logical parse position.** This is the durable trap. `sourceRefill`
+installs up to 256 bytes per call, so for any file smaller than the buffer
+the cursor already sits at the file's *end* while the lexer is still
+parsing its middle. The logical position is
+`cursor - (blockLen - blockIndex)`. `sourceFramePush` originally saved the
+raw cursor as the parent's resume offset, so every pop resumed past all
+remaining parent content. **Any future code that needs "where is the
+parser right now" -- WP47's include-event recording especially -- must
+apply the same correction, never read the cursor directly.**
+
+**2. Provenance must be captured after a fetch, not before it.**
+`lexerFill` snapshotted `CasmSourceFileId`/`LineLo`/`Hi`/`Column` before
+calling `sourceNextByte`. That is correct for an ordinary byte but stale
+whenever the same call resolves a child frame's EOF and triggers the
+automatic pop: the byte delivered belongs to the restored parent, not the
+abandoned child. Fixed with `CasmSourceResultFileId`/`LineLo`/`Hi`/
+`Column` (`state.s`), written by `sourceFetchPhysical` at
+`sfpHaveByte`/`sfpEof` -- the only layer that knows which span the byte
+truly came from. Any stand-in `sourceNextByte` (e.g.
+`tests/src/casm_include/casm_include.s`, which links no `source.s`) must
+honor the same contract.
+
+**3. A growing length field cannot serve as a traversal bound.** Depth-0
+traversal was capped only by `CasmSourceLoadedLenLo/Hi`, which grows every
+time `sourceAppendFile` appends an `.INCLUDE` child *mid-traversal*. A
+top-level file with content after its own `.INCLUDE` therefore ran past
+its own end into the appended child's bytes instead of hitting EOF. Fixed
+with `CasmSourceTopLevelEndLo/Hi`, a fixed snapshot taken at
+`sourceLoad`'s completion, before any child can exist. Nested frames
+already had the equivalent in `CasmFrameEndOffsetLo/Hi`; depth 0 simply
+never got one.
+
+**4. Inserting code before a return path can clobber the return value.**
+The fix-2 provenance capture added at `sfpEof` destroyed the
+`CASM_SOURCE_EOF` value in `A` that the routine must still return,
+surfacing as a spurious `CASM_DIAG_INVALID_SOURCE_BYTE`.
+
+**A green test was concealing two cancelling bugs.** `frSinglePushPop`
+passed before fixes 3 and 4 landed, for entirely the wrong reason: with
+the resume offset wrong and no depth-0 cap, the pop re-read the *child's*
+bytes a second time, but the parent's line counter had been correctly
+restored to 4, so those re-read `C1`/`C2` labels were stamped lines 4 and
+5 -- exactly the `P3=4, P4=5` the assertion expected. Fixing the overrun
+made the test *start* failing, which is what exposed that `P3`/`P4` had
+never been read at all. **A passing assertion on derived values (line
+numbers) does not prove the underlying traversal is correct; two errors
+can cancel.** Where practical, assert on something the bug cannot fake --
+a byte offset, a push/pop event count, an identity -- not only on a
+value that a wrong path might coincidentally reproduce.
+
+**Method note.** Static review had been exhausted twice with wrong
+conclusions before instrumentation settled it. What worked was printing
+real state to screen (frame depth, label-line log, push/pop counts, raw
+cursor offsets, catalog indices) and having the user run it. Two of the
+false starts came from misreading my own debug output: a decimal-printing
+routine read as hex (`A=25` decimal `$19`, not `$25`), and an X-register
+clash inside the print helper that caused an endless loop. Verify the
+instrumentation itself before trusting what it reports.
+
 ### Agent-driven VICE testing contract
 
 - Agent-driven VICE tests must boot Command64 from the selected D64 before launching an

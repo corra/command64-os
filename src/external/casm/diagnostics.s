@@ -94,7 +94,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE9_WP45_LAST + 1
+    cmp #CASM_DIAG_PHASE9_WP46_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED
@@ -1013,6 +1013,8 @@ diagMessageLo:
     .byte <msgInvalidIncludeFilename
     .byte <msgIncludeFilenameTooLong
     .byte <msgIncludeCatalogFull
+    .byte <msgIncludeDepthExceeded
+    .byte <msgIncludeCycleDetected
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -1068,10 +1070,12 @@ diagMessageHi:
     .byte >msgInvalidIncludeFilename
     .byte >msgIncludeFilenameTooLong
     .byte >msgIncludeCatalogFull
+    .byte >msgIncludeDepthExceeded
+    .byte >msgIncludeCycleDetected
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE9_WP45_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE9_WP45_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE9_WP46_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE9_WP46_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -1177,6 +1181,10 @@ msgIncludeFilenameTooLong:
     .byte "CASM: INCLUDE FILENAME TOO LONG", PetCr, 0
 msgIncludeCatalogFull:
     .byte "CASM: INCLUDE CATALOG FULL", PetCr, 0
+msgIncludeDepthExceeded:
+    .byte "CASM: INCLUDE DEPTH EXCEEDED", PetCr, 0
+msgIncludeCycleDetected:
+    .byte "CASM: INCLUDE CYCLE DETECTED", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

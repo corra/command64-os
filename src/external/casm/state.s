@@ -180,3 +180,31 @@ CasmDiagStateEnd:
 .assert CasmTokenRecordEnd - CasmTokenRecord = CASM_TOKEN_REC_SIZE, error, "CASM token record must be exactly 39 bytes"
 .assert CasmLexerStateEnd - CasmLexerStateStart = 47, error, "CASM lexer state must be exactly 47 bytes"
 .assert CasmPhase3StateEnd - CasmPhase3StateStart = 63, error, "CASM Phase 3 state must be exactly 63 bytes"
+
+; ---------------------------------------------------------------------------
+; WP46 fix: the true provenance (file id, line, column) of the byte just
+; delivered by a sourceNextByte-shaped fetch -- written by source.s's
+; sourceFetchPhysical (at sfpHaveByte/sfpEof) or by a standalone harness's
+; own stand-in sourceNextByte (e.g. tests/src/casm_include/casm_include.s,
+; which supplies no source.s at all), and read by lexerFill (lexer.s) right
+; after calling sourceNextByte, replacing its old practice of snapshotting
+; CasmSourceFileId/LineLo/Hi/Column itself *before* the call -- stale
+; whenever that same call is the one that resolves a child frame's EOF and
+; triggers an automatic pop, since the delivered byte then belongs to the
+; restored parent's position, not the position snapshotted before the call.
+;
+; Deliberately outside CasmPhase3State's own exact-size assert above, same
+; precedent as the WP15 diagnostic state block: this is provenance metadata
+; about a fetch result, not source or lexer traversal state itself.
+; ---------------------------------------------------------------------------
+.export CasmSourceResultFileId
+.export CasmSourceResultLineLo
+.export CasmSourceResultLineHi
+.export CasmSourceResultColumn
+
+.segment "BSS"
+
+CasmSourceResultFileId: .res 1
+CasmSourceResultLineLo: .res 1
+CasmSourceResultLineHi: .res 1
+CasmSourceResultColumn: .res 1

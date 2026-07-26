@@ -894,3 +894,65 @@ string(REPEAT "4" 20 CASM_CAT_BODY_4)
 file(WRITE "${OUTPUT_DIR}/casmcat4.seq" "${CASM_CAT_BODY_4}")
 string(REPEAT "5" 12 CASM_CAT_BODY_5)
 file(WRITE "${OUTPUT_DIR}/casmcat5.seq" "${CASM_CAT_BODY_5}")
+
+# CASM Phase 9 WP46 test_casm_frame fixtures. Real CASM statement source
+# (label-only lines plus one or more .INCLUDE directives), so the harness's
+# own real lexer/parser drives traversal across genuine frame push/pop
+# boundaries -- unlike WP45's raw-byte casmcat* fixtures above.
+#
+# casmfrp1/casmfrc1: single push/pop. Parent labels P1(line1)/P2(line2),
+# .INCLUDE at line3, child labels C1(line1)/C2(line2) in the child's own
+# numbering, then parent resumes at P3(line4)/P4(line5).
+file(WRITE "${OUTPUT_DIR}/casmfrp1.seq"
+    "P1:${CASM_LF}P2:${CASM_LF}.INCLUDE \"CASMFRC1\"${CASM_LF}P3:${CASM_LF}P4:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmfrc1.seq"
+    "C1:${CASM_LF}C2:${CASM_LF}"
+)
+
+# casmfrp2/casmfrc2/casmfrc3: three-level nesting. N1(line1) ->
+# .INCLUDE at line2 -> M1(line1 in casmfrc2) -> .INCLUDE at line2 ->
+# G1(line1 in casmfrc3)/G2(line2) -> pop -> M2(line3 in casmfrc2) -> pop ->
+# N2(line3 in casmfrp2).
+file(WRITE "${OUTPUT_DIR}/casmfrp2.seq"
+    "N1:${CASM_LF}.INCLUDE \"CASMFRC2\"${CASM_LF}N2:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmfrc2.seq"
+    "M1:${CASM_LF}.INCLUDE \"CASMFRC3\"${CASM_LF}M2:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmfrc3.seq"
+    "G1:${CASM_LF}G2:${CASM_LF}"
+)
+
+# casmfrp3: sequential reinclusion of the same physical file (casmfrc1)
+# from two different .INCLUDE sites in the same parent, after the first
+# frame has already popped -- must be legal (not a cycle) and must be a
+# deduplicated cache hit the second time (Phase 0C.19).
+file(WRITE "${OUTPUT_DIR}/casmfrp3.seq"
+    "S1:${CASM_LF}.INCLUDE \"CASMFRC1\"${CASM_LF}S2:${CASM_LF}.INCLUDE \"CASMFRC1\"${CASM_LF}S3:${CASM_LF}"
+)
+
+# casmfrp4/casmfrcr1: pending-CR must never cross a frame boundary.
+# casmfrcr1 ends in a bare CR (no trailing LF, matching casmfincr.seq's
+# own existing bare-final-CR convention) as the child's very last byte;
+# casmfrp4 resumes with a blank line (a lone LF) immediately after the
+# .INCLUDE. If the child's trailing CR wrongly collapsed with that
+# resumed LF as one CRLF pair, the blank line would be lost and P3 would
+# be misnumbered line 3 instead of the correct line 4.
+file(WRITE "${OUTPUT_DIR}/casmfrcr1.seq"
+    "C1:${CASM_CR}"
+)
+file(WRITE "${OUTPUT_DIR}/casmfrp4.seq"
+    "P1:${CASM_LF}.INCLUDE \"CASMFRCR1\"${CASM_LF}${CASM_LF}P3:${CASM_LF}"
+)
+
+# casmfrr1/casmfrr2: two top-level files (no includes at all) sharing a
+# line number, proving the pre-existing WP34 echo-identity gap fix -- the
+# root-transition boundary must reset the diagnostic echo bookkeeping the
+# same way a frame push/pop does, not just line/column/pending-CR.
+file(WRITE "${OUTPUT_DIR}/casmfrr1.seq"
+    "R1:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmfrr2.seq"
+    "R2:${CASM_LF}"
+)

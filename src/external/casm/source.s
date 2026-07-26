@@ -54,6 +54,20 @@
 .import CasmSourceLineLength
 .import CasmSourceLineState
 
+; WP46 fix: the true provenance (file id, line, column) of the byte just
+; delivered by sourceFetchPhysical, captured at sfpHaveByte/sfpEof -- the
+; one point guaranteed to run only after any pending refill/automatic-pop/
+; root-transition triggered by *this* fetch has already been committed, but
+; before this byte's own column/line-advance side effects (snbColumnInc,
+; sourceAdvanceNewline) run below. lexerFill (lexer.s) reads these after
+; calling sourceNextByte instead of snapshotting CasmSourceFileId/LineLo/Hi/
+; Column itself before the call -- see lexerFill's own header comment for
+; why the "before" snapshot went stale across an automatic pop.
+.import CasmSourceResultFileId
+.import CasmSourceResultLineLo
+.import CasmSourceResultLineHi
+.import CasmSourceResultColumn
+
 ; WP15 diagnostic line echo. Written here and never read by traversal: no
 ; source decision may depend on these.
 .import CasmDiagLineBufA
@@ -68,6 +82,13 @@
 .import CasmDiagPrevNoLo
 .import CasmDiagPrevNoHi
 .import CasmDiagCapture
+
+; WP46: frame push/pop own invalidating the lexer's lookahead directly
+; (CasmLookaheadValid = 0), matching sourceRewind's existing precedent
+; that the state-owning caller invalidates lookahead rather than a
+; private lexer routine -- source.s otherwise still writes no other
+; lexer-owned state.
+.import CasmLookaheadValid
 
 ; Phase 2 managed file services and shared transfer state.
 .import inputStreamOpen
@@ -90,6 +111,8 @@
 .export sourceInit
 .export sourceLoad
 .export sourceAppendFile
+.export sourceFramePush
+.export CasmFrameDepth
 .export sourceOpen
 .export sourceNextByte
 .export sourceNextLine
@@ -154,6 +177,19 @@
 CasmSourceVmmSlot:        .res 1
 CasmSourceLoadedLenLo:    .res 1
 CasmSourceLoadedLenHi:    .res 1
+; WP46 fix: the combined top-level content's own true end offset, fixed at
+; sourceLoad's own completion (a snapshot of CasmSourceLoadedLenLo/Hi taken
+; before any .INCLUDE child is ever appended). CasmSourceLoadedLenLo/Hi
+; itself keeps growing as sourceAppendFile appends children mid-traversal,
+; so it cannot be used as depth-0's own cap once any child has been
+; appended -- without a separate, fixed boundary, a top-level file with
+; real content after its own .INCLUDE would overread straight into an
+; appended child's bytes on reaching its own true end, instead of hitting
+; EOF. Mirrors the existing per-frame CasmFrameEndOffsetLo/Hi mechanism
+; nested frames already have; depth-0 traversal never had an equivalent
+; until now.
+CasmSourceTopLevelEndLo:  .res 1
+CasmSourceTopLevelEndHi:  .res 1
 CasmSourceVmmCursorLo:    .res 1
 CasmSourceVmmCursorHi:    .res 1
 CasmSourceFileTable:      .res CASM_SOURCE_COUNT_MAX * 2
@@ -163,6 +199,33 @@ CasmSourceStreamCursorLo: .res 1
 CasmSourceStreamCursorHi: .res 1
 CasmSourceAppendStartLo:  .res 1
 CasmSourceAppendStartHi:  .res 1
+
+; ---------------------------------------------------------------------------
+; WP46 nested-include frame stack (Phase 0C.19: 16 levels beyond a
+; depth-zero top-level root). Plain BSS parallel arrays, 0-based, indexed
+; by depth-1 while a frame at that depth is active or being saved/restored
+; -- CasmFrameDepth itself is the 1-based count of currently active frames
+; (0 = none, traversing a top-level root exactly as before Phase 9).
+;
+; CasmFrameCatalogIndex is the active chain's own physical identity, used
+; only for cycle detection (Phase 0C.19: "scans the active frame chain
+; only" -- a top-level root is never itself a catalog entry, so this
+; array never needs to represent one). CasmFrameEndOffsetLo/Hi is the
+; frame's own end in the combined store, sourceRefill's cap while that
+; depth is active. CasmFrameResume* is the suspended parent's exact
+; traversal state at the moment this depth was pushed, restored verbatim
+; on pop.
+; ---------------------------------------------------------------------------
+CasmFrameDepth:           .res 1
+CasmFrameCatalogIndex:    .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameEndOffsetLo:     .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameEndOffsetHi:     .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumeOffsetLo:  .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumeOffsetHi:  .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumeLineLo:    .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumeLineHi:    .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumeColumn:    .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumePendingCr: .res CASM_INCLUDE_MAX_DEPTH
 
 .segment "CODE"
 
@@ -189,6 +252,8 @@ sourceInit:
     sta CasmSourceVmmSlot
     sta CasmSourceLoadedLenLo
     sta CasmSourceLoadedLenHi
+    sta CasmSourceTopLevelEndLo
+    sta CasmSourceTopLevelEndHi
     sta CasmSourceVmmCursorLo
     sta CasmSourceVmmCursorHi
     sta CasmSourceLoadIndex
@@ -197,6 +262,7 @@ sourceInit:
     sta CasmSourceStreamCursorHi
     sta CasmSourceAppendStartLo
     sta CasmSourceAppendStartHi
+    sta CasmFrameDepth
     ldx #(CASM_SOURCE_COUNT_MAX * 2) - 1
 siClearFileTable:
     sta CasmSourceFileTable, x
@@ -443,8 +509,10 @@ slFileLoopNear:
 slAllDone:
     lda CasmSourceVmmCursorLo
     sta CasmSourceLoadedLenLo
-    lda CasmSourceVmmCursorHi
+    sta CasmSourceTopLevelEndLo   ; WP46 fix: fixed snapshot before any
+    lda CasmSourceVmmCursorHi     ; .INCLUDE child ever gets appended
     sta CasmSourceLoadedLenHi
+    sta CasmSourceTopLevelEndHi
     lda #0
     sta CasmSourceVmmCursorLo
     sta CasmSourceVmmCursorHi
@@ -1211,18 +1279,41 @@ sourceFetchPhysical:
     ; length is a corrupt cursor and a stream-state failure.
     lda CasmSourceBlockIndexLo
     cmp CasmSourceBlockLenLo
-    bne sfpCursorFail
+    bne sfpCursorFailNear
     lda CasmSourceBlockIndexHi
     cmp CasmSourceBlockLenHi
-    bne sfpCursorFail
+    bne sfpCursorFailNear
 
     jsr sourceRefill
     bcs sfpFail                 ; refill failed; source already ERROR
     cmp #CASM_SOURCE_EOF
     beq sfpEof
     ; Refill installed a nonempty block with index 0; a byte is now available.
+    jmp sfpHaveByte
+
+; Trampoline: sfpCursorFail is out of direct branch range from the checks
+; above (the WP46 provenance-capture insert below pushed it further away).
+sfpCursorFailNear:
+    jmp sfpCursorFail
 
 sfpHaveByte:
+    ; WP46 fix: capture this byte's true provenance now -- any refill/pop/
+    ; root-transition this call needed has already been committed above,
+    ; and this byte's own column/line-advance side effects (in
+    ; sourceNextByte, above this layer) have not run yet. See the field
+    ; declarations' own header comment.
+    lda CasmSourceFileId
+    sta CasmSourceResultFileId
+    lda CasmSourceLineLo
+    sta CasmSourceResultLineLo
+    lda CasmSourceLineHi
+    sta CasmSourceResultLineHi
+    lda CasmSourceColumn
+    bne sfpResultColumnStore
+    lda #CASM_SOURCE_COLUMN_MAX  ; exhausted latch -> report the max column
+sfpResultColumnStore:
+    sta CasmSourceResultColumn
+
     ; Offset overflow is validated before any cursor or byte is committed.
     lda CasmSourceOffsetLo
     cmp #$FF
@@ -1249,7 +1340,28 @@ sfpOffsetDone:
     clc
     rts
 sfpEof:
-    ; sourceRefill committed EOF with A = CASM_SOURCE_EOF, C clear.
+    ; WP46 fix: EOF has no byte of its own, but the caller (lexerFill) still
+    ; stamps the EOF token's provenance from these fields. Capture the
+    ; current (unchanged since the last real byte's own advance) position
+    ; here too, matching the pre-fix behavior of snapshotting immediately
+    ; before this call -- real combined EOF (depth 0, content exhausted)
+    ; never mutates Line/Column/FileId itself, so "current" and "just
+    ; before this call" are the same value on this path.
+    lda CasmSourceFileId
+    sta CasmSourceResultFileId
+    lda CasmSourceLineLo
+    sta CasmSourceResultLineLo
+    lda CasmSourceLineHi
+    sta CasmSourceResultLineHi
+    lda CasmSourceColumn
+    bne sfpEofColumnStore
+    lda #CASM_SOURCE_COLUMN_MAX
+sfpEofColumnStore:
+    sta CasmSourceResultColumn
+    ; sourceRefill committed EOF with A = CASM_SOURCE_EOF, C clear -- but the
+    ; provenance capture above clobbered A, so it must be reloaded here
+    ; rather than trusted to survive from the jsr sourceRefill/cmp above.
+    lda #CASM_SOURCE_EOF
     clc
     rts
 sfpFail:
@@ -1427,6 +1539,12 @@ sourceResetTraversal:
 ; Inputs:    none
 ; Outputs:   none (commits the transition on a boundary; no-op otherwise)
 ; Clobbers:  A, X, processor flags
+;
+; WP46: also resets the diagnostic echo/offset-guard state
+; (sourceResetBoundaryEcho) on a real transition -- fixes a pre-existing
+; gap where two different top-level files sharing a line number could
+; show one file's cached echo text under the other's diagnostic, since
+; nothing previously invalidated that bookkeeping at a file boundary.
 ; ---------------------------------------------------------------------------
 srCheckFileBoundary:
     lda CasmSourceFileId
@@ -1454,7 +1572,193 @@ srCheckFileBoundary:
     sta CasmSourceColumn
     lda #0
     sta CasmSourcePendingCr
+    jsr sourceResetBoundaryEcho
 srcfbDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceResetBoundaryEcho (private, WP46)
+; Discard both diagnostic echo buffers' cached content at a source
+; traversal boundary (top-level file transition, frame push, or frame
+; pop) and reset the per-span byte-delivered overflow guard
+; (CasmSourceOffsetLo/Hi). Must be called only after CasmSourceLineLo/Hi
+; already holds the new position's correct line number: the reset
+; "current" buffer is re-anchored to that line, empty, so a diagnostic on
+; the very first byte after the boundary renders a blank line rather than
+; stale or (before this fix) another file's text.
+;
+; CasmSourceOffsetLo/Hi has no consumer outside this module (only its own
+; overflow guard and a "has any byte been consumed yet" check) -- once the
+; same physical bytes can be delivered many times over through repeated
+; inclusion, resetting it fresh at every boundary is correct: it protects
+; only whatever span is currently active, never a global total.
+;
+; Inputs:    CasmSourceLineLo/Hi already set to the new position's line
+; Outputs:   both echo buffers empty and re-anchored to the new current
+;            line; CasmSourceOffsetLo/Hi = 0
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+sourceResetBoundaryEcho:
+    lda #0
+    sta CasmDiagLineLen
+    sta CasmDiagLineClipped
+    sta CasmDiagLineSel
+    sta CasmDiagPrevLen
+    sta CasmDiagPrevClipped
+    sta CasmDiagPrevNoLo
+    sta CasmDiagPrevNoHi
+    sta CasmSourceOffsetLo
+    sta CasmSourceOffsetHi
+    lda CasmSourceLineLo
+    sta CasmDiagLineNoLo
+    lda CasmSourceLineHi
+    sta CasmDiagLineNoHi
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceFramePush (WP46)
+; Push a new nested include frame, switching live traversal to the child's
+; span. Depth and active-chain cycle checks run first, before any state
+; changes -- a rejected push leaves every frame-stack field, the live
+; cursor, and the echo buffers completely untouched.
+;
+; The caller (a test harness now; WP47's real dispatch later) is
+; responsible for resolving the child through include.s's
+; includeCatalogLoad first and reading its start/length out of
+; CasmIncludeRecordStage -- this routine has no dependency on include.s at
+; all, keeping the two modules' layering exactly as it already was
+; (include.s already imports from source.s; the reverse never happens).
+;
+; Inputs:    A = candidate catalog index (0..CASM_INCLUDE_PHYS_CAPACITY-1);
+;            CasmValue0Lo/Hi = child start offset; CasmValue1Lo/Hi = child
+;            end offset (start + length), both in the combined source
+;            store -- staged by the caller immediately before this call,
+;            not carried across any intervening call (unlike the WP45
+;            defect this project already hit once with CasmValue0Lo/Hi).
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; the parent's live
+;            cursor/line/column/pending-CR saved into the new depth's
+;            frame-stack slot; live traversal switched to the child's
+;            start/line 1/column 1/pending-CR clear; the installed block
+;            invalidated (forces a fresh refill); echo/offset-guard state
+;            reset; lookahead invalidated; CasmFrameDepth incremented
+;            Failure: A = CASM_DIAG_INCLUDE_DEPTH_EXCEEDED (depth already
+;            at CASM_INCLUDE_MAX_DEPTH) or CASM_DIAG_INCLUDE_CYCLE_DETECTED
+;            (the candidate catalog index already appears somewhere in the
+;            active frame chain), C set; nothing changed
+; Clobbers:  A, X, Y, CasmSourceScratch0/1, CasmLookaheadValid
+; Scratch:   CasmSourceScratch0 (the candidate catalog index, held across
+;            the cycle-scan loop below), CasmSourceScratch1 (the scan's
+;            loop bound) -- both free here: this routine runs standalone,
+;            never interleaved with sourceLoad/sourceAppendFile's own use
+;            of the same cells
+; ---------------------------------------------------------------------------
+sourceFramePush:
+    sta CasmSourceScratch0
+    lda CasmFrameDepth
+    cmp #CASM_INCLUDE_MAX_DEPTH
+    bcc sfpDepthOk
+    lda #CASM_DIAG_INCLUDE_DEPTH_EXCEEDED
+    sec
+    rts
+
+sfpDepthOk:
+    lda CasmFrameDepth
+    beq sfpNoCycle               ; depth 0: nothing active to collide with
+    sta CasmSourceScratch1
+    ldx #0
+sfpCycleLoop:
+    cpx CasmSourceScratch1
+    beq sfpNoCycle
+    lda CasmFrameCatalogIndex, x
+    cmp CasmSourceScratch0
+    beq sfpCycle
+    inx
+    jmp sfpCycleLoop
+sfpCycle:
+    lda #CASM_DIAG_INCLUDE_CYCLE_DETECTED
+    sec
+    rts
+
+sfpNoCycle:
+    ; Save the parent's live state into the new depth's slot (0-based
+    ; index = CasmFrameDepth's current, pre-increment value).
+    ldx CasmFrameDepth
+    lda CasmSourceScratch0
+    sta CasmFrameCatalogIndex, x
+    lda CasmValue1Lo
+    sta CasmFrameEndOffsetLo, x
+    lda CasmValue1Hi
+    sta CasmFrameEndOffsetHi, x
+
+    ; WP46 fix: the parent's resume offset is its LOGICAL parse position,
+    ; not CasmSourceVmmCursorLo/Hi. That cursor is the bulk-refill read
+    ; head: sourceRefill installs up to 256 bytes at a time, so by the time
+    ; the lexer has parsed as far as an .INCLUDE line, the cursor has
+    ; typically already run ahead to the end of the whole installed block
+    ; (for a fixture smaller than the buffer, that means the file's very
+    ; end). Resuming the parent from there would skip every byte still
+    ; sitting unconsumed in the block.
+    ;
+    ; The true position is cursor - (blockLen - blockIndex): back the read
+    ; head up by however much of the installed block the lexer has not yet
+    ; consumed. CasmSourceScratch0/1 are free again here -- the candidate
+    ; catalog index they carried was already stored above, and the cycle
+    ; scan is finished.
+    lda CasmSourceBlockLenLo
+    sec
+    sbc CasmSourceBlockIndexLo
+    sta CasmSourceScratch0
+    lda CasmSourceBlockLenHi
+    sbc CasmSourceBlockIndexHi
+    sta CasmSourceScratch1
+    lda CasmSourceVmmCursorLo
+    sec
+    sbc CasmSourceScratch0
+    sta CasmFrameResumeOffsetLo, x
+    lda CasmSourceVmmCursorHi
+    sbc CasmSourceScratch1
+    sta CasmFrameResumeOffsetHi, x
+
+    lda CasmSourceLineLo
+    sta CasmFrameResumeLineLo, x
+    lda CasmSourceLineHi
+    sta CasmFrameResumeLineHi, x
+    lda CasmSourceColumn
+    sta CasmFrameResumeColumn, x
+    lda CasmSourcePendingCr
+    sta CasmFrameResumePendingCr, x
+
+    ; Switch the live cursor to the child's start. The installed block is
+    ; invalidated (index = length = 0) rather than kept: unlike
+    ; srCheckFileBoundary's own reset (always called from within
+    ; sourceRefill, where the block is already guaranteed exhausted), this
+    ; routine is called from *outside* the refill mechanism entirely, so
+    ; whatever block the parent had mid-consumed must not be trusted for
+    ; the child's completely different position.
+    lda CasmValue0Lo
+    sta CasmSourceVmmCursorLo
+    lda CasmValue0Hi
+    sta CasmSourceVmmCursorHi
+    lda #0
+    sta CasmSourceBlockIndexLo
+    sta CasmSourceBlockIndexHi
+    sta CasmSourceBlockLenLo
+    sta CasmSourceBlockLenHi
+    lda #<CASM_SOURCE_LINE_INITIAL
+    sta CasmSourceLineLo
+    lda #>CASM_SOURCE_LINE_INITIAL
+    sta CasmSourceLineHi
+    lda #CASM_SOURCE_COLUMN_INITIAL
+    sta CasmSourceColumn
+    lda #0
+    sta CasmSourcePendingCr
+    jsr sourceResetBoundaryEcho
+    inc CasmFrameDepth
+    lda #0
+    sta CasmLookaheadValid
+    lda #CASM_DIAG_NONE
+    clc
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1521,7 +1825,13 @@ srMinDone:
 ;            (chunk destination offset within this refill's transfer region)
 ; ---------------------------------------------------------------------------
 sourceRefill:
+    ; WP46: the top-level file-boundary check is a depth-0 (root traversal)
+    ; concept only -- while a nested include frame is active, reaching its
+    ; own end is handled by the cap/pop logic below instead.
+    lda CasmFrameDepth
+    bne srSkipRootBoundary
     jsr srCheckFileBoundary
+srSkipRootBoundary:
     jsr sourceComputeBase
     sta CasmLexerScratch0        ; base: needed again after computing requestLen
     beq srFullRequest            ; base 0 -> whole buffer -> requestLen = 256
@@ -1551,15 +1861,39 @@ srComputeRemaining:
     sta CasmValue0Hi
     jsr srMin                    ; transferLen = min(requestLen, remaining)
 
-    ; WP34: also cap at the next file boundary, if one exists -- keeps a
-    ; single installed block from ever spanning two files (srCheckFileBoundary
-    ; relies on this). Gated so a single-file source (CasmSourceCount == 1)
-    ; never computes this term, degrading exactly to WP33's 2-way min.
+    ; WP34: also cap at the next top-level file boundary, if one exists --
+    ; keeps a single installed block from ever spanning two files
+    ; (srCheckFileBoundary relies on this). Root traversal (depth 0) only.
+    ; WP46: while a nested include frame is active (depth > 0), cap at
+    ; that frame's own end offset instead -- the top-level file table has
+    ; no relation to an included file's span, which can sit anywhere in
+    ; the combined store.
+    lda CasmFrameDepth
+    bne srCapNested
+
+    ; WP46 fix: cap depth-0 traversal at the combined top-level content's
+    ; own fixed end (CasmSourceTopLevelEndLo/Hi) before the next-file-table
+    ; check below. CasmSourceLoadedLenLo/Hi (what srComputeRemaining just
+    ; used) grows as .INCLUDE children get appended mid-traversal; without
+    ; this separate fixed bound, a top-level file with real content after
+    ; its own .INCLUDE would overread straight into an appended child's
+    ; bytes on reaching its own true end, instead of hitting EOF.
+    lda CasmSourceTopLevelEndLo
+    sec
+    sbc CasmSourceVmmCursorLo
+    sta CasmValue0Lo
+    lda CasmSourceTopLevelEndHi
+    sbc CasmSourceVmmCursorHi
+    sta CasmValue0Hi
+    jsr srMin
+
     lda CasmSourceFileId
     clc
     adc #1
     cmp CasmSourceCount
-    bcs srTransferLenReady        ; no next file -- transferLen already final
+    bcc srCapRootHasNext
+    jmp srTransferLenReady        ; no next file -- transferLen already final
+srCapRootHasNext:
     asl
     tax
     lda CasmSourceFileTable, x
@@ -1570,12 +1904,25 @@ srComputeRemaining:
     sbc CasmSourceVmmCursorHi
     sta CasmValue0Hi
     jsr srMin
+    jmp srTransferLenReady
+srCapNested:
+    ; 0-based array index of the currently active frame is CasmFrameDepth-1.
+    tax
+    dex
+    lda CasmFrameEndOffsetLo, x
+    sec
+    sbc CasmSourceVmmCursorLo
+    sta CasmValue0Lo
+    lda CasmFrameEndOffsetHi, x
+    sbc CasmSourceVmmCursorHi
+    sta CasmValue0Hi
+    jsr srMin
 
 srTransferLenReady:
     lda CasmSourceScratch0
     ora CasmSourceScratch1
     bne srHaveData
-    jmp srEof                    ; transferLen == 0: combined content exhausted
+    jmp srEofOrPop                ; transferLen == 0: EOF, or a frame to pop
 
 srHaveData:
     ; Precompute the block's final index/length now, from the original
@@ -1720,6 +2067,75 @@ sourceComputeBase:
     rts
 scbLine:
     lda CasmSourceLineLength
+    rts
+
+; ---------------------------------------------------------------------------
+; srEofOrPop (private, WP46)
+; transferLen == 0 means either the whole combined traversal is exhausted
+; (depth 0: unchanged WP33/34 behavior) or the currently active nested
+; frame has reached its own end and must be popped back to its suspended
+; parent. A pop retries the entire sourceRefill computation from the top
+; -- which may itself immediately pop again, if the newly-resumed parent
+; is *also* exactly at its own end (e.g. an included file's very last
+; statement was itself another `.INCLUDE`).
+;
+; Inputs:    CasmFrameDepth
+; Outputs:   depth 0: as srEof. depth > 0: never returns to the original
+;            caller directly -- always re-enters sourceRefill instead.
+; ---------------------------------------------------------------------------
+srEofOrPop:
+    lda CasmFrameDepth
+    beq srEofNear
+    jsr sourceFramePopInternal
+    jmp sourceRefill
+srEofNear:
+    jmp srEof
+
+; ---------------------------------------------------------------------------
+; sourceFramePopInternal (private, WP46)
+; Restore the suspended parent's traversal state from the current depth's
+; frame-stack slot and decrement CasmFrameDepth. Called only from
+; srEofOrPop, when the active frame's own content is exhausted; never
+; fails (restores only previously-saved, known-good state -- no OS call,
+; no allocation).
+;
+; Inputs:    CasmFrameDepth > 0
+; Outputs:   CasmSourceVmmCursorLo/Hi, CasmSourceLineLo/Hi, CasmSourceColumn,
+;            CasmSourcePendingCr restored from the popped frame's saved
+;            resume state; CasmSourceBlockIndexLo/Hi and
+;            CasmSourceBlockLenLo/Hi invalidated (both zeroed, forcing
+;            sourceFetchPhysical's next call to refill rather than trust
+;            the child's now-stale installed block); echo/offset-guard
+;            state reset (sourceResetBoundaryEcho); lookahead invalidated
+;            (CasmLookaheadValid = 0, matching sourceRewind's existing
+;            precedent that the state-owning caller invalidates lookahead,
+;            not a private lexer routine); CasmFrameDepth decremented
+; Clobbers:  A, X
+; ---------------------------------------------------------------------------
+sourceFramePopInternal:
+    ldx CasmFrameDepth
+    dex                            ; 0-based array index of the frame being popped
+    lda CasmFrameResumeOffsetLo, x
+    sta CasmSourceVmmCursorLo
+    lda CasmFrameResumeOffsetHi, x
+    sta CasmSourceVmmCursorHi
+    lda CasmFrameResumeLineLo, x
+    sta CasmSourceLineLo
+    lda CasmFrameResumeLineHi, x
+    sta CasmSourceLineHi
+    lda CasmFrameResumeColumn, x
+    sta CasmSourceColumn
+    lda CasmFrameResumePendingCr, x
+    sta CasmSourcePendingCr
+    lda #0
+    sta CasmSourceBlockIndexLo
+    sta CasmSourceBlockIndexHi
+    sta CasmSourceBlockLenLo
+    sta CasmSourceBlockLenHi
+    jsr sourceResetBoundaryEcho
+    dec CasmFrameDepth
+    lda #0
+    sta CasmLookaheadValid
     rts
 
 srEof:
