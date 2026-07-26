@@ -209,7 +209,11 @@ if(Ca65_FOUND)
     # three grammar diagnostics overflowed $3700 by 16 measured bytes before
     # scanner/dispatch code. The reviewed +768-byte envelope covers the full
     # quoted-operand work package without approaching the user-space ceiling.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3A00")
+    # WP45: $3A00 -> $3E00 -- the new standalone include.s catalog module
+    # (metadata store, device resolution, case-fold compare, record I/O)
+    # measured a 694-byte overflow at $3A00; the user approved a reviewed
+    # +1024-byte envelope, leaving 330 bytes headroom.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "3E00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -362,6 +366,24 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1200")
         endif()
+        if(TEST_NAME STREQUAL "casm_catalog")
+            # WP45: include.s plus every module sourceAppendFile transitively
+            # needs. Does NOT link cli.s (mirrors casm_pass1/casm_passcheck's
+            # own precedent): this harness declares its own small stand-in
+            # CasmSourceNames/CasmSourceCount/cliSourceSlotLo/Hi rather than
+            # pulling in cli.s's whole CLI-parsing dependency chain just for
+            # those three globals, since source.s's sourceLoad references
+            # them and ld65 links whole object files.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1A00")
+        endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
     endforeach()
@@ -432,6 +454,8 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_l15release)
 # WP44's include harness is intentionally packaged on casm_overflow_test_d64:
 # test.d64 is already at the 1541 directory-entry ceiling.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_include)
+# WP45's catalog harness joins it there for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_catalog)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -639,7 +663,7 @@ add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp test_l15release test_casm_include
+    PRGS casm comp test_l15release test_casm_include test_casm_catalog
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -661,6 +685,34 @@ add_custom_command(
         -w "${CASM_REF_DIR}/casmbig1.ref"
         "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     COMMENT "Appending WP34/WP36 large-source CASM fixtures and casmbig1's reference to casm_overflow_test.d64"
+    VERBATIM
+)
+
+# WP45 test_casm_catalog fixtures: plain raw content (not CASM source), so
+# bare lowercase -f names (no ".s" suffix), matching this disk's own
+# generic-content naming convention. Lowercase -f matches test_casm_catalog's
+# own UPPERCASE .byte filename string literals through ca65's charmap, the
+# same lowercase-disk-name/uppercase-source-literal pairing already
+# established by every "<name>.s" CASM source fixture on this project's
+# disks (see project-cc1541-filename-case).
+add_custom_command(
+    TARGET casm_overflow_test_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat1" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcat1.seq"
+        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat2" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcat2.seq"
+        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat3" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcat3.seq"
+        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat4" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcat4.seq"
+        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat5" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcat5.seq"
+        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+    COMMENT "Appending WP45 test_casm_catalog fixtures to casm_overflow_test.d64"
     VERBATIM
 )
 

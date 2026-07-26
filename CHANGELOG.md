@@ -32,6 +32,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 9 WP45 physical file catalog and dynamic source loading**
+  (CASM `0.1.47` build 1171): added a standalone `include.s` module (8KB
+  metadata VMM store, device resolution via the OS's own `DOS_PARSE_PREFIX`,
+  case-folded catalog identity, deduplicated catalog load with transient
+  child open/append) and `source.s`'s `sourceAppendFile`. No production
+  `.INCLUDE` behavior changed: `casmRunPass` still reports
+  `FEATURE NOT IMPLEMENTED`, unchanged from WP44 -- this module is proven
+  only by the new 12-case `test_casm_catalog` harness, with no
+  `casmRunPass` call site (WP46's job). One new diagnostic, `$34`
+  `CASM_DIAG_INCLUDE_CATALOG_FULL`. MAIN grown `$3A00` -> `$3E00`
+  (694-byte measured overflow). User runtime testing found and fixed two
+  real defects before the final pass: a test harness device assumption, and
+  a genuine `sourceAppendFile` shared-scratch aliasing bug
+  (`CasmValue0Lo/Hi`, also clobbered by `vwPrepareTransfer` on every VMM
+  chunk write) -- fixed with a dedicated, never-shared field. User runtime
+  verification passes (`CASM CATALOG: PASS`).
+  See `brain/plans/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`.
 - **CASM Phase 9 WP44 quoted include operand grammar** (CASM `0.1.46` build
   1166): added bounded `.INCLUDE "filename"` scanning for 1-63
   original PETSCII bytes, dedicated filename state, diagnostics `$31-$33`, and

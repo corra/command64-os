@@ -1310,7 +1310,23 @@ Parent plan:
       `test_casm_includ` runtime, stable no-change build, legacy whole-object
       harnesses, and all three disk images pass. WP45 remains pending.
 - [ ] `199b4da7-987a-44cf-a84d-b4e0b786f5d0`: WP45 physical file catalog and
-      dynamic source loading.
+      dynamic source loading. Detailed plan approved and active at
+      `brain/plans/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`.
+      Standalone `include.s` module plus a dedicated `test_casm_catalog`
+      harness only; `casmRunPass` keeps returning `CASM_DIAG_NOT_IMPLEMENTED`
+      at `.INCLUDE` until WP46 wires frame traversal. Implementation complete:
+      the 12-case `test_casm_catalog` harness, all standalone/whole-object
+      regressions, and all three disk images pass statically; MAIN grown
+      `$3A00` -> `$3E00` (694-byte measured overflow, user-approved). User
+      runtime testing found and fixed two real defects (a harness device
+      assumption; a genuine `sourceAppendFile` shared-scratch aliasing bug
+      in `source.s`) before confirming all 12 cases pass
+      (`CASM CATALOG: PASS`). User approved completion. Final CASM `0.1.47`
+      build 1171; no-change rebuild stable; all three disk images pass.
+      Walkthrough:
+      `brain/walkthroughs/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`.
+      **WP45 complete.** WP46 remains pending separate plan approval and
+      activation.
 - [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d`: WP46 frame stack, nested
       traversal, and cycle detection.
 - [ ] `579096d9-ce77-44db-96a9-c32654238949`: WP47 ordered include graph and

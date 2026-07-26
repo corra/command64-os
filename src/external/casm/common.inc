@@ -227,6 +227,70 @@ CASM_INCLUDE_PRINT_HI_MAX          = $FE
 .assert CASM_PETSCII_QUOTE >= CASM_INCLUDE_PRINT_LO_MIN, error, "CASM include quote below printable range"
 .assert CASM_PETSCII_QUOTE <= CASM_INCLUDE_PRINT_LO_MAX, error, "CASM include quote above printable range"
 
+; Phase 9 WP45 physical file catalog contract. One 8KB VMM allocation (Phase
+; 0C.19 freeze) holds the physical-file catalog; WP45 writes only the first
+; CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZE bytes of it. The
+; remainder is reserved, untouched space for WP47's include-event log --
+; never a second allocation.
+CASM_INCLUDE_META_BYTES = 8192
+
+.assert CASM_INCLUDE_META_BYTES = 8192, error, "CASM include metadata allocation size changed"
+
+; Physical-file record: 4 control bytes (flags/device/namelen/reserved), a
+; 2-byte source-store start offset, a 2-byte byte length, a 64-byte
+; null-terminated name slot (original spelling, prefix already removed), and
+; 56 reserved bytes -- 128 bytes total, transferred as two fixed 64-byte
+; vmmWindowRead/vmmWindowWrite windows (matching CASM_VMM_BUFFER_SIZE
+; exactly, the same one-record-per-transfer precedent CASM_SYMBOL_REC_SIZE
+; established). Identity comparison folds the stored name's case live at
+; compare time rather than storing a second folded copy, so one buffer
+; satisfies both the case-folded-identity and original-spelling-for-
+; diagnostics halves of the Phase 0C.19 contract.
+CASM_INCLUDE_PHYS_REC_FLAG      = 0
+CASM_INCLUDE_PHYS_REC_DEVICE    = 1
+CASM_INCLUDE_PHYS_REC_NAMELEN   = 2
+CASM_INCLUDE_PHYS_REC_RESERVED0 = 3
+CASM_INCLUDE_PHYS_REC_START_LO  = 4
+CASM_INCLUDE_PHYS_REC_START_HI  = 5
+CASM_INCLUDE_PHYS_REC_LENGTH_LO = 6
+CASM_INCLUDE_PHYS_REC_LENGTH_HI = 7
+CASM_INCLUDE_PHYS_REC_NAME      = 8    ; 64-byte fixed slot, null-terminated
+CASM_INCLUDE_PHYS_REC_SIZE      = 128
+
+CASM_INCLUDE_PHYS_CAPACITY = 32
+
+; Command 64 supported device numbers (matches CurrentDevice's own range and
+; DOS_PARSE_PREFIX's recognized "8:"/"9:"/"10:"/"11:" prefixes).
+CASM_DEVICE_MIN = 8
+CASM_DEVICE_MAX = 11
+
+.assert CASM_DEVICE_MAX - CASM_DEVICE_MIN + 1 = 4, error, "CASM device range changed"
+
+.assert CASM_INCLUDE_PHYS_REC_DEVICE = CASM_INCLUDE_PHYS_REC_FLAG + 1, error, "CASM include physical record device offset changed"
+.assert CASM_INCLUDE_PHYS_REC_NAMELEN = CASM_INCLUDE_PHYS_REC_DEVICE + 1, error, "CASM include physical record namelen offset changed"
+.assert CASM_INCLUDE_PHYS_REC_RESERVED0 = CASM_INCLUDE_PHYS_REC_NAMELEN + 1, error, "CASM include physical record reserved offset changed"
+.assert CASM_INCLUDE_PHYS_REC_START_LO = CASM_INCLUDE_PHYS_REC_RESERVED0 + 1, error, "CASM include physical record start offset changed"
+.assert CASM_INCLUDE_PHYS_REC_START_HI = CASM_INCLUDE_PHYS_REC_START_LO + 1, error, "CASM include physical record start offsets changed"
+.assert CASM_INCLUDE_PHYS_REC_LENGTH_LO = CASM_INCLUDE_PHYS_REC_START_HI + 1, error, "CASM include physical record length offset changed"
+.assert CASM_INCLUDE_PHYS_REC_LENGTH_HI = CASM_INCLUDE_PHYS_REC_LENGTH_LO + 1, error, "CASM include physical record length offsets changed"
+.assert CASM_INCLUDE_PHYS_REC_NAME = CASM_INCLUDE_PHYS_REC_LENGTH_HI + 1, error, "CASM include physical record name offset changed"
+.assert CASM_INCLUDE_PHYS_REC_SIZE = 128, error, "CASM include physical record size changed"
+.assert CASM_INCLUDE_PHYS_REC_SIZE = CASM_VMM_BUFFER_SIZE * 2, error, "CASM include physical record must fit two VMM transfers exactly"
+.assert CASM_INCLUDE_PHYS_REC_NAME + CASM_INCLUDE_FILENAME_BUFFER_SIZE <= CASM_INCLUDE_PHYS_REC_SIZE, error, "CASM include physical record name does not fit"
+.assert CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZE <= CASM_INCLUDE_META_BYTES, error, "CASM include physical catalog exceeds metadata allocation"
+
+; Transient synthesis buffer for an explicit "<n>:name" string handed to
+; fileOpenInput/DOS_OPEN_FILE when the resolved device is not what
+; DOS_OPEN_FILE would default to on its own (an inherited parent device that
+; differs from CurrentDevice, which DOS_OPEN_FILE cannot be told directly --
+; it only ever honors an explicit prefix in the string or else CurrentDevice).
+; Sized independently of CASM_INCLUDE_FILENAME_BUFFER_SIZE (device digits +
+; colon can add bytes the original spelling didn't have) and never persisted
+; into a catalog record.
+CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE = 68
+
+.assert CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE >= CASM_INCLUDE_FILENAME_BUFFER_SIZE + 4, error, "CASM include open-name synthesis buffer too small"
+
 CASM_OPT_OUTPUT = %00000001
 CASM_OPT_STATIC = %00000010
 CASM_OPT_MAP    = %00000100
@@ -498,6 +562,18 @@ CASM_DIAG_INCLUDE_FILENAME_EXPECTED = $31
 CASM_DIAG_INVALID_INCLUDE_FILENAME  = $32
 CASM_DIAG_INCLUDE_FILENAME_TOO_LONG = $33
 CASM_DIAG_PHASE9_WP44_LAST = CASM_DIAG_INCLUDE_FILENAME_TOO_LONG
+; CASM Phase 9 WP45 physical file catalog and dynamic source loading.
+; Metadata allocation and record-transfer failures deliberately reuse
+; vmmStoreAlloc's/vmmWindowRead's/vmmWindowWrite's own existing
+; CASM_DIAG_VMM_ALLOC_FAILED/CASM_DIAG_VMM_UNAVAILABLE/
+; CASM_DIAG_VMM_TRANSFER_FAILED by direct propagation -- tracing every call
+; site found no failure mode those don't already describe correctly, so no
+; new diagnostic was reserved for them (the same "reserved but unreachable"
+; finding WP23 made for CASM_DIAG_VMM_ALLOC_TOO_LARGE). Only the physical
+; catalog's own 32-slot capacity check is genuinely new, matching the
+; CASM_DIAG_SYMBOL_TABLE_FULL/CASM_DIAG_REGISTRY_FULL precedent.
+CASM_DIAG_INCLUDE_CATALOG_FULL = $34
+CASM_DIAG_PHASE9_WP45_LAST = CASM_DIAG_INCLUDE_CATALOG_FULL
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -528,6 +604,8 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_INVALID_INCLUDE_FILENAME = CASM_DIAG_INCLUDE_FILENAME_EXPECTED + 1, error, "CASM WP44 diagnostics must remain contiguous"
 .assert CASM_DIAG_INCLUDE_FILENAME_TOO_LONG = CASM_DIAG_INVALID_INCLUDE_FILENAME + 1, error, "CASM WP44 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE9_WP44_LAST = $33, error, "CASM WP44 diagnostic range changed"
+.assert CASM_DIAG_INCLUDE_CATALOG_FULL = CASM_DIAG_PHASE9_WP44_LAST + 1, error, "CASM Phase 9 WP45 diagnostics must follow WP44"
+.assert CASM_DIAG_PHASE9_WP45_LAST = $34, error, "CASM WP45 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

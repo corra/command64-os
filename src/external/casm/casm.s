@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "46"
+.define VERSION_STAGE "47"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -271,7 +271,11 @@ crpDir:
     cmp #CASM_DIRECTIVE_INCLUDE
     bne crpEmitDir
     ; WP44 validates and stores the operand but deliberately performs no source
-    ; I/O. WP45 replaces this temporary semantic boundary with child loading.
+    ; I/O. WP45 built the catalog/dynamic-load module (include.s) standalone,
+    ; proven only by its own test harness, with no casmRunPass call site --
+    ; wiring a real child load in here has nowhere to resume parsing from
+    ; without a frame stack. WP46 replaces this temporary semantic boundary
+    ; once frame push/traversal switching exists.
     jsr diagSetLocFromStmt
     lda #CASM_DIAG_NOT_IMPLEMENTED
     sec

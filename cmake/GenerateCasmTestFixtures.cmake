@@ -875,3 +875,22 @@ file(WRITE "${OUTPUT_DIR}/casmreloc1.seq"
     "    .BYTE \$4F, \$4B\n"
     "    .BYTE \$0D, \$00\n"
 )
+
+# CASM Phase 9 WP45 test_casm_catalog fixtures. Plain raw byte content, not
+# CASM source -- includeCatalogLoad/sourceAppendFile stream and append these
+# unparsed, so exact distinct sizes (not their content) are what the harness
+# asserts against. casmcat3 seeds the source store as the one top-level file
+# (sourceLoad); casmcat1/casmcat2 are the first two distinct catalog entries;
+# casmcat4 is a third distinct entry used right after a repeated-load/
+# cache-hit case to prove no phantom append occurred; casmcat5 is the
+# catalog's 32nd (capacity-boundary) real entry.
+string(REPEAT "1" 10 CASM_CAT_BODY_1)
+file(WRITE "${OUTPUT_DIR}/casmcat1.seq" "${CASM_CAT_BODY_1}")
+string(REPEAT "2" 15 CASM_CAT_BODY_2)
+file(WRITE "${OUTPUT_DIR}/casmcat2.seq" "${CASM_CAT_BODY_2}")
+string(REPEAT "3" 8 CASM_CAT_BODY_3)
+file(WRITE "${OUTPUT_DIR}/casmcat3.seq" "${CASM_CAT_BODY_3}")
+string(REPEAT "4" 20 CASM_CAT_BODY_4)
+file(WRITE "${OUTPUT_DIR}/casmcat4.seq" "${CASM_CAT_BODY_4}")
+string(REPEAT "5" 12 CASM_CAT_BODY_5)
+file(WRITE "${OUTPUT_DIR}/casmcat5.seq" "${CASM_CAT_BODY_5}")

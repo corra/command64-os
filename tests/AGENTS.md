@@ -40,6 +40,11 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - `test_casm_include` is packaged only on `casm_overflow_test_d64` under the
   16-character disk name `test_casm_includ`; `test.d64` has no directory entry
   available for it.
+- `test_casm_catalog` joins it there for the same reason, under the
+  16-character disk name `test_casm_catalo`, alongside five new tiny
+  raw-content fixtures (`casmcat1`-`casmcat5`, bare lowercase disk names --
+  not CASM source, so they skip the `.s`-suffix convention `CASM_TEST_FIXTURES`
+  uses on `test_image_d64`).
 
 ## Child DOX Index
 

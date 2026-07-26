@@ -89,6 +89,7 @@
 
 .export sourceInit
 .export sourceLoad
+.export sourceAppendFile
 .export sourceOpen
 .export sourceNextByte
 .export sourceNextLine
@@ -126,17 +127,42 @@
 ; being loaded" and "which file is being traversed". CasmSourceLoadLastByte
 ; tracks the most recently written byte so sourceLoad can decide whether a
 ; synthetic inter-file newline is needed.
+;
+; WP45 addition: CasmSourceStreamCursorLo/Hi is the shared per-file streaming
+; primitive's (slStreamOneFile) own running write offset, deliberately
+; distinct from both CasmSourceVmmCursorLo/Hi (which keeps its exact
+; existing dual role, untouched by this change) and CasmSourceLoadedLenLo/Hi.
+; sourceLoad's static loop copies its own running CasmSourceVmmCursorLo/Hi in
+; before each file and copies the advanced result back out after; the new
+; sourceAppendFile entry point copies CasmSourceLoadedLenLo/Hi in and back out
+; instead. Because the two callers never run concurrently (single-threaded,
+; synchronous calls), one shared field is sufficient and neither
+; CasmSourceVmmCursorLo/Hi (the live traversal read cursor once loading has
+; finished) nor CasmSourceLoadedLenLo/Hi is ever read or written by the parts
+; of this module that don't already have a reason to.
+;
+; CasmSourceAppendStartLo/Hi holds sourceAppendFile's own file-start offset
+; across its entire streaming loop -- deliberately not CasmValue0Lo/Hi (the
+; shared general-purpose zero-page scratch pair), because vwPrepareTransfer
+; (vmm_store.s, reached via slVmmWrite on every chunk write) documents
+; CasmValue0Lo/Hi as its own scratch and clobbers it on the very first
+; chunk. CasmValue0Lo/Hi is written only once, at the very end, from this
+; stable field.
 ; ---------------------------------------------------------------------------
 .segment "BSS"
 
-CasmSourceVmmSlot:      .res 1
-CasmSourceLoadedLenLo:  .res 1
-CasmSourceLoadedLenHi:  .res 1
-CasmSourceVmmCursorLo:  .res 1
-CasmSourceVmmCursorHi:  .res 1
-CasmSourceFileTable:    .res CASM_SOURCE_COUNT_MAX * 2
-CasmSourceLoadIndex:    .res 1
-CasmSourceLoadLastByte: .res 1
+CasmSourceVmmSlot:        .res 1
+CasmSourceLoadedLenLo:    .res 1
+CasmSourceLoadedLenHi:    .res 1
+CasmSourceVmmCursorLo:    .res 1
+CasmSourceVmmCursorHi:    .res 1
+CasmSourceFileTable:      .res CASM_SOURCE_COUNT_MAX * 2
+CasmSourceLoadIndex:      .res 1
+CasmSourceLoadLastByte:   .res 1
+CasmSourceStreamCursorLo: .res 1
+CasmSourceStreamCursorHi: .res 1
+CasmSourceAppendStartLo:  .res 1
+CasmSourceAppendStartHi:  .res 1
 
 .segment "CODE"
 
@@ -167,6 +193,10 @@ sourceInit:
     sta CasmSourceVmmCursorHi
     sta CasmSourceLoadIndex
     sta CasmSourceLoadLastByte
+    sta CasmSourceStreamCursorLo
+    sta CasmSourceStreamCursorHi
+    sta CasmSourceAppendStartLo
+    sta CasmSourceAppendStartHi
     ldx #(CASM_SOURCE_COUNT_MAX * 2) - 1
 siClearFileTable:
     sta CasmSourceFileTable, x
@@ -251,6 +281,16 @@ slFileLoop:
     sta CasmSourceFileTable, x
     lda CasmSourceVmmCursorHi
     sta CasmSourceFileTable + 1, x
+
+    ; WP45: hand this file's streaming off to the shared per-file primitive
+    ; (slCheckCap/slVmmWrite below) through CasmSourceStreamCursorLo/Hi --
+    ; copied in from this loop's own running total here, and copied back out
+    ; once the file (plus any synthetic newline) is fully written, at
+    ; slAdvanceIndex below.
+    lda CasmSourceVmmCursorLo
+    sta CasmSourceStreamCursorLo
+    lda CasmSourceVmmCursorHi
+    sta CasmSourceStreamCursorHi
 
     ; This file's slot pointer, via cli.s's shared lookup table.
     ldy CasmSourceLoadIndex
@@ -386,6 +426,12 @@ slFileDone:
     bcs slWriteFailNear
 
 slAdvanceIndex:
+    ; WP45: copy this file's (plus any synthetic newline's) advanced stream
+    ; cursor back into this loop's own running total.
+    lda CasmSourceStreamCursorLo
+    sta CasmSourceVmmCursorLo
+    lda CasmSourceStreamCursorHi
+    sta CasmSourceVmmCursorHi
     inc CasmSourceLoadIndex
     lda CasmSourceLoadIndex
     cmp CasmSourceCount
@@ -417,14 +463,17 @@ slFail:
     rts
 
 ; ---------------------------------------------------------------------------
-; slCheckCap (private, WP34)
-; Verify CasmSourceVmmCursorLo/Hi + CasmIoLenLo/Hi does not exceed
+; slCheckCap (private, WP34; WP45: retargeted to the shared stream cursor)
+; Verify CasmSourceStreamCursorLo/Hi + CasmIoLenLo/Hi does not exceed
 ; CASM_SOURCE_VMM_MAX_BYTES (65535), the combined multi-file cap. Because
 ; that cap is exactly the largest 16-bit value, a 16-bit add of cursor+count
 ; that does not carry is always within the cap (result <= 65535 by
 ; construction) and one that does carry always exceeds it (true sum >=
 ; 65536): no comparison beyond the carry flag itself is needed. Does not
-; modify the cursor.
+; modify the cursor. Shared by sourceLoad's per-file loop (via the
+; copy-in/copy-out at slFileLoop/slAdvanceIndex above) and sourceAppendFile
+; below -- both stage the cursor they mean into CasmSourceStreamCursorLo/Hi
+; before calling this.
 ;
 ; Inputs:    CasmIoLenLo/Hi = byte count about to be written
 ; Outputs:   C clear if the advance is within the cap; C set with
@@ -432,10 +481,10 @@ slFail:
 ; Clobbers:  A, processor flags
 ; ---------------------------------------------------------------------------
 slCheckCap:
-    lda CasmSourceVmmCursorLo
+    lda CasmSourceStreamCursorLo
     clc
     adc CasmIoLenLo
-    lda CasmSourceVmmCursorHi
+    lda CasmSourceStreamCursorHi
     adc CasmIoLenHi
     bcs slcOverflow
     clc
@@ -446,39 +495,191 @@ slcOverflow:
     rts
 
 ; ---------------------------------------------------------------------------
-; slVmmWrite (private, WP33/WP34)
+; slVmmWrite (private, WP33/WP34; WP45: retargeted to the shared stream
+; cursor)
 ; Write CasmIoLenLo/Hi bytes already staged in CasmVmmBuffer at the current
-; combined cursor (CasmSourceVmmCursorLo/Hi), then advance the cursor by
-; that count. Shared by the main per-file chunk-write loop and the
-; synthetic inter-file newline, the two places sourceLoad transfers staged
-; bytes into the VMM allocation. The caller must already have checked the
-; combined cap (slCheckCap) before calling.
+; shared stream cursor (CasmSourceStreamCursorLo/Hi), then advance the
+; cursor by that count. Shared by the main per-file chunk-write loop, the
+; synthetic inter-file newline, and sourceAppendFile below -- every place
+; this module transfers staged bytes into the VMM allocation. The caller
+; must already have checked the combined cap (slCheckCap) before calling.
 ;
 ; Inputs:    CasmIoLenLo/Hi = byte count staged in CasmVmmBuffer
-; Outputs:   C clear on success; CasmSourceVmmCursorLo/Hi advanced
+; Outputs:   C clear on success; CasmSourceStreamCursorLo/Hi advanced
 ;            C set, A = CASM_DIAG_VMM_TRANSFER_FAILED on failure (cursor
 ;            unchanged)
 ; Clobbers:  A, X, Y, CasmVmmOffLo/Hi and vmmWindowWrite's own volatile state
 ; ---------------------------------------------------------------------------
 slVmmWrite:
-    lda CasmSourceVmmCursorLo
+    lda CasmSourceStreamCursorLo
     sta CasmVmmOffLo
-    lda CasmSourceVmmCursorHi
+    lda CasmSourceStreamCursorHi
     sta CasmVmmOffHi
     ldx CasmSourceVmmSlot
     jsr vmmWindowWrite
     bcs slvwFail
 
-    lda CasmSourceVmmCursorLo
+    lda CasmSourceStreamCursorLo
     clc
     adc CasmIoLenLo
-    sta CasmSourceVmmCursorLo
-    lda CasmSourceVmmCursorHi
+    sta CasmSourceStreamCursorLo
+    lda CasmSourceStreamCursorHi
     adc CasmIoLenHi
-    sta CasmSourceVmmCursorHi
+    sta CasmSourceStreamCursorHi
     clc
     rts
 slvwFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceAppendFile (WP45)
+; Stream exactly one more file into the already-loaded VMM source allocation,
+; appending at the true end of loaded content (CasmSourceLoadedLenLo/Hi) --
+; never at CasmSourceVmmCursorLo/Hi, which may currently be live traversal
+; read-cursor state if this is called between sourceOpen and sourceClose.
+; This routine neither reads nor writes CasmSourceVmmCursorLo/Hi, CasmIoBuffer
+; refill state, CasmSourceFileTable, or CasmSourceLoadIndex -- those remain
+; exclusively sourceLoad's/sourceRefill's. No synthetic newline is inserted:
+; that behavior is specific to sourceLoad's flat multi-top-level-file
+; concatenation and does not apply to one included file's own span.
+;
+; Inputs:    loading already completed via sourceLoad, so CasmSourceVmmSlot
+;            is a valid granted slot -- this routine never reads
+;            CasmSourceState itself, so it may be called with source CLOSED
+;            (right after sourceLoad, before sourceOpen), READY, or EOF;
+;            X/Y = null-terminated filename pointer (already resolved/
+;            prefixed by the caller if a non-default device is needed --
+;            this routine performs no device resolution of its own)
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; CasmSourceLoadedLenLo/Hi
+;            advanced by the appended byte count; CasmValue0Lo/Hi = this
+;            file's start offset (the pre-call total), CasmValue1Lo/Hi =
+;            the appended byte count
+;            Failure: A = CASM_DIAG_*, C set (propagated open/read/close/
+;            cap/transfer diagnostic); CasmSourceLoadedLenLo/Hi unchanged
+; Preserves: CasmSourceVmmCursorLo/Hi (untouched)
+; Clobbers:  A, X, Y, CasmSourceScratch0/1, CasmLexerScratch0, CasmIoBuffer,
+;            CasmVmmBuffer, CasmSourceStreamCursorLo/Hi,
+;            CasmSourceAppendStartLo/Hi, CasmValue0Lo/Hi, CasmValue1Lo/Hi,
+;            fileio.s/vmm_store.s volatile state
+; ---------------------------------------------------------------------------
+sourceAppendFile:
+    ; Remember this file's start (the pre-call total) in a dedicated field,
+    ; not CasmValue0Lo/Hi: vwPrepareTransfer (vmm_store.s, reached via
+    ; slVmmWrite on every chunk write below) documents CasmValue0Lo/Hi as its
+    ; own offset+count scratch and clobbers it on the very first chunk --
+    ; the same shared-scratch-clobber bug class that hit vmm_store.s three
+    ; times in WP23-25. CasmValue0Lo/Hi is only written, once, at the very
+    ; end (safFileDone) for the caller's benefit.
+    lda CasmSourceLoadedLenLo
+    sta CasmSourceAppendStartLo
+    sta CasmSourceStreamCursorLo
+    lda CasmSourceLoadedLenHi
+    sta CasmSourceAppendStartHi
+    sta CasmSourceStreamCursorHi
+
+    jsr inputStreamOpen
+    bcs safFail
+
+safReadLoop:
+    jsr inputStreamRead
+    bcs safFail
+    cmp #CASM_STREAM_EOF
+    beq safFileDoneNear
+
+    jsr slCheckCap
+    bcs safFail
+
+    lda CasmIoLenLo
+    sta CasmSourceScratch0
+    lda CasmIoLenHi
+    sta CasmSourceScratch1
+    lda #0
+    sta CasmLexerScratch0
+
+safWriteChunkLoop:
+    lda CasmSourceScratch0
+    ora CasmSourceScratch1
+    beq safReadLoop              ; block fully written -> read the next one
+
+    lda CasmSourceScratch1
+    bne safWriteChunkFull        ; remaining hi != 0 -> remaining > 255
+    lda CasmSourceScratch0
+    cmp #CASM_VMM_BUFFER_SIZE + 1
+    bcs safWriteChunkFull        ; remaining >= 64 -> full chunk
+    sta CasmIoLenLo               ; partial final chunk: chunkLen = remaining
+    lda #0
+    sta CasmIoLenHi
+    jmp safWriteChunkStage
+safWriteChunkFull:
+    lda #CASM_VMM_BUFFER_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+
+safWriteChunkStage:
+    lda CasmLexerScratch0
+    clc
+    adc #<CasmIoBuffer
+    sta CasmIoPtrLo
+    lda #>CasmIoBuffer
+    adc #0
+    sta CasmIoPtrHi
+
+    ldy #0
+safWriteCopyLoop:
+    cpy CasmIoLenLo
+    beq safWriteCopyDone
+    lda (CasmIoPtrLo), y
+    sta CasmVmmBuffer, y
+    iny
+    jmp safWriteCopyLoop
+safWriteCopyDone:
+
+    jsr slVmmWrite
+    bcs safFail
+
+    lda CasmLexerScratch0
+    clc
+    adc CasmIoLenLo
+    sta CasmLexerScratch0
+
+    lda CasmSourceScratch0
+    sec
+    sbc CasmIoLenLo
+    sta CasmSourceScratch0
+    lda CasmSourceScratch1
+    sbc CasmIoLenHi
+    sta CasmSourceScratch1
+    jmp safWriteChunkLoop
+
+safFileDoneNear:
+    jmp safFileDone
+safFail:
+    rts                          ; A/C already set by the failing call
+
+safFileDone:
+    jsr inputStreamClose
+    bcs safFail
+
+    ; Commit: the shared stream cursor is now this file's end. The appended
+    ; length is end - start (CasmSourceAppendStartLo/Hi, staged before the
+    ; open above). CasmValue0Lo/Hi and CasmValue1Lo/Hi are written here, for
+    ; the first time, only now that no further clobbering call remains.
+    lda CasmSourceStreamCursorLo
+    sta CasmSourceLoadedLenLo
+    sec
+    sbc CasmSourceAppendStartLo
+    sta CasmValue1Lo
+    lda CasmSourceStreamCursorHi
+    sta CasmSourceLoadedLenHi
+    sbc CasmSourceAppendStartHi
+    sta CasmValue1Hi
+    lda CasmSourceAppendStartLo
+    sta CasmValue0Lo
+    lda CasmSourceAppendStartHi
+    sta CasmValue0Hi
+    lda #CASM_DIAG_NONE
+    clc
     rts
 
 ; ---------------------------------------------------------------------------

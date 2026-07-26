@@ -79,6 +79,17 @@ The `src/external/casm` directory owns CASM, a native Command 64
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
   effects. Do not describe include loading or traversal as operational.
+- WP45 adds `include.s` (metadata VMM store, device resolution via the OS's
+  own `DOS_PARSE_PREFIX`, case-folded catalog identity, deduplicated
+  catalog load) and `source.s`'s `sourceAppendFile` as a **standalone**
+  module and API, proven only by `tests/src/casm_catalog/`. `casmRunPass`'s
+  `.INCLUDE` dispatch is unchanged from WP44 (still NOT IMPLEMENTED) --
+  there is no production call site for `include.s` yet. Do not describe
+  catalog/dynamic loading as reachable from a real assembly before WP46
+  wires frame push/traversal switching. The frozen 128-byte physical record
+  layout (`CASM_INCLUDE_PHYS_REC_*`, `common.inc`) stores only the original
+  (unfolded) spelling; identity comparison folds case live at compare time
+  rather than storing a second copy.
 - Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
   by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
   point in the emission engine's byte writer -- not a structured event

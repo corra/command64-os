@@ -1104,8 +1104,44 @@
     - User-approved complete at CASM `0.1.46` build 1166
     - Corrected 14-case runtime, stable no-change build, whole-object harnesses,
       and all three disk images pass; WP45 remains pending
-  - [ ] `199b4da7-987a-44cf-a84d-b4e0b786f5d0` WP45 physical file catalog and
+  - [x] `199b4da7-987a-44cf-a84d-b4e0b786f5d0` WP45 physical file catalog and
         dynamic source loading
+    - Detailed plan approved and active:
+      `brain/plans/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`
+    - Standalone `include.s` module plus a dedicated `test_casm_catalog`
+      harness only, per user-confirmed scope; no `casmRunPass` call site yet
+    - Implementation complete: new `include.s` (8KB metadata VMM store,
+      `DOS_PARSE_PREFIX`-based device resolution, case-folded catalog
+      identity, deduplicated catalog load) and `source.s`'s
+      `sourceAppendFile` (shared stream cursor distinct from the live
+      traversal read cursor); one new diagnostic `$34`
+      `CASM_DIAG_INCLUDE_CATALOG_FULL` (two originally-planned ones found
+      unreachable and dropped, mirroring WP23's own precedent)
+    - Linking `include.s` overflowed production `casm`'s `$3A00` MAIN
+      envelope by 694 measured bytes; user approved growing it to `$3E00`
+      (+1024 bytes, 309 bytes headroom). Final build 1170 passes, no-change
+      stable
+    - New 12-case `test_casm_catalog` harness (build 1009) packaged on
+      `casm_overflow_test_d64` (`test_casm_catalo`, 16-char disk name) with
+      5 new tiny fixtures (`casmcat1`-`casmcat5`)
+    - `test_casm_pass1`/`test_casm_passcheck` (both link `source.s` whole)
+      continue to fit their existing `$3A00` envelope unchanged; all other
+      standalone harnesses and all three disk images build clean
+    - User runtime testing found and fixed two real defects before the
+      final pass: (1) the harness itself hardcoded device 8, but the
+      user's two-drive VICE setup runs the fixture disk from device 9 --
+      fixed by capturing the real `CurrentDevice` at startup instead of
+      assuming a fixed device; (2) a genuine `sourceAppendFile` bug
+      (`source.s`) stashed the file's start offset in the shared
+      `CasmValue0Lo/Hi` scratch pair, which `vwPrepareTransfer`
+      (`vmm_store.s`) clobbers on every chunk write -- fixed with a new,
+      never-shared `CasmSourceAppendStartLo/Hi` field. Same aliasing bug
+      class as WP23-25/WP44's own precedent
+    - User confirmed all 12 cases pass: `CASM CATALOG: PASS`
+    - Walkthrough:
+      `brain/walkthroughs/2026-07-25-casm-phase9-wp45-physical-file-catalog-and-dynamic-source-loading.md`
+    - User approved completion; final CASM `0.1.47` build 1171, no-change
+      rebuild stable, all three disk images pass. **WP45 complete.**
   - [ ] `005a1819-eda6-4fa5-89e1-5848a5076a7d` WP46 frame stack, nested
         traversal, and cycle detection
   - [ ] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and

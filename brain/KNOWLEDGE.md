@@ -1683,6 +1683,56 @@ includes before emitter or I/O effects and temporarily returns NOT IMPLEMENTED.
 The user-approved MAIN envelope is `$3A00`; CASM build 1166 is 15,800 bytes with
 1722 R6 entries. The corrected 14-case `test_casm_includ` runtime passes.
 
+WP45 (complete, user-approved) adds `src/external/casm/include.s` as a standalone
+module: an 8KB metadata VMM store (`CASM_INCLUDE_META_BYTES`; the first
+4096 bytes hold 32 128-byte physical-file records, `CASM_INCLUDE_PHYS_REC_*`,
+the rest reserved for WP47's event log), device resolution via the OS's own
+`DOS_PARSE_PREFIX` (which advances its caller's zero-page pointer past a
+recognized prefix in place -- no independent colon scan needed or safe to
+duplicate), live case-folded catalog identity comparison (one stored
+spelling, folded only at compare time), and deduplicated catalog load with
+transient child open/append. `source.s` gained `sourceAppendFile`, which
+appends at the true end of loaded content
+(`CasmSourceLoadedLenLo/Hi`) through a new shared stream cursor
+(`CasmSourceStreamCursorLo/Hi`) distinct from the live traversal read cursor
+(`CasmSourceVmmCursorLo/Hi`) -- both `sourceLoad`'s existing per-file loop
+and the new entry point route through it, never simultaneously. Per the
+user's confirmed scope, `include.s` has **no production call site**:
+`casmRunPass`'s `.INCLUDE` dispatch is unchanged from WP44, proven only by
+the new `test_casm_catalog` harness; WP46 wires frame push/traversal
+switching. One new diagnostic, `$34` `CASM_DIAG_INCLUDE_CATALOG_FULL`; two
+originally-planned ones (metadata alloc/transfer failure) were dropped
+before implementation as unreachable, since `vmmStoreAlloc`/
+`vmmWindowRead`/`vmmWindowWrite` already propagate correct diagnostics for
+every failure mode those would have covered (the same class of finding as
+WP23's dropped `CASM_DIAG_VMM_ALLOC_TOO_LARGE`). Linking `include.s`
+overflowed the production `casm` target's `$3A00` MAIN envelope by 694
+measured bytes; the user approved growing it to `$3E00` (+1024 bytes). Final
+build 1170 passes and holds stable on a no-change rebuild (309 bytes MAIN
+headroom); `test_casm_pass1`/`test_casm_passcheck` (both link `source.s`
+whole) continue to fit their existing `$3A00` envelope unchanged.
+
+Two real defects surfaced only through the user's runtime testing, not
+static verification, both fixed with the user's approval before completion:
+(1) the `test_casm_catalog` harness itself hardcoded device 8 for every
+real-load case, but the user's actual two-drive VICE setup boots `test.d64`
+on device 8 and runs the fixture-carrying `casm_overflow_test.d64` from
+device 9 -- fixed by capturing the real `CurrentDevice` once at startup
+into a `TestDevice` field instead of assuming a fixed device (confirmed via
+`cmdLoad` in `shell.asm`: an embedded `LOAD "x",n` device prefix is only a
+transient override, always restored to the prior `CurrentDevice` afterward,
+and no separate "device loaded from" is tracked anywhere in the app table).
+(2) A genuine `sourceAppendFile` bug: it stashed the file's start offset in
+`CasmValue0Lo/Hi`, which `vwPrepareTransfer` (`vmm_store.s`, reached via
+`slVmmWrite` on every chunk write) already documents as its own
+offset+count scratch and clobbers on the first chunk -- fixed by moving the
+stashed value to a new, never-shared `CasmSourceAppendStartLo/Hi`, writing
+`CasmValue0Lo/Hi` only once, at the very end. The same shared-scratch
+aliasing bug class as WP23-25's `vmm_store.s` and WP44's own test harness,
+and one `include.s`'s own header comments explicitly warned about -- this
+routine fell into it anyway, underscoring that the warning alone doesn't
+prevent the mistake; only tracing every clobbering call site does.
+
 ### Absolute vs. Relocatable Binaries
 - **Constraint**: External programs are compiled for `$3200` (UserProgStart) by default.
 - **Relocation**: In Phase 6B, a **Binary Relocator** (`aptRelocate` in `loader.asm`) is implemented. Relocatable apps are compiled twice at a 1-page offset, and post-processed by `tools/reloc.py` to append a relocation table and a 6-byte footer (`BaseAddr`, `TableSize`, `'R'`,`'6'`).
