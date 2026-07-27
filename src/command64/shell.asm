@@ -318,6 +318,23 @@ sdExtGotLen:
     jsr shellLoadPrg
     bcs sdExtError
 
+    // Relocate before executing. An external command is always loaded at
+    // UserProgStart no matter which origin it was built for, so any R6 binary
+    // whose base differs needs its high bytes patched -- otherwise it runs
+    // with every absolute address pointing a few pages low and crashes almost
+    // immediately. This used to be invisible because every external app was
+    // built at UserProgStart and native CASM emits at CASM_DEFAULT_ORIGIN,
+    // which happened to be the same address; the moment those two diverged,
+    // every native CASM binary broke here while the same file loaded fine via
+    // LOAD (the only other caller of aptRelocate).
+    //
+    // A plain, non-relocatable PRG has no R6 footer, so aptRelocate leaves
+    // memory untouched and returns C=1 -- exactly the previous behaviour. The
+    // carry is deliberately ignored: "not relocatable" is not a load error.
+    stx TempLo              // end_addr+1 lo/hi, as returned by KernalLOAD
+    sty TempHi
+    jsr aptRelocate         // HexValLo/Hi still hold UserProgStart from above
+
     lda SavedDevice
     sta CurrentDevice
 

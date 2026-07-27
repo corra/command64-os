@@ -33,9 +33,13 @@ start:
     ldx #0
     ldy #0
     jsr OS_API
-    bcc test_fail          ; Carry must be set on null pointer error
+    bcs :+
+    jmp test_fail          ; Carry must be set on null pointer error
+    :
     cmp #DOS_ERR_INVALID_ARG
-    bne test_fail          ; Error code must be DOS_ERR_INVALID_ARG ($04)
+    beq :+
+    jmp test_fail          ; Error code must be DOS_ERR_INVALID_ARG ($04)
+    :
 
     ; --- Test 2: DOS_GET_SYSTEM_INFO with Valid Buffer ---
     ; Setup guard bytes
@@ -48,58 +52,91 @@ start:
     ldx #<sys_buf
     ldy #>sys_buf
     jsr OS_API
-    bcs test_fail          ; Carry must be clear on success
+    bcc :+
+    jmp test_fail          ; Carry must be clear on success
+    :
     cmp #DOS_ERR_OK
-    bne test_fail          ; Status must be DOS_ERR_OK ($00)
+    beq :+
+    jmp test_fail          ; Status must be DOS_ERR_OK ($00)
+    :
 
     ; Verify Guard Bytes
     lda sys_guard_pre
     cmp #$AA
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
     lda sys_guard_post
     cmp #$55
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; Verify StructVersion (byte 0) == 1
     lda sys_buf + SYS_INFO_OFF_VER
     cmp #1
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; Verify StructSize (byte 1) == 24
     lda sys_buf + SYS_INFO_OFF_SIZE
     cmp #SYS_INFO_SIZE
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; Verify OsMajor (byte 2) == 4
     lda sys_buf + SYS_INFO_OFF_OS_MAJ
     cmp #4
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; Verify OsMinor (byte 3) == 0
     lda sys_buf + SYS_INFO_OFF_OS_MIN
     cmp #0
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
-    ; Verify UserProgStart (bytes 7-8) == $0800
+    ; Verify UserProgStart (bytes 7-8) tracks the configured origin.
+    ; Compared against __MAIN_START__ rather than a literal: this test is
+    ; linked at USER_PROG_START_HEX, the same CMake variable the OS builds
+    ; its UserProgStart from, so the two move together. The literal $0800
+    ; this previously asserted was never correct for any shipped build.
     lda sys_buf + SYS_INFO_OFF_PROG_LO
-    cmp #$00
-    bne test_fail
+    cmp #<__MAIN_START__
+    beq :+
+    jmp test_fail
+    :
     lda sys_buf + SYS_INFO_OFF_PROG_HI
-    cmp #$08
-    bne test_fail
+    cmp #>__MAIN_START__
+    beq :+
+    jmp test_fail
+    :
 
-    ; Verify UserProgEnd (bytes 9-10) == $BFFF
+    ; Verify UserProgEnd (bytes 9-10) == $BFFF -- the last address a user
+    ; program may occupy, since $C000-$CFFF is reserved for the VMM MCT and
+    ; the loader rejects any destination >= $C000. Note this is NOT the
+    ; UserProgEnd label in include/command64.inc, which is $CFFF.
     lda sys_buf + SYS_INFO_OFF_END_LO
     cmp #$FF
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
     lda sys_buf + SYS_INFO_OFF_END_HI
     cmp #$BF
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; Verify AppMaxSlots (byte 20) == 16
     lda sys_buf + SYS_INFO_OFF_MAX_SLOT
     cmp #16
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; --- Test 3: DOS_GET_APP_INFO Out of Bounds Slot Index (A = 16) ---
     lda #16                ; Invalid slot index
@@ -117,18 +154,26 @@ start:
     ldx #<app_buf
     ldy #>app_buf
     jsr call_get_app_info_16
-    bcc test_fail          ; Carry must be set on out of bounds index
+    bcs :+
+    jmp test_fail          ; Carry must be set on out of bounds index
+    :
     cmp #DOS_ERR_INVALID_INDEX
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; --- Test 4: DOS_GET_APP_INFO Null Pointer ---
     lda #0                 ; Slot index 0
     ldx #0
     ldy #0
     jsr call_get_app_info
-    bcc test_fail          ; Carry must be set on null pointer
+    bcs :+
+    jmp test_fail          ; Carry must be set on null pointer
+    :
     cmp #DOS_ERR_INVALID_ARG
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; --- Test 5: DOS_GET_APP_INFO Unallocated / Unavailable Slot ---
     lda #$AA
@@ -140,15 +185,21 @@ start:
     ldx #<app_buf
     ldy #>app_buf
     jsr call_get_app_info
-    bcc test_fail          ; Carry must be set on empty/unavailable slot
+    bcs :+
+    jmp test_fail          ; Carry must be set on empty/unavailable slot
+    :
 
     ; Verify Guard Bytes preserved
     lda app_guard_pre
     cmp #$AA
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
     lda app_guard_post
     cmp #$55
-    bne test_fail
+    beq :+
+    jmp test_fail
+    :
 
     ; Print Success Message
     lda #DOS_PRINT_STR

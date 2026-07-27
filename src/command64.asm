@@ -25,8 +25,12 @@
 //                        hardcoded absolute addresses in command64.inc, must
 //                        never move.
 //   AppTable      $2000  App Table segment (apptable.asm)
+//   ApiExt        packed after ShellExt — bodies of API service handlers that
+//                        will not fit below the pinned ApiStub at $1000. The
+//                        Api segment holds only the dispatcher and its tables;
+//                        see api.asm for why new handlers belong here.
 
-.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData,AppTable,ShellExt"]
+.file [name="command64.prg", segments="Main,Utils,Api,Loader,Path,Vmm,File,ApiStub,Petsci,CommandTable,CommandShell,VmmData,AppTable,ShellExt,ApiExt"]
 
 .segmentdef Main [start=$0801]
 .segmentdef Utils [start=$0820]
@@ -41,6 +45,10 @@
 .segmentdef VmmData [start=$1FA0]
 .segmentdef AppTable [start=$2000]
 .segmentdef ShellExt [startAfter="AppTable"]
+// Overflow home for API handler bodies. The segment chain below the pinned
+// ApiStub ($1000) is full, so a service whose body does not fit there lives
+// here instead and is reached through the Api segment's dispatch table.
+.segmentdef ApiExt [startAfter="ShellExt"]
 
 // Api, Utils, Loader, Path, Vmm, and File get their segment contents from the
 // imported source files; ApiStub keeps its own fixed start=$1000 declared
