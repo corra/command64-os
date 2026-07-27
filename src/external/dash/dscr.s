@@ -1,0 +1,144 @@
+; DSCR.S - DASH SCREEN AND LAYOUT MANAGEMENT
+
+CLEARSCREEN:
+    LDX #0
+CLEARLOOP:
+    LDA #$20                ; SPACE
+    STA $0400, X
+    STA $0500, X
+    STA $0600, X
+    STA $0700, X
+    
+    LDA #$0E                ; LIGHT BLUE TEXT COLOR
+    STA $D800, X
+    STA $D900, X
+    STA $DA00, X
+    STA $DB00, X
+    
+    INX
+    BNE CLEARLOOP
+    RTS
+
+DRAWFRAME:
+    ; COPY ROW 0 (TOP BORDER)
+    LDX #0
+ROW0LOOP:
+    LDA BORDERROW, X
+    STA $0400, X
+    INX
+    CPX #40
+    BNE ROW0LOOP
+
+    ; COPY ROW 1 (TITLE)
+    LDX #0
+ROW1LOOP:
+    LDA TITLEROW, X
+    STA $0428, X
+    INX
+    CPX #40
+    BNE ROW1LOOP
+
+    ; COPY ROW 2 (TABS)
+    LDX #0
+ROW2LOOP:
+    LDA TABSROW, X
+    STA $0450, X
+    INX
+    CPX #40
+    BNE ROW2LOOP
+
+    ; COPY ROW 3 (BORDER)
+    LDX #0
+ROW3LOOP:
+    LDA BORDERROW, X
+    STA $0478, X
+    INX
+    CPX #40
+    BNE ROW3LOOP
+
+    ; COPY ROW 21 (MIDDLE BOTTOM BORDER)
+    LDX #0
+ROW21LOOP:
+    LDA BORDERROW, X
+    STA $0748, X
+    INX
+    CPX #40
+    BNE ROW21LOOP
+
+    ; COPY ROW 22 (STATUS BAR)
+    LDX #0
+ROW22LOOP:
+    LDA STATUSROW, X
+    STA $0770, X
+    INX
+    CPX #40
+    BNE ROW22LOOP
+
+    ; COPY ROW 23 (BOTTOM BORDER)
+    LDX #0
+ROW23LOOP:
+    LDA BORDERROW, X
+    STA $0798, X
+    INX
+    CPX #40
+    BNE ROW23LOOP
+
+    ; DRAW MIDDLE FRAME LINES ON ROWS 4 TO 20
+    LDA #4                  ; CURRENT ROW INDEX
+    STA $72                 ; ZP $72 = ROW INDEX
+DRAWMIDROWS:
+    LDA $72
+    CMP #21
+    BCS DRAWMIDDONE
+    
+    JSR COMPUTEROWADDR      ; RESULT IN ZP $73/$74
+    
+    LDY #0
+    LDA #$5D                ; SCREEN CODE VERTICAL LINE
+    STA ($73), Y
+    
+    LDA #$20                ; SPACE
+    INY
+CLEARMIDROWLOOP:
+    STA ($73), Y
+    INY
+    CPY #39
+    BCC CLEARMIDROWLOOP
+    
+    LDA #$5D                ; VERTICAL LINE
+    STA ($73), Y
+    
+    INC $72                 ; NEXT ROW
+    JMP DRAWMIDROWS
+DRAWMIDDONE:
+    RTS
+
+; COMPUTEROWADDR - SCREEN ADDRESS OF ROW IN ZP $72 -> ZP $73/$74.
+;
+; ROW*40 IS BUILT AS ROW*8 + ROW*32. ROW*8 FITS IN ONE BYTE FOR EVERY LEGAL ROW
+; (24*8 = 192), BUT ROW*32 DOES NOT: IT PASSES 255 AT ROW 8 (8*32 = 256). THE
+; OVERFLOW MUST THEREFORE BE CARRIED INTO THE HIGH BYTE WITH ROL RATHER THAN
+; DISCARDED BY A BARE ASL, OR EVERY ROW FROM 8 DOWN LANDS A FULL PAGE SHORT --
+; ROW 8 AT $0440 INSTEAD OF $0540 -- AND THE FRAME DRAWS ON TOP OF ITSELF.
+COMPUTEROWADDR:
+    LDA #0
+    STA $74                 ; HIGH BYTE OF ROW*40, ACCUMULATED VIA ROL BELOW
+
+    LDA $72                 ; ROW
+    ASL A                   ; ROW * 2
+    ASL A                   ; ROW * 4
+    ASL A                   ; ROW * 8  (FITS: MAX 192)
+    STA $73
+
+    ASL A
+    ROL $74                 ; ROW * 16, OVERFLOW KEPT
+    ASL A
+    ROL $74                 ; ROW * 32, OVERFLOW KEPT
+
+    CLC
+    ADC $73                 ; ROW*32 + ROW*8 = ROW*40 (LOW)
+    STA $73
+    LDA $74
+    ADC #$04                ; + SCREEN BASE $0400, PLUS THE CARRY JUST ABOVE
+    STA $74
+    RTS

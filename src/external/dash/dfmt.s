@@ -1,0 +1,34 @@
+; DFMT.S - TEXT FORMATTING AND RENDERING PRIMITIVES
+
+PRINTAT:
+    ; INPUT: X = STRING POINTER LOW, Y = STRING POINTER HIGH
+    ;        ZP $72 = ROW INDEX (5..19)
+    ;        ZP $77 = COL INDEX (2..37)
+    STX $75
+    STY $76                 ; ZP $75/$76 POINTS TO SOURCE STRING
+    
+    LDA $72
+    PHA                     ; SAVE ROW INDEX
+    JSR COMPUTEROWADDR      ; COMPUTES SCREEN ADDRESS OF ROW TO ZP $73/$74
+    PLA
+    STA $72                 ; RESTORE ROW INDEX
+    
+    ; ADD COL INDEX (ZP $77) TO SCREEN POINTER ZP $73/$74
+    LDA $73
+    CLC
+    ADC $77
+    STA $73
+    BCC _PANOCARRY
+    INC $74
+_PANOCARRY:
+    
+    ; COPY BYTES UNTIL $00
+    LDY #0
+_PACOPYLOOP:
+    LDA ($75), Y
+    BEQ _PADONE
+    STA ($73), Y
+    INY
+    JMP _PACOPYLOOP
+_PADONE:
+    RTS
