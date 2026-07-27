@@ -63,6 +63,10 @@ apiNotRelease:
     bne apiNotGetSysInfo
     jmp ahGetSystemInfo
 apiNotGetSysInfo:
+    cmp #DOS_GET_APP_INFO
+    bne apiNotGetAppInfo
+    jmp ahGetAppInfo
+apiNotGetAppInfo:
 
     // Unknown function — return with error (C=1)
     sec
@@ -500,4 +504,199 @@ _agsiWriteAppUsed:
 _agsiErrNull:
     lda #DOS_ERR_INVALID_ARG
     sec
+    rts
+
+ahGetAppInfo:
+    // Input: HexValLo ($61) = Requested Slot Index (0..15)
+    //        X = Buffer Pointer Low Byte
+    //        Y = Buffer Pointer High Byte
+    // Output: Carry = 0 (Success, A = $00), Carry = 1 (Error, A = Error Code)
+
+    // 1. Validate Slot Index: HexValLo must be < APT_MAX_SLOTS (16)
+    lda HexValLo
+    cmp #APT_MAX_SLOTS
+    bcc _agaiIndexOk
+    lda #DOS_ERR_INVALID_INDEX  // $01
+    sec
+    rts
+
+_agaiIndexOk:
+    pha                         // Save slot index on stack
+
+    // 2. Validate Buffer Pointer (X/Y)
+    stx PrintPtrLo
+    sty PrintPtrHi
+    txa
+    ora PrintPtrHi
+    beq _agaiErrNull
+
+    // High address check: destination high byte must be < $D0 and >= $02
+    lda PrintPtrHi
+    cmp #$02
+    bcc _agaiErrNull
+    cmp #$D0
+    bcs _agaiErrNull
+
+    // 3. Validate AppTable Subsystem (vmmInitialized != 0 AND AptSegLo|AptSegHi != 0)
+    lda vmmInitialized
+    beq _agaiErrUnavail
+    lda AptSegLo
+    ora AptSegHi
+    beq _agaiErrUnavail
+
+    // 4. Position to slot entry base using aptSlotBase (X = slot index)
+    pla                         // Restore slot index into A
+    pha                         // Save again for record writing
+    tax                         // X = slot index
+    jsr aptSlotBase             // sets VmmSegLo/Hi and VmmOffLo/Hi (APT_HEADER_SIZE + X*40)
+                                // clobbers A, DstHandle (= 0), preserves X
+
+    // Read Flags byte (offset 0 in entry)
+    jsr vmmReadByte             // A = Flags byte
+    tay                         // Y = Flags byte
+    and #APT_FLAG_USED
+    bne _agaiSlotOccupied
+
+    // Slot is unallocated! Return DOS_ERR_SLOT_EMPTY ($02) with buffer UNCHANGED
+    pla                         // Clean stack
+    lda #DOS_ERR_SLOT_EMPTY
+    sec
+    rts
+
+_agaiErrNull:
+    pla                         // Clean stack
+    lda #DOS_ERR_INVALID_ARG
+    sec
+    rts
+
+_agaiErrUnavail:
+    pla                         // Clean stack
+    lda #DOS_ERR_UNAVAILABLE
+    sec
+    rts
+
+_agaiSlotOccupied:
+    // Y contains raw Flags byte
+    // Stack contains requested slot index
+
+    // Write Offset 0: StructVersion = 1
+    ldx #APP_INFO_OFF_VER
+    lda #1
+    sta (PrintPtrLo), x
+
+    // Write Offset 1: StructSize = 24 ($18)
+    ldx #APP_INFO_OFF_SIZE
+    lda #APP_INFO_SIZE
+    sta (PrintPtrLo), x
+
+    // Write Offset 2: SlotIndex (from stack)
+    pla                         // A = SlotIndex
+    ldx #APP_INFO_OFF_SLOT
+    sta (PrintPtrLo), x
+
+    // Write Offset 3: Flags (Y)
+    tya                         // A = Flags
+    ldx #APP_INFO_OFF_FLAGS
+    sta (PrintPtrLo), x
+
+    // Read LoadAddr (offset 17 in entry, APT_OFF_ADDR)
+    // Advance VmmOffLo by 17
+    clc
+    lda VmmOffLo
+    adc #APT_OFF_ADDR
+    sta VmmOffLo
+    bcc _agaiReadLoad
+    inc VmmOffHi
+_agaiReadLoad:
+    jsr vmmReadByte             // LoadAddr lo
+    ldx #APP_INFO_OFF_LOAD_LO
+    sta (PrintPtrLo), x
+
+    inc VmmOffLo
+    bne _agaiReadLoadHi
+    inc VmmOffHi
+_agaiReadLoadHi:
+    jsr vmmReadByte             // LoadAddr hi
+    ldx #APP_INFO_OFF_LOAD_HI
+    sta (PrintPtrLo), x
+
+    // Read Size (offset 19 in entry, APT_OFF_SIZE)
+    inc VmmOffLo
+    bne _agaiReadSizeLo
+    inc VmmOffHi
+_agaiReadSizeLo:
+    jsr vmmReadByte             // Size lo
+    ldx #APP_INFO_OFF_SIZE_LO
+    sta (PrintPtrLo), x
+
+    inc VmmOffLo
+    bne _agaiReadSizeHi
+    inc VmmOffHi
+_agaiReadSizeHi:
+    jsr vmmReadByte             // Size hi
+    ldx #APP_INFO_OFF_SIZE_HI
+    sta (PrintPtrLo), x
+
+    // Read 16-byte Name field (offset 1 in entry, APT_OFF_NAME)
+    ldx #APP_INFO_OFF_SLOT
+    lda (PrintPtrLo), x         // reload SlotIndex
+    tax
+    jsr aptSlotBase             // VmmOff = entry base
+    inc VmmOffLo                // base + 1 = APT_OFF_NAME
+
+    // Read up to 16 raw PETSCII bytes into fileScratch
+    ldx #0                      // name byte index 0..15
+_agaiNameLoop:
+    cpx #16
+    bcs _agaiNameMeasured
+    txa
+    pha
+    jsr vmmReadByte             // A = name byte
+    pla
+    tax
+    sta fileScratch, x
+    inc VmmOffLo
+    bne _agaiNextChar
+    inc VmmOffHi
+_agaiNextChar:
+    inx
+    jmp _agaiNameLoop
+
+_agaiNameMeasured:
+    // Count string length: number of bytes before first $00 (max 15)
+    ldx #0                      // length counter
+_agaiLenLoop:
+    cpx #15
+    bcs _agaiLenDone
+    lda fileScratch, x
+    beq _agaiLenDone
+    inx
+    jmp _agaiLenLoop
+_agaiLenDone:
+    txa                         // A = NameLen (0..15)
+    ldy #APP_INFO_OFF_NAME_LEN
+    sta (PrintPtrLo), y
+
+    // Copy 15 bytes from fileScratch into destination NameData (offset 9..23)
+    ldy #0
+_agaiCopyNameLoop:
+    cpy #15
+    bcs _agaiCopyDone
+    tya
+    clc
+    adc #APP_INFO_OFF_NAME_DATA // = 9
+    tax                         // X = destination index (9..23)
+    tya
+    pha
+    lda fileScratch, y
+    sta (PrintPtrLo), x
+    pla
+    tay
+    iny
+    jmp _agaiCopyNameLoop
+
+_agaiCopyDone:
+    // Success
+    lda #DOS_ERR_OK
+    clc
     rts
