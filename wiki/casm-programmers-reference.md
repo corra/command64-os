@@ -8,12 +8,16 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 8 complete (build 1157, version 0.1.44).** CASM performs a
-> real two-pass assembly with labels, a bounded expression evaluator, a
-> VMM-backed symbol table, up to eight concatenated top-level source files,
-> and native R6-relocatable output (see
-> [Coverage](#16-coverage-what-works-today)). Phase 9 (`.include` processing)
-> is separately gated and not part of this state — see
+> **Status: Phase 9 in progress, WP46 complete (build 1191, version 0.1.48).**
+> CASM performs a real two-pass assembly with labels, a bounded expression
+> evaluator, a VMM-backed symbol table, up to eight concatenated top-level
+> source files, and native R6-relocatable output (see
+> [Coverage](#17-coverage-what-works-today)). Phase 9 has so far landed the
+> `.INCLUDE` operand grammar, the physical-file catalog, and the nested
+> traversal frame stack — **none of which is reachable from a real assembly
+> yet**: `casmRunPass` still fatals with `CASM_DIAG_NOT_IMPLEMENTED` at
+> `.INCLUDE` until WP47 wires real dispatch. See
+> [§16](#16-include-processing-phase-9-in-progress) and
 > [wiki/tasks/casm.md](tasks/casm.md) for the live task list. Treat anything
 > marked "not yet implemented" below as exactly that, not as a documentation
 > gap.
@@ -38,11 +42,13 @@ flowchart TD
     symbols["symbols.s — VMM-backed symbol table + hash index"]
     opcodes["opcodes.s — opcode table + addressing-mode matcher"]
     reloc["reloc.s — relocation table + R6 footer"]
+    include["include.s — physical file catalog (standalone, no live call site)"]
     diagnostics["diagnostics.s — structured diagnostic printing"]
     emit["emit.s — PC tracking, pass gate, PRG emission"]
     state["state.s — source/lexer/token BSS records (leaf)"]
 
     casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc
+    include --> vmm & source
     emit --> parser & opcodes & fileio & lexer & reloc
     parser --> lexer & state & expr & symbols & emit
     expr --> lexer & state & diagnostics
@@ -93,20 +99,31 @@ Every `bcs` after an init or pipeline call routes to `exitFatal` (via
 `outputAbort` once an output file exists) — see
 [§4](#4-resource-ownership--exit-contract).
 
+`casmRunPass` dispatches each parsed statement by type: `IDENTIFIER` inserts
+a symbol (Pass 1 only), `MNEMONIC` goes through `opcodesFindOpcode` +
+`emitInstruction`, `DIRECTIVE` goes to `emitDirective`, `NEWLINE` does
+nothing, and `EOF` ends the pass. The one exception is `.INCLUDE`, which
+`casmRunPass` intercepts *before* `emitDirective` and rejects with
+`CASM_DIAG_NOT_IMPLEMENTED` — includes alter the token source, so they are
+the driver's business, not the emitter's, and the machinery to switch
+sources exists but is not yet wired here ([§16](#16-include-processing-phase-9-in-progress)).
+`include.s` sits deliberately outside the arrows above: nothing on the
+production path calls it yet.
+
 ## 2. Build & Toolchain
 
 - Built with ca65/ld65 via the `add_ca65_app` CMake helper (`src/external/AGENTS.md`), not KickAssembler.
 - Entry file: `casm.s`. Shared declarations: `common.inc`. Includes
   `include/ca65/command64.inc` for OS API/KERNAL symbols and
   `build_casm.inc` (CMake-generated) for `BUILD_NUMBER`.
-- Current `MAIN` link envelope: `$3700`, raised repeatedly as phases landed
-  (`$1000` → `$2000` → `$2800` → … → `$3700`); every raise is a recorded,
-  user-approved step in `wiki/tasks/casm.md`.
+- Current `MAIN` link envelope: `$4000`, raised repeatedly as phases landed
+  (`$1000` → `$2000` → `$2800` → … → `$3A00` → `$3E00` → `$4000`); every
+  raise is a recorded, user-approved step in `wiki/tasks/casm.md`.
 - Zero page: application-private range `$70-$8F` (32 bytes), declared once in
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.1.44`).
+  `casm.s` (currently `0.1.48`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 
@@ -297,7 +314,45 @@ exactly on it. With one source file the whole mechanism degrades to a no-op.
   after EOF returns EOF again with no further OS call.
 - **`sourceRewind`** does **not** invalidate the lexer's lookahead — that's
   the lexer's job (`lexerInit`), because lookahead is lexer state that
-  `source.s` never writes.
+  `source.s` never writes. (Frame push and pop are the exception: they clear
+  `CasmLookaheadValid` directly, since the state-owning caller is the one that
+  knows the lookahead is now stale.)
+
+**Byte provenance** (`state.s`): `CasmSourceResultFileId`/`LineLo`/`LineHi`/
+`Column` record where the byte just delivered actually came from, written
+inside `sourceFetchPhysical` at the one point that runs after any refill,
+frame pop or file transition this fetch triggered, but before the byte's own
+column/line advance. Consumers — `lexerFill` above all — must read these
+**after** calling `sourceNextByte`, never snapshot `CasmSourceFileId`/`Line*`/
+`Column` before the call: that call may be the one that resolves a child
+frame's EOF and pops, in which case the byte returned belongs to the restored
+parent.
+
+**Frame stack** (`sourceFramePush`, [§16](#16-include-processing-phase-9-in-progress)):
+`source.s` can suspend the current traversal and switch to another span of the
+combined store, then resume exactly where it left off. Depth 0 means no nested
+frame is active, i.e. traversal behaves exactly as it did before Phase 9.
+
+Two invariants inside this module are easy to get wrong and have each already
+caused a real defect:
+
+- `CasmSourceVmmCursorLo/Hi` is the **bulk-refill read head, not the parse
+  position**. A refill installs up to 256 bytes at once, so for any file
+  smaller than the buffer the cursor already sits at that file's end while the
+  lexer is still parsing its middle. The parse position is
+  `cursor − (blockLen − blockIndex)`; anything asking "where is the parser
+  right now" must apply that correction.
+- Depth-0 traversal is bounded by `CasmSourceTopLevelEndLo/Hi`, a fixed
+  snapshot taken when `sourceLoad` completes — **not** by
+  `CasmSourceLoadedLenLo/Hi`, which keeps growing as `sourceAppendFile`
+  appends content mid-traversal. Nested frames use their own
+  `CasmFrameEndOffsetLo/Hi`.
+
+**`sourceAppendFile`** streams one further file onto the end of the combined
+store *during* traversal, without disturbing the live read cursor, and
+reports its start offset and length. It shares the per-file streaming
+primitive with `sourceLoad` through `CasmSourceStreamCursorLo/Hi`; the two
+callers never run concurrently, so one shared cursor field is sufficient.
 
 ## 9. Lexer (`lexer.s`)
 
@@ -344,6 +399,25 @@ An identifier's 31-byte bound is also the symbol table's name bound
 ([§12](#12-symbol-table-symbolss)) — the two are the same limit, not two
 limits that happen to agree.
 
+**`lexerScanIncludeOperand`** is a second, deliberately separate entry point
+used only for a `.INCLUDE` operand, because an include filename (up to 63
+bytes) does not fit the frozen 31-byte token payload. It scans the quoted
+string following an already-consumed `.INCLUDE` directive into
+`parser.s`'s own `CasmIncludeFilename` buffer, leaves the stable token record
+untouched, and leaves the statement terminator buffered so ordinary statement
+iteration is unaffected. The grammar it enforces:
+
+| Rule | Failure |
+|---|---|
+| A `"` must open the operand | `CASM_DIAG_INCLUDE_FILENAME_EXPECTED` |
+| 1-63 payload bytes, each printable PETSCII (`$20-$7E` or `$A0-$FE`); the quote itself is the delimiter and never payload | `CASM_DIAG_INVALID_INCLUDE_FILENAME` (empty or non-printable) |
+| A closing `"` within 63 bytes | `CASM_DIAG_INCLUDE_FILENAME_TOO_LONG` |
+| Only the statement terminator may follow | `CASM_DIAG_EXPECTED_NEWLINE` |
+
+Payload bytes are stored in their **original** PETSCII spelling — no case
+folding — because the spelling is what a diagnostic must echo back. Identity
+comparison folds case at compare time instead ([§16](#16-include-processing-phase-9-in-progress)).
+
 ## 10. Parser (`parser.s`)
 
 An LL(1) statement/operand parser consuming the lexer's single-token buffer
@@ -377,6 +451,14 @@ driver's job (`casm.s`'s `crpLabel`, Pass 1 only), keeping the semantic
 action out of the grammar module. Any other unexpected token is
 `CASM_DIAG_SYNTAX_ERROR`; a well-formed operand sequence missing its
 terminator is `CASM_DIAG_EXPECTED_NEWLINE`.
+
+**`.INCLUDE`** is classified like any other directive, then routed to
+`lexerScanIncludeOperand` instead of the operand grammar above. The scanned
+filename lands in this module's `CasmIncludeFilename` (64 bytes) /
+`CasmIncludeFilenameLen`, kept here rather than in the token record because
+63 bytes do not fit the frozen 31-byte payload. The parser validates and
+stores; it performs no file, VMM, PC or output effect of any kind
+([§16](#16-include-processing-phase-9-in-progress)).
 
 **`CasmParserStmt` layout** (7 bytes, in `parser.s`'s own BSS):
 
@@ -568,11 +650,13 @@ pass gate, and the output staging buffer.
   same width in both passes, and branches never consult it) — this is a
   defensive internal invariant, reported as the locationless
   `CASM_DIAG_PASS_MISMATCH`.
-- **`.STATIC` / `.RELOC` / `.INCLUDE`** are recognized by the lexer as
-  directives but rejected by `emitDirective` with
-  `CASM_DIAG_NOT_IMPLEMENTED` — they're lexed, not yet assembled. Note that
-  static-vs-relocatable output is selected by `/S` and the presence of
-  `.ORG`, not by the `.STATIC`/`.RELOC` directives.
+- **`.STATIC` / `.RELOC`** are recognized by the lexer as directives but
+  rejected by `emitDirective` with `CASM_DIAG_NOT_IMPLEMENTED` — they're
+  lexed, not yet assembled. Note that static-vs-relocatable output is
+  selected by `/S` and the presence of `.ORG`, not by these directives.
+  **`.INCLUDE`** never reaches `emitDirective` at all: `casmRunPass`
+  intercepts it first, so the emitter treats it as an internal dispatch
+  error (`CASM_DIAG_UNKNOWN`) rather than unsupported syntax.
 
 ## 15. Relocation & R6 Output (`reloc.s`)
 
@@ -601,10 +685,99 @@ no staging across chunks) and the footer is staged in the same now-free
 buffer for one final write. No seeking is involved: `emitFinalize` already
 left the file position immediately after the last program byte.
 
-## 16. Coverage: What Works Today
+## 16. Include Processing (Phase 9, in progress)
 
-As of build 1157 / v0.1.44 (Phase 8 complete; Phase 9 separately gated and
-not started in this state):
+**Nothing in this section is reachable from a real assembly yet.**
+`casmRunPass` intercepts `.INCLUDE` and fatals with
+`CASM_DIAG_NOT_IMPLEMENTED`; the pieces below are built, frozen and
+fixture-tested standalone (`tests/src/casm_include`, `casm_catalog`,
+`casm_frame`), and WP47 is what wires them into the dispatch. The phase
+contract (Phase 0C.19, in
+`brain/plans/2026-07-25-casm-phase9-include-processing.md`) freezes: quoted
+1-63-byte raw-PETSCII filenames, inherited parent devices unless explicitly
+prefixed, immutable Pass 1 loading with filesystem-free Pass 2 replay, 16
+include levels, 32 physical files, 128 include events, and the existing
+65,535-byte combined source cap.
+
+### 16.1 Physical file catalog (`include.s`)
+
+One 8KB VMM allocation: the first 4,096 bytes hold 32 × 128-byte physical
+records; the remaining 4,096 are reserved, untouched space for WP47's
+include-event log — deliberately not a second allocation.
+
+| Routine | Contract |
+|---|---|
+| `includeCatalogInit` | Allocate the metadata store, catalog empty |
+| `includeResolveDevice` | `A` = parent's resolved device, `X`/`Y` = spelling → resolved device (8-11) and a pointer past any `<n>:` prefix |
+| `includeCatalogFind` | Linear scan for a captured key; `C` clear + `X` = record index on a hit |
+| `includeCatalogRead` | Read record `A` into `CasmIncludeRecordStage` (two 64-byte windows) |
+| `includeCatalogLoad` | Resolve → deduplicate → on a miss, transiently open/read/close the child through `sourceAppendFile` and write a new record. `C` clear + `X` = record index |
+
+**Record layout** (128 bytes, `CASM_INCLUDE_PHYS_REC_*`): `Flag`, `Device`,
+`NameLen`, one reserved byte, `Start` (2, offset in the combined source
+store), `Length` (2), a 64-byte null-terminated `Name` slot, then 56 reserved
+bytes. 128 = exactly two `CASM_VMM_BUFFER_SIZE` transfers, the same
+one-record-per-transfer discipline `CASM_SYMBOL_REC_SIZE` established.
+
+Three design points carry their own rationale:
+
+- **Device resolution reuses the OS's `DOS_PARSE_PREFIX`** rather than
+  scanning for a colon locally. That routine already advances the caller's
+  pointer past a recognized `8:`/`9:`/`10:`/`11:` prefix in place, and a
+  naive local scan would disagree with it on a name like `FOO:BAR`, where the
+  OS finds no prefix but a colon is still present. When no prefix is given,
+  the OS would resolve to `CurrentDevice` — which is *not* what a child
+  should inherit, so the parent's own resolved device is substituted instead.
+- **Identity folds case at compare time** (`includeFoldByte`) instead of
+  storing a second folded copy: unshifted and shifted PETSCII spellings
+  compare equal, while only the original spelling is ever persisted, so one
+  buffer satisfies both the case-insensitive identity rule and the
+  original-spelling-for-diagnostics rule.
+- **A repeated include loads nothing.** On a catalog hit there is no file
+  I/O and no append: every include of the same physical file shares one
+  immutable byte copy in the source store.
+
+A linear scan is sufficient at 32 records (with cheap early-outs on flag,
+device, name length, then folded bytes) — unlike the 512-entry symbol table,
+no hash index is warranted. A 33rd distinct file is
+`CASM_DIAG_INCLUDE_CATALOG_FULL`.
+
+### 16.2 Frame stack and nested traversal (`source.s`)
+
+`sourceFramePush` suspends the current traversal and switches to a child's
+span of the combined store; `CASM_INCLUDE_MAX_DEPTH` is 16 levels beyond the
+depth-0 root. The frame stack is plain BSS parallel arrays indexed by
+depth − 1: the child's catalog index and end offset, plus the parent's exact
+resume state (offset, line, column, pending-CR latch).
+
+- **Inputs**: `A` = candidate catalog index, `CasmValue0Lo/Hi` = child start,
+  `CasmValue1Lo/Hi` = child end. Both must be staged immediately before the
+  call — `CasmValue0Lo/Hi` is VMM transfer scratch and cannot survive an
+  intervening transfer.
+- **Checks run before any state change**, so a rejected push leaves the frame
+  stack, the live cursor and the echo buffers completely untouched: depth at
+  the cap is `CASM_DIAG_INCLUDE_DEPTH_EXCEEDED`, and a candidate already
+  present in the **active frame chain** is `CASM_DIAG_INCLUDE_CYCLE_DETECTED`.
+  Cycle detection scans the active chain only — a diamond (the same file
+  included twice along different branches) is legal and dedupes; only genuine
+  recursion is rejected.
+- **Push** saves the parent's state, switches the cursor to the child's start
+  at line 1 / column 1, invalidates the installed block and the lexer's
+  lookahead, and increments the depth.
+- **Pop is automatic.** When a refill computes a zero-length transfer,
+  `srEofOrPop` either reports EOF (depth 0) or restores the parent frame and
+  re-enters `sourceRefill` from the top — which may immediately pop again, as
+  happens when an included file's very last statement was itself an
+  `.INCLUDE`. Popping restores only previously saved state, so it cannot fail.
+
+Note that `sourceFramePush` takes the child's start and length as plain
+inputs and has **no** dependency on `include.s`; the caller resolves the child
+through `includeCatalogLoad` first. The layering stays one-way — `include.s`
+imports from `source.s`, never the reverse.
+
+## 17. Coverage: What Works Today
+
+As of build 1191 / v0.1.48 (Phase 8 complete; Phase 9 through WP46):
 
 **Works:**
 - All 56 legal, documented 6502 mnemonics across every addressing mode they
@@ -621,13 +794,19 @@ not started in this state):
   default, R6-relocatable output at origin `$3400` with a relocation table
   and footer the OS's own loader understands.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (49 distinct `CASM_DIAG_*` codes —
-  [§17](#17-diagnostic-reference)).
+  diagnostic per failure (55 distinct `CASM_DIAG_*` codes —
+  [§18](#18-diagnostic-reference)).
+
+**Built but not yet reachable** — `.INCLUDE`'s operand grammar, physical file
+catalog, and nested traversal frame stack all exist and are fixture-tested,
+but `casmRunPass` still rejects `.INCLUDE` with
+`CASM_DIAG_NOT_IMPLEMENTED`; WP47 wires the dispatch
+([§16](#16-include-processing-phase-9-in-progress)).
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
 rather than being silently accepted):
-- **`.INCLUDE`** — `CASM_DIAG_NOT_IMPLEMENTED`. Include processing is
-  Phase 9, gated behind its own approved plan.
+- **`.INCLUDE`** — `CASM_DIAG_NOT_IMPLEMENTED`, raised by `casmRunPass`
+  after the operand has been validated and stored.
 - **`.STATIC` / `.RELOC` directives** — `CASM_DIAG_NOT_IMPLEMENTED`; use
   `/S` and `.ORG` instead.
 - **`/M` (map) and `/L` (listing) output** — CLI-parsed, then `start`
@@ -639,9 +818,11 @@ rather than being silently accepted):
 
 Bounded capacities worth knowing before writing large source: 512 symbols,
 4,096 relocation entries, 31-byte identifiers, 8 source files, 64KB combined
-source.
+source. Frozen for Phase 9, in place but not yet exercised by a live
+assembly: 32 distinct included files, 16 nesting levels, 63-byte include
+filenames.
 
-## 17. Diagnostic Reference
+## 18. Diagnostic Reference
 
 All diagnostics are stable one-byte identifiers (`CASM_DIAG_*`) with a fixed
 PETSCII message, looked up via a parallel low/high address table in
@@ -650,10 +831,10 @@ asserted at build time; `$00` (`NONE`) and `$FF`/out-of-range (`UNKNOWN` →
 `"CASM: INTERNAL ERROR"`) are the only gaps.
 
 The **Context** column marks the diagnostics that additionally print a
-location line and a caret under the offending source (see §17.1). The rest
+location line and a caret under the offending source (see §18.1). The rest
 print the message line alone — they have no meaningful source position.
 
-### 17.1 Source-context contract
+### 18.1 Source-context contract
 
 A source-position diagnostic prints its location beneath its message; with
 more than one top-level source, an `IN FILE` line precedes it:
@@ -763,9 +944,15 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$2E` | `SYMBOL_TABLE_FULL` | SYMBOL TABLE FULL | ✓ | `symbols.s` (512 records) |
 | `$2F` | `PASS_MISMATCH` | PASS 1/2 MISMATCH |  | `emit.s` (`emitCheckPassAgreement`) *(Phase 6B range ends here)* |
 | `$30` | `RELOC_TABLE_FULL` | RELOC TABLE FULL |  | `reloc.s` (4096 entries) *(Phase 8 range ends here)* |
-| `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
+| `$31` | `INCLUDE_FILENAME_EXPECTED` | INCLUDE FILENAME EXPECTED | ✓ | `lexer.s` (no opening quote after `.INCLUDE`) |
+| `$32` | `INVALID_INCLUDE_FILENAME` | INVALID INCLUDE FILENAME | ✓ | `lexer.s` (empty or non-printable byte), `include.s` (empty post-prefix name) |
+| `$33` | `INCLUDE_FILENAME_TOO_LONG` | INCLUDE FILENAME TOO LONG | ✓ | `lexer.s` (>63 payload bytes) *(WP44 range ends here)* |
+| `$34` | `INCLUDE_CATALOG_FULL` | INCLUDE CATALOG FULL |  | `include.s` (32 distinct physical files) *(WP45 range ends here)* |
+| `$35` | `INCLUDE_DEPTH_EXCEEDED` | INCLUDE DEPTH EXCEEDED |  | `source.s` (`sourceFramePush`, 16 levels) |
+| `$36` | `INCLUDE_CYCLE_DETECTED` | INCLUDE CYCLE DETECTED |  | `source.s` (candidate already in the active frame chain) *(WP46 range ends here)* |
+| `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values, and `emit.s` reaching `.INCLUDE` (an internal dispatch error) |
 
-## 18. Extending CASM
+## 19. Extending CASM
 
 - **New directive**: add a `CASM_DIRECTIVE_*` constant and its name string in
   `lexer.s` (`dirOrgStr` etc. + the `compareTokenText` chain in
@@ -806,6 +993,6 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 - [Codebase Knowledge Graph § 7](codebase-knowledge-graph.md#7-casm--internal-module-graph) — the same module graph in the context of the whole `src/`/`include/` tree.
 - [wiki/tasks/casm.md](tasks/casm.md) — live phase/work-package status.
 - `src/external/casm/AGENTS.md` — the local contracts and hard gates this module works under.
-- `brain/plans/2026-07-*-casm-*.md` — approved phase and work-package plans (source of the numeric contracts documented above).
+- `brain/plans/2026-07-*-casm-*.md` — approved phase and work-package plans (source of the numeric contracts documented above), including `2026-07-25-casm-phase9-include-processing.md` for the Phase 9 freeze.
 - [api-reference.md](api-reference.md) — the `OS_API` (`JSR $1000`) surface CASM calls into for every file/print operation.
 - [vmm-api.md](vmm-api.md) — the OS VMM services `vmm_store.s` wraps.
