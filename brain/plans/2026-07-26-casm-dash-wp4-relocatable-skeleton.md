@@ -11,7 +11,22 @@ status: draft
 Create the smallest real multi-file DASH application assembled natively by
 CASM. It must emit R6 output at the implicit `$3400` base, select three
 placeholder pages, redraw on input, exit through `DOS_EXIT`, and run unchanged
-at `$3400`, `$4000`, and `$5000`.
+at `$3800`, `$5000`, and `$9000`.
+
+**Test addresses amended 2026-07-27.** The original triple was
+`$3400/$4000/$5000`. `$3400` is no longer a legal load address: the OS grew
+past it when the DOS_GET_SYSTEM_INFO/DOS_GET_APP_INFO handler bodies forced
+`USER_PROG_START_HEX` to `$3800` (the OS image now ends at `$3539`), and
+`aptCheckRange` rejects any destination below `UserProgStart` as a protected
+region. The replacement triple is `$3800` (UserProgStart, the address the
+external-command path uses), `$5000`, and `$9000` — spread across the legal
+range, which is `$3800` to `$BC00` for a program this size, since `$C000` and
+above is protected for the VMM MCT.
+
+This is stronger coverage than before, not weaker: CASM emits at
+`CASM_DEFAULT_ORIGIN` (`$3400`), so the old `$3400` case had a relocation delta
+of zero and exercised no relocation at all. All three new addresses carry
+distinct non-zero deltas (`$04`, `$1C`, `$5C`).
 
 Parent: `brain/plans/2026-07-26-casm-dash-system-dashboard.md`.
 Prerequisites: approved completion of WP1-WP3 unless the user explicitly
@@ -149,12 +164,12 @@ missing integration rather than using ca65/KickAssembler for DASH.
 ## Atomic Increments
 
 1. Freeze short filenames, command, source order, DOX, and artifact path.
-2. Implement one-file entry/GETIN/Q proof and run at `$3400`.
+2. Implement one-file entry/GETIN/Q proof and run at `$3800`.
 3. Split into seven ordered files with cross-file labels.
 4. Add F1/F3/F5/R and direct placeholder selection.
 5. Add the relocatable `.WORD` trampoline and prove stack balance.
 6. Audit R6 header, table, footer, required entries, and exclusions.
-7. Run the same binary at `$3400`, `$4000`, and `$5000`.
+7. Run the same binary at `$3800`, `$5000`, and `$9000`.
 8. Apply only approved packaging/DOX/document records and present walkthrough.
 
 ## Verification

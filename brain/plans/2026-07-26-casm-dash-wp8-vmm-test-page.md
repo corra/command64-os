@@ -138,7 +138,7 @@ and counts remain in `[0,$1000)`.
 - Injected/read/write/compare failures, where safely testable, report correct
   stage and still free.
 - Without REU, T performs no allocation/transfer and navigation/Q remain safe.
-- Same behavior at `$3400/$4000/$5000`.
+- Same behavior at `$3800/$5000/$9000`.
 
 ## Stop Conditions
 

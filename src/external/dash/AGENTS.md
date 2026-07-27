@@ -65,4 +65,4 @@ Native CASM requires an REU for assembly; the resulting DASH runtime does not.
 - `COMP DASH.PRG DASH.REF` matches byte-for-byte on the C64, and re-running CASM with no source change reproduces identical bytes.
 - Relocation entries cover only eligible program bytes: `.WORD` renderer pointers, absolute label operands, and `#>label` high bytes. Fixed targets produce **no** entries — `$1000`, `$FFE4`, screen/colour RAM (`$0400`-`$07FF`, `$D800`-`$DBFF`), and ZP `$70`-`$8F`. `#<label` low bytes are correctly excluded (`applyExtraction` clears `RELOCATABLE` for `<`).
 - Repeated page dispatch leaves the stack balanced: `dispatchPage` pushes 2 bytes, the renderer's `RTS` consumes them landing on `dispatchReturn`, whose `RTS` consumes the original caller return. Net delta zero.
-- The same artifact runs identically at `$3400`, `$4000`, and `$5000`, without an REU.
+- The same artifact runs identically at `$3800`, `$5000`, and `$9000`, without an REU.

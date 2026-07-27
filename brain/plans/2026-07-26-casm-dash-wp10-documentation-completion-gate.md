@@ -148,7 +148,7 @@ Include:
 - Configure/build results, PRG size/header/hash, R6 count/footer, disk inventory,
   and no-change rebuild evidence.
 - Complete expected/actual relocation ledger and fixed/private exclusions.
-- Runtime result rows for `$3400/$4000/$5000`, all pages/controls, REU tests,
+- Runtime result rows for `$3800/$5000/$9000`, all pages/controls, REU tests,
   no-REU behavior, repeated lifecycle, and clean exit.
 - Every anomaly, reproduction result, root cause, fix/no-fix decision, and
   blocking assessment.
