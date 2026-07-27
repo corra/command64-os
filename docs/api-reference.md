@@ -204,6 +204,34 @@ after finishing direct use.
 - **Note:** Safe to call even if LFN 15 was never open or was already closed;
   closing an unopened KERNAL logical file is a harmless no-op.
 
+### DOS_GET_SYSTEM_INFO ($5C)
+
+Populates a caller-supplied 24-byte buffer with current system metrics, including OS version, video mode, user RAM boundaries, VMM page counts, active application counts, and device numbers.
+
+- **Input:**
+  - `X/Y`: Pointer to caller-supplied 24-byte buffer (Lo/Hi).
+- **Output:**
+  - `Carry` = 0: Success, `A` = `$00` (`DOS_ERR_OK`), buffer populated.
+  - `Carry` = 1: Failure, `A` = `$04` (`DOS_ERR_INVALID_ARG`), buffer unchanged.
+- **Record Structure (24 Bytes):**
+  - Offset 0: `StructVersion` (1 byte = `$01`)
+  - Offset 1: `StructSize` (1 byte = `24`)
+  - Offset 2: `OsMajor` (1 byte = `4`)
+  - Offset 3: `OsMinor` (1 byte = `0`)
+  - Offset 4: `OsStage` (1 byte = `0` Release)
+  - Offset 5: `CurrentDevice` (1 byte)
+  - Offset 6: `VideoStandard` (1 byte: `0`=NTSC, `1`=PAL)
+  - Offsets 7-8: `UserProgStart` (2 bytes, little-endian = `$0800`)
+  - Offsets 9-10: `UserProgEnd` (2 bytes, little-endian = `$BFFF`)
+  - Offset 11: `VmmFlags` (1 byte bitmask: bit 0 = VMM Active)
+  - Offsets 12-13: `VmmPageSize` (2 bytes, little-endian = `4096`)
+  - Offsets 14-15: `VmmTotalPages` (2 bytes, little-endian = `4096`)
+  - Offsets 16-17: `VmmAllocPages` (2 bytes, little-endian)
+  - Offsets 18-19: `VmmFreePages` (2 bytes, little-endian)
+  - Offset 20: `AppMaxSlots` (1 byte = `16`)
+  - Offset 21: `AppUsedSlots` (1 byte count of active slots)
+  - Offsets 22-23: `Reserved` (2 bytes = `$0000`)
+
 ### DOS_EXIT ($4C)
 
 Termates the program and returns to the command64 shell.

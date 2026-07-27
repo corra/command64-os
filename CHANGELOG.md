@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DASH WP2 System Information API**: Implemented kernel service `DOS_GET_SYSTEM_INFO` ($5C) in `src/command64/api.asm` to return 24-byte system info records to caller buffers.
 - **DASH WP1 API Contract Freeze**: Frozen byte-exact public contracts for `DOS_GET_SYSTEM_INFO` ($5C) and `DOS_GET_APP_INFO` ($5D) in `brain/plans/2026-07-26-casm-dash-wp1-api-contract-freeze.md`.
 
 ### Fixed
