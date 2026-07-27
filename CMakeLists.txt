@@ -76,6 +76,9 @@ set(PACMAN_ENTRY "src/external/pacman/pacman_main.s")
 set(PACMAN_AUTOTILE "${CMAKE_SOURCE_DIR}/src/external/pacman/autotile.py")
 set(PACMAN_GAME_SOURCE "${CMAKE_SOURCE_DIR}/src/external/pacman/pacman_game.s")
 
+file(GLOB_RECURSE BANNER_SRCS CONFIGURE_DEPENDS "src/external/banner/*.s" "src/external/banner/*.inc" "include/ca65/*.inc")
+set(BANNER_ENTRY "src/external/banner/banner.s")
+
 file(GLOB_RECURSE VI_SRCS CONFIGURE_DEPENDS "src/external/vi/*.asm" "include/*.inc")
 set(VI_ENTRY "src/external/vi/vi.asm")
 
@@ -237,6 +240,14 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CONWAY target")
 endif()
 set(CONWAY_TARGET conway)
+
+# 4. BANNER External Command PRG Target — renders 5x6 block PETSCII text messages.
+if(Ca65_FOUND)
+    add_ca65_app(banner "${BANNER_ENTRY}" BANNER_SRCS 1000 "0800")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for BANNER target")
+endif()
+set(BANNER_TARGET banner)
 
 # 4b. PACMAN — character-grid Pac-Man clone
 if(Ca65_FOUND)
@@ -665,6 +676,22 @@ add_c64_disk_image(test_image_d64
 )
 add_dependencies(test_image_d64 casm_test_fixtures)
 add_dependencies(test_image_d64 casm_reference_fixtures)
+
+add_c64_disk_image(command64_casm_utils_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
+    DISK_LABEL "CASM UTILS"
+    DISK_ID "${DISK_ID}"
+    PRGS ${BANNER_TARGET}
+)
+add_custom_command(
+    TARGET command64_casm_utils_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
+        "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
+    COMMENT "Appending banner.s source to command64_casm_utils.d64"
+    VERBATIM
+)
+
 
 # Large-source CASM fixtures whose raw .seq text does not fit on test.d64
 # alongside every other CASM/OS fixture, so they get their own small,

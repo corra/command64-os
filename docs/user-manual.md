@@ -289,6 +289,12 @@ resets the maze and actors while lives remain, and stops play at zero lives.
 | `P` or `SPACE` | Pause / resume |
 | `Q` | Quit and return to shell |
 
+### BANNER
+
+**Description:** Renders text messages in 5x6 block PETSCII characters using inverted space (`$A0`). Wraps text cleanly after 6 characters on a 40-column screen row.
+**Syntax:** `BANNER [text]`
+**Example:** `BANNER HELLO`
+
 ---
 
 <a name="technical-limits"></a>
