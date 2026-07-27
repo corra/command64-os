@@ -1434,3 +1434,19 @@
     - [x] Complete build verification and user-run C64/VICE walkthrough
     - [ ] Deferred: restore the exact 240-dot maze after visual revisions
     - [ ] Deferred: implement ghost warp-tunnel behavior
+# Active Regression Work
+
+- [x] Cross-device `COPY` regression (`wiki/tasks/copy-cross-device-regression.md`)
+  - [x] Reproduce `copy banner.s 8:banner.s` with device 9 active.
+  - [x] Confirm the copied file differs in size.
+  - [x] Correct data-channel sequencing and failure cleanup.
+  - [x] Verify byte equality by extracting both D64 payloads.
+  - [x] Obtain user completion confirmation.
+- [ ] Cross-device `COMP` regression (`wiki/tasks/comp-cross-device-regression.md`)
+  - [x] Reproduce false `FILES ARE DIFFERENT SIZES` on identical files.
+  - [ ] Add a public multi-file open contract and update `COMP`.
+- [/] User-program origin and external relocation (`wiki/tasks/user-program-origin-relocation.md`)
+  - [x] Select relevant changes from the incomplete DASH branch.
+  - [x] Make `$3800` the fresh-build default and relocate R6 external commands.
+  - [x] Rebuild packaged applications and smoke-test CASM.
+  - [ ] Smoke-test a non-relocatable external command.

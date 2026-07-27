@@ -318,6 +318,11 @@ sdExtGotLen:
     jsr shellLoadPrg
     bcs sdExtError
 
+    // External commands load at UserProgStart even when their R6 build origin
+    // differs. Relocate before execution; non-relocatable PRGs are unchanged
+    // and aptRelocate's carry is intentionally ignored for that case.
+    jsr relocateExternalCommand
+
     lda SavedDevice
     sta CurrentDevice
 
@@ -1532,6 +1537,8 @@ ccFoundDest:
     ldy #0
     ldx #0
 ccCopyDest:
+    cpx #40                 // DestBuf is 40 bytes — refuse to write index 40+
+    bcs ccDestTooLong
     lda (PrintPtrLo), y
     beq ccGotDest
     cmp #' '
@@ -1543,6 +1550,15 @@ ccCopyDest:
 ccGotDest:
     lda #0
     sta DestBuf, x
+    jmp ccDestParsed
+
+ccDestTooLong:
+    lda #<nameTooLongMsg
+    ldy #>nameTooLongMsg
+    jsr petPrintString
+    jmp copyExit
+
+ccDestParsed:
 
     // Check if DestBuf is empty (first character is 0)
     lda DestBuf
@@ -1560,39 +1576,159 @@ ccCopySrcToDest:
 ccDestNotEmpty:
     // Determine source file type before opening it
     jsr getSourceFileType
-    sta HexValHi            // Save file type for destination open
-    
-    // 5. Open Source for Read
+    sta CopyFileType        // Preserve type across source read and dest preflight
+
+    // Validate the source before creating the destination. fileOpen's status
+    // verification overwrites SourceBuf, so preserve and restore its name in
+    // the transfer buffer while no file data is resident there yet.
+    ldx #0
+ccSaveSourceName:
+    lda SourceBuf, x
+    sta CommandBuffer, x
+    beq ccSourceNameSaved
+    inx
+    jmp ccSaveSourceName
+ccSourceNameSaved:
     lda SrcDevice
     sta CurrentDevice
-    
     lda #0
-    sta HexValLo            // mode=0 (Read)
+    sta HexValLo
+    sta HexValHi
     ldx #<SourceBuf
     ldy #>SourceBuf
     lda #DOS_OPEN_FILE
     jsr apiHandler
-    bcs ccOpenErr
-    sta SrcHandle           // Use dedicated ZP handle scratch
+    bcc ccSourceValidated
+    jmp ccOpenErr
+ccSourceValidated:
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
 
-    // 6. Open Dest for Write
+    // Source validation used LFN 15 after opening the temporary data channel.
+    // Both can now be closed safely because no final data channel exists yet.
+    lda #DOS_RELEASE_L15
+    jsr apiHandler
+
+    ldx #0
+ccRestoreSourceName:
+    lda CommandBuffer, x
+    sta SourceBuf, x
+    beq ccSourceNameRestored
+    inx
+    jmp ccRestoreSourceName
+ccSourceNameRestored:
+
+    // Validate and release the destination command channel before either
+    // final data channel is opened. Closing LFN 15 afterward would close the
+    // drive's active data channels as well.
     lda DstDevice
     sta CurrentDevice
-    
+    jsr checkDeviceReady
+    bcc ccDestReady
+    jmp ccOpenErr
+ccDestReady:
+    lda #DOS_RELEASE_L15
+    jsr apiHandler
+
+    // 5. Open destination with all readiness checks already complete.
+    lda #1
+    sta FileOpenSkipChecks
     lda #1
     sta HexValLo            // mode=1 (Write)
+    lda CopyFileType
+    sta HexValHi
     ldx #<DestBuf
     ldy #>DestBuf
     lda #DOS_OPEN_FILE
     jsr apiHandler
-    bcs ccCloseSrcErr       // Error opening dest, close source
+    bcc ccDestOpen
+    jmp ccOpenErr
+ccDestOpen:
     sta DstHandle           // Use dedicated ZP handle scratch
 
-    lda #0
-    sta HexValHi            // Clear HexValHi so we don't leak the type to other file opens
+    // 6. Reopen the already-validated source without command-channel checks;
+    // switching LFN 15 here would invalidate the open destination stream.
+    lda SrcDevice
+    sta CurrentDevice
 
-    // 7. Copy Loop
-ccLoop:
+    lda #1
+    sta FileOpenSkipChecks
+    lda #0
+    sta HexValLo            // mode=0 (Read)
+    sta HexValHi
+    ldx #<SourceBuf
+    ldy #>SourceBuf
+    lda #DOS_OPEN_FILE
+    jsr apiHandler
+    bcc ccSourceOpen
+    jmp ccCloseDestOpenErr
+ccSourceOpen:
+    sta SrcHandle
+
+    jsr ccReadChunk
+    bcc ccFirstReadOk
+    lda #1
+    sta CopyErrorKind
+    jmp ccTransferErr
+ccFirstReadOk:
+
+    // 7. Copy Loop.
+ccWriteChunk:
+    lda CopyCountLo
+    ora CopyCountHi
+    bne ccHaveWriteData
+    jmp ccDone
+ccHaveWriteData:
+
+    // Write the preserved source byte count to dest.
+    lda CopyCountLo
+    sta HexValLo
+    lda CopyCountHi
+    sta HexValHi
+    lda DstHandle
+    sta FileHandle
+    ldx #<CommandBuffer
+    ldy #>CommandBuffer
+    lda #DOS_WRITE_FILE
+    jsr apiHandler
+    bcc ccWriteOk
+    jmp ccWriteErr
+ccWriteOk:
+
+    // EOI may coincide with a full 64-byte chunk, so byte count alone is not
+    // sufficient to decide whether another read is safe.
+    lda CopyEof
+    beq ccCheckFullChunk
+    jmp ccDone
+ccCheckFullChunk:
+    lda CopyCountHi
+    bne ccReadNext
+    lda CopyCountLo
+    cmp #64
+    beq ccReadNext
+    jmp ccDone
+
+ccReadNext:
+    jsr ccReadChunk
+    bcc ccReadOk
+    jmp ccReadErr
+ccReadOk:
+    jmp ccWriteChunk
+
+.segment ShellExt
+
+relocateExternalCommand:
+    stx TempLo              // end address + 1 from KernalLOAD
+    sty TempHi
+    jsr aptRelocate         // HexValLo/Hi still hold UserProgStart
+    rts
+
+ccSyncDestination:
+    lda DstDevice
+    jmp readErrorChannel
+
+ccReadChunk:
     lda SrcHandle           // Source Handle -> FileHandle for read call
     sta FileHandle
     ldx #<CommandBuffer     // Reuse CommandBuffer as read buffer
@@ -1603,30 +1739,32 @@ ccLoop:
     sta HexValHi
     lda #DOS_READ_FILE
     jsr apiHandler
-    bcs ccDone
+    bcs ccReadChunkDone
 
-    // Check if read 0 bytes (EOF)
     lda HexValLo
-    ora HexValHi
-    beq ccDone
+    sta CopyCountLo
+    lda HexValHi
+    sta CopyCountHi
 
-    // Write to dest
-    lda DstHandle           // Dest Handle -> FileHandle for write call
-    sta FileHandle
-    ldx #<CommandBuffer
-    ldy #>CommandBuffer
-    // HexValLo/Hi already contains the actual count read
-    lda #DOS_WRITE_FILE
-    jsr apiHandler
-    bcs ccDone              // Write error
+    lda KernalStatus
+    and #$40                // KERNAL EOI flag from fileRead's final READST
+    sta CopyEof
+    clc
+ccReadChunkDone:
+    rts
 
-    // If we read a full 64-byte block, try to read more
-    lda HexValLo
-    cmp #64
-    beq ccLoop
+ccReadErr:
+    lda #1
+    sta CopyErrorKind
+    jmp ccTransferErr
 
-ccDone:
-    // 8. Close both
+ccWriteErr:
+    lda #2
+    sta CopyErrorKind
+
+ccTransferErr:
+    // Both handles are valid here. Close them before scratching the partial
+    // destination, then report the original transfer operation that failed.
     lda SrcHandle
     sta FileHandle
     lda #DOS_CLOSE_FILE
@@ -1636,6 +1774,65 @@ ccDone:
     sta FileHandle
     lda #DOS_CLOSE_FILE
     jsr apiHandler
+
+    lda DstDevice
+    sta CurrentDevice
+    ldx #<DestBuf
+    ldy #>DestBuf
+    lda #DOS_DELETE_FILE
+    jsr apiHandler
+
+    lda CopyErrorKind
+    cmp #1
+    beq ccPrintReadErr
+    lda #<copyWriteErrMsg
+    ldy #>copyWriteErrMsg
+    jmp ccPrintTransferErr
+ccPrintReadErr:
+    lda #<copyReadErrMsg
+    ldy #>copyReadErrMsg
+ccPrintTransferErr:
+    jsr petPrintString
+    lda #PetCr
+    jsr KernalChROUT
+    jmp copyExit
+
+ccCloseDestOpenErr:
+    pha                     // Preserve source-open status across cleanup.
+    lda DstHandle
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+
+    lda DstDevice
+    sta CurrentDevice
+    ldx #<DestBuf
+    ldy #>DestBuf
+    lda #DOS_DELETE_FILE
+    jsr apiHandler
+    pla
+    jmp ccOpenErr
+
+.segment CommandShell
+
+ccDone:
+    // 8. Finalize the destination before closing the source. Closing the
+    // reader first can invalidate the writer before Commodore DOS commits its
+    // final sector and directory entry.
+    lda DstHandle
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+
+    lda SrcHandle
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr apiHandler
+
+    // KERNAL CLOSE returns before a true drive necessarily commits the final
+    // sector and directory entry. Reading status synchronizes with that work
+    // so the prompt cannot race an immediate directory lookup.
+    jsr ccSyncDestination
     
     lda #PetCr
     jsr KernalChROUT
@@ -1653,17 +1850,6 @@ ccOpenErr:
     lda #PetCr
     jsr KernalChROUT
     jmp copyExit
-
-ccCloseSrcErr:
-    pha                     // Save the dest-open error status; the source-close
-                             // call below clobbers A with its own (irrelevant) status
-    lda SrcHandle           // source handle — TempLo holds scan index here, not the handle
-    sta FileHandle
-    lda #DOS_CLOSE_FILE
-    jsr apiHandler          // Close source; its own status is not reported —
-                             // the original dest-open failure is what the user needs to see
-    pla                     // Restore the real dest-open error status for printDeviceStatusMsg
-    jmp ccOpenErr
 
 copyExit:
     lda SavedDevice
@@ -1685,10 +1871,19 @@ sssDone:
 
 
 
+.segment ShellExt
+
 // Local variables for device routing state
 SavedDevice: .byte 0
 SrcDevice:   .byte 0
 DstDevice:   .byte 0
+CopyCountLo: .byte 0
+CopyCountHi: .byte 0
+CopyEof:     .byte 0
+CopyErrorKind: .byte 0
+CopyFileType: .byte 0
+
+.segment CommandShell
 
 // --- getSourceFileType ---
 // Finds the file type of the file in SourceBuf on SrcDevice by reading the directory.
@@ -2986,6 +3181,14 @@ nameTooLongMsg:
 
 loadErrMsg:
     .text "Load error"
+    .byte 0
+
+copyReadErrMsg:
+    .text "Copy read error"
+    .byte 0
+
+copyWriteErrMsg:
+    .text "Copy write error"
     .byte 0
 
 noReuMsg:

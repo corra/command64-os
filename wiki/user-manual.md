@@ -306,7 +306,7 @@ resets the maze and actors while lives remain, and stops play at zero lives.
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **User Program Space (`UserProgStart` - $CFFF):** currently `$3400` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
+- **User Program Space (`UserProgStart` - $CFFF):** currently `$3800` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin; CASM continues to emit relocatable output at `$3400` by default.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity

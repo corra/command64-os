@@ -71,7 +71,13 @@ fiLoop:
 //         HexValLo = Access Mode (0=Read, 1=Write)
 // Output: A = Handle (0-7) or $FF on error
 //         Carry: 0=Success, 1=Error
+.segment ShellExt
 fileOpen:
+    lda FileOpenSkipChecks
+    sta OpenSkipChecks
+    lda #0
+    sta FileOpenSkipChecks  // one-shot internal option; never leak to callers
+
     // Stash HexValLo/Hi immediately before any clobbering calls (checkDeviceReady, etc.)
     lda HexValLo
     sta OpenMode
@@ -87,6 +93,8 @@ fileOpen:
 
     // Preflight: fail fast (with a specific reason) if the device is
     // missing or has no disk, instead of opening a channel with no data.
+    lda OpenSkipChecks
+    bne foDeviceOk
     lda TargetDevice
     jsr checkDeviceReady
     bcc foDeviceOk
@@ -204,6 +212,8 @@ foSkipMode:
     // Skip read verification for write-mode opens
     lda OpenMode
     bne foSkipReadVerify
+    lda OpenSkipChecks
+    bne foSkipReadVerify
 
     lda TempLo               // save the handle table offset across the
     pha                       // LFN 15 round trip (readErrorChannel reuses
@@ -259,6 +269,7 @@ foError:
 // Closes an open file.
 // Input:  A = Handle
 // Output: Carry: 0=Success, 1=Error
+.segment File
 fileClose:
     asl                     // handle index to offset
     tax
@@ -692,6 +703,14 @@ SaveOffset:
 OpenMode:
     .byte 0
 OpenType:
+    .byte 0
+OpenSkipChecks:
+    .byte 0
+
+// Internal one-shot option used by COPY after it has already validated and
+// closed the source. The final reopen must not switch LFN 15 while the
+// destination data channel is open.
+FileOpenSkipChecks:
     .byte 0
 
 L15Device:

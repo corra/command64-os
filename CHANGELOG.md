@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Cross-device COPY truncation**: `COPY` performed command-channel readiness
+  and source verification while another drive's data channel was open. Closing
+  or switching LFN 15 invalidated that data channel, so the next read or write
+  failed and the old normal-completion path committed a one-block partial file.
+  `COPY` now completes all LFN 15 traffic before opening its final source and
+  destination data channels, reports transfer errors, and scratches incomplete
+  destinations. Destination names are also bounded to their 40-byte buffer.
 - **CASM diagnostics reported the wrong line for the statement following an
   `.include`**: the lexer captured a token's file/line/column *before*
   fetching its first byte. That is correct for an ordinary byte, but the
@@ -41,6 +48,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See `brain/plans/label-l15-cache-release.md`.
 
 ### Changed
+
+- **User program origin and external dispatch**: Fresh builds now default to
+  `UserProgStart=$3800` with relocation partner `$3900`. External R6 commands
+  loaded by name are relocated before execution, allowing CASM's independent
+  `$3400` emission origin to remain stable.
 
 - **VICE MCP agent testing contract**: replaced the blanket MCP prohibition with a
   state- and evidence-driven workflow. Agents must boot Command64 from the selected D64,
