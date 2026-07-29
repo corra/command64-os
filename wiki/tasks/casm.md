@@ -1385,3 +1385,15 @@ Parent plan:
       traceback.
 - [ ] The user completes the runtime walkthrough and explicitly approves Phase
       9 completion.
+
+## Optional Phase 10 - Progress and Processing Indication
+
+- [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,
+      always-on progress for source loading, include traversal, both passes, and
+      output writing. This phase is deferred and must not activate before Phase
+      9 completion plus a separate design/ABI review approval.
+- Plan:
+  `brain/plans/2026-07-29-casm-optional-phase10-progress-indication.md`.
+- Task: `wiki/tasks/casm-progress-indication.md`.
+- A full implementation review is mandatory after automated verification and
+  before runtime acceptance or merge.

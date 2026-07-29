@@ -1450,3 +1450,14 @@
   - [x] Make `$3800` the fresh-build default and relocate R6 external commands.
   - [x] Rebuild packaged applications and smoke-test CASM.
   - [ ] Smoke-test a non-relocatable external command.
+
+# Deferred Optional Work
+
+- [ ] Taskwarrior #36 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
+      Phase 10 progress and processing indication
+  - Plan: `brain/plans/2026-07-29-casm-optional-phase10-progress-indication.md`
+  - Task: `wiki/tasks/casm-progress-indication.md`
+  - [ ] Complete design/ABI review after CASM Phase 9 closes.
+  - [ ] Implement bounded load, include, pass, and output progress.
+  - [ ] Meet the 5% representative and 10% stress slowdown limits.
+  - [ ] Complete full implementation review before runtime acceptance or merge.
