@@ -5,14 +5,14 @@ Taskwarrior: 33
 
 ## Goal
 
-Implement `BANNER` as a UNIX-style external command for Command64 OS that renders text messages in 5x6 block PETSCII characters using inverted space (`$A0`).
+Implement `BANNER` as a UNIX-style external command for Command64 OS that renders text messages in 5x6 block characters. Implemented using `#` (`$23`) for block cells — the originally specified inverted space (`$A0`) was replaced during implementation because it rendered incorrectly.
 
 ## Scope
 
 - External application built with ca65/ld65 toolchain in `src/external/banner/`.
 - Integrated into `CMakeLists.txt` and shipped in a new CASM utilities disk image.
 - Command line parsing for message string argument.
-- 5x6 monospace character rendering engine defaulting to inverted space (`$A0`) for block cells and regular space (`$20`) for empty cells.
+- 5x6 monospace character rendering engine using `#` (`$23`) for block cells and regular space (`$20`) for empty cells.
 - Horizontal (left-to-right) output layout with 1-character spacing (6 columns total per character, 6 characters max per 40-column screen row).
 - Clean line-wrapping when text exceeds the 40-column screen width.
 - Clean exit to OS shell via `DOS_EXIT` (`$4C` via `OS_API`).
@@ -29,8 +29,9 @@ Implement `BANNER` as a UNIX-style external command for Command64 OS that render
 - [x] Create `src/external/banner/header.s` to hold ca65/ld65 build segments.
 - [x] Wire `BANNER` into `CMakeLists.txt` as a target on `command64_casm_utils.d64` (PRG and source SEQ).
 - [x] Verify clean build of the CASM utilities disk image.
-- [ ] Verify manual runtime execution in VICE emulator.
-- [x] Update documentation (`docs/user-manual.md`, `wiki/user-manual.md`).
+- [x] Verify manual runtime execution in VICE emulator (user-confirmed 2026-07-28).
+- [x] Implement line-leading space skipping so wrapped lines stay left-aligned.
+- [x] Update documentation (`wiki/user-manual.md` -> synced to `docs/`, `wiki/banner-utility.md`, `CHANGELOG.md`).
 
 ## Manual Verification
 

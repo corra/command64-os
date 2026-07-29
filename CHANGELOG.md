@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`BANNER` external command** (BANNER build `1005`): renders a text message in
+  large 5x6 block characters assembled from `#` (`$23`), wrapping strictly every
+  6 characters to fit the 40-column screen, with a blank separator row between
+  block lines. Supports `A`-`Z` (lowercase folded to uppercase), `0`-`9`, and
+  the punctuation `! ? . , - + = : ; / \ * ( ) #`; unmapped characters render as
+  a blank glyph. Messages are capped at 120 characters, and `/?`, `-?`, `/H`,
+  `-H`, or no argument print the usage banner. Exits via `DOS_EXIT` (`$4C`).
+  BANNER ships on a new `command64_casm_utils.d64` image (label `CASM UTILS`)
+  rather than the standard OS image, alongside its own `banner.s` source as a
+  SEQ file.
+  `src/external/banner/banner.s` doubles as the project's **native CASM source
+  compatibility** reference: it is deliberately self-contained and segment-free
+  (inlined zero-page equates and font data, `ASL A` written explicitly, no ca65
+  anonymous labels, no `.RES`), so the same file assembles both with host
+  ca65/ld65 and with `CASM` on the C64 itself. The host-only PRG load-address
+  header lives separately in `src/external/banner/header.s`.
+  See `wiki/banner-utility.md` and
+  `brain/plans/2026-07-27-banner-casm-source-validation.md`.
+- **`BANNER` line-leading space skipping**: each block line now consumes any
+  leading spaces before it is measured, so wrapped lines stay left-aligned and a
+  message ending in a run of spaces terminates cleanly instead of emitting an
+  empty trailing block line.
+
 ### Fixed
 
 - **Cross-device COPY truncation**: `COPY` performed command-channel readiness

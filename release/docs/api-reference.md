@@ -188,6 +188,22 @@ Writes a caller-specified byte range from C64 RAM into a previously
 - **Output:** `Carry` = 0.
 - **Error:** `Carry` = 1 (REU/VMM not initialized).
 
+### DOS_RELEASE_L15 ($5B)
+
+Closes KERNAL logical file 15 (the command channel) and clears the OS's
+persistent-open cache for it (`ensureL15Open`/`L15Device` in `file.asm`).
+This releases a channel left open by an earlier OS disk operation before a
+program claims LFN 15 directly, and prevents a stale cache after that program
+closes the channel itself. Call it before directly opening LFN 15 and again
+after finishing direct use.
+
+- **Input:** None.
+- **Output:** `Carry` = 0 (always succeeds).
+- **Behavior:** Calls `KernalCLOSE` for LFN 15, then sets `L15Device` to the
+  closed sentinel (`0`).
+- **Note:** Safe to call even if LFN 15 was never open or was already closed;
+  closing an unopened KERNAL logical file is a harmless no-op.
+
 ### DOS_EXIT ($4C)
 
 Termates the program and returns to the command64 shell.

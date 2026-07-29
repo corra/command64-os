@@ -11,7 +11,7 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-07-15)
+## Current State (2026-07-28)
 
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
@@ -19,11 +19,22 @@
 - Phase 5: DRIVE/multi-device, Environment (`SET`/`PATH`) complete.
 - Phase 6A: App Manager Phase A complete.
 - Phase 6B: Binary Relocator complete.
-- Phase 6C: External Editor (VI) complete.
+- Phase 6C: External Editor (VI) — first implementation withdrawn after code
+  review; source removed and build target commented out. Deferred to a future
+  rework. EDLIN is the supported editor in the meantime.
 - **Conway memory safety & relocation crash fix**: Resolved memory collisions between code and double buffers by embedding the grid buffers as relocatable, page-aligned data tables inside the binaries. Both Kick and ca65 builds generate identical size-bounded relocatable binaries (3008 bytes, 59 relocation entries).
 - Project Infrastructure: Taskwarrior tasks initialized, Codebase Memory indexed, Code Wiki created.
 - **CMake Migration**: Build system migrated to CMake with clean source imports, cross-platform build counters, and a root Makefile proxy wrapper.
-- **Version**: 0.4.0 (command64 OS Build 2591, VI Build 1013) / DEBUG 0.4.0 (Build 1101) / LABEL 0.4.0 (Build 1034) / CONWAY 0.4.1 (Build 1058) / EDLIN 0.1.4 (Build 1017) / PACMAN 0.1.3 (Build 1055) / CASM 0.1.17 (Build 1079).
+- **Version**: 0.4.0 (command64 OS Build 2658) / CASM 0.1.48 (Build 1191) /
+  DEBUG 0.4.0 (Build 1109) / LABEL 0.4.0 (Build 1043) / CONWAY 0.4.1 (Build 1061) /
+  PACMAN 0.1.9 (Build 1090) / EDLIN 0.1.4 (Build 1033) / FORMAT 0.1.0 (Build 1011) /
+  COMP 0.1.0 (Build 1004) / BANNER (Build 1005).
+  Not built: DVORAK 0.1.0 (Build 1001, deliberately unwired — see the note in
+  `CMakeLists.txt`) and VI (deferred to a future rework; `BUILD_VI` 1015 counter
+  retained, `src/external/vi/vi.asm` removed and `add_external_app(vi ...)`
+  commented out at `CMakeLists.txt:269`).
+  BANNER has no `VERSION_*` defines — its usage string hardcodes `1.0.0.1000`
+  and does not track `BUILD_BANNER`.
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
@@ -470,7 +481,8 @@ application still starts at `$3400`; no zero-page or OS memory region moved.
 - [ ] Support subdirectories (1581 / SD2IEC)
 - [x] Environment variable storage (`SET`, `PATH`) in REU
 - [x] Implement `VOL` and `LABEL` commands (disk directory header editing)
-- [x] Develop external `vi` alike editor (Phase 6C) (Code review completed; remediation pending)
+- [ ] Develop external `vi` alike editor (Phase 6C) (Future rework; first implementation withdrawn after code review, source removed and build target disabled)
+- [x] Implement `BANNER` external command (also the native CASM source-compatibility reference)
 - [x] Implement `TIME` command using CIA 1 TOD clock
 - [x] Implement `DATE` command (software calendar in resident kernel RAM)
 - [ ] Phase 6D: Cooperative VMM Swapping & Memory Safety
