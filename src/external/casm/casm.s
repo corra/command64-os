@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
-.define VERSION_STAGE "48"
+.define VERSION_STAGE "50"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -48,6 +48,32 @@
 .import sourceRewind
 .import symbolsInit
 .import symbolsInsert
+
+; WP47 include processing. casmRunPass is the one production bridge between
+; include.s's catalog/event log and source.s's frame traversal: neither module
+; imports the other (WP46 finding 4), so the shared caller sequences them --
+; exactly the role tests/src/casm_frame's driver loop stood in for until now.
+.import includeCatalogInit
+.import includeCatalogLoad
+.import includeCatalogLookup
+.import includeCatalogRead
+.import includeResolveDevice
+.import includeEventRecord
+.import includeEventReplay
+.import includeReplayReset
+.import includeReplayFinalCheck
+.import CasmIncludeEventStage
+.import CasmIncludeRecordStage
+.import CasmIncludeFilename
+.import sourceFramePush
+.import CasmFrameDepth
+.import CasmFrameCatalogIndex
+.import CasmSourceFileId
+.import CasmStmtLocLineLo
+.import CasmStmtLocLineHi
+.import CasmStmtLocColumn
+.import cliSourceSlotLo
+.import cliSourceSlotHi
 
 .import CasmOutputName
 .import fileCreateOutput
@@ -119,6 +145,14 @@ startOptionsReady:
     bcs startInitFatal
     jsr sourceLoad
     bcs startInitFatal
+    ; WP47: allocate the include metadata store (physical catalog + event
+    ; log) once, after the source store exists -- the catalog's records point
+    ; into that store, and every `.INCLUDE` Pass 1 resolves appends to it.
+    ; This is include.s's first production call site: WP45 built the module
+    ; standalone and WP46 built the traversal engine, both proven only by
+    ; their own harnesses.
+    jsr includeCatalogInit
+    bcs startInitFatal
     jsr sourceOpen
     bcs startInitFatal
     jsr lexerInit
@@ -158,6 +192,15 @@ startPass1:
     ; source defines is in the symbol table.
     jsr sourceRewind
     bcs startFatalNear
+    ; WP47: rewind the include-event replay cursor alongside the source
+    ; itself. sourceRewind deliberately knows nothing about include.s (that
+    ; module has never been a source.s dependency, and the reverse layering
+    ; is what WP46 froze), so the shared caller sequences both -- exactly as
+    ; it already sequences sourceRewind and lexerInit. The recorded event
+    ; *count* is deliberately preserved: it is precisely what Pass 2 must
+    ; consume in full.
+    jsr includeReplayReset
+    bcs startFatalNear
     jsr lexerInit
     bcs startFatalNear
     ldx #<CasmOutputName
@@ -175,6 +218,15 @@ startPass1:
     lda #CASM_PASS_MODE_EMIT
     sta CasmPassMode
     jsr casmRunPass
+    bcs startFatalNear
+
+    ; WP47: every event Pass 1 recorded must have been consumed by the time
+    ; Pass 2 reaches clean EOF. This catches a *missing* trailing event --
+    ; a Pass 2 that never reached an `.INCLUDE` Pass 1 did -- which the
+    ; per-site correspondence check structurally cannot detect, since a
+    ; replay that stops early never performs a disagreeing comparison.
+    ; Deliberately a post-loop gate, mirroring emitCheckPassAgreement below.
+    jsr includeReplayFinalCheck
     bcs startFatalNear
 
     ; WP30: a genuine disagreement is not believed reachable through any
@@ -270,16 +322,9 @@ crpDir:
     lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
     cmp #CASM_DIRECTIVE_INCLUDE
     bne crpEmitDir
-    ; WP44 validates and stores the operand but deliberately performs no source
-    ; I/O. WP45 built the catalog/dynamic-load module (include.s) standalone,
-    ; proven only by its own test harness, with no casmRunPass call site --
-    ; wiring a real child load in here has nowhere to resume parsing from
-    ; without a frame stack. WP46 replaces this temporary semantic boundary
-    ; once frame push/traversal switching exists.
-    jsr diagSetLocFromStmt
-    lda #CASM_DIAG_NOT_IMPLEMENTED
-    sec
-    rts
+    jsr crpInclude
+    bcs crpFail
+    jmp casmRunPass
 crpEmitDir:
     jsr emitDirective
     bcs crpFail
@@ -291,11 +336,251 @@ crpDone:
 crpFail:
     rts                          ; C already set, A = CASM_DIAG_*
 
+; ---------------------------------------------------------------------------
+; crpInclude (private, WP47)
+; Handle one parsed `.INCLUDE` statement, in whichever pass is running. This
+; is the production dispatch that WP44's/WP45's/WP46's temporary
+; CASM_DIAG_NOT_IMPLEMENTED boundary stood in for, and the sequence
+; tests/src/casm_frame's driver loop proved by hand: resolve the operand
+; through include.s, then hand the resulting child span to source.s's frame
+; push, which switches live traversal into the child transparently (the
+; lexer and parser never learn a boundary was crossed; the matching pop is
+; automatic at the child's own EOF, inside sourceRefill).
+;
+; Unlike every other statement type here, this one must branch on
+; CasmPassMode itself rather than relying on a lower layer to be
+; pass-mode-correct:
+;
+;   Pass 1 (MEASURE) discovers the include graph. It may open, read, close,
+;   and append a not-yet-cataloged child (includeCatalogLoad), and records
+;   one ordered event per *occurrence* -- a repeated include of an
+;   already-cataloged file still records its own event, because Phase 0C.19
+;   expands every time and deduplicates only the stored bytes.
+;
+;   Pass 2 (EMIT) replays that graph and must never touch the filesystem
+;   (Phase 0C.19: "Pass 2 opens no source files"). It calls
+;   includeCatalogLookup -- the load-free entry point -- and verifies the
+;   independently re-derived child against the recorded event before pushing.
+;   Every physical file a valid replay needs was already cataloged in Pass 1,
+;   since Pass 2 only ever replays events Pass 1 itself recorded.
+;
+; Both paths push identically, so the bytes emitted for statements inside an
+; included file depend on exactly the same traversal in both passes -- which
+; is what keeps Pass 1's measured addresses and Pass 2's emitted output in
+; agreement.
+;
+; Deliberately does NOT call emitMarkStarted: `.INCLUDE` emits nothing, and
+; marking output started here would reject a `.ORG` at the top of an included
+; file that the equivalent flattened source accepts. Flattened equivalence is
+; the governing property (Phase 9 verification matrix), so the include
+; statement itself must be emission-transparent.
+;
+; Inputs:    a parsed `.INCLUDE` statement; CasmIncludeFilename/…Len hold the
+;            validated operand (WP44); CasmPassMode set for this pass
+; Outputs:   C clear on success, with live traversal switched into the child
+;            C set, A = CASM_DIAG_* on failure, with the diagnostic location
+;            stamped to the `.INCLUDE` site itself (Phase 0C.19: "Include
+;            load failures point at the parent `.INCLUDE` site")
+; Clobbers:  A, X, Y, CasmValue0Lo/Hi, CasmValue1Lo/Hi, CrpInc* scratch and
+;            every routine it calls
+; ---------------------------------------------------------------------------
+crpInclude:
+    jsr crpParentIdentity
+    bcs crpIncFail
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_MEASURE
+    bne crpIncReplay
+
+    ; --- Pass 1: discover, load (or reuse), and record -------------------
+    lda CrpIncParentDevice
+    ldx #<CasmIncludeFilename
+    ldy #>CasmIncludeFilename
+    jsr includeCatalogLoad
+    bcs crpIncFail
+    stx CrpIncChildIndex
+    jsr crpStageEvent
+    jsr includeEventRecord
+    bcs crpIncFail
+    jmp crpIncPush
+
+    ; --- Pass 2: replay, verifying correspondence ------------------------
+crpIncReplay:
+    lda CrpIncParentDevice
+    ldx #<CasmIncludeFilename
+    ldy #>CasmIncludeFilename
+    jsr includeCatalogLookup
+    bcs crpIncLookupMiss
+    stx CrpIncChildIndex
+    jsr crpStageEvent
+    jsr includeEventReplay
+    bcs crpIncFail
+
+crpIncPush:
+    ; The resolved child's own 128-byte record is already staged in
+    ; CasmIncludeRecordStage -- by includeCatalogLoad (whether it hit an
+    ; existing record or built a new one) or by includeCatalogLookup's hit.
+    ; sourceFramePush wants start and *end*, so the length is added here;
+    ; both are staged immediately before the call rather than carried across
+    ; any intervening one, matching sourceFramePush's own documented
+    ; contract.
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_START_LO
+    sta CasmValue0Lo
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_START_HI
+    sta CasmValue0Hi
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_START_LO
+    clc
+    adc CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_LENGTH_LO
+    sta CasmValue1Lo
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_START_HI
+    adc CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_LENGTH_HI
+    sta CasmValue1Hi
+    lda CrpIncChildIndex
+    jsr sourceFramePush
+    bcs crpIncFail
+    clc
+    rts
+
+crpIncLookupMiss:
+    ; C set from includeCatalogLookup: either a real failure (propagate it)
+    ; or a genuine catalog miss. A miss cannot legitimately happen in Pass 2
+    ; -- the catalog is immutable between passes and Pass 1 cataloged every
+    ; child it recorded -- so it is a replay divergence, not a user error.
+    cmp #CASM_DIAG_NONE
+    bne crpIncFail
+    lda #CASM_DIAG_INCLUDE_REPLAY_MISMATCH
+crpIncFail:
+    ; Stamp the `.INCLUDE` site itself, preserving the diagnostic in A.
+    ; Done only on the failure path, matching this codebase's convention
+    ; that a location is recorded when raising rather than speculatively on
+    ; every statement (a location set by a *successful* statement would
+    ; later attach itself to an unrelated locationless diagnostic).
+    pha
+    jsr diagSetLocFromStmt
+    pla
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; crpParentIdentity (private, WP47)
+; Identify the file that *contains* the `.INCLUDE` statement being handled,
+; and the device its unprefixed children should inherit.
+;
+; The two possible parents live in different namespaces, which is exactly why
+; an include event stores a (kind, id) pair rather than a bare index:
+;
+;   depth 0 -- the parent is a top-level root, identified by
+;   CasmSourceFileId. Top-level files are deliberately not catalog entries
+;   (WP45/WP46 left that unification to WP48), so its device is re-derived
+;   on demand from its own preserved CLI spelling (cli.s's CasmSourceNames,
+;   reached through the compile-time cliSourceSlot tables) via the same
+;   DOS_PARSE_PREFIX resolution include.s applies to a child, defaulting to
+;   CurrentDevice when unprefixed. That is Phase 0C.19's "an unprefixed
+;   top-level file captures CurrentDevice during initial load", evaluated
+;   lazily rather than stored -- observably identical, since nothing in CASM
+;   changes CurrentDevice during a run.
+;
+;   depth > 0 -- the parent is itself an included file, identified by the
+;   active frame's catalog index, whose own record already stores its
+;   resolved device.
+;
+; Inputs:    CasmFrameDepth and the live traversal state
+; Outputs:   C clear, with CrpIncParentKind/CrpIncParentId/CrpIncParentDevice
+;            populated
+;            C set, A = CASM_DIAG_* (propagated from includeCatalogRead)
+; Clobbers:  A, X, Y, CasmPtr0Lo/Hi and the called routines' own clobbers
+; ---------------------------------------------------------------------------
+crpParentIdentity:
+    lda CasmFrameDepth
+    bne cpiFrame
+
+    lda #CASM_INCLUDE_EVENT_PARENT_KIND_ROOT
+    sta CrpIncParentKind
+    lda CasmSourceFileId
+    sta CrpIncParentId
+    tax
+    lda cliSourceSlotHi, x
+    tay
+    lda cliSourceSlotLo, x
+    tax                          ; X/Y = this root's own original spelling
+    lda CurrentDevice            ; the unprefixed default, per Phase 0C.19
+    jsr includeResolveDevice
+    sta CrpIncParentDevice
+    clc
+    rts
+
+cpiFrame:
+    lda #CASM_INCLUDE_EVENT_PARENT_KIND_FRAME
+    sta CrpIncParentKind
+    ; 0-based array index of the currently active frame is CasmFrameDepth-1.
+    ; Reloaded explicitly rather than reusing the depth still in A on entry
+    ; from the branch above -- the kind constant just overwrote it, and a
+    ; `tax` here would silently index frame 0 at every depth (harmlessly
+    ; correct at depth 1, wrong at every deeper level).
+    ldx CasmFrameDepth
+    dex
+    lda CasmFrameCatalogIndex, x
+    sta CrpIncParentId
+    jsr includeCatalogRead       ; A = index; fills CasmIncludeRecordStage
+    bcs cpiFail
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_DEVICE
+    sta CrpIncParentDevice
+    clc
+cpiFail:
+    rts                          ; A/C already set by includeCatalogRead
+
+; ---------------------------------------------------------------------------
+; crpStageEvent (private, WP47)
+; Stage the six-field include-event tuple describing the `.INCLUDE` currently
+; being handled. Pass 1 persists it (includeEventRecord); Pass 2 stages the
+; same tuple, independently re-derived this pass, as the candidate a recorded
+; event must match (includeEventReplay). Both passes build it here, from one
+; routine, so a replay can never disagree merely because the two paths
+; assembled the tuple differently.
+;
+; The include-site line/column come from CasmStmtLoc*, stamped by
+; parserParseStatement on this statement's first token -- deliberately not
+; the live source position, which has already advanced past the operand by
+; the time this runs.
+;
+; Inputs:    CrpIncParentKind/CrpIncParentId/CrpIncChildIndex populated;
+;            CasmStmtLoc* stamped for this statement
+; Outputs:   CasmIncludeEventStage's six meaningful fields populated
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+crpStageEvent:
+    lda CrpIncParentKind
+    sta CasmIncludeEventStage + CASM_INCLUDE_EVENT_PARENT_KIND
+    lda CrpIncParentId
+    sta CasmIncludeEventStage + CASM_INCLUDE_EVENT_PARENT_ID
+    lda CasmStmtLocLineLo
+    sta CasmIncludeEventStage + CASM_INCLUDE_EVENT_PARENT_LINE_LO
+    lda CasmStmtLocLineHi
+    sta CasmIncludeEventStage + CASM_INCLUDE_EVENT_PARENT_LINE_HI
+    lda CasmStmtLocColumn
+    sta CasmIncludeEventStage + CASM_INCLUDE_EVENT_PARENT_COLUMN
+    lda CrpIncChildIndex
+    sta CasmIncludeEventStage + CASM_INCLUDE_EVENT_CHILD_INDEX
+    rts
+
 startFatal:
     ; Best-effort delete of any partial output while preserving the primary
     ; diagnostic in A, then route through central cleanup.
     jsr outputAbort
     jmp exitFatal
+
+.segment "BSS"
+
+; WP47 `.INCLUDE` dispatch scratch. Held only across one crpInclude call, but
+; kept in named BSS rather than shared zero-page scratch: crpInclude calls
+; include.s and source.s routines that document CasmValue*/CasmPtr*/
+; CasmSourceScratch* as their own scratch, and this project has already been
+; bitten three times (WP23-25, WP44, WP45) by state that looked safe to carry
+; across such a call and was not.
+CrpIncParentKind:   .res 1
+CrpIncParentId:     .res 1
+CrpIncParentDevice: .res 1
+CrpIncChildIndex:   .res 1
 
 .segment "RODATA"
 

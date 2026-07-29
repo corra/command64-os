@@ -287,6 +287,62 @@ CASM_INCLUDE_MAX_DEPTH = 16
 .assert CASM_INCLUDE_PHYS_REC_NAME + CASM_INCLUDE_FILENAME_BUFFER_SIZE <= CASM_INCLUDE_PHYS_REC_SIZE, error, "CASM include physical record name does not fit"
 .assert CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZE <= CASM_INCLUDE_META_BYTES, error, "CASM include physical catalog exceeds metadata allocation"
 
+; Phase 9 WP47 include-event log contract. Occupies the second half of the
+; same 8KB metadata allocation the physical catalog already owns -- the space
+; WP45's own header comment reserved for exactly this, never a second
+; allocation. Pass 1 appends one event per `.INCLUDE` *occurrence* (a repeated
+; include of an already-cataloged file still records its own event: Phase
+; 0C.19 mandates expansion every time, with only the physical bytes
+; deduplicated); Pass 2 consumes them in order with zero source-filesystem
+; I/O.
+;
+; 16 bytes per record, so a whole event transfers in ONE 64-byte
+; vmmWindowRead/vmmWindowWrite window -- unlike the 128-byte physical record's
+; two-window read/write pair. The record deliberately stores no start/length
+; span: Pass 2 always re-reads the child's span fresh from the (immutable
+; since Pass 1) catalog, so a span duplicated here could only ever disagree
+; with the record that actually governs traversal.
+;
+; Parent identity is a (kind, id) pair rather than a bare index because the
+; two possible parents live in different namespaces: a top-level root is
+; identified by CasmSourceFileId (0..CASM_SOURCE_COUNT_MAX-1) and is NOT a
+; catalog entry at all (WP45/WP46 deliberately never cataloged top-level
+; files -- unifying them is WP48's job), while a nested parent is identified
+; by its catalog index (0..CASM_INCLUDE_PHYS_CAPACITY-1). Without the kind
+; tag, root 3 and catalog record 3 would compare equal during replay.
+CASM_INCLUDE_EVENT_PARENT_KIND    = 0
+CASM_INCLUDE_EVENT_PARENT_ID      = 1
+CASM_INCLUDE_EVENT_PARENT_LINE_LO = 2
+CASM_INCLUDE_EVENT_PARENT_LINE_HI = 3
+CASM_INCLUDE_EVENT_PARENT_COLUMN  = 4
+CASM_INCLUDE_EVENT_CHILD_INDEX    = 5
+CASM_INCLUDE_EVENT_SIZE           = 16
+
+CASM_INCLUDE_EVENT_PARENT_KIND_ROOT  = 0
+CASM_INCLUDE_EVENT_PARENT_KIND_FRAME = 1
+
+; Phase 0C.19 freeze: "Maximum include occurrences/events is 128."
+CASM_INCLUDE_EVENT_CAPACITY = 128
+
+; Byte offset of the event log within the metadata allocation. Anchored to
+; the catalog's own full reserved extent (not a bare literal) so growing
+; CASM_INCLUDE_PHYS_CAPACITY can never silently overlap the two regions.
+CASM_INCLUDE_EVENT_BASE = CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZE
+
+.assert CASM_INCLUDE_EVENT_PARENT_ID = CASM_INCLUDE_EVENT_PARENT_KIND + 1, error, "CASM include event parent id offset changed"
+.assert CASM_INCLUDE_EVENT_PARENT_LINE_LO = CASM_INCLUDE_EVENT_PARENT_ID + 1, error, "CASM include event parent line offset changed"
+.assert CASM_INCLUDE_EVENT_PARENT_LINE_HI = CASM_INCLUDE_EVENT_PARENT_LINE_LO + 1, error, "CASM include event parent line offsets changed"
+.assert CASM_INCLUDE_EVENT_PARENT_COLUMN = CASM_INCLUDE_EVENT_PARENT_LINE_HI + 1, error, "CASM include event parent column offset changed"
+.assert CASM_INCLUDE_EVENT_CHILD_INDEX = CASM_INCLUDE_EVENT_PARENT_COLUMN + 1, error, "CASM include event child index offset changed"
+.assert CASM_INCLUDE_EVENT_SIZE = 16, error, "CASM include event record size changed"
+.assert CASM_INCLUDE_EVENT_SIZE <= CASM_VMM_BUFFER_SIZE, error, "CASM include event record must fit one VMM transfer"
+.assert CASM_INCLUDE_EVENT_CAPACITY = 128, error, "CASM include event capacity changed"
+.assert CASM_INCLUDE_EVENT_PARENT_KIND_FRAME = CASM_INCLUDE_EVENT_PARENT_KIND_ROOT + 1, error, "CASM include event parent kinds must remain contiguous"
+; The event log must start at or after the catalog's end and fit entirely
+; within the one 8KB metadata allocation.
+.assert CASM_INCLUDE_EVENT_BASE >= CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZE, error, "CASM include event log overlaps the physical catalog"
+.assert CASM_INCLUDE_EVENT_BASE + (CASM_INCLUDE_EVENT_CAPACITY * CASM_INCLUDE_EVENT_SIZE) <= CASM_INCLUDE_META_BYTES, error, "CASM include event log exceeds metadata allocation"
+
 ; Transient synthesis buffer for an explicit "<n>:name" string handed to
 ; fileOpenInput/DOS_OPEN_FILE when the resolved device is not what
 ; DOS_OPEN_FILE would default to on its own (an inherited parent device that
@@ -464,6 +520,37 @@ CASM_TOKEN_REC_COLUMN  = 6
 CASM_TOKEN_REC_TEXT    = 7
 CASM_TOKEN_REC_SIZE    = CASM_TOKEN_REC_TEXT + CASM_TOKEN_TEXT_BUFFER_SIZE
 
+; Phase 9 WP48: CASM_TOKEN_REC_FILE_ID (and every field it is copied into
+; verbatim -- CasmSourceResultFileId, CasmLookaheadFileId, CasmStmtLocFileId,
+; CasmDiagLocFileId) is bit-packed rather than a raw top-level index, so a
+; byte's true provenance survives being fetched from inside a nested
+; `.INCLUDE` frame. This is a semantic amendment to an already-stable-ABI
+; byte, not a size change -- CASM_TOKEN_REC_SIZE stays 39 (user-approved:
+; the alternative was growing the frozen token record for the first time
+; since WP44 froze it there).
+;
+; Bit 7 clear: bits 0-6 are CasmSourceFileId (0..CASM_SOURCE_COUNT_MAX-1), a
+; top-level root's own index -- the field's original, sole meaning before
+; Phase 9.
+; Bit 7 set: bits 0-6 are a physical catalog index
+; (0..CASM_INCLUDE_PHYS_CAPACITY-1), identifying which included file the
+; byte actually came from. Mirrors CASM_INCLUDE_EVENT_PARENT_KIND_ROOT/FRAME
+; (WP47)'s own root-vs-frame split, applied here to per-byte provenance
+; instead of an include event.
+;
+; Both namespaces fit in 7 bits with room to spare (CASM_SOURCE_COUNT_MAX is
+; 8, CASM_INCLUDE_PHYS_CAPACITY is 32), so one flag bit is sufficient and no
+; id ever collides with the flag bit itself.
+CASM_DIAG_FILEID_FRAME_FLAG = $80
+CASM_DIAG_FILEID_ID_MASK    = $7F
+
+.assert CASM_DIAG_FILEID_FRAME_FLAG = $80, error, "CASM FILE_ID frame flag bit changed"
+.assert CASM_DIAG_FILEID_ID_MASK = $7F, error, "CASM FILE_ID id mask changed"
+.assert (CASM_DIAG_FILEID_FRAME_FLAG & CASM_DIAG_FILEID_ID_MASK) = 0, error, "CASM FILE_ID flag and id mask must not overlap"
+.assert (CASM_DIAG_FILEID_FRAME_FLAG | CASM_DIAG_FILEID_ID_MASK) = $FF, error, "CASM FILE_ID flag and id mask must cover the whole byte"
+.assert CASM_SOURCE_COUNT_MAX <= CASM_DIAG_FILEID_ID_MASK + 1, error, "CASM top-level file count no longer fits the FILE_ID id bits"
+.assert CASM_INCLUDE_PHYS_CAPACITY <= CASM_DIAG_FILEID_ID_MASK + 1, error, "CASM include catalog capacity no longer fits the FILE_ID id bits"
+
 .assert CASM_SOURCE_LINE_PAYLOAD_MAX = 255, error, "CASM source line payload changed"
 .assert CASM_SOURCE_STATE_COUNT = CASM_SOURCE_STATE_ERROR + 1, error, "CASM source state range changed"
 .assert CASM_SOURCE_API_COUNT = CASM_SOURCE_API_LINE + 1, error, "CASM source API range changed"
@@ -586,6 +673,19 @@ CASM_DIAG_PHASE9_WP45_LAST = CASM_DIAG_INCLUDE_CATALOG_FULL
 CASM_DIAG_INCLUDE_DEPTH_EXCEEDED = $35
 CASM_DIAG_INCLUDE_CYCLE_DETECTED = $36
 CASM_DIAG_PHASE9_WP46_LAST = CASM_DIAG_INCLUDE_CYCLE_DETECTED
+; CASM Phase 9 WP47 ordered include graph and Pass 2 replay. The event log's
+; own 128-occurrence capacity check is genuinely new (same
+; CASM_DIAG_SYMBOL_TABLE_FULL/CASM_DIAG_INCLUDE_CATALOG_FULL precedent).
+; CASM_DIAG_INCLUDE_REPLAY_MISMATCH covers every Pass 2 correspondence
+; failure -- a disagreeing parent/child identity or include-site location, an
+; `.INCLUDE` with no recorded event behind it, and unconsumed events left at
+; Pass 2's own EOF. Like CASM_DIAG_PASS_MISMATCH (WP30), it is a defensive
+; internal-consistency diagnostic, not believed reachable through any
+; legitimate source under the current grammar. Metadata transfer failures keep
+; propagating CASM_DIAG_VMM_TRANSFER_FAILED, exactly as WP45 established.
+CASM_DIAG_INCLUDE_EVENT_LOG_FULL  = $37
+CASM_DIAG_INCLUDE_REPLAY_MISMATCH = $38
+CASM_DIAG_PHASE9_WP47_LAST = CASM_DIAG_INCLUDE_REPLAY_MISMATCH
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -621,6 +721,9 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_INCLUDE_DEPTH_EXCEEDED = CASM_DIAG_PHASE9_WP45_LAST + 1, error, "CASM Phase 9 WP46 diagnostics must follow WP45"
 .assert CASM_DIAG_INCLUDE_CYCLE_DETECTED = CASM_DIAG_INCLUDE_DEPTH_EXCEEDED + 1, error, "CASM WP46 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE9_WP46_LAST = $36, error, "CASM WP46 diagnostic range changed"
+.assert CASM_DIAG_INCLUDE_EVENT_LOG_FULL = CASM_DIAG_PHASE9_WP46_LAST + 1, error, "CASM Phase 9 WP47 diagnostics must follow WP46"
+.assert CASM_DIAG_INCLUDE_REPLAY_MISMATCH = CASM_DIAG_INCLUDE_EVENT_LOG_FULL + 1, error, "CASM WP47 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE9_WP47_LAST = $38, error, "CASM WP47 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

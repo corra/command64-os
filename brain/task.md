@@ -1085,7 +1085,7 @@
     - **WP42 is complete, and with it the CASM Phase 8 milestone closes**,
       approved by the user
 
-- [/] `687ada7e-4175-41b4-93f3-9e8df85c1a5c` CASM Phase 9: include processing
+- [x] `687ada7e-4175-41b4-93f3-9e8df85c1a5c` CASM Phase 9: include processing
   - Parent plan:
     `brain/plans/2026-07-25-casm-phase9-include-processing.md`
   - [x] `2826144e-b7c6-4372-8e1d-74cfff242d1a` WP43 prerequisite
@@ -1200,12 +1200,92 @@
       `git diff --check` clean. **WP46 complete.** WP47 is unblocked in
       Taskwarrior by dependency but not activated -- it remains pending
       separate plan approval
-  - [ ] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and
-        Pass 2 replay
-  - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics
-        and tracebacks
-  - [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693` WP49 verification, walkthrough,
+  - [x] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and
+        Pass 2 replay — complete 2026-07-29. Plan:
+        `brain/plans/2026-07-29-casm-phase9-wp47-ordered-include-graph-and-pass2-replay.md`
+    - First real production `.INCLUDE` dispatch in `casmRunPass`: Pass 1
+      loads/pushes and records one ordered event per include site; Pass 2
+      replays with zero source-filesystem I/O. Also gives
+      `includeCatalogInit` its first production call site
+    - Frozen 16-byte include-event record in the metadata allocation's
+      already-reserved second half (offset 4096); parent identity carries a
+      kind tag (top-level root vs nested frame) because WP45/46 deliberately
+      never cataloged top-level files (WP48's job)
+    - User-confirmed scope: WP46's deferred per-frame echo save/restore
+      stays deferred; Pass 2 defensively re-derives child identity and
+      compares it against the recorded event
+    - Factored `includeCatalogLookup` out of `includeCatalogLoad` so Pass 2
+      calls an entry point *structurally* incapable of filesystem I/O rather
+      than one merely trusted not to perform it. Zero-Pass-2-source-I/O is
+      proven by reachability: the only open path in a pass sits inside the
+      `CASM_PASS_MODE_MEASURE` branch
+    - Deviation from plan (user-approved): end-to-end fixtures ship on a new
+      `casm_include_test_d64` image, not `casm_overflow_test_d64` — that
+      disk had ~10 free blocks and this WP's verification writes eight
+      output PRGs to the disk it reads from
+    - MAIN `$4000` -> `$4200` (measured 16,718-byte minimum, 178 bytes
+      headroom); `test_casm_catalog` `$1B00` -> `$1C00`
+    - Defect caught in code review before runtime: `crpParentIdentity`
+      indexed the frame array with a stale `A` (the parent-kind constant),
+      reading frame 0 at every depth — coincidentally correct at depth 1,
+      wrong from depth 2 up
+    - All runtime checks passed first attempt: `test_casm_event`'s 15 cases,
+      and all four end-to-end pairs `FILES COMPARE OK` (cross-boundary
+      labels/branches both directions, three-level nesting, sequential
+      reinclusion, relocatable with relocation table). User approved
+      completion. Final CASM `0.1.49` build 1196; no-change rebuild stable;
+      all four disk images pass. **WP47 complete.** WP48 unblocked in
+      Taskwarrior but deliberately not activated
+  - [x] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics
+        and tracebacks — complete 2026-07-29. Plan:
+        `brain/plans/2026-07-29-casm-phase9-wp48-included-source-diagnostics-and-tracebacks.md`,
+        branch `feature/casm-phase9-wp48`
+    - Fixed a live defect: a diagnostic raised inside an included file
+      previously named the wrong file — `CasmSourceFileId` only tracked the
+      top-level index and is never updated while a nested frame is active
+    - User-confirmed scope: bit-pack (kind, id) into the existing 1-byte
+      `FILE_ID` field rather than grow the frozen 39-byte token record; add
+      a dedicated `CasmFrameSiteColumn` array rather than reuse
+      `CasmFrameResumeColumn` for the traceback's per-frame column
+    - Traceback renders from the still-live frame stack at
+      `diagPrintFatal` time — no raise-time snapshot needed, since nothing
+      pops a frame before cleanup runs
+    - No new `CASM_DIAG_*` values. `test_casm_pass1`/`test_casm_passcheck`
+      will need `include.s` added to their link for the first time, likely
+      forcing envelope bumps
+    - [x] Implement packed root/catalog provenance and dedicated include-site
+      column capture
+    - [x] Implement catalog-backed physical filenames and bounded traceback
+      rendering with non-masking fallback
+    - [x] Add the production nested-failure fixture chain and build all four
+      disk images
+    - [x] Fix review-found parent-byte append after unterminated child EOF and
+      add a dedicated nested boundary fixture
+    - [x] Recover post-pop traceback depth and originating root from retained
+      bounded frame metadata
+    - [x] Replace runtime-disproven resume-line reuse with dedicated include-site
+      line arrays; raise `test_casm_pass1` to approved `$4200`
+    - [x] Raise whole-object `test_casm_event` to approved `$1D00` after its
+      measured 31-byte overflow
+    - [x] Complete the user runtime walkthrough and approve completion; user
+          reported all tests pass and explicitly approved completion on
+          2026-07-29. Final CASM `0.1.50` build 1204; WP49 remains pending and
+          inactive
+  - [x] `a8c3dbf0-9333-4489-9c3b-3e752049b693` WP49 verification, walkthrough,
         and Phase 9 completion gate
+    - [x] Obtain approval for the detailed verification-only plan
+    - [x] Activate WP49 and synchronize repository and Taskwarrior state
+    - [x] Reconcile the frozen WP43-WP48 baseline and review full execution paths
+      - [x] Confirm version/build, envelopes, harness targets, images, and
+            production Pass 1/Pass 2/traversal/cleanup paths
+      - [x] Resolve the stale CMake production-headroom comment (196 recorded
+            there versus final WP48's 85) through an approved narrow amendment
+    - [x] Run static, harness, regression, envelope, artifact, and image checks
+    - [x] Verify trusted references, failure handling, cleanup, and stable rebuild
+    - [x] Produce and complete the user runtime walkthrough
+    - [x] Obtain explicit approval before marking WP49 and Phase 9 complete
+    - User explicitly approved completion on 2026-07-29. CASM remains
+      `0.1.50` build 1204; Phase 10 remains inactive.
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task

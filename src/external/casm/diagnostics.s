@@ -47,6 +47,19 @@
 .import cliSourceSlotLo
 .import cliSourceSlotHi
 
+; WP48 included-source identity and traceback state. Catalog reads use the
+; immutable VMM metadata store and never touch the source filesystem.
+.import includeCatalogRead
+.import CasmIncludeRecordStage
+.import CasmFrameDepth
+.import CasmFrameCatalogIndex
+.import CasmFrameRootFileId
+.import CasmFrameResumeLineLo
+.import CasmFrameResumeLineHi
+.import CasmFrameSiteLineLo
+.import CasmFrameSiteLineHi
+.import CasmFrameSiteColumn
+
 .import CasmDiagLineBufA
 .import CasmDiagLineBufB
 .import CasmDiagLineSel
@@ -61,6 +74,14 @@
 
 ; Terminal, fatal-path-only line recovery. See its contract in source.s.
 .import sourceDrainLineTail
+
+.segment "BSS"
+
+; Fatal rendering can drain the remainder of an unterminated included line.
+; That drain may reach child EOF and pop the live frame, so retain the depth
+; observed on entry. The bounded frame arrays themselves remain intact.
+CasmDiagTraceDepth: .res 1
+CasmDiagTraceIndex: .res 1
 
 .segment "CODE"
 
@@ -94,7 +115,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE9_WP46_LAST + 1
+    cmp #CASM_DIAG_PHASE9_WP47_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED
@@ -705,25 +726,45 @@ diagPrintSourceContext:
     bne @haveLoc
     rts
 @haveLoc:
-    ; WP35: print which file this location belongs to, only when more than
-    ; one top-level source was given -- keeps single-file diagnostic text
-    ; byte-identical to every prior phase's. cliSourceSlotLo/Hi (cli.s,
-    ; already exported for sourceLoad's own reuse) is indexed directly by
-    ; CasmDiagLocFileId to get a ready-to-print null-terminated pointer.
+    lda CasmFrameDepth
+    sta CasmDiagTraceDepth
+    ; A token at an unterminated child EOF may already have caused lookahead
+    ; to pop one or more frames before its diagnostic is raised. Its packed
+    ; FILE_ID remains authoritative and the bounded frame arrays are retained.
+    ; Recover the original depth by finding that catalog id. Active-chain cycle
+    ; prevention makes the first ascending match unambiguous; indices below it
+    ; are its distinct ancestors, while stale entries can only follow it.
+    lda CasmDiagLocFileId
+    bpl @traceDepthReady
+    and #CASM_DIAG_FILEID_ID_MASK
+    sta CasmDiagTraceIndex
+    ldx #0
+@findTraceDepth:
+    cpx #CASM_INCLUDE_MAX_DEPTH
+    bcs @traceDepthReady         ; corrupt/missing metadata: retain live depth
+    cmp CasmFrameCatalogIndex, x
+    beq @traceDepthFound
+    inx
+    bne @findTraceDepth         ; bounded at 16, always taken
+@traceDepthFound:
+    inx                         ; array index -> 1-based frame depth
+    stx CasmDiagTraceDepth
+@traceDepthReady:
+
+    ; WP48: an included-file location always names its physical file. Preserve
+    ; WP35's existing gate for roots so a single-root, no-include diagnostic
+    ; remains byte-identical to prior releases.
+    lda CasmDiagLocFileId
+    bmi @printFileName
     lda CasmSourceCount
     cmp #2
     bcc @skipFileName
+@printFileName:
     ldx #<msgInFile
     ldy #>msgInFile
     jsr diagPrintString
-    ldx CasmDiagLocFileId
-    lda cliSourceSlotLo, x
-    pha
-    lda cliSourceSlotHi, x
-    tay
-    pla
-    tax
-    jsr diagPrintString
+    lda CasmDiagLocFileId
+    jsr diagPrintIncludeIdentity
     ldx #<msgCR
     ldy #>msgCR
     jsr diagPrintString
@@ -806,8 +847,113 @@ diagPrintSourceContext:
     lda CasmDiagLineClipped
     sta CasmDiagViewClipped
 @render:
-    jmp diagPrintLineAndCaret
+    jsr diagPrintLineAndCaret
+    jmp diagPrintIncludeTraceback
 @noText:
+    jmp diagPrintIncludeTraceback
+
+; ---------------------------------------------------------------------------
+; diagPrintIncludeIdentity (private, WP48)
+; Print a filename selected by the packed FILE_ID provenance byte.
+;
+; Inputs:    A = packed FILE_ID (bit 7 frame kind, bits 0-6 id)
+; Outputs:   none
+; Preserves: none
+; Clobbers:  A, X, Y, processor flags, CasmIncludeRecordStage for frame ids
+; Failure:   a catalog-read failure prints a fixed placeholder and returns;
+;            it never replaces or propagates over the primary diagnostic
+; ---------------------------------------------------------------------------
+diagPrintIncludeIdentity:
+    pha
+    and #CASM_DIAG_FILEID_FRAME_FLAG
+    bne @frame
+    pla
+    and #CASM_DIAG_FILEID_ID_MASK
+    tax
+    lda cliSourceSlotLo, x
+    pha
+    lda cliSourceSlotHi, x
+    tay
+    pla
+    tax
+    jmp diagPrintString
+@frame:
+    pla
+    and #CASM_DIAG_FILEID_ID_MASK
+    jsr includeCatalogRead
+    bcs @unavailable
+    ldx #<(CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_NAME)
+    ldy #>(CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_NAME)
+    jmp diagPrintString
+@unavailable:
+    ldx #<msgIncludeUnavailable
+    ldy #>msgIncludeUnavailable
+    jmp diagPrintString
+
+; ---------------------------------------------------------------------------
+; diagPrintIncludeTraceback (private, WP48)
+; Print active include sites from innermost parent to the depth-zero root.
+;
+; Inputs:    CasmDiagTraceDepth captured at diagnostic-render entry;
+;            frame catalog/site/root arrays
+; Outputs:   none
+; Preserves: none
+; Clobbers:  A, X, Y, processor flags, CasmValue0Lo/Hi,
+;            CasmIncludeRecordStage, CasmDiagTraceIndex
+; ---------------------------------------------------------------------------
+diagPrintIncludeTraceback:
+    lda CasmDiagTraceDepth
+    sta CasmDiagTraceIndex
+@loop:
+    lda CasmDiagTraceIndex
+    beq @done
+
+    ldx #<msgIncludedFrom
+    ldy #>msgIncludedFrom
+    jsr diagPrintString
+
+    lda CasmDiagTraceIndex
+    cmp #1
+    beq @rootParent
+    sec
+    sbc #2
+    tax
+    lda CasmFrameCatalogIndex, x
+    ora #CASM_DIAG_FILEID_FRAME_FLAG
+    bne @printParent            ; flag guarantees nonzero
+@rootParent:
+    lda CasmFrameRootFileId      ; outermost frame's originating CLI root
+@printParent:
+    jsr diagPrintIncludeIdentity
+
+    ldx #<msgLinePrefix
+    ldy #>msgLinePrefix
+    jsr diagPrintString
+    ldx CasmDiagTraceIndex
+    dex
+    lda CasmFrameSiteLineLo, x
+    sta CasmValue0Lo
+    lda CasmFrameSiteLineHi, x
+    sta CasmValue0Hi
+    jsr printDec16
+
+    ldx #<msgColumnPrefix
+    ldy #>msgColumnPrefix
+    jsr diagPrintString
+    ldx CasmDiagTraceIndex
+    dex
+    lda CasmFrameSiteColumn, x
+    sta CasmValue0Lo
+    lda #0
+    sta CasmValue0Hi
+    jsr printDec16
+    ldx #<msgCR
+    ldy #>msgCR
+    jsr diagPrintString
+
+    dec CasmDiagTraceIndex
+    jmp @loop
+@done:
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1015,6 +1161,8 @@ diagMessageLo:
     .byte <msgIncludeCatalogFull
     .byte <msgIncludeDepthExceeded
     .byte <msgIncludeCycleDetected
+    .byte <msgIncludeEventLogFull
+    .byte <msgIncludeReplayMismatch
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -1072,10 +1220,12 @@ diagMessageHi:
     .byte >msgIncludeCatalogFull
     .byte >msgIncludeDepthExceeded
     .byte >msgIncludeCycleDetected
+    .byte >msgIncludeEventLogFull
+    .byte >msgIncludeReplayMismatch
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE9_WP46_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE9_WP46_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE9_WP47_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE9_WP47_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -1185,6 +1335,10 @@ msgIncludeDepthExceeded:
     .byte "CASM: INCLUDE DEPTH EXCEEDED", PetCr, 0
 msgIncludeCycleDetected:
     .byte "CASM: INCLUDE CYCLE DETECTED", PetCr, 0
+msgIncludeEventLogFull:
+    .byte "CASM: INCLUDE EVENT LOG FULL", PetCr, 0
+msgIncludeReplayMismatch:
+    .byte "CASM: INCLUDE REPLAY MISMATCH", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:
@@ -1263,9 +1417,13 @@ msgLocColPrefix:  .byte " C:", 0
 msgCR:            .byte PetCr, 0
 
 ; WP15 source context strings.
-; WP35: printed only when CasmSourceCount > 1, on its own line before
-; msgAtLine.
+; WP35/WP48: root names print when CasmSourceCount > 1; included-file names
+; always print. Traceback strings follow the same identity renderer.
 msgInFile:       .byte "IN FILE ", 0
+msgIncludedFrom: .byte "INCLUDED FROM ", 0
+msgLinePrefix:   .byte " LINE ", 0
+msgColumnPrefix: .byte " COLUMN ", 0
+msgIncludeUnavailable: .byte "<INCLUDE?>", 0
 msgAtLine:       .byte "AT LINE ", 0
 msgColPrefix:    .byte ", COL ", 0
 msgOffsetPrefix: .byte " (OFFSET ", 0

@@ -956,3 +956,178 @@ file(WRITE "${OUTPUT_DIR}/casmfrr1.seq"
 file(WRITE "${OUTPUT_DIR}/casmfrr2.seq"
     "R2:${CASM_LF}"
 )
+
+# WP48 end-to-end included-source diagnostic fixture. The failure originates
+# in the grandchild, while both include sites begin at column 5. Production
+# CASM must name CASMIDC2.S and render two INCLUDED FROM lines in
+# innermost-to-root order, each reporting LINE 2 COLUMN 5.
+file(WRITE "${OUTPUT_DIR}/casmidp1.seq"
+    "ROOT:${CASM_LF}    .INCLUDE \"CASMIDC1.S\"${CASM_LF}AFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmidc1.seq"
+    "CHILD:${CASM_LF}    .INCLUDE \"CASMIDC2.S\"${CASM_LF}CHILDAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmidc2.seq"
+    "GRAND:${CASM_LF}    LDA MISSING${CASM_LF}"
+)
+
+# WP48 amendment: same nested failure with no newline after the grandchild's
+# failing statement. Fatal best-effort line draining must stop when child EOF
+# pops to the parent, rather than appending the parent's CHILDAFTER text to the
+# grandchild diagnostic line.
+file(WRITE "${OUTPUT_DIR}/casmidup1.seq"
+    "ROOT:${CASM_LF}    .INCLUDE \"CASMIDUC1.S\"${CASM_LF}ROOTAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiduc1.seq"
+    "CHILD:${CASM_LF}    .INCLUDE \"CASMIDUC2.S\"${CASM_LF}CHILDAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiduc2.seq"
+    "GRAND:${CASM_LF}    LDA MISSING"
+)
+
+# WP48 second amendment: invalid source byte before an unterminated child EOF.
+# The diagnostic is raised while the child frame is still active, then fatal
+# line-tail draining reaches EOF/pop. The packed-identity guard must stop before
+# the resumed parent's DRAINAFTER text is appended to the child echo.
+file(WRITE "${OUTPUT_DIR}/casmiddp1.seq"
+    "ROOT:${CASM_LF}    .INCLUDE \"CASMIDDC1.S\"${CASM_LF}ROOTAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiddc1.seq"
+    "CHILD:${CASM_LF}    .INCLUDE \"CASMIDDC2.S\"${CASM_LF}DRAINAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiddc2.seq"
+    "GRAND:${CASM_LF}    .BYTE @"
+)
+
+# ---------------------------------------------------------------------------
+# WP47 end-to-end `.INCLUDE` fixtures.
+#
+# Unlike every earlier Phase 9 fixture set, these are assembled by the real
+# `casm` binary through the real casmRunPass dispatch -- WP47 is the work
+# package that makes `.INCLUDE` actually assemble. Each case ships as a
+# PAIR: an `.INCLUDE` version and a hand-flattened equivalent whose text is
+# the literal textual expansion of that include. Assembling both and
+# comparing the two output PRGs is the governing correctness property
+# (Phase 9 verification matrix: "static and relocatable trusted-reference
+# equivalence to flattened source"). The comparison is deliberately
+# CASM-vs-CASM rather than against a hand-derived .ref: an opcode-table or
+# expression defect would move both outputs identically, so any difference
+# between them isolates an include-traversal defect specifically.
+#
+# Operands are spelled UPPERCASE with the ".S" suffix to pair with the
+# lowercase cc1541 -f disk names these are written under (see CMakeLists.txt)
+# -- cc1541 maps lowercase host bytes to unshifted PETSCII, which is exactly
+# what uppercase ASCII in this source text becomes. Getting that pairing
+# backwards makes DOS_OPEN_FILE silently miss the file.
+#
+# casmip1/casmic1/casmif1: single-level include with labels and a branch
+# crossing the boundary in BOTH directions -- the parent's JMP targets a
+# label defined inside the child (a reference backward across the include
+# site), and the child's BNE targets a label defined in the parent AFTER
+# the include site (a forward reference out of the child). Both directions
+# must resolve identically to the flattened form, which is what proves the
+# symbol table sees one continuous scope across a frame boundary.
+file(WRITE "${OUTPUT_DIR}/casmip1.seq"
+    ".ORG \$C000${CASM_LF}"
+    "START:${CASM_LF}"
+    "LDX #\$00${CASM_LF}"
+    ".INCLUDE \"CASMIC1.S\"${CASM_LF}"
+    "LDA #\$02${CASM_LF}"
+    "JMP CHILDLBL${CASM_LF}"
+    "BACKREF:${CASM_LF}"
+    "NOP${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmic1.seq"
+    "CHILDLBL:${CASM_LF}"
+    "LDA #\$01${CASM_LF}"
+    "BNE BACKREF${CASM_LF}"
+    "NOP${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmif1.seq"
+    ".ORG \$C000${CASM_LF}"
+    "START:${CASM_LF}"
+    "LDX #\$00${CASM_LF}"
+    "CHILDLBL:${CASM_LF}"
+    "LDA #\$01${CASM_LF}"
+    "BNE BACKREF${CASM_LF}"
+    "NOP${CASM_LF}"
+    "LDA #\$02${CASM_LF}"
+    "JMP CHILDLBL${CASM_LF}"
+    "BACKREF:${CASM_LF}"
+    "NOP${CASM_LF}"
+)
+
+# casmip2/casmic2/casmic3/casmif2: three-level nesting (parent -> child ->
+# grandchild), with real statements before and after each include site so a
+# mis-resumed parent shows up as wrong emitted bytes, not merely a wrong
+# line number.
+file(WRITE "${OUTPUT_DIR}/casmip2.seq"
+    ".ORG \$C000${CASM_LF}"
+    "LDX #\$01${CASM_LF}"
+    ".INCLUDE \"CASMIC2.S\"${CASM_LF}"
+    "LDY #\$04${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmic2.seq"
+    "LDA #\$02${CASM_LF}"
+    ".INCLUDE \"CASMIC3.S\"${CASM_LF}"
+    "NOP${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmic3.seq"
+    "INX${CASM_LF}"
+    "INY${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmif2.seq"
+    ".ORG \$C000${CASM_LF}"
+    "LDX #\$01${CASM_LF}"
+    "LDA #\$02${CASM_LF}"
+    "INX${CASM_LF}"
+    "INY${CASM_LF}"
+    "NOP${CASM_LF}"
+    "LDY #\$04${CASM_LF}"
+)
+
+# casmip3/casmif3: sequential reinclusion of one physical file from two
+# different sites in the same parent. Phase 0C.19 requires the bytes to be
+# stored once but EXPANDED both times, so the flattened equivalent contains
+# the child's statements twice. This is also the case that proves two
+# separate events referencing the same child index replay in the correct
+# order. Reuses casmic3.seq rather than adding another fixture.
+file(WRITE "${OUTPUT_DIR}/casmip3.seq"
+    ".ORG \$C000${CASM_LF}"
+    ".INCLUDE \"CASMIC3.S\"${CASM_LF}"
+    "NOP${CASM_LF}"
+    ".INCLUDE \"CASMIC3.S\"${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmif3.seq"
+    ".ORG \$C000${CASM_LF}"
+    "INX${CASM_LF}"
+    "INY${CASM_LF}"
+    "NOP${CASM_LF}"
+    "INX${CASM_LF}"
+    "INY${CASM_LF}"
+)
+
+# casmip4/casmic4/casmif4: the same equivalence property for a RELOCATABLE
+# assembly (no .ORG, so the default $3400 origin and the R6 footer apply).
+# The child's `JMP TARGET4` is an absolute reference to a label defined in
+# the parent after the include site, so this pair also proves the
+# relocation TABLE matches between included and flattened forms -- not just
+# the code bytes. A pair with only implied/immediate instructions would
+# emit an empty relocation table and prove nothing about relocation.
+file(WRITE "${OUTPUT_DIR}/casmip4.seq"
+    "LDX #\$01${CASM_LF}"
+    ".INCLUDE \"CASMIC4.S\"${CASM_LF}"
+    "TARGET4:${CASM_LF}"
+    "NOP${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmic4.seq"
+    "JMP TARGET4${CASM_LF}"
+    "INX${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmif4.seq"
+    "LDX #\$01${CASM_LF}"
+    "JMP TARGET4${CASM_LF}"
+    "INX${CASM_LF}"
+    "TARGET4:${CASM_LF}"
+    "NOP${CASM_LF}"
+)

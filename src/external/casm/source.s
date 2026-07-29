@@ -49,6 +49,11 @@
 .import CasmSourceLineLo
 .import CasmSourceLineHi
 .import CasmSourceColumn
+; WP48: the `.INCLUDE` statement's own start column, captured into
+; CasmFrameSiteColumn at push time -- see sourceFramePush.
+.import CasmStmtLocColumn
+.import CasmStmtLocLineLo
+.import CasmStmtLocLineHi
 .import CasmSourcePendingCr
 .import CasmSourceResultByte
 .import CasmSourceLineLength
@@ -77,6 +82,7 @@
 .import CasmDiagLineClipped
 .import CasmDiagLineNoLo
 .import CasmDiagLineNoHi
+.import CasmDiagLocFileId
 .import CasmDiagPrevLen
 .import CasmDiagPrevClipped
 .import CasmDiagPrevNoLo
@@ -113,6 +119,18 @@
 .export sourceAppendFile
 .export sourceFramePush
 .export CasmFrameDepth
+; WP47: the active chain's own physical identity, read by casmRunPass's
+; `.INCLUDE` dispatch to name the *parent* of an include event when that
+; parent is itself an included file (depth > 0) rather than a top-level root.
+.export CasmFrameCatalogIndex
+; WP48: the include-site column at each depth's push, read by diagnostics.s
+; to render each traceback line's own site location.
+.export CasmFrameResumeLineLo
+.export CasmFrameResumeLineHi
+.export CasmFrameSiteLineLo
+.export CasmFrameSiteLineHi
+.export CasmFrameSiteColumn
+.export CasmFrameRootFileId
 .export sourceOpen
 .export sourceNextByte
 .export sourceNextLine
@@ -199,6 +217,10 @@ CasmSourceStreamCursorLo: .res 1
 CasmSourceStreamCursorHi: .res 1
 CasmSourceAppendStartLo:  .res 1
 CasmSourceAppendStartHi:  .res 1
+; WP48 amendment: packed identity of the diagnostic line being drained. A
+; child EOF may pop to its parent inside sourceFetchPhysical; the first parent
+; byte is consumed but must never be appended to the child's displayed line.
+CasmSourceDrainFileId:    .res 1
 
 ; ---------------------------------------------------------------------------
 ; WP46 nested-include frame stack (Phase 0C.19: 16 levels beyond a
@@ -218,6 +240,9 @@ CasmSourceAppendStartHi:  .res 1
 ; ---------------------------------------------------------------------------
 CasmFrameDepth:           .res 1
 CasmFrameCatalogIndex:    .res CASM_INCLUDE_MAX_DEPTH
+; Root CLI identity retained with every frame so a diagnostic raised after
+; multi-pop/root-transition lookahead can still name its originating root.
+CasmFrameRootFileId:      .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameEndOffsetLo:     .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameEndOffsetHi:     .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumeOffsetLo:  .res CASM_INCLUDE_MAX_DEPTH
@@ -226,6 +251,13 @@ CasmFrameResumeLineLo:    .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumeLineHi:    .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumeColumn:    .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumePendingCr: .res CASM_INCLUDE_MAX_DEPTH
+
+; WP48: the `.INCLUDE` statement's own start location at this depth's push.
+; These are deliberately separate from CasmFrameResumeLine/Column, which are
+; the parent's position after the whole statement and its consumed newline.
+CasmFrameSiteLineLo:      .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameSiteLineHi:      .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameSiteColumn:      .res CASM_INCLUDE_MAX_DEPTH
 
 .segment "CODE"
 
@@ -1116,6 +1148,8 @@ snlBadState:
 ; Clobbers:  A, X, Y, source scratch, refill/OS volatile state
 ; ---------------------------------------------------------------------------
 sourceDrainLineTail:
+    lda CasmDiagLocFileId
+    sta CasmSourceDrainFileId
     lda CasmSourceState
     cmp #CASM_SOURCE_STATE_EOF
     beq sdtDone                 ; nothing further to read
@@ -1125,6 +1159,14 @@ sdtLoop:
     bcs sdtDone                 ; buffer full: diagLineAppend already latched it
     jsr sourceFetchPhysical
     bcs sdtDone                 ; read failure: keep what was already captured
+    ; sourceFetchPhysical resolves frame EOF by popping and returning the next
+    ; parent byte. Stop before appending when that delivered byte's packed
+    ; provenance differs from the diagnostic line's identity.
+    pha
+    lda CasmSourceResultFileId
+    cmp CasmSourceDrainFileId
+    bne sdtDifferentFile
+    pla
     cmp #CASM_SOURCE_EOF
     beq sdtDone
     ; Raw byte: a newline in either encoding ends the line. No normalization is
@@ -1136,6 +1178,8 @@ sdtLoop:
     beq sdtDone
     jsr diagLineAppend
     jmp sdtLoop
+sdtDifferentFile:
+    pla
 sdtDone:
     rts
 
@@ -1253,6 +1297,33 @@ sglBadState:
     rts
 
 ; ---------------------------------------------------------------------------
+; sourceComputePackedFileId (private, WP48)
+; Compute the packed provenance byte a fetched byte should carry: bit 7 set
+; and bits 0-6 the active frame's own catalog index when a nested `.INCLUDE`
+; frame is active, or bit 7 clear and bits 0-6 the plain top-level index
+; otherwise. See common.inc's CASM_DIAG_FILEID_FRAME_FLAG/ID_MASK header for
+; the full rationale: this replaces the pre-WP48 behavior of always
+; reporting the outermost top-level file's index, even for a byte fetched
+; from deep inside a nested include.
+;
+; Inputs:    none
+; Outputs:   A = packed FILE_ID byte
+; Preserves: none
+; Clobbers:  A, X, processor flags
+; ---------------------------------------------------------------------------
+sourceComputePackedFileId:
+    lda CasmFrameDepth
+    beq scpfRoot
+    tax
+    dex
+    lda CasmFrameCatalogIndex, x
+    ora #CASM_DIAG_FILEID_FRAME_FLAG
+    rts
+scpfRoot:
+    lda CasmSourceFileId
+    rts
+
+; ---------------------------------------------------------------------------
 ; sourceFetchPhysical (private)
 ; Fetch one physical byte from the current block, refilling when the block is
 ; exhausted. Every fetched byte advances the checked block index and physical
@@ -1302,7 +1373,11 @@ sfpHaveByte:
     ; and this byte's own column/line-advance side effects (in
     ; sourceNextByte, above this layer) have not run yet. See the field
     ; declarations' own header comment.
-    lda CasmSourceFileId
+    ; WP48: FileId is now the packed (kind, id) byte -- see
+    ; sourceComputePackedFileId's own header -- so a byte fetched from
+    ; inside a nested `.INCLUDE` frame carries that frame's own catalog
+    ; identity, not the outermost top-level file's index.
+    jsr sourceComputePackedFileId
     sta CasmSourceResultFileId
     lda CasmSourceLineLo
     sta CasmSourceResultLineLo
@@ -1346,8 +1421,12 @@ sfpEof:
     ; here too, matching the pre-fix behavior of snapshotting immediately
     ; before this call -- real combined EOF (depth 0, content exhausted)
     ; never mutates Line/Column/FileId itself, so "current" and "just
-    ; before this call" are the same value on this path.
-    lda CasmSourceFileId
+    ; before this call" are the same value on this path. Real combined EOF
+    ; is depth-0-only (srEofOrPop pops and retries at depth > 0, never
+    ; returning EOF while a frame is active), so this could use the raw
+    ; root form directly -- sourceComputePackedFileId is called anyway for
+    ; a single shared implementation rather than a second, narrower one.
+    jsr sourceComputePackedFileId
     sta CasmSourceResultFileId
     lda CasmSourceLineLo
     sta CasmSourceResultLineLo
@@ -1728,6 +1807,19 @@ sfpNoCycle:
     sta CasmFrameResumeColumn, x
     lda CasmSourcePendingCr
     sta CasmFrameResumePendingCr, x
+
+    ; WP48: capture the `.INCLUDE` statement's own start location. Runtime
+    ; verification proved the parser has consumed the trailing newline before
+    ; this push, so the resume line is already the following line and cannot
+    ; double as the include-site line.
+    lda CasmStmtLocLineLo
+    sta CasmFrameSiteLineLo, x
+    lda CasmStmtLocLineHi
+    sta CasmFrameSiteLineHi, x
+    lda CasmStmtLocColumn
+    sta CasmFrameSiteColumn, x
+    lda CasmSourceFileId
+    sta CasmFrameRootFileId, x
 
     ; Switch the live cursor to the child's start. The installed block is
     ; invalidated (index = length = 0) rather than kept: unlike

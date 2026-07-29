@@ -221,7 +221,17 @@ if(Ca65_FOUND)
     # push/pop/cycle-detection arrays plus the rewired sourceRefill)
     # measured a 221-byte overflow at $3E00; the user approved growing to
     # exactly what's needed, leaving 292 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4000")
+    # WP47: $4000 -> $4200 -- the include-event log (storage, record, replay,
+    # reset, and final-check routines), the first real `.INCLUDE` dispatch in
+    # casmRunPass, and two new diagnostics overflowed $4000 by 104 measured
+    # bytes; $4100 still overflowed by 78, putting the true minimum at 16,718
+    # bytes. $4200 (+512) leaves 178 bytes headroom, the smallest round-page
+    # step above that minimum, matching this line's own precedent.
+    # WP48: included-source filename/traceback rendering plus the frame-site
+    # column array overflowed $4200 by 60 measured bytes. One page is the
+    # smallest aligned increase; the final site-line/traceback corrections
+    # leave 85 bytes headroom.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4300")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -328,6 +338,7 @@ if(Ca65_FOUND)
         endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
@@ -347,7 +358,12 @@ if(Ca65_FOUND)
             # 161 measured bytes. Match production CASM's approved $3A00.
             # WP46: the new source.s frame stack overflowed $3A00 by 176
             # measured bytes; match production CASM's approved $4000.
-            set(TEST_PRG_SIZE "4000")
+            # WP48: linking include.s for diagnostic catalog lookup plus the
+            # new renderer overflowed $4000 by 158 bytes. The approved $4100
+            # envelope initially fit; runtime correction added dedicated
+            # include-site line arrays and overflowed $4100 by 14 bytes. The
+            # approved $4200 envelope leaves 242 bytes headroom.
+            set(TEST_PRG_SIZE "4200")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -358,6 +374,7 @@ if(Ca65_FOUND)
             # ld65 links whole object files, so every symbol emit.s
             # references must still resolve.
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
@@ -400,7 +417,29 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1B00")
+            # WP47: $1B00 -> $1C00. This harness links include.s whole, so it
+            # carries WP47's event-log code and staging BSS even though it
+            # never calls them; $1B00 overflowed by 128 measured bytes.
+            set(TEST_PRG_SIZE "1C00")
+        endif()
+        if(TEST_NAME STREQUAL "casm_event")
+            # WP47: include.s (the event log) plus every module it
+            # transitively needs. Same stand-in-globals precedent as
+            # casm_catalog above -- no cli.s. Deliberately no lexer/parser/
+            # emit/diagnostics surface: the event log is pure metadata and
+            # this harness never parses or assembles anything.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            # WP47: $1C00 after casm_catalog's own $1B00 overflowed by 164
+            # bytes. WP48's dedicated include-site line arrays then overflowed
+            # $1C00 by 31 measured bytes; approved $1D00 leaves 225 bytes.
+            set(TEST_PRG_SIZE "1D00")
         endif()
         if(TEST_NAME STREQUAL "casm_frame")
             # WP46: include.s (for includeCatalogLoad) plus the same
@@ -425,7 +464,9 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "4000")
+            # WP48 diagnostic rendering overflowed $4000 by 93 measured bytes;
+            # the approved one-page increase leaves 163 bytes headroom.
+            set(TEST_PRG_SIZE "4100")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
@@ -501,6 +542,8 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_include)
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_catalog)
 # WP46's frame harness joins it there for the same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_frame)
+# WP47's event-log harness joins it there for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_event)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -724,10 +767,52 @@ add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp test_l15release test_casm_include test_casm_catalog test_casm_frame
+    PRGS casm comp test_l15release test_casm_include test_casm_catalog test_casm_frame test_casm_event
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
+
+# 6c. CASM include end-to-end disk (Phase 9 WP47). Its own image because
+# WP47's verification WRITES to the disk it reads from: each casmipN
+# (.INCLUDE form) and casmifN (hand-flattened equivalent) is assembled by
+# the real casm binary and the two output PRGs are compared with COMP --
+# the governing "included assembly equals flattened assembly" property.
+# casm_overflow_test.d64 had ~10 free blocks left (WP34's combined-cap pair
+# alone occupies 277), leaving no room for outputs, let alone a re-run.
+#
+# Carries casm.prg and comp.prg so the whole check runs from this one disk,
+# and nothing else -- roughly 590 blocks stay free for output PRGs.
+add_c64_disk_image(casm_include_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS casm comp
+)
+add_dependencies(casm_include_test_d64 casm_test_fixtures)
+
+# Real CASM assembly source, so these carry the ".s" on-disk suffix the CASM
+# source-fixture convention requires (unlike WP46's frame-harness fixtures,
+# which are consumed only by a test harness and use bare names). Lowercase
+# -f pairs with the UPPERCASE `.INCLUDE "CASMIC1.S"` operands in the source
+# text: cc1541 maps lowercase host bytes to unshifted PETSCII, which is
+# exactly what uppercase ASCII in that source text becomes. Reversing that
+# pairing makes DOS_OPEN_FILE silently miss the child.
+foreach(WP47_FIXTURE casmip1 casmic1 casmif1
+                     casmip2 casmic2 casmic3 casmif2
+                     casmip3 casmif3
+                     casmip4 casmic4 casmif4
+                     casmidp1 casmidc1 casmidc2
+                     casmidup1 casmiduc1 casmiduc2
+                     casmiddp1 casmiddc1 casmiddc2)
+    add_custom_command(
+        TARGET casm_include_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${WP47_FIXTURE}.s" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${WP47_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+        COMMENT "Appending Phase 9 include fixture ${WP47_FIXTURE}.s to casm_include_test.d64"
+        VERBATIM
+    )
+endforeach()
 add_custom_command(
     TARGET casm_overflow_test_d64 POST_BUILD
     COMMAND "${CC1541_EXECUTABLE}" -f "casmmfovf1.s" -T SEQ
@@ -815,6 +900,16 @@ add_custom_command(
     COMMENT "Appending WP46 test_casm_frame fixtures to casm_overflow_test.d64"
     VERBATIM
 )
+
+# WP47 end-to-end .INCLUDE fixtures live on their own disk image
+# (casm_include_test_d64, defined below) rather than joining
+# casm_overflow_test.d64: that disk is down to ~10 free blocks, almost
+# entirely consumed by WP34's 277-block combined-cap overflow pair, and this
+# work package's walkthrough assembles eight sources that each WRITE an
+# output PRG back to disk. A verification disk with no room to write the
+# thing being verified -- or to re-run after a fix -- is a trap, and the
+# established precedent for that squeeze is a new image, which is how
+# casm_overflow_test.d64 itself came to exist.
 
 # Append the WP14 trusted reference PRGs to test.d64 (PRG type, lowercase -f so
 # they store as unshifted PETSCII matching what the user types on the default
