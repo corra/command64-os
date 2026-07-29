@@ -1975,7 +1975,9 @@ runs, not one clean pass.
 - The user explicitly approved WP49 and Phase 9 completion on 2026-07-29.
   Phase 9 closes at CASM `0.1.50` build 1204; the approved verification-only
   WP49 package changed no production behavior and required no version increment.
-  Optional Phase 10 remains inactive and separately gated.
+  Master-plan Phase 10 remains inactive and separately gated. Progress and
+  processing indication is a deferred optional feature outside the numbered
+  phases.
 
 ## C64 Platform Constraints Discovered
 

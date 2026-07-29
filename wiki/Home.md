@@ -57,7 +57,7 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
   - [DATE Command Implementation](tasks/date.md)
 - **Utilities**
   - [External FORMAT Utility](tasks/format.md)
-  - [CASM Progress and Processing Indication](tasks/casm-progress-indication.md) - Optional deferred CASM Phase 10 feature with mandatory design and implementation reviews.
+  - [CASM Progress and Processing Indication](tasks/casm-progress-indication.md) - Optional deferred feature outside the CASM master-plan phases, with mandatory design and implementation reviews.
 - **Shell Semantics**
   - [External Application Return Codes](tasks/external-app-return-codes.md)
   - [Shell HELP Advertises Commands That Cannot Dispatch](tasks/shell-command-alias-discrepancy.md) - Bug: `RENAME`, `ERASE`, and `APPS` are advertised but absent from `tableCmd`.

@@ -1285,7 +1285,7 @@
     - [x] Produce and complete the user runtime walkthrough
     - [x] Obtain explicit approval before marking WP49 and Phase 9 complete
     - User explicitly approved completion on 2026-07-29. CASM remains
-      `0.1.50` build 1204; Phase 10 remains inactive.
+      `0.1.50` build 1204; master-plan Phase 10 remains inactive.
 
 - [/] Taskwarrior #24 (`a45d0395`): Implement external `COMP` utility
   - [x] Create active Taskwarrior task
@@ -1534,9 +1534,11 @@
 # Deferred Optional Work
 
 - [ ] Taskwarrior #36 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
-      Phase 10 progress and processing indication
-  - Plan: `brain/plans/2026-07-29-casm-optional-phase10-progress-indication.md`
+      progress and processing indication feature
+  - Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
   - Task: `wiki/tasks/casm-progress-indication.md`
+  - This feature is outside the master plan's numbered phases and does not
+    replace Phase 10, Symbol Map and Listing.
   - [ ] Complete design/ABI review after CASM Phase 9 closes.
   - [ ] Implement bounded load, include, pass, and output progress.
   - [ ] Meet the 5% representative and 10% stress slowdown limits.

@@ -1450,17 +1450,19 @@ Parent plan:
       9 completion.
 
 **All eight acceptance items are checked. WP43-WP49 are complete and approved;
-CASM Phase 9 is complete at CASM `0.1.50` build 1204. Phase 10 remains inactive
-and separately gated.**
+CASM Phase 9 is complete at CASM `0.1.50` build 1204. Master-plan Phase 10,
+Symbol Map and Listing, remains inactive and separately gated.**
 
-## Optional Phase 10 - Progress and Processing Indication
+## Optional Feature - Progress and Processing Indication
 
 - [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,
       always-on progress for source loading, include traversal, both passes, and
-      output writing. This phase is deferred and must not activate before Phase
+      output writing. This feature is deferred and must not activate before Phase
       9 completion plus a separate design/ABI review approval.
 - Plan:
-  `brain/plans/2026-07-29-casm-optional-phase10-progress-indication.md`.
+  `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
 - Task: `wiki/tasks/casm-progress-indication.md`.
+- This optional feature is outside the master plan's numbered phases and does
+  not replace Phase 10, Symbol Map and Listing.
 - A full implementation review is mandatory after automated verification and
   before runtime acceptance or merge.

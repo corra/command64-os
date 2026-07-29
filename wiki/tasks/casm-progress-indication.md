@@ -2,9 +2,9 @@
 
 Status: [ ]
 Type: Optional Future Feature
-Phase: CASM Phase 10 (deferred)
+Classification: Optional Feature (deferred)
 Taskwarrior: 36 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`)
-Plan: `brain/plans/2026-07-29-casm-optional-phase10-progress-indication.md`
+Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
 
 ## Goal
 
@@ -12,8 +12,10 @@ Add an always-on, bounded progress display for CASM source loading, include
 processing, Pass 1, Pass 2, and output writing without changing assembly output
 or deterministic replay.
 
-This optional phase may be deferred. The plan is approved for future use, but
+This optional feature may be deferred. The plan is approved for future use, but
 implementation is not active or authorized until its design/ABI review passes.
+It is not a numbered phase in the CASM master plan and does not replace or
+renumber Phase 10, Symbol Map and Listing.
 
 ## Approved Behavior
 
@@ -38,8 +40,9 @@ implementation is not active or authorized until its design/ABI review passes.
 ## Review Gates
 
 - [x] Confirm CASM Phase 9 is complete before activation. Phase 9 completed
-      with explicit user approval on 2026-07-29; this does not activate Phase
-      10 or satisfy its separate design/ABI review gate.
+      with explicit user approval on 2026-07-29; this does not activate this
+      feature or master-plan Phase 10, or satisfy the feature's separate
+      design/ABI review gate.
 - [ ] Complete and approve the pre-implementation design/ABI review.
 - [ ] Freeze exact screen layout, storage, diagnostics, and register/flag ABI.
 - [ ] Implement only in separately approved atomic increments.

@@ -652,4 +652,8 @@ diagnostics.
 - 2026-07-16: Initial proposal reviewed and reorganized to correct phase
   dependencies, preserve native-only execution, identify high-risk feature
   expansions, and define future native release phases.
-- Implementation has not started and requires explicit phase approval.
+- 2026-07-29: Phases 1-9 are complete through CASM `0.1.50` build 1204.
+  Progress and processing indication is tracked as a separately gated optional
+  feature outside this plan's numbered phases; it does not replace or renumber
+  Phase 10, Symbol Map and Listing.
+- Phase 10 has not started and requires explicit phase approval.

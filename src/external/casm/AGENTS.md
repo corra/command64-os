@@ -78,7 +78,8 @@ The `src/external/casm` directory owns CASM, a native Command 64
   own dispatch. WP48 added included-source diagnostic filenames and bounded
   include-site tracebacks at `0.1.50`; WP49's consolidated verification and
   user-approved completion gate passed at build 1204. Phase 9 is complete.
-  Optional Phase 10 remains separately planned and inactive.
+  Master-plan Phase 10 remains separately planned and inactive. Progress
+  indication is a deferred optional feature outside the numbered phases.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
@@ -113,8 +114,8 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
   by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
   point in the emission engine's byte writer -- not a structured event
-  stream. A future listing/map consumer (Phase 10) designs its own event
-  shape against its real needs at that time rather than reusing a
+  stream. The future listing/map consumer in master-plan Phase 10 designs its
+  own event shape against its real needs at that time rather than reusing a
   speculative one built now. See
   `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
   (Phase 0C.5 freeze) for the decision record.

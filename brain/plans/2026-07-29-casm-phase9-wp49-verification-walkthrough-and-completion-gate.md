@@ -43,7 +43,8 @@ Excluded:
 - New directives, syntax, diagnostics, include behavior, refactoring, or
   optimization.
 - Unapproved memory-envelope or Phase 9 contract changes.
-- Phase 10 progress indication or automatic activation of later work.
+- Progress indication or automatic activation of master-plan Phase 10 or later
+  work.
 
 ## Frozen Acceptance Contract
 
@@ -207,7 +208,8 @@ group.
    and present the bounded runtime walkthrough.
 6. After the user performs the walkthrough and explicitly approves completion,
    synchronize Taskwarrior, task/acceptance records, knowledge, memory,
-   changelog, walkthrough, and applicable DOX files. Do not activate Phase 10.
+   changelog, walkthrough, and applicable DOX files. Do not activate the
+   progress feature or master-plan Phase 10.
 
 ## Expected Files
 
@@ -304,4 +306,5 @@ walkthrough, and applicable DOX record agrees. Completion never activates Phase
   mark WP49 and Phase 9 complete.
 - 2026-07-29: User explicitly approved completion. WP49 and CASM Phase 9 are
   complete at CASM `0.1.50` build 1204. The approved verification-only package
-  required no version increment and Phase 10 remains inactive.
+  required no version increment; the progress feature and master-plan Phase 10
+  remain inactive.

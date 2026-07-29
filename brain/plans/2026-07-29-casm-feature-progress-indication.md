@@ -1,17 +1,18 @@
 ---
-feature: casm-optional-phase10-progress-indication
+feature: casm-progress-indication
 created: 2026-07-29
 status: deferred-approved-plan
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 ---
 
-# Plan: CASM Optional Phase 10 - Progress and Processing Indication
+# CASM Feature Plan: Progress and Processing Indication
 
 ## Status and Authorization
 
-This is an approved plan for a future, optional CASM Phase 10. The feature may
-be deferred indefinitely. This approval authorizes preserving the plan and task
-records only; it does not activate the phase or authorize implementation.
+This is an approved plan for a future optional CASM feature outside the numbered
+phases in the CASM master plan. The feature may be deferred indefinitely. This
+approval authorizes preserving the plan and task records only; it does not
+activate the feature or authorize implementation.
 
 Before implementation begins, the current code and memory layout must undergo a
 design/ABI review. After implementation and automated verification, the complete
@@ -35,7 +36,7 @@ no keyboard polling and introduces no cancellation state or cleanup path.
 
 ## Prerequisites
 
-- CASM Phase 9 must be complete and user-approved before this optional phase is
+- CASM Phase 9 must be complete and user-approved before this optional feature is
   activated.
 - The implementation branch must start from the then-current `main`, not from
   this plan's 2026-07-29 planning baseline.
@@ -257,7 +258,7 @@ Acceptance thresholds, measured in the same VICE configuration:
    includes, both passes, output, success summary, and representative failures.
 10. **Completion gate:** only after user confirmation, update version/build,
     changelog, task records, knowledge/memory, DOX, and walkthrough; ask whether
-    the optional phase is complete before marking it done.
+     the optional feature is complete before marking it done.
 
 ## Verification Matrix
 
@@ -342,7 +343,7 @@ Stop and request guidance if:
 
 ## Completion Gate
 
-The phase is not complete until both reviews pass, automated evidence is clean,
+The feature is not complete until both reviews pass, automated evidence is clean,
 the user completes the runtime walkthrough, and the user explicitly approves
 marking the task done. Until activation, this plan and its task remain deferred
 and pending.
