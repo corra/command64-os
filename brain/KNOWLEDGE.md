@@ -1938,6 +1938,45 @@ runs, not one clean pass.
 - **Generalization**: This standard is generalized to all `ca65` external applications and test suites in the repository, ensuring uniform version representation.
 
 
+### CASM Phase 9 WP48 Included-Source Diagnostics
+
+- Source provenance uses one packed byte without growing the frozen 39-byte
+  token record: bit 7 clear identifies a top-level root, bit 7 set identifies
+  an include physical-catalog entry, and bits 0-6 hold the bounded id.
+- `sourceFetchPhysical` computes provenance after frame EOF/pop resolution, so
+  each delivered byte carries the identity of the file it actually belongs to.
+- Included-file names are rendered from the immutable VMM catalog through
+  `includeCatalogRead`; rendering performs no filesystem I/O and degrades to
+  `<INCLUDE?>` without masking the primary diagnostic if metadata reading fails.
+- Tracebacks walk bounded frame arrays from innermost parent to root. The
+  include-site location uses dedicated `CasmFrameSiteLineLo/Hi` and
+  `CasmFrameSiteColumn` arrays. Resume line/column are post-statement traversal
+  state and must never be displayed as the include site.
+- Fatal source-line draining can reach child EOF and pop a live frame. WP48
+  snapshots `CasmFrameDepth` at diagnostic entry for traceback and latches the
+  diagnostic's packed file identity in `sourceDrainLineTail`; a byte delivered
+  after frame pop is consumed but not appended to the child source echo.
+- Unterminated-token lookahead can pop frames before fatal rendering. The packed
+  catalog id recovers traceback depth from retained frame slots, and
+  `CasmFrameRootFileId` retains the originating CLI root across multi-pop/root
+  transitions.
+- Measured MAIN envelopes after runtime correction: production `$4300` (85
+  bytes headroom), `test_casm_pass1` `$4200` (242 bytes), `test_casm_frame`
+  `$4100` (52 bytes), `test_casm_event` `$1D00` (225 bytes), and unchanged
+  `test_casm_passcheck` `$4000`.
+- WP49 consolidated verification confirmed the final Phase 9 implementation
+  without production changes: CASM remains `0.1.50` build 1204 with 14,478 code
+  bytes and 2,104 relocation points; all six Phase 9 harnesses, affected shared
+  regressions, four independently built disk images, trusted-reference cases,
+  bounded failures, cleanup/reuse cases, and runtime diagnostics pass. The final
+  production `$4300` headroom is 85 bytes; the earlier 196-byte CMake comment
+  was an intermediate WP48 measurement and was corrected under an approved
+  documentation-only WP49 amendment.
+- The user explicitly approved WP49 and Phase 9 completion on 2026-07-29.
+  Phase 9 closes at CASM `0.1.50` build 1204; the approved verification-only
+  WP49 package changed no production behavior and required no version increment.
+  Optional Phase 10 remains inactive and separately gated.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

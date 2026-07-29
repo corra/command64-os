@@ -227,7 +227,11 @@ if(Ca65_FOUND)
     # bytes; $4100 still overflowed by 78, putting the true minimum at 16,718
     # bytes. $4200 (+512) leaves 178 bytes headroom, the smallest round-page
     # step above that minimum, matching this line's own precedent.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4200")
+    # WP48: included-source filename/traceback rendering plus the frame-site
+    # column array overflowed $4200 by 60 measured bytes. One page is the
+    # smallest aligned increase; the final site-line/traceback corrections
+    # leave 85 bytes headroom.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4300")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -334,6 +338,7 @@ if(Ca65_FOUND)
         endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
@@ -353,7 +358,12 @@ if(Ca65_FOUND)
             # 161 measured bytes. Match production CASM's approved $3A00.
             # WP46: the new source.s frame stack overflowed $3A00 by 176
             # measured bytes; match production CASM's approved $4000.
-            set(TEST_PRG_SIZE "4000")
+            # WP48: linking include.s for diagnostic catalog lookup plus the
+            # new renderer overflowed $4000 by 158 bytes. The approved $4100
+            # envelope initially fit; runtime correction added dedicated
+            # include-site line arrays and overflowed $4100 by 14 bytes. The
+            # approved $4200 envelope leaves 242 bytes headroom.
+            set(TEST_PRG_SIZE "4200")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -364,6 +374,7 @@ if(Ca65_FOUND)
             # ld65 links whole object files, so every symbol emit.s
             # references must still resolve.
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
@@ -425,10 +436,10 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            # $1C00: casm_catalog's own $1B00 overflowed by 164 bytes here,
-            # since this harness links the same module set plus WP47's new
-            # event-log code and its own staging scratch.
-            set(TEST_PRG_SIZE "1C00")
+            # WP47: $1C00 after casm_catalog's own $1B00 overflowed by 164
+            # bytes. WP48's dedicated include-site line arrays then overflowed
+            # $1C00 by 31 measured bytes; approved $1D00 leaves 225 bytes.
+            set(TEST_PRG_SIZE "1D00")
         endif()
         if(TEST_NAME STREQUAL "casm_frame")
             # WP46: include.s (for includeCatalogLoad) plus the same
@@ -453,7 +464,9 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "4000")
+            # WP48 diagnostic rendering overflowed $4000 by 93 measured bytes;
+            # the approved one-page increase leaves 163 bytes headroom.
+            set(TEST_PRG_SIZE "4100")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}")
         list(APPEND TEST_TARGETS ${TEST_TARGET})
@@ -787,13 +800,16 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 foreach(WP47_FIXTURE casmip1 casmic1 casmif1
                      casmip2 casmic2 casmic3 casmif2
                      casmip3 casmif3
-                     casmip4 casmic4 casmif4)
+                     casmip4 casmic4 casmif4
+                     casmidp1 casmidc1 casmidc2
+                     casmidup1 casmiduc1 casmiduc2
+                     casmiddp1 casmiddc1 casmiddc2)
     add_custom_command(
         TARGET casm_include_test_d64 POST_BUILD
         COMMAND "${CC1541_EXECUTABLE}" -f "${WP47_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP47_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_include_test.d64"
-        COMMENT "Appending WP47 include fixture ${WP47_FIXTURE}.s to casm_include_test.d64"
+        COMMENT "Appending Phase 9 include fixture ${WP47_FIXTURE}.s to casm_include_test.d64"
         VERBATIM
     )
 endforeach()

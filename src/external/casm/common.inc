@@ -520,6 +520,37 @@ CASM_TOKEN_REC_COLUMN  = 6
 CASM_TOKEN_REC_TEXT    = 7
 CASM_TOKEN_REC_SIZE    = CASM_TOKEN_REC_TEXT + CASM_TOKEN_TEXT_BUFFER_SIZE
 
+; Phase 9 WP48: CASM_TOKEN_REC_FILE_ID (and every field it is copied into
+; verbatim -- CasmSourceResultFileId, CasmLookaheadFileId, CasmStmtLocFileId,
+; CasmDiagLocFileId) is bit-packed rather than a raw top-level index, so a
+; byte's true provenance survives being fetched from inside a nested
+; `.INCLUDE` frame. This is a semantic amendment to an already-stable-ABI
+; byte, not a size change -- CASM_TOKEN_REC_SIZE stays 39 (user-approved:
+; the alternative was growing the frozen token record for the first time
+; since WP44 froze it there).
+;
+; Bit 7 clear: bits 0-6 are CasmSourceFileId (0..CASM_SOURCE_COUNT_MAX-1), a
+; top-level root's own index -- the field's original, sole meaning before
+; Phase 9.
+; Bit 7 set: bits 0-6 are a physical catalog index
+; (0..CASM_INCLUDE_PHYS_CAPACITY-1), identifying which included file the
+; byte actually came from. Mirrors CASM_INCLUDE_EVENT_PARENT_KIND_ROOT/FRAME
+; (WP47)'s own root-vs-frame split, applied here to per-byte provenance
+; instead of an include event.
+;
+; Both namespaces fit in 7 bits with room to spare (CASM_SOURCE_COUNT_MAX is
+; 8, CASM_INCLUDE_PHYS_CAPACITY is 32), so one flag bit is sufficient and no
+; id ever collides with the flag bit itself.
+CASM_DIAG_FILEID_FRAME_FLAG = $80
+CASM_DIAG_FILEID_ID_MASK    = $7F
+
+.assert CASM_DIAG_FILEID_FRAME_FLAG = $80, error, "CASM FILE_ID frame flag bit changed"
+.assert CASM_DIAG_FILEID_ID_MASK = $7F, error, "CASM FILE_ID id mask changed"
+.assert (CASM_DIAG_FILEID_FRAME_FLAG & CASM_DIAG_FILEID_ID_MASK) = 0, error, "CASM FILE_ID flag and id mask must not overlap"
+.assert (CASM_DIAG_FILEID_FRAME_FLAG | CASM_DIAG_FILEID_ID_MASK) = $FF, error, "CASM FILE_ID flag and id mask must cover the whole byte"
+.assert CASM_SOURCE_COUNT_MAX <= CASM_DIAG_FILEID_ID_MASK + 1, error, "CASM top-level file count no longer fits the FILE_ID id bits"
+.assert CASM_INCLUDE_PHYS_CAPACITY <= CASM_DIAG_FILEID_ID_MASK + 1, error, "CASM include catalog capacity no longer fits the FILE_ID id bits"
+
 .assert CASM_SOURCE_LINE_PAYLOAD_MAX = 255, error, "CASM source line payload changed"
 .assert CASM_SOURCE_STATE_COUNT = CASM_SOURCE_STATE_ERROR + 1, error, "CASM source state range changed"
 .assert CASM_SOURCE_API_COUNT = CASM_SOURCE_API_LINE + 1, error, "CASM source API range changed"
