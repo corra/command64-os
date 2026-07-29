@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **EDLIN command-letter case sensitivity**: command dispatch (`edlin.s`)
+  now folds shifted PETSCII command bytes down to their unshifted form
+  before matching, so `L`/`l` and Shift+`L` (and likewise `P`/`D`/`I`/`W`/`Q`)
+  all dispatch identically instead of the shifted form failing with `?`.
+  Closes the case-sensitivity bug logged in
+  `brain/plans/2026-07-09-edlin-port-feasibility.md`.
+
 ### Added
 
 - **`BANNER` external command** (BANNER build `1005`): renders a text message in
@@ -96,6 +105,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 10 Symbol Map and Listing plan approved**: froze deterministic
+  definition-order `/M` output, native 40-column PETSCII `/L` files, `.LST`
+  derivation, physical-source/include provenance, VMM bounds, cleanup behavior,
+  six separately gated work packages, and the final `0.2.0` promotion contract.
+  This planning change activates no work package and changes no CASM artifact.
+- **CASM Phase 10 WP50 contract approved**: reconciled exact physical-line
+  capture with the live source/include architecture, freezing a source-owned
+  completed-line sidecar, 16-byte metadata records, explicit 65,536-byte mirror
+  endpoint, diagnostics `$39-$41`, and WP51-WP55 fixture ownership. WP50 is
+  active for planning and baseline verification only; runtime behavior is
+  unchanged.
 - **CASM Phase 9 include processing complete** (CASM `0.1.50` build 1204):
   WP49 consolidated the quoted-operand, catalog, nested traversal, ordered
   Pass 2 replay, flattened-output equivalence, diagnostics, bounded-failure,

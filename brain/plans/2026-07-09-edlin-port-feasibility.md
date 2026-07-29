@@ -120,3 +120,10 @@ vi (if ever attempted) reuses the line-input/paging plumbing this produces.
   TODO: *Search and Replace*, Limited search and replace on the road-map
   BUGS: *Case sensitivity*, Commands are currently case sensitive which is a
         significant non-blocking UX flaw.
+
+- 2026-07-29: *Case sensitivity* hotfixed. `commandLoop` (`edlin.s`) now folds
+  shifted command-letter bytes (`$C1`-`$DA`) down to unshifted (`$41`-`$5A`)
+  before dispatch, reusing the same PETSCII shift-fold as `shell.asm`'s
+  `petsciiToLower` and the Phase 5 Search/Replace `tolower` spec above. Both
+  shifted and unshifted forms of `L`/`P`/`D`/`I`/`W`/`Q` now dispatch
+  identically.

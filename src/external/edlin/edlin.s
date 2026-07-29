@@ -178,34 +178,46 @@ clHaveCmdOrRange:
     ; past any range ourselves using the same skip rules (digits, '.',
     ; '#', comma, spaces) without touching Line1/Line2 state.
     jsr peekCommandByte
+    cmp #$C1
+    bcc clNoShiftFold
+    cmp #$DB
+    bcs clNoShiftFold
+    and #$7F               ; fold shifted A-Z ($C1-$DA) to unshifted ($41-$5A)
+clNoShiftFold:
     tax
-
-    cpx #'L'
+                            ; NOTE: this ca65 build's -t c64 charmap maps
+                            ; lowercase ASCII source literals to the
+                            ; *unshifted* PETSCII byte (and uppercase source
+                            ; literals to the shifted byte) -- see debug.s's
+                            ; identical and #$7F + lowercase-literal pattern
+                            ; at debug.s:508-519. Compare against lowercase
+                            ; literals here to match the fold above.
+    cpx #'l'
     bne clNotList
     jsr cmdList
     jmp commandLoop
 clNotList:
-    cpx #'P'
+    cpx #'p'
     bne clNotPage
     jsr cmdPage
     jmp commandLoop
 clNotPage:
-    cpx #'D'
+    cpx #'d'
     bne clNotDelete
     jsr cmdDelete
     jmp commandLoop
 clNotDelete:
-    cpx #'I'
+    cpx #'i'
     bne clNotInsert
     jsr cmdInsert
     jmp commandLoop
 clNotInsert:
-    cpx #'W'
+    cpx #'w'
     bne clNotWrite
     jsr cmdWrite
     jmp commandLoop
 clNotWrite:
-    cpx #'Q'
+    cpx #'q'
     bne clNotQuit
     jsr cmdQuit
     cmp #1
