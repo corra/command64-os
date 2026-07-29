@@ -31,6 +31,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   leading spaces before it is measured, so wrapped lines stay left-aligned and a
   message ending in a run of spaces terminates cleanly instead of emitting an
   empty trailing block line.
+- **CASM `.INCLUDE` now assembles** (CASM `0.1.49` build 1196): a source file
+  can include another with `.INCLUDE "FILENAME"`, and the included text is
+  assembled exactly as if it had been pasted in at that point. Labels,
+  forward and backward references, and branches all resolve across the
+  boundary in both directions, so a shared file of routines or equates can
+  be pulled into several programs. Includes may nest up to 16 levels deep;
+  up to 32 distinct files and 128 include sites are supported per assembly.
+  Including the same file more than once expands it every time, but stores
+  its text only once. A child with no explicit device inherits the device of
+  the file that included it; an explicit `8:`-`11:` prefix overrides that.
+  Both assembly passes see identical text -- the second pass never re-reads
+  a file from disk -- so a source that changes on disk mid-assembly cannot
+  produce a half-updated program. Two new diagnostics, `INCLUDE EVENT LOG
+  FULL` and `INCLUDE REPLAY MISMATCH`, join the existing include depth,
+  cycle, and catalog messages. Previously `.INCLUDE` parsed correctly but
+  always stopped with `NOT IMPLEMENTED`.
 
 ### Fixed
 

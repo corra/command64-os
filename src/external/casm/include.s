@@ -62,12 +62,21 @@
 .export includeCatalogFind
 .export includeCatalogRead
 .export includeCatalogLoad
+.export includeCatalogLookup
+
+.export includeEventRecord
+.export includeEventReplay
+.export includeReplayReset
+.export includeReplayFinalCheck
 
 .export CasmIncludeMetaSlot
 .export CasmIncludeCatalogCount
 .export CasmIncludeResolvedDevice
 .export CasmIncludeRecordStage
 .export CasmIncludeOpenName
+.export CasmIncludeEventStage
+.export CasmIncludeEventCount
+.export CasmIncludeEventCursor
 
 .segment "BSS"
 
@@ -99,6 +108,28 @@ CasmIncludeOpenName: .res CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE
 CasmIncludeScanIndex: .res 1
 CasmIncludeFreeSlot:  .res 1
 
+; ---------------------------------------------------------------------------
+; WP47 include-event log state.
+;
+; CasmIncludeEventCount is Pass 1's append count and, once Pass 1 finishes,
+; the exact number of events Pass 2 must consume -- it is deliberately never
+; written again after Pass 1 completes, so no separate "final count" field is
+; needed. CasmIncludeEventCursor is Pass 2's read position only;
+; includeReplayReset returns it to 0 between passes (nothing in source.s's own
+; sourceRewind knows about this module, and it should not: source.s has never
+; depended on include.s and that layering is preserved).
+;
+; CasmIncludeEventStage is the caller-populated 16-byte record, used as the
+; write payload by includeEventRecord and as the *candidate* tuple by
+; includeEventReplay. It is deliberately separate from CasmIncludeRecordStage
+; (the 128-byte physical-record staging buffer): a Pass 2 replay holds a
+; resolved child's physical record in that buffer at the same moment it
+; compares this event tuple, so sharing one buffer would destroy one of them.
+; ---------------------------------------------------------------------------
+CasmIncludeEventCount:  .res 1
+CasmIncludeEventCursor: .res 1
+CasmIncludeEventStage:  .res CASM_INCLUDE_EVENT_SIZE
+
 .segment "CODE"
 
 ; ---------------------------------------------------------------------------
@@ -108,7 +139,8 @@ CasmIncludeFreeSlot:  .res 1
 ;
 ; Inputs:    none
 ; Outputs:   C clear, A = CASM_DIAG_NONE; CasmIncludeMetaSlot holds the
-;            granted registry slot, CasmIncludeCatalogCount = 0
+;            granted registry slot, CasmIncludeCatalogCount = 0, and (WP47)
+;            the include-event log is empty with its replay cursor rewound
 ;            C set, A = CASM_DIAG_VMM_ALLOC_FAILED or
 ;            CASM_DIAG_VMM_UNAVAILABLE (propagated from vmmStoreAlloc)
 ; Clobbers:  A, X, Y and vmmStoreAlloc's own volatile state
@@ -121,6 +153,10 @@ includeCatalogInit:
     stx CasmIncludeMetaSlot
     lda #0
     sta CasmIncludeCatalogCount
+    ; WP47: one init call still fully prepares every Phase 9 metadata
+    ; structure, so no caller has to know the event log exists separately.
+    sta CasmIncludeEventCount
+    sta CasmIncludeEventCursor
     lda #CASM_DIAG_NONE
     clc
     rts
@@ -486,6 +522,41 @@ isonNameDone:
     rts
 
 ; ---------------------------------------------------------------------------
+; includeCatalogLookup (WP47)
+; Resolve a child spelling's device, capture its case-folded identity, and
+; look it up in the catalog -- **without ever loading, opening, or appending
+; anything**. This is the load-free half of includeCatalogLoad, factored out
+; so Pass 2 has an entry point it can call that is structurally incapable of
+; touching the filesystem (Phase 0C.19: "Pass 2 opens no source files").
+; Calling includeCatalogLoad in Pass 2 instead would be a latent violation:
+; that routine loads on a catalog miss, and a miss is exactly the case a
+; corrupted replay could produce.
+;
+; includeCatalogLoad itself is now this routine plus its own on-miss load, so
+; the resolve/capture/find sequence exists in exactly one place and the two
+; entry points can never drift apart in device or identity handling.
+;
+; Inputs:    A = parent's resolved device; X/Y = pointer to the child's
+;            original spelling (null-terminated; not mutated)
+; Outputs:   C clear with X = the matching record index on a hit; the matched
+;            record is left in CasmIncludeRecordStage (includeCatalogFind's
+;            own existing behavior), and CasmIncludeResolvedDevice/
+;            CasmIncludeNamePtrLo/Hi/CasmIncludeKey* describe the resolved
+;            child
+;            C set, A = CASM_DIAG_NONE on a genuine miss (not a failure)
+;            C set, A = CASM_DIAG_INVALID_INCLUDE_FILENAME (empty post-prefix
+;            name) or CASM_DIAG_VMM_TRANSFER_FAILED on a real failure
+; Clobbers:  A, X, Y and every routine it calls
+; ---------------------------------------------------------------------------
+includeCatalogLookup:
+    jsr includeResolveDevice
+    jsr includeCaptureKey
+    bcs iclkFail
+    jmp includeCatalogFind       ; tail call: its outputs are exactly ours
+iclkFail:
+    rts                          ; A/C already set by includeCaptureKey
+
+; ---------------------------------------------------------------------------
 ; includeCatalogLoad
 ; Resolve, canonicalize, and deduplicate one child include target. On a
 ; catalog hit, performs no file I/O and no source append (Phase 0C.19:
@@ -510,11 +581,7 @@ isonNameDone:
 ; Clobbers:  A, X, Y and every routine above's own clobbers
 ; ---------------------------------------------------------------------------
 includeCatalogLoad:
-    jsr includeResolveDevice
-    jsr includeCaptureKey
-    bcs iclFailNear
-
-    jsr includeCatalogFind
+    jsr includeCatalogLookup
     bcc iclHitNear
     ; C set: either a genuine miss (proceed to load) or a propagated read
     ; failure. Both leave A meaningful only in the failure case; a genuine
@@ -613,6 +680,236 @@ iclHit:
     rts
 iclFail:
     rts                          ; A/C already set by the failing call
+
+; ---------------------------------------------------------------------------
+; includeEventOffset (private, WP47)
+; Compute one event record's byte offset within the metadata allocation:
+; CASM_INCLUDE_EVENT_BASE + index * CASM_INCLUDE_EVENT_SIZE (16), a 4-bit
+; left shift of the 8-bit index into a 16-bit accumulator plus the log's own
+; base. Mirrors includeCatalogRead's own 7-bit shift for the 128-byte
+; physical record; the base term is what keeps the event log clear of the
+; catalog occupying the allocation's first half.
+;
+; Inputs:    A = event index (0..CASM_INCLUDE_EVENT_CAPACITY-1)
+; Outputs:   CasmVmmOffLo/Hi = the record's byte offset
+; Preserves: Y
+; Clobbers:  A, X, processor flags
+; ---------------------------------------------------------------------------
+includeEventOffset:
+    sta CasmVmmOffLo
+    lda #0
+    sta CasmVmmOffHi
+    ldx #4                       ; * 16
+ieoShift:
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    dex
+    bne ieoShift
+    lda CasmVmmOffLo
+    clc
+    adc #<CASM_INCLUDE_EVENT_BASE
+    sta CasmVmmOffLo
+    lda CasmVmmOffHi
+    adc #>CASM_INCLUDE_EVENT_BASE
+    sta CasmVmmOffHi
+    rts
+
+; ---------------------------------------------------------------------------
+; includeEventRecord (WP47)
+; Append one include event, in encounter order, to the Pass 1 event log. The
+; caller stages the event's six meaningful fields into CasmIncludeEventStage
+; (CASM_INCLUDE_EVENT_PARENT_KIND/PARENT_ID/PARENT_LINE_LO/PARENT_LINE_HI/
+; PARENT_COLUMN/CHILD_INDEX) first; this routine zero-fills the reserved tail
+; itself, so a caller can never leak stale BSS into a persisted record and
+; every stored event is byte-deterministic for a given assembly.
+;
+; Called once per `.INCLUDE` *occurrence*, including a repeated include of an
+; already-cataloged file (Phase 0C.19: expansion happens every time; only the
+; physical bytes are deduplicated). The capacity check runs before any write,
+; so a rejected append leaves the log and CasmIncludeEventCount untouched.
+;
+; Inputs:    CasmIncludeEventStage's six meaningful fields populated
+; Outputs:   C clear, A = CASM_DIAG_NONE; the event is stored at index
+;            CasmIncludeEventCount, which is then incremented
+;            C set, A = CASM_DIAG_INCLUDE_EVENT_LOG_FULL (128 events already
+;            recorded) or CASM_DIAG_VMM_TRANSFER_FAILED (propagated)
+; Clobbers:  A, X, Y, CasmVmmOffLo/Hi, CasmIoLenLo/Hi, CasmVmmBuffer and
+;            vmmWindowWrite's own volatile state
+; ---------------------------------------------------------------------------
+includeEventRecord:
+    lda CasmIncludeEventCount
+    cmp #CASM_INCLUDE_EVENT_CAPACITY
+    bcc ierHaveRoom
+    lda #CASM_DIAG_INCLUDE_EVENT_LOG_FULL
+    sec
+    rts
+
+ierHaveRoom:
+    ; Zero the reserved tail (everything past the six meaningful fields)
+    ; before staging, so reserved bytes are always stored as zero.
+    lda #0
+    ldy #CASM_INCLUDE_EVENT_CHILD_INDEX + 1
+ierZeroLoop:
+    cpy #CASM_INCLUDE_EVENT_SIZE
+    bcs ierZeroDone
+    sta CasmIncludeEventStage, y
+    iny
+    jmp ierZeroLoop
+ierZeroDone:
+
+    lda CasmIncludeEventCount
+    jsr includeEventOffset
+
+    ldy #0
+ierStageLoop:
+    lda CasmIncludeEventStage, y
+    sta CasmVmmBuffer, y
+    iny
+    cpy #CASM_INCLUDE_EVENT_SIZE
+    bcc ierStageLoop
+
+    lda #CASM_INCLUDE_EVENT_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmIncludeMetaSlot
+    jsr vmmWindowWrite
+    bcs ierFail
+
+    inc CasmIncludeEventCount
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+ierFail:
+    rts                          ; A/C already set by vmmWindowWrite
+
+; ---------------------------------------------------------------------------
+; includeEventReplay (WP47)
+; Consume the next recorded event and verify it corresponds to the
+; `.INCLUDE` Pass 2 has actually reached. The caller stages the candidate
+; tuple it independently derived this pass into CasmIncludeEventStage --
+; exactly the same six fields includeEventRecord persisted in Pass 1 -- and
+; this routine reads the stored event and compares all six.
+;
+; Comparing a re-derived candidate rather than trusting the stored record is
+; deliberate (WP47 Scope Decision 2, mirroring emitCheckPassAgreement): the
+; check is not believed reachable through any legitimate source, but it turns
+; a silent divergence into a diagnosed failure. A cursor already at
+; CasmIncludeEventCount means Pass 2 reached an `.INCLUDE` that Pass 1 never
+; recorded -- an *extra* event -- which is a mismatch, not an end condition.
+;
+; The stored record is compared directly out of CasmVmmBuffer rather than
+; copied to a private buffer first. That is safe *here specifically* because
+; no second VMM call occurs between the read and the last comparison (the
+; aliasing hazard documented in this file's header is a second transfer
+; landing before the first read's bytes are consumed), and the candidate it
+; is compared against lives in this module's own CasmIncludeEventStage.
+;
+; Inputs:    CasmIncludeEventStage's six meaningful fields populated with the
+;            candidate tuple derived this pass
+; Outputs:   C clear, A = CASM_DIAG_NONE; CasmIncludeEventCursor advanced
+;            past the matched event
+;            C set, A = CASM_DIAG_INCLUDE_REPLAY_MISMATCH (no event remains,
+;            or any field disagrees) or CASM_DIAG_VMM_TRANSFER_FAILED
+;            (propagated); the cursor is not advanced on any failure
+; Clobbers:  A, X, Y, CasmVmmOffLo/Hi, CasmIoLenLo/Hi, CasmVmmBuffer and
+;            vmmWindowRead's own volatile state
+; ---------------------------------------------------------------------------
+includeEventReplay:
+    lda CasmIncludeEventCursor
+    cmp CasmIncludeEventCount
+    bcc ierpHaveEvent
+    lda #CASM_DIAG_INCLUDE_REPLAY_MISMATCH
+    sec
+    rts
+
+ierpHaveEvent:
+    jsr includeEventOffset       ; A still holds the cursor
+    lda #CASM_INCLUDE_EVENT_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmIncludeMetaSlot
+    jsr vmmWindowRead
+    bcs ierpFail
+
+    ; Compare only the six meaningful fields; the reserved tail is stored as
+    ; zero but is deliberately not compared, so a later work package can
+    ; populate it without invalidating events this one wrote.
+    ldy #CASM_INCLUDE_EVENT_PARENT_KIND
+ierpCompareLoop:
+    lda CasmVmmBuffer, y
+    cmp CasmIncludeEventStage, y
+    bne ierpMismatch
+    iny
+    cpy #CASM_INCLUDE_EVENT_CHILD_INDEX + 1
+    bcc ierpCompareLoop
+
+    inc CasmIncludeEventCursor
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+ierpMismatch:
+    lda #CASM_DIAG_INCLUDE_REPLAY_MISMATCH
+    sec
+    rts
+ierpFail:
+    rts                          ; A/C already set by vmmWindowRead
+
+; ---------------------------------------------------------------------------
+; includeReplayReset (WP47)
+; Rewind the event-replay cursor for Pass 2. Called alongside sourceRewind,
+; from the orchestration layer: source.s owns no include state and include.s
+; owns no traversal state, so neither module resets the other's -- the shared
+; caller sequences both, exactly as it already sequences sourceRewind and
+; lexerInit.
+;
+; CasmIncludeEventCount is deliberately NOT cleared: Pass 1's final count is
+; precisely the number of events Pass 2 must consume, and
+; includeReplayFinalCheck compares against it.
+;
+; Inputs:    none
+; Outputs:   C clear, A = CASM_DIAG_NONE; CasmIncludeEventCursor = 0
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+includeReplayReset:
+    lda #0
+    sta CasmIncludeEventCursor
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; includeReplayFinalCheck (WP47)
+; At Pass 2's own combined EOF, require that every recorded event was
+; consumed. This catches a *missing* trailing event -- a Pass 2 that simply
+; never reached an `.INCLUDE` Pass 1 did -- which the per-site correspondence
+; check in includeEventReplay cannot detect on its own, because a replay that
+; ends early never performs a disagreeing comparison at all.
+;
+; Deliberately a separate post-loop call rather than folded into the
+; per-statement dispatcher, matching emitCheckPassAgreement's own existing
+; shape as an end-of-pass consistency gate.
+;
+; Inputs:    Pass 2 reached clean EOF
+; Outputs:   C clear, A = CASM_DIAG_NONE when every event was consumed
+;            C set, A = CASM_DIAG_INCLUDE_REPLAY_MISMATCH otherwise
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+includeReplayFinalCheck:
+    lda CasmIncludeEventCursor
+    cmp CasmIncludeEventCount
+    bne irfcMismatch
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+irfcMismatch:
+    lda #CASM_DIAG_INCLUDE_REPLAY_MISMATCH
+    sec
+    rts
 
 .segment "RODATA"
 

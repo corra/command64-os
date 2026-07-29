@@ -73,23 +73,43 @@ The `src/external/casm` directory owns CASM, a native Command 64
   raw-PETSCII filenames, inherited parent devices unless explicitly prefixed,
   immutable Pass 1 VMM loading, filesystem-free Pass 2 event replay, 16 include
   levels, 32 physical files, 128 include events, and a 65,535-byte combined
-  distinct-source cap. This is a planned contract until WP44-WP49 implement it;
-  do not describe `.INCLUDE` as currently operational before then.
+  distinct-source cap. **As of WP47 (`0.1.49`) `.INCLUDE` is operational**:
+  it loads, traverses, and assembles nested includes through `casmRunPass`'s
+  own dispatch. WP48 (included-source diagnostic filenames and bounded
+  include-site tracebacks) and WP49 (the phase completion gate) remain
+  outstanding, so included-file diagnostics still name files by CLI index
+  rather than by catalog identity -- do not describe that part as finished.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
   effects. Do not describe include loading or traversal as operational.
-- WP45 adds `include.s` (metadata VMM store, device resolution via the OS's
-  own `DOS_PARSE_PREFIX`, case-folded catalog identity, deduplicated
-  catalog load) and `source.s`'s `sourceAppendFile` as a **standalone**
-  module and API, proven only by `tests/src/casm_catalog/`. `casmRunPass`'s
-  `.INCLUDE` dispatch is unchanged from WP44 (still NOT IMPLEMENTED) --
-  there is no production call site for `include.s` yet. Do not describe
-  catalog/dynamic loading as reachable from a real assembly before WP46
-  wires frame push/traversal switching. The frozen 128-byte physical record
-  layout (`CASM_INCLUDE_PHYS_REC_*`, `common.inc`) stores only the original
-  (unfolded) spelling; identity comparison folds case live at compare time
-  rather than storing a second copy.
+- WP45 added `include.s` (metadata VMM store, device resolution via the OS's
+  own `DOS_PARSE_PREFIX`, case-folded catalog identity, deduplicated catalog
+  load) and `source.s`'s `sourceAppendFile`. The frozen 128-byte physical
+  record layout (`CASM_INCLUDE_PHYS_REC_*`, `common.inc`) stores only the
+  original (unfolded) spelling; identity comparison folds case live at
+  compare time rather than storing a second copy.
+- WP47 froze the 16-byte include-event record
+  (`CASM_INCLUDE_EVENT_*`, `common.inc`) in the second half of the same 8KB
+  metadata allocation, at `CASM_INCLUDE_EVENT_BASE` — anchored to the
+  catalog's own extent, never a literal, so growing the catalog cannot
+  silently overlap the log. An event stores no byte span: Pass 2 re-reads
+  the child's span from the catalog, so a duplicated span could only
+  disagree with the record that actually governs traversal. Parent identity
+  is a (kind, id) pair because a top-level root (`CasmSourceFileId`) and an
+  included parent (catalog index) occupy overlapping id spaces — top-level
+  files are still not catalog entries; unifying them is WP48's job.
+- **Pass 2 must never call `includeCatalogLoad`.** That entry point opens a
+  file on a catalog miss, and a miss is exactly what a corrupted replay
+  produces. Pass 2 calls `includeCatalogLookup` (resolve + capture + find,
+  no load), which makes "zero Pass 2 source I/O" structural rather than
+  merely trusted: the guarantee is provable from the call graph, since the
+  only open path reachable during a pass sits inside `crpInclude`'s
+  `CASM_PASS_MODE_MEASURE` branch. Preserve that property when touching
+  either routine.
+- `casmRunPass` is the one production bridge between `include.s` and
+  `source.s`. Neither module imports the other, and that layering is
+  deliberate — the shared caller sequences catalog lookup and frame push.
 - Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
   by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
   point in the emission engine's byte writer -- not a structured event

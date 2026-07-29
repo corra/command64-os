@@ -1361,8 +1361,40 @@ Parent plan:
       `brain/walkthroughs/2026-07-26-casm-phase9-wp46-frame-stack-nested-traversal-and-cycle-detection.md`.
       **WP46 complete.** WP47 remains pending separate plan approval and
       activation.
-- [ ] `579096d9-ce77-44db-96a9-c32654238949`: WP47 ordered include graph and
-      Pass 2 replay.
+- [x] `579096d9-ce77-44db-96a9-c32654238949`: WP47 ordered include graph and
+      Pass 2 replay. Plan:
+      `brain/plans/2026-07-29-casm-phase9-wp47-ordered-include-graph-and-pass2-replay.md`.
+      Wires the first real production `.INCLUDE` dispatch into `casmRunPass`
+      (Pass 1 loads/pushes/records an ordered event per include site; Pass 2
+      replays those events with zero source-filesystem I/O), adds the
+      16-byte include-event log in the metadata allocation's already-reserved
+      second half, and gives `includeCatalogInit` its first production call
+      site. User-confirmed scope: WP46's deferred per-frame diagnostic echo
+      save/restore stays deferred; Pass 2 defensively re-derives child
+      identity via `includeCatalogFind` and compares it against the recorded
+      event (`emitCheckPassAgreement` precedent). End-to-end fixtures ship
+      with CASM-vs-CASM flattened-equivalence diffing on a **new**
+      `casm_include_test_d64` image, not `casm_overflow_test_d64` as
+      originally planned: that disk was down to ~10 free blocks (WP34's
+      combined-cap pair alone occupies 277) and this WP's verification
+      writes eight output PRGs back to the disk it reads from. Also factored
+      `includeCatalogLookup` out of `includeCatalogLoad` so Pass 2 has an
+      entry point structurally incapable of filesystem I/O, rather than one
+      merely trusted not to perform it. MAIN grown `$4000` -> `$4200`
+      (measured 16,718-byte minimum, 178 bytes headroom);
+      `test_casm_catalog` `$1B00` -> `$1C00`. One defect caught in code
+      review before runtime: `crpParentIdentity` indexed the frame array
+      with a stale `A`, reading frame 0 at every depth -- coincidentally
+      correct at depth 1, wrong from depth 2 up. Zero-Pass-2-source-I/O
+      proven structurally (the only reachable open path sits inside the
+      `CASM_PASS_MODE_MEASURE` branch). All runtime checks passed on the
+      first attempt: `test_casm_event`'s 15 cases, and all four end-to-end
+      pairs reporting `FILES COMPARE OK`. User approved completion. Final
+      CASM `0.1.49` build 1196; no-change rebuild stable; all four disk
+      images pass. Walkthrough:
+      `brain/walkthroughs/2026-07-29-casm-phase9-wp47-ordered-include-graph-and-pass2-replay.md`.
+      **WP47 complete.** WP48 remains pending separate plan approval and
+      activation.
 - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095`: WP48 included-source diagnostics
       and tracebacks.
 - [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693`: WP49 verification, walkthrough,

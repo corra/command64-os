@@ -1804,6 +1804,63 @@ routine read as hex (`A=25` decimal `$19`, not `$25`), and an X-register
 clash inside the print helper that caused an endless loop. Verify the
 instrumentation itself before trusting what it reports.
 
+### CASM Phase 9 WP47: `.INCLUDE` goes live; structural vs. trusted invariants (2026-07-29)
+
+WP47 wired the first real production `.INCLUDE` dispatch into `casmRunPass`
+and added the ordered include-event log Pass 2 replays. Final CASM `0.1.49`
+build 1196. In contrast to WP46, it passed its entire runtime matrix on the
+first attempt — because WP46 had already absorbed the hard traversal work,
+so WP47 built on a proven engine rather than a theoretical one.
+
+**Make an invariant structural rather than merely trusted.** Phase 0C.19
+requires Pass 2 to perform zero source-filesystem I/O. `includeCatalogLoad`
+opens a file on a catalog miss, so calling it in Pass 2 would have been a
+latent violation — and a miss is exactly what a corrupted replay produces.
+The fix was factoring `includeCatalogLookup` (resolve + capture + find, no
+load) out of it, so Pass 2's path is *incapable* of an open rather than
+trusted not to attempt one. The invariant is then provable by reachability
+instead of by instrumentation: `inputStreamOpen` has two call sites, the
+only one reachable during a pass is inside `includeCatalogLoad`, and that
+routine's only production caller sits in the `CASM_PASS_MODE_MEASURE`
+branch. Prefer this shape over a runtime assertion whenever the call graph
+can carry the guarantee.
+
+**Two parents in different namespaces need a discriminator.** An
+`.INCLUDE`'s parent is either a top-level root (identified by
+`CasmSourceFileId`) or an already-included file (identified by its catalog
+index). WP45/WP46 deliberately never cataloged top-level files, so those id
+spaces overlap: root 0 and catalog record 0 are different files with the
+same number. The 16-byte event record therefore stores a (kind, id) pair,
+and `evmismatch1` in `tests/src/casm_event` exists specifically to prove a
+frame-parent 0 never compares equal to a root-parent 0.
+
+**A missing trailing event is invisible to per-site checks.** Per-`.INCLUDE`
+correspondence cannot detect a Pass 2 that simply *stops early* — a replay
+that ends before reaching an `.INCLUDE` never performs a disagreeing
+comparison. That needs its own end-of-pass gate
+(`includeReplayFinalCheck`, cursor == count), structurally parallel to
+`emitCheckPassAgreement`. Whenever a consistency check is per-item, ask
+separately what happens when the loop terminates early.
+
+**Register-carried state across a constant load.** `crpParentIdentity` took
+the frame index from `A` via `tax`, but `A` had already been overwritten by
+the parent-kind constant stored two instructions earlier. It would have
+indexed `CasmFrameCatalogIndex[0]` at *every* depth — coincidentally
+correct at depth 1 (the only depth a two-level fixture reaches) and wrong
+from depth 2 up, inheriting the wrong parent's device. Caught in code review
+before runtime, and precisely why the three-level `casmip2` fixture exists.
+Same coincidental-correctness family as WP46's cancelling-bugs finding
+above: depth 1 is not a sufficient test of depth-indexed logic.
+
+**A verification disk must have room to hold what it verifies.**
+`casm_overflow_test.d64` was down to ~10 free blocks (WP34's combined-cap
+pair alone occupies 277), and WP47's end-to-end check *writes* eight output
+PRGs back to the disk it reads from. The fixtures moved to a new
+`casm_include_test_d64` (574 blocks free). Also note `fileCreateOutput` uses
+no `@:` replace prefix, so re-running an assembly whose output already
+exists fails with a DOS file-exists error — plan fixture disks for repeated
+runs, not one clean pass.
+
 ### Agent-driven VICE testing contract
 
 - Agent-driven VICE tests must boot Command64 from the selected D64 before launching an
