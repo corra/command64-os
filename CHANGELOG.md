@@ -96,6 +96,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM Phase 9 include processing complete** (CASM `0.1.50` build 1204):
+  WP49 consolidated the quoted-operand, catalog, nested traversal, ordered
+  Pass 2 replay, flattened-output equivalence, diagnostics, bounded-failure,
+  cleanup, artifact, and runtime matrices delivered by WP43-WP48. All six
+  Phase 9 harnesses, affected shared regressions, trusted references, and four
+  independently built disk images pass. The final `$4300` production envelope
+  has 85 bytes headroom. WP49 introduced no production behavior, so the CASM
+  version and build remain unchanged. Optional Phase 10 remains inactive.
 - **User program origin and external dispatch**: Fresh builds now default to
   `UserProgStart=$3800` with relocation partner `$3900`. External R6 commands
   loaded by name are relocated before execution, allowing CASM's independent

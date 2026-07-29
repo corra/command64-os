@@ -229,7 +229,8 @@ if(Ca65_FOUND)
     # step above that minimum, matching this line's own precedent.
     # WP48: included-source filename/traceback rendering plus the frame-site
     # column array overflowed $4200 by 60 measured bytes. One page is the
-    # smallest aligned increase and leaves 196 bytes headroom.
+    # smallest aligned increase; the final site-line/traceback corrections
+    # leave 85 bytes headroom.
     add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4300")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")

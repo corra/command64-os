@@ -37,7 +37,9 @@ implementation is not active or authorized until its design/ABI review passes.
 
 ## Review Gates
 
-- [ ] Confirm CASM Phase 9 is complete before activation.
+- [x] Confirm CASM Phase 9 is complete before activation. Phase 9 completed
+      with explicit user approval on 2026-07-29; this does not activate Phase
+      10 or satisfy its separate design/ABI review gate.
 - [ ] Complete and approve the pre-implementation design/ABI review.
 - [ ] Freeze exact screen layout, storage, diagnostics, and register/flag ABI.
 - [ ] Implement only in separately approved atomic increments.

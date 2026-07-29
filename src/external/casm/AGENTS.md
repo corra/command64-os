@@ -75,9 +75,10 @@ The `src/external/casm` directory owns CASM, a native Command 64
   levels, 32 physical files, 128 include events, and a 65,535-byte combined
   distinct-source cap. **As of WP47 (`0.1.49`) `.INCLUDE` is operational**:
   it loads, traverses, and assembles nested includes through `casmRunPass`'s
-  own dispatch. WP48 (included-source diagnostic filenames and bounded
-  include-site tracebacks) is complete at `0.1.50`; WP49 (the phase completion
-  gate) remains outstanding. Do not describe Phase 9 as complete yet.
+  own dispatch. WP48 added included-source diagnostic filenames and bounded
+  include-site tracebacks at `0.1.50`; WP49's consolidated verification and
+  user-approved completion gate passed at build 1204. Phase 9 is complete.
+  Optional Phase 10 remains separately planned and inactive.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter

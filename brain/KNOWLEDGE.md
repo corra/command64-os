@@ -1964,6 +1964,18 @@ runs, not one clean pass.
   bytes headroom), `test_casm_pass1` `$4200` (242 bytes), `test_casm_frame`
   `$4100` (52 bytes), `test_casm_event` `$1D00` (225 bytes), and unchanged
   `test_casm_passcheck` `$4000`.
+- WP49 consolidated verification confirmed the final Phase 9 implementation
+  without production changes: CASM remains `0.1.50` build 1204 with 14,478 code
+  bytes and 2,104 relocation points; all six Phase 9 harnesses, affected shared
+  regressions, four independently built disk images, trusted-reference cases,
+  bounded failures, cleanup/reuse cases, and runtime diagnostics pass. The final
+  production `$4300` headroom is 85 bytes; the earlier 196-byte CMake comment
+  was an intermediate WP48 measurement and was corrected under an approved
+  documentation-only WP49 amendment.
+- The user explicitly approved WP49 and Phase 9 completion on 2026-07-29.
+  Phase 9 closes at CASM `0.1.50` build 1204; the approved verification-only
+  WP49 package changed no production behavior and required no version increment.
+  Optional Phase 10 remains inactive and separately gated.
 
 ## C64 Platform Constraints Discovered
 

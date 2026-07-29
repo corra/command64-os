@@ -1420,26 +1420,38 @@ Parent plan:
       The user confirmed all runtime walkthrough cases pass and explicitly
       approved completion on 2026-07-29. Final CASM `0.1.50` build 1204;
       WP49 remains pending and was not activated.
-- [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693`: WP49 verification, walkthrough,
-      and Phase 9 completion gate.
+- [x] `a8c3dbf0-9333-4489-9c3b-3e752049b693`: WP49 verification, walkthrough,
+      and Phase 9 completion gate. **Complete** (2026-07-29). Approved plan:
+      `brain/plans/2026-07-29-casm-phase9-wp49-verification-walkthrough-and-completion-gate.md`.
+      Verification-only scope; production behavior changes require an amended
+      plan and renewed approval. Host/static verification passed, all four disk
+      images built independently, and the user reported the complete runtime
+      matrix passes. Walkthrough:
+      `brain/walkthroughs/2026-07-29-casm-phase9-wp49-verification-walkthrough-and-completion-gate.md`.
+      The user explicitly approved completion. CASM remains `0.1.50` build
+      1204; the approved verification-only package required no version change.
 
 ## Phase 9 Acceptance
 
-- [ ] `.INCLUDE` accepts one quoted 1-63-byte raw PETSCII filename and rejects
+- [x] `.INCLUDE` accepts one quoted 1-63-byte raw PETSCII filename and rejects
       malformed operands deterministically.
-- [ ] Explicit child devices override inherited parent devices; no search path
+- [x] Explicit child devices override inherited parent devices; no search path
       or fallback probing occurs.
-- [ ] Nested includes support 16 active levels, detect direct/indirect cycles,
+- [x] Nested includes support 16 active levels, detect direct/indirect cycles,
       and permit sequential reinclusion.
-- [ ] Up to 32 distinct physical files and 128 include events are bounded and
+- [x] Up to 32 distinct physical files and 128 include events are bounded and
       diagnosed; distinct source bytes remain capped at 65,535.
-- [ ] Pass 2 opens no source files and exactly replays Pass 1's event graph.
-- [ ] Included labels, branches, static output, and relocatable R6 output match
+- [x] Pass 2 opens no source files and exactly replays Pass 1's event graph.
+- [x] Included labels, branches, static output, and relocatable R6 output match
       equivalent flattened trusted references.
-- [ ] Included diagnostics identify the physical location and parent include
+- [x] Included diagnostics identify the physical location and parent include
       traceback.
-- [ ] The user completes the runtime walkthrough and explicitly approves Phase
+- [x] The user completes the runtime walkthrough and explicitly approves Phase
       9 completion.
+
+**All eight acceptance items are checked. WP43-WP49 are complete and approved;
+CASM Phase 9 is complete at CASM `0.1.50` build 1204. Phase 10 remains inactive
+and separately gated.**
 
 ## Optional Phase 10 - Progress and Processing Indication
 

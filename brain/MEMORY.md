@@ -35,10 +35,16 @@
   commented out at `CMakeLists.txt:269`).
   BANNER has no `VERSION_*` defines — its usage string hardcodes `1.0.0.1000`
   and does not track `BUILD_BANNER`.
-- **CASM Phase 9 WP48 complete**: included-source provenance now carries packed
+- **CASM Phase 9 complete**: WP48 included-source provenance carries packed
   root/catalog identity and fatal diagnostics render the physical filename plus
   a bounded include-site traceback. Build/static and runtime verification passed;
-  the user explicitly approved completion on 2026-07-29. WP49 remains pending.
+  the user explicitly approved WP48 completion on 2026-07-29. The user approved
+  and activated WP49's verification-only completion gate on 2026-07-29; Phase 9
+  is complete. Consolidated host/static verification passed, all four
+  disk images built independently, and the user reported the complete runtime
+  matrix passes. The WP49 walkthrough is recorded and the user explicitly
+  approved completion on 2026-07-29. Final CASM remains `0.1.50` build 1204;
+  optional Phase 10 is inactive and separately gated.
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
