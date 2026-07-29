@@ -1453,6 +1453,39 @@ Parent plan:
 CASM Phase 9 is complete at CASM `0.1.50` build 1204. Master-plan Phase 10,
 Symbol Map and Listing, remains inactive and separately gated.**
 
+## Phase 10 - Symbol Map and Listing
+
+- [ ] Parent Taskwarrior `32e09eea-691d-40bc-aa7a-7d2299fe093b`: implement
+      deterministic `/M` symbol-map output and native `/L` listing files without
+      changing generated PRG bytes.
+- Approved governing plan:
+  `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
+- Milestone task: `wiki/tasks/casm-phase10-symbol-map-listing.md`.
+- [/] WP50 `ad82f04d-0d34-4902-9a2c-ae27292902cf`: contract reconciliation and
+      ABI freeze. Active under approved plan
+      `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`.
+- [ ] WP51 `a64fa847-1b46-44fd-be3b-8ad7b1055c92`: listing stores and capture
+      events. Approved plan:
+      `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`.
+      Blocked by WP50.
+- [ ] WP52 `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: deterministic symbol map.
+      Approved plan:
+      `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
+      Blocked by WP51.
+- [ ] WP53 `aa57f461-36a9-455c-966f-ac484ec57b41`: listing naming,
+      serialization, and cleanup. Approved plan:
+      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
+      Blocked by WP52.
+- [ ] WP54 `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: production integration.
+      Approved plan:
+      `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
+      Blocked by WP53.
+- [ ] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
+      and Phase 10 completion gate. Blocked by WP54.
+
+**The parent and WP50 plans are approved. WP50 is the only active package and
+authorizes reconciliation/planning work only; WP51-WP55 remain blocked.**
+
 ## Optional Feature - Progress and Processing Indication
 
 - [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,

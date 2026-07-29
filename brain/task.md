@@ -1531,9 +1531,42 @@
   - [x] Rebuild packaged applications and smoke-test CASM.
   - [ ] Smoke-test a non-relocatable external command.
 
+# CASM Phase 10 - Symbol Map and Listing
+
+- [ ] Taskwarrior #34 (`32e09eea-691d-40bc-aa7a-7d2299fe093b`): CASM Phase 10
+      Symbol Map and Listing
+  - Approved governing plan:
+    `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`
+  - Milestone task: `wiki/tasks/casm-phase10-symbol-map-listing.md`
+  - [/] WP50 (`ad82f04d-0d34-4902-9a2c-ae27292902cf`): contract reconciliation
+        and ABI freeze; active under approved plan
+        `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`
+  - [ ] WP51 (`a64fa847-1b46-44fd-be3b-8ad7b1055c92`): listing stores and
+        capture events; approved plan
+        `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`;
+        blocked by WP50
+  - [ ] WP52 (`0bf2e86b-0bd0-443a-b84b-b2c258e98181`): deterministic symbol
+        map; approved plan
+        `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`;
+        blocked by WP51
+  - [ ] WP53 (`aa57f461-36a9-455c-966f-ac484ec57b41`): listing naming,
+        serialization, and cleanup; approved plan
+        `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`;
+        blocked by WP52
+  - [ ] WP54 (`f4b598fd-bab1-4394-9415-c71e3ea1cfa5`): production integration;
+        approved plan
+        `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`;
+        blocked by WP53
+  - [ ] WP55 (`94d98a2b-7ad4-49f0-bf33-38702690eca9`): verification,
+        walkthrough, and phase gate; approved plan
+        `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`;
+        blocked by WP54
+  - [ ] Obtain explicit completion approval before the separate `0.2.0`
+        promotion
+
 # Deferred Optional Work
 
-- [ ] Taskwarrior #36 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
+- [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature
   - Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
   - Task: `wiki/tasks/casm-progress-indication.md`

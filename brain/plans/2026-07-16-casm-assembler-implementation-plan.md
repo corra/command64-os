@@ -656,4 +656,7 @@ diagnostics.
   Progress and processing indication is tracked as a separately gated optional
   feature outside this plan's numbered phases; it does not replace or renumber
   Phase 10, Symbol Map and Listing.
-- Phase 10 has not started and requires explicit phase approval.
+- 2026-07-29: The Phase 10 Symbol Map and Listing governing plan is approved at
+  `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`. WP50-WP55 remain
+  pending and individually gated; approval of the parent plan does not activate
+  WP50 or authorize source edits.
