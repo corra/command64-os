@@ -73,10 +73,14 @@ The command64 shell is the primary interface for the OS.
 **Syntax:** `DIR`
 **Example output:** `"MYPROG" (2032 bytes)`
 
-### APPS / PS
+### PS
 
 **Description:** Lists currently loaded/registered programs, showing each one's name, load address, and size.
-**Syntax:** `APPS` or `PS`
+**Syntax:** `PS`
+
+> **Note:** the built-in `HELP` text advertises `APPS` with `PS` as its alias,
+> but only `PS` is present in the shell's command table and dispatches. Typing
+> `APPS` falls through to the external-program search and fails.
 
 ### FREE
 
@@ -108,15 +112,21 @@ The command64 shell is the primary interface for the OS.
 **Syntax:** `COPY [source] [destination]`
 **Example:** `COPY FILE1 FILE2`
 
-### DEL / ERASE
+### DEL
 
 **Description:** Deletes a file from the disk.
-**Syntax:** `DEL [filename]` or `ERASE [filename]`
+**Syntax:** `DEL [filename]`
 
-### REN / RENAME
+> **Note:** `HELP` advertises `ERASE` as an alias for `DEL`, but `ERASE` is not
+> in the shell's command table and does not dispatch.
+
+### REN
 
 **Description:** Renames an existing file on the disk.
 **Syntax:** `REN [oldname] [newname]`
+
+> **Note:** `HELP` advertises `RENAME` as an alias for `REN`, but `RENAME` is
+> not in the shell's command table and does not dispatch.
 
 ### VER
 
@@ -158,9 +168,11 @@ The command64 shell is the primary interface for the OS.
 
 command64 supports up to four disk devices simultaneously (8, 9, 10, and 11).
 
-### DRIVE / DEVICE / DEV
+### DRIVE / DEV
 
 **Description:** Switches the active device or displays the current one.
+`DEV` is a true alias — both names are present in the shell's command table.
+`DEVICE` is **not** a recognized command.
 **Syntax:** `DRIVE [number]`
 **Examples:**
 
@@ -182,7 +194,7 @@ command64 supports up to four disk devices simultaneously (8, 9, 10, and 11).
 **Description:** Temporarily redirects a single disk operation to a specific drive (8, 9, 10, or 11) using the drive number followed by a colon (`:`).
 This routing applies only to the duration of that specific command, leaving the active device (set by `DRIVE`) unchanged.
 
-**Supported Commands:** `DIR`, `TYPE`, `MORE`, `COPY`, `DEL`/`ERASE`, `REN`/`RENAME`, `VOL`, `LABEL`, and `FLUSH`.
+**Supported Commands:** `DIR`, `TYPE`, `MORE`, `COPY`, `DEL`, `REN`, `VOL`, `LABEL`, and `FLUSH`.
 
 **Examples:**
 
@@ -289,6 +301,31 @@ resets the maze and actors while lives remain, and stops play at zero lives.
 | `P` or `SPACE` | Pause / resume |
 | `Q` | Quit and return to shell |
 
+### BANNER
+
+**Description:** Renders a text message in large 5×6 block characters built from
+the `#` character (`$23`). Output wraps after 6 characters per block line to fit
+the 40-column screen. BANNER ships on the CASM utilities disk image
+(`command64_casm_utils.d64`), not on the standard OS image.
+**Syntax:** `BANNER <text>`
+**Example:** `BANNER HELLO`
+
+Running `BANNER` with no text — or with `/?`, `-?`, `/H`, or `-H` — prints the
+usage banner instead of rendering.
+
+**Text handling:**
+
+- Lowercase letters are folded to uppercase; `A`–`Z`, `0`–`9`, and the
+  punctuation `! ? . , - + = : ; / \ * ( ) #` have glyphs. Any other character
+  renders as a blank glyph.
+- Messages are capped at 120 characters; anything beyond that is discarded.
+- Spaces at the start of a block line are skipped, so wrapped lines stay
+  left-aligned and a trailing run of spaces does not emit an empty final line.
+- A blank line separates consecutive block lines.
+
+See the **[BANNER Utility Manual](banner-utility.md)** for the full glyph table
+and worked examples.
+
 ---
 
 <a name="technical-limits"></a>
@@ -300,7 +337,7 @@ resets the maze and actors while lives remain, and stops play at zero lives.
 - **$0801:** OS Entry Point (BASIC Launcher).
 - **$1000:** OS Service Bus (External API Hook).
 - **$1180 - $1900:** Command Shell and built-in handlers.
-- **User Program Space (`UserProgStart` - $CFFF):** currently `$3400` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin.
+- **User Program Space (`UserProgStart` - $CFFF):** currently `$3800` (expanded by banking out BASIC ROM). `UserProgStart` has grown over successive OS releases as resident segments expand — always compile external utilities against the current build's constant rather than a hardcoded address. Relocatable binaries (see the Programmer's Reference) can run at any address regardless of their compile-time origin; CASM continues to emit relocatable output at `$3400` by default.
 - **$C000:** VMM Memory Control Table (REU Management).
 
 ### VMM Capacity

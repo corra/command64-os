@@ -113,6 +113,10 @@
 .export sourceAppendFile
 .export sourceFramePush
 .export CasmFrameDepth
+; WP47: the active chain's own physical identity, read by casmRunPass's
+; `.INCLUDE` dispatch to name the *parent* of an include event when that
+; parent is itself an included file (depth > 0) rather than a top-level root.
+.export CasmFrameCatalogIndex
 .export sourceOpen
 .export sourceNextByte
 .export sourceNextLine

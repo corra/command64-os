@@ -9,7 +9,7 @@ The purpose of the `src/external` directory is to contain external user space ap
 
 # Local Contracts
 
-- All external applications must run in user space (starts at `$2200` to `$9FFF`).
+- All external applications must run in user space (currently starts at `$3800`; use `UserProgStart` rather than hardcoding an address).
 - Every external application target must enforce build-time versioning through the unified CMake app helpers: `add_external_app` for KickAssembler apps or `add_ca65_app` for ca65/ld65 apps.
 - A persistent build number file `BUILD_<APPNAME_UPPER>` containing the current build number must be maintained in the application's own `src/external/<appname>/` directory.
 - App-private zero-page scratch allocations may use `$70-$8F`. Collisions between separately loaded apps are acceptable only because external apps are not concurrently resident; document any new allocation in the app source and avoid clobbering OS-owned zero-page locations.

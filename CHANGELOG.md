@@ -7,8 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`BANNER` external command** (BANNER build `1005`): renders a text message in
+  large 5x6 block characters assembled from `#` (`$23`), wrapping strictly every
+  6 characters to fit the 40-column screen, with a blank separator row between
+  block lines. Supports `A`-`Z` (lowercase folded to uppercase), `0`-`9`, and
+  the punctuation `! ? . , - + = : ; / \ * ( ) #`; unmapped characters render as
+  a blank glyph. Messages are capped at 120 characters, and `/?`, `-?`, `/H`,
+  `-H`, or no argument print the usage banner. Exits via `DOS_EXIT` (`$4C`).
+  BANNER ships on a new `command64_casm_utils.d64` image (label `CASM UTILS`)
+  rather than the standard OS image, alongside its own `banner.s` source as a
+  SEQ file.
+  `src/external/banner/banner.s` doubles as the project's **native CASM source
+  compatibility** reference: it is deliberately self-contained and segment-free
+  (inlined zero-page equates and font data, `ASL A` written explicitly, no ca65
+  anonymous labels, no `.RES`), so the same file assembles both with host
+  ca65/ld65 and with `CASM` on the C64 itself. The host-only PRG load-address
+  header lives separately in `src/external/banner/header.s`.
+  See `wiki/banner-utility.md` and
+  `brain/plans/2026-07-27-banner-casm-source-validation.md`.
+- **`BANNER` line-leading space skipping**: each block line now consumes any
+  leading spaces before it is measured, so wrapped lines stay left-aligned and a
+  message ending in a run of spaces terminates cleanly instead of emitting an
+  empty trailing block line.
+- **CASM `.INCLUDE` now assembles** (CASM `0.1.49` build 1196): a source file
+  can include another with `.INCLUDE "FILENAME"`, and the included text is
+  assembled exactly as if it had been pasted in at that point. Labels,
+  forward and backward references, and branches all resolve across the
+  boundary in both directions, so a shared file of routines or equates can
+  be pulled into several programs. Includes may nest up to 16 levels deep;
+  up to 32 distinct files and 128 include sites are supported per assembly.
+  Including the same file more than once expands it every time, but stores
+  its text only once. A child with no explicit device inherits the device of
+  the file that included it; an explicit `8:`-`11:` prefix overrides that.
+  Both assembly passes see identical text -- the second pass never re-reads
+  a file from disk -- so a source that changes on disk mid-assembly cannot
+  produce a half-updated program. Two new diagnostics, `INCLUDE EVENT LOG
+  FULL` and `INCLUDE REPLAY MISMATCH`, join the existing include depth,
+  cycle, and catalog messages. Previously `.INCLUDE` parsed correctly but
+  always stopped with `NOT IMPLEMENTED`.
+
 ### Fixed
 
+- **Cross-device COPY truncation**: `COPY` performed command-channel readiness
+  and source verification while another drive's data channel was open. Closing
+  or switching LFN 15 invalidated that data channel, so the next read or write
+  failed and the old normal-completion path committed a one-block partial file.
+  `COPY` now completes all LFN 15 traffic before opening its final source and
+  destination data channels, reports transfer errors, and scratches incomplete
+  destinations. Destination names are also bounded to their 40-byte buffer.
 - **CASM diagnostics reported the wrong line for the statement following an
   `.include`**: the lexer captured a token's file/line/column *before*
   fetching its first byte. That is correct for an ordinary byte, but the
@@ -41,6 +89,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   See `brain/plans/label-l15-cache-release.md`.
 
 ### Changed
+
+- **User program origin and external dispatch**: Fresh builds now default to
+  `UserProgStart=$3800` with relocation partner `$3900`. External R6 commands
+  loaded by name are relocated before execution, allowing CASM's independent
+  `$3400` emission origin to remain stable.
 
 - **VICE MCP agent testing contract**: replaced the blanket MCP prohibition with a
   state- and evidence-driven workflow. Agents must boot Command64 from the selected D64,

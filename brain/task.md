@@ -1200,8 +1200,42 @@
       `git diff --check` clean. **WP46 complete.** WP47 is unblocked in
       Taskwarrior by dependency but not activated -- it remains pending
       separate plan approval
-  - [ ] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and
-        Pass 2 replay
+  - [x] `579096d9-ce77-44db-96a9-c32654238949` WP47 ordered include graph and
+        Pass 2 replay — complete 2026-07-29. Plan:
+        `brain/plans/2026-07-29-casm-phase9-wp47-ordered-include-graph-and-pass2-replay.md`
+    - First real production `.INCLUDE` dispatch in `casmRunPass`: Pass 1
+      loads/pushes and records one ordered event per include site; Pass 2
+      replays with zero source-filesystem I/O. Also gives
+      `includeCatalogInit` its first production call site
+    - Frozen 16-byte include-event record in the metadata allocation's
+      already-reserved second half (offset 4096); parent identity carries a
+      kind tag (top-level root vs nested frame) because WP45/46 deliberately
+      never cataloged top-level files (WP48's job)
+    - User-confirmed scope: WP46's deferred per-frame echo save/restore
+      stays deferred; Pass 2 defensively re-derives child identity and
+      compares it against the recorded event
+    - Factored `includeCatalogLookup` out of `includeCatalogLoad` so Pass 2
+      calls an entry point *structurally* incapable of filesystem I/O rather
+      than one merely trusted not to perform it. Zero-Pass-2-source-I/O is
+      proven by reachability: the only open path in a pass sits inside the
+      `CASM_PASS_MODE_MEASURE` branch
+    - Deviation from plan (user-approved): end-to-end fixtures ship on a new
+      `casm_include_test_d64` image, not `casm_overflow_test_d64` — that
+      disk had ~10 free blocks and this WP's verification writes eight
+      output PRGs to the disk it reads from
+    - MAIN `$4000` -> `$4200` (measured 16,718-byte minimum, 178 bytes
+      headroom); `test_casm_catalog` `$1B00` -> `$1C00`
+    - Defect caught in code review before runtime: `crpParentIdentity`
+      indexed the frame array with a stale `A` (the parent-kind constant),
+      reading frame 0 at every depth — coincidentally correct at depth 1,
+      wrong from depth 2 up
+    - All runtime checks passed first attempt: `test_casm_event`'s 15 cases,
+      and all four end-to-end pairs `FILES COMPARE OK` (cross-boundary
+      labels/branches both directions, three-level nesting, sequential
+      reinclusion, relocatable with relocation table). User approved
+      completion. Final CASM `0.1.49` build 1196; no-change rebuild stable;
+      all four disk images pass. **WP47 complete.** WP48 unblocked in
+      Taskwarrior but deliberately not activated
   - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics
         and tracebacks
   - [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693` WP49 verification, walkthrough,
@@ -1434,3 +1468,19 @@
     - [x] Complete build verification and user-run C64/VICE walkthrough
     - [ ] Deferred: restore the exact 240-dot maze after visual revisions
     - [ ] Deferred: implement ghost warp-tunnel behavior
+# Active Regression Work
+
+- [x] Cross-device `COPY` regression (`wiki/tasks/copy-cross-device-regression.md`)
+  - [x] Reproduce `copy banner.s 8:banner.s` with device 9 active.
+  - [x] Confirm the copied file differs in size.
+  - [x] Correct data-channel sequencing and failure cleanup.
+  - [x] Verify byte equality by extracting both D64 payloads.
+  - [x] Obtain user completion confirmation.
+- [ ] Cross-device `COMP` regression (`wiki/tasks/comp-cross-device-regression.md`)
+  - [x] Reproduce false `FILES ARE DIFFERENT SIZES` on identical files.
+  - [ ] Add a public multi-file open contract and update `COMP`.
+- [/] User-program origin and external relocation (`wiki/tasks/user-program-origin-relocation.md`)
+  - [x] Select relevant changes from the incomplete DASH branch.
+  - [x] Make `$3800` the fresh-build default and relocate R6 external commands.
+  - [x] Rebuild packaged applications and smoke-test CASM.
+  - [ ] Smoke-test a non-relocatable external command.

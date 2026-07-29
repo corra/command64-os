@@ -1,7 +1,7 @@
 # command64 OS PACMAN Utility Manual
 
 **File Name:** `pacman.prg`
-**Target Address:** `UserProgStart` (currently `$3400`)
+**Target Address:** `UserProgStart` (currently `$3800`)
 **Version:** 0.1.3.1055
 
 ## Overview
@@ -87,7 +87,7 @@ table of 24-bit powers of ten.
 
 | Address range | Contents |
 | --- | --- |
-| `UserProgStart` (`$3400`) onward | Relocatable code, actor state, maze tables, and lookup tables |
+| `UserProgStart` (`$3800`) onward | Relocatable code, actor state, maze tables, and lookup tables |
 | `$70–$84` | App-private Pac-Man state and scratch zero page |
 
 ---

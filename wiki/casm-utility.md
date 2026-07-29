@@ -2,7 +2,7 @@
 
 **File Name:** `casm.prg`
 **Version:** `0.1.15.1053`
-**Target Address:** `UserProgStart` (currently `$3400`, Standard User Program Space)
+**Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
 ## Overview
@@ -190,7 +190,7 @@ JSR $1000
 .BYTE $0D, $00
 ```
 
-Walking through it: the program loads at `$3400` (`UserProgStart`), so its
+Walking through it: the explicitly based program loads at `$3400`, so its
 message text starts at `$340E` (14 bytes after the load address — 2 bytes
 of `LDX`/`LDY` opcode+operand, twice, plus `LDA`/`JSR` pairs). The `LDX
 #$0E` / `LDY #$34` pair loads that address into X/Y, `LDA #$09` selects
@@ -209,8 +209,8 @@ GO 3400
 
 (`LOAD CASMHELLO` loads the assembled PRG at its header-specified address —
 `$3400` — and registers it in the App Table; `GO 3400` then looks it up by
-address and runs it. `GO` with no argument would also work here, since
-`$3400` is `UserProgStart`, the default `GO` searches when given nothing.)
+address and runs it. The current `UserProgStart` is `$3800`, so `GO` with no
+argument does not select this explicitly based example.)
 
 *Output:* `YES IT BUILDS! -- CASM`, then a clean return to the shell.
 
