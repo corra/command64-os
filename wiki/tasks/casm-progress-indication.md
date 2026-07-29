@@ -3,7 +3,7 @@
 Status: [ ]
 Type: Optional Future Feature
 Classification: Optional Feature (deferred)
-Taskwarrior: 36 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`)
+Taskwarrior: 33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`)
 Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
 
 ## Goal

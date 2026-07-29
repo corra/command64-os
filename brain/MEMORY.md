@@ -46,6 +46,17 @@
   approved completion on 2026-07-29. Final CASM remains `0.1.50` build 1204;
   master-plan Phase 10 is inactive and separately gated. The optional progress
   indication feature is deferred outside the numbered phases.
+- **CASM Phase 10 plan approved, implementation inactive**: Symbol Map and
+  Listing is governed by
+  `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`. `/L` conditionally
+  adds two 65,536-byte VMM allocations (4,096 x 16-byte metadata records and an
+  emitted-byte mirror), for a planned worst-case six of eight CASM VMM registry
+  slots. No current memory map or production artifact changed. WP50 must measure
+  and freeze MAIN/BSS and ABI effects before source edits.
+- **CASM Phase 10 WP50 active, no allocation yet**: Phase 0C.20 permits WP51 to
+  add at most 11 source BSS bytes: four internal bytes for absolute refill-block
+  base/current-line start and a seven-byte completed-line sidecar. No zero-page,
+  MAIN, VMM, source, or artifact change occurs in WP50's planning increment.
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
 - **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.

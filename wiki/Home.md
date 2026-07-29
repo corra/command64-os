@@ -57,6 +57,7 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
   - [DATE Command Implementation](tasks/date.md)
 - **Utilities**
   - [External FORMAT Utility](tasks/format.md)
+  - [CASM Phase 10 - Symbol Map and Listing](tasks/casm-phase10-symbol-map-listing.md) - Approved governing plan; WP50-WP55 remain pending and separately gated.
   - [CASM Progress and Processing Indication](tasks/casm-progress-indication.md) - Optional deferred feature outside the CASM master-plan phases, with mandatory design and implementation reviews.
 - **Shell Semantics**
   - [External Application Return Codes](tasks/external-app-return-codes.md)

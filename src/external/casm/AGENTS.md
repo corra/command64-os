@@ -78,8 +78,10 @@ The `src/external/casm` directory owns CASM, a native Command 64
   own dispatch. WP48 added included-source diagnostic filenames and bounded
   include-site tracebacks at `0.1.50`; WP49's consolidated verification and
   user-approved completion gate passed at build 1204. Phase 9 is complete.
-  Master-plan Phase 10 remains separately planned and inactive. Progress
-  indication is a deferred optional feature outside the numbered phases.
+  The master-plan Phase 10 Symbol Map and Listing governing plan is approved at
+  `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`; WP50-WP55 remain
+  inactive and each requires a dedicated approved plan. Progress indication is
+  a deferred optional feature outside the numbered phases.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
@@ -119,6 +121,44 @@ The `src/external/casm` directory owns CASM, a native Command 64
   speculative one built now. See
   `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
   (Phase 0C.5 freeze) for the decision record.
+- Phase 10's approved reporting architecture conditionally allocates exactly
+  two `/L` VMM stores: 4,096 fixed 16-byte physical-line metadata records and a
+  65,536-byte source-generated-byte mirror. Capture hooks `emitByte`, not
+  `emitRawByte`, so PRG headers and R6 metadata are excluded. Listing output is
+  raw PETSCII with CR terminators and 40-byte rows; `/M` walks symbol records in
+  definition order without sorting. These contracts do not authorize edits
+  before WP50's dedicated plan is approved.
+- WP50's approved Phase 0C.20 freeze is recorded at
+  `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`.
+  Exact listing spans come from a source-owned seven-byte completed-line
+  sidecar plus four internal block-base/line-start bytes, never from token
+  growth or `CasmSourceVmmCursor`. A listing transaction snapshots PC and byte
+  cursor before parse, commits after dispatch, and commits `.INCLUDE` before
+  frame push. WP50 authorizes planning/baseline work only; WP51 runtime edits
+  remain blocked pending its dedicated plan.
+- WP51's approved-but-blocked plan is
+  `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`.
+  It freezes two 65,535-byte allocation requests (each granted as 64 KiB), a
+  dedicated 64-byte mirror stage, post-`emitRawByte` mirroring, and separate
+  storage/real-path harnesses. Do not activate or implement WP51 before WP50's
+  completion gate.
+- WP52's approved-but-blocked plan is
+  `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
+  Definition-order reporting uses stateless `symbolsReadByIndex`, a map-owned
+  40-byte row buffer, and diagnostic `$42`; it owns no VMM/file resource and
+  remains uncalled by production until WP54.
+- WP53's approved-but-blocked plan is
+  `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
+  It freezes `.LST` derivation, bounded source-span reads, committed-PRG and
+  listing-specific ownership, resolved include `device:name` headers,
+  byte-before-source continuations, and reuse of idle `CasmIoBuffer` for
+  aggregate listing writes. Production `/L` remains gated to WP54.
+- WP54's approved-but-blocked plan is
+  `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
+  Production ordering is rewind, conditional capture allocation, PRG emission,
+  capture/PRG finalization, source close, PRG commit, listing commit, map, then
+  existing success output. One committed-aware artifact abort owns all fatal
+  paths; `test_casm_phase10` verifies orchestration before runtime acceptance.
 - Do not implement a phase until the user approves that phase's prerequisite
   contract gate. Phase 0A governs the scaffold; Phase 0B governs Phase 2 CLI
   and file services; later language/storage contracts remain Phase 0C work.

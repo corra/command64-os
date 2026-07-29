@@ -1978,6 +1978,45 @@ runs, not one clean pass.
   Master-plan Phase 10 remains inactive and separately gated. Progress and
   processing indication is a deferred optional feature outside the numbered
   phases.
+- The user approved the Phase 10 Symbol Map and Listing governing plan on
+  2026-07-29. `/M` uses definition-order `$HHHH LABEL` console rows with a
+  header and total. `/L` uses a derived `.LST`, raw PETSCII/CR, exact 40-column
+  rows, every physical source line, 4,096 fixed 16-byte metadata records, and a
+  separate 65,536-byte emitted-byte mirror. Post-finalization listing failure
+  retains the valid PRG and removes only the incomplete listing. WP50-WP55 are
+  sequential and pending; each requires a dedicated approved plan. The verified
+  `0.1.56` phase result receives a separate completion-only `0.2.0` promotion.
+- WP50 reconciliation found that exact listing spans cannot come from the
+  frozen token/lexer records or refill read head. The approved Phase 0C.20
+  design uses four source-internal block/line-start bytes plus a seven-byte
+  completed-line sidecar and `sourceTakeCompletedLine`. A Pass 2 transaction
+  snapshots PC/byte cursor before parsing and commits after dispatch, with
+  `.INCLUDE` committed before frame push. The 16-byte metadata ABI, explicit
+  65,536-byte full flag, and diagnostic reservation `$39-$41` are frozen.
+- The approved WP51 design requests each 64 KiB store as 65,535 bytes (the VMM
+  wrapper rejects a zero request and rounds 65,535 to 16 pages), uses a dedicated
+  64-byte mirror stage copied through shared `CasmVmmBuffer`, mirrors only after
+  `emitRawByte` succeeds, and splits verification between storage and real-path
+  capture harnesses. Production/test MAIN may be measured up to `$4C00`; WP51
+  remains blocked by WP50.
+- The approved WP52 design adds stateless definition-order
+  `symbolsReadByIndex`, a map-owned 40-byte row buffer/private formatters,
+  structural symbol-record validation, and locationless diagnostic `$42`.
+  `test_casm_map` captures exact `diagPrintString` rows. Map owns no VMM/file
+  resources, remains uncalled in production until WP54, and is capped at a
+  smallest-aligned production envelope no larger than `$4F00`.
+- The approved WP53 design adds `.LST` derivation, source-owned bounded span
+  reads, explicit committed PRG state, dedicated listing SEQ ownership, and a
+  replay serializer. Included headers render resolved `device:name`; byte
+  continuations precede source continuations; a 41-byte row buffer aggregates
+  into idle `CasmIoBuffer`. Post-commit failures retain PRG, diagnostics
+  `$3D-$41` become active, and production is capped at `$5800`.
+- The approved WP54 production sequence allocates `/L` stores after Pass 1
+  rewind but before PRG creation, then checks/finalizes capture and PRG, closes
+  source, commits PRG, writes listing, prints map, and finally prints the
+  existing success line. One committed-aware artifact abort handles every fatal
+  stage. `test_casm_phase10` verifies exact call/failure order; the production
+  envelope is capped at `$5B00`.
 
 ## C64 Platform Constraints Discovered
 
