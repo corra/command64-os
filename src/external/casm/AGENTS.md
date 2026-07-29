@@ -76,9 +76,8 @@ The `src/external/casm` directory owns CASM, a native Command 64
   distinct-source cap. **As of WP47 (`0.1.49`) `.INCLUDE` is operational**:
   it loads, traverses, and assembles nested includes through `casmRunPass`'s
   own dispatch. WP48 (included-source diagnostic filenames and bounded
-  include-site tracebacks) and WP49 (the phase completion gate) remain
-  outstanding, so included-file diagnostics still name files by CLI index
-  rather than by catalog identity -- do not describe that part as finished.
+  include-site tracebacks) is complete at `0.1.50`; WP49 (the phase completion
+  gate) remains outstanding. Do not describe Phase 9 as complete yet.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
@@ -186,6 +185,13 @@ The `src/external/casm` directory owns CASM, a native Command 64
   the byte returned belongs to the restored parent. Any stand-in
   `sourceNextByte` (e.g. `tests/src/casm_include/casm_include.s`, which links
   no `source.s`) must populate the same fields.
+- WP48 bit-packs every delivered byte's `FILE_ID`: bit 7 clear means bits
+  0-6 are a top-level root index; bit 7 set means bits 0-6 are an include
+  physical-catalog index. This meaning propagates through
+  `CasmLookaheadFileId`, token `CASM_TOKEN_REC_FILE_ID`, `CasmStmtLocFileId`,
+  and `CasmDiagLocFileId`. Readers must decode
+  `CASM_DIAG_FILEID_FRAME_FLAG`/`CASM_DIAG_FILEID_ID_MASK`, not assume a raw
+  CLI source index. The token record remains 39 bytes.
 - Depth-0 traversal is bounded by `CasmSourceTopLevelEndLo/Hi`, a fixed
   snapshot taken when `sourceLoad` completes -- not by
   `CasmSourceLoadedLenLo/Hi`, which keeps growing as `sourceAppendFile`

@@ -1393,10 +1393,33 @@ Parent plan:
       CASM `0.1.49` build 1196; no-change rebuild stable; all four disk
       images pass. Walkthrough:
       `brain/walkthroughs/2026-07-29-casm-phase9-wp47-ordered-include-graph-and-pass2-replay.md`.
-      **WP47 complete.** WP48 remains pending separate plan approval and
-      activation.
-- [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095`: WP48 included-source diagnostics
-      and tracebacks.
+      **WP47 complete.** At WP47 closeout, WP48 remained pending separate plan
+      approval and activation.
+- [x] `797bb460-6d82-453c-8f55-7aa53d2eb095`: WP48 included-source diagnostics
+      and tracebacks. **Complete** (2026-07-29). Plan:
+      `brain/plans/2026-07-29-casm-phase9-wp48-included-source-diagnostics-and-tracebacks.md`,
+      branch `feature/casm-phase9-wp48`. Fixed a live defect: a diagnostic
+      raised inside an included file previously named the wrong file
+      (`CasmSourceFileId` never tracks nested-frame identity). Bit-packs
+      (kind, id) into the existing token-record `FILE_ID` byte rather than
+      growing the frozen 39-byte record; adds a bounded include-site
+      traceback rendered from the still-live frame stack at
+      `diagPrintFatal` time (no new raise-time snapshot needed). No new
+      `CASM_DIAG_*` values.
+      Implementation and host-side verification are complete at candidate
+      build 1203. User-approved envelopes: production `$4300`,
+      `test_casm_pass1` `$4200`, `test_casm_frame` `$4100`; `test_casm_passcheck`
+      remains `$4000`. Review-found unterminated-child line-drain crossing is
+      fixed with a packed-identity boundary check and dedicated fixture.
+      Post-pop traceback depth and originating-root recovery are retained in
+      bounded frame arrays.
+      First runtime pass confirmed filenames/columns but exposed resume-line
+      misuse (`LINE 3`); dedicated include-site line arrays now correct it.
+      `test_casm_event` grew to approved `$1D00` after a measured 31-byte
+      overflow from the shared source-frame arrays.
+      The user confirmed all runtime walkthrough cases pass and explicitly
+      approved completion on 2026-07-29. Final CASM `0.1.50` build 1204;
+      WP49 remains pending and was not activated.
 - [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693`: WP49 verification, walkthrough,
       and Phase 9 completion gate.
 

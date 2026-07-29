@@ -957,6 +957,48 @@ file(WRITE "${OUTPUT_DIR}/casmfrr2.seq"
     "R2:${CASM_LF}"
 )
 
+# WP48 end-to-end included-source diagnostic fixture. The failure originates
+# in the grandchild, while both include sites begin at column 5. Production
+# CASM must name CASMIDC2.S and render two INCLUDED FROM lines in
+# innermost-to-root order, each reporting LINE 2 COLUMN 5.
+file(WRITE "${OUTPUT_DIR}/casmidp1.seq"
+    "ROOT:${CASM_LF}    .INCLUDE \"CASMIDC1.S\"${CASM_LF}AFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmidc1.seq"
+    "CHILD:${CASM_LF}    .INCLUDE \"CASMIDC2.S\"${CASM_LF}CHILDAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmidc2.seq"
+    "GRAND:${CASM_LF}    LDA MISSING${CASM_LF}"
+)
+
+# WP48 amendment: same nested failure with no newline after the grandchild's
+# failing statement. Fatal best-effort line draining must stop when child EOF
+# pops to the parent, rather than appending the parent's CHILDAFTER text to the
+# grandchild diagnostic line.
+file(WRITE "${OUTPUT_DIR}/casmidup1.seq"
+    "ROOT:${CASM_LF}    .INCLUDE \"CASMIDUC1.S\"${CASM_LF}ROOTAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiduc1.seq"
+    "CHILD:${CASM_LF}    .INCLUDE \"CASMIDUC2.S\"${CASM_LF}CHILDAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiduc2.seq"
+    "GRAND:${CASM_LF}    LDA MISSING"
+)
+
+# WP48 second amendment: invalid source byte before an unterminated child EOF.
+# The diagnostic is raised while the child frame is still active, then fatal
+# line-tail draining reaches EOF/pop. The packed-identity guard must stop before
+# the resumed parent's DRAINAFTER text is appended to the child echo.
+file(WRITE "${OUTPUT_DIR}/casmiddp1.seq"
+    "ROOT:${CASM_LF}    .INCLUDE \"CASMIDDC1.S\"${CASM_LF}ROOTAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiddc1.seq"
+    "CHILD:${CASM_LF}    .INCLUDE \"CASMIDDC2.S\"${CASM_LF}DRAINAFTER:${CASM_LF}"
+)
+file(WRITE "${OUTPUT_DIR}/casmiddc2.seq"
+    "GRAND:${CASM_LF}    .BYTE @"
+)
+
 # ---------------------------------------------------------------------------
 # WP47 end-to-end `.INCLUDE` fixtures.
 #

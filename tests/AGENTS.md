@@ -64,6 +64,16 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   second naming mismatch. Running it needs both drives -- boot `test.d64` on
   device 8, then switch to device 9 (`9:` at the shell) where
   `casm_overflow_test.d64` is attached.
+- WP48 adds `casmidp1.s`, `casmidc1.s`, and `casmidc2.s` to
+  `casm_include_test.d64`. Running `CASM CASMIDP1.S` must fail in the
+  grandchild, name `CASMIDC2.S`, and print two `INCLUDED FROM` lines in
+  innermost-to-root order with `LINE 2 COLUMN 5`.
+- `casmidup1.s`/`casmiduc1.s`/`casmiduc2.s` repeat that failure with an
+  unterminated final identifier, proving packed identity and traceback depth
+  can be recovered after normal lexer lookahead already popped the child.
+- `casmiddp1.s`/`casmiddc1.s`/`casmiddc2.s` raise an invalid-byte diagnostic
+  before an unterminated child EOF. Fatal line draining must not append
+  `DRAINAFTER`, `ROOTAFTER`, or other parent bytes after frame EOF/pop.
 
 ## Child DOX Index
 

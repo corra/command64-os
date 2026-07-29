@@ -1236,8 +1236,41 @@
       completion. Final CASM `0.1.49` build 1196; no-change rebuild stable;
       all four disk images pass. **WP47 complete.** WP48 unblocked in
       Taskwarrior but deliberately not activated
-  - [ ] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics
-        and tracebacks
+  - [x] `797bb460-6d82-453c-8f55-7aa53d2eb095` WP48 included-source diagnostics
+        and tracebacks — complete 2026-07-29. Plan:
+        `brain/plans/2026-07-29-casm-phase9-wp48-included-source-diagnostics-and-tracebacks.md`,
+        branch `feature/casm-phase9-wp48`
+    - Fixed a live defect: a diagnostic raised inside an included file
+      previously named the wrong file — `CasmSourceFileId` only tracked the
+      top-level index and is never updated while a nested frame is active
+    - User-confirmed scope: bit-pack (kind, id) into the existing 1-byte
+      `FILE_ID` field rather than grow the frozen 39-byte token record; add
+      a dedicated `CasmFrameSiteColumn` array rather than reuse
+      `CasmFrameResumeColumn` for the traceback's per-frame column
+    - Traceback renders from the still-live frame stack at
+      `diagPrintFatal` time — no raise-time snapshot needed, since nothing
+      pops a frame before cleanup runs
+    - No new `CASM_DIAG_*` values. `test_casm_pass1`/`test_casm_passcheck`
+      will need `include.s` added to their link for the first time, likely
+      forcing envelope bumps
+    - [x] Implement packed root/catalog provenance and dedicated include-site
+      column capture
+    - [x] Implement catalog-backed physical filenames and bounded traceback
+      rendering with non-masking fallback
+    - [x] Add the production nested-failure fixture chain and build all four
+      disk images
+    - [x] Fix review-found parent-byte append after unterminated child EOF and
+      add a dedicated nested boundary fixture
+    - [x] Recover post-pop traceback depth and originating root from retained
+      bounded frame metadata
+    - [x] Replace runtime-disproven resume-line reuse with dedicated include-site
+      line arrays; raise `test_casm_pass1` to approved `$4200`
+    - [x] Raise whole-object `test_casm_event` to approved `$1D00` after its
+      measured 31-byte overflow
+    - [x] Complete the user runtime walkthrough and approve completion; user
+          reported all tests pass and explicitly approved completion on
+          2026-07-29. Final CASM `0.1.50` build 1204; WP49 remains pending and
+          inactive
   - [ ] `a8c3dbf0-9333-4489-9c3b-3e752049b693` WP49 verification, walkthrough,
         and Phase 9 completion gate
 

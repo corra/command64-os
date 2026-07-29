@@ -50,6 +50,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM included-source diagnostics**: diagnostics raised inside nested
+  `.INCLUDE` files now name the actual physical included file instead of the
+  outermost top-level source. Fatal output also prints a bounded
+  innermost-to-root include-site traceback with each parent's filename, line,
+  and column. Root-only single-source diagnostic output remains unchanged.
+  Runtime verification passed and CASM advanced to `0.1.50` build 1204.
 - **Cross-device COPY truncation**: `COPY` performed command-channel readiness
   and source verification while another drive's data channel was open. Closing
   or switching LFN 15 invalidated that data channel, so the next read or write
