@@ -4,7 +4,7 @@
 # back to a binary at build time by scripts/hex_manifest_to_bin.py,
 # which contains no 6502 knowledge and no assembler of any kind.
 #
-# provenance:  PLACEHOLDER - ca65 dash_ref build, NOT native CASM. Pending the reviewed native run required by the WP4 artifact contract; regenerate with the CASM-produced PRG and drop --allow-host-bytes.
+# provenance -  PLACEHOLDER - ca65 dash_ref build, NOT native CASM. Pending the reviewed native run required by the WP4 artifact contract; regenerate with the CASM-produced PRG and drop --allow-host-bytes.
 # cross-check: MATCHES dash_ref.prg (923 bytes) byte-for-byte
 # load addr:   $3400
 #
