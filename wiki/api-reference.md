@@ -232,6 +232,30 @@ Populates a caller-supplied 24-byte buffer with current system metrics, includin
   - Offset 21: `AppUsedSlots` (1 byte count of active slots)
   - Offsets 22-23: `Reserved` (2 bytes = `$0000`)
 
+### DOS_GET_APP_INFO ($5D)
+
+Populates a caller-supplied 24-byte buffer with normalized application information for a requested slot index (0..15).
+
+- **Input:**
+  - `HexValLo` ($61): Requested slot index (0..15).
+  - `X/Y`: Pointer to caller-supplied 24-byte buffer (Lo/Hi).
+- **Output:**
+  - `Carry` = 0: Success, `A` = `$00` (`DOS_ERR_OK`), buffer populated.
+  - `Carry` = 1: Failure with specific error code in `A` (buffer **unchanged**):
+    - `A` = `$01` (`DOS_ERR_INVALID_INDEX`): Slot index >= 16.
+    - `A` = `$02` (`DOS_ERR_SLOT_EMPTY`): Slot is unallocated.
+    - `A` = `$03` (`DOS_ERR_UNAVAILABLE`): VMM/AppTable not initialized.
+    - `A` = `$04` (`DOS_ERR_INVALID_ARG`): Null or invalid buffer pointer.
+- **Record Structure (24 Bytes):**
+  - Offset 0: `StructVersion` (1 byte = `$01`)
+  - Offset 1: `StructSize` (1 byte = `24`)
+  - Offset 2: `SlotIndex` (1 byte = requested index 0..15)
+  - Offset 3: `Flags` (1 byte bitmask: bit 0 = Used, 1 = Running, 2 = REU, 3 = Stack)
+  - Offsets 4-5: `LoadAddr` (2 bytes, little-endian word)
+  - Offsets 6-7: `Size` (2 bytes, little-endian word)
+  - Offset 8: `NameLen` (1 byte PETSCII length, 0..15)
+  - Offsets 9-23: `NameData` (15 PETSCII characters, null-padded)
+
 ### DOS_EXIT ($4C)
 
 Termates the program and returns to the command64 shell.

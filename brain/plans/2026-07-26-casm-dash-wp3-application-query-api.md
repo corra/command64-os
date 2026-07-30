@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp3-application-query-api
 created: 2026-07-26
-status: draft
+updated: 2026-07-27
+status: complete
 ---
 
 # Plan: DASH WP3 - Application Query API

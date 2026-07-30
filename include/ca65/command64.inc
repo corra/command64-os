@@ -101,6 +101,19 @@ SYS_INFO_OFF_USD_SLOT = 21  ; AppUsedSlots (1 byte)
 SYS_INFO_OFF_RES0     = 22  ; Reserved (1 byte)
 SYS_INFO_OFF_RES1     = 23  ; Reserved (1 byte)
 
+; --- Application Information Record Constants ---
+APP_INFO_SIZE         = 24  ; Byte size of DOS_GET_APP_INFO structure
+APP_INFO_OFF_VER      = 0   ; StructVersion (1 byte)
+APP_INFO_OFF_SIZE     = 1   ; StructSize (1 byte = 24)
+APP_INFO_OFF_SLOT     = 2   ; SlotIndex (1 byte: 0..15)
+APP_INFO_OFF_FLAGS    = 3   ; Flags (1 byte: bit 0=used, 1=running, 2=reu, 3=stack)
+APP_INFO_OFF_LOAD_LO  = 4   ; LoadAddr low byte
+APP_INFO_OFF_LOAD_HI  = 5   ; LoadAddr high byte
+APP_INFO_OFF_SIZE_LO  = 6   ; Size low byte
+APP_INFO_OFF_SIZE_HI  = 7   ; Size high byte
+APP_INFO_OFF_NAME_LEN = 8   ; NameLen (1 byte: 0..15)
+APP_INFO_OFF_NAME_DATA= 9   ; NameData (15 bytes PETSCII, null-padded)
+
 ; --- PETSCII Control Characters ---
 PetCr   = $0D ; Carriage return
 PetLl   = $0A ; Line feed

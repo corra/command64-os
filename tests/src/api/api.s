@@ -101,6 +101,55 @@ start:
     cmp #16
     bne test_fail
 
+    ; --- Test 3: DOS_GET_APP_INFO Out of Bounds Slot Index (A = 16) ---
+    lda #16                ; Invalid slot index
+    ldx #<app_buf
+    ldy #>app_buf
+    lda #DOS_GET_APP_INFO  ; Load function code (note: A parameter is slot index, passed in A before dispatch)
+    ; In calling convention, A = Function code, but for DOS_GET_APP_INFO, slot index is in HexValLo or passed via A
+    ; Let's pass slot index 16 in A for DOS_GET_APP_INFO
+    lda #16
+    ldx #<app_buf
+    ldy #>app_buf
+    lda #DOS_GET_APP_INFO
+    ; Note: ahGetAppInfo checks slot index in A.
+    lda #16
+    ldx #<app_buf
+    ldy #>app_buf
+    jsr call_get_app_info_16
+    bcc test_fail          ; Carry must be set on out of bounds index
+    cmp #DOS_ERR_INVALID_INDEX
+    bne test_fail
+
+    ; --- Test 4: DOS_GET_APP_INFO Null Pointer ---
+    lda #0                 ; Slot index 0
+    ldx #0
+    ldy #0
+    jsr call_get_app_info
+    bcc test_fail          ; Carry must be set on null pointer
+    cmp #DOS_ERR_INVALID_ARG
+    bne test_fail
+
+    ; --- Test 5: DOS_GET_APP_INFO Unallocated / Unavailable Slot ---
+    lda #$AA
+    sta app_guard_pre
+    lda #$55
+    sta app_guard_post
+
+    lda #0                 ; Slot index 0
+    ldx #<app_buf
+    ldy #>app_buf
+    jsr call_get_app_info
+    bcc test_fail          ; Carry must be set on empty/unavailable slot
+
+    ; Verify Guard Bytes preserved
+    lda app_guard_pre
+    cmp #$AA
+    bne test_fail
+    lda app_guard_post
+    cmp #$55
+    bne test_fail
+
     ; Print Success Message
     lda #DOS_PRINT_STR
     ldx #<pass_msg
@@ -109,6 +158,17 @@ start:
 
     lda #DOS_EXIT
     jsr OS_API
+
+call_get_app_info_16:
+    lda #16
+    .byte $2C              ; BIT skip
+call_get_app_info:
+    lda #0                 ; Slot 0
+    ; Save slot index in ZP scratch ($61 HexValLo) before setting A = DOS_GET_APP_INFO
+    sta HexValLo
+    lda #DOS_GET_APP_INFO
+    jsr OS_API
+    rts
 
 test_fail:
     lda #DOS_PRINT_STR
@@ -129,7 +189,7 @@ msg:
     .byte $54, $50, $55, $54, $20, $57, $4F, $52, $4B, $53, $21, $0D, $00
 
 pass_msg:
-    .byte $0D, $44, $4F, $53, $5F, $47, $45, $54, $5F, $53, $59, $53, $54, $45, $4D, $5F, $49, $4E, $46, $4F, $20, $50, $41, $53, $53, $45, $44, $21, $0D, $00
+    .byte $0D, $44, $4F, $53, $5F, $47, $45, $54, $5F, $53, $59, $53, $54, $45, $4D, $5F, $49, $4E, $46, $4F, $20, $41, $4E, $44, $20, $41, $50, $50, $5F, $49, $4E, $46, $4F, $20, $50, $41, $53, $53, $45, $44, $21, $0D, $00
 
 fail_msg:
     .byte $0D, $41, $50, $49, $20, $54, $45, $53, $54, $20, $46, $41, $49, $4C, $45, $44, $21, $0D, $00
@@ -138,3 +198,6 @@ fail_msg:
 sys_guard_pre:  .res 1
 sys_buf:        .res 24
 sys_guard_post: .res 1
+app_guard_pre:  .res 1
+app_buf:        .res 24
+app_guard_post: .res 1

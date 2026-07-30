@@ -80,6 +80,19 @@
 .label SYS_INFO_OFF_RES0     = 22  // Reserved (1 byte)
 .label SYS_INFO_OFF_RES1     = 23  // Reserved (1 byte)
 
+// --- Application Information Record Constants ---
+.label APP_INFO_SIZE         = 24  // Byte size of DOS_GET_APP_INFO structure
+.label APP_INFO_OFF_VER      = 0   // StructVersion (1 byte)
+.label APP_INFO_OFF_SIZE     = 1   // StructSize (1 byte = 24)
+.label APP_INFO_OFF_SLOT     = 2   // SlotIndex (1 byte: 0..15)
+.label APP_INFO_OFF_FLAGS    = 3   // Flags (1 byte: bit 0=used, 1=running, 2=reu, 3=stack)
+.label APP_INFO_OFF_LOAD_LO  = 4   // LoadAddr low byte
+.label APP_INFO_OFF_LOAD_HI  = 5   // LoadAddr high byte
+.label APP_INFO_OFF_SIZE_LO  = 6   // Size low byte
+.label APP_INFO_OFF_SIZE_HI  = 7   // Size high byte
+.label APP_INFO_OFF_NAME_LEN = 8   // NameLen (1 byte: 0..15)
+.label APP_INFO_OFF_NAME_DATA= 9   // NameData (15 bytes PETSCII, null-padded)
+
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return
 .label PetLl   = $0A  // Line feed
