@@ -283,8 +283,32 @@ set(BANNER_TARGET banner)
 # CASM always emits at $3400, so a reference linked anywhere else would differ
 # in every absolute operand and could never match. DASH is relocatable, so the
 # pinned origin has no runtime consequence.
+#
+# dmain.s is the single entry point for BOTH toolchains: it pulls in the other
+# six sources via native CASM's .INCLUDE, using the same uppercase operand
+# spelling ("DSCR.S" etc.) that already matches the disk directory entries
+# cc1541 -f writes (proven by the existing multi-file CLI, which opens these
+# exact files under these exact uppercase names today). ca65, though, resolves
+# .include operands as literal filesystem paths on this case-sensitive host,
+# and the checked-in files are lowercase (dscr.s). Rather than duplicate the
+# include order a second time in dash_wrapper.s (which is exactly the
+# hand-synced-in-two-places risk this restructuring removes), generate
+# uppercase symlinks at configure time and hand ca65 an extra -I directory so
+# the identical "DSCR.S"-spelled operand resolves for both toolchains without
+# renaming any checked-in source file.
 if(Ca65_FOUND)
-    add_ca65_app(dash_ref "${DASH_ENTRY}" DASH_SRCS 1000 "1000" BASE_HEX "3400")
+    set(DASH_REF_SHIM_DIR "${CMAKE_BINARY_DIR}/dash_ref_includes")
+    file(MAKE_DIRECTORY "${DASH_REF_SHIM_DIR}")
+    foreach(DASH_SUB dscr.s dfmt.s dsys.s dapp.s dvmm.s ddata.s)
+        string(TOUPPER "${DASH_SUB}" DASH_SUB_UPPER)
+        file(CREATE_LINK
+            "${CMAKE_SOURCE_DIR}/src/external/dash/${DASH_SUB}"
+            "${DASH_REF_SHIM_DIR}/${DASH_SUB_UPPER}"
+            SYMBOLIC COPY_ON_ERROR
+        )
+    endforeach()
+    add_ca65_app(dash_ref "${DASH_ENTRY}" DASH_SRCS 1000 "1000" BASE_HEX "3400"
+        EXTRA_INCLUDE_DIRS "${DASH_REF_SHIM_DIR}")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for DASH_REF target")
 endif()

@@ -24,6 +24,12 @@ DASH is a CASM-assembled, relocatable, three-page system dashboard utility for C
   - ZP `$73-$74`: `screenDestPtr`
   - ZP `$75-$76`: `stringSrcPtr`
   - ZP `$77`: `currentCol` index
+  - ZP `$78-$79`: formatting/division working value (`FORMATHEX16`, `FORMATDEC16`, `DIV10`); also used transiently as `SCREENPUTCHAR`'s color-pointer input before being copied to `$7B-$7C`
+  - ZP `$7A`: `DIV10` remainder accumulator
+  - ZP `$7B-$7C`: `SCREENPUTCHAR`/`HIGHLIGHTTABS` color-cell pointer
+  - ZP `$7D`: `SCREENPUTCHAR` character stash; `HIGHLIGHTTABS` chosen-color stash
+  - ZP `$7E`: `SCREENPUTSTRING` clamped max-length; `HIGHLIGHTTABS` per-tab length
+  - ZP `$7F`: `SCREENPUTSTRING` saved source-string index (needed because `SCREENPUTCHAR` clobbers Y)
 - **OS API Jump Table**: Exclusively queries kernel services via `$1000` jump table.
 - **Exit Procedure**: Terminates using `DOS_EXIT` (`A = $4C`, `JSR $1000`).
 
@@ -36,7 +42,8 @@ DASH is a CASM-assembled, relocatable, three-page system dashboard utility for C
   - **No equates.** Constants are raw literals or ZP address targets.
   - **Accumulator shifts must be written `asl a`.** CASM maps a no-operand shift to `MODE_IMPLIED` and has *no* implied-to-accumulator fallback (`opcodesFindOpcode`), so a bare `asl` is a hard `CASM_DIAG_INVALID_ADDR_MODE`. ca65 accepts both spellings; only `asl a` works in both.
   - **Expressions are bounded**: one symbol or literal, an optional `<`/`>` prefix, and an optional `± NUMBER`. No parenthesised or multiplicative arithmetic.
-- **Source Order Is Authoritative**: the CASM command line's order and `dash_wrapper.s`'s `.include` order must match exactly, or the two toolchains lay the program out differently and the comparison is meaningless. `ddata.s` stays last so data follows all code.
+- **Source Order Is Authoritative, Specified Once**: `dmain.s` pulls in the other six sources itself via `.INCLUDE "DSCR.S"` / `.INCLUDE "DFMT.S"` / ... / `.INCLUDE "DDATA.S"` (native CASM's include facility, operational since CASM WP47), and `dash_wrapper.s` (the ca65-only wrapper) does nothing but `.include "dmain.s"` — its own `.INCLUDE` chain then does the rest for both toolchains. `ddata.s` stays last so data follows all code. Because both toolchains now read the order from the same six lines instead of it being hand-duplicated between a CASM command line and `dash_wrapper.s`'s own include list, the two can no longer silently drift out of sync.
+  - **Case mismatch is expected and handled by the build, not the source**: the `.INCLUDE` operands are uppercase (`"DSCR.S"`), matching the uppercase PETSCII directory entries `cc1541 -f` writes on the packaged disk (same byte-matching mechanism the old multi-file CLI already relied on). ca65 resolves `.include` operands as literal filesystem paths on this case-sensitive host, where the real files are lowercase (`dscr.s`). `CMakeLists.txt` generates uppercase symlinks into `${CMAKE_BINARY_DIR}/dash_ref_includes/` at configure time and passes that directory to the `dash_ref` ca65 build via `add_ca65_app`'s `EXTRA_INCLUDE_DIRS`, so the identical operand spelling resolves for both toolchains without renaming any checked-in file.
 - **Dispatch Trampoline**: High/low bytes of the target page routine are stashed into ZP `$70/$71`. The return address is set by pushing `dispatchReturnMinusOne` onto the stack before executing `JMP ($0070)`.
 
 # Artifact Provenance
@@ -49,13 +56,19 @@ DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a P
 
 # Native Assembly Workflow
 
-Everything needed lives on `command64_casm_utils.d64` (casm.prg, comp.prg, the seven sources as SEQ, and the ca65 reference as `dash.ref`). Because the OS loads external commands from `CurrentDevice`, switching to that drive means no command needs a `9:` prefix — which matters, since prefixes cost 2 bytes per source token against the shell's 80-byte `CommandBuffer`.
+Everything needed lives on `command64_casm_utils.d64` (casm.prg, comp.prg, the seven sources as SEQ, and the ca65 reference as `dash.ref`). Because the OS loads external commands from `CurrentDevice`, switching to that drive means no command needs a `9:` prefix.
 
 ```text
 DRIVE 9
-CASM DMAIN.S DSCR.S DFMT.S DSYS.S DAPP.S DVMM.S DDATA.S /O:DASH.PRG   (67 bytes)
+CASM DMAIN.S /O:DASH.PRG
 COMP DASH.PRG DASH.REF
 ```
+
+`dmain.s`'s own `.INCLUDE` chain pulls in the other six sources (see Source
+Order Is Authoritative above), so the command line only ever names the entry
+file — the old seven-file line (`CASM DMAIN.S DSCR.S DFMT.S DSYS.S DAPP.S
+DVMM.S DDATA.S /O:DASH.PRG`, 67 of the shell's 80-byte `CommandBuffer`) is no
+longer needed, freeing that headroom for future growth.
 
 Native CASM requires an REU for assembly; the resulting DASH runtime does not.
 

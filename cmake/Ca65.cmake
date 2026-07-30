@@ -49,8 +49,18 @@
 # would silently shift every absolute operand in the reference and turn the
 # comparison into a guaranteed mismatch. Relocatable output means the pinned
 # origin costs nothing at runtime.
+#
+# Optional keyword argument: EXTRA_INCLUDE_DIRS. Extra -I search directories
+# appended after the standard three (source dir, include/ca65, generated
+# build_<name>.inc dir). Only DASH needs this: its .INCLUDE operands are
+# uppercase PETSCII-matching filenames (e.g. "DSCR.S") so native CASM on a
+# case-preserving CBM disk resolves them, but the real host files are
+# lowercase (dscr.s) on this case-sensitive filesystem. The caller points
+# this at a directory of uppercase symlinks/copies so ca65's cross-check
+# build resolves the identical operand ca65-side, without renaming any
+# checked-in source file.
 function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZE_HEX)
-    cmake_parse_arguments(CA65APP "" "BASE_HEX" "" ${ARGN})
+    cmake_parse_arguments(CA65APP "" "BASE_HEX" "EXTRA_INCLUDE_DIRS" ${ARGN})
 
     # CODE_ALIGN stays positional so the existing 6-arg call sites need no
     # change; it is simply whatever positional argument survives keyword parsing.
@@ -174,10 +184,15 @@ SEGMENTS {
         get_filename_component(SRC_DIR "${SRC_ABS}" DIRECTORY)
         get_filename_component(SRC_NAME "${SRC_ABS}" NAME_WE)
         set(OBJ "${OUT_DIR}/${SRC_NAME}.o")
+        set(EXTRA_I_FLAGS "")
+        foreach(EXTRA_DIR ${CA65APP_EXTRA_INCLUDE_DIRS})
+            list(APPEND EXTRA_I_FLAGS "-I" "${EXTRA_DIR}")
+        endforeach()
         add_custom_command(
             OUTPUT "${OBJ}"
             COMMAND "${CA65_EXECUTABLE}" "${SRC_ABS}"
                 -I "${SRC_DIR}" -I "${CMAKE_SOURCE_DIR}/include/ca65" -I "${INC_DIR}"
+                ${EXTRA_I_FLAGS}
                 -t c64 -o "${OBJ}"
             # DEPENDS the full source/include set (via HASH_SOURCES, which
             # -- like add_external_app's SOURCES_VAR convention -- should
