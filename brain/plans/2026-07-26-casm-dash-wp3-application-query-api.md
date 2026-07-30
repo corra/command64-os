@@ -218,7 +218,7 @@ User walkthrough:
 - Inclusive arithmetic wraps.
 - Truthful running state cannot cover `DOS_EXIT`.
 - Required staging has no approved owner.
-- Resident growth threatens `$3400`.
+- Resident growth threatens `UserProgStart` (`$3800`).
 
 ## Completion Gate
 

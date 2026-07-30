@@ -102,7 +102,7 @@ defensive marker on overflow.
 - No direct `AptSeg`, MCT, VMM-table offset, or REU-register access.
 - All 16 rows remain inside the content area.
 - WP3 occupied/empty/invalid/unavailable/malformed tests pass.
-- At `$3400/$4000/$5000`, DASH displays its actual registered range and all
+- At `$3800/$5000/$9000`, DASH displays its actual registered range and all
   other loaded applications correctly.
 - Empty slots do not expose stale names.
 - Full table does not overwrite frame/status.

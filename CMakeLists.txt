@@ -31,8 +31,19 @@ include(Ca65)
 set(DISK_NAME "Command 64")
 set(DISK_ID "2a")
 
-# Origin for user executable programs (default $3800). CASM's independent
-# default emission origin remains $3400; R6 binaries are relocated when loaded.
+# Origin for user executable programs (default $3800).
+#
+# This has been raised whenever resident OS segments outgrew the space below it
+# ($2000 -> $2200 -> $2600 -> $2C00 -> $3200 -> $3400 -> $3800). The move to
+# $3800 accommodates the DOS_GET_SYSTEM_INFO ($5C) / DOS_GET_APP_INFO ($5D)
+# handler bodies, which pushed the OS image to $3538.
+#
+# NOTE: this is deliberately NOT the same thing as CASM's emission origin
+# (CASM_DEFAULT_ORIGIN, $3400, in src/external/casm/common.inc). CASM emits
+# relocatable R6 output whose footer records $3400 as the relocation base; the
+# OS loader relocates it to wherever it is actually loaded, so the two values
+# are free to differ. Anything compared byte-for-byte against native CASM
+# output must be linked at CASM's origin -- see add_ca65_app's BASE_HEX.
 set(USER_PROG_START_HEX "3800" CACHE STRING "Hex origin for user programs")
 set(USER_PROG_START_HEX_NEXT "3900" CACHE STRING "Hex origin for next page relocation build")
 set(USER_PROG_START_ADDR "$${USER_PROG_START_HEX}")
@@ -79,6 +90,9 @@ set(PACMAN_GAME_SOURCE "${CMAKE_SOURCE_DIR}/src/external/pacman/pacman_game.s")
 
 file(GLOB_RECURSE BANNER_SRCS CONFIGURE_DEPENDS "src/external/banner/*.s" "src/external/banner/*.inc" "include/ca65/*.inc")
 set(BANNER_ENTRY "src/external/banner/banner.s")
+
+file(GLOB_RECURSE DASH_SRCS CONFIGURE_DEPENDS "src/external/dash/*.s" "src/external/dash/*.inc" "include/ca65/*.inc")
+set(DASH_ENTRY "src/external/dash/dash_wrapper.s")
 
 file(GLOB_RECURSE VI_SRCS CONFIGURE_DEPENDS "src/external/vi/*.asm" "include/*.inc")
 set(VI_ENTRY "src/external/vi/vi.asm")
@@ -259,6 +273,21 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for BANNER target")
 endif()
 set(BANNER_TARGET banner)
+
+# DASH_REF Reference Target — host ca65/ld65 build of the very same seven
+# sources, existing only to be compared byte-for-byte against native CASM
+# output. It is NEVER the source of shipped bytes (see the DASH production
+# target below).
+#
+# BASE_HEX pins it to CASM's emission origin rather than USER_PROG_START_HEX:
+# CASM always emits at $3400, so a reference linked anywhere else would differ
+# in every absolute operand and could never match. DASH is relocatable, so the
+# pinned origin has no runtime consequence.
+if(Ca65_FOUND)
+    add_ca65_app(dash_ref "${DASH_ENTRY}" DASH_SRCS 1000 "1000" BASE_HEX "3400")
+else()
+    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for DASH_REF target")
+endif()
 
 # 4b. PACMAN — character-grid Pac-Man clone
 if(Ca65_FOUND)
@@ -530,7 +559,34 @@ endforeach()
 
 add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 
+# DASH Production Target — generated from the reviewed hex manifest.
+#
+# PROVENANCE: the manifest records bytes produced by the NATIVE CASM assembler
+# running on the C64 against the seven sources in src/external/dash/, packaged
+# as SEQ files on command64_casm_utils.d64 (see that image target below). The
+# dash_ref ca65 target is an INDEPENDENT cross-check only -- it must never be
+# the source of manifest bytes. Regenerating the manifest is a deliberate,
+# reviewed act (scripts/build_dash_manifest.py), never a build step, so a
+# source edit can never silently change what ships.
+set(DASH_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/dash/dash.ref.hex")
+set(DASH_BIN "${CMAKE_BINARY_DIR}/dash.prg")
+add_custom_command(
+    OUTPUT "${DASH_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${DASH_MANIFEST}" "${DASH_BIN}"
+    DEPENDS "${DASH_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+    COMMENT "Generating DASH production binary from manifest"
+    VERBATIM
+)
+add_custom_target(dash ALL DEPENDS "${DASH_BIN}")
+set_target_properties(dash PROPERTIES C64_PRG_PATH "${DASH_BIN}")
+
 # 6. Disk images
+# DASH deliberately does NOT ship here: it is packaged on
+# command64_casm_utils.d64, the native-CASM development disk, until its
+# manifest is backed by a reviewed native CASM run (WP4 artifact contract).
 set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${CASM_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 # test_l15release ships on casm_overflow_test_d64 instead (see that target's
@@ -737,11 +793,24 @@ add_c64_disk_image(test_image_d64
 add_dependencies(test_image_d64 casm_test_fixtures)
 add_dependencies(test_image_d64 casm_reference_fixtures)
 
+# The native-CASM development disk: the target of all CASM native tool work.
+#
+# It is deliberately SELF-CONTAINED. The OS loads an external command from
+# CurrentDevice (see loader.asm's SETLFS), so once the user types "DRIVE 9"
+# every part of a native assembly run -- the CASM binary, the sources, the
+# output, and the COMP verifier -- lives on this one disk, and no CASM command
+# line needs a "9:" device prefix. That matters directly: prefixes cost 2 bytes
+# per source token, and DASH's seven-source command has to fit the shell's
+# 80-byte CommandBuffer.
+#
+# Carries casm.prg (the assembler under test) and comp.prg (native byte-for-
+# byte file comparison) alongside each app's sources, mirroring how
+# casm_overflow_test_d64 pairs fixtures with comp.prg for verification.
 add_c64_disk_image(command64_casm_utils_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     DISK_LABEL "CASM UTILS"
     DISK_ID "${DISK_ID}"
-    PRGS ${BANNER_TARGET}
+    PRGS ${BANNER_TARGET} ${CASM_TARGET} ${COMP_TARGET}
 )
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
@@ -751,6 +820,67 @@ add_custom_command(
     COMMENT "Appending banner.s source to command64_casm_utils.d64"
     VERBATIM
 )
+
+# DASH's seven sources, as SEQ files, in the authoritative assembly order.
+# That order is not cosmetic: CASM emits one linear stream in command-line
+# order, so it -- and dash_wrapper.s's matching .include order -- is what makes
+# the native and ca65 layouts comparable. ddata.s must stay last so the data
+# block follows all code.
+#
+# Written with cc1541 -w (verbatim host bytes), so the on-disk source is the
+# same ASCII the repo and ca65 see. The lowercase -f spelling matches the
+# banner.s precedent already proven to open from native CASM (see
+# project-cc1541-filename-case for why -f case is load-bearing).
+set(DASH_SEQ_SOURCES dmain.s dscr.s dfmt.s dsys.s dapp.s dvmm.s ddata.s)
+
+# Gate the packaging on a CASM-lexability check of the exact bytes about to be
+# written. cc1541 -w does no character-set translation, so any ASCII lowercase
+# here reaches the C64 as PETSCII graphics codes and CASM rejects the source --
+# a failure that shows up on the C64 looking like a program or assembler
+# problem, not an encoding one. Note dash_wrapper.s is deliberately absent: it
+# is ca65-only, never packaged, and free to use lowercase and .segment.
+set(DASH_SEQ_ABS "")
+foreach(DASH_SEQ IN LISTS DASH_SEQ_SOURCES)
+    list(APPEND DASH_SEQ_ABS "${CMAKE_SOURCE_DIR}/src/external/dash/${DASH_SEQ}")
+endforeach()
+add_custom_command(
+    TARGET command64_casm_utils_d64 PRE_BUILD
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/check_casm_source_bytes.py"
+        ${DASH_SEQ_ABS} "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
+    COMMENT "Verifying native-CASM sources are uppercase ASCII"
+    VERBATIM
+)
+
+foreach(DASH_SEQ IN LISTS DASH_SEQ_SOURCES)
+    add_custom_command(
+        TARGET command64_casm_utils_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${DASH_SEQ}" -T SEQ
+            -w "${CMAKE_SOURCE_DIR}/src/external/dash/${DASH_SEQ}"
+            "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
+        COMMENT "Appending DASH source ${DASH_SEQ} to command64_casm_utils.d64"
+        VERBATIM
+    )
+endforeach()
+
+# The ca65 reference build, shipped as DASH.REF so the native run can be
+# verified on the C64 itself with "COMP DASH.PRG DASH.REF".
+#
+# This is a genuinely non-circular check, the same principle as CASM's
+# hand-derived trusted-reference fixtures: ca65 and CASM share no code, and
+# they derive relocation entries by completely different means -- tools/reloc.py
+# diffs two links one page apart, while CASM classifies each operand as
+# relocatable during emission. A defect in one cannot reproduce itself in the
+# other. The reference is EVIDENCE for the manifest review, never its source.
+add_custom_command(
+    TARGET command64_casm_utils_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "dash.ref" -T PRG
+        -w "${CMAKE_BINARY_DIR}/dash_ref.prg"
+        "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
+    COMMENT "Appending ca65 cross-check reference dash.ref to command64_casm_utils.d64"
+    VERBATIM
+)
+add_dependencies(command64_casm_utils_d64 dash_ref)
 
 
 # Large-source CASM fixtures whose raw .seq text does not fit on test.d64

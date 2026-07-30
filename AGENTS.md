@@ -89,8 +89,8 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
     + DO: Save scripts in a `scripts` folder in the project so they may be reusede. If a script is worth writing once it is worth saving to prevent reduntant work later.
     + ALWAYS: If a script become part of the build process it **must be integrated** into the build system.
 6.
-    + DO: Use the *build system* `cmake` and `make` are explicitly *allowed*
-    + DO NOT: Use assembelr and linker tools directly *without explicit permission* which require *justifiable purpose*
+    + DO: Use the **build system** `cmake` and `make` **are explicitly ALWAYS allowed**
+    + DO NOT: Use assembler and linker tools directly **without explicit permission** which require *justifiable purpose*
 
 ### Technical Execution & Verification
 

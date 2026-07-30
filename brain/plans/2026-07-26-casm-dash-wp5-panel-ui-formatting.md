@@ -117,7 +117,7 @@ formatDec16  -> right-aligned 1-5 digit unsigned field
 - Applications page retains 17 required rows.
 - R6 growth is explained by local pointers only; fixed screen/color rows do
   not appear in relocation records.
-- At `$3400/$4000/$5000`, user confirms frame alignment, active tabs, bounded
+- At `$3800/$5000/$9000`, user confirms frame alignment, active tabs, bounded
   placeholder content, refresh behavior, and clean Q exit.
 - Behavior matches with and without REU.
 

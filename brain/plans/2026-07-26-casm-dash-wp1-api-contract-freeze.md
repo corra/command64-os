@@ -60,8 +60,18 @@ Parent plan: `brain/plans/2026-07-26-casm-dash-system-dashboard.md`.
 
 ### Discrepancy 6: Program Limit & User Space
 - **Frozen**:
-  - `UserProgStart`: Reported from `UserProgStart` constant (`$0800` default, or `$3400` when relocatable apps shift base).
-  - `UserProgEnd`: Reported as `$BFFF` inclusive (`$C000` exclusive). `$C000-$CFFF` is strictly reserved for MCT / VMM workspace and I/O registers; it is NEVER reported as user space.
+  - `UserProgStart`: Reported from the `UserProgStart` constant, which CMake
+    generates from `USER_PROG_START_HEX` into `build_config.inc`. It is a
+    build-time value, **not** something that shifts at runtime when a
+    relocatable app loads elsewhere. It is `$3800` as of 2026-07-27 and has
+    risen repeatedly as resident OS segments grew ($2000 → $2200 → $2600 →
+    $2C00 → $3200 → $3400 → $3800). *Corrected 2026-07-27: this line
+    previously froze the value as "`$0800` default, or `$3400` when
+    relocatable apps shift base". `$0800` was never correct for any shipped
+    build, and `tests/src/api/api.s` asserted it verbatim; that test now
+    compares against `__MAIN_START__` so it tracks the configured origin.
+    Consumers must never hardcode the number.*
+  - `UserProgEnd`: Reported as `$BFFF` inclusive (`$C000` exclusive). `$C000-$CFFF` is strictly reserved for MCT / VMM workspace and I/O registers; it is NEVER reported as user space. *Note: this is deliberately not the `UserProgEnd` label in `include/command64.inc`, which is `$CFFF`. The two mean different things — the label covers all remaining RAM, this field reports the last address a user program may occupy.*
 
 ### Discrepancy 7: REU Physical RAM vs VMM Logical Semantics
 - **Frozen**:

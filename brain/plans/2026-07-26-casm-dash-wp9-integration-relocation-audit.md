@@ -11,7 +11,7 @@ status: draft
 Prove that the final native-CASM DASH source produces one reproducible R6
 artifact with complete and exclusive relocation entries, no private OS memory
 dependencies, correct image packaging, no regressions, and identical behavior
-at `$3400`, `$4000`, and `$5000`.
+at `$3800`, `$5000`, and `$9000`.
 
 WP9 is an audit/integration package, not an open-ended defect-remediation
 package.
@@ -21,7 +21,7 @@ package.
 - WP1-WP8 each have explicit completion approval.
 - Final API ABI, DASH source order, source names, memory envelope, and artifact
   policy are frozen.
-- DASH has passed a narrow `$3400` runtime check.
+- DASH has passed a narrow `$3800` runtime check.
 - VMM cleanup and no-REU behavior have user evidence.
 - Active CASM baseline/version is identified; parallel CASM changes are either
   complete or explicitly excluded.
@@ -139,7 +139,7 @@ are insufficient. DASH must not directly consume:
 5. Audit fixed/private address uses against source and decoded operands.
 6. Wire production image packaging and stale-artifact protection.
 7. Run OS/API/CASM/DASH static regression matrix.
-8. Request user `$3400/$4000/$5000`, REU, no-REU, and lifecycle matrix.
+8. Request user `$3800/$5000/$9000`, REU, no-REU, and lifecycle matrix.
 9. Stop/amend on discrepancies; otherwise prepare WP9 walkthrough.
 10. Ask for explicit WP9 completion approval.
 
@@ -173,7 +173,7 @@ cmake --build build --target test_image_d64
 
 ## User Runtime Matrix
 
-For the same artifact at `$3400`, `$4000`, and `$5000`:
+For the same artifact at `$3800`, `$5000`, and `$9000`:
 
 - Frame/title/tabs/status render correctly.
 - F1/F3/F5 relocated dispatch works.
