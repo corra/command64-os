@@ -119,9 +119,17 @@ FORMATDEC16:
     STA FMTBUF+4
     LDX #4                   ; WRITE INDEX, STARTS AT THE RIGHTMOST BYTE
 FD16LOOP:
-    JSR DIV10                ; DIVIDES $78/$79 BY 10 IN PLACE; REMAINDER IN A
+    TXA                       ; DIV10 CLOBBERS X (ITS OWN 16-ITERATION SHIFT
+    PHA                       ; COUNTER), SO THE WRITE INDEX MUST BE STACKED
+    JSR DIV10                 ; ACROSS THE CALL, NOT LEFT IN X. DIVIDES
+                               ; $78/$79 BY 10 IN PLACE; REMAINDER IN A.
     TAY
     LDA HEXDIGITS, Y          ; DIGITS 0-9 SHARE THE HEX DIGIT TABLE
+    STA $7A                   ; STASH DIGIT CHAR (DIV10 HAS ALREADY RETURNED,
+                               ; SO ITS SCRATCH BYTE IS FREE)
+    PLA
+    TAX                       ; RESTORE THE WRITE INDEX
+    LDA $7A
     STA FMTBUF, X
     LDA $78
     ORA $79

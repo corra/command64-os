@@ -370,9 +370,11 @@ _agsiNotLow:
     jmp _agsiErrNull
 _agsiNotHigh:
 
-    // Offset 0: StructVersion = 1
+    // Offset 0: StructVersion = 2 (WP6 amendment: offset 22 is now OsPatch,
+    // not Reserved0 -- see brain/plans/2026-07-26-casm-dash-wp1-api-contract-
+    // freeze.md section 7)
     ldy #SYS_INFO_OFF_VER
-    lda #1
+    lda #SYS_INFO_STRUCT_VER
     sta (PrintPtrLo), y
 
     // Offset 1: StructSize = 24 ($18)
@@ -380,19 +382,21 @@ _agsiNotHigh:
     lda #SYS_INFO_SIZE
     sta (PrintPtrLo), y
 
-    // Offset 2: OsMajor = 4
+    // Offset 2: OsMajor -- from VERSION via build_config.inc (OsVersionMajor),
+    // not a hardcoded immediate (WP6 amendment)
     ldy #SYS_INFO_OFF_OS_MAJ
-    lda #4
+    lda #OsVersionMajor
     sta (PrintPtrLo), y
 
-    // Offset 3: OsMinor = 0
+    // Offset 3: OsMinor -- from VERSION via build_config.inc (OsVersionMinor)
     ldy #SYS_INFO_OFF_OS_MIN
-    lda #0
+    lda #OsVersionMinor
     sta (PrintPtrLo), y
 
-    // Offset 4: OsStage = 0 (Release)
+    // Offset 4: OsStage -- from VERSION's optional "-dev" suffix via
+    // build_config.inc (OsVersionStage): 0=Release, 1=Dev
     ldy #SYS_INFO_OFF_OS_STG
-    lda #0
+    lda #OsVersionStage
     sta (PrintPtrLo), y
 
     // Offset 5: CurrentDevice (ZP $BA)
@@ -594,10 +598,14 @@ _agsiWriteAppUsed:
     ldy #SYS_INFO_OFF_USD_SLOT
     sta (PrintPtrLo), y
 
-    // Offsets 22-23: Reserved = 0
-    lda #0
-    ldy #SYS_INFO_OFF_RES0
+    // Offset 22: OsPatch -- from VERSION via build_config.inc (OsVersionPatch)
+    // (formerly Reserved0/$00; WP6 amendment bumped StructVersion to 2)
+    ldy #SYS_INFO_OFF_OS_PAT
+    lda #OsVersionPatch
     sta (PrintPtrLo), y
+
+    // Offset 23: Reserved1 = 0
+    lda #0
     ldy #SYS_INFO_OFF_RES1
     sta (PrintPtrLo), y
 

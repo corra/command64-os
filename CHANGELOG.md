@@ -7,8 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **DOS_GET_SYSTEM_INFO OS version literals** ($5C, `src/command64/api.asm`): `OsMajor`/`OsMinor`/`OsStage` were hardcoded immediates (`4`/`0`/`0`), disconnected from the repository `VERSION` file (Task Warrior #41). Now parsed by CMake from `VERSION` (`MAJOR.MINOR.PATCH[-dev]`) into `build_config.inc` constants. `StructVersion` bumps to `$02`; offset 22 (formerly `Reserved0`) is now `OsPatch`. Part of DASH WP6 (System page).
+- **DASH FORMATDEC16 digit corruption** (`src/external/dash/dfmt.s`): `DIV10` clobbers X (its own 16-iteration shift counter), but `FORMATDEC16` called it while X still held the digit write-index, so every digit landed at `FMTBUF+0` and multi-digit values were truncated to their last digit. Found via live testing on native-CASM-built `DASH.PRG`, not caught by static review. Fixed by stacking the write-index across the `DIV10` call.
+
 ### Added
 
+- **DASH WP6 System Page**: `dsys.s` queries `DOS_GET_SYSTEM_INFO` ($5C) once per redraw and renders OS version, device, video standard, user/protected ranges, VMM/REU availability, page size/counts, and application counts, using WP5's bounded screen primitives. Known deferred inconsistencies (hardcoded 16MB-REU capacity assumption; `DOS_EXIT`/`FREE` not reliably reclaiming app-table slots or VMM allocations) are kernel-side and tracked as Task Warrior #42, out of WP6's scope.
+- **DASH WP5 Panel UI and Formatting**: Bounded 40x25 panel framework (`dscr.s`), hex/decimal formatters (`dfmt.s`) — exact 1000-cell clear, bounded cursor/string writes, frame/tabs/status-bar rendering, active-tab highlighting.
+- **DASH WP4 Relocatable Skeleton**: Seven-file dual-assembler (native CASM / ca65) DASH source layout, page dispatch trampoline, and reviewed hex-manifest artifact provenance (`dash.ref.hex`, `dash_ref` ca65 cross-check).
 - **DASH WP3 Application Query API**: Implemented kernel service `DOS_GET_APP_INFO` ($5D) in `src/command64/api.asm` to query normalized 24-byte application slot records.
 - **DASH WP2 System Information API**: Implemented kernel service `DOS_GET_SYSTEM_INFO` ($5C) in `src/command64/api.asm` to return 24-byte system info records to caller buffers.
 - **DASH WP1 API Contract Freeze**: Frozen byte-exact public contracts for `DOS_GET_SYSTEM_INFO` ($5C) and `DOS_GET_APP_INFO` ($5D) in `brain/plans/2026-07-26-casm-dash-wp1-api-contract-freeze.md`.

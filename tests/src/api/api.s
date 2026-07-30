@@ -4,6 +4,7 @@
 ; ca65 API test.
 
 .include "command64.inc"
+.include "build_config.inc"    ; CMake-generated: OsVersionMajor/Minor/Patch/Stage
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "1"
@@ -72,9 +73,11 @@ start:
     jmp test_fail
     :
 
-    ; Verify StructVersion (byte 0) == 1
+    ; Verify StructVersion (byte 0) == 2 (WP6 amendment: offset 22 is now
+    ; OsPatch, not Reserved0 -- see
+    ; brain/plans/2026-07-26-casm-dash-wp1-api-contract-freeze.md section 7)
     lda sys_buf + SYS_INFO_OFF_VER
-    cmp #1
+    cmp #SYS_INFO_STRUCT_VER
     beq :+
     jmp test_fail
     :
@@ -86,16 +89,31 @@ start:
     jmp test_fail
     :
 
-    ; Verify OsMajor (byte 2) == 4
+    ; Verify OsMajor/OsMinor/OsPatch/OsStage (bytes 2, 3, 22, 4) against the
+    ; same CMake-generated build_config.inc constants ahGetSystemInfo sources
+    ; from, so this test tracks the VERSION file automatically instead of
+    ; asserting a literal that goes stale (the old "== 4" / "== 0" here
+    ; predated the WP6 amendment and no longer matched VERSION).
     lda sys_buf + SYS_INFO_OFF_OS_MAJ
-    cmp #4
+    cmp #OsVersionMajor
     beq :+
     jmp test_fail
     :
 
-    ; Verify OsMinor (byte 3) == 0
     lda sys_buf + SYS_INFO_OFF_OS_MIN
-    cmp #0
+    cmp #OsVersionMinor
+    beq :+
+    jmp test_fail
+    :
+
+    lda sys_buf + SYS_INFO_OFF_OS_PAT
+    cmp #OsVersionPatch
+    beq :+
+    jmp test_fail
+    :
+
+    lda sys_buf + SYS_INFO_OFF_OS_STG
+    cmp #OsVersionStage
     beq :+
     jmp test_fail
     :

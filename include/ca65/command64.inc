@@ -76,6 +76,7 @@ DOS_ERR_INVALID_ARG   = $04 ; Null or invalid argument pointer
 
 ; --- System Information Record Constants ---
 SYS_INFO_SIZE         = 24  ; Byte size of DOS_GET_SYSTEM_INFO structure
+SYS_INFO_STRUCT_VER   = 2   ; StructVersion value this OS emits (WP6 amendment added OsPatch at offset 22)
 SYS_INFO_OFF_VER      = 0   ; StructVersion (1 byte)
 SYS_INFO_OFF_SIZE     = 1   ; StructSize (1 byte = 24)
 SYS_INFO_OFF_OS_MAJ   = 2   ; OsMajor (1 byte)
@@ -98,7 +99,7 @@ SYS_INFO_OFF_FRE_LO   = 18  ; VmmFreePages low byte
 SYS_INFO_OFF_FRE_HI   = 19  ; VmmFreePages high byte
 SYS_INFO_OFF_MAX_SLOT = 20  ; AppMaxSlots (1 byte = 16)
 SYS_INFO_OFF_USD_SLOT = 21  ; AppUsedSlots (1 byte)
-SYS_INFO_OFF_RES0     = 22  ; Reserved (1 byte)
+SYS_INFO_OFF_OS_PAT   = 22  ; OsPatch (1 byte) -- formerly Reserved0, WP6 amendment
 SYS_INFO_OFF_RES1     = 23  ; Reserved (1 byte)
 
 ; --- Application Information Record Constants ---

@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp4-relocatable-skeleton
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete
 ---
 
 # Plan: DASH WP4 - Relocatable Skeleton

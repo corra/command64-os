@@ -25,7 +25,7 @@ DASH is a CASM-assembled, relocatable, three-page system dashboard utility for C
   - ZP `$75-$76`: `stringSrcPtr`
   - ZP `$77`: `currentCol` index
   - ZP `$78-$79`: formatting/division working value (`FORMATHEX16`, `FORMATDEC16`, `DIV10`); also used transiently as `SCREENPUTCHAR`'s color-pointer input before being copied to `$7B-$7C`
-  - ZP `$7A`: `DIV10` remainder accumulator
+  - ZP `$7A`: `DIV10` remainder accumulator; also used transiently by `dsys.s`'s `PRINTDEC16` as a skip-count scratch, only after `FORMATDEC16`/`DIV10` have already returned
   - ZP `$7B-$7C`: `SCREENPUTCHAR`/`HIGHLIGHTTABS` color-cell pointer
   - ZP `$7D`: `SCREENPUTCHAR` character stash; `HIGHLIGHTTABS` chosen-color stash
   - ZP `$7E`: `SCREENPUTSTRING` clamped max-length; `HIGHLIGHTTABS` per-tab length

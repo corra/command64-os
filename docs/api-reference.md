@@ -213,15 +213,18 @@ Populates a caller-supplied 24-byte buffer with current system metrics, includin
 - **Output:**
   - `Carry` = 0: Success, `A` = `$00` (`DOS_ERR_OK`), buffer populated.
   - `Carry` = 1: Failure, `A` = `$04` (`DOS_ERR_INVALID_ARG`), buffer unchanged.
-- **Record Structure (24 Bytes):**
-  - Offset 0: `StructVersion` (1 byte = `$01`)
+- **Record Structure (24 Bytes, `StructVersion` = `$02`):**
+  - Offset 0: `StructVersion` (1 byte = `$02`, bumped from `$01` by the WP6
+    amendment described below)
   - Offset 1: `StructSize` (1 byte = `24`)
-  - Offset 2: `OsMajor` (1 byte = `4`)
-  - Offset 3: `OsMinor` (1 byte = `0`)
-  - Offset 4: `OsStage` (1 byte = `0` Release)
+  - Offset 2: `OsMajor` (1 byte, from the repository `VERSION` file)
+  - Offset 3: `OsMinor` (1 byte, from `VERSION`)
+  - Offset 4: `OsStage` (1 byte: `0`=Release, `1`=Dev, from `VERSION`'s
+    optional `-dev` suffix)
   - Offset 5: `CurrentDevice` (1 byte)
   - Offset 6: `VideoStandard` (1 byte: `0`=NTSC, `1`=PAL)
-  - Offsets 7-8: `UserProgStart` (2 bytes, little-endian = `$0800`)
+  - Offsets 7-8: `UserProgStart` (2 bytes, little-endian; the build-configured
+    origin, `USER_PROG_START_HEX` in `CMakeLists.txt` -- not a fixed literal)
   - Offsets 9-10: `UserProgEnd` (2 bytes, little-endian = `$BFFF`)
   - Offset 11: `VmmFlags` (1 byte bitmask: bit 0 = VMM Active)
   - Offsets 12-13: `VmmPageSize` (2 bytes, little-endian = `4096`)
@@ -230,7 +233,17 @@ Populates a caller-supplied 24-byte buffer with current system metrics, includin
   - Offsets 18-19: `VmmFreePages` (2 bytes, little-endian)
   - Offset 20: `AppMaxSlots` (1 byte = `16`)
   - Offset 21: `AppUsedSlots` (1 byte count of active slots)
-  - Offsets 22-23: `Reserved` (2 bytes = `$0000`)
+  - Offset 22: `OsPatch` (1 byte, from `VERSION`; formerly `Reserved0`,
+    reinterpreted by the DASH WP6 amendment to
+    `brain/plans/2026-07-26-casm-dash-wp1-api-contract-freeze.md`)
+  - Offset 23: `Reserved1` (1 byte = `$00`)
+
+`OsMajor`/`OsMinor`/`OsPatch`/`OsStage` are parsed by CMake from `VERSION`
+(`MAJOR.MINOR.PATCH[-dev]`) into `OsVersionMajor`/`OsVersionMinor`/
+`OsVersionPatch`/`OsVersionStage` constants in the generated
+`build_config.inc`, the same mechanism `UserProgStart` already used. They
+were previously hardcoded immediates (`4`/`0`/`0`) in `ahGetSystemInfo`,
+disconnected from `VERSION`.
 
 ### DOS_GET_APP_INFO ($5D)
 

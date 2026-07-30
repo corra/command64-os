@@ -51,7 +51,8 @@ Parent plan: `brain/plans/2026-07-26-casm-dash-system-dashboard.md`.
 - **Frozen**: On any error status (`Carry = 1`), caller's buffer remains **completely unchanged**. Partial record writes, corrupt overwrites, or zeroing on failure are strictly forbidden.
 
 ### Discrepancy 5: Version Encoding
-- **Frozen**: Fixed binary version fields in both records:
+- **Frozen (superseded 2026-07-30 for `DOS_GET_SYSTEM_INFO` only, see WP6
+  Amendment below)**: Fixed binary version fields in both records:
   - `StructVersion`: `$01` (Version 1 structure layout)
   - `StructSize`: `24` (`$18`, exact 24-byte record length)
   - `OsMajor`: Binary major version byte (`4`)
@@ -116,6 +117,12 @@ Output:
 ```
 
 #### System Information Record Layout (24 Bytes)
+
+**Superseded by the WP6 Amendment below as of 2026-07-30**: `StructVersion` is
+now `$02`, and offset 22 is `OsPatch`, not `Reserved0`. The table below is
+kept as the original WP1 record for history; see the Amendment section for
+the current layout.
+
 | Offset | Field Name | Size (Bytes) | Type / Encoding | Description |
 | ---: | :--- | :---: | :--- | :--- |
 | 0 | `StructVersion` | 1 | uint8 | `$01` (Version 1) |
@@ -140,7 +147,7 @@ Output:
 | 19 | `VmmFreePagesHi` | 1 | uint8 | Free logical pages high |
 | 20 | `AppMaxSlots` | 1 | uint8 | Maximum application table slots (`16`) |
 | 21 | `AppUsedSlots` | 1 | uint8 | Active occupied application slots count |
-| 22 | `Reserved0` | 1 | uint8 | Reserved for alignment/future (`$00`) |
+| 22 | `Reserved0` | 1 | uint8 | Reserved for alignment/future (`$00`) -- reinterpreted as `OsPatch` by the WP6 Amendment |
 | 23 | `Reserved1` | 1 | uint8 | Reserved for alignment/future (`$00`) |
 
 ---
@@ -212,3 +219,47 @@ When implementing `DASH` source files in CASM:
 | Unassigned Service Numbers | `$5C` and `$5D` verified free in `api.asm` & `command64.inc` | PASS (Verified) |
 | Little-Endian Specification | All 16-bit fields (`UserProgStart`, `UserProgEnd`, `VmmPageSize`, `VmmTotalPages`, `VmmAllocPages`, `VmmFreePages`, `LoadAddr`, `Size`) explicitly marked little-endian | PASS (Verified) |
 | Buffer Mutation on Failure | Guaranteed unchanged on `Carry = 1` | PASS (Verified) |
+
+---
+
+## 7. WP6 Amendment (2026-07-30): Live OS Version Fields
+
+`DASH`'s System page (WP6) is the WP referenced by
+[[project-dash-version-literal-deferred]] / Task Warrior #41: `OsMajor`,
+`OsMinor`, and `OsStage` in `ahGetSystemInfo` were hardcoded immediates
+(`4`, `0`, `0`), disconnected from the repository's actual `VERSION` file
+(`0.4.1` as of this amendment). Fixing that is in WP6's scope, not a
+follow-up, per the 2026-07-30 deferral decision. This amendment covers
+`DOS_GET_SYSTEM_INFO` (`$5C`) only; `DOS_GET_APP_INFO` (`$5D`) is unaffected.
+
+Decisions (confirmed with the user 2026-07-30):
+
+- **`StructVersion` bumps `$01` -> `$02`.** Offset 22 (`Reserved0`) changes
+  meaning to `OsPatch`, and although `StructSize` doesn't change, this is
+  still treated as a structure-version bump so a caller checking
+  `StructVersion` can detect the new field is defined.
+- **Offset 22 is now `OsPatch`** (uint8, binary patch version byte). Offset
+  23 (`Reserved1`) is untouched, still reserved.
+- **`OsMajor`/`OsMinor`/`OsPatch` are now derived from the repository's
+  `VERSION` file** (`MAJOR.MINOR.PATCH[-dev]`), parsed by CMake into the
+  Kick-dialect `.const` values `OsVersionMajor`/`OsVersionMinor`/
+  `OsVersionPatch`/`OsVersionStage` in the generated `build_config.inc`
+  (see WP2's existing `UserProgStart` generation for precedent), rather than
+  hardcoded immediates in `api.asm`.
+- **`OsStage` is now derived from an optional `-dev` suffix on `VERSION`**
+  (`0.4.1` -> Release/`$00`; `0.4.1-dev` -> Dev/`$01`), rather than staying a
+  permanent `$00` literal. No prior CMake build-type concept existed for
+  this; the `-dev` suffix on `VERSION` is the new source of truth.
+
+### Amended System Information Record Layout (24 Bytes, StructVersion `$02`)
+
+| Offset | Field Name | Size (Bytes) | Type / Encoding | Description |
+| ---: | :--- | :---: | :--- | :--- |
+| 0 | `StructVersion` | 1 | uint8 | `$02` (Version 2) |
+| 1 | `StructSize` | 1 | uint8 | `24` (`$18`, total record length, unchanged) |
+| 2 | `OsMajor` | 1 | uint8 | Major OS version, from `VERSION` |
+| 3 | `OsMinor` | 1 | uint8 | Minor OS version, from `VERSION` |
+| 4 | `OsStage` | 1 | uint8 | Release stage (`0`=Release, `1`=Dev), from `VERSION`'s `-dev` suffix |
+| 5-21 | *(unchanged)* | | | See Section 3 table above |
+| 22 | `OsPatch` | 1 | uint8 | Patch OS version, from `VERSION` (formerly `Reserved0`) |
+| 23 | `Reserved1` | 1 | uint8 | Reserved for alignment/future (`$00`), unchanged |
