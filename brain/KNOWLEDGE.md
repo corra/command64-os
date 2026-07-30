@@ -2018,6 +2018,42 @@ runs, not one clean pass.
   stage. `test_casm_phase10` verifies exact call/failure order; the production
   envelope is capped at `$5B00`.
 
+### DASH System Dashboard (WP1-WP9, 2026-07-26 to 2026-07-30)
+
+- Two new public OS services back DASH and nothing else reads private state:
+  `DOS_GET_SYSTEM_INFO` (`$5C`) and `DOS_GET_APP_INFO` (`$5D`), both in
+  `src/command64/api.asm`, returning fixed 24-byte records with
+  buffer-unchanged-on-error semantics. Their handler bodies didn't fit below
+  the pinned `$1000` `ApiStub`, so a new `ApiExt` segment was added
+  (packed after `ShellExt`, below `AppTable`) — the first OS segment added
+  specifically because sub-`$1000` space was full, not because of a memory
+  layout change elsewhere.
+- DASH itself is a seven-file dual-assembler (native CASM / ca65) source set
+  under `src/external/dash/` (`dmain.s` entry, `.INCLUDE`-chaining the other
+  six), assembled for real only by native CASM on hardware/VICE; the ca65
+  `dash_ref` target is a non-circular cross-check only (`tools/reloc.py`
+  diffs two links a page apart; CASM classifies operands during emission —
+  neither can reproduce the other's defects). The shipping artifact is a
+  reviewed hex manifest (`dash.ref.hex`), never a live build step, with a
+  per-file `source_sha256` staleness gate.
+- Every DASH page (System/Applications/VMM) is capability-gated on the
+  public API record alone: a value that depends on VMM/REU state renders
+  `N/A` when unavailable rather than a false zero, and the Applications
+  page's `R` (running) flag renders the raw `APT_FLAG_RUNNING` bit as-is
+  (truthfully always `-` today — no loader path sets it, Task Warrior #42)
+  rather than inferring running state any other way.
+- The VMM Test page's cleanup contract: exactly one `DOS_FREE_MEM` attempt on
+  every post-allocation exit path (success or failure), and a failed free
+  permanently disables retesting for that run rather than risking a second
+  allocation on top of an unfreed one. This is the same "one owner, one
+  cleanup pass, no silent retry that could double up" shape as CASM's own
+  `resourcesCleanup`.
+- Interim, explicitly-labeled provenance is an accepted project pattern, not
+  just a DASH one-off: WP9 shipped `dash.prg` from the `dash_ref` ca65
+  cross-check (`--allow-host-bytes`) with a truthful `# provenance:` line,
+  user-approved as sufficient for now rather than blocking on a native-CASM-
+  on-hardware run.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

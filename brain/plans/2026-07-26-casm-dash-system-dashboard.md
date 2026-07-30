@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-system-dashboard
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete (user-approved 2026-07-30, all WP1-WP10 closed)
 ---
 
 # Plan: CASM Native Relocatable DASH System Dashboard
@@ -553,3 +554,16 @@ The first implementation increment is WP1 only. It produces the dedicated API
 contract plan with exact service numbers, record bytes, statuses, register and
 flag behavior, scratch/clobber rules, and verification. No API or DASH source
 may be edited until that plan is explicitly approved.
+
+## Closeout (user-approved 2026-07-30)
+
+All ten work packages are complete: WP1-WP3 (frozen `$5C`/`$5D` API contract
+and implementations), WP4-WP5 (relocatable skeleton, panel UI/formatting),
+WP6-WP8 (System, Applications, VMM Test pages), WP9 (integration/relocation
+audit -- R6 ledger, private-address audit, production packaging, stale-
+artifact gate; manifest provenance remains the ca65 `dash_ref` cross-check as
+an explicit interim, user-approved rather than blocking on a native-CASM-on-
+hardware run), and WP10 (documentation reconciliation and completion
+walkthrough, see that plan's own closeout note). DASH ships as `dash.prg`
+(`DASH V0.1.4`) on the production `image_d64`. See each WP's own plan file
+for its individual completion note and evidence.
