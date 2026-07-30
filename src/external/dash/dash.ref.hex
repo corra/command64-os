@@ -4,18 +4,19 @@
 # back to a binary at build time by scripts/hex_manifest_to_bin.py,
 # which contains no 6502 knowledge and no assembler of any kind.
 #
-# provenance:  INTERIM: ca65 cross-check build (dash_ref.prg), used via --allow-host-bytes as a deliberate temporary stand-in for WP5-WP8. NOT a native CASM run -- must be replaced once a real native-CASM-on-C64/VICE assembly is reviewed, per the WP4 artifact contract and WP9's stale-manifest finding (2026-07-30).
+# provenance:  ca65 dash_ref cross-check build, --allow-host-bytes interim (user-approved 2026-07-30, DASH V0.1.4 version bump)
+# cross-check: MATCHES dash_ref.prg (4766 bytes) byte-for-byte
 # load addr:   $3400
 #
 # bytes: 4766
-# sha256: a91a68a2df629e50c40769125f579e3f22719ac5cc1e06a1db829b242dd1c6d4
+# sha256: 3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b
 # source_sha256: dmain.s=591a0a396926e65ef4e79db6faab3e4c396042a19dd8cb96591f64f78c9b0cea
 # source_sha256: dscr.s=2107dd045d1b3b253989c5d0da684323bbd357cf0c331d2de48b18c1143d9d4f
 # source_sha256: dfmt.s=0ba99dddda4cbeea8144d8b22787e17362bae3899af6d1754a7bbc7f49176743
 # source_sha256: dsys.s=5fc7202e6a545bb247a3548d41d635184919aac23cab6d157aac6d21f2b5cea6
 # source_sha256: dapp.s=f8c8b5f53357a5175fc64173b08bf6f82d2ffbe132c7029320aa0c86c6c656b8
 # source_sha256: dvmm.s=64141df29ebea3362104ad9215403521195da865866118bb40348eb569fb6659
-# source_sha256: ddata.s=84e316b9fea11d89d665d7b12e89ab58fdb6daea70c7910e232c5cda500be4d0
+# source_sha256: ddata.s=7e62064a9ccca922988e85ab8e7c9052dc0874741f08f740efdd93b3897436cb
 
 00 34 D8 A9 00 8D 91 3E A9 01 8D 92 3E AD 92 3E
 F0 08 A9 00 8D 92 3E 20 8F 34 20 E4 FF AA F0 ED
@@ -187,7 +188,7 @@ A9 00 60 8A 29 01 F0 03 A9 AA 60 A9 55 60 8A 60
 A2 00 20 4B 3E DD F4 41 D0 05 E8 D0 F5 18 60 8D
 E5 40 BD F4 41 8D E6 40 AD E7 40 8D E3 40 8E E4
 40 38 60 00 00 39 37 64 39 19 3B 04 01 13 08 20
-16 30 2E 31 2E 33 00 00 00 00 00 00 30 31 32 33
+16 30 2E 31 2E 34 00 00 00 00 00 00 30 31 32 33
 34 35 36 37 38 39 01 02 03 04 05 06 02 0B 1A 06
 0C 08 5B 40 40 40 40 40 40 40 40 40 40 40 40 40
 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40

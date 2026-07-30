@@ -6,7 +6,7 @@ This document provides technical details for developing applications for the com
 
 When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$BFFF` by writing to the 6510 CPU Port register at `$0001` (clearing bit 0, `LORAM`). This exposes the underlying RAM, providing a contiguous user program space from `UserProgStart` (currently `$3800`, configurable via the CMake cache variable `USER_PROG_START_HEX`) up to `$CFFF` (since `$C000-$CFFF` is reserved for the VMM Memory Control Table). The **KERNAL ROM** (`$E000-$FFFF`) and **I/O space** (`$D000-$DFFF`) remain active to support system calls, hardware devices, and REU operations.
 
-> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → $2C00 → $3200 → $3400 → current `$3800`). Applications should never hardcode a prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. CASM's independent default emission origin remains `$3400`; its R6 output is relocated when loaded. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
+> **Note:** `UserProgStart` has shifted upward several times as resident OS segments (`AppTable`, `ShellExt`) have grown ($2000 → $2200 → $2600 → $2C00 → $3200 → $3400 → current `$3800`). Applications should never hardcode `$3400` or any other prior value — always link/compile against the current `USER_PROG_START_HEX` CMake cache variable so binaries stay valid across OS builds. CASM's independent default emission origin remains `$3400`; its R6 output is relocated when loaded. Non-relocatable binaries compiled for a stale origin can still be loaded at an arbitrary address via the Binary Relocator (see §6.5).
 
 ### C64 RAM Banking Control ($0001 CPU Port)
 
@@ -37,9 +37,14 @@ When Command 64 OS starts, the shell banks out the **C64 BASIC ROM** at `$A000-$
 |         |   as OS segments below it expand — see note above)    |
 +---------+-------------------------------------------------------+------------------------+
 |  $37FF  |  OS-Reserved Padding / Alignment Room                 |  Free RAM (size varies
-|  $34A0  |  (headroom for future ShellExt/AppTable growth)       |  build to build)
+|  $3539  |  (headroom for future ApiExt/ShellExt/AppTable growth)|  build to build)
 +---------+-------------------------------------------------------+
-|  $349F  |  ShellExt Segment                                     |  OS Shell Data
+|  $3538  |  ApiExt Segment                                       |  OS API Handler
+|  $32C6  |  Dispatch tables plus API service handler bodies that |  Bodies (RAM)
+|         |  do not fit below the ApiStub pinned at $1000 —       |
+|         |  currently DOS_GET_SYSTEM_INFO / DOS_GET_APP_INFO     |
++---------+-------------------------------------------------------+
+|  $32C5  |  ShellExt Segment                                     |  OS Shell Data
 |  $2495  |  Version, help strings, DIR size-calc routines, and   |  (RAM)
 |         |  file I/O/date-time internal state (see note below)   |
 +---------+-------------------------------------------------------+

@@ -53,6 +53,8 @@ DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a P
 - The manifest records bytes produced by **native CASM running on the C64**. It is regenerated only by a deliberate human act (`scripts/build_dash_manifest.py`), never as a build step, so editing a source can never silently change what ships.
 - The ca65 `dash_ref` target is an **independent cross-check only** and must never be the source of manifest bytes. `build_dash_manifest.py` refuses its output unless `--allow-host-bytes` is passed explicitly.
 - The cross-check is non-circular: ca65 and CASM share no code and derive relocation entries by completely different means — `tools/reloc.py` diffs two links one page apart, while CASM classifies each operand as relocatable during emission. A defect in one cannot reproduce itself in the other.
+- **Stale-artifact protection (WP9)**: `dash.ref.hex` embeds one `# source_sha256: <name>=<hash>` line per source file, written by `build_dash_manifest.py`. The `dash` CMake target always passes `--source-dir` to `hex_manifest_to_bin.py`, which recomputes each file's hash and hard-fails the build on any mismatch, missing file, or a manifest with no recorded hashes at all — editing a source without regenerating the manifest is a build failure, not a silent stale ship.
+- **Current provenance**: `dash.ref.hex`'s shipping bytes come from the `dash_ref` ca65 cross-check (`--allow-host-bytes`), an explicit, user-approved interim measure recorded truthfully in the manifest's own `# provenance:` line — not a native-CASM-on-hardware run. `dash` ships on `image_d64` (production only, never `test.d64`) from these bytes today.
 
 # Native Assembly Workflow
 

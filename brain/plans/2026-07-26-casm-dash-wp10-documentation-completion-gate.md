@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp10-documentation-completion-gate
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete (user-approved 2026-07-30)
 ---
 
 # Plan: DASH WP10 - Documentation and Completion Gate
@@ -199,3 +200,23 @@ End the walkthrough by asking whether the user approves WP10 and the DASH
 initiative as complete and authorizes final task, Taskwarrior, plan, version,
 and completion-record updates. Do not perform those updates before an explicit
 affirmative response.
+
+### Closeout (user-approved 2026-07-30)
+
+Walkthrough presented: stale `wiki/casm-utility.md` (Phase 4) and
+`wiki/casm-programmers-reference.md` (WP46) reconciled to current CASM
+(`0.1.50` build 1204, Phase 9 complete); new `wiki/dash-utility.md` manual
+added (mirrored to `docs/`); a pre-existing `wiki`/`docs` desync in
+`programmers-reference.md` (missing `ApiExt` segment) fixed; `wiki/Home.md`,
+`wiki/AGENTS.md`, `src/external/dash/AGENTS.md`, `CHANGELOG.md`, and
+`brain/KNOWLEDGE.md` updated. `command64`/`casm`/`dash`/`image_d64`/
+`test_image_d64` all build clean; `git diff` contained only documentation.
+
+The user approved WP10 and the DASH initiative as complete, and additionally
+directed a version bump: DASH's on-screen version banner advanced from
+`V0.1.3` to `V0.1.4` (`ddata.s`'s `DASHVERSTR`), with `dash.ref.hex`
+regenerated against the rebuilt `dash_ref` ca65 cross-check (still the
+explicit interim provenance approved during WP9 -- unchanged code/relocation
+counts, new SHA-256). This plan, WP9, and the parent
+`2026-07-26-casm-dash-system-dashboard.md` plan are marked complete in this
+same closeout increment, per this gate's own Completion Sequence.

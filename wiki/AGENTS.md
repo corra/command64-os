@@ -17,8 +17,13 @@ The purpose of the `wiki` directory is to store the comprehensive user and progr
   intentionally mirrored, byte-for-byte, in `docs/` under the same filename
   (in-repo docs can't symlink to the GitHub wiki checkout). `wiki/` is the
   source of truth for these six files — edit here first, then copy the
-  change to the matching `docs/` file in the same commit. Per-app manuals
-  (`*-utility.md`) are **not** mirrored; they live only in `wiki/`.
+  change to the matching `docs/` file in the same commit.
+- Per-app manuals (`*-utility.md`) are mirrored to `docs/` inconsistently in
+  practice (`banner`, `casm`, `debug`, `edlin`, and `dash` are; `conway`,
+  `label`, and `pacman` are not) — there is no single rule to follow here.
+  Check whether `docs/<name>-utility.md` already exists before deciding: if
+  it does, keep it byte-identical in the same commit; if it doesn't, adding
+  one is optional and not required by this contract.
 
 # Work Guidance
 

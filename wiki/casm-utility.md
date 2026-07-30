@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.1.15.1053`
+**Version:** `0.1.50` (build 1204)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
@@ -10,48 +10,64 @@
 `CASM` is a native 6502/6510 assembler that runs *on the C64 itself* — you
 write source on the machine (with `EDLIN`, for example), assemble it with
 `CASM`, and `LOAD`/`RUN` the resulting PRG, all without leaving the shell.
+It performs a real two-pass assembly with labels and forward references, a
+bounded expression evaluator, source-file inclusion via `.INCLUDE`, and
+produces relocatable output by default so the same PRG can run at any load
+address the OS chooses.
 
-> **CASM is under active development (Phase 4).** Everything documented
-> below as "supported" is real and has been verified end-to-end against the
-> shipped build. Features not yet implemented are called out explicitly in
-> [Not Yet Supported](#not-yet-supported) rather than silently omitted —
-> assume anything not mentioned here doesn't work yet.
+> **CASM Phase 9 is complete (labels/expressions/multi-file/relocation/
+> include processing all shipped).** Phase 10 (symbol map and listing
+> output for `/M`/`/L`) is planning-only so far — those two switches are
+> accepted on the command line but have no effect yet. Everything else
+> documented below as supported is real and has been verified end-to-end,
+> including in production via [DASH](dash-utility.md), which assembles
+> through a seven-file `.INCLUDE` chain. See
+> [Not Yet Supported](#not-yet-supported) for the remaining gaps.
 
 ## Command Syntax
 
 ```text
-CASM <source> [/O:<output>] [/S] [/M] [/L]
+CASM <source>... [/O:<output>] [/S] [/M] [/L]
 ```
 
 ### Parameters
 
-- **`<source>`** (required): the file to assemble. Exactly one source file
-  is accepted; a second bare filename is an error.
+- **`<source>...`** (required): one or more top-level source files to
+  assemble, up to 8, concatenated in the order given on the command line
+  (each keeps its own line numbers for diagnostics). A 9th source name is
+  `CASM: TOO MANY SOURCE FILES`.
 - **`/O:<output>`** (optional): explicit output filename, up to 63
-  characters. Without it, the output name is derived from `<source>`: its
-  extension (the part after the last `.` that comes after any device-prefix
-  `:`) is replaced with `.PRG`, or `.PRG` is appended if it has none. For
-  example, `CASM GAME.CSM` writes `GAME.PRG`; `CASM 9:UTIL` writes
-  `9:UTIL.PRG`.
-- **`/S`**: static output. Currently accepted but has no additional effect
-  — CASM always writes a PRG by default once assembly succeeds.
-- **`/M`** and **`/L`**: map file and listing file. **Not yet implemented.**
-  CASM recognizes these switches but exits immediately with `FEATURE NOT
-  IMPLEMENTED` if either is present — don't use them yet.
+  characters. Without it, the output name is derived from the *first*
+  source file: its extension (the part after the last `.` that comes after
+  any device-prefix `:`) is replaced with `.PRG`, or `.PRG` is appended if
+  it has none. For example, `CASM GAME.CSM` writes `GAME.PRG`; `CASM
+  9:UTIL` writes `9:UTIL.PRG`.
+- **`/S`**: static output. The assembly must supply its own `.ORG`, and the
+  resulting PRG carries no relocation trailer — use this for a program that
+  will only ever run at one fixed address.
+- **`/M`** and **`/L`**: map file and listing file. **Accepted but not yet
+  implemented** — CASM parses these switches with no error, but they
+  currently have no effect. Phase 10 is what will make them do something;
+  don't rely on them yet.
 
-Options may appear before or after the source filename, in any order, and
+Options may appear before or after the source filenames, in any order, and
 are matched case-insensitively (`/o:out.prg` works the same as `/O:OUT.PRG`).
 
 ### What Happens
 
-1. CASM opens `<source>` for reading. If it can't be opened, you get
-   `CASM: CANNOT OPEN INPUT` and nothing else happens.
-2. It assembles the whole file in one pass, creating the output file as
-   soon as parsing starts.
-3. On success, it prints `CASM: INPUT VALIDATED` and returns to the shell.
+1. CASM opens every listed source in order and streams them into one
+   combined 65,535-byte source buffer (a synthetic linefeed is inserted
+   between files that don't already end in one). If a source can't be
+   opened, you get `CASM: CANNOT OPEN INPUT` and nothing else happens.
+2. **Pass 1** measures the whole assembly without writing any output,
+   defining every label's address as it goes — this is what makes forward
+   references (using a label before its definition) work.
+3. **Pass 2** re-walks the same source from the start, now that every label
+   resolves, and actually emits the PRG.
+4. On success, it prints `CASM: INPUT VALIDATED` and returns to the shell.
    The output PRG is on disk and ready to `LOAD`.
-4. On any error, it prints one specific diagnostic (see
-   [Example 3: Error Messages](#example-3-error-messages)), deletes the
+5. On any error, it prints one specific diagnostic (see
+   [Example 4: Error Messages](#example-4-error-messages)), deletes the
    partial output file if one was created, and returns to the shell — no
    half-written PRG is left behind.
 
@@ -60,18 +76,46 @@ are matched case-insensitively (`/o:out.prg` works the same as `/O:OUT.PRG`).
 ### Statements
 
 One statement per line: an optional leading whitespace, then either a
-directive (`.ORG`, `.BYTE`, `.WORD`), a mnemonic and its operand, or nothing
-(a blank line is valid). A semicolon starts a comment that runs to end of
-line:
+label definition, a directive (`.ORG`, `.BYTE`, `.WORD`, `.INCLUDE`), a
+mnemonic and its operand, or nothing (a blank line is valid). A semicolon
+starts a comment that runs to end of line:
 
 ```asm
-    LDA #$01        ; load the value
+START:  LDA #$01        ; load the value
+        STA $D020
 ```
 
-**Labels and symbols are not yet supported.** Every address and offset in
-your source must currently be written as a literal number — see
-[casmhello.seq](#example-2-a-complete-runnable-program) below for what that
-looks like in practice.
+### Labels and Symbols
+
+A line consisting of an identifier followed by `:` defines a label at the
+current address:
+
+```asm
+LOOP:   INX
+        BNE LOOP
+```
+
+Labels can be used before their definition (a forward reference) — CASM's
+first pass resolves every label's address before the second pass emits any
+code, so it doesn't matter whether `LOOP` appears above or below where it's
+used. Identifiers are up to 31 characters, **case-sensitive** (in PETSCII
+terms, unshifted and shifted spellings of the same letter are different
+symbols), and stored in a 512-entry symbol table shared across the whole
+assembly. Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
+that's never defined is `CASM: UNDEFINED SYMBOL`; exceeding 512 distinct
+labels is `CASM: SYMBOL TABLE FULL`.
+
+An expression is one symbol or literal number, with an optional `<` (low
+byte) or `>` (high byte) prefix, and an optional `+`/`-` numeric addend:
+
+```asm
+LDA #<MESSAGE      ; low byte of MESSAGE's address
+LDA #>MESSAGE      ; high byte of MESSAGE's address
+LDA MESSAGE+3      ; the 4th byte of MESSAGE
+```
+
+Parenthesized or multiplicative arithmetic (`(A+B)*2`) is not supported —
+`CASM: EXPRESSION UNSUPPORTED`.
 
 ### Numeric Literals
 
@@ -89,9 +133,7 @@ after the whole token is read).
 ### Addressing Modes
 
 Every documented 6502 addressing mode that the target mnemonic supports is
-available. This single program exercises one instruction in each mode —
-it's a real, build-verified fixture (`casmwp11.seq`) used in CASM's own test
-suite:
+available:
 
 ```asm
 INX                 ; implied
@@ -108,15 +150,18 @@ JMP ($1234)           ; indirect
 ```
 
 You never have to choose zero-page vs. absolute yourself: write the operand
-as a plain number, and CASM picks zero page automatically whenever the
-value fits in a byte and the mnemonic supports it in that mode, falling
+as a plain number or label, and CASM picks zero page automatically whenever
+the value fits in a byte and the mnemonic supports it in that mode, falling
 back to absolute otherwise. `LDA $10` assembles as zero-page `LDA` (2
 bytes); `LDA $1000` assembles as absolute `LDA` (3 bytes) — same source
-syntax either way.
+syntax either way. A label's address always forces the *absolute* form of
+the instruction, even if the resolved value happens to fit in a byte — this
+keeps instruction sizes identical between passes regardless of where the
+label is defined.
 
 Branch mnemonics (`BCC`, `BCS`, `BEQ`, `BMI`, `BNE`, `BPL`, `BVC`, `BVS`)
-take a plain 16-bit target address, not a signed offset — CASM computes the
-relative displacement for you and rejects the instruction with `CASM:
+take a plain target address or label, not a signed offset — CASM computes
+the relative displacement for you and rejects the instruction with `CASM:
 BRANCH OUT OF RANGE` if the target is more than 127 bytes behind or 128
 bytes ahead of the next instruction.
 
@@ -124,16 +169,68 @@ bytes ahead of the next instruction.
 
 | Directive | Syntax | Effect |
 | --- | --- | --- |
-| `.ORG` | `.ORG $C000` | Sets the assembly address. Required exactly once, before any instruction or `.BYTE`/`.WORD`; a second `.ORG` is an error. |
+| `.ORG` | `.ORG $C000` | Sets the assembly's fixed address and switches it to static output (see [Relocation](#relocation) below). Optional — omit it entirely for the default relocatable behavior. A second `.ORG`, or one after output has already started, is an error. |
 | `.BYTE` | `.BYTE $01, $02, $FF` | Emits one or more comma-separated byte values (each must fit 8 bits) at the current address. |
 | `.WORD` | `.WORD $1234, $ABCD` | Emits one or more comma-separated 16-bit values, little-endian, at the current address. |
+| `.INCLUDE` | `.INCLUDE "SUBS.S"` | Splices another source file in at this point, as if its text appeared here. See [Splitting Source Across Files](#splitting-source-across-files). |
 
-`.STATIC`, `.RELOC`, and `.INCLUDE` are recognized by name but not yet
-implemented — using one exits with `CASM: FEATURE NOT IMPLEMENTED`.
+`.STATIC` and `.RELOC` are recognized by name but not yet implemented —
+using either exits with `CASM: FEATURE NOT IMPLEMENTED`. Use `/S` with an
+explicit `.ORG` for static output instead (see below).
+
+### Relocation
+
+By default — with no `.ORG` and no `/S` — CASM produces **relocatable**
+output: the PRG assembles against an implicit base address (`$3400`) but
+carries a relocation table and footer (format `R6`) that lets the OS loader
+patch every address-dependent byte to run correctly at whatever address it's
+actually loaded at. This is what lets a single assembled PRG run unmodified
+from `LOAD`/`RUN` at the default user program address, or explicitly
+relocated elsewhere.
+
+Giving an explicit `.ORG`, or passing `/S` (which requires an explicit
+`.ORG`), switches to **static** output instead: the PRG is fixed at that one
+address, with no relocation table. Use static output for a program that
+must live at a specific fixed address and will never move — `/S` with no
+`.ORG` is `CASM: ORG REQUIRED`.
+
+### Splitting Source Across Files
+
+`.INCLUDE "NAME.S"` loads another source file's text in place at that point,
+as if it had been pasted there — the included file's own labels and code
+become part of the same single assembly (same symbol table, same two
+passes). This is how a large program is organized as multiple files without
+needing them all named on the `CASM` command line:
+
+```asm
+.INCLUDE "SUBS.S"
+```
+
+Rules:
+
+- The filename must be a quoted string, 1-63 printable characters, right
+  after `.INCLUDE`. A missing opening quote is `CASM: INCLUDE FILENAME
+  EXPECTED`; an empty or unprintable name is `CASM: INVALID INCLUDE
+  FILENAME`; over 63 characters is `CASM: INCLUDE FILENAME TOO LONG`.
+- A file with no explicit device prefix (`8:`, `9:`, `10:`, `11:`) is read
+  from the *including* file's own device — so a chain of includes stays on
+  whichever disk the top-level source came from unless a child explicitly
+  names another one.
+- The same physical file may be `.INCLUDE`d more than once (from different
+  places) without being read from disk twice — up to 32 distinct files
+  total (`CASM: INCLUDE CATALOG FULL` beyond that).
+- Includes may nest up to 16 levels deep (`CASM: INCLUDE DEPTH EXCEEDED`
+  beyond that); a file that (directly or indirectly) includes itself is
+  `CASM: INCLUDE CYCLE DETECTED`.
+- The combined size of every source file involved — top-level and included
+  — is still capped at 65,535 bytes total.
+
+See [DASH](dash-utility.md) for a real, shipping seven-file program built
+entirely through one `.INCLUDE` chain from a single entry file.
 
 ## Practical Examples
 
-### Example 1: A Minimal Valid Program
+### Example 1: A Minimal Static Program
 
 ```asm
 .ORG $C000
@@ -153,8 +250,8 @@ Assemble it:
 CASM DEMO.CSM
 ```
 
-*Output:* `CASM: INPUT VALIDATED`. This produces a 20-byte PRG loading at
-`$C000`:
+*Output:* `CASM: INPUT VALIDATED`. This produces a 20-byte static PRG
+loading at `$C000` (no relocation trailer, since `.ORG` was given):
 
 ```text
 00 C0                      ; PRG header (load address $C000)
@@ -168,58 +265,73 @@ D0 FD                      ; BNE $C007   (displacement -3, branches to itself mi
 34 12 CD AB                ; .WORD $1234,$ABCD
 ```
 
-### Example 2: A Complete, Runnable Program
-
-Because labels aren't implemented yet, a runnable program has to spell out
-every address by hand — including the OS service-bus entry point (`$1000`)
-and its own message's load address. Here's `CASMHELLO.CSM`, one of CASM's
-own verified test fixtures. It prints a message via `DOS_PRINT_STR` and
-exits cleanly via `DOS_EXIT`:
+### Example 2: Labels and Forward References
 
 ```asm
-.ORG $3400
-LDX #$0E
-LDY #$34
-LDA #$09
-JSR $1000
-LDA #$4C
-JSR $1000
-.BYTE $59, $45, $53, $20, $49, $54, $20
-.BYTE $42, $55, $49, $4C, $44, $53, $21, $20
-.BYTE $2D, $2D, $20, $43, $41, $53, $4D
-.BYTE $0D, $00
+        LDX #$00
+LOOP:   LDA MESSAGE,X
+        BEQ DONE
+        JSR $1000
+        INX
+        BNE LOOP
+DONE:   LDA #$4C
+        JSR $1000
+MESSAGE:
+        .BYTE $48, $49, $00     ; "HI" + null terminator
 ```
 
-Walking through it: the explicitly based program loads at `$3400`, so its
-message text starts at `$340E` (14 bytes after the load address — 2 bytes
-of `LDX`/`LDY` opcode+operand, twice, plus `LDA`/`JSR` pairs). The `LDX
-#$0E` / `LDY #$34` pair loads that address into X/Y, `LDA #$09` selects
-`DOS_PRINT_STR` and `JSR $1000` calls the OS service bus (see
-[api-reference.md](api-reference.md)) to print it; `LDA #$4C`/`JSR $1000`
-then calls `DOS_EXIT`. The `.BYTE` lines spell out `"YES IT BUILDS! --
-CASM"` followed by a carriage return and a null terminator.
+This assembles with no `.ORG`, so it produces the default relocatable
+output at implicit base `$3400`, complete with a relocation table covering
+`MESSAGE`'s address wherever the loader ultimately places it. `LOOP` is used
+before its own definition is reached in the source (a genuine forward
+reference within the same file) and resolves correctly because Pass 1
+records every label's address before Pass 2 emits any code.
 
-To try it:
+### Example 3: Splitting Source with `.INCLUDE`
+
+`MAIN.S`:
+
+```asm
+        LDA #$09
+        LDX #<MESSAGE
+        LDY #>MESSAGE
+        JSR $1000
+        LDA #$4C
+        JSR $1000
+        .INCLUDE "DATA.S"
+```
+
+`DATA.S`:
+
+```asm
+MESSAGE:
+        .BYTE $59, $45, $53, $20, $49, $54, $20
+        .BYTE $42, $55, $49, $4C, $44, $53, $21, $00
+```
+
+Assemble and run it:
 
 ```text
-CASM CASMHELLO.CSM
-LOAD CASMHELLO
-GO 3400
+CASM MAIN.S /O:HELLO.PRG
+LOAD HELLO
+RUN
 ```
 
-(`LOAD CASMHELLO` loads the assembled PRG at its header-specified address —
-`$3400` — and registers it in the App Table; `GO 3400` then looks it up by
-address and runs it. The current `UserProgStart` is `$3800`, so `GO` with no
-argument does not select this explicitly based example.)
+`.INCLUDE "DATA.S"` splices `DATA.S`'s text in at that point, so `MESSAGE`
+is defined as part of the same assembly `MAIN.S` started — no separate
+symbol table, no separate passes. `#<MESSAGE`/`#>MESSAGE` load the low/high
+bytes of the label's relocated address into X/Y before calling
+`DOS_PRINT_STR` (see [api-reference.md](api-reference.md)); `LDA #$4C` then
+`JSR $1000` calls `DOS_EXIT`.
 
-*Output:* `YES IT BUILDS! -- CASM`, then a clean return to the shell.
+*Output:* `YES IT BUILDS!`, then a clean return to the shell.
 
-### Example 3: Error Messages
+### Example 4: Error Messages
 
 CASM stops at the first error and reports a specific diagnostic rather than
 a generic failure. A few representative cases (see the [Programmer's
-Reference diagnostic table](casm-programmers-reference.md#13-diagnostic-reference)
-for the complete list of all 36 codes):
+Reference diagnostic table](casm-programmers-reference.md#18-diagnostic-reference)
+for the complete list):
 
 | Source | Result |
 | --- | --- |
@@ -231,16 +343,20 @@ for the complete list of all 36 codes):
 | `LDA A` *(accumulator mode on an instruction that has none)* | `CASM: INVALID ADDRESSING MODE` |
 | `INX #5` *(immediate mode on an implied-only instruction)* | `CASM: INVALID ADDRESSING MODE` |
 | `LDA #$1234` *(immediate operand exceeds 8 bits)* | `CASM: OPERAND OUT OF RANGE` |
-| Any code before the first `.ORG` | `CASM: ORG REQUIRED` |
 | A second `.ORG` | `CASM: DUPLICATE ORG` |
+| `/S` with no `.ORG` anywhere | `CASM: ORG REQUIRED` |
 | `.ORG $C000` / `BNE $D000` *(target far out of branch range)* | `CASM: BRANCH OUT OF RANGE` |
+| Using `UNDEFINEDLABEL` that's never defined | `CASM: UNDEFINED SYMBOL` |
+| Defining the same label twice | `CASM: DUPLICATE SYMBOL` |
+| `.INCLUDE FOO.S` *(missing quotes)* | `CASM: INCLUDE FILENAME EXPECTED` |
 | A word CASM doesn't recognize where a statement should start | `CASM: SYNTAX ERROR` |
 
 ### Reading a diagnostic
 
 A diagnostic that concerns a specific place in the source prints two extra
-lines under the message: a location and the offending line with a caret.
-Assembling a file whose second line is `LDA #$0A@,X` produces:
+lines under the message: a location and the offending line with a caret
+(preceded by an `IN FILE` line whenever more than one top-level source file
+was given, so an error inside an `.INCLUDE`d file names it):
 
 ```text
 CASM: INVALID SOURCE BYTE
@@ -249,14 +365,15 @@ AT LINE 2, COL 9 (OFFSET 8) BYTE $40
           ^
 ```
 
-- **LINE** and **COL** are 1-based; **OFFSET** is the 0-based byte index into
-  the line (always `COL - 1`), which some editors report instead of a column.
-- **BYTE** appears only for `INVALID SOURCE BYTE`, giving the rejected byte's
-  value. That byte is shown as `.` in the line above, because it is by
-  definition not a normal printable character, so its value is stated in hex
-  rather than left ambiguous.
-- Lines wider than the screen scroll a window to keep the caret visible, with
-  `<.` or `.>` marking a clipped edge.
+- **LINE** and **COL** are 1-based and counted **per file**; **OFFSET** is
+  the 0-based byte index into the line (always `COL - 1`), which some
+  editors report instead of a column.
+- **BYTE** appears only for `INVALID SOURCE BYTE`, giving the rejected
+  byte's value. That byte is shown as `.` in the line above, because it is
+  by definition not a normal printable character, so its value is stated in
+  hex rather than left ambiguous.
+- Lines wider than the screen scroll a window to keep the caret visible,
+  with `<.` or `.>` marking a clipped edge.
 
 Diagnostics with no source position — a missing file, an option error, an
 internal failure — print the message line alone.
@@ -264,13 +381,18 @@ internal failure — print the message line alone.
 ## Not Yet Supported
 
 These will produce a specific error rather than silently doing the wrong
-thing — see the [Programmer's Reference §12](casm-programmers-reference.md#12-coverage-what-works-today)
+thing — see the [Programmer's Reference §17](casm-programmers-reference.md#17-coverage-what-works-today)
 for status and rationale:
 
-- **Labels and symbols.** Every address must be a literal number today.
-- **`.STATIC`, `.RELOC`, `.INCLUDE` directives.**
-- **`/M` (map file) and `/L` (listing file) output.**
-- **Source files larger than 64KB.**
+- **`.STATIC` / `.RELOC` directives** — use `/S` plus `.ORG` instead.
+- **`/M` (map file) and `/L` (listing file) output.** Accepted on the
+  command line but have no effect; Phase 10 will implement them.
+- **Multiplicative or parenthesized expression arithmetic** — `(A+B)*2` and
+  similar are not supported; only one symbol/literal plus an optional
+  `±NUMBER` addend.
+- **More than 8 top-level source files, 32 distinct included files, 16
+  include-nesting levels, 512 distinct labels, 4096 relocation entries, or
+  65,535 bytes of combined source.**
 
 ## Source
 

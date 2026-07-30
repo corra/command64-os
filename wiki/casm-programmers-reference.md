@@ -8,16 +8,18 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 9 in progress, WP46 complete (build 1191, version 0.1.48).**
+> **Status: Phase 9 complete (build 1204, version 0.1.50).** Phase 10
+> (symbol map and listing output, WP50-55) is planning-only so far — WP50
+> (contract reconciliation/ABI freeze) is active, WP51-55 are blocked behind
+> it, and no Phase 10 code has landed yet.
 > CASM performs a real two-pass assembly with labels, a bounded expression
 > evaluator, a VMM-backed symbol table, up to eight concatenated top-level
-> source files, and native R6-relocatable output (see
-> [Coverage](#17-coverage-what-works-today)). Phase 9 has so far landed the
-> `.INCLUDE` operand grammar, the physical-file catalog, and the nested
-> traversal frame stack — **none of which is reachable from a real assembly
-> yet**: `casmRunPass` still fatals with `CASM_DIAG_NOT_IMPLEMENTED` at
-> `.INCLUDE` until WP47 wires real dispatch. See
-> [§16](#16-include-processing-phase-9-in-progress) and
+> source files, native R6-relocatable output, and — as of WP47 — a fully
+> wired `.INCLUDE` dispatch (see [Coverage](#17-coverage-what-works-today)).
+> `.INCLUDE` is not merely built and fixture-tested: `casmRunPass` now
+> dispatches it for real, and DASH's production build
+> (`CASM DMAIN.S /O:DASH.PRG`) exercises this path on every assembly — see
+> [§16](#16-include-processing-phase-9-complete). See
 > [wiki/tasks/casm.md](tasks/casm.md) for the live task list. Treat anything
 > marked "not yet implemented" below as exactly that, not as a documentation
 > gap.
@@ -103,12 +105,12 @@ Every `bcs` after an init or pipeline call routes to `exitFatal` (via
 a symbol (Pass 1 only), `MNEMONIC` goes through `opcodesFindOpcode` +
 `emitInstruction`, `DIRECTIVE` goes to `emitDirective`, `NEWLINE` does
 nothing, and `EOF` ends the pass. The one exception is `.INCLUDE`, which
-`casmRunPass` intercepts *before* `emitDirective` and rejects with
-`CASM_DIAG_NOT_IMPLEMENTED` — includes alter the token source, so they are
-the driver's business, not the emitter's, and the machinery to switch
-sources exists but is not yet wired here ([§16](#16-include-processing-phase-9-in-progress)).
-`include.s` sits deliberately outside the arrows above: nothing on the
-production path calls it yet.
+`casmRunPass` intercepts *before* `emitDirective` and dispatches directly:
+includes alter the token source, so they are the driver's business, not the
+emitter's. Pass 1 resolves it through `includeCatalogLoad` (real file I/O
+allowed on a catalog miss); Pass 2 replays the identical result through
+`includeCatalogLookup`, a separate entry point structurally incapable of
+touching the filesystem — see [§16](#16-include-processing-phase-9-complete).
 
 ## 2. Build & Toolchain
 
@@ -328,7 +330,7 @@ column/line advance. Consumers — `lexerFill` above all — must read these
 frame's EOF and pops, in which case the byte returned belongs to the restored
 parent.
 
-**Frame stack** (`sourceFramePush`, [§16](#16-include-processing-phase-9-in-progress)):
+**Frame stack** (`sourceFramePush`, [§16](#16-include-processing-phase-9-complete)):
 `source.s` can suspend the current traversal and switch to another span of the
 combined store, then resume exactly where it left off. Depth 0 means no nested
 frame is active, i.e. traversal behaves exactly as it did before Phase 9.
@@ -416,7 +418,7 @@ iteration is unaffected. The grammar it enforces:
 
 Payload bytes are stored in their **original** PETSCII spelling — no case
 folding — because the spelling is what a diagnostic must echo back. Identity
-comparison folds case at compare time instead ([§16](#16-include-processing-phase-9-in-progress)).
+comparison folds case at compare time instead ([§16](#16-include-processing-phase-9-complete)).
 
 ## 10. Parser (`parser.s`)
 
@@ -458,7 +460,7 @@ filename lands in this module's `CasmIncludeFilename` (64 bytes) /
 `CasmIncludeFilenameLen`, kept here rather than in the token record because
 63 bytes do not fit the frozen 31-byte payload. The parser validates and
 stores; it performs no file, VMM, PC or output effect of any kind
-([§16](#16-include-processing-phase-9-in-progress)).
+([§16](#16-include-processing-phase-9-complete)).
 
 **`CasmParserStmt` layout** (7 bytes, in `parser.s`'s own BSS):
 
@@ -685,14 +687,19 @@ no staging across chunks) and the footer is staged in the same now-free
 buffer for one final write. No seeking is involved: `emitFinalize` already
 left the file position immediately after the last program byte.
 
-## 16. Include Processing (Phase 9, in progress)
+## 16. Include Processing (Phase 9, complete)
 
-**Nothing in this section is reachable from a real assembly yet.**
-`casmRunPass` intercepts `.INCLUDE` and fatals with
-`CASM_DIAG_NOT_IMPLEMENTED`; the pieces below are built, frozen and
-fixture-tested standalone (`tests/src/casm_include`, `casm_catalog`,
-`casm_frame`), and WP47 is what wires them into the dispatch. The phase
-contract (Phase 0C.19, in
+**`.INCLUDE` is fully wired and reachable from a real assembly.** WP47 wired
+the pieces below (previously built, frozen and fixture-tested standalone in
+`tests/src/casm_include`, `casm_catalog`, `casm_frame`) into `casmRunPass`'s
+real dispatch: Pass 1 resolves each `.INCLUDE` through
+`includeCatalogLoad` (which may perform real file I/O on a catalog miss),
+and Pass 2 replays the identical result through `includeCatalogLookup` — a
+separate entry point that is structurally incapable of filesystem I/O, so a
+second pass can never diverge from what Pass 1 already loaded. DASH's
+production build (`CASM DMAIN.S /O:DASH.PRG`, seven source files chained
+through one `.INCLUDE` from `dmain.s`) exercises this path on every real
+assembly. The phase contract (Phase 0C.19, in
 `brain/plans/2026-07-25-casm-phase9-include-processing.md`) freezes: quoted
 1-63-byte raw-PETSCII filenames, inherited parent devices unless explicitly
 prefixed, immutable Pass 1 loading with filesystem-free Pass 2 replay, 16
@@ -777,7 +784,8 @@ imports from `source.s`, never the reverse.
 
 ## 17. Coverage: What Works Today
 
-As of build 1191 / v0.1.48 (Phase 8 complete; Phase 9 through WP46):
+As of build 1204 / v0.1.50 (Phase 9 complete; Phase 10 WP50 planning-only,
+WP51-55 unstarted):
 
 **Works:**
 - All 56 legal, documented 6502 mnemonics across every addressing mode they
@@ -790,27 +798,27 @@ As of build 1191 / v0.1.48 (Phase 8 complete; Phase 9 through WP46):
   `± NUMBER` addend.
 - **Up to eight top-level source files**, concatenated in command-line order
   with per-file line numbers in diagnostics.
+- **`.INCLUDE`**, fully wired into `casmRunPass` dispatch (WP47): quoted
+  1-63-byte filenames, inherited parent device unless explicitly prefixed,
+  up to 32 distinct physical files deduplicated by identity, 16 nesting
+  levels, Pass 1 real I/O via `includeCatalogLoad` replayed filesystem-free
+  in Pass 2 via `includeCatalogLookup` ([§16](#16-include-processing-phase-9-complete)).
+  Exercised on every real DASH build, not just fixture-tested.
 - **Two output modes**: static (`/S` plus an explicit `.ORG`) and, by
   default, R6-relocatable output at origin `$3400` with a relocation table
   and footer the OS's own loader understands.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (55 distinct `CASM_DIAG_*` codes —
+  diagnostic per failure (60 distinct `CASM_DIAG_*` codes —
   [§18](#18-diagnostic-reference)).
-
-**Built but not yet reachable** — `.INCLUDE`'s operand grammar, physical file
-catalog, and nested traversal frame stack all exist and are fixture-tested,
-but `casmRunPass` still rejects `.INCLUDE` with
-`CASM_DIAG_NOT_IMPLEMENTED`; WP47 wires the dispatch
-([§16](#16-include-processing-phase-9-in-progress)).
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
 rather than being silently accepted):
-- **`.INCLUDE`** — `CASM_DIAG_NOT_IMPLEMENTED`, raised by `casmRunPass`
-  after the operand has been validated and stored.
 - **`.STATIC` / `.RELOC` directives** — `CASM_DIAG_NOT_IMPLEMENTED`; use
   `/S` and `.ORG` instead.
-- **`/M` (map) and `/L` (listing) output** — CLI-parsed, then `start`
-  fatals with `CASM_DIAG_NOT_IMPLEMENTED` if either bit is set.
+- **`/M` (map) and `/L` (listing) output** — CLI-parsed with no error, but
+  `start` fatals with `CASM_DIAG_NOT_IMPLEMENTED` if either bit is set.
+  Phase 10 (WP51-55) is planning-only and will implement these; no Phase 10
+  code has landed.
 - **Combined sources over 64K** — `sourceLoad`'s checked total overflows at
   65,536 bytes (`CASM_DIAG_SOURCE_OFFSET_OVERFLOW`).
 - **Multiplicative or parenthesized expression arithmetic** —
@@ -905,7 +913,7 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$07` | `DUPLICATE_OPTION` | DUPLICATE OPTION |  | `cli.s` |
 | `$08` | `UNKNOWN_OPTION` | UNKNOWN OPTION |  | `cli.s` |
 | `$09` | `FILENAME_TOO_LONG` | FILENAME TOO LONG |  | `cli.s` |
-| `$0A` | `NOT_IMPLEMENTED` | FEATURE NOT IMPLEMENTED |  | `casm.s` (`/M`,`/L`), `emit.s` (`.STATIC`/`.RELOC`/`.INCLUDE`) |
+| `$0A` | `NOT_IMPLEMENTED` | FEATURE NOT IMPLEMENTED |  | `casm.s` (`/M`,`/L`), `emit.s` (`.STATIC`/`.RELOC`) |
 | `$0B` | `INPUT_OPEN_FAILED` | CANNOT OPEN INPUT |  | `fileio.s` |
 | `$0C` | `INPUT_READ_FAILED` | INPUT READ FAILED |  | `fileio.s` |
 | `$0D` | `INPUT_CLOSE_FAILED` | INPUT CLOSE FAILED |  | `fileio.s`/`source.s` |
@@ -947,10 +955,12 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$31` | `INCLUDE_FILENAME_EXPECTED` | INCLUDE FILENAME EXPECTED | ✓ | `lexer.s` (no opening quote after `.INCLUDE`) |
 | `$32` | `INVALID_INCLUDE_FILENAME` | INVALID INCLUDE FILENAME | ✓ | `lexer.s` (empty or non-printable byte), `include.s` (empty post-prefix name) |
 | `$33` | `INCLUDE_FILENAME_TOO_LONG` | INCLUDE FILENAME TOO LONG | ✓ | `lexer.s` (>63 payload bytes) *(WP44 range ends here)* |
-| `$34` | `INCLUDE_CATALOG_FULL` | INCLUDE CATALOG FULL |  | `include.s` (32 distinct physical files) *(WP45 range ends here)* |
-| `$35` | `INCLUDE_DEPTH_EXCEEDED` | INCLUDE DEPTH EXCEEDED |  | `source.s` (`sourceFramePush`, 16 levels) |
-| `$36` | `INCLUDE_CYCLE_DETECTED` | INCLUDE CYCLE DETECTED |  | `source.s` (candidate already in the active frame chain) *(WP46 range ends here)* |
-| `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values, and `emit.s` reaching `.INCLUDE` (an internal dispatch error) |
+| `$34` | `INCLUDE_CATALOG_FULL` | INCLUDE CATALOG FULL | ✓ | `include.s` (32 distinct physical files) *(WP45 range ends here)* |
+| `$35` | `INCLUDE_DEPTH_EXCEEDED` | INCLUDE DEPTH EXCEEDED | ✓ | `source.s` (`sourceFramePush`, 16 levels) |
+| `$36` | `INCLUDE_CYCLE_DETECTED` | INCLUDE CYCLE DETECTED | ✓ | `source.s` (candidate already in the active frame chain) *(WP46 range ends here)* |
+| `$37` | `INCLUDE_EVENT_LOG_FULL` | INCLUDE EVENT LOG FULL |  | `include.s` (128 include events) |
+| `$38` | `INCLUDE_REPLAY_MISMATCH` | INCLUDE REPLAY MISMATCH |  | `casm.s` (Pass 2's `includeCatalogLookup` disagrees with Pass 1's recorded result — defensive internal invariant) *(Phase 9/WP47 range ends here)* |
+| `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
 ## 19. Extending CASM
 
