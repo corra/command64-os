@@ -2,7 +2,7 @@
 feature: casm-dash-wp9-integration-relocation-audit
 created: 2026-07-26
 updated: 2026-07-30
-status: static-audit-complete, manifest-regen-and-hardware-matrix-pending
+status: complete (user-approved 2026-07-30)
 ---
 
 # Plan: DASH WP9 - Integration and Relocation Audit
@@ -438,3 +438,24 @@ Present artifact provenance/hash/size, disk inventory, complete relocation and
 private-address ledgers, static builds, and user runtime results. Ask whether
 WP9 is complete. Do not mark it complete or activate WP10 closeout before the
 user's explicit response.
+
+### Closeout (user-confirmed 2026-07-30)
+
+At WP10 activation review, the deferred items (Increments 2-3 native-CASM
+manifest regeneration, Increment 8 user runtime matrix) were presented to the
+user per the Completion Gate above. The user explicitly called all of them
+verified and directed that the shipping manifest continue to be built from
+the `dash_ref` ca65 cross-check reference (`--allow-host-bytes`) for the time
+being, rather than blocking on a native-CASM-on-VICE run.
+
+This is an explicit, informed acceptance of the interim provenance recorded
+earlier in this plan, not a silent substitution: `dash.ref.hex`'s
+`# provenance:` line still truthfully states the bytes are ca65-sourced via
+`--allow-host-bytes`, and that remains accurate. A native-CASM regeneration
+is no longer a WP9 blocker; if the user wants it done later, it should be
+picked up as its own small remediation WP rather than reopening WP9.
+
+WP9 is complete on this basis. No plan/task/Taskwarrior records beyond this
+plan file required updating -- WP7-WP9 dash work has never been tracked in
+Taskwarrior or `brain/task.md` (only `wiki/tasks/dash-wp1.md` through
+`dash-wp6.md` exist, covering WP1-WP6 only).
