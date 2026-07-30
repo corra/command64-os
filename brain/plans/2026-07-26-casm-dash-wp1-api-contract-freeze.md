@@ -160,8 +160,15 @@ Input:
   A = $5D (DOS_GET_APP_INFO)
   X = Buffer Pointer Low Byte
   Y = Buffer Pointer High Byte
-  HexValLo (ZP $61) or Register A's slot index:
+  HexValLo (ZP $66) or Register A's slot index:
     - Pass requested slot index (0..15) in Register A before calling, or in X/Y parameter block.
+    - *Corrected 2026-07-30 (WP7 activation review): this line and the WP3
+      implementation notes below previously said ZP `$61`. `HexValLo` is
+      `$66` (`HexValHi` is `$67`) in both `include/command64.inc` and
+      `include/ca65/command64.inc`; `$61` was never correct. WP3's actual
+      `ahGetAppInfo` implementation and its test in `tests/src/api/api.s`
+      always used the real `$66` -- only the documentation/comments were
+      stale, not the frozen ABI itself.*
 
 Output:
   Carry = 0: Success (A = $00, slot occupied, buffer filled with 24-byte record)

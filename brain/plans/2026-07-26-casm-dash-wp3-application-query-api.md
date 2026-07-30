@@ -226,3 +226,53 @@ Present public/private mapping, all status evidence, guard and immutability
 results, bank-contamination result, code/storage delta, and running-state proof
 or approved limitation. Ask the user whether WP3 is complete before WP4
 activation or completion records.
+
+## WP7 Amendment (2026-07-30): Occupied-Slot Buffer-Write Bug
+
+Found live during WP7 (Applications page) activation review and confirmed by
+the user's own testing (`load casm 7000` then viewing DASH's Applications
+page reported `APP QUERY ERROR` instead of the loaded app): `ahGetAppInfo`'s
+occupied-slot write path (`src/command64/api.asm`) used `STA (PrintPtrLo), X`
+throughout, which is not a valid 6502 addressing mode (only `(zp,X)` and
+`(zp),Y` exist). Kick Assembler silently treats the parentheses as plain
+grouping and assembles it as absolute,X off `PrintPtrLo`'s own zero-page
+address, so every field write except `NameLen` (which already correctly used
+`(PrintPtrLo), Y`) landed in OS zero page instead of the caller's buffer.
+`Carry` still cleared (success), so callers received an all-zero record with
+no indication anything was wrong -- exactly what DASH's `StructVersion`/
+`StructSize` validation (added in WP7, since WP1 froze both as fixed
+constants for this record) caught.
+
+Never caught earlier because no automated test exercised an occupied slot
+(`tests/src/api/api.s` only covers invalid-index/null-pointer/empty-slot --
+already flagged as a gap during WP7's own activation review, before the user
+found the live symptom), and WP3's original "query all occupied slots" user
+walkthrough evidently didn't surface it either.
+
+Fixed by rewriting every offset write (and the one offset read) to real
+`(PrintPtrLo), Y` indirect-indexed addressing.
+
+**Second, independent bug found immediately after, also via the user's live
+testing** (range/size/flags then rendered correctly but the name column was
+blank): `_agaiNameLoop`'s raw-name-byte read stacked `X` across the
+`vmmReadByte` call (`TXA`/`PHA` ... `JSR vmmReadByte` ... `PLA`/`TAX`) on the
+mistaken assumption it needed to. Neither `vmmReadByte` nor
+`vmmComputeAddress` touch `X` at all -- only `A`/`Y` -- so the `PLA`
+immediately after the call clobbered `A` with the just-restored loop index,
+discarding the fetched name byte before the `STA fileScratch, X` that
+followed it. Every slot's `fileScratch` therefore held `[0,1,2,...,15]`
+instead of the real name, and `fileScratch[0] == 0` made the length-counting
+loop always measure `NameLen = 0` -- a name column that renders as blank
+padding, not garbage, which is why range/size/flags could be visibly correct
+while the name was empty. This bug predates WP7 entirely (the loop code is
+untouched from WP3) and was masked by the first bug (nothing ever reached
+this far with a valid buffer to prove wrong). Fixed by removing the
+unnecessary stack dance -- `X` survives the call untouched.
+
+**Notation on `PS`/`APPS` (`aptList`, `src/command64/apptable.asm`): no
+changes needed.** It reads app-table entries directly via `aptSlotBase`/
+`vmmReadByte` and prints with `KernalChROUT` -- a completely separate code
+path from `ahGetAppInfo` that never used `(PrintPtrLo), X/Y` addressing at
+all, and was never exposed to this bug. This is also why `PS` displaying
+apps correctly while DASH's Applications page failed was not a contradiction
+-- it was two different implementations, only one of which was broken.

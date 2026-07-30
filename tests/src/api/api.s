@@ -233,7 +233,7 @@ call_get_app_info_16:
     .byte $2C              ; BIT skip
 call_get_app_info:
     lda #0                 ; Slot 0
-    ; Save slot index in ZP scratch ($61 HexValLo) before setting A = DOS_GET_APP_INFO
+    ; Save slot index in ZP scratch ($66 HexValLo) before setting A = DOS_GET_APP_INFO
     sta HexValLo
     lda #DOS_GET_APP_INFO
     jsr OS_API
