@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp2-system-information-api
 created: 2026-07-26
-status: draft
+updated: 2026-07-27
+status: complete
 ---
 
 # Plan: DASH WP2 - System Information API

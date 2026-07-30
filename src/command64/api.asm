@@ -59,6 +59,10 @@ apiNotVmmWrite:
     bne apiNotRelease
     jmp ahReleaseL15
 apiNotRelease:
+    cmp #DOS_GET_SYSTEM_INFO
+    bne apiNotGetSysInfo
+    jmp ahGetSystemInfo
+apiNotGetSysInfo:
 
     // Unknown function — return with error (C=1)
     sec
@@ -238,4 +242,262 @@ ahReleaseL15:
     lda #0
     sta L15Device
     clc
+    rts
+
+ahGetSystemInfo:
+    // Input: X = Buffer Pointer Low Byte, Y = Buffer Pointer High Byte
+    // Output: Carry = 0 (Success, A = $00), Carry = 1 (Error, A = DOS_ERR_INVALID_ARG)
+    
+    // Null pointer check: X=0 AND Y=0 is invalid
+    stx PrintPtrLo
+    sty PrintPtrHi
+    txa
+    ora PrintPtrHi
+    beq _agsiErrNull
+
+    // High address check: destination high byte must be < $D0 (must not write into I/O or ROM)
+    // Also must not be in ZP/Stack range (high byte >= $02)
+    lda PrintPtrHi
+    cmp #$02
+    bcc _agsiErrNull
+    cmp #$D0
+    bcs _agsiErrNull
+
+    // Offset 0: StructVersion = 1
+    ldy #SYS_INFO_OFF_VER
+    lda #1
+    sta (PrintPtrLo), y
+
+    // Offset 1: StructSize = 24 ($18)
+    ldy #SYS_INFO_OFF_SIZE
+    lda #SYS_INFO_SIZE
+    sta (PrintPtrLo), y
+
+    // Offset 2: OsMajor = 4
+    ldy #SYS_INFO_OFF_OS_MAJ
+    lda #4
+    sta (PrintPtrLo), y
+
+    // Offset 3: OsMinor = 0
+    ldy #SYS_INFO_OFF_OS_MIN
+    lda #0
+    sta (PrintPtrLo), y
+
+    // Offset 4: OsStage = 0 (Release)
+    ldy #SYS_INFO_OFF_OS_STG
+    lda #0
+    sta (PrintPtrLo), y
+
+    // Offset 5: CurrentDevice (ZP $BA)
+    ldy #SYS_INFO_OFF_DEV
+    lda CurrentDevice
+    sta (PrintPtrLo), y
+
+    // Offset 6: VideoStandard ($02A6 KernalVideoStd)
+    ldy #SYS_INFO_OFF_VIDEO
+    lda KernalVideoStd
+    sta (PrintPtrLo), y
+
+    // Offset 7-8: UserProgStart ($0800 default)
+    ldy #SYS_INFO_OFF_PROG_LO
+    lda #<UserProgStart
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_PROG_HI
+    lda #>UserProgStart
+    sta (PrintPtrLo), y
+
+    // Offset 9-10: UserProgEnd ($BFFF: low $FF, high $BF)
+    ldy #SYS_INFO_OFF_END_LO
+    lda #$FF
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_END_HI
+    lda #$BF
+    sta (PrintPtrLo), y
+
+    // Inspect VMM state (vmmInitialized)
+    lda vmmInitialized
+    beq _agsiNoVmm
+
+    // VMM is initialized!
+    // Offset 11: VmmFlags = $01 (Bit 0 active)
+    ldy #SYS_INFO_OFF_VMM_FLG
+    lda #$01
+    sta (PrintPtrLo), y
+
+    // Offset 12-13: VmmPageSize = 4096 ($1000: low $00, high $10)
+    ldy #SYS_INFO_OFF_PGSZ_LO
+    lda #$00
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_PGSZ_HI
+    lda #$10
+    sta (PrintPtrLo), y
+
+    // Offset 14-15: VmmTotalPages = 4096 ($1000: low $00, high $10)
+    ldy #SYS_INFO_OFF_TOT_LO
+    lda #$00
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_TOT_HI
+    lda #$10
+    sta (PrintPtrLo), y
+
+    // Scan MCT array ($C000-$CFFF) to count allocated and free pages
+    // Using HexValLo/Hi ($61/$62) as scratch counter for AllocPages
+    lda HexValLo
+    pha
+    lda HexValHi
+    pha
+
+    lda #0
+    sta HexValLo            // Alloc counter low
+    sta HexValHi            // Alloc counter high
+
+    // Scan 16 pages of 256 bytes = 4096 bytes at $C000
+    lda #<VmmMctBase
+    sta FileLenLo
+    lda #>VmmMctBase
+    sta FileLenHi           // Pointer FileLenLo/Hi = $C000
+
+    ldx #16                 // 16 pages
+    ldy #0
+_agsiMctLoop:
+    lda (FileLenLo), y
+    cmp #PAGE_FREE          // PAGE_FREE = 0
+    beq _agsiMctNext
+    inc HexValLo            // non-zero -> allocated page
+    bne _agsiMctNext
+    inc HexValHi
+_agsiMctNext:
+    iny
+    bne _agsiMctLoop
+    inc FileLenHi
+    dex
+    bne _agsiMctLoop
+
+    // Write VmmAllocPages (HexValLo/Hi)
+    ldy #SYS_INFO_OFF_ALC_LO
+    lda HexValLo
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_ALC_HI
+    lda HexValHi
+    sta (PrintPtrLo), y
+
+    // Calculate VmmFreePages = 4096 - VmmAllocPages ($1000 - HexVal)
+    sec
+    lda #$00
+    sbc HexValLo
+    tax                     // Free low in X
+    lda #$10
+    sbc HexValHi
+    tay                     // Free high in Y
+
+    // Restore HexValLo/Hi
+    pla
+    sta HexValHi
+    pla
+    sta HexValLo
+
+    // Write VmmFreePages (X/Y)
+    tya                     // Y is Free high
+    pha                     // Save Free high
+    ldy #SYS_INFO_OFF_FRE_LO
+    txa                     // X is Free low
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_FRE_HI
+    pla                     // Restore Free high
+    sta (PrintPtrLo), y
+
+    jmp _agsiAppSlots
+
+_agsiNoVmm:
+    // VMM inactive
+    ldy #SYS_INFO_OFF_VMM_FLG
+    lda #0
+    sta (PrintPtrLo), y
+
+    // VmmPageSize = 0
+    ldy #SYS_INFO_OFF_PGSZ_LO
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_PGSZ_HI
+    sta (PrintPtrLo), y
+
+    // VmmTotalPages = 0
+    ldy #SYS_INFO_OFF_TOT_LO
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_TOT_HI
+    sta (PrintPtrLo), y
+
+    // VmmAllocPages = 0
+    ldy #SYS_INFO_OFF_ALC_LO
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_ALC_HI
+    sta (PrintPtrLo), y
+
+    // VmmFreePages = 0
+    ldy #SYS_INFO_OFF_FRE_LO
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_FRE_HI
+    sta (PrintPtrLo), y
+
+_agsiAppSlots:
+    // Offset 20: AppMaxSlots = 16 ($10)
+    ldy #SYS_INFO_OFF_MAX_SLOT
+    lda #APT_MAX_SLOTS
+    sta (PrintPtrLo), y
+
+    // Offset 21: AppUsedSlots
+    // Count active slots if vmmInitialized != 0 AND AptSegLo|AptSegHi != 0
+    lda vmmInitialized
+    beq _agsiNoAppSlots
+    lda AptSegLo
+    ora AptSegHi
+    beq _agsiNoAppSlots
+
+    // AppTable is active! Scan slots 0..15
+    ldx #0                  // Slot index
+    ldy #0                  // Active slots counter
+_agsiAppScanLoop:
+    cpx #APT_MAX_SLOTS
+    bcs _agsiAppScanDone
+    txa
+    pha
+    tya
+    pha
+    // Call aptSlotBase (X = slot index)
+    jsr aptSlotBase         // sets VmmSeg/Off to slot X base
+    jsr vmmReadByte         // A = Flags byte of slot X
+    pla
+    tay
+    pla
+    tax
+    and #APT_FLAG_USED
+    beq _agsiAppScanNext
+    iny                     // Increment active slot counter
+_agsiAppScanNext:
+    inx
+    jmp _agsiAppScanLoop
+_agsiAppScanDone:
+    tya                     // A = active slot count
+    jmp _agsiWriteAppUsed
+
+_agsiNoAppSlots:
+    lda #0
+_agsiWriteAppUsed:
+    ldy #SYS_INFO_OFF_USD_SLOT
+    sta (PrintPtrLo), y
+
+    // Offsets 22-23: Reserved = 0
+    lda #0
+    ldy #SYS_INFO_OFF_RES0
+    sta (PrintPtrLo), y
+    ldy #SYS_INFO_OFF_RES1
+    sta (PrintPtrLo), y
+
+    // Return success
+    lda #DOS_ERR_OK
+    clc
+    rts
+
+_agsiErrNull:
+    lda #DOS_ERR_INVALID_ARG
+    sec
     rts

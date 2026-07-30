@@ -64,6 +64,42 @@ DOS_SEND_COMMAND = $58 ; Send raw command-channel string, read drive response
 DOS_VMM_READ     = $59 ; Block-read bytes from a DOS_ALLOC_MEM'd REU segment
 DOS_VMM_WRITE    = $5A ; Block-write bytes to a DOS_ALLOC_MEM'd REU segment
 DOS_RELEASE_L15  = $5B ; Close LFN 15 and clear the OS command-channel cache
+DOS_GET_SYSTEM_INFO = $5C ; Gather system status and memory metrics
+DOS_GET_APP_INFO    = $5D ; Query loaded application table entry
+
+; --- API Status & Error Codes ---
+DOS_ERR_OK            = $00 ; Success
+DOS_ERR_INVALID_INDEX = $01 ; Invalid slot index (>= 16)
+DOS_ERR_SLOT_EMPTY     = $02 ; Requested app slot is unallocated
+DOS_ERR_UNAVAILABLE  = $03 ; Feature or subsystem uninitialized
+DOS_ERR_INVALID_ARG   = $04 ; Null or invalid argument pointer
+
+; --- System Information Record Constants ---
+SYS_INFO_SIZE         = 24  ; Byte size of DOS_GET_SYSTEM_INFO structure
+SYS_INFO_OFF_VER      = 0   ; StructVersion (1 byte)
+SYS_INFO_OFF_SIZE     = 1   ; StructSize (1 byte = 24)
+SYS_INFO_OFF_OS_MAJ   = 2   ; OsMajor (1 byte)
+SYS_INFO_OFF_OS_MIN   = 3   ; OsMinor (1 byte)
+SYS_INFO_OFF_OS_STG   = 4   ; OsStage (1 byte)
+SYS_INFO_OFF_DEV      = 5   ; CurrentDevice (1 byte)
+SYS_INFO_OFF_VIDEO    = 6   ; VideoStandard (1 byte: 0=NTSC, 1=PAL)
+SYS_INFO_OFF_PROG_LO  = 7   ; UserProgStart low byte
+SYS_INFO_OFF_PROG_HI  = 8   ; UserProgStart high byte
+SYS_INFO_OFF_END_LO   = 9   ; UserProgEnd low byte ($FF)
+SYS_INFO_OFF_END_HI   = 10  ; UserProgEnd high byte ($BF)
+SYS_INFO_OFF_VMM_FLG  = 11  ; VmmFlags (1 byte: bit 0=active, bit 1=probed)
+SYS_INFO_OFF_PGSZ_LO  = 12  ; VmmPageSize low byte ($00)
+SYS_INFO_OFF_PGSZ_HI  = 13  ; VmmPageSize high byte ($10 = 4096)
+SYS_INFO_OFF_TOT_LO   = 14  ; VmmTotalPages low byte ($00)
+SYS_INFO_OFF_TOT_HI   = 15  ; VmmTotalPages high byte ($10 = 4096)
+SYS_INFO_OFF_ALC_LO   = 16  ; VmmAllocPages low byte
+SYS_INFO_OFF_ALC_HI   = 17  ; VmmAllocPages high byte
+SYS_INFO_OFF_FRE_LO   = 18  ; VmmFreePages low byte
+SYS_INFO_OFF_FRE_HI   = 19  ; VmmFreePages high byte
+SYS_INFO_OFF_MAX_SLOT = 20  ; AppMaxSlots (1 byte = 16)
+SYS_INFO_OFF_USD_SLOT = 21  ; AppUsedSlots (1 byte)
+SYS_INFO_OFF_RES0     = 22  ; Reserved (1 byte)
+SYS_INFO_OFF_RES1     = 23  ; Reserved (1 byte)
 
 ; --- PETSCII Control Characters ---
 PetCr   = $0D ; Carriage return
