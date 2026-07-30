@@ -646,15 +646,37 @@ add_custom_target(sync_docs ALL DEPENDS ${SYNC_OUTPUTS})
 # the source of manifest bytes. Regenerating the manifest is a deliberate,
 # reviewed act (scripts/build_dash_manifest.py), never a build step, so a
 # source edit can never silently change what ships.
+#
+# STALE-ARTIFACT PROTECTION (WP9): the manifest records a source_sha256 for
+# each of the seven sources at regeneration time; --source-dir here makes
+# hex_manifest_to_bin.py recompute those hashes from the real files and hard-
+# fail on any mismatch (or on a manifest with no recorded hashes at all,
+# e.g. one predating this check). This is a deliberate, expected build
+# failure right now: dash.ref.hex is still the WP4 placeholder and has never
+# been regenerated for WP5-WP8's sources, so it correctly refuses to ship a
+# stub as if it were the current dashboard. Building `dash` (and therefore
+# `image_d64`, which now packages it) will fail until a real native-CASM run
+# is reviewed and transcribed via build_dash_manifest.py.
 set(DASH_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/dash/dash.ref.hex")
+set(DASH_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/dash")
 set(DASH_BIN "${CMAKE_BINARY_DIR}/dash.prg")
+# Same seven sources as DASH_SEQ_SOURCES below (defined later in this file,
+# alongside command64_casm_utils_d64) -- listed again here, not referenced,
+# since CMake processes this file top-to-bottom and that variable does not
+# exist yet at this point.
+set(DASH_SOURCE_ABS_EARLY "")
+foreach(DASH_SRC_NAME dmain.s dscr.s dfmt.s dsys.s dapp.s dvmm.s ddata.s)
+    list(APPEND DASH_SOURCE_ABS_EARLY "${DASH_SOURCE_DIR}/${DASH_SRC_NAME}")
+endforeach()
 add_custom_command(
     OUTPUT "${DASH_BIN}"
     COMMAND "${Python3_EXECUTABLE}"
         "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
         "${DASH_MANIFEST}" "${DASH_BIN}"
+        "--source-dir" "${DASH_SOURCE_DIR}"
     DEPENDS "${DASH_MANIFEST}"
         "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        ${DASH_SOURCE_ABS_EARLY}
     COMMENT "Generating DASH production binary from manifest"
     VERBATIM
 )
@@ -662,11 +684,21 @@ add_custom_target(dash ALL DEPENDS "${DASH_BIN}")
 set_target_properties(dash PROPERTIES C64_PRG_PATH "${DASH_BIN}")
 
 # 6. Disk images
-# DASH deliberately does NOT ship here: it is packaged on
-# command64_casm_utils.d64, the native-CASM development disk, until its
-# manifest is backed by a reviewed native CASM run (WP4 artifact contract).
-set(IMAGE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${CASM_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
-set(TEST_IMAGE_PRG_TARGETS ${IMAGE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
+# TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS
+# itself) deliberately: test.d64 is already near its directory-entry
+# capacity with its test fixtures (see the "ERROR: Dir track full" this
+# caused when DASH was briefly added to the shared list during WP9), and
+# DASH is a shipped app, not a test fixture -- it belongs only on the
+# production image, per this plan's own "do not add files to test.d64
+# without checking its known directory-entry saturation" caution.
+set(IMAGE_BASE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${COMP_TARGET} ${CASM_TARGET} ${EDLIN_TARGET} ${CONWAY_TARGET} pacman ${C_TARGETS})
+# DASH ships here as of WP9 (Integration and Relocation Audit): the
+# manifest-transcribed `dash` target above, packaged under the same
+# production disk as every other shipped external app. Gated on the
+# stale-artifact check above, so it can only actually build once a fresh,
+# reviewed manifest backs it.
+set(IMAGE_PRG_TARGETS ${IMAGE_BASE_PRG_TARGETS} dash)
+set(TEST_IMAGE_PRG_TARGETS ${IMAGE_BASE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
 # test_l15release ships on casm_overflow_test_d64 instead (see that target's
 # own comment) -- test.d64 sits at the 1541 directory track's hard 144-entry
 # ceiling, and adding one more entry there would bump an unrelated fixture

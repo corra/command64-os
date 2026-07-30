@@ -36,6 +36,16 @@ from pathlib import Path
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_MANIFEST = REPO_ROOT / "src" / "external" / "dash" / "dash.ref.hex"
 CA65_REFERENCE = REPO_ROOT / "build" / "dash_ref.prg"
+DEFAULT_SOURCE_DIR = REPO_ROOT / "src" / "external" / "dash"
+
+# The seven ordered DASH sources (see AGENTS.md "Source Order Is
+# Authoritative") -- also the exact set WP9's stale-artifact protection
+# records a source_sha256 entry for, so hex_manifest_to_bin.py's
+# --source-dir check can catch any one of them changing without a manifest
+# regeneration.
+DASH_SOURCE_NAMES = [
+    "dmain.s", "dscr.s", "dfmt.s", "dsys.s", "dapp.s", "dvmm.s", "ddata.s",
+]
 
 
 def fail(msg):
@@ -55,6 +65,10 @@ def main(argv=None):
                          "build 1191 on command64_casm_utils.d64, 2026-07-27\")")
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST,
                     help="manifest to write (default: %(default)s)")
+    ap.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR,
+                    help="directory holding the seven DASH sources to hash "
+                         "into the manifest's source_sha256 entries "
+                         "(default: %(default)s)")
     ap.add_argument("--cross-check", type=Path, metavar="REF",
                     help="also compare PRG byte-for-byte against REF (normally "
                          "build/dash_ref.prg, the independent ca65 build) and "
@@ -100,6 +114,21 @@ def main(argv=None):
                  f"lengths {len(data)} vs {len(ref)}, first difference at "
                  f"offset {first} (0x{first:04X}). Manifest not written.")
 
+    # WP9 stale-artifact protection: hash the exact seven sources this run
+    # was assembled from, so hex_manifest_to_bin.py's --source-dir check can
+    # catch a source edited after this manifest was reviewed, before it ships
+    # silently. Missing a source file here is refused, not skipped -- a
+    # manifest that can't prove which sources it covers provides no
+    # protection at all.
+    source_shas = {}
+    for name in DASH_SOURCE_NAMES:
+        src_path = args.source_dir / name
+        if not src_path.is_file():
+            fail(f"{src_path}: not a file (required to record its "
+                 "source_sha256 -- pass --source-dir to point at the seven "
+                 "DASH sources this PRG was actually assembled from)")
+        source_shas[name] = hashlib.sha256(src_path.read_bytes()).hexdigest()
+
     lines = [
         "# DASH relocatable skeleton -- reviewed hex manifest (WP4)",
         "#",
@@ -116,8 +145,10 @@ def main(argv=None):
         "#",
         f"# bytes: {len(data)}",
         f"# sha256: {digest}",
-        "",
     ]
+    for name in DASH_SOURCE_NAMES:
+        lines.append(f"# source_sha256: {name}={source_shas[name]}")
+    lines.append("")
     for i in range(0, len(data), 16):
         lines.append(" ".join(f"{b:02X}" for b in data[i:i + 16]))
 
@@ -128,6 +159,8 @@ def main(argv=None):
     print(f"  provenance: {args.provenance}")
     if cross_check_note:
         print(f"  cross-check: {cross_check_note}")
+    print(f"  source_sha256 recorded for {len(source_shas)} files from "
+          f"{args.source_dir}")
     return 0
 
 
