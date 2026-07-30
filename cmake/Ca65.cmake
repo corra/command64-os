@@ -39,10 +39,48 @@
 # ", align = <value>" to the generated .cfg's CODE segment line -- needed
 # by apps (e.g. conway) that embed page-aligned data buffers directly in
 # CODE via a source-level ".align" directive.
+#
+# Optional keyword argument: BASE_HEX. Links the app at a fixed origin instead
+# of the global USER_PROG_START_HEX. Only one thing needs this -- an app built
+# purely as a byte-for-byte reference for native CASM output must be linked at
+# CASM's own emission origin (CASM_DEFAULT_ORIGIN, hardcoded $3400 in
+# src/external/casm/common.inc), which is deliberately independent of where the
+# OS happens to load user programs today. Without it, raising USER_PROG_START_HEX
+# would silently shift every absolute operand in the reference and turn the
+# comparison into a guaranteed mismatch. Relocatable output means the pinned
+# origin costs nothing at runtime.
+#
+# Optional keyword argument: EXTRA_INCLUDE_DIRS. Extra -I search directories
+# appended after the standard three (source dir, include/ca65, generated
+# build_<name>.inc dir). Only DASH needs this: its .INCLUDE operands are
+# uppercase PETSCII-matching filenames (e.g. "DSCR.S") so native CASM on a
+# case-preserving CBM disk resolves them, but the real host files are
+# lowercase (dscr.s) on this case-sensitive filesystem. The caller points
+# this at a directory of uppercase symlinks/copies so ca65's cross-check
+# build resolves the identical operand ca65-side, without renaming any
+# checked-in source file.
 function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZE_HEX)
+    cmake_parse_arguments(CA65APP "" "BASE_HEX" "EXTRA_INCLUDE_DIRS" ${ARGN})
+
+    # CODE_ALIGN stays positional so the existing 6-arg call sites need no
+    # change; it is simply whatever positional argument survives keyword parsing.
     set(CODE_ALIGN "")
-    if(ARGC GREATER 5)
-        list(GET ARGN 0 CODE_ALIGN)
+    if(CA65APP_UNPARSED_ARGUMENTS)
+        list(GET CA65APP_UNPARSED_ARGUMENTS 0 CODE_ALIGN)
+    endif()
+
+    # Base/next page for the two links reloc.py diffs. Defaults to the global
+    # user-program origin; BASE_HEX overrides it, and the +1-page partner is
+    # derived from it so the two can never drift out of step.
+    if(CA65APP_BASE_HEX)
+        set(APP_BASE_HEX "${CA65APP_BASE_HEX}")
+        math(EXPR APP_BASE_NEXT_DEC "0x${CA65APP_BASE_HEX} + 0x100")
+        math(EXPR APP_BASE_NEXT_DEC "${APP_BASE_NEXT_DEC}" OUTPUT_FORMAT HEXADECIMAL)
+        string(REGEX REPLACE "^0x" "" APP_BASE_HEX_NEXT "${APP_BASE_NEXT_DEC}")
+        string(TOUPPER "${APP_BASE_HEX_NEXT}" APP_BASE_HEX_NEXT)
+    else()
+        set(APP_BASE_HEX "${USER_PROG_START_HEX}")
+        set(APP_BASE_HEX_NEXT "${USER_PROG_START_HEX_NEXT}")
     endif()
     string(TOUPPER "${TARGET_NAME}" TARGET_NAME_UPPER)
     get_filename_component(ENTRY_FILE_ABS "${ENTRY_FILE}" ABSOLUTE)
@@ -96,8 +134,8 @@ function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZ
     # across all 6 checked-in pairs apart from `start`/`size`).
     set(CFG_DIR "${CMAKE_BINARY_DIR}/build_${TARGET_NAME}_cfg")
     file(MAKE_DIRECTORY "${CFG_DIR}")
-    set(CFG_BASE "${CFG_DIR}/${TARGET_NAME}_${USER_PROG_START_HEX}.cfg")
-    set(CFG_NEXT "${CFG_DIR}/${TARGET_NAME}_${USER_PROG_START_HEX_NEXT}.cfg")
+    set(CFG_BASE "${CFG_DIR}/${TARGET_NAME}_${APP_BASE_HEX}.cfg")
+    set(CFG_NEXT "${CFG_DIR}/${TARGET_NAME}_${APP_BASE_HEX_NEXT}.cfg")
     set(CODE_SEGMENT_LINE "    CODE:   load = MAIN,   type = ro;")
     if(CODE_ALIGN)
         set(CODE_SEGMENT_LINE "    CODE:   load = MAIN,   type = ro, align = ${CODE_ALIGN};")
@@ -117,9 +155,9 @@ SEGMENTS {
 }
 ")
     string(REPLACE "@CODE_SEGMENT@" "${CODE_SEGMENT_LINE}" CFG_TEMPLATE "${CFG_TEMPLATE}")
-    string(REPLACE "@START@" "${USER_PROG_START_HEX}" CFG_BASE_CONTENT "${CFG_TEMPLATE}")
+    string(REPLACE "@START@" "${APP_BASE_HEX}" CFG_BASE_CONTENT "${CFG_TEMPLATE}")
     string(REPLACE "@SIZE@" "${PRG_SIZE_HEX}" CFG_BASE_CONTENT "${CFG_BASE_CONTENT}")
-    string(REPLACE "@START@" "${USER_PROG_START_HEX_NEXT}" CFG_NEXT_CONTENT "${CFG_TEMPLATE}")
+    string(REPLACE "@START@" "${APP_BASE_HEX_NEXT}" CFG_NEXT_CONTENT "${CFG_TEMPLATE}")
     string(REPLACE "@SIZE@" "${PRG_SIZE_HEX}" CFG_NEXT_CONTENT "${CFG_NEXT_CONTENT}")
     file(WRITE "${CFG_BASE}" "${CFG_BASE_CONTENT}")
     file(WRITE "${CFG_NEXT}" "${CFG_NEXT_CONTENT}")
@@ -136,6 +174,8 @@ SEGMENTS {
     set(ALL_SOURCES "${ENTRY_FILE_ABS}" ${${SOURCES_VAR}})
     list(REMOVE_DUPLICATES ALL_SOURCES)
     list(FILTER ALL_SOURCES INCLUDE REGEX "\\.s$")
+    # Exclude DASH sub-sources from independent compilation as they are .included by dash_wrapper.s
+    list(FILTER ALL_SOURCES EXCLUDE REGEX "src/external/dash/d[a-z]+\\.s$")
     set(OUT_DIR "${CMAKE_BINARY_DIR}/out_${TARGET_NAME}")
     file(MAKE_DIRECTORY "${OUT_DIR}")
     set(OBJS "")
@@ -144,10 +184,15 @@ SEGMENTS {
         get_filename_component(SRC_DIR "${SRC_ABS}" DIRECTORY)
         get_filename_component(SRC_NAME "${SRC_ABS}" NAME_WE)
         set(OBJ "${OUT_DIR}/${SRC_NAME}.o")
+        set(EXTRA_I_FLAGS "")
+        foreach(EXTRA_DIR ${CA65APP_EXTRA_INCLUDE_DIRS})
+            list(APPEND EXTRA_I_FLAGS "-I" "${EXTRA_DIR}")
+        endforeach()
         add_custom_command(
             OUTPUT "${OBJ}"
             COMMAND "${CA65_EXECUTABLE}" "${SRC_ABS}"
                 -I "${SRC_DIR}" -I "${CMAKE_SOURCE_DIR}/include/ca65" -I "${INC_DIR}"
+                ${EXTRA_I_FLAGS}
                 -t c64 -o "${OBJ}"
             # DEPENDS the full source/include set (via HASH_SOURCES, which
             # -- like add_external_app's SOURCES_VAR convention -- should
@@ -170,14 +215,14 @@ SEGMENTS {
         OUTPUT "${PRG_BASE}"
         COMMAND "${LD65_EXECUTABLE}" -C "${CFG_BASE}" -o "${PRG_BASE}" ${OBJS}
         DEPENDS ${OBJS} "${CFG_BASE}"
-        COMMENT "ld65: linking ${TARGET_NAME_UPPER} at $${USER_PROG_START_HEX} (relocation base build)"
+        COMMENT "ld65: linking ${TARGET_NAME_UPPER} at $${APP_BASE_HEX} (relocation base build)"
         VERBATIM
     )
     add_custom_command(
         OUTPUT "${PRG_NEXT}"
         COMMAND "${LD65_EXECUTABLE}" -C "${CFG_NEXT}" -o "${PRG_NEXT}" ${OBJS}
         DEPENDS ${OBJS} "${CFG_NEXT}"
-        COMMENT "ld65: linking ${TARGET_NAME_UPPER} at $${USER_PROG_START_HEX_NEXT} (relocation +1 page build)"
+        COMMENT "ld65: linking ${TARGET_NAME_UPPER} at $${APP_BASE_HEX_NEXT} (relocation +1 page build)"
         VERBATIM
     )
 

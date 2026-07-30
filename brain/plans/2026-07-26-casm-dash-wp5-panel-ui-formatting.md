@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp5-panel-ui-formatting
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete
 ---
 
 # Plan: DASH WP5 - Panel UI and Formatting
@@ -117,7 +118,7 @@ formatDec16  -> right-aligned 1-5 digit unsigned field
 - Applications page retains 17 required rows.
 - R6 growth is explained by local pointers only; fixed screen/color rows do
   not appear in relocation records.
-- At `$3400/$4000/$5000`, user confirms frame alignment, active tabs, bounded
+- At `$3800/$5000/$9000`, user confirms frame alignment, active tabs, bounded
   placeholder content, refresh behavior, and clean Q exit.
 - Behavior matches with and without REU.
 
@@ -136,3 +137,20 @@ formatDec16  -> right-aligned 1-5 digit unsigned field
 Present geometry, encoding, formatter vectors, boundary proof, R6 delta, and
 user visual results at all three addresses. Ask whether WP5 is complete before
 WP6 activation.
+
+## Completion Note (2026-07-30)
+
+Approved complete. `dash_ref` (ca65 cross-check) builds clean: base `$3400`,
+1151 code bytes, 90 relocation points, linked one page apart for the reloc
+diff. `CLEARSCREEN` writes exactly 1000 cells; cursor/string primitives
+reject/clamp out-of-range coordinates and row-crossing writes; hex/decimal
+formatters use bounded nibble extraction and 16-iteration binary division.
+
+Accepted variance from the Geometry table above: the implementation draws
+rows 0-23 only (top/title/tabs/header-separator, middle frame 4-20, a second
+border@21, status@22, bottom border@23); physical row 24 is never written and
+stays blank. This is one row short of the frozen "4-21 content / 22 separator
+/ 23 status / 24 bottom" table, but the content area is still exactly 17 rows
+(4-20), which satisfies this plan's own Verification requirement ("Applications
+page retains 17 required rows" for 1 header + 16 app rows). Left as-is rather
+than reworked to consume all 25 rows.

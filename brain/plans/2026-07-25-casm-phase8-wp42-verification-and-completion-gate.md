@@ -266,6 +266,14 @@ and CMake wiring are in place:
    (assemble), then for each of `$3400`, `$4000`, `$5000`: `LOAD CASMRELOC1
    <addr>` followed by `RUN CASMRELOC1`, confirming the message "CASM
    RELOC RUNS OK" prints identically at every address.
+
+   > **Addendum 2026-07-27 — do not re-run this step verbatim.** The result
+   > above stands as recorded, but `$3400` has since become an illegal load
+   > address: `USER_PROG_START_HEX` moved to `$3800` and `aptCheckRange`
+   > rejects anything below `UserProgStart` as protected. Substitute `$3800`,
+   > `$5000`, `$9000`. Note also that the `$3400` case here had a relocation
+   > delta of zero, so it never exercised the relocation path it appears to
+   > test.
 6. **Static-fixture regression** (confirms the gate text's second half,
    "static fixtures remain ordinary PRGs"): `casmemit1`, `casmhello`
    (`RUN`), `casmorgexpl1` -- re-run via `COMP`/`RUN` unmodified.

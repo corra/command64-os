@@ -14,6 +14,7 @@ Welcome to the command64 Operating System Wiki. This wiki contains user manuals,
   - [PACMAN Utility Manual](pacman-utility.md) - Learn how to run the Pac-Man demo app.
   - [CASM Utility Manual](casm-utility.md) - Learn how to assemble 6502 source into a runnable PRG on the C64 itself.
   - [BANNER Utility Manual](banner-utility.md) - Learn how to render messages in 5x6 block characters.
+  - [DASH Utility Manual](dash-utility.md) - Learn how to run the three-page system/applications/VMM dashboard.
 
 - **Developer Specifications & References:**
   - [OS Service Bus API Reference](api-reference.md) - The stable entry point (`JSR $1000`) and function codes ($02–$56).
@@ -31,7 +32,7 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
 
 ### In Progress
 
-- [CASM Native Assembler](tasks/casm.md) - Phase 9 (`.INCLUDE` processing) in progress; Phases 1-8 complete.
+- [CASM Native Assembler](tasks/casm.md) - Phase 9 (`.INCLUDE` processing) complete; Phase 10 (symbol map/listing, WP50-55) contract reconciliation in progress.
 - [EDLIN Port](tasks/edlin-port.md) - Porting MS-DOS EDLIN to command64 OS.
 - [DEBUG ca65/ld65 Migration](tasks/debug-ca65-migration.md) - Migrating the DEBUG utility off KickAssembler.
 - [Phase 5 Multi-Device Support](tasks/phase-5-multi-device.md) - Switching between/interacting with devices 8-11.

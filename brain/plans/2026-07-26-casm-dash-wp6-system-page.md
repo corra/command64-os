@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp6-system-page
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete
 ---
 
 # Plan: DASH WP6 - System Page
@@ -123,3 +124,68 @@ Unknown or invalid values display `N/A`, never misleading zero.
 Present exact field mapping, private-address audit, API regression evidence,
 and REU/no-REU multi-address walkthrough. Ask whether WP6 is complete before
 WP7 activation.
+
+## Implementation Note (2026-07-30)
+
+Implemented, not yet gated complete -- see wiki/tasks/dash-wp6.md for the
+sub-task list and outstanding items (native-CASM manifest regeneration and
+the live REU/no-REU multi-address walkthrough both still need the user).
+
+Also folded in, per explicit 2026-07-30 user decision: the kernel-side fix
+for [[project-dash-version-literal-deferred]] (Task Warrior #41, now closed)
+and the WP1 amendment bumping `StructVersion` to `$02` / reinterpreting
+offset 22 as `OsPatch` (see
+`brain/plans/2026-07-26-casm-dash-wp1-api-contract-freeze.md` section 7).
+
+## Completion Note (2026-07-30)
+
+Approved complete by the user, with known inconsistencies explicitly
+deferred rather than blocking closure -- see below.
+
+**Real bug found and fixed during live verification**: `FORMATDEC16`
+(`dfmt.s`, WP5 code) called `JSR DIV10` while X still held the digit
+write-index; `DIV10` is documented as clobbering X (its own 16-iteration
+shift counter) and always returns with X=0, so every digit was written to
+`FMTBUF+0` regardless of position, and the multi-digit loop terminated after
+one digit. This produced exactly the "digit then padding" / "only the last
+digit of a multi-digit number" symptoms reported against the System page.
+Fixed by stacking X across the `DIV10` call. This was caught only by testing
+the native-CASM-built `DASH.PRG` on real/emulated hardware and comparing
+against expectations byte-by-byte with the user -- static review, a Python
+simulation, and disassembly of the byte-identical `dash_ref.prg` all missed
+it, because none of those exercise real runtime register-clobber behavior.
+Confirms the WP5 gap flagged at its own completion note (formatter test
+vectors were verified by static inspection there, not on hardware).
+
+Also added `DASHVERSTR` (ddata.s) -- a static `"DASH V0.1.3"` banner on the
+previously-unused screen row 24, matching other external apps' version-label
+convention (e.g. `casm.s`'s `"CASM V<major>.<minor>.<stage>.<build>"`). DASH
+cannot use those apps' `.define`/generated-`build_<name>.inc` mechanism since
+the dual-assembler subset has no equates; this is a hand-bumped literal
+instead. It's a real, permanent banner now, not a throwaway debug line.
+
+**Known inconsistencies, explicitly deferred (not WP6's to fix -- DASH is
+reporting exactly what `$5C` returns; these are kernel apptable.asm/vmm.asm
+behaviors)**, logged as Task Warrior #42 (project `casm-dash`):
+
+- `VmmTotalPages`/`VmmPageSize` are hardcoded to a 16MB-REU assumption
+  (4096 pages x 4096 bytes), not computed from the actual attached REU.
+  `VmmFlags` bit 1 ("REU probed") is defined in the WP1 contract but never
+  set by `ahGetSystemInfo`. Correct only by coincidence for a 16MB REU.
+- `DOS_EXIT` does not clear `APT_FLAG_USED`/`APT_FLAG_RUNNING` or free the
+  exiting program's VMM allocations; only the manual `FREE` shell command
+  reclaims app-table slots, and even that left `APPLICATIONS` unchanged in a
+  user-verified repro (VMM pages partially reclaimed, app count did not
+  move) -- possibly a bug in `aptRemoveAll` itself, not just a missing
+  automatic-cleanup feature.
+
+These require kernel (not DASH-side) changes and are deferred to a future
+point-fix WP rather than folded into WP6.
+
+**Not independently re-verified in this closing pass**: the full
+`$3800`/`$5000`/`$9000` load-address matrix from this plan's original
+Completion Gate. The user's live testing in this session loaded DASH at
+`$3800` via COMMAND64's own `load`/`run` shell commands (device 9) and
+confirmed correct System-page rendering there, including after the
+`FORMATDEC16` fix; the other two addresses were not separately exercised in
+this pass.

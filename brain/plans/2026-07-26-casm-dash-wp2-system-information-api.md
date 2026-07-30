@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-wp2-system-information-api
 created: 2026-07-26
-status: draft
+updated: 2026-07-27
+status: complete
 ---
 
 # Plan: DASH WP2 - System Information API
@@ -120,7 +121,7 @@ Helper names and placement are implementation details unless exposed.
 - If counters require resident bytes, document owner, lifetime, clobbers, and
   address/segment; update `brain/MEMORY.md` if ownership changes.
 - Measure Api/Vmm/AppTable/ShellExt boundaries after each increment.
-- Stop before resident code approaches or overlaps `$3400`.
+- Stop before resident code approaches or overlaps `UserProgStart` (`$3800`).
 
 ## Failure and Cleanup
 
@@ -196,7 +197,7 @@ User runtime checks:
 - Guard bytes change or partial output appears on error.
 - Version sources disagree.
 - App count and table scan disagree without a frozen corruption rule.
-- Segment growth threatens `$1000` or `$3400` boundaries.
+- Segment growth threatens `$1000` or `UserProgStart` (`$3800`) boundaries.
 - No safe no-REU test path exists and no alternative is approved.
 
 ## Completion Gate

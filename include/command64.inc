@@ -43,6 +43,56 @@
 .label DOS_VMM_READ    = $59  // Block-read bytes from a DOS_ALLOC_MEM'd REU segment
 .label DOS_VMM_WRITE   = $5A  // Block-write bytes to a DOS_ALLOC_MEM'd REU segment
 .label DOS_RELEASE_L15 = $5B  // Close LFN 15 and clear the OS command-channel cache
+.label DOS_GET_SYSTEM_INFO = $5C // Gather system status and memory metrics
+.label DOS_GET_APP_INFO    = $5D // Query loaded application table entry
+
+// --- API Status & Error Codes ---
+.label DOS_ERR_OK            = $00 // Success
+.label DOS_ERR_INVALID_INDEX = $01 // Invalid slot index (>= 16)
+.label DOS_ERR_SLOT_EMPTY     = $02 // Requested app slot is unallocated
+.label DOS_ERR_UNAVAILABLE  = $03 // Feature or subsystem uninitialized
+.label DOS_ERR_INVALID_ARG   = $04 // Null or invalid argument pointer
+
+// --- System Information Record Constants ---
+.label SYS_INFO_SIZE         = 24  // Byte size of DOS_GET_SYSTEM_INFO structure
+.label SYS_INFO_STRUCT_VER   = 2   // StructVersion value this OS emits (WP6 amendment added OsPatch at offset 22)
+.label SYS_INFO_OFF_VER      = 0   // StructVersion (1 byte)
+.label SYS_INFO_OFF_SIZE     = 1   // StructSize (1 byte = 24)
+.label SYS_INFO_OFF_OS_MAJ   = 2   // OsMajor (1 byte)
+.label SYS_INFO_OFF_OS_MIN   = 3   // OsMinor (1 byte)
+.label SYS_INFO_OFF_OS_STG   = 4   // OsStage (1 byte)
+.label SYS_INFO_OFF_DEV      = 5   // CurrentDevice (1 byte)
+.label SYS_INFO_OFF_VIDEO    = 6   // VideoStandard (1 byte: 0=NTSC, 1=PAL)
+.label SYS_INFO_OFF_PROG_LO  = 7   // UserProgStart low byte
+.label SYS_INFO_OFF_PROG_HI  = 8   // UserProgStart high byte
+.label SYS_INFO_OFF_END_LO   = 9   // UserProgEnd low byte ($FF)
+.label SYS_INFO_OFF_END_HI   = 10  // UserProgEnd high byte ($BF)
+.label SYS_INFO_OFF_VMM_FLG  = 11  // VmmFlags (1 byte: bit 0=active, bit 1=probed)
+.label SYS_INFO_OFF_PGSZ_LO  = 12  // VmmPageSize low byte ($00)
+.label SYS_INFO_OFF_PGSZ_HI  = 13  // VmmPageSize high byte ($10 = 4096)
+.label SYS_INFO_OFF_TOT_LO   = 14  // VmmTotalPages low byte ($00)
+.label SYS_INFO_OFF_TOT_HI   = 15  // VmmTotalPages high byte ($10 = 4096)
+.label SYS_INFO_OFF_ALC_LO   = 16  // VmmAllocPages low byte
+.label SYS_INFO_OFF_ALC_HI   = 17  // VmmAllocPages high byte
+.label SYS_INFO_OFF_FRE_LO   = 18  // VmmFreePages low byte
+.label SYS_INFO_OFF_FRE_HI   = 19  // VmmFreePages high byte
+.label SYS_INFO_OFF_MAX_SLOT = 20  // AppMaxSlots (1 byte = 16)
+.label SYS_INFO_OFF_USD_SLOT = 21  // AppUsedSlots (1 byte)
+.label SYS_INFO_OFF_OS_PAT   = 22  // OsPatch (1 byte) -- formerly Reserved0, WP6 amendment
+.label SYS_INFO_OFF_RES1     = 23  // Reserved (1 byte)
+
+// --- Application Information Record Constants ---
+.label APP_INFO_SIZE         = 24  // Byte size of DOS_GET_APP_INFO structure
+.label APP_INFO_OFF_VER      = 0   // StructVersion (1 byte)
+.label APP_INFO_OFF_SIZE     = 1   // StructSize (1 byte = 24)
+.label APP_INFO_OFF_SLOT     = 2   // SlotIndex (1 byte: 0..15)
+.label APP_INFO_OFF_FLAGS    = 3   // Flags (1 byte: bit 0=used, 1=running, 2=reu, 3=stack)
+.label APP_INFO_OFF_LOAD_LO  = 4   // LoadAddr low byte
+.label APP_INFO_OFF_LOAD_HI  = 5   // LoadAddr high byte
+.label APP_INFO_OFF_SIZE_LO  = 6   // Size low byte
+.label APP_INFO_OFF_SIZE_HI  = 7   // Size high byte
+.label APP_INFO_OFF_NAME_LEN = 8   // NameLen (1 byte: 0..15)
+.label APP_INFO_OFF_NAME_DATA= 9   // NameData (15 bytes PETSCII, null-padded)
 
 // --- PETSCII Control Characters ---
 .label PetCr   = $0D  // Carriage return

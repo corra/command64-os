@@ -1,7 +1,8 @@
 ---
 feature: casm-dash-system-dashboard
 created: 2026-07-26
-status: draft
+updated: 2026-07-30
+status: complete (user-approved 2026-07-30, all WP1-WP10 closed)
 ---
 
 # Plan: CASM Native Relocatable DASH System Dashboard
@@ -397,7 +398,8 @@ Rules:
 - Save persistent values before `$1000` calls that may clobber registers or
   shared zero page.
 - Do not write the MCT or REU registers directly.
-- Never assume the runtime load address is `$3400`.
+- Never assume the runtime load address equals the emission origin. CASM
+  emits at `$3400`; `UserProgStart` is `$3800` and moves over time.
 - Avoid self-modifying code unless a separately reviewed need appears.
 - Represent internal pointers through relocation-aware `.WORD` values or
   `<`/`>` expressions.
@@ -444,9 +446,13 @@ hardware; the `c64-testing` MCP and web emulators must not be used.
 
 Load and run the same generated binary at:
 
-- `$3400`: zero-delta control.
-- `$4000`: positive page relocation.
-- `$5000`: second positive page relocation.
+- `$3800`: `UserProgStart`, the address the external-command path uses.
+- `$5000`: mid-range page relocation.
+- `$9000`: high-range page relocation.
+
+There is deliberately no zero-delta control: CASM emits at
+`CASM_DEFAULT_ORIGIN` (`$3400`), which is below `UserProgStart` and so can
+never be a legal load address. Every case exercises relocation.
 
 At each address verify:
 
@@ -519,7 +525,7 @@ At each address verify:
 
 - Run the complete build and regression matrix.
 - Inspect all R6 entries.
-- Test at `$3400`, `$4000`, and `$5000`.
+- Test at `$3800`, `$5000`, and `$9000`.
 - Confirm `DASH` consumes no private OS addresses.
 
 ### WP10: Documentation and Completion Gate
@@ -548,3 +554,16 @@ The first implementation increment is WP1 only. It produces the dedicated API
 contract plan with exact service numbers, record bytes, statuses, register and
 flag behavior, scratch/clobber rules, and verification. No API or DASH source
 may be edited until that plan is explicitly approved.
+
+## Closeout (user-approved 2026-07-30)
+
+All ten work packages are complete: WP1-WP3 (frozen `$5C`/`$5D` API contract
+and implementations), WP4-WP5 (relocatable skeleton, panel UI/formatting),
+WP6-WP8 (System, Applications, VMM Test pages), WP9 (integration/relocation
+audit -- R6 ledger, private-address audit, production packaging, stale-
+artifact gate; manifest provenance remains the ca65 `dash_ref` cross-check as
+an explicit interim, user-approved rather than blocking on a native-CASM-on-
+hardware run), and WP10 (documentation reconciliation and completion
+walkthrough, see that plan's own closeout note). DASH ships as `dash.prg`
+(`DASH V0.1.4`) on the production `image_d64`. See each WP's own plan file
+for its individual completion note and evidence.
