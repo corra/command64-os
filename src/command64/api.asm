@@ -454,7 +454,7 @@ _agsiNotHigh:
     sta (PrintPtrLo), y
 
     // Scan MCT array ($C000-$CFFF) to count allocated and free pages
-    // Using HexValLo/Hi ($61/$62) as scratch counter for AllocPages
+    // Using HexValLo/Hi ($66/$67) as scratch counter for AllocPages
     lda HexValLo
     pha
     lda HexValHi
@@ -620,7 +620,7 @@ _agsiErrNull:
     rts
 
 ahGetAppInfo:
-    // Input: HexValLo ($61) = Requested Slot Index (0..15)
+    // Input: HexValLo ($66) = Requested Slot Index (0..15)
     //        X = Buffer Pointer Low Byte
     //        Y = Buffer Pointer High Byte
     // Output: Carry = 0 (Success, A = $00), Carry = 1 (Error, A = Error Code)
@@ -691,26 +691,37 @@ _agaiErrUnavail:
 _agaiSlotOccupied:
     // Y contains raw Flags byte
     // Stack contains requested slot index
+    //
+    // FIX (WP7 activation review, 2026-07-30): every field write below used
+    // to read "STA (PrintPtrLo), X". That is not a real 6502 addressing mode
+    // -- only (zp,X) and (zp),Y exist -- and Kick Assembler silently treats
+    // the parentheses as plain grouping, assembling it as absolute,X off
+    // PrintPtrLo's OWN zero-page address ($FB) rather than dereferencing it.
+    // Every field except NameLen (which already correctly used (PrintPtrLo),
+    // Y) was silently written into OS zero page instead of the caller's
+    // buffer, which is why an occupied-slot query always reported success
+    // with a record that never actually left StructVersion/StructSize (and
+    // most other fields) as anything but zero. Never caught earlier because
+    // no test exercised an occupied slot -- only invalid-index/null/empty
+    // were covered (see tests/src/api/api.s), and `PS`/`APPS` reads the app
+    // table directly via aptList (apptable.asm), not through this API, so it
+    // was never exposed to this bug either.
 
-    // Write Offset 0: StructVersion = 1
-    ldx #APP_INFO_OFF_VER
+    tya                         // A = Flags (Y unaffected by TYA)
+    ldy #APP_INFO_OFF_FLAGS
+    sta (PrintPtrLo), y         // Write Offset 3: Flags
+
+    ldy #APP_INFO_OFF_VER
     lda #1
-    sta (PrintPtrLo), x
+    sta (PrintPtrLo), y         // Write Offset 0: StructVersion = 1
 
-    // Write Offset 1: StructSize = 24 ($18)
-    ldx #APP_INFO_OFF_SIZE
+    ldy #APP_INFO_OFF_SIZE
     lda #APP_INFO_SIZE
-    sta (PrintPtrLo), x
+    sta (PrintPtrLo), y         // Write Offset 1: StructSize = 24 ($18)
 
-    // Write Offset 2: SlotIndex (from stack)
-    pla                         // A = SlotIndex
-    ldx #APP_INFO_OFF_SLOT
-    sta (PrintPtrLo), x
-
-    // Write Offset 3: Flags (Y)
-    tya                         // A = Flags
-    ldx #APP_INFO_OFF_FLAGS
-    sta (PrintPtrLo), x
+    pla                         // A = SlotIndex (from stack)
+    ldy #APP_INFO_OFF_SLOT
+    sta (PrintPtrLo), y         // Write Offset 2: SlotIndex
 
     // Read LoadAddr (offset 17 in entry, APT_OFF_ADDR)
     // Advance VmmOffLo by 17
@@ -722,16 +733,16 @@ _agaiSlotOccupied:
     inc VmmOffHi
 _agaiReadLoad:
     jsr vmmReadByte             // LoadAddr lo
-    ldx #APP_INFO_OFF_LOAD_LO
-    sta (PrintPtrLo), x
+    ldy #APP_INFO_OFF_LOAD_LO
+    sta (PrintPtrLo), y
 
     inc VmmOffLo
     bne _agaiReadLoadHi
     inc VmmOffHi
 _agaiReadLoadHi:
     jsr vmmReadByte             // LoadAddr hi
-    ldx #APP_INFO_OFF_LOAD_HI
-    sta (PrintPtrLo), x
+    ldy #APP_INFO_OFF_LOAD_HI
+    sta (PrintPtrLo), y
 
     // Read Size (offset 19 in entry, APT_OFF_SIZE)
     inc VmmOffLo
@@ -739,34 +750,41 @@ _agaiReadLoadHi:
     inc VmmOffHi
 _agaiReadSizeLo:
     jsr vmmReadByte             // Size lo
-    ldx #APP_INFO_OFF_SIZE_LO
-    sta (PrintPtrLo), x
+    ldy #APP_INFO_OFF_SIZE_LO
+    sta (PrintPtrLo), y
 
     inc VmmOffLo
     bne _agaiReadSizeHi
     inc VmmOffHi
 _agaiReadSizeHi:
     jsr vmmReadByte             // Size hi
-    ldx #APP_INFO_OFF_SIZE_HI
-    sta (PrintPtrLo), x
+    ldy #APP_INFO_OFF_SIZE_HI
+    sta (PrintPtrLo), y
 
     // Read 16-byte Name field (offset 1 in entry, APT_OFF_NAME)
-    ldx #APP_INFO_OFF_SLOT
-    lda (PrintPtrLo), x         // reload SlotIndex
+    ldy #APP_INFO_OFF_SLOT
+    lda (PrintPtrLo), y         // reload SlotIndex (now correctly persisted
+                                // in the caller's buffer by the write above)
     tax
     jsr aptSlotBase             // VmmOff = entry base
     inc VmmOffLo                // base + 1 = APT_OFF_NAME
 
     // Read up to 16 raw PETSCII bytes into fileScratch
+    //
+    // FIX (WP7 live testing, 2026-07-30): this used to stack X across the
+    // vmmReadByte call ("txa/pha ... jsr vmmReadByte ... pla/tax"), but
+    // vmmReadByte (and vmmComputeAddress, which it calls) never touch X --
+    // only A and Y. The PLA after the call clobbered A with the just-popped
+    // loop index, discarding the fetched name byte before the STA below, so
+    // every slot's fileScratch ended up holding [0,1,2,...] instead of the
+    // real name -- fileScratch[0]=0 made the length-measuring loop below
+    // always read NameLen=0, i.e. always no visible name. X survives the
+    // call untouched, so the stack dance was unnecessary.
     ldx #0                      // name byte index 0..15
 _agaiNameLoop:
     cpx #16
     bcs _agaiNameMeasured
-    txa
-    pha
-    jsr vmmReadByte             // A = name byte
-    pla
-    tax
+    jsr vmmReadByte             // A = name byte; X preserved
     sta fileScratch, x
     inc VmmOffLo
     bne _agaiNextChar
@@ -791,21 +809,19 @@ _agaiLenDone:
     sta (PrintPtrLo), y
 
     // Copy 15 bytes from fileScratch into destination NameData (offset 9..23)
-    ldy #0
+    ldx #0
 _agaiCopyNameLoop:
-    cpy #15
+    cpx #15
     bcs _agaiCopyDone
-    tya
-    clc
-    adc #APP_INFO_OFF_NAME_DATA // = 9
-    tax                         // X = destination index (9..23)
-    tya
+    lda fileScratch, x
     pha
-    lda fileScratch, y
-    sta (PrintPtrLo), x
-    pla
+    txa
+    clc
+    adc #APP_INFO_OFF_NAME_DATA // Y = X + 9 = destination index (9..23)
     tay
-    iny
+    pla
+    sta (PrintPtrLo), y
+    inx
     jmp _agaiCopyNameLoop
 
 _agaiCopyDone:
