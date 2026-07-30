@@ -8,7 +8,7 @@ if(CMAKE_BINARY_DIR EQUAL CMAKE_SOURCE_DIR)
     message(FATAL_ERROR "In-source builds are not allowed. Please create a separate build directory and run cmake from there.")
 endif()
 
-project(command64-os VERSION 0.4.0 LANGUAGES NONE)
+project(command64-os VERSION 0.4.1 LANGUAGES NONE)
 
 # Include custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
@@ -504,7 +504,11 @@ endif()
 # Copies documentation files from wiki/ to docs/ automatically during builds.
 set(SYNC_FILES
     api-reference.md
+    banner-utility.md
+    casm-utility.md
     debug-test-plan.md
+    debug-utility.md
+    edlin-utility.md
     pet-sci-api.md
     programmers-reference.md
     user-manual.md
@@ -710,6 +714,18 @@ add_c64_disk_image(image_d64
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS ${IMAGE_PRG_TARGETS}
+)
+# BANNER ships on the OS disk as source only (banner.s), not a compiled
+# PRG: assembling it with CASM is meant to be part of the end-user
+# experience, not a pre-built command. See command64_casm_utils_d64 below
+# for the separate dev-utility disk that also carries the compiled PRG.
+add_custom_command(
+    TARGET image_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
+        "${CMAKE_BINARY_DIR}/image.d64"
+    COMMENT "Appending banner.s source to image.d64"
+    VERBATIM
 )
 
 add_c64_disk_image(test_image_d64

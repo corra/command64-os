@@ -264,6 +264,24 @@ If you type a command that the shell doesn't recognize as internal, it automatic
 **Syntax:** `LABEL [new-label]`
 **Example:** `LABEL NEWDISK`
 
+### FORMAT
+
+**Description:** Low-level-formats a floppy disk by sending the drive's
+native `N:` (New) command over its command channel; the drive firmware
+performs the actual format. **This destroys all data on the target disk.**
+FORMAT guards the operation behind a two-step confirmation: a `(Y/N)`
+prompt naming the target device, then a re-typed disk name that must match
+exactly before the format is sent. Any mismatch cancels with `FORMAT
+CANCELLED.` and touches nothing.
+**Syntax:** `FORMAT <dev>:<name>,<id>`
+**Example:** `FORMAT 8:MYDISK,01`
+
+Arguments can be given on the command line or left out; FORMAT prompts
+interactively for device (8-11), name (1-16 characters, no `,` or `:`), and
+ID (exactly 2 characters) in turn, reprompting on invalid input. If a
+CLI argument is present but fails validation, FORMAT reports the specific
+error and stops rather than falling back to interactive prompts.
+
 ### CONWAY
 
 **Description:** A 40×24 toroidal Life-like cellular automaton with nine presets, custom Birth/Survival rules, and a five-digit generation counter. CONWAY opens on a menu; preset 1 is classic B3/S23 Life.
@@ -301,12 +319,76 @@ resets the maze and actors while lives remain, and stops play at zero lives.
 | `P` or `SPACE` | Pause / resume |
 | `Q` | Quit and return to shell |
 
+### CASM
+
+**Description:** A native 6502/6510 assembler that runs *on the C64
+itself* — write source with `EDLIN`, assemble it with `CASM`, then
+`LOAD`/`RUN` the resulting PRG, all without leaving the shell. CASM reads
+its whole source file, assembles it, and on success prints `INPUT
+VALIDATED` and writes a runnable PRG to disk. On any error it prints one
+specific diagnostic, deletes the partial output, and returns to the shell.
+`.INCLUDE` is supported for splitting source across multiple files.
+**Syntax:** `CASM <source> [/O:<output>] [/S] [/M] [/L]`
+**Example:** `CASM GAME.CSM` (writes `GAME.PRG`). `CASM GAME.CSM
+/O:OUT.PRG` (explicit output name).
+
+- **`/O:<output>`**: explicit output filename. Without it, the output name
+  is derived from `<source>` by replacing its extension with `.PRG`.
+- **`/S`**: static output (currently CASM's default behavior regardless).
+- **`/M`** and **`/L`**: symbol-map and listing output. Not yet available
+  in this build — CASM recognizes both switches but exits with `FEATURE
+  NOT IMPLEMENTED` if either is used.
+
+See the **[CASM Utility Manual](casm-utility.md)** for the full language
+reference (addressing modes, directives, expressions, and limits).
+
+### EDLIN
+
+**Description:** A line-oriented text editor ported from MS-DOS 4.00's
+`EDLIN` — the tool for writing CASM source or any other text file
+directly on the C64. Every interaction is "prompt with `*`, read a line,
+act on it," so no screen positioning is required. The edit buffer lives in
+the VMM (REU) heap, so file size isn't bounded by the ~40KB of base RAM
+available to user programs (a REU is required).
+**Syntax:** `EDLIN <filename>`
+
+Running `EDLIN` with no argument prints usage and exits. If the named file
+doesn't exist, EDLIN prints `NEW FILE.` and starts with an empty buffer.
+Once running, EDLIN prompts with `*` and reads one line at a time: an
+optional line range followed by a single command letter for Insert,
+Delete, List, Page, edit-line, Quit, or Write.
+
+See the **[EDLIN Utility Manual](edlin-utility.md)** for the full command
+reference and deviations from MS-DOS EDLIN.
+
+### DEBUG
+
+**Description:** A low-level machine-language monitor, memory editor, and
+debugger with parity to MS-DOS `DEBUG` commands — interactive memory
+inspection, disassembly, assembly, file loading/saving, and 6502 execution
+control.
+**Syntax:** `DEBUG`
+
+Once running, DEBUG uses single-character commands with hexadecimal
+arguments: `D` (dump memory), `E` (enter data), `F` (fill), `M` (move),
+`C` (compare), `S` (search), `A` (assemble), `?` (help), `V` (version),
+and `Q` (quit back to the shell).
+
+See the **[DEBUG Utility Manual](debug-utility.md)** for the complete
+command reference.
+
 ### BANNER
 
 **Description:** Renders a text message in large 5×6 block characters built from
 the `#` character (`$23`). Output wraps after 6 characters per block line to fit
-the 40-column screen. BANNER ships on the CASM utilities disk image
-(`command64_casm_utils.d64`), not on the standard OS image.
+the 40-column screen. BANNER ships on the OS disk as **source only**
+(`BANNER.S`) — assembling it with `CASM` is the intended first thing to try:
+
+```text
+CASM BANNER.S
+BANNER HELLO
+```
+
 **Syntax:** `BANNER <text>`
 **Example:** `BANNER HELLO`
 

@@ -7,7 +7,7 @@
 // --- Version Information ---
 .const VERSION_MAJOR = "0"
 .const VERSION_MINOR = "4"
-.const VERSION_STAGE = "0" // Release 0.4.0 (ca65 migration release)
+.const VERSION_STAGE = "1" // Release 0.4.1
 #import "build_os.inc"
 
 

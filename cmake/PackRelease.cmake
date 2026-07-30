@@ -34,6 +34,14 @@ file(MAKE_DIRECTORY "${RELEASE_DIR}")
 # Clean and recreate release/docs
 file(REMOVE_RECURSE "${RELEASE_DIR}/docs")
 
+# Copy the release quickstart as the archive's top-level README
+set(FILES_TO_ARCHIVE "")
+if(EXISTS "${SOURCE_DIR}/packaging/RELEASE_README.md")
+    file(COPY "${SOURCE_DIR}/packaging/RELEASE_README.md" DESTINATION "${RELEASE_DIR}")
+    file(RENAME "${RELEASE_DIR}/RELEASE_README.md" "${RELEASE_DIR}/README.md")
+    list(APPEND FILES_TO_ARCHIVE "README.md")
+endif()
+
 # Copy docs
 if(EXISTS "${SOURCE_DIR}/docs")
     file(COPY "${SOURCE_DIR}/docs" DESTINATION "${RELEASE_DIR}")
@@ -41,9 +49,7 @@ if(EXISTS "${SOURCE_DIR}/docs")
     file(REMOVE_RECURSE "${RELEASE_DIR}/docs/superpowers")
 endif()
 
-# Copy compiled files and build list of items to archive
-set(FILES_TO_ARCHIVE "")
-
+# Copy compiled files and add them to the archive list
 foreach(PRG_PATH ${PRG_PATHS})
     get_filename_component(PRG_NAME "${PRG_PATH}" NAME)
     file(COPY "${PRG_PATH}" DESTINATION "${RELEASE_DIR}")
@@ -56,10 +62,11 @@ if(EXISTS "${BINARY_DIR}/image.d64")
     list(APPEND FILES_TO_ARCHIVE "image.d64")
 endif()
 
-if(EXISTS "${BINARY_DIR}/test.d64")
-    file(COPY "${BINARY_DIR}/test.d64" DESTINATION "${RELEASE_DIR}")
-    list(APPEND FILES_TO_ARCHIVE "test.d64")
-endif()
+# test.d64 is a developer QA/regression disk (the full app set plus every
+# test harness and fixture) and is deliberately not packaged in the public
+# release archive; it stays in the CMake build directory for local testing.
+# Remove any stale copy left in release/ by a prior version of this script.
+file(REMOVE "${RELEASE_DIR}/test.d64")
 
 # Add docs to the archive list
 list(APPEND FILES_TO_ARCHIVE "docs")
@@ -76,9 +83,11 @@ if(NOT ZIP_RESULT EQUAL 0)
     message(FATAL_ERROR "Failed to create ZIP archive")
 endif()
 
-# Create tar.gz archive
+# Create tar.gz archive (the 'z' mode flag is required for actual gzip
+# compression -- plain "cf" silently wrote an uncompressed tar named
+# .tar.gz, which "tar xzf" then failed to extract)
 execute_process(
-    COMMAND "${CMAKE_COMMAND}" -E tar cf "${RELEASE_NAME}.tar.gz" --format=gnutar ${FILES_TO_ARCHIVE}
+    COMMAND "${CMAKE_COMMAND}" -E tar czf "${RELEASE_NAME}.tar.gz" --format=gnutar ${FILES_TO_ARCHIVE}
     WORKING_DIRECTORY "${RELEASE_DIR}"
     RESULT_VARIABLE TAR_RESULT
 )
