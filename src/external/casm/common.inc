@@ -686,6 +686,25 @@ CASM_DIAG_PHASE9_WP46_LAST = CASM_DIAG_INCLUDE_CYCLE_DETECTED
 CASM_DIAG_INCLUDE_EVENT_LOG_FULL  = $37
 CASM_DIAG_INCLUDE_REPLAY_MISMATCH = $38
 CASM_DIAG_PHASE9_WP47_LAST = CASM_DIAG_INCLUDE_REPLAY_MISMATCH
+
+; CASM Phase 10 WP51 listing capture: metadata/byte-mirror capacity and
+; source/listing capture transaction-discipline failures.
+; CASM_DIAG_LISTING_NAME_COLLISION is declared and rendered here (per WP50's
+; ABI freeze reserving it first in the Phase 10 range) but WP53 -- not WP51
+; -- is the only package that can raise it; no WP51 code path reaches it.
+CASM_DIAG_LISTING_NAME_COLLISION  = $39
+CASM_DIAG_LISTING_RECORDS_FULL    = $3A  ; listingCommitLine: metadata store already at CASM_LISTING_META_MAX
+CASM_DIAG_LISTING_BYTES_FULL      = $3B  ; listingMirrorByte: byte mirror already CASM_LISTING_BYTE_MAX
+CASM_DIAG_LISTING_REPLAY_MISMATCH = $3C  ; listing/source capture transaction discipline violated
+CASM_DIAG_PHASE10_WP51_LAST = CASM_DIAG_LISTING_REPLAY_MISMATCH
+; Reserved for WP53's listing-file I/O; declared for contiguity only -- not
+; yet raised, and not yet covered by diagnostics.s's message table.
+CASM_DIAG_LISTING_CREATE_FAILED = $3D
+CASM_DIAG_LISTING_WRITE_FAILED  = $3E
+CASM_DIAG_LISTING_CLOSE_FAILED  = $3F
+CASM_DIAG_LISTING_DELETE_FAILED = $40
+CASM_DIAG_LISTING_SHORT_WRITE   = $41
+CASM_DIAG_PHASE10_WP53_LAST = CASM_DIAG_LISTING_SHORT_WRITE
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -724,6 +743,17 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_INCLUDE_EVENT_LOG_FULL = CASM_DIAG_PHASE9_WP46_LAST + 1, error, "CASM Phase 9 WP47 diagnostics must follow WP46"
 .assert CASM_DIAG_INCLUDE_REPLAY_MISMATCH = CASM_DIAG_INCLUDE_EVENT_LOG_FULL + 1, error, "CASM WP47 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE9_WP47_LAST = $38, error, "CASM WP47 diagnostic range changed"
+.assert CASM_DIAG_LISTING_NAME_COLLISION = CASM_DIAG_PHASE9_WP47_LAST + 1, error, "CASM Phase 10 diagnostics must follow Phase 9"
+.assert CASM_DIAG_LISTING_RECORDS_FULL = CASM_DIAG_LISTING_NAME_COLLISION + 1, error, "CASM WP51 diagnostics must remain contiguous"
+.assert CASM_DIAG_LISTING_BYTES_FULL = CASM_DIAG_LISTING_RECORDS_FULL + 1, error, "CASM WP51 diagnostics must remain contiguous"
+.assert CASM_DIAG_LISTING_REPLAY_MISMATCH = CASM_DIAG_LISTING_BYTES_FULL + 1, error, "CASM WP51 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE10_WP51_LAST = $3C, error, "CASM WP51 diagnostic range changed"
+.assert CASM_DIAG_LISTING_CREATE_FAILED = CASM_DIAG_PHASE10_WP51_LAST + 1, error, "CASM WP53 diagnostics must follow WP51"
+.assert CASM_DIAG_LISTING_WRITE_FAILED = CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
+.assert CASM_DIAG_LISTING_CLOSE_FAILED = CASM_DIAG_LISTING_WRITE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
+.assert CASM_DIAG_LISTING_DELETE_FAILED = CASM_DIAG_LISTING_CLOSE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
+.assert CASM_DIAG_LISTING_SHORT_WRITE = CASM_DIAG_LISTING_DELETE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE10_WP53_LAST = $41, error, "CASM WP53 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -1039,5 +1069,67 @@ CASM_CLEANUP_ACTIVE = $01
 ; "1000"; this numeric mirror supports later size assertions and docs.
 CASM_PHASE1_MAIN_SIZE = $1000
 .assert CASM_PHASE1_MAIN_SIZE = $1000, error, "CASM MAIN envelope changed"
+
+; ---------------------------------------------------------------------------
+; Phase 10 WP51: listing metadata record and byte-mirror capture
+; ---------------------------------------------------------------------------
+
+; One fixed 16-byte metadata record per captured physical source line,
+; WP50-frozen offsets (parent plan's "Metadata ABI"; WP50 plan's "Metadata
+; ABI" section). 4,096 records x 16 bytes = 65,536 bytes = exactly one
+; CASM_VMM_ALLOC_MAX_BYTES allocation.
+CASM_LISTING_META_FILEID       = 0   ; 1 byte: packed physical file identity
+CASM_LISTING_META_FLAGS        = 1   ; 1 byte: bit 0 = FINAL_UNTERMINATED, rest reserved zero
+CASM_LISTING_META_LINE_LO      = 2
+CASM_LISTING_META_LINE_HI      = 3   ; one-based physical line number
+CASM_LISTING_META_OFF_LO       = 4
+CASM_LISTING_META_OFF_HI       = 5   ; absolute source VMM offset, first payload byte
+CASM_LISTING_META_LEN          = 6   ; source payload length, 0-255
+CASM_LISTING_META_RESERVED0    = 7   ; zero-filled
+CASM_LISTING_META_PC_LO        = 8
+CASM_LISTING_META_PC_HI        = 9   ; starting PC before the line's dispatch
+CASM_LISTING_META_BYTEOFF_LO   = 10
+CASM_LISTING_META_BYTEOFF_HI   = 11  ; first mirrored byte-mirror offset for the line
+CASM_LISTING_META_BYTECOUNT_LO = 12
+CASM_LISTING_META_BYTECOUNT_HI = 13  ; emitted-byte count attributed to the line
+CASM_LISTING_META_RESERVED1    = 14  ; 2 bytes, zero-filled
+CASM_LISTING_META_REC_SIZE     = 16
+
+CASM_LISTING_META_FLAG_FINAL_UNTERMINATED = %00000001
+
+; Bounded capacity: 4,096 physical-line occurrences, one vmmStoreAlloc call.
+CASM_LISTING_META_MAX = 4096
+
+; Dedicated byte-mirror flush stage. Deliberately distinct from the shared
+; CasmVmmBuffer (symbols.s/source.s/reloc.s/include.s all stage through that
+; buffer already; a second concurrent user would silently corrupt whichever
+; transfer is in flight), but sized to match it exactly so one flush is
+; exactly one VMM window transfer.
+CASM_LISTING_STAGE_SIZE = 64
+
+; Completed-line sidecar flags (WP50's "Completed-Line Sidecar" freeze),
+; owned by source.s and read by listing.s after sourceTakeCompletedLine.
+CASM_SOURCE_COMPLETED_FLAG_VALID              = %00000001
+CASM_SOURCE_COMPLETED_FLAG_SYNTHETIC_ONLY     = %00000010
+CASM_SOURCE_COMPLETED_FLAG_FINAL_UNTERMINATED = %00000100
+
+.assert CASM_LISTING_META_FLAGS = CASM_LISTING_META_FILEID + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_LINE_LO = CASM_LISTING_META_FLAGS + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_LINE_HI = CASM_LISTING_META_LINE_LO + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_OFF_LO = CASM_LISTING_META_LINE_HI + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_OFF_HI = CASM_LISTING_META_OFF_LO + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_LEN = CASM_LISTING_META_OFF_HI + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_RESERVED0 = CASM_LISTING_META_LEN + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_PC_LO = CASM_LISTING_META_RESERVED0 + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_PC_HI = CASM_LISTING_META_PC_LO + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_BYTEOFF_LO = CASM_LISTING_META_PC_HI + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_BYTEOFF_HI = CASM_LISTING_META_BYTEOFF_LO + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_BYTECOUNT_LO = CASM_LISTING_META_BYTEOFF_HI + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_BYTECOUNT_HI = CASM_LISTING_META_BYTECOUNT_LO + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_RESERVED1 = CASM_LISTING_META_BYTECOUNT_HI + 1, error, "CASM listing metadata offset changed"
+.assert CASM_LISTING_META_REC_SIZE = 16, error, "CASM listing metadata record size changed"
+.assert CASM_LISTING_META_REC_SIZE = CASM_LISTING_META_RESERVED1 + 2, error, "CASM listing metadata record size mismatch"
+.assert CASM_LISTING_META_MAX * CASM_LISTING_META_REC_SIZE = CASM_VMM_ALLOC_MAX_BYTES, error, "CASM listing metadata store must be exactly one VMM allocation"
+.assert CASM_LISTING_STAGE_SIZE = CASM_VMM_BUFFER_SIZE, error, "CASM listing byte-mirror stage must match one VMM transfer"
 
 .endif

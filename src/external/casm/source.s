@@ -138,6 +138,13 @@
 .export sourceRewind
 .export sourceClose
 .export sourceDrainLineTail
+.export CasmSourceCompletedStartLo
+.export CasmSourceCompletedStartHi
+.export CasmSourceCompletedLength
+.export CasmSourceCompletedFileId
+.export CasmSourceCompletedLineLo
+.export CasmSourceCompletedLineHi
+.export CasmSourceCompletedFlags
 
 ; ---------------------------------------------------------------------------
 ; WP33/WP34 VMM-backed source load state
@@ -221,6 +228,39 @@ CasmSourceAppendStartHi:  .res 1
 ; child EOF may pop to its parent inside sourceFetchPhysical; the first parent
 ; byte is consumed but must never be appended to the child's displayed line.
 CasmSourceDrainFileId:    .res 1
+
+; ---------------------------------------------------------------------------
+; Phase 10 WP51 listing capture: source-position tracking and the completed-
+; line sidecar (WP50's "Phase 0C.20 Source-Span Freeze"). Exactly 11 bytes:
+; four internal (this module only, no exported consumer) plus the seven-byte
+; public sidecar listing.s reads after calling sourceTakeCompletedLine.
+;
+; CasmSourceBlockBaseLo/Hi is the absolute source-VMM address of the
+; currently installed refill block; a fetched byte's own offset is block
+; base plus block index, taken before advancement. CasmSourceLineStartLo/Hi
+; tracks the first physical byte of the line currently being scanned; CR,
+; LF, CRLF, EOF, frame push/pop, and synthetic separators all update it
+; explicitly. Neither byte is exported: no consumer outside this module may
+; reconstruct position from CasmSourceVmmCursorLo/Hi, and none may read
+; these two pairs directly either -- only sourceTakeCompletedLine's sidecar
+; below is the public contract.
+CasmSourceBlockBaseLo:  .res 1
+CasmSourceBlockBaseHi:  .res 1
+CasmSourceLineStartLo:  .res 1
+CasmSourceLineStartHi:  .res 1
+
+; Completed-line sidecar. Published exactly once when a physical line
+; completes; consumed (validity cleared) by sourceTakeCompletedLine. Length
+; excludes CR/LF/CRLF. Flags: bit 0 VALID, bit 1 SYNTHETIC_ONLY, bit 2
+; FINAL_UNTERMINATED, bits 3-7 reserved zero (CASM_SOURCE_COMPLETED_FLAG_*,
+; common.inc).
+CasmSourceCompletedStartLo: .res 1
+CasmSourceCompletedStartHi: .res 1
+CasmSourceCompletedLength:  .res 1
+CasmSourceCompletedFileId:  .res 1
+CasmSourceCompletedLineLo:  .res 1
+CasmSourceCompletedLineHi:  .res 1
+CasmSourceCompletedFlags:   .res 1
 
 ; ---------------------------------------------------------------------------
 ; WP46 nested-include frame stack (Phase 0C.19: 16 levels beyond a

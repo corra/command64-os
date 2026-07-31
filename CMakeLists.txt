@@ -287,7 +287,7 @@ if(Ca65_FOUND)
     # column array overflowed $4200 by 60 measured bytes. One page is the
     # smallest aligned increase; the final site-line/traceback corrections
     # leave 85 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4300")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4400")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -526,7 +526,9 @@ if(Ca65_FOUND)
             # WP47: $1B00 -> $1C00. This harness links include.s whole, so it
             # carries WP47's event-log code and staging BSS even though it
             # never calls them; $1B00 overflowed by 128 measured bytes.
-            set(TEST_PRG_SIZE "1C00")
+            # WP51: $1C00 -> $1D00. source.s grew 11 bytes for the listing
+            # capture sidecar (Phase 0C.20); $1C00 overflowed by 6 bytes.
+            set(TEST_PRG_SIZE "1D00")
         endif()
         if(TEST_NAME STREQUAL "casm_event")
             # WP47: include.s (the event log) plus every module it
@@ -572,7 +574,9 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             # WP48 diagnostic rendering overflowed $4000 by 93 measured bytes;
             # the approved one-page increase leaves 163 bytes headroom.
-            set(TEST_PRG_SIZE "4100")
+            # WP51: source.s's 11-byte listing sidecar plus four new listing
+            # diagnostic messages overflowed $4100 by 83 bytes.
+            set(TEST_PRG_SIZE "4200")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})

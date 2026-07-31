@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-wp51-listing-stores-capture
 created: 2026-07-29
-status: approved-blocked
+status: active-approved
 taskwarrior: a64fa847-1b46-44fd-be3b-8ad7b1055c92
 depends-on: ad82f04d-0d34-4902-9a2c-ae27292902cf
 ---
@@ -10,8 +10,8 @@ depends-on: ad82f04d-0d34-4902-9a2c-ae27292902cf
 
 ## Status and Authorization
 
-This dedicated plan is approved but blocked by WP50 completion. Approval freezes
-WP51 implementation details; it does not activate WP51 or authorize source edits.
+WP50 completed 2026-07-31 at CASM `0.1.51` build 1206. WP51 is now active on
+`feature/casm-phase10-wp51`, implementing per the increments below.
 
 Parent:
 `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
@@ -247,3 +247,34 @@ Completion does not activate WP52.
 
 - 2026-07-29: User approved this plan. WP51 remains pending and blocked by
   active WP50; no WP51 source or test implementation is authorized yet.
+- 2026-07-31: WP50 completed; WP51 activated on `feature/casm-phase10-wp51`.
+  Completed Atomic Increment 1 (constants, diagnostics, state, assertions,
+  test envelopes):
+  - `common.inc`: added `CASM_LISTING_META_*` field offsets/flags (16-byte
+    record, WP50-frozen layout), `CASM_LISTING_META_MAX` (4,096),
+    `CASM_LISTING_STAGE_SIZE` (64, matches `CASM_VMM_BUFFER_SIZE`), and the
+    completed-line sidecar flag bits. Reserved `$39-$3C`
+    (`CASM_DIAG_LISTING_NAME_COLLISION/RECORDS_FULL/BYTES_FULL/
+    REPLAY_MISMATCH`) and `$3D-$41` (WP53's listing-file I/O diagnostics)
+    with contiguity asserts, per the parent/WP50 numbering.
+  - `diagnostics.s`: added message-table entries and text for the four
+    `$39-$3C` diagnostics; extended the table-completeness asserts to
+    `CASM_DIAG_PHASE10_WP51_LAST`. `$3D-$41` intentionally have no message
+    entries yet (WP53's job).
+  - `source.s`: added the WP50-frozen 11 bytes -- four internal
+    (`CasmSourceBlockBase*`/`CasmSourceLineStart*`, not exported) and the
+    seven-byte completed-line sidecar (`CasmSourceCompleted*`, exported for
+    listing.s to read after `sourceTakeCompletedLine`, which increment 2
+    implements). No capture logic yet -- storage only.
+  - Envelope fallout (expected growth from real message strings + BSS, not a
+    stop condition): production `casm` grew past its `$4300` envelope by 39
+    bytes and was bumped to `$4400` (smallest 256-byte-aligned fit, well
+    under the plan's `$4C00` ceiling). `test_casm_catalog` (`$1C00` ->
+    `$1D00`) and `test_casm_frame` (`$4100` -> `$4200`) needed the same
+    one-page bump from linking the grown `source.s`/`diagnostics.s` whole.
+  - Verified: `casm` and all nine existing `test_casm_*` targets plus
+    `image_d64`/`test_image_d64`/`casm_overflow_test_d64`/
+    `casm_include_test_d64` rebuild clean; a no-change rebuild of `casm` and
+    `test_casm_frame` held their build counters stable.
+  - No `listing.s` yet (starts Increment 3); `sourceSetLineCapture`/
+    `sourceTakeCompletedLine` not yet implemented (Increment 2).

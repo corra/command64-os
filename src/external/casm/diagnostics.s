@@ -1163,6 +1163,10 @@ diagMessageLo:
     .byte <msgIncludeCycleDetected
     .byte <msgIncludeEventLogFull
     .byte <msgIncludeReplayMismatch
+    .byte <msgListingNameCollision
+    .byte <msgListingRecordsFull
+    .byte <msgListingBytesFull
+    .byte <msgListingReplayMismatch
 diagMessageLoEnd:
 
 diagMessageHi:
@@ -1222,10 +1226,14 @@ diagMessageHi:
     .byte >msgIncludeCycleDetected
     .byte >msgIncludeEventLogFull
     .byte >msgIncludeReplayMismatch
+    .byte >msgListingNameCollision
+    .byte >msgListingRecordsFull
+    .byte >msgListingBytesFull
+    .byte >msgListingReplayMismatch
 diagMessageHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE9_WP47_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE9_WP47_LAST, error, "CASM diagnostic high table is incomplete"
+.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE10_WP51_LAST, error, "CASM diagnostic low table is incomplete"
+.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE10_WP51_LAST, error, "CASM diagnostic high table is incomplete"
 
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
@@ -1339,6 +1347,14 @@ msgIncludeEventLogFull:
     .byte "CASM: INCLUDE EVENT LOG FULL", PetCr, 0
 msgIncludeReplayMismatch:
     .byte "CASM: INCLUDE REPLAY MISMATCH", PetCr, 0
+msgListingNameCollision:
+    .byte "CASM: LISTING NAME COLLISION", PetCr, 0
+msgListingRecordsFull:
+    .byte "CASM: LISTING RECORDS FULL", PetCr, 0
+msgListingBytesFull:
+    .byte "CASM: LISTING BYTES FULL", PetCr, 0
+msgListingReplayMismatch:
+    .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:
