@@ -16,7 +16,9 @@ separate WP50 completion-only increment described below.
 
 Parent plan: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
 
-Baseline: CASM `0.1.50` build 1204 with Phase 9 complete.
+Baseline: CASM `0.1.50`, originally build 1204. Build 1205 on `main` as of
+2026-07-31 -- see "Baseline Build Drift" below; no CASM source or behavior
+changed.
 
 ## Objective
 
@@ -232,6 +234,49 @@ production sequencing.
 - WP55: full regression/bounds, memory/ABI/stack/carry/resource/artifact audit,
   implementation review, native walkthrough, and `0.2.0` gate.
 
+## Baseline Build Drift
+
+Commit `f3b2e14` (DASH WP6, 2026-07-30) changed `include/ca65/command64.inc`,
+a shared header CASM's build depends on. `add_ca65_app`'s hash-gate correctly
+bumped every dependent build counter by exactly one, including
+`src/external/casm/BUILD_CASM` (`1204` -> `1205`) and all nine
+`tests/src/casm_*` build files, with zero CASM source or behavior change.
+Confirmed by inspecting the commit diff: only `BUILD_CASM`-family counter
+files and the shared header changed; no file under `src/external/casm/`
+changed. WP50's measured baseline below is therefore CASM `0.1.50` build
+`1205`, not the plan's original `1204`.
+
+## Baseline Measurement Record
+
+Recorded 2026-07-31 from a from-source `ld65 --mapfile` relink of the current
+`casm_3900.cfg` (unmodified `.o`s, no rebuild) and from `build/casm.prg`:
+
+- PRG size: 18,694 bytes (`build/casm.prg`, `0x0000`-`0x48FF` plus 2-byte load
+  address). Footer bytes `00 38 38 08 52 36` confirm the R6 relocation-table
+  marker (`52 36` = ASCII `R6`) is intact and terminal.
+- Segments (from relink): `CODE` `003900`-`00670B` (`002E0C` = 11,788 bytes),
+  `RODATA` `00670C`-`00718D` (`000A82` = 2,690 bytes), `BSS`
+  `00718E`-`007BAB` (`000A1E` = 2,590 bytes), `HEADER` `009000`-`009001`
+  (2 bytes).
+- MAIN envelope: `$3900`-`$7BFF` (`$4300` = 17,152 bytes). Used through
+  `$7BAB`; free from `$7BAB` to `$7C00` = 85 bytes, matching the plan's
+  Reconciled Findings #10 exactly.
+- Zero page: `common.inc` and `vmm_store.s`/`opcodes.s`/`cli.s` show CASM's
+  private zero page fully allocated, consistent with Reconciled Findings #10
+  ("private zero page is fully allocated"); WP50 approves no new zero-page
+  byte, so no further slot accounting is needed until a work package requests
+  one.
+- File handles: `MAX_HANDLES = 8` (`include/ca65/command64.inc:166`), shared
+  OS-wide, not CASM-specific.
+- VMM stores: current worst-case CASM occupancy and the Phase 10 two-store
+  addition are already reconciled in the parent plan's "Conditional VMM
+  Stores" section (six of eight slots worst-case); no new finding here.
+
+No `image_d64`/`test_image_d64` rebuild was performed in this recording
+increment since no source changed; a same-source rebuild was already
+confirmed stable (`casm` target reported up to date, no build-counter
+movement) before this record was written.
+
 ## Scope
 
 Included:
@@ -306,3 +351,11 @@ confirms final closure. Completion does not activate WP51.
   Change" above): WP53 embeds CBM DOS `@0:` itself, no OS change needed,
   pending a runtime fixture. No production or memory-layout change was made in
   this increment.
+- 2026-07-31: Recorded the full baseline measurement (see "Baseline Build
+  Drift" and "Baseline Measurement Record" above): committed CASM build is
+  `1205`, not the plan's original `1204`, due to a harmless shared-header
+  hash-gate bump from unrelated DASH work; no CASM source or behavior changed.
+  Atomic increments 2 and 3 are complete. Increment 4 (WP51's dedicated plan)
+  was already drafted and user-approved (`approved-blocked`) prior to this
+  session. Remaining: produce the WP50 walkthrough and request completion
+  approval (increment 5), then the version-only `0.1.51` bump (increment 6).
