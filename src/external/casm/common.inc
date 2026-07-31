@@ -1109,9 +1109,19 @@ CASM_LISTING_STAGE_SIZE = 64
 
 ; Completed-line sidecar flags (WP50's "Completed-Line Sidecar" freeze),
 ; owned by source.s and read by listing.s after sourceTakeCompletedLine.
+; Bits 3-6 stay reserved/always-zero in every value sourceTakeCompletedLine
+; returns to a caller. Bit 7 (CASM_SOURCE_CAPTURE_ENABLED, below) shares this
+; same byte purely as source.s's own private persistent enable/disable
+; storage -- WP50 authorized exactly 11 new source BSS bytes, with none held
+; back for an enable flag, so sourceSetLineCapture packs it into this
+; existing byte's otherwise-reserved space instead of adding a 12th byte.
+; sourceTakeCompletedLine always masks bit 7 out of its returned value, so
+; no caller outside source.s ever observes it; the documented "bits 3-7
+; reserved, always zero" contract holds from every caller's perspective.
 CASM_SOURCE_COMPLETED_FLAG_VALID              = %00000001
 CASM_SOURCE_COMPLETED_FLAG_SYNTHETIC_ONLY     = %00000010
 CASM_SOURCE_COMPLETED_FLAG_FINAL_UNTERMINATED = %00000100
+CASM_SOURCE_CAPTURE_ENABLED                   = %10000000
 
 .assert CASM_LISTING_META_FLAGS = CASM_LISTING_META_FILEID + 1, error, "CASM listing metadata offset changed"
 .assert CASM_LISTING_META_LINE_LO = CASM_LISTING_META_FLAGS + 1, error, "CASM listing metadata offset changed"

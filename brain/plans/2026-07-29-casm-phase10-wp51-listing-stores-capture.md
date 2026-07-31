@@ -278,3 +278,67 @@ Completion does not activate WP52.
     `test_casm_frame` held their build counters stable.
   - No `listing.s` yet (starts Increment 3); `sourceSetLineCapture`/
     `sourceTakeCompletedLine` not yet implemented (Increment 2).
+- 2026-07-31: Completed Atomic Increment 2 (source position/publication/
+  consume API) in `source.s`:
+  - `sourceRefill`'s `srHaveData` path snapshots `CasmSourceBlockBaseLo/Hi`
+    from the cursor before the chunk-read loop advances it (byte-mode-only
+    traversal always computes base 0, so no subtraction is needed).
+  - New private `sourceCaptureNewline`, called from `sourceAdvanceNewline`
+    before the line number increments: computes the just-ended line's
+    length from `CasmSourceLineStartLo/Hi` to the CR/LF byte, publishes the
+    sidecar when capture is enabled, then re-anchors `LineStart` to the
+    position right after the byte. Raises
+    `CASM_DIAG_LISTING_REPLAY_MISMATCH` if an unconsumed sidecar is still
+    pending, propagated through `sourceAdvanceNewline`'s existing
+    overflow-style failure convention (X explicitly saved/restored around
+    the call to preserve `sourceAdvanceNewline`'s documented "Preserves:
+    X, Y").
+  - A found-and-fixed subtlety: a CR's own re-anchor is one byte short if
+    an LF turns out to follow (CRLF is only confirmed on a *later*,
+    separate `sourceNextByte` call, by which point the parser has already
+    committed the CR's line). Fixed with a one-byte nudge to `LineStart` at
+    the existing LF-swallow site in `sourceNextResult`, unconditional and
+    harmless when capture is disabled.
+  - New private `sourceCaptureFinal`, called from `srEof` (true depth-0
+    EOF) and from `sourceFramePopInternal` (a popped child's own final
+    unterminated line, before its state is discarded) -- publishes a
+    `FINAL_UNTERMINATED` record only when real payload was consumed since
+    the last anchor; a clean file/frame with no trailing content publishes
+    nothing. `sourceFramePopInternal` and `srEofOrPop` gained a real
+    success/failure return convention to propagate this (previously
+    undocumented as fallible).
+  - `sourceFramePush` saves the parent's `LineStart` into a new
+    `CasmFrameResumeLineStartLo/Hi` frame-stack array (same precedent as
+    the existing `CasmFrameResumeLine*` fields) and sets the child's
+    `LineStart` directly to its own start offset;
+    `sourceFramePopInternal` restores it from the array.
+  - `sourceSetLineCapture`/`sourceTakeCompletedLine` implemented per the
+    frozen ABI. The "capture enabled" boolean has no dedicated byte of its
+    own -- WP50 authorized exactly 11 new source BSS bytes with none held
+    back for it -- so it lives in bit 7 of `CasmSourceCompletedFlags`
+    (`CASM_SOURCE_CAPTURE_ENABLED`, common.inc), always masked out of
+    `sourceTakeCompletedLine`'s returned value so no caller outside
+    `source.s` ever observes it and the documented "bits 3-7 reserved,
+    always zero" contract holds for every real consumer.
+  - `sourceResetTraversal` (shared by `sourceInit`/`sourceRewind`) now
+    also disables capture and clears any stale sidecar.
+  - Deliberately deferred: multi-root synthetic-separator suppression
+    (WP50/51: "synthetic-only separators do not become metadata records").
+    No mechanism yet distinguishes a `sourceLoad`-inserted synthetic LF
+    from a real one at traversal time; this increment publishes every
+    real newline uniformly, including that boundary byte. Flagged for
+    Increment 6's real-path multi-root harness to catch empirically and
+    fix with evidence, rather than guessing the mechanism from static
+    reasoning alone.
+  - Envelope fallout: production `casm` bumped `$4400` -> `$4500`;
+    `test_casm_catalog`/`test_casm_event` bumped to `$1E00`;
+    `test_casm_frame` bumped to `$4300`; `test_casm_pass1` matched
+    production's `$4500`. All nine existing `test_casm_*` targets, `casm`,
+    and every affected disk image rebuild clean; `casm` and
+    `test_casm_frame` hold stable build counters on a no-change rebuild.
+  - Not yet verified by any automated test: Increment 2 has no dedicated
+    harness by the plan's own design (verification is Increment 6's real-
+    path `test_casm_listcap` job, once the emitter/pass/include
+    integration in Increment 5 exists to actually drive this code through
+    real assembly). This increment is build-clean but functionally
+    unverified so far.

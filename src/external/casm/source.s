@@ -138,6 +138,8 @@
 .export sourceRewind
 .export sourceClose
 .export sourceDrainLineTail
+.export sourceSetLineCapture
+.export sourceTakeCompletedLine
 .export CasmSourceCompletedStartLo
 .export CasmSourceCompletedStartHi
 .export CasmSourceCompletedLength
@@ -291,6 +293,11 @@ CasmFrameResumeLineLo:    .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumeLineHi:    .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumeColumn:    .res CASM_INCLUDE_MAX_DEPTH
 CasmFrameResumePendingCr: .res CASM_INCLUDE_MAX_DEPTH
+; WP51: the parent's CasmSourceLineStartLo/Hi at push time, restored
+; verbatim on pop -- same resume-state precedent as CasmFrameResumeLine*
+; above, added for listing capture's line-start anchor.
+CasmFrameResumeLineStartLo: .res CASM_INCLUDE_MAX_DEPTH
+CasmFrameResumeLineStartHi: .res CASM_INCLUDE_MAX_DEPTH
 
 ; WP48: the `.INCLUDE` statement's own start location at this depth's push.
 ; These are deliberately separate from CasmFrameResumeLine/Column, which are
@@ -924,7 +931,16 @@ snbFetch:
     sta CasmSourcePendingCr
     lda CasmSourceScratch0
     cmp #CASM_PETSCII_LF
-    beq snbFetch
+    bne snbClassify
+    ; WP51: sourceCaptureNewline already re-anchored CasmSourceLineStartLo/Hi
+    ; at the CR, one byte short of this now-confirmed CRLF's true next-line
+    ; start (it could not yet know an LF would follow). Nudge it by the one
+    ; byte this swallow just consumed, unconditionally -- harmless when
+    ; capture is disabled, since nothing reads the anchor in that case.
+    inc CasmSourceLineStartLo
+    bne snbFetch
+    inc CasmSourceLineStartHi
+    jmp snbFetch
 
 snbClassify:
     lda CasmSourceScratch0
@@ -1505,9 +1521,15 @@ sfpCursorFail:
 ; overflow, increment it, and reset the column to 1. The column-exhausted latch
 ; is discarded because the line ended before a further byte was needed.
 ;
+; WP51: also publishes the just-completed physical line through
+; sourceCaptureNewline (a no-op when line capture is disabled) before
+; incrementing the line, since CasmSourceLineLo/Hi here is still the line
+; that just ended.
+;
 ; Inputs:    none
 ; Outputs:   Success: C clear; line advanced, column reset to 1
-;            Fail:    A = CASM_DIAG_SOURCE_LOCATION_OVERFLOW, C set; source ERROR
+;            Fail:    A = CASM_DIAG_SOURCE_LOCATION_OVERFLOW or
+;                     CASM_DIAG_LISTING_REPLAY_MISMATCH, C set; source ERROR
 ; Preserves: X, Y
 ; Clobbers:  A, processor flags
 ; ---------------------------------------------------------------------------
@@ -1519,6 +1541,12 @@ sourceAdvanceNewline:
     cmp #>CASM_SOURCE_LINE_MAX
     beq sanOverflow             ; line == $FFFF -> next line would overflow
 sanAdvance:
+    txa
+    pha
+    jsr sourceCaptureNewline
+    pla
+    tax
+    bcs sanCaptureFail
     inc CasmSourceLineLo
     bne sanColumnReset
     inc CasmSourceLineHi
@@ -1560,6 +1588,180 @@ sanOverflow:
     sta CasmSourceState
     lda #CASM_DIAG_SOURCE_LOCATION_OVERFLOW
     sec
+    rts
+sanCaptureFail:
+    ; sourceCaptureNewline's only failure mode: an unconsumed sidecar was
+    ; still pending (listing.s failed to consume the prior publish before
+    ; this one). Not believed reachable under legitimate use -- same
+    ; defensive-only status as CASM_DIAG_PASS_MISMATCH/
+    ; CASM_DIAG_INCLUDE_REPLAY_MISMATCH.
+    lda #CASM_SOURCE_STATE_ERROR
+    sta CasmSourceState
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceCaptureNewline (private, WP51)
+; If line capture is enabled, publish the just-completed physical line (the
+; span from CasmSourceLineStartLo/Hi up to, but excluding, the CR/LF byte
+; just consumed) into the completed-line sidecar, then re-anchor
+; CasmSourceLineStartLo/Hi to the position immediately after this byte -- the
+; presumptive start of the next physical line. Called from
+; sourceAdvanceNewline before CasmSourceLineLo/Hi is incremented, so
+; CasmSourceLineLo/Hi here is still the line that just ended.
+;
+; A CR that turns out to be the first half of a CRLF re-anchors one byte
+; short (the LF has not been fetched yet); the LF-swallow site in
+; sourceNextResult corrects it by one byte when the swallow is confirmed.
+;
+; Inputs:    CasmSourceResultFileId, CasmSourceLineLo/Hi (the line that just
+;            ended), CasmSourceLineStartLo/Hi, CasmSourceBlockBaseLo/Hi,
+;            CasmSourceBlockIndexLo/Hi (current absolute position, already
+;            advanced past the CR/LF byte)
+; Outputs:   Success: C clear; CasmSourceLineStartLo/Hi re-anchored; sidecar
+;            published if capture is enabled
+;            Failure: A = CASM_DIAG_LISTING_REPLAY_MISMATCH, C set (an
+;            unconsumed sidecar was already pending); nothing changed
+; Preserves: Y
+; Clobbers:  A, X, processor flags, CasmSourceScratch0/1
+; ---------------------------------------------------------------------------
+sourceCaptureNewline:
+    lda CasmSourceCompletedFlags
+    and #CASM_SOURCE_CAPTURE_ENABLED
+    beq scnReanchor              ; disabled: re-anchor only, always succeeds
+
+    lda CasmSourceCompletedFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_VALID
+    beq scnCompute
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+
+scnCompute:
+    ; now = CasmSourceBlockBaseLo/Hi + CasmSourceBlockIndexLo/Hi
+    lda CasmSourceBlockBaseLo
+    clc
+    adc CasmSourceBlockIndexLo
+    sta CasmSourceScratch0
+    lda CasmSourceBlockBaseHi
+    adc CasmSourceBlockIndexHi
+    sta CasmSourceScratch1
+
+    ; length = (now - 1) - CasmSourceLineStartLo/Hi
+    lda CasmSourceScratch0
+    sec
+    sbc #1
+    sta CasmSourceScratch0
+    lda CasmSourceScratch1
+    sbc #0
+    sta CasmSourceScratch1
+    lda CasmSourceScratch0
+    sec
+    sbc CasmSourceLineStartLo
+    tax                          ; X = length low byte (0-255 expected)
+    lda CasmSourceScratch1
+    sbc CasmSourceLineStartHi
+    beq scnPublish               ; length high byte 0 -> length fits 8 bits
+    ; length > 255: cannot happen under the existing
+    ; CASM_DIAG_SOURCE_LINE_TOO_LONG bound: treated as a defensive replay
+    ; mismatch rather than silently truncating an out-of-range length.
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+
+scnPublish:
+    lda CasmSourceLineStartLo
+    sta CasmSourceCompletedStartLo
+    lda CasmSourceLineStartHi
+    sta CasmSourceCompletedStartHi
+    stx CasmSourceCompletedLength
+    lda CasmSourceResultFileId
+    sta CasmSourceCompletedFileId
+    lda CasmSourceLineLo
+    sta CasmSourceCompletedLineLo
+    lda CasmSourceLineHi
+    sta CasmSourceCompletedLineHi
+    lda #(CASM_SOURCE_CAPTURE_ENABLED | CASM_SOURCE_COMPLETED_FLAG_VALID)
+    sta CasmSourceCompletedFlags
+
+scnReanchor:
+    lda CasmSourceBlockBaseLo
+    clc
+    adc CasmSourceBlockIndexLo
+    sta CasmSourceLineStartLo
+    lda CasmSourceBlockBaseHi
+    adc CasmSourceBlockIndexHi
+    sta CasmSourceLineStartHi
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceCaptureFinal (private, WP51)
+; If line capture is enabled and real payload has been consumed since the
+; last anchor (current absolute offset > CasmSourceLineStartLo/Hi), publish
+; one FINAL_UNTERMINATED completed-line record for it. Used both at true
+; combined-content EOF (srEof, depth 0) and from sourceFramePopInternal, for
+; a child frame's own final unterminated line before its state is discarded
+; on pop. A file/frame with no trailing content since its last real newline
+; (or an empty file/frame) publishes nothing.
+;
+; Inputs:    CasmSourceResultFileId, CasmSourceLineLo/Hi, CasmSourceLineStartLo/Hi,
+;            CasmSourceBlockBaseLo/Hi, CasmSourceBlockIndexLo/Hi -- all
+;            describing whichever traversal (root or the frame about to be
+;            popped) is still live when this is called
+; Outputs:   Success: C clear; sidecar published if applicable
+;            Failure: A = CASM_DIAG_LISTING_REPLAY_MISMATCH, C set (an
+;            unconsumed sidecar was already pending)
+; Preserves: Y
+; Clobbers:  A, X, processor flags, CasmSourceScratch0/1
+; ---------------------------------------------------------------------------
+sourceCaptureFinal:
+    lda CasmSourceCompletedFlags
+    and #CASM_SOURCE_CAPTURE_ENABLED
+    beq scfOk                    ; disabled: nothing to do
+
+    lda CasmSourceBlockBaseLo
+    clc
+    adc CasmSourceBlockIndexLo
+    sta CasmSourceScratch0
+    lda CasmSourceBlockBaseHi
+    adc CasmSourceBlockIndexHi
+    sta CasmSourceScratch1
+
+    ; length = now - CasmSourceLineStartLo/Hi (no "-1": no terminator byte)
+    lda CasmSourceScratch0
+    sec
+    sbc CasmSourceLineStartLo
+    tax
+    lda CasmSourceScratch1
+    sbc CasmSourceLineStartHi
+    bne scfOk                    ; > 255: defensive skip (see sourceCaptureNewline)
+    cpx #0
+    beq scfOk                    ; length 0: nothing pending, publish nothing
+
+    lda CasmSourceCompletedFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_VALID
+    beq scfPublish
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+scfPublish:
+    lda CasmSourceLineStartLo
+    sta CasmSourceCompletedStartLo
+    lda CasmSourceLineStartHi
+    sta CasmSourceCompletedStartHi
+    stx CasmSourceCompletedLength
+    lda CasmSourceResultFileId
+    sta CasmSourceCompletedFileId
+    lda CasmSourceLineLo
+    sta CasmSourceCompletedLineLo
+    lda CasmSourceLineHi
+    sta CasmSourceCompletedLineHi
+    lda #(CASM_SOURCE_CAPTURE_ENABLED | CASM_SOURCE_COMPLETED_FLAG_VALID | CASM_SOURCE_COMPLETED_FLAG_FINAL_UNTERMINATED)
+    sta CasmSourceCompletedFlags
+scfOk:
+    clc
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1636,6 +1838,79 @@ sourceResetTraversal:
     sta CasmDiagPrevNoHi
     lda #<CASM_SOURCE_LINE_INITIAL
     sta CasmDiagLineNoLo
+    ; WP51: a reset or rewind disables listing capture and clears any
+    ; unconsumed sidecar. CasmSourceBlockBaseLo/Hi and
+    ; CasmSourceLineStartLo/Hi are left stale (harmless): both are only
+    ; ever read while capture is enabled, and sourceSetLineCapture always
+    ; re-anchors CasmSourceLineStartLo/Hi fresh on enable.
+    lda #0
+    sta CasmSourceCompletedFlags
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceSetLineCapture (WP51)
+; Enable or disable listing capture. Enabling anchors CasmSourceLineStartLo/
+; Hi to the current traversal position (CasmSourceVmmCursorLo/Hi, valid
+; immediately after sourceRewind since no block has been installed yet --
+; the first sourceRefill will independently derive the identical value for
+; CasmSourceBlockBaseLo/Hi) and clears any stale unconsumed sidecar.
+; Disabling clears capture and any unconsumed sidecar.
+;
+; Inputs:    A = 0 disables; nonzero enables
+; Outputs:   C clear always; no failure path
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+sourceSetLineCapture:
+    cmp #0
+    bne slcEnable
+    lda #0
+    sta CasmSourceCompletedFlags
+    clc
+    rts
+slcEnable:
+    lda #CASM_SOURCE_CAPTURE_ENABLED
+    sta CasmSourceCompletedFlags
+    lda CasmSourceVmmCursorLo
+    sta CasmSourceLineStartLo
+    lda CasmSourceVmmCursorHi
+    sta CasmSourceLineStartHi
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceTakeCompletedLine (WP51)
+; Consume the completed-line sidecar if a publish is pending. The private
+; CASM_SOURCE_CAPTURE_ENABLED bit (shared with this byte -- see common.inc)
+; is always masked out of the returned value, so a caller only ever
+; observes the documented VALID/SYNTHETIC_ONLY/FINAL_UNTERMINATED bits with
+; bits 3-7 reserved and zero, exactly as the public sidecar contract states.
+;
+; Inputs:    none
+; Outputs:   Pending: C clear; A = flags with VALID set (and, when
+;            applicable, FINAL_UNTERMINATED); CasmSourceCompletedStartLo/Hi,
+;            Length, FileId, LineLo/Hi remain readable; pending-valid state
+;            consumed
+;            No pending: C clear; A = 0
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+sourceTakeCompletedLine:
+    lda CasmSourceCompletedFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_VALID
+    beq stclNone
+    lda CasmSourceCompletedFlags
+    and #%01111111               ; mask off the private ENABLED bit
+    pha
+    lda CasmSourceCompletedFlags
+    and #%11111110               ; clear VALID; ENABLED/reserved bits survive
+    sta CasmSourceCompletedFlags
+    pla
+    clc
+    rts
+stclNone:
+    lda #0
+    clc
     rts
 
 ; ---------------------------------------------------------------------------
@@ -1847,6 +2122,10 @@ sfpNoCycle:
     sta CasmFrameResumeColumn, x
     lda CasmSourcePendingCr
     sta CasmFrameResumePendingCr, x
+    lda CasmSourceLineStartLo
+    sta CasmFrameResumeLineStartLo, x
+    lda CasmSourceLineStartHi
+    sta CasmFrameResumeLineStartHi, x
 
     ; WP48: capture the `.INCLUDE` statement's own start location. Runtime
     ; verification proved the parser has consumed the trailing newline before
@@ -1870,8 +2149,15 @@ sfpNoCycle:
     ; the child's completely different position.
     lda CasmValue0Lo
     sta CasmSourceVmmCursorLo
+    ; WP51: the child's line-start anchor is exactly its own start offset --
+    ; the same value just stored into the cursor above. Set directly rather
+    ; than deferred to the next refill's own base snapshot (sourceRefill),
+    ; since both independently compute the identical value; setting it here
+    ; keeps it valid even if a diagnostic reads it before the first fetch.
+    sta CasmSourceLineStartLo
     lda CasmValue0Hi
     sta CasmSourceVmmCursorHi
+    sta CasmSourceLineStartHi
     lda #0
     sta CasmSourceBlockIndexLo
     sta CasmSourceBlockIndexHi
@@ -2057,6 +2343,16 @@ srTransferLenReady:
     jmp srEofOrPop                ; transferLen == 0: EOF, or a frame to pop
 
 srHaveData:
+    ; WP51: snapshot this block's absolute base before CasmSourceVmmCursorLo/
+    ; Hi advances below. CASM's real traversal is always CASM_SOURCE_API_BYTE
+    ; (the lexer never uses LINE mode), where sourceComputeBase always
+    ; returns 0, so block index 0 always corresponds exactly to the cursor's
+    ; current (not-yet-advanced) value -- no subtraction needed.
+    lda CasmSourceVmmCursorLo
+    sta CasmSourceBlockBaseLo
+    lda CasmSourceVmmCursorHi
+    sta CasmSourceBlockBaseHi
+
     ; Precompute the block's final index/length now, from the original
     ; (not-yet-decremented) transferLen: index = base; length = base +
     ; transferLen. Doing this before the chunk loop below avoids needing an
@@ -2213,38 +2509,54 @@ scbLine:
 ;
 ; Inputs:    CasmFrameDepth
 ; Outputs:   depth 0: as srEof. depth > 0: never returns to the original
-;            caller directly -- always re-enters sourceRefill instead.
+;            caller directly -- always re-enters sourceRefill instead,
+;            unless sourceFramePopInternal's WP51 capture publish fails.
 ; ---------------------------------------------------------------------------
 srEofOrPop:
     lda CasmFrameDepth
     beq srEofNear
     jsr sourceFramePopInternal
+    bcs srEofOrPopFail
     jmp sourceRefill
 srEofNear:
     jmp srEof
+srEofOrPopFail:
+    ; sourceFramePopInternal already set source ERROR and A = diagnostic.
+    sec
+    rts
 
 ; ---------------------------------------------------------------------------
-; sourceFramePopInternal (private, WP46)
+; sourceFramePopInternal (private, WP46; WP51 capture publish)
 ; Restore the suspended parent's traversal state from the current depth's
 ; frame-stack slot and decrement CasmFrameDepth. Called only from
-; srEofOrPop, when the active frame's own content is exhausted; never
-; fails (restores only previously-saved, known-good state -- no OS call,
-; no allocation).
+; srEofOrPop, when the active frame's own content is exhausted.
+;
+; WP51: before restoring anything, publishes the popped child's own final
+; unterminated line (if any) through sourceCaptureFinal -- a no-op when
+; capture is disabled or the child ended cleanly on a real newline -- since
+; nothing else ever gets a chance to flush it once this frame's state is
+; discarded below.
 ;
 ; Inputs:    CasmFrameDepth > 0
-; Outputs:   CasmSourceVmmCursorLo/Hi, CasmSourceLineLo/Hi, CasmSourceColumn,
-;            CasmSourcePendingCr restored from the popped frame's saved
-;            resume state; CasmSourceBlockIndexLo/Hi and
-;            CasmSourceBlockLenLo/Hi invalidated (both zeroed, forcing
-;            sourceFetchPhysical's next call to refill rather than trust
-;            the child's now-stale installed block); echo/offset-guard
-;            state reset (sourceResetBoundaryEcho); lookahead invalidated
+; Outputs:   Success: C clear; CasmSourceVmmCursorLo/Hi, CasmSourceLineLo/Hi,
+;            CasmSourceColumn, CasmSourcePendingCr, CasmSourceLineStartLo/Hi
+;            restored from the popped frame's saved resume state;
+;            CasmSourceBlockIndexLo/Hi and CasmSourceBlockLenLo/Hi
+;            invalidated (both zeroed, forcing sourceFetchPhysical's next
+;            call to refill rather than trust the child's now-stale
+;            installed block); echo/offset-guard state reset
+;            (sourceResetBoundaryEcho); lookahead invalidated
 ;            (CasmLookaheadValid = 0, matching sourceRewind's existing
 ;            precedent that the state-owning caller invalidates lookahead,
 ;            not a private lexer routine); CasmFrameDepth decremented
+;            Failure: A = CASM_DIAG_LISTING_REPLAY_MISMATCH, C set (an
+;            unconsumed sidecar was already pending); nothing changed,
+;            source ERROR
 ; Clobbers:  A, X
 ; ---------------------------------------------------------------------------
 sourceFramePopInternal:
+    jsr sourceCaptureFinal
+    bcs sfpiCaptureFail
     ldx CasmFrameDepth
     dex                            ; 0-based array index of the frame being popped
     lda CasmFrameResumeOffsetLo, x
@@ -2259,6 +2571,10 @@ sourceFramePopInternal:
     sta CasmSourceColumn
     lda CasmFrameResumePendingCr, x
     sta CasmSourcePendingCr
+    lda CasmFrameResumeLineStartLo, x
+    sta CasmSourceLineStartLo
+    lda CasmFrameResumeLineStartHi, x
+    sta CasmSourceLineStartHi
     lda #0
     sta CasmSourceBlockIndexLo
     sta CasmSourceBlockIndexHi
@@ -2268,6 +2584,11 @@ sourceFramePopInternal:
     dec CasmFrameDepth
     lda #0
     sta CasmLookaheadValid
+    clc
+    rts
+sfpiCaptureFail:
+    ; sourceCaptureFinal already set source ERROR and A = diagnostic.
+    sec
     rts
 
 srEof:
@@ -2280,12 +2601,20 @@ srEof:
     lda CasmSourceBlockIndexHi
     cmp CasmSourceBlockLenHi
     bne srEofMismatch
+    ; WP51: publish any final unterminated line before committing EOF --
+    ; a no-op when capture is disabled or the source ended on a real newline.
+    jsr sourceCaptureFinal
+    bcs srEofCaptureFail
     lda #CASM_SOURCE_STATE_EOF
     sta CasmSourceState
     lda #0
     sta CasmSourceResultByte
     lda #CASM_SOURCE_EOF
     clc
+    rts
+srEofCaptureFail:
+    ; sourceCaptureFinal already set source ERROR and A = diagnostic.
+    sec
     rts
 srEofMismatch:
     lda #CASM_SOURCE_STATE_ERROR

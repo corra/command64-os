@@ -287,7 +287,7 @@ if(Ca65_FOUND)
     # column array overflowed $4200 by 60 measured bytes. One page is the
     # smallest aligned increase; the final site-line/traceback corrections
     # leave 85 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4400")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4500")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -469,7 +469,10 @@ if(Ca65_FOUND)
             # envelope initially fit; runtime correction added dedicated
             # include-site line arrays and overflowed $4100 by 14 bytes. The
             # approved $4200 envelope leaves 242 bytes headroom.
-            set(TEST_PRG_SIZE "4200")
+            # WP51 increment 2: source.s's listing-capture additions
+            # overflowed $4200 by 295 bytes; match production CASM's
+            # approved $4500.
+            set(TEST_PRG_SIZE "4500")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -528,7 +531,11 @@ if(Ca65_FOUND)
             # never calls them; $1B00 overflowed by 128 measured bytes.
             # WP51: $1C00 -> $1D00. source.s grew 11 bytes for the listing
             # capture sidecar (Phase 0C.20); $1C00 overflowed by 6 bytes.
-            set(TEST_PRG_SIZE "1D00")
+            # WP51 increment 2: $1D00 -> $1E00. sourceCaptureNewline/
+            # sourceCaptureFinal/sourceSetLineCapture/sourceTakeCompletedLine
+            # plus the frame-stack LineStart array overflowed $1D00 by 153
+            # bytes.
+            set(TEST_PRG_SIZE "1E00")
         endif()
         if(TEST_NAME STREQUAL "casm_event")
             # WP47: include.s (the event log) plus every module it
@@ -547,7 +554,10 @@ if(Ca65_FOUND)
             # WP47: $1C00 after casm_catalog's own $1B00 overflowed by 164
             # bytes. WP48's dedicated include-site line arrays then overflowed
             # $1C00 by 31 measured bytes; approved $1D00 leaves 225 bytes.
-            set(TEST_PRG_SIZE "1D00")
+            # WP51 increment 2: source.s's listing-capture additions (sidecar,
+            # frame-stack LineStart array, sourceCaptureNewline/Final)
+            # overflowed $1D00 by 189 bytes.
+            set(TEST_PRG_SIZE "1E00")
         endif()
         if(TEST_NAME STREQUAL "casm_frame")
             # WP46: include.s (for includeCatalogLoad) plus the same
@@ -576,7 +586,10 @@ if(Ca65_FOUND)
             # the approved one-page increase leaves 163 bytes headroom.
             # WP51: source.s's 11-byte listing sidecar plus four new listing
             # diagnostic messages overflowed $4100 by 83 bytes.
-            set(TEST_PRG_SIZE "4200")
+            # WP51 increment 2: sourceCaptureNewline/sourceCaptureFinal/
+            # sourceSetLineCapture/sourceTakeCompletedLine plus the
+            # frame-stack LineStart array overflowed $4200 by 230 bytes.
+            set(TEST_PRG_SIZE "4300")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
