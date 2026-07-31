@@ -16,6 +16,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 WP50 Contract Reconciliation and ABI Freeze**: bumped to
+  `V0.1.51`. Re-traced the approved Phase 10 (symbol map/native listing)
+  contract against the live Phase 9 source with no discrepancy found (token
+  record/lexer-state sizes, next-free diagnostic `$39`, source-offset/cursor
+  semantics, 85-byte MAIN headroom all confirmed exact via a live `ld65`
+  relink). Resolved the open listing-file replacement question: CASM embeds
+  CBM DOS's native `@0:` replace marker itself between the device prefix and
+  basename, so no `DOS_OPEN_FILE` change is needed — no existence probe, no
+  OS API change, pending a WP53 runtime fixture. Version-only completion
+  increment; no listing/map behavior implemented (still gated, WP51-WP55
+  blocked pending explicit activation).
 - **DASH bumped to `V0.1.4`**: hand-bumped version banner (`ddata.s`'s `DASHVERSTR`, printed on every page's status row) alongside WP10's documentation reconciliation. `dash.ref.hex` regenerated via `build_dash_manifest.py --allow-host-bytes` against the rebuilt `dash_ref` cross-check (still the explicit, user-approved interim provenance from WP9 — same 3828 code bytes / 465 relocation entries, new SHA-256 `3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b`).
 - **DASH WP10 Documentation and Completion Gate**: Reconciled `wiki/casm-utility.md` (stale since CASM Phase 4/v0.1.15 — rewritten for the current v0.1.50/Phase-9-complete feature set: labels, two-pass assembly, `.INCLUDE`, R6 relocation by default) and `wiki/casm-programmers-reference.md` (stale banner/coverage/diagnostic table from WP46 — updated for WP47-49's `.INCLUDE` dispatch, `$37`/`$38` diagnostics). Added `wiki/dash-utility.md` (new, mirrored to `docs/`) covering DASH's controls, page contents, VMM test states, memory/API contract, and R6 relocation evidence. Fixed a pre-existing `wiki`/`docs` desync in `programmers-reference.md` (the `ApiExt` segment, added for `DOS_GET_SYSTEM_INFO`/`DOS_GET_APP_INFO`, was present in `docs/` but missing from `wiki/`, the documented source of truth).
 - **DASH WP9 Integration and Relocation Audit**: R6 relocation ledger (465 entries against the `dash_ref` cross-check, all bounded/unique/complete), private-address audit (no `$C000`-`$CFFF`, REU register, or non-public ZP access), production image packaging (`dash` added to `image_d64` only, not `test.d64`), and a source-hash stale-artifact gate on the shipping manifest. Manifest provenance remains the `dash_ref` ca65 cross-check (`--allow-host-bytes`) as an explicit, user-approved interim; a native-CASM-on-hardware regeneration is deferred, not a blocker.

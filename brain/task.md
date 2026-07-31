@@ -1538,13 +1538,16 @@
   - Approved governing plan:
     `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`
   - Milestone task: `wiki/tasks/casm-phase10-symbol-map-listing.md`
-  - [/] WP50 (`ad82f04d-0d34-4902-9a2c-ae27292902cf`): contract reconciliation
-        and ABI freeze; active under approved plan
+  - [x] WP50 (`ad82f04d-0d34-4902-9a2c-ae27292902cf`): contract reconciliation
+        and ABI freeze; complete at CASM `0.1.51` build 1206, user-approved
+        2026-07-31, per
         `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`
+        and
+        `brain/walkthroughs/2026-07-31-casm-phase10-wp50-contract-reconciliation.md`
   - [ ] WP51 (`a64fa847-1b46-44fd-be3b-8ad7b1055c92`): listing stores and
         capture events; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`;
-        blocked by WP50
+        WP50 complete, WP51 not yet activated
   - [ ] WP52 (`0bf2e86b-0bd0-443a-b84b-b2c258e98181`): deterministic symbol
         map; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`;
