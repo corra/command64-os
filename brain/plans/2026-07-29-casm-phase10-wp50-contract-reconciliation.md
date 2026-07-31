@@ -187,6 +187,38 @@ WP53 uses listing-specific handle, resource slot, open/close state, replacement
 state, validity state, and deletion eligibility. WP50 must trace `DOS_OPEN_FILE`
 replacement semantics and stop if safe cleanup requires an unapproved OS change.
 
+### Resolved: Listing Replacement Requires No OS Change
+
+Traced `fileOpen` (`src/command64/file.asm`), `normalizeName`, and
+`parsePointerDevice` (`src/command64/utils.asm`):
+
+- `normalizeName` only case-shifts A-Z; `@` and `:` pass through untouched.
+- `parsePointerDevice` matches only a literal `8:`/`9:`/`10:`/`11:` at the
+  string's start, strips exactly those bytes, and forwards the remainder
+  verbatim through `SETNAM`.
+
+Consequence: CASM may embed CBM DOS's native `@0:` replace marker itself,
+between the device prefix and the basename -- `cliDeriveListingName`/
+`CasmListingName` construct `<device-digits>:@0:<basename>.LST`.
+`parsePointerDevice` still strips the leading `8:`/`9:`/`10:`/`11:` for device
+targeting exactly as today; the untouched `@0:<basename>.LST` remainder reaches
+the drive. No `DOS_OPEN_FILE` change, no new OS API, and no existence probe are
+required.
+
+`@0:` is unconditionally safe on real CBM DOS whether or not the target file
+already exists: the drive performs an atomic scratch-and-rename internally
+(creates if absent, replaces if present), and the previous valid file survives
+untouched if the write is interrupted. WP53 therefore always opens the listing
+write with the embedded `@0:` marker -- no existence check, no
+create-vs-replace branch, and the atomicity comes for free.
+
+This mechanism is traced from source only and is not yet runtime-verified
+against this project's `DOS_OPEN_FILE` plus VICE-emulated-1541 stack. WP53's
+harness (`test_casm_listwrite`) must add a fixture that writes a listing over
+an already-existing file of the same name through the real OS/VICE path and
+confirms the drive honors `@0:` as expected before WP53 relies on it in
+production sequencing.
+
 ## Fixture Ownership
 
 - WP51: line forms/newlines/bounds, deferred data directives, include traversal,
@@ -265,3 +297,12 @@ confirms final closure. Completion does not activate WP51.
 - 2026-07-29: User approved this plan. WP50 was activated; WP51-WP55 remain
   pending and blocked. No production or memory-layout change is authorized in
   this recording increment.
+- 2026-07-31: Reconciled Findings 1-12, the source-span/sidecar freeze, the
+  metadata ABI, the emitted-byte endpoint, and the diagnostic reservation were
+  independently re-traced against the live `0.1.50` build 1204 source and
+  confirmed exact, including a live `ld65 --mapfile` relink confirming the
+  85-byte MAIN headroom claim precisely. Resolved the previously open listing
+  file-ownership question (see "Resolved: Listing Replacement Requires No OS
+  Change" above): WP53 embeds CBM DOS `@0:` itself, no OS change needed,
+  pending a runtime fixture. No production or memory-layout change was made in
+  this increment.

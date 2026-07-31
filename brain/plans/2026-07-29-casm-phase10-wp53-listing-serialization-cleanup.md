@@ -45,9 +45,18 @@ close/release the PRG handle and mark committed only on success. Amend
 
 Add listing handle, slot, state, opened, valid, committed, and delete-pending
 state. Listing type is SEQ. Add dedicated create/write/close/delete/abort paths
-mapping `$3D-$41`. A successful write-mode open owns the newly created or
-explicitly replaced artifact. Abort preserves primary diagnostics, retries
-bounded close/delete, leaves failed handles registered, and is repeat-safe.
+mapping `$3D-$41`. Per WP50's frozen file-ownership resolution, the write-mode
+open always embeds CBM DOS's native `@0:` replace marker between the device
+prefix and basename (`<device-digits>:@0:<basename>.LST`) -- no existence
+probe, no create-vs-replace branch, no OS change. This requires no new
+`DOS_OPEN_FILE` semantics: `parsePointerDevice` strips the existing `8:`/`9:`/
+`10:`/`11:` device prefix exactly as today, and `normalizeName` passes `@`/`:`
+through untouched, so the embedded `@0:` reaches the drive unmodified. Add a
+`test_casm_listwrite` fixture that writes a listing over an already-existing
+same-name file through the real OS/VICE path and confirms the drive honors
+`@0:` before this mechanism is relied on in production sequencing (WP54).
+Abort preserves primary diagnostics, retries bounded close/delete, leaves
+failed handles registered, and is repeat-safe.
 
 ## Serializer
 
