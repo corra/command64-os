@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-wp50-contract-reconciliation
 created: 2026-07-29
-status: active-approved
+status: complete
 taskwarrior: ad82f04d-0d34-4902-9a2c-ae27292902cf
 ---
 
@@ -337,6 +337,10 @@ records and Taskwarrior agree, baseline/documentation verification passes, the
 user approves completion, version-only `0.1.51` builds stably, and the user
 confirms final closure. Completion does not activate WP51.
 
+**Met 2026-07-31.** User approved completion; CASM stands at `0.1.51` build
+`1206`, stable on no-change rebuild. WP51 remains blocked until its own
+explicit activation.
+
 ## Progress
 
 - 2026-07-29: User approved this plan. WP50 was activated; WP51-WP55 remain
@@ -359,3 +363,12 @@ confirms final closure. Completion does not activate WP51.
   was already drafted and user-approved (`approved-blocked`) prior to this
   session. Remaining: produce the WP50 walkthrough and request completion
   approval (increment 5), then the version-only `0.1.51` bump (increment 6).
+- 2026-07-31: User approved the WP50 walkthrough and completion. Applied the
+  version-only bump (`VERSION_STAGE` `"50"` -> `"51"` in `casm.s`); the
+  hash-gated build counter advanced exactly once, `1205` -> `1206`, and a
+  subsequent no-change rebuild reported the `casm` target already built with
+  no further counter movement. `build/casm.prg` held at 18,694 bytes (identical
+  to the pre-bump size), confirming only the version-string bytes changed.
+  `image_d64` and `test_image_d64` both rebuilt successfully carrying the new
+  `casm` PRG. WP50 is complete at CASM `0.1.51` build `1206`. WP51 remains
+  blocked pending its own explicit activation.

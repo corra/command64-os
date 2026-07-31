@@ -1,8 +1,8 @@
 # CASM Phase 10 WP50 Verification Walkthrough
 
-Status: Draft; awaiting user completion approval
+Status: Complete; user approved 2026-07-31
 Branch: `feature/casm-phase10-wp50`
-Candidate: CASM `0.1.50`, committed build `1205` (no CASM source change)
+Candidate: CASM `0.1.51` build `1206`
 
 ## Scope
 
@@ -89,16 +89,21 @@ changed; a same-source `casm` target build reported already up to date.
 all agree WP50 is the sole active Phase 10 package, with WP51-WP55 pending and
 blocked. No sync correction was required.
 
-## Outstanding Before Completion
+## Version-Only Completion Increment
 
-- User review of the plan edits made in this session (listing file-ownership
-  resolution, baseline drift note, baseline measurement record).
-- Explicit user approval to mark WP50 and this walkthrough complete.
-- Only after that approval: apply the version-only `0.1.51` bump, rebuild,
-  confirm the build counter advances exactly once and is stable on a
-  subsequent no-change rebuild, and synchronize final status records.
+User approved WP50 completion 2026-07-31. Applied the only production change
+WP50 authorizes: `VERSION_STAGE` `"50"` -> `"51"` in `casm.s`. Results:
+
+- The hash-gated build counter advanced exactly once: `1205` -> `1206`.
+- A subsequent no-change rebuild reported the `casm` target already built,
+  with no further counter movement.
+- `build/casm.prg` held at 18,694 bytes, identical to the pre-bump size,
+  confirming only the version-string bytes changed (both `"50"` and `"51"`
+  are two PETSCII characters).
+- `image_d64` and `test_image_d64` both rebuilt successfully, each carrying
+  the updated `casm` PRG (74 blocks) in their directory listings.
 
 ## Completion Gate
 
-Not yet met. This walkthrough is a draft pending user review and explicit
-completion approval per the WP50 plan's Completion Gate.
+Met 2026-07-31. CASM stands at `0.1.51` build `1206`, stable on no-change
+rebuild. WP51 remains blocked pending its own explicit activation.
