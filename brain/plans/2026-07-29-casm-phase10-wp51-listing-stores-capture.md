@@ -626,3 +626,29 @@ Completion does not activate WP52.
     complete: harness written, fixtures pass live, `diagPrintFatal` range fix
     and the `test.d64` overflow fix both verified as part of the same clean
     build/rebuild already recorded above.
+- 2026-08-03: Completed Atomic Increment 7 (measure and minimize envelopes):
+  - Measured every envelope WP51 touched or created with a real `ld65 -m`
+    map (not guesswork): for each target, the true minimum is the BSS
+    segment's end address minus the link base, rounded up to the next
+    256-byte page. Checked `casm` ($4900), `test_casm_pass1` ($4700),
+    `test_casm_frame` ($4700), `test_casm_listing` ($1300),
+    `test_casm_listcap` ($4B00), `test_casm_catalog` ($1E00), and
+    `test_casm_event` ($1E00) -- all seven were already sitting at the
+    smallest 256-byte-aligned fit (0-255 bytes of headroom, never a full
+    spare page).
+  - Found one target with a full spare page: `test_casm_passcheck`'s BSS
+    ended at 0x42F6 above its $3800 base, needing only $4300, but its
+    envelope was still $4400 (carried over from increment 5's rough
+    "$4000 overflowed by 759 bytes" retry, which landed one page past the
+    true minimum). Tightened to $4300 in `CMakeLists.txt`.
+  - Verified: `test_casm_passcheck` links clean at $4300; a full clean
+    rebuild (`rm -rf build`, reconfigure) of every target succeeds with
+    zero errors, including `image_d64`, `test_image_d64`,
+    `casm_overflow_test_d64`, `casm_include_test_d64`, and
+    `casm_listing_test_d64`; a subsequent no-change rebuild of `casm`,
+    `test_casm_passcheck`, `test_casm_pass1`, `test_casm_frame`,
+    `test_casm_listing`, and `test_casm_listcap` held every build counter
+    stable (no source or hash-gated content actually changed for any of
+    them except the passcheck `.cfg` size, which does not participate in
+    the source hash).
+  - No other envelope in this plan's touched set required a change.

@@ -526,7 +526,11 @@ if(Ca65_FOUND)
             # Same whole-object source set and WP44/WP46 envelope requirement
             # as casm_pass1 above. WP51 increment 5: also needs listing.s, same
             # reason as casm_pass1; $4000 overflowed by 759 measured bytes.
-            set(TEST_PRG_SIZE "4400")
+            # WP51 increment 7: measured against a real ld65 map ($4400's own
+            # BSS end was 0x7AF6, only 0x42F6 above $3800) -- $4300 is the
+            # true smallest 256-byte-aligned fit, 266 bytes tighter than the
+            # $4400 carried over from increment 5's own rough overflow retry.
+            set(TEST_PRG_SIZE "4300")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
