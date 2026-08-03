@@ -393,3 +393,73 @@ Completion does not activate WP52.
   - Still deferred: multi-root synthetic-separator suppression (see
     Increment 2's note above) and the byte-mirror stage/endpoint/finalize
     logic (Increment 4).
+- 2026-07-31: Completed Atomic Increment 4 (buffered mirror, endpoint,
+  finalize, and boundary fixtures):
+  - `listing.s`: `listingBeginLine` (snapshots `CasmPc`, the byte cursor,
+    and the full flag; imports `CasmPc` directly from `emit.s` rather than
+    passing it through a scratch pair), `listingMirrorByte` (stages into a
+    dedicated 64-byte buffer, advances the 16-bit byte cursor, detects the
+    exact 65,536-byte wrap to set `CasmListingByteFull`, flushes every full
+    stage), private `listingFlushStage` (one `vmmWindowWrite` per flush;
+    the destination offset's own 16-bit borrow arithmetic naturally lands
+    on the correct final page even when the cursor has just wrapped to
+    zero, since 65,536 is an exact multiple of the 64-byte stage),
+    `listingCommitLine` (consumes the sidecar via
+    `sourceTakeCompletedLine`, clears the transaction with no record for a
+    no-pending or synthetic-only completion, otherwise translates the
+    sidecar's `FINAL_UNTERMINATED` bit into the metadata record's own
+    single-bit encoding and computes the byte delta -- a plain subtraction,
+    or a 16-bit negate when the store wrapped to exactly zero during this
+    transaction specifically, tracked via a separate begin-time snapshot of
+    the full flag), and `listingCaptureFinalize` (requires no active
+    transaction and no unconsumed sidecar -- peeked directly via the
+    exported `CasmSourceCompletedFlags`, never consumed here -- flushes the
+    final partial stage, disables source capture, marks
+    `CASM_LISTING_STATE_COMPLETE`).
+  - `test_casm_listing` gained five fixtures: `listingtxn1` (basic
+    begin/mirror/commit lifecycle with full metadata-field verification),
+    `listingtxnedge1` (no-pending/synthetic-only clearing, a real zero-byte
+    line, duplicate-begin and mirror-without-transaction rejections),
+    `listingstage1` (63/64/65-byte stage boundary with byte-mirror content
+    verification), `listingfull2` (a real fill to exactly 65,535/65,536/
+    65,537 bytes proving the full-flag/wrap/rejection-before-mutation
+    behavior), `listingfinalize1` (both finalize precondition failures plus
+    the success path and a replay of both recorded lines).
+  - **Two real bugs found only through live VICE testing, both fixed and
+    reverified** (matching this project's established pattern that static
+    review alone misses runtime state-lifecycle defects):
+    1. A genuine `listing.s` production bug: `listingStateInit` was never
+       updated to clear `CasmListingByteCursorLo/Hi`, `CasmListingByteFull`,
+       `CasmListingStageLen`, or `CasmListingTxnActive` when those fields
+       were added earlier in this same increment -- it only reset the
+       Increment-3 fields (state/record count/replay index). Since the C64
+       does not zero a PRG's BSS between loads (a `type = bss` segment
+       contributes no bytes to the file at all), a repeat invocation in the
+       same session -- exactly what this test harness does across its many
+       fixtures, and what production CASM would do on a second run without
+       an intervening reset -- silently inherited stale values. Fixed by
+       moving the reset into `listingStateInit`, matching the routine's own
+       documented "clear ... cursors, flags, stages, transaction, and
+       replay state" scope from the WP51 plan.
+    2. A test-fixture-only bug: the harness's own `sourceTakeCompletedLine`
+       stub reset `StubHasPending` on consume but never cleared
+       `CasmSourceCompletedFlags`' `VALID` bit itself, unlike the real
+       `source.s` contract -- `listingCaptureFinalize`'s direct peek at
+       that same exported byte then found a stale `VALID` bit and
+       incorrectly rejected a legitimate finalize as an unconsumed
+       sidecar. Fixed by making the stub clear the byte on consume, exactly
+       matching the real ABI.
+  - Envelope: `casm` bumped `$4700` -> `$4900` (still well under the
+    plan's `$4C00` ceiling); `test_casm_listing` bumped `$1000` -> `$1300`
+    across several iterations while the new transaction API and fixtures
+    were added.
+  - Verified live under VICE across multiple fresh-boot iterations, with
+    temporary lettered diagnostic markers used to localize each of the two
+    bugs precisely before being removed once the harness passed clean.
+    **User confirmed all eleven fixtures pass** (`CASM LISTING: PASS`) on a
+    final clean run with the markers removed.
+  - Still deferred to later increments: multi-root synthetic-separator
+    suppression (Increment 2's note; Increment 6 will verify empirically),
+    and all emitter/pass/include production wiring (Increment 5 -- `/L`
+    remains rejected in production; nothing in this increment is reachable
+    outside `test_casm_listing`).

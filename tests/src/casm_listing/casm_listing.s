@@ -39,6 +39,10 @@
 .import listingMetaAppend
 .import listingReplayReset
 .import listingReplayNext
+.import listingBeginLine
+.import listingMirrorByte
+.import listingCommitLine
+.import listingCaptureFinalize
 .import CasmListingState
 .import CasmListingMetaVmmSlot
 .import CasmListingByteVmmSlot
@@ -61,9 +65,24 @@
 .import vmmStoreFree
 .import vmmWindowRead
 .import CasmVmmBuffer
+.import CasmListingByteCursorLo
+.import CasmListingByteCursorHi
+.import CasmListingByteFull
+.import CasmListingStage
+.import CasmListingStageLen
+.import CasmListingTxnActive
 
 .export diagPrintFatal
 .export sourceSetLineCapture
+.export sourceTakeCompletedLine
+.export CasmPc
+.export CasmSourceCompletedFlags
+.export CasmSourceCompletedStartLo
+.export CasmSourceCompletedStartHi
+.export CasmSourceCompletedLength
+.export CasmSourceCompletedFileId
+.export CasmSourceCompletedLineLo
+.export CasmSourceCompletedLineHi
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -89,6 +108,16 @@ start:
     jsr listingvmmfail1
     jsr reportCase
     jsr listingfull1
+    jsr reportCase
+    jsr listingtxn1
+    jsr reportCase
+    jsr listingtxnedge1
+    jsr reportCase
+    jsr listingstage1
+    jsr reportCase
+    jsr listingfull2
+    jsr reportCase
+    jsr listingfinalize1
     jsr reportCase
 
     ; Every fixture above frees whatever it allocates itself (matching
@@ -886,6 +915,710 @@ lf1Fail:
     rts
 
 ; ---------------------------------------------------------------------------
+; listingtxn1
+; Fresh allocation. Basic listingBeginLine/listingMirrorByte/listingCommitLine
+; lifecycle: mirror three bytes, commit a real (non-synthetic) completed
+; line, and read the resulting metadata record back to confirm PC/ByteOff/
+; ByteCount/FileId/Line/Offset/Len/Flags are exactly right.
+; ---------------------------------------------------------------------------
+listingtxn1:
+    jsr listingStateInit
+    bcc :+
+    jmp lt1Fail
+:
+    jsr listingCaptureInit
+    bcc :+
+    jmp lt1Fail
+:
+    lda #<$3412
+    sta CasmPc
+    lda #>$3412
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp lt1Fail
+:
+    lda #$AA
+    jsr listingMirrorByte
+    bcc :+
+    jmp lt1Fail
+:
+    lda #$BB
+    jsr listingMirrorByte
+    bcc :+
+    jmp lt1Fail
+:
+    lda #$CC
+    jsr listingMirrorByte
+    bcc :+
+    jmp lt1Fail
+:
+    lda #1
+    sta StubHasPending
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    lda #$10
+    sta CasmSourceCompletedStartLo
+    lda #$00
+    sta CasmSourceCompletedStartHi
+    lda #7
+    sta CasmSourceCompletedLength
+    lda #3
+    sta CasmSourceCompletedFileId
+    lda #9
+    sta CasmSourceCompletedLineLo
+    lda #0
+    sta CasmSourceCompletedLineHi
+    jsr listingCommitLine
+    bcc :+
+    jmp lt1Fail
+:
+    lda CasmListingRecordCountLo
+    cmp #1
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmListingRecordCountHi
+    beq :+
+    jmp lt1Fail
+:
+    ldx CasmListingMetaVmmSlot
+    lda #0
+    sta CasmVmmOffLo
+    sta CasmVmmOffHi
+    lda #16
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 0     ; FileId
+    cmp #3
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 1     ; Flags (real line, not final-unterminated)
+    cmp #0
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 2     ; Line lo
+    cmp #9
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 4     ; Offset lo
+    cmp #$10
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 6     ; Len
+    cmp #7
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 8     ; PC lo
+    cmp #$12
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 9     ; PC hi
+    cmp #$34
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 10    ; ByteOff lo (begin cursor was 0)
+    cmp #0
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 11    ; ByteOff hi
+    cmp #0
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 12    ; ByteCount lo (3 bytes mirrored)
+    cmp #3
+    beq :+
+    jmp lt1Fail
+:
+    lda CasmVmmBuffer + 13    ; ByteCount hi
+    cmp #0
+    beq :+
+    jmp lt1Fail
+:
+    ldx CasmListingMetaVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lt1Fail
+:
+    ldx CasmListingByteVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lt1Fail
+:
+    lda #CASM_LISTING_STATE_NONE
+    sta CasmListingState
+    clc
+    rts
+lt1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingtxnedge1
+; Fresh allocation. Exercises listingCommitLine's other two clearing paths
+; (no pending completion; a synthetic-only completion), a real zero-byte
+; line (a legitimate blank/comment-only line, distinct from the synthetic
+; case), and the duplicate-begin / mirror-without-transaction rejections.
+; ---------------------------------------------------------------------------
+listingtxnedge1:
+    jsr listingStateInit
+    bcc :+
+    jmp lte1Fail
+:
+    jsr listingCaptureInit
+    bcc :+
+    jmp lte1Fail
+:
+    ; Mirror without an active transaction must fail.
+    lda #$01
+    jsr listingMirrorByte
+    bcs :+
+    jmp lte1Fail
+:
+    cmp #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    beq :+
+    jmp lte1Fail
+:
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp lte1Fail
+:
+    ; Duplicate begin must fail without disturbing the active transaction.
+    jsr listingBeginLine
+    bcs :+
+    jmp lte1Fail
+:
+    cmp #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    beq :+
+    jmp lte1Fail
+:
+    lda #$FF
+    jsr listingMirrorByte
+    bcc :+
+    jmp lte1Fail
+:
+    ; No pending completion: commit clears the transaction, no record.
+    lda #0
+    sta StubHasPending
+    jsr listingCommitLine
+    bcc :+
+    jmp lte1Fail
+:
+    lda CasmListingRecordCountLo
+    ora CasmListingRecordCountHi
+    beq :+
+    jmp lte1Fail
+:
+    ; A synthetic-only completion: commit clears the transaction, no record.
+    jsr listingBeginLine
+    bcc :+
+    jmp lte1Fail
+:
+    lda #$EE
+    jsr listingMirrorByte
+    bcc :+
+    jmp lte1Fail
+:
+    lda #1
+    sta StubHasPending
+    lda #(CASM_SOURCE_COMPLETED_FLAG_VALID | CASM_SOURCE_COMPLETED_FLAG_SYNTHETIC_ONLY)
+    sta CasmSourceCompletedFlags
+    jsr listingCommitLine
+    bcc :+
+    jmp lte1Fail
+:
+    lda CasmListingRecordCountLo
+    ora CasmListingRecordCountHi
+    beq :+
+    jmp lte1Fail
+:
+    ; A real, legitimately empty line (no bytes mirrored) still records.
+    jsr listingBeginLine
+    bcc :+
+    jmp lte1Fail
+:
+    lda #1
+    sta StubHasPending
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    lda #0
+    sta CasmSourceCompletedStartLo
+    sta CasmSourceCompletedStartHi
+    sta CasmSourceCompletedLength
+    sta CasmSourceCompletedFileId
+    lda #1
+    sta CasmSourceCompletedLineLo
+    lda #0
+    sta CasmSourceCompletedLineHi
+    jsr listingCommitLine
+    bcc :+
+    jmp lte1Fail
+:
+    lda CasmListingRecordCountLo
+    cmp #1
+    beq :+
+    jmp lte1Fail
+:
+    lda CasmListingRecordCountHi
+    beq :+
+    jmp lte1Fail
+:
+    ldx CasmListingMetaVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lte1Fail
+:
+    ldx CasmListingByteVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lte1Fail
+:
+    lda #CASM_LISTING_STATE_NONE
+    sta CasmListingState
+    clc
+    rts
+lte1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingstage1
+; Fresh allocation. Mirrors exactly 63 bytes (no flush yet), then a 64th
+; (flush to exactly one VMM window), then a 65th (fresh stage after flush),
+; confirming CasmListingStageLen at each boundary and reading the flushed 64
+; bytes back from the byte-mirror VMM store to confirm exact content and
+; order. Commits the line and confirms the metadata record's ByteCount (65)
+; and ByteOff (0, the begin-time cursor).
+; ---------------------------------------------------------------------------
+listingstage1:
+    jsr listingStateInit
+    bcc :+
+    jmp lst1Fail
+:
+    jsr listingCaptureInit
+    bcc :+
+    jmp lst1Fail
+:
+    lda #<$4000
+    sta CasmPc
+    lda #>$4000
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp lst1Fail
+:
+    lda #0
+    sta LoopLo
+lst1FillLoop:
+    lda LoopLo
+    jsr listingMirrorByte
+    bcc :+
+    jmp lst1Fail
+:
+    inc LoopLo
+    lda LoopLo
+    cmp #63
+    bne lst1FillLoop
+
+    lda CasmListingStageLen
+    cmp #63
+    beq :+
+    jmp lst1Fail
+:
+    lda #63
+    jsr listingMirrorByte
+    bcc :+
+    jmp lst1Fail
+:
+    lda CasmListingStageLen
+    beq :+
+    jmp lst1Fail
+:
+    lda #99
+    jsr listingMirrorByte
+    bcc :+
+    jmp lst1Fail
+:
+    lda CasmListingStageLen
+    cmp #1
+    beq :+
+    jmp lst1Fail
+:
+    ldx CasmListingByteVmmSlot
+    lda #0
+    sta CasmVmmOffLo
+    sta CasmVmmOffHi
+    lda #64
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp lst1Fail
+:
+    ldy #0
+lst1CheckLoop:
+    tya
+    cmp CasmVmmBuffer, y
+    beq lst1CheckOk
+    jmp lst1Fail
+lst1CheckOk:
+    iny
+    cpy #64
+    bne lst1CheckLoop
+
+    lda #1
+    sta StubHasPending
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    lda #0
+    sta CasmSourceCompletedStartLo
+    sta CasmSourceCompletedStartHi
+    lda #5
+    sta CasmSourceCompletedLength
+    lda #0
+    sta CasmSourceCompletedFileId
+    lda #1
+    sta CasmSourceCompletedLineLo
+    lda #0
+    sta CasmSourceCompletedLineHi
+    jsr listingCommitLine
+    bcc :+
+    jmp lst1Fail
+:
+    ldx CasmListingMetaVmmSlot
+    lda #0
+    sta CasmVmmOffLo
+    sta CasmVmmOffHi
+    lda #16
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp lst1Fail
+:
+    lda CasmVmmBuffer + 10    ; ByteOff lo
+    cmp #0
+    beq :+
+    jmp lst1Fail
+:
+    lda CasmVmmBuffer + 11    ; ByteOff hi
+    cmp #0
+    beq :+
+    jmp lst1Fail
+:
+    lda CasmVmmBuffer + 12    ; ByteCount lo (65 bytes mirrored total)
+    cmp #65
+    beq :+
+    jmp lst1Fail
+:
+    lda CasmVmmBuffer + 13    ; ByteCount hi
+    cmp #0
+    beq :+
+    jmp lst1Fail
+:
+    ldx CasmListingMetaVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lst1Fail
+:
+    ldx CasmListingByteVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lst1Fail
+:
+    lda #CASM_LISTING_STATE_NONE
+    sta CasmListingState
+    clc
+    rts
+lst1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingfull2
+; Fresh allocation. Mirrors exactly 65,535 bytes (confirming the store is
+; NOT yet full), then one more (the 65,536th, confirming the store BECOMES
+; full and the cursor wraps to exactly zero), then attempts a 65,537th
+; (confirming it is rejected with CASM_DIAG_LISTING_BYTES_FULL before any
+; mutation). A real fill, matching listingfull1's own precedent for the
+; metadata store's capacity boundary.
+; ---------------------------------------------------------------------------
+listingfull2:
+    jsr listingStateInit
+    bcc :+
+    jmp lf2Fail
+:
+    jsr listingCaptureInit
+    bcc :+
+    jmp lf2Fail
+:
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp lf2Fail
+:
+    lda #0
+    sta LoopLo
+    sta LoopHi
+lf2Loop:
+    lda #$42
+    jsr listingMirrorByte
+    bcc lf2Continue
+    jmp lf2Fail
+lf2Continue:
+    inc LoopLo
+    bne lf2CheckDone
+    inc LoopHi
+lf2CheckDone:
+    lda LoopLo
+    cmp #<65535
+    bne lf2Loop
+    lda LoopHi
+    cmp #>65535
+    bne lf2Loop
+
+    lda CasmListingByteFull
+    beq :+
+    jmp lf2Fail                  ; must not be full yet (65,535 written)
+:
+    lda #$99
+    jsr listingMirrorByte
+    bcc :+
+    jmp lf2Fail
+:
+    lda CasmListingByteFull
+    bne :+
+    jmp lf2Fail                  ; must be full now (65,536th just written)
+:
+    lda CasmListingByteCursorLo
+    ora CasmListingByteCursorHi
+    beq :+
+    jmp lf2Fail                  ; cursor must have wrapped to exactly zero
+:
+    lda #$77
+    jsr listingMirrorByte
+    bcs :+
+    jmp lf2Fail                  ; the 65,537th byte must be rejected
+:
+    cmp #CASM_DIAG_LISTING_BYTES_FULL
+    beq :+
+    jmp lf2Fail
+:
+    ; Close the transaction. The true 65,536-byte delta does not fit this
+    ; fixture's own ByteCount verification -- listingtxn1/listingstage1
+    ; already prove the ordinary delta arithmetic; this fixture's own scope
+    ; is the endpoint/full-flag behavior, not this one record's own count.
+    lda #1
+    sta StubHasPending
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    lda #0
+    sta CasmSourceCompletedStartLo
+    sta CasmSourceCompletedStartHi
+    sta CasmSourceCompletedLength
+    sta CasmSourceCompletedFileId
+    lda #1
+    sta CasmSourceCompletedLineLo
+    lda #0
+    sta CasmSourceCompletedLineHi
+    jsr listingCommitLine
+    bcc :+
+    jmp lf2Fail
+:
+    ldx CasmListingMetaVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lf2Fail
+:
+    ldx CasmListingByteVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lf2Fail
+:
+    lda #CASM_LISTING_STATE_NONE
+    sta CasmListingState
+    clc
+    rts
+lf2Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingfinalize1
+; Fresh allocation. Confirms listingCaptureFinalize's two precondition
+; failures (an active transaction; an unconsumed sidecar) and its success
+; path (flushes a final partial stage, disables source capture through the
+; stub, and marks CasmListingState complete), then replays both recorded
+; lines from the same allocation.
+; ---------------------------------------------------------------------------
+listingfinalize1:
+    jsr listingStateInit
+    bcc :+
+    jmp lfi1Fail
+:
+    jsr listingCaptureInit
+    bcc :+
+    jmp lfi1Fail
+:
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp lfi1Fail
+:
+    ; An active transaction must reject finalize.
+    jsr listingCaptureFinalize
+    bcs :+
+    jmp lfi1Fail
+:
+    cmp #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    beq :+
+    jmp lfi1Fail
+:
+    lda #1
+    sta StubHasPending
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    lda #0
+    sta CasmSourceCompletedStartLo
+    sta CasmSourceCompletedStartHi
+    sta CasmSourceCompletedLength
+    sta CasmSourceCompletedFileId
+    sta CasmSourceCompletedLineHi
+    lda #1
+    sta CasmSourceCompletedLineLo
+    jsr listingCommitLine
+    bcc :+
+    jmp lfi1Fail
+:
+    ; An unconsumed sidecar (peeked directly, independent of the active-
+    ; transaction check above, which the prior commit already cleared).
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    jsr listingCaptureFinalize
+    bcs :+
+    jmp lfi1Fail
+:
+    cmp #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    beq :+
+    jmp lfi1Fail
+:
+    lda #0
+    sta CasmSourceCompletedFlags
+
+    ; Leave a partial (non-flushed) stage so finalize's own flush is real.
+    jsr listingBeginLine
+    bcc :+
+    jmp lfi1Fail
+:
+    lda #$55
+    jsr listingMirrorByte
+    bcc :+
+    jmp lfi1Fail
+:
+    lda #1
+    sta StubHasPending
+    lda #CASM_SOURCE_COMPLETED_FLAG_VALID
+    sta CasmSourceCompletedFlags
+    lda #0
+    sta CasmSourceCompletedStartLo
+    sta CasmSourceCompletedStartHi
+    sta CasmSourceCompletedLength
+    sta CasmSourceCompletedFileId
+    sta CasmSourceCompletedLineHi
+    lda #2
+    sta CasmSourceCompletedLineLo
+    jsr listingCommitLine
+    bcc :+
+    jmp lfi1Fail
+:
+    lda CasmListingStageLen
+    cmp #1
+    beq :+
+    jmp lfi1Fail
+:
+    jsr listingCaptureFinalize
+    bcc :+
+    jmp lfi1Fail
+:
+    lda CasmListingStageLen
+    beq :+
+    jmp lfi1Fail                 ; finalize must flush the trailing partial stage
+:
+    lda CasmListingState
+    cmp #CASM_LISTING_STATE_COMPLETE
+    beq :+
+    jmp lfi1Fail
+:
+    jsr listingReplayReset
+    bcc :+
+    jmp lfi1Fail
+:
+    jsr listingReplayNext
+    bcc :+
+    jmp lfi1Fail
+:
+    cmp #CASM_STREAM_DATA
+    beq :+
+    jmp lfi1Fail
+:
+    jsr listingReplayNext
+    bcc :+
+    jmp lfi1Fail
+:
+    cmp #CASM_STREAM_DATA
+    beq :+
+    jmp lfi1Fail
+:
+    jsr listingReplayNext
+    bcc :+
+    jmp lfi1Fail
+:
+    cmp #CASM_STREAM_EOF
+    beq :+
+    jmp lfi1Fail
+:
+    ldx CasmListingMetaVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lfi1Fail
+:
+    ldx CasmListingByteVmmSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp lfi1Fail
+:
+    lda #CASM_LISTING_STATE_NONE
+    sta CasmListingState
+    clc
+    rts
+lfi1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; diagPrintFatal (stub)
 ; resources.s's exitSuccess/exitFatal reference this; this harness never
 ; calls either, so a trivial stub satisfies the link without pulling in the
@@ -906,6 +1639,37 @@ sourceSetLineCapture:
     clc
     rts
 
+; ---------------------------------------------------------------------------
+; sourceTakeCompletedLine (stub, WP51 increment 4)
+; listing.s's listingCommitLine/listingCaptureFinalize call this; this
+; harness never links the real source.s (see the file header). Test-
+; controlled: a fixture sets StubHasPending and CasmSourceCompletedFlags/
+; StartLo/Hi/Length/FileId/LineLo/Hi directly before calling the routine
+; under test, matching the real ABI's "fields remain readable after this
+; call" contract exactly (they are plain exported BSS here, already holding
+; whatever the fixture staged). Consumes StubHasPending (clears it) so a
+; second call in the same fixture correctly reports "no pending" without
+; needing the real VALID-bit state machine this stub does not implement.
+; ---------------------------------------------------------------------------
+sourceTakeCompletedLine:
+    lda StubHasPending
+    beq stclStubNone
+    lda #0
+    sta StubHasPending
+    lda CasmSourceCompletedFlags
+    pha
+    lda #0
+    sta CasmSourceCompletedFlags  ; consuming clears VALID, matching the real
+                                  ; source.s contract listingCaptureFinalize's
+                                  ; own direct peek relies on
+    pla
+    clc
+    rts
+stclStubNone:
+    lda #0
+    clc
+    rts
+
 .segment "RODATA"
 
 passMsg:
@@ -917,6 +1681,15 @@ failMsg:
 
 FailCount: .res 1
 LoopLo:    .res 1
+StubHasPending: .res 1
+CasmPc: .res 2
+CasmSourceCompletedFlags:   .res 1
+CasmSourceCompletedStartLo: .res 1
+CasmSourceCompletedStartHi: .res 1
+CasmSourceCompletedLength:  .res 1
+CasmSourceCompletedFileId:  .res 1
+CasmSourceCompletedLineLo:  .res 1
+CasmSourceCompletedLineHi:  .res 1
 LoopHi:    .res 1
 SlotCount: .res 1
 SlotTable: .res 8

@@ -287,7 +287,7 @@ if(Ca65_FOUND)
     # column array overflowed $4200 by 60 measured bytes. One page is the
     # smallest aligned increase; the final site-line/traceback corrections
     # leave 85 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4700")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4900")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -438,7 +438,11 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1000")
+            # WP51 increment 4: the per-line transaction API (listingBeginLine/
+            # listingMirrorByte/listingCommitLine/listingCaptureFinalize) plus
+            # this harness's own new fixtures overflowed $1000 by 236 bytes;
+            # $1100 overflowed by a further 20; $1200 overflowed by 1.
+            set(TEST_PRG_SIZE "1300")
         endif()
         if(TEST_NAME STREQUAL "casm_symbols")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}

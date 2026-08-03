@@ -8,12 +8,14 @@
 ; serializer. `/L` remains rejected by production orchestration until WP54;
 ; this module writes no `.LST` file and is never called in production yet.
 ;
-; WP51 increment 3 scope: allocation (listingCaptureInit), the metadata
+; WP51 increment 3 built allocation (listingCaptureInit), the metadata
 ; append/replay primitives, and enough lifecycle state (listingStateInit) to
-; exercise both in isolation through test_casm_listing. The per-line
-; transaction API (listingBeginLine/listingMirrorByte/listingCommitLine/
-; listingCaptureFinalize) and the byte-mirror stage arrive in increment 4;
-; emitter/pass/include integration in increment 5.
+; exercise both in isolation through test_casm_listing.
+;
+; WP51 increment 4 adds the per-line transaction API (listingBeginLine/
+; listingMirrorByte/listingCommitLine), the buffered byte-mirror stage and
+; its 65,536-byte endpoint, and listingCaptureFinalize. Emitter/pass/include
+; integration -- the real production call sites -- arrives in increment 5.
 
 .include "command64.inc"
 .include "common.inc"
@@ -23,12 +25,25 @@
 .import vmmWindowWrite
 .import CasmVmmBuffer
 .import sourceSetLineCapture
+.import sourceTakeCompletedLine
+.import CasmSourceCompletedFlags
+.import CasmSourceCompletedStartLo
+.import CasmSourceCompletedStartHi
+.import CasmSourceCompletedLength
+.import CasmSourceCompletedFileId
+.import CasmSourceCompletedLineLo
+.import CasmSourceCompletedLineHi
+.import CasmPc
 
 .export listingStateInit
 .export listingCaptureInit
 .export listingMetaAppend
 .export listingReplayReset
 .export listingReplayNext
+.export listingBeginLine
+.export listingMirrorByte
+.export listingCommitLine
+.export listingCaptureFinalize
 .export CasmListingState
 .export CasmListingMetaVmmSlot
 .export CasmListingByteVmmSlot
@@ -47,6 +62,12 @@
 .export CasmListingPendingByteOffHi
 .export CasmListingPendingByteCountLo
 .export CasmListingPendingByteCountHi
+.export CasmListingByteCursorLo
+.export CasmListingByteCursorHi
+.export CasmListingByteFull
+.export CasmListingStage
+.export CasmListingStageLen
+.export CasmListingTxnActive
 
 .segment "BSS"
 
@@ -57,6 +78,36 @@ CasmListingRecordCountLo: .res 1
 CasmListingRecordCountHi: .res 1
 CasmListingReplayIndexLo: .res 1
 CasmListingReplayIndexHi: .res 1
+
+; WP51 increment 4: byte-mirror endpoint and buffered flush stage.
+; CasmListingByteCursorLo/Hi is the next free offset in the byte-mirror VMM
+; store while CasmListingByteFull is zero. The exact 65,536th byte write
+; advances the cursor from $FFFF and wraps it to $0000 (plain 16-bit
+; increment overflow); that wrap is the only signal CasmListingByteFull is
+; set from, since the store's own capacity is exactly 65,536 bytes and no
+; 17th bit exists to count it directly. CasmListingStage/StageLen buffer up
+; to CASM_LISTING_STAGE_SIZE (64) bytes before one vmmWindowWrite flush;
+; byte-at-a-time VMM calls are prohibited by the WP51 plan.
+CasmListingByteCursorLo:  .res 1
+CasmListingByteCursorHi:  .res 1
+CasmListingByteFull:      .res 1
+CasmListingStage:         .res CASM_LISTING_STAGE_SIZE
+CasmListingStageLen:      .res 1
+
+; WP51 increment 4: one-line-at-a-time capture transaction. Snapshotted by
+; listingBeginLine, consumed by listingCommitLine. CasmListingTxnFullFlag
+; is CasmListingByteFull's value at the transaction's own start -- distinct
+; from CasmListingByteFull's live value, since listingCommitLine's byte-
+; delta arithmetic must tell "this transaction never wrapped the store" (a
+; plain 16-bit subtraction) apart from "this transaction is exactly what
+; wrapped the store to zero and set full" (a 16-bit negate) -- CasmListingByteFull
+; alone cannot distinguish the two once set.
+CasmListingTxnActive:       .res 1
+CasmListingTxnPcLo:         .res 1
+CasmListingTxnPcHi:         .res 1
+CasmListingTxnByteCursorLo: .res 1
+CasmListingTxnByteCursorHi: .res 1
+CasmListingTxnFullFlag:     .res 1
 
 ; Metadata record fields, staged by the caller before listingMetaAppend.
 ; Reserved0/Reserved1 are not staged here at all -- listingMetaAppend always
@@ -80,9 +131,18 @@ CasmListingPendingByteCountHi: .res 1
 
 ; ---------------------------------------------------------------------------
 ; listingStateInit
-; Clear listing state to NONE without acquiring any resource. Safe to call
-; unconditionally from normal CASM initialization so every listing hook stays
-; a deterministic no-op while `/L` is rejected in production.
+; Clear listing state to NONE without acquiring any resource: slots'-worth
+; of bookkeeping (record/replay counters), the byte-mirror cursor/full flag/
+; stage length, and the transaction-active flag. Safe to call unconditionally
+; from normal CASM initialization so every listing hook stays a deterministic
+; no-op while `/L` is rejected in production.
+;
+; Explicit, not assumed: BSS is not zero-filled between two loads of the same
+; PRG (a "type = bss" segment contributes no bytes to the file at all, so
+; nothing ever re-zeroes it at runtime) -- a repeat invocation in the same
+; session, such as this module's own test harness calling listingCaptureInit
+; many times across its fixtures, would otherwise inherit whatever an earlier
+; run or fixture left behind.
 ;
 ; Inputs:    none
 ; Outputs:   A = CASM_DIAG_NONE, C clear
@@ -96,6 +156,11 @@ listingStateInit:
     sta CasmListingRecordCountHi
     sta CasmListingReplayIndexLo
     sta CasmListingReplayIndexHi
+    sta CasmListingByteCursorLo
+    sta CasmListingByteCursorHi
+    sta CasmListingByteFull
+    sta CasmListingStageLen
+    sta CasmListingTxnActive
     lda #CASM_DIAG_NONE
     clc
     rts
@@ -326,4 +391,355 @@ lrnDone:
 lrnFail:
     lda #CASM_DIAG_VMM_TRANSFER_FAILED
     sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingFlushStage (private, WP51 increment 4)
+; Flush CasmListingStage[0..CasmListingStageLen-1] to the byte-mirror VMM
+; store at offset = CasmListingByteCursorLo/Hi - CasmListingStageLen, then
+; clear CasmListingStageLen only after a successful write. A store that
+; just became exactly full always flushes on a stage boundary: 65,536 is an
+; exact multiple of CASM_LISTING_STAGE_SIZE (64), so the destination
+; computed here for a just-wrapped cursor (0 - StageLen, a 16-bit borrow)
+; correctly lands on the store's final 64-byte page.
+;
+; Inputs:    CasmListingStage/StageLen, CasmListingByteCursorLo/Hi
+; Outputs:   Success: C clear; StageLen cleared (or was already 0: a no-op)
+;            Failure: A = CASM_DIAG_VMM_TRANSFER_FAILED, C set; StageLen
+;            unchanged
+; Clobbers:  A, X, Y, CasmVmmBuffer, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi
+; ---------------------------------------------------------------------------
+listingFlushStage:
+    lda CasmListingStageLen
+    beq lfsNothing
+
+    lda CasmListingByteCursorLo
+    sec
+    sbc CasmListingStageLen
+    sta CasmVmmOffLo
+    lda CasmListingByteCursorHi
+    sbc #0
+    sta CasmVmmOffHi
+
+    ldy CasmListingStageLen
+    dey
+lfsCopyLoop:
+    lda CasmListingStage, y
+    sta CasmVmmBuffer, y
+    dey
+    bpl lfsCopyLoop
+
+    lda CasmListingStageLen
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmListingByteVmmSlot
+    jsr vmmWindowWrite
+    bcs lfsFail
+
+    lda #0
+    sta CasmListingStageLen
+lfsNothing:
+    clc
+    rts
+lfsFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; listingBeginLine (WP51 increment 4)
+; Begin one capture transaction: snapshot the current PC, byte-mirror
+; cursor, and full flag, then mark the transaction active. No-op when
+; capture is disabled. A duplicate begin (a transaction already active)
+; means a prior line was never committed -- a caller ordering defect, not a
+; reachable condition through correct emitter/pass integration.
+;
+; Inputs:    CasmPc (emit.s)
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; transaction active
+;            Failure: A = CASM_DIAG_LISTING_REPLAY_MISMATCH, C set (a
+;            transaction was already active); nothing changed
+;            Disabled: C clear; no-op
+; Clobbers:  A
+; ---------------------------------------------------------------------------
+listingBeginLine:
+    lda CasmListingState
+    cmp #CASM_LISTING_STATE_ENABLED
+    beq lblEnabled
+    clc
+    rts
+lblEnabled:
+    lda CasmListingTxnActive
+    beq lblNoTxn
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+lblNoTxn:
+    lda CasmPc
+    sta CasmListingTxnPcLo
+    lda CasmPc + 1
+    sta CasmListingTxnPcHi
+    lda CasmListingByteCursorLo
+    sta CasmListingTxnByteCursorLo
+    lda CasmListingByteCursorHi
+    sta CasmListingTxnByteCursorHi
+    lda CasmListingByteFull
+    sta CasmListingTxnFullFlag
+    lda #1
+    sta CasmListingTxnActive
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; listingMirrorByte (WP51 increment 4)
+; Mirror one Pass 2 source-generated byte. No-op when capture is disabled.
+; Requires an active transaction. Rejects before any mutation once the
+; store is already full. Appends to the buffered stage, advances the
+; 16-bit byte cursor, flushes the stage whenever it reaches
+; CASM_LISTING_STAGE_SIZE bytes, and detects the exact 65,536-byte wrap.
+;
+; Inputs:    A = the byte to mirror
+; Outputs:   Success: C clear; byte staged (and flushed if the stage just
+;            filled); cursor advanced; CasmListingByteFull set if this byte
+;            was exactly the store's 65,536th
+;            Failure: A = CASM_DIAG_LISTING_REPLAY_MISMATCH (no active
+;            transaction), CASM_DIAG_LISTING_BYTES_FULL (store already
+;            full), or CASM_DIAG_VMM_TRANSFER_FAILED (stage flush failed),
+;            C set
+;            Disabled: C clear; no-op
+; Clobbers:  A, X, Y, CasmVmmBuffer, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi
+; ---------------------------------------------------------------------------
+listingMirrorByte:
+    pha
+    lda CasmListingState
+    cmp #CASM_LISTING_STATE_ENABLED
+    beq lmbEnabled
+    pla
+    clc
+    rts
+lmbEnabled:
+    lda CasmListingTxnActive
+    bne lmbHaveTxn
+    pla
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+lmbHaveTxn:
+    lda CasmListingByteFull
+    beq lmbNotFull
+    pla
+    lda #CASM_DIAG_LISTING_BYTES_FULL
+    sec
+    rts
+lmbNotFull:
+    pla
+    ldy CasmListingStageLen
+    sta CasmListingStage, y
+    inc CasmListingStageLen
+
+    inc CasmListingByteCursorLo
+    bne lmbCursorDone
+    inc CasmListingByteCursorHi
+lmbCursorDone:
+    lda CasmListingByteCursorLo
+    ora CasmListingByteCursorHi
+    bne lmbNotWrapped
+    lda #1
+    sta CasmListingByteFull      ; cursor wrapped to exactly 0 -> store full
+lmbNotWrapped:
+
+    lda CasmListingStageLen
+    cmp #CASM_LISTING_STAGE_SIZE
+    bne lmbDone
+    jsr listingFlushStage
+    bcs lmbRet
+lmbDone:
+    clc
+lmbRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; listingCommitLine (WP51 increment 4)
+; End the active capture transaction. No-op when capture is disabled.
+; Consumes the completed-line sidecar (sourceTakeCompletedLine): no pending
+; completion, or a synthetic-only one, clears the transaction with no
+; metadata record. A real physical line computes the emitted-byte delta
+; since listingBeginLine (handling the exact-full wraparound), translates
+; the sidecar's FINAL_UNTERMINATED bit into the metadata record's own
+; single-bit Flags encoding, stages every field, and appends one record.
+;
+; Inputs:    an active transaction (listingBeginLine already called)
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; transaction cleared;
+;            zero or one metadata record appended
+;            Failure: A = CASM_DIAG_LISTING_REPLAY_MISMATCH (no active
+;            transaction), CASM_DIAG_LISTING_RECORDS_FULL, or
+;            CASM_DIAG_VMM_TRANSFER_FAILED, C set; transaction cleared
+;            regardless (a stalled transaction must never block whatever
+;            fatal-abort path the caller takes next)
+;            Disabled: C clear; no-op
+; Clobbers:  A, X, Y, CasmVmmBuffer, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi
+; ---------------------------------------------------------------------------
+listingCommitLine:
+    lda CasmListingState
+    cmp #CASM_LISTING_STATE_ENABLED
+    beq lclEnabled
+    clc
+    rts
+lclEnabled:
+    lda CasmListingTxnActive
+    bne lclHaveTxn
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+lclHaveTxn:
+    jsr sourceTakeCompletedLine
+    ; sourceTakeCompletedLine already cleared VALID in CasmSourceCompletedFlags
+    ; itself as part of consuming it -- the returned A is the only place the
+    ; pre-consume flags still exist, so stash it now rather than re-reading
+    ; the module variable for the SYNTHETIC_ONLY/FINAL_UNTERMINATED checks
+    ; below (into CasmListingPendingFlags, overwritten with the translated
+    ; single-bit value once those checks are done).
+    sta CasmListingPendingFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_VALID
+    bne lclHavePending
+    jmp lclClearNoRecord
+lclHavePending:
+    lda CasmListingPendingFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_SYNTHETIC_ONLY
+    beq lclRealLine
+    jmp lclClearNoRecord
+lclRealLine:
+
+    ; Translate the sidecar's FINAL_UNTERMINATED bit into the metadata
+    ; record's own bit 0 -- the two encodings are deliberately different
+    ; bytes (the sidecar carries VALID/SYNTHETIC_ONLY too; the metadata
+    ; record's Flags field never does).
+    lda CasmListingPendingFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_FINAL_UNTERMINATED
+    beq lclFlagsNotFinal
+    lda #CASM_LISTING_META_FLAG_FINAL_UNTERMINATED
+    jmp lclFlagsReady
+lclFlagsNotFinal:
+    lda #0
+lclFlagsReady:
+    sta CasmListingPendingFlags
+
+    lda CasmSourceCompletedFileId
+    sta CasmListingPendingFileId
+    lda CasmSourceCompletedLineLo
+    sta CasmListingPendingLineLo
+    lda CasmSourceCompletedLineHi
+    sta CasmListingPendingLineHi
+    lda CasmSourceCompletedStartLo
+    sta CasmListingPendingOffsetLo
+    lda CasmSourceCompletedStartHi
+    sta CasmListingPendingOffsetHi
+    lda CasmSourceCompletedLength
+    sta CasmListingPendingLen
+
+    lda CasmListingTxnPcLo
+    sta CasmListingPendingPcLo
+    lda CasmListingTxnPcHi
+    sta CasmListingPendingPcHi
+    lda CasmListingTxnByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingTxnByteCursorHi
+    sta CasmListingPendingByteOffHi
+
+    ; Byte delta since listingBeginLine. A transaction that began already
+    ; full accepted no bytes (listingMirrorByte rejects before mutation),
+    ; so the plain-subtract path below already yields 0 in that case (the
+    ; cursor cannot have moved). Only a transaction that was NOT full at
+    ; begin but IS full now just wrapped the cursor to exactly 0, requiring
+    ; the 16-bit negate instead of a plain subtract.
+    lda CasmListingTxnFullFlag
+    bne lclNoWrap
+    lda CasmListingByteFull
+    beq lclNoWrap
+    lda #0
+    sec
+    sbc CasmListingTxnByteCursorLo
+    sta CasmListingPendingByteCountLo
+    lda #0
+    sbc CasmListingTxnByteCursorHi
+    sta CasmListingPendingByteCountHi
+    jmp lclDeltaReady
+lclNoWrap:
+    lda CasmListingByteCursorLo
+    sec
+    sbc CasmListingTxnByteCursorLo
+    sta CasmListingPendingByteCountLo
+    lda CasmListingByteCursorHi
+    sbc CasmListingTxnByteCursorHi
+    sta CasmListingPendingByteCountHi
+lclDeltaReady:
+
+    jsr listingMetaAppend
+    bcc lclClearOk
+    pha
+    lda #0
+    sta CasmListingTxnActive
+    pla
+    sec
+    rts
+lclClearOk:
+    lda #0
+    sta CasmListingTxnActive
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lclClearNoRecord:
+    lda #0
+    sta CasmListingTxnActive
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; listingCaptureFinalize (WP51 increment 4)
+; Close listing capture after Pass 2 completes. Requires enabled capture,
+; no active transaction, and no unconsumed sidecar (peeked directly via
+; CasmSourceCompletedFlags, not consumed -- only sourceTakeCompletedLine
+; ever clears it). Flushes any final partial byte-mirror stage, disables
+; source-side capture, and marks capture complete. Both VMM allocations stay
+; live for WP53's later serializer; this routine never frees either.
+;
+; Inputs:    CasmListingState == CASM_LISTING_STATE_ENABLED
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; CasmListingState =
+;            CASM_LISTING_STATE_COMPLETE; source capture disabled
+;            Failure: A = CASM_DIAG_STREAM_STATE_FAILED (wrong starting
+;            state), CASM_DIAG_LISTING_REPLAY_MISMATCH (active transaction
+;            or unconsumed sidecar), or CASM_DIAG_VMM_TRANSFER_FAILED
+;            (final stage flush failed), C set; CasmListingState unchanged
+; Clobbers:  A, X, Y, CasmVmmBuffer, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi
+; ---------------------------------------------------------------------------
+listingCaptureFinalize:
+    lda CasmListingState
+    cmp #CASM_LISTING_STATE_ENABLED
+    beq lcfEnabled
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+lcfEnabled:
+    lda CasmListingTxnActive
+    beq lcfNoTxn
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+lcfNoTxn:
+    lda CasmSourceCompletedFlags
+    and #CASM_SOURCE_COMPLETED_FLAG_VALID
+    beq lcfNoSidecar
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+lcfNoSidecar:
+    jsr listingFlushStage
+    bcs lcfRet
+    lda #0
+    jsr sourceSetLineCapture
+    lda #CASM_LISTING_STATE_COMPLETE
+    sta CasmListingState
+    lda #CASM_DIAG_NONE
+    clc
+lcfRet:
     rts
