@@ -28,6 +28,7 @@
 .import CasmCliOptions
 .import fileIoInit
 .import sourceInit
+.import listingStateInit
 .import sourceLoad
 .import sourceOpen
 .import sourceClose
@@ -118,6 +119,11 @@ start:
     bcs startInitFatal
     jsr sourceInit
     bcs startInitFatal
+    ; WP51: unconditional and harmless while /M and /L are rejected below --
+    ; keeps every listing hook a deterministic no-op (listingStateInit
+    ; acquires no resource) rather than leaving CasmListingState uninitialized
+    ; BSS until WP54 wires production /L activation.
+    jsr listingStateInit
     lda #CASM_PHASE_CLI_FILE
     sta CasmPhase
 

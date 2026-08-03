@@ -287,7 +287,7 @@ if(Ca65_FOUND)
     # column array overflowed $4200 by 60 measured bytes. One page is the
     # smallest aligned increase; the final site-line/traceback corrections
     # leave 85 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4500")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4700")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -421,6 +421,20 @@ if(Ca65_FOUND)
         endif()
         if(TEST_NAME STREQUAL "casm_vmm")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
+        if(TEST_NAME STREQUAL "casm_listing")
+            # WP51 increment 3: listing.s plus every module listingCaptureInit
+            # transitively needs. Does NOT link source.s -- this harness
+            # provides its own trivial sourceSetLineCapture stub (matching
+            # casm_reloc.s's own CasmPc/CasmPassMode stand-in precedent),
+            # since it proves VMM allocation/metadata/replay mechanics, not
+            # source-side capture enablement.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
@@ -731,6 +745,8 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_catalog)
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_frame)
 # WP47's event-log harness joins it there for the same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_event)
+# WP51 increment 3's listing harness joins it there for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listing)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1062,6 +1078,19 @@ add_c64_disk_image(casm_include_test_d64
     PRGS casm comp
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
+
+# 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
+# both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
+# (already near its byte-space ceiling from the WP34/WP36 large-source
+# fixture pairs) had no room left for another PRG. Carries
+# test_casm_listing (Increment 3: VMM allocation/metadata/replay); WP51
+# Increment 6 adds test_casm_listcap here alongside it.
+add_c64_disk_image(casm_listing_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS test_casm_listing
+)
 
 # Real CASM assembly source, so these carry the ".s" on-disk suffix the CASM
 # source-fixture convention requires (unlike WP46's frame-harness fixtures,

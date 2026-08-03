@@ -1142,4 +1142,9 @@ CASM_SOURCE_CAPTURE_ENABLED                   = %10000000
 .assert CASM_LISTING_META_MAX * CASM_LISTING_META_REC_SIZE = CASM_VMM_ALLOC_MAX_BYTES, error, "CASM listing metadata store must be exactly one VMM allocation"
 .assert CASM_LISTING_STAGE_SIZE = CASM_VMM_BUFFER_SIZE, error, "CASM listing byte-mirror stage must match one VMM transfer"
 
+; listing.s capture lifecycle state (WP51).
+CASM_LISTING_STATE_NONE     = $00  ; listingStateInit only; no VMM acquired
+CASM_LISTING_STATE_ENABLED  = $01  ; listingCaptureInit succeeded; capturing
+CASM_LISTING_STATE_COMPLETE = $02  ; listingCaptureFinalize succeeded
+
 .endif

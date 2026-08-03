@@ -342,3 +342,54 @@ Completion does not activate WP52.
     integration in Increment 5 exists to actually drive this code through
     real assembly). This increment is build-clean but functionally
     unverified so far.
+- 2026-07-31: Completed Atomic Increment 3 (listing allocation, metadata,
+  replay, and storage harness):
+  - New `src/external/casm/listing.s`: `listingStateInit`,
+    `listingCaptureInit` (two 65,535-byte VMM allocations, rounded to
+    65,536/16 pages each), `listingMetaAppend` (zero-fills the 16-byte
+    record before staging so reserved bytes are always zero regardless of
+    prior `CasmVmmBuffer` content, capacity-checked against
+    `CASM_LISTING_META_MAX`), `listingReplayReset`/`listingReplayNext`
+    (repeat-stable at EOF). Wired into `casm.s`'s init sequence
+    unconditionally (harmless while `/M`/`/L` stay rejected pending WP54).
+  - New `tests/src/casm_listing/casm_listing.s` harness: allocation
+    success, a real registry-full second-allocation failure (pre-filling
+    dummy slots), a three-record append with deliberately dirtied
+    `CasmVmmBuffer` proving the reserved-byte zero-fill, full replay
+    including repeat-stable EOF, a real freed-slot VMM transfer failure for
+    both append and replay, and a real fill to exactly
+    `CASM_LISTING_META_MAX` (4,096) records confirming the 4,097th fails
+    with `CASM_DIAG_LISTING_RECORDS_FULL` specifically.
+  - New tracked disk image `casm_listing_test_d64`
+    (`build/casm_listing_test.d64`, device-attach target, `PRGS
+    test_casm_listing`): both `test.d64` (directory-entry ceiling) and
+    `casm_overflow_test.d64` (byte-space ceiling) had no room left, so this
+    is a new, permanent, CMake-tracked image per explicit user direction
+    (not a throwaway scratch disk) -- WP51 Increment 6 adds
+    `test_casm_listcap` here alongside it.
+  - Verified live under VICE (true drive emulation, booted from
+    `image.d64` on device 8 -- `test.d64` was the original habit from the
+    documented canary procedure but is not actually required here, since
+    the harness lives entirely on its own device-9 disk and doesn't touch
+    `test.d64` at all). User ran the harness directly and reported real
+    failures across three iterations, each traced to an actual fixture bug
+    (not `listing.s` production logic) and fixed:
+    1. `listingallocfail1`'s dummy-slot fill count assumed a clean 8-slot
+       registry, but `listinginit1`'s live allocation (kept live for reuse)
+       already held 2 slots; fixed 7 -> 5 dummy slots.
+    2. That same fixture's own `listingCaptureInit` call then overwrote
+       the shared `CasmListingMetaVmmSlot`/`CasmListingByteVmmSlot`
+       variables that still held `listinginit1`'s live allocation,
+       corrupting state for `listingappend1`/`listingreplay1`; fixed by
+       saving/restoring both slot numbers and `CasmListingState` around the
+       fixture's own test.
+    3. After both fixes: **user confirmed all six fixtures pass** (`CASM
+       LISTING: PASS`).
+  - All nine existing `test_casm_*` targets, `casm`, and every affected
+    disk image (`image_d64`, `test_image_d64`, `casm_overflow_test_d64`,
+    `casm_include_test_d64`, `casm_listing_test_d64`) rebuild clean; `casm`
+    and `test_casm_listing` hold stable build counters on a no-change
+    rebuild.
+  - Still deferred: multi-root synthetic-separator suppression (see
+    Increment 2's note above) and the byte-mirror stage/endpoint/finalize
+    logic (Increment 4).
