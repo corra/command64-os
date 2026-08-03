@@ -470,6 +470,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
@@ -490,7 +491,12 @@ if(Ca65_FOUND)
             # WP51 increment 2: source.s's listing-capture additions
             # overflowed $4200 by 295 bytes; match production CASM's
             # approved $4500.
-            set(TEST_PRG_SIZE "4500")
+            # WP51 increment 5: emitByte's new listingMirrorByte call requires
+            # linking listing.s whole, matching production's own dependency --
+            # emitByte cannot resolve the symbol otherwise, whether or not this
+            # harness's own driver ever enables capture. $4500 overflowed by
+            # 418 measured bytes.
+            set(TEST_PRG_SIZE "4700")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -509,6 +515,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
@@ -517,8 +524,9 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             # Same whole-object source set and WP44/WP46 envelope requirement
-            # as casm_pass1 above.
-            set(TEST_PRG_SIZE "4000")
+            # as casm_pass1 above. WP51 increment 5: also needs listing.s, same
+            # reason as casm_pass1; $4000 overflowed by 759 measured bytes.
+            set(TEST_PRG_SIZE "4400")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -593,6 +601,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
@@ -607,7 +616,10 @@ if(Ca65_FOUND)
             # WP51 increment 2: sourceCaptureNewline/sourceCaptureFinal/
             # sourceSetLineCapture/sourceTakeCompletedLine plus the
             # frame-stack LineStart array overflowed $4200 by 230 bytes.
-            set(TEST_PRG_SIZE "4300")
+            # WP51 increment 5: linking listing.s (required by emit.s's new
+            # listingMirrorByte call) overflowed $4300 by 609 measured bytes;
+            # $4600 still overflowed by a further 97.
+            set(TEST_PRG_SIZE "4700")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})

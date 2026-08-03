@@ -28,6 +28,7 @@
 .import parserParseExpressionValue
 .import CasmCliOptions
 .import relocRecord
+.import listingMirrorByte
 
 ; WP15 diagnostic context. Statement-level failures use the stamped statement
 ; location; failures inside a .BYTE/.WORD operand list use the token record,
@@ -595,9 +596,16 @@ emrlOk:
 ; ---------------------------------------------------------------------------
 ; emitByte (private)
 ; Stage one program byte and advance the program counter with overflow check.
+; WP51: also mirrors the byte into the listing capture's byte store
+; (listingMirrorByte, a no-op when capture is disabled) after emitRawByte
+; accepts it -- PRG acceptance therefore precedes mirror acceptance, and a
+; mirror failure returns before the PC increment, following the existing
+; incomplete-PRG abort path.
 ; Inputs:  A = byte
-; Outputs: C clear on success; C set with A = ADDRESS_OVERFLOW or write
-;          diagnostic on failure
+; Outputs: C clear on success; C set with A = ADDRESS_OVERFLOW, a write
+;          diagnostic, or a listing diagnostic on failure
+; Clobbers: A, X (the byte is stacked across emitRawByte/listingMirrorByte;
+;          see listingMirrorByte for its own X/Y/VMM-scratch clobbers)
 ; ---------------------------------------------------------------------------
 emitByte:
     ldx CasmPcOverflow
@@ -606,7 +614,11 @@ emitByte:
     sec
     rts
 ebEmit:
+    pha                          ; preserve the byte for the mirror call below
     jsr emitRawByte
+    bcs ebRawFail
+    pla
+    jsr listingMirrorByte        ; no-op when listing capture is disabled
     bcs ebFail
     inc CasmPc
     bne ebDone
@@ -616,6 +628,14 @@ ebEmit:
     sta CasmPcOverflow
 ebDone:
     clc
+    rts
+ebRawFail:
+    ; emitRawByte failed: A/C already hold its diagnostic. Discard the
+    ; stacked byte without disturbing A.
+    tax
+    pla
+    txa
+    sec
     rts
 ebFail:
     rts

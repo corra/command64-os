@@ -29,6 +29,8 @@
 .import fileIoInit
 .import sourceInit
 .import listingStateInit
+.import listingBeginLine
+.import listingCommitLine
 .import sourceLoad
 .import sourceOpen
 .import sourceClose
@@ -273,13 +275,26 @@ startFatalNear:
 ; registry-owned for a checked close during cleanup; INPUT VALIDATED prints
 ; only after the final buffered write (emitFinalize) succeeds.
 ;
+; WP51: also drives one listing-capture transaction per statement, gated to
+; Pass 2 only (crpListingBegin/crpListingCommit below) -- Pass 1 never opens
+; a transaction, so a Pass-2-only commit call can never trip
+; listingCommitLine's "no active transaction" guard. Both helpers are
+; themselves already a no-op whenever listing capture isn't enabled, so this
+; is harmless while `/L` stays rejected in production (WP54). Failed parse/
+; dispatch commits nothing -- every failure branch here returns through
+; crpFail without reaching a commit call, abandoning any open transaction to
+; the fatal-abort path the caller takes next.
+;
 ; Inputs:    CasmPassMode set by the caller for this pass; lexer/source READY
 ; Outputs:   C clear at CASM_TOKEN_EOF; C set with A = CASM_DIAG_* on any
-;            parse, symbol-table, addressing-mode, or emission failure
+;            parse, symbol-table, addressing-mode, emission, or listing-
+;            capture failure
 ; Clobbers:  A, X, Y, CasmParser*/CasmLabelName* scratch, lexer/source/emit/
-;            symbol volatile state
+;            symbol/listing volatile state
 ; ---------------------------------------------------------------------------
 casmRunPass:
+    jsr crpListingBegin
+    bcs crpFail
     jsr parserParseStatement
     bcs crpFail
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE
@@ -291,7 +306,10 @@ casmRunPass:
     beq crpDir
     cmp #CASM_TOKEN_EOF
     beq crpDone
-    jmp casmRunPass              ; NEWLINE: nothing to do
+    ; NEWLINE: nothing to emit, but still commit the physical line just ended.
+    jsr crpListingCommit
+    bcs crpFail
+    jmp casmRunPass
 
 crpLabel:
     ; WP38: mark output started (and, on the very first qualifying statement
@@ -305,7 +323,8 @@ crpLabel:
     bcs crpFail
     lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
-    bne casmRunPass              ; EMIT: nothing else to do for a label statement
+    bne crpLabelCommit            ; EMIT: nothing else to do for a label
+                                   ; statement besides the commit below
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
@@ -315,6 +334,9 @@ crpLabel:
     ldy CasmPc + 1
     jsr symbolsInsert
     bcs crpFail
+crpLabelCommit:
+    jsr crpListingCommit
+    bcs crpFail
     jmp casmRunPass
 
 crpInsn:
@@ -322,25 +344,70 @@ crpInsn:
     bcs crpFail
     jsr emitInstruction
     bcs crpFail
+    jsr crpListingCommit
+    bcs crpFail
     jmp casmRunPass
 
 crpDir:
     lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
     cmp #CASM_DIRECTIVE_INCLUDE
     bne crpEmitDir
+    ; crpInclude commits the parent's own line itself, before pushing the
+    ; child frame -- see its header comment.
     jsr crpInclude
     bcs crpFail
     jmp casmRunPass
 crpEmitDir:
     jsr emitDirective
     bcs crpFail
+    jsr crpListingCommit
+    bcs crpFail
     jmp casmRunPass
 
 crpDone:
+    ; EOF: commit any pending final (unterminated) physical line. This adds
+    ; no record of its own for EOF -- listingCommitLine only ever appends a
+    ; record for a real physical line sourceTakeCompletedLine reports as
+    ; pending, which is exactly the FINAL_UNTERMINATED case here; a source
+    ; that ended cleanly on its last newline has nothing pending and this is
+    ; a no-op.
+    jsr crpListingCommit
+    bcs crpFail
     clc
     rts
 crpFail:
     rts                          ; C already set, A = CASM_DIAG_*
+
+; ---------------------------------------------------------------------------
+; crpListingBegin / crpListingCommit (private, WP51 increment 5)
+; Gate listingBeginLine/listingCommitLine to Pass 2 (CASM_PASS_MODE_EMIT)
+; only. Pass 1 never begins a transaction, so a Pass-1 commit call would
+; otherwise trip listingCommitLine's own "no active transaction" ->
+; CASM_DIAG_LISTING_REPLAY_MISMATCH guard the moment listing capture is ever
+; enabled (WP54) -- both routines already no-op on their own whenever
+; capture itself is disabled, but that alone does not make them Pass-1-safe
+; once it isn't.
+; Outputs: C clear on success (including every no-op case); C set with
+;          A = CASM_DIAG_* propagated from the underlying listing.s call
+; Clobbers: A, X, Y and the underlying listing.s call's own clobbers
+; ---------------------------------------------------------------------------
+crpListingBegin:
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_EMIT
+    beq crpListingBeginPass2
+    clc
+    rts
+crpListingBeginPass2:
+    jmp listingBeginLine
+
+crpListingCommit:
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_EMIT
+    beq crpListingCommitPass2
+    clc
+    rts
+crpListingCommitPass2:
+    jmp listingCommitLine
 
 ; ---------------------------------------------------------------------------
 ; crpInclude (private, WP47)
@@ -407,7 +474,7 @@ crpInclude:
     jsr crpStageEvent
     jsr includeEventRecord
     bcs crpIncFail
-    jmp crpIncPush
+    jmp crpIncCommit
 
     ; --- Pass 2: replay, verifying correspondence ------------------------
 crpIncReplay:
@@ -419,6 +486,15 @@ crpIncReplay:
     stx CrpIncChildIndex
     jsr crpStageEvent
     jsr includeEventReplay
+    bcs crpIncFail
+
+crpIncCommit:
+    ; Commit the `.INCLUDE` statement's own (parent) physical line before
+    ; switching live traversal into the child -- this directive is excluded
+    ; from casmRunPass's ordinary post-dispatch commit (crpEmitDir), so it is
+    ; committed here instead, exactly once, regardless of which pass path
+    ; reached it. A commit failure prevents the push below.
+    jsr crpListingCommit
     bcs crpIncFail
 
 crpIncPush:
