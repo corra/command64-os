@@ -531,3 +531,98 @@ Completion does not activate WP52.
     -- that is Increment 6's `test_casm_listcap` job. This increment is
     build-clean and structurally reviewed against the plan's per-branch
     commit/no-commit rules, but functionally unverified until then.
+- 2026-08-03: Built Atomic Increment 6 (real-path capture harness and
+  regressions) -- build-clean, **not yet run under VICE**, per-user
+  established practice of doing that verification themselves (increments 3
+  and 4's own bugs were only ever found that way):
+  - New `tests/src/casm_listcap/casm_listcap.s`: the first thing anywhere
+    (test or production) to drive a real source/lexer/parser/emitter/include
+    two-pass assembly with listing capture genuinely enabled
+    (`listingCaptureInit`). Reimplements `casm.s`'s current
+    `casmRunPass`/`crpInclude`/`crpParentIdentity`/`crpStageEvent` dispatch
+    verbatim, including Increment 5's `crpListingBegin`/`crpListingCommit`
+    Pass-2-only gates -- this is precisely the wiring this harness exists to
+    prove. Seven fixtures: `fixEmpty`, `fixNewlineVariants` (CR/LF/CRLF,
+    shared expected record), `fixFinalUnterminated`, `fixDeferredData`
+    (`.BYTE`/`.WORD` lists plus a 255-character comment line for the Length
+    field's byte-sized boundary), `fixLabelsInclude` (label + `.INCLUDE`
+    zero-byte records, two levels of nesting, parent resume),
+    `fixRootsSynthetic` (two top-level roots, evidence fixture for the
+    synthetic-separator gap below), and `fixPrgIdentity` (the same source
+    assembled capture-off then capture-on, byte-compared).
+  - Deliberately scoped down from the plan's full per-increment checklist: no
+    dedicated "failure without partial commit" fixture through the real
+    driver (`test_casm_listing`'s own Increment 3/4 fixtures already prove
+    `listingMetaAppend`/`listingCommitLine`'s records-full behavior directly;
+    every fixture above already exercises Increment 5's new pass-mode-gated
+    commit wiring, the actual new risk surface). Not a dedicated 14/15-byte
+    boundary case either -- no architectural significance for those two
+    specific values was found in `common.inc` during planning, unlike 255
+    (`CASM_LISTING_META_LEN`'s hard one-byte cap), which the deferred-data
+    fixture's comment line does check.
+  - Comparison helpers: `lcReplayAndCompare`/`lcCompareRow` replay every
+    metadata record against a 17-byte-stride expected-row table (16 real
+    `CASM_LISTING_META_*` bytes plus one "check the Off field" flag --
+    included-frame records skip `OFF_LO/HI` since those live in `include.s`'s
+    own catalog-physical offset space, which this harness does not attempt
+    to hand-derive; root-level records' Off values are fully asserted).
+    `lcCaptureFileA`/`lcCaptureFileB`/`lcCompareBuffers` do a sequential
+    single-input-stream byte comparison (`fileio.s` only supports one open
+    input at a time) for the PRG-identity fixture.
+  - New production-adjacent fix bundled in, found during exploration rather
+    than invented: `diagnostics.s`'s `diagPrintFatal` range check still
+    capped at `CASM_DIAG_PHASE9_WP47_LAST` ($38), so the four WP51 listing
+    diagnostics ($39-$3C, added in Increment 1 with real message-table text)
+    silently rendered "CASM: INTERNAL ERROR" instead. Bumped to
+    `CASM_DIAG_PHASE10_WP51_LAST + 1`.
+  - Real bug found and fixed before any live testing, purely from full clean
+    rebuilds: the new `test_casm_listcap` target auto-joined `test.d64`'s own
+    `TEST_IMAGE_PRG_TARGETS` (discovered via the generic `tests/src/*/*.s`
+    glob) and overflowed it -- `test.d64` was already at the 1541
+    directory-entry ceiling per every prior WP44-47/51 harness that needed
+    its own disk for the same reason. Fixed with the same
+    `list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listcap)` pattern
+    those harnesses already established.
+  - CMake wiring: new `casm_listcap` branch in the generic ca65 test-target
+    loop (envelope `$4B00`, measured after `$4700` overflowed by 966 bytes);
+    twelve new fixtures added to `cmake/GenerateCasmTestFixtures.cmake`
+    (`casmlc01`-`casmlc10` plus `.INCLUDE`-referenced `casmlc7c`/`casmlc7g`,
+    bare disk names matching `test_casm_frame.s`'s own precedent, not
+    production CASM's ".S"-suffixed convention) and appended to
+    `casm_listing_test_d64` (now carrying `test_casm_listing` and
+    `test_casm_listcap` together, per that disk's own reserved-for-this-job
+    comment from Increment 3). Deliberately NOT added to the shared
+    `CASM_TEST_FIXTURES` list (that would re-trigger the `test.d64` overflow
+    above) -- `add_dependencies(casm_listing_test_d64 casm_test_fixtures)`
+    is what guarantees the shared generator script runs first, since that
+    script unconditionally (re)writes every fixture it defines regardless of
+    which ones are declared as its CMake-tracked `OUTPUT`.
+  - Verified so far: full clean rebuild (`rm -rf build`, reconfigure) and a
+    no-change rebuild (stable `casm`/`test_casm_listcap` build counters) both
+    succeed with zero errors, including `casm_listing_test_d64` itself.
+  - **User ran `test_casm_listcap` live under VICE: all seven fixtures pass**
+    (`CASM LISTCAP: PASS`), first attempt, no fixture bugs found this time
+    (unlike Increments 3-4, where live runs found real bugs on the first
+    try).
+  - `fixRootsSynthetic`'s result is itself a finding, not just a pass: for
+    the tested scenario (two real, non-empty root lines, the first missing
+    its terminator so `sourceLoad` inserts the synthetic separator), each
+    root's own line is correctly attributed to its own `FileId` at its own
+    real offset -- the synthetic separator byte correctly closes out the
+    *preceding* file's own trailing real content rather than misattributing
+    it to the next file or producing a spurious extra record. Read narrowly:
+    this does NOT prove `source.s` ever sets `SYNTHETIC_ONLY` (it still
+    doesn't, and nothing here required it to) -- it proves the one scenario
+    that could plausibly misattribute a record in practice is fine as is.
+    The only scenario left genuinely unexercised is a root file with truly
+    zero real content (where the synthetic separator's own "line" would have
+    nothing real to attach to) -- deliberately not built here since a
+    literal 0-byte SEQ fixture risks corrupting the disk image (per
+    tests/AGENTS.md's own prior incident). Given the tested case passes
+    clean, no `source.s` fix is being made in Increment 6; the empty-root
+    edge case is recorded here as a known, narrow, low-priority gap rather
+    than guessed at further.
+  - No `source.s` production changes were needed. Increment 6 is otherwise
+    complete: harness written, fixtures pass live, `diagPrintFatal` range fix
+    and the `test.d64` overflow fix both verified as part of the same clean
+    build/rebuild already recorded above.

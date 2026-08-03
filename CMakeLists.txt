@@ -621,6 +621,39 @@ if(Ca65_FOUND)
             # $4600 still overflowed by a further 97.
             set(TEST_PRG_SIZE "4700")
         endif()
+        if(TEST_NAME STREQUAL "casm_listcap")
+            # WP51 Increment 6: the same whole-object surface as casm_frame
+            # plus listing.s (already needed there since Increment 5), real
+            # diagnostics.s -- this harness reimplements casm.s's own
+            # casmRunPass/crpInclude/crpListingBegin/crpListingCommit
+            # dispatch verbatim to drive a real two-pass assembly with
+            # listing capture genuinely enabled, the first thing anywhere to
+            # do so. Does NOT link cli.s: its own two-slot stand-in
+            # CasmSourceNames/CasmSourceCount/cliSourceSlotLo/Hi, matching
+            # casm_frame.s's own precedent.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            # $4700 (casm_frame's own envelope) overflowed by 966 measured
+            # bytes -- this harness's own driver/fixture code and 15
+            # expected-record RODATA tables are substantially larger than
+            # casm_frame's.
+            set(TEST_PRG_SIZE "4B00")
+        endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
         list(APPEND TEST_TARGETS ${TEST_TARGET})
@@ -763,6 +796,9 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_frame)
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_event)
 # WP51 increment 3's listing harness joins it there for the same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listing)
+# WP51 increment 6's real-path capture harness: its own casm_listing_test_d64
+# disk, same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listcap)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1099,14 +1135,30 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source
 # fixture pairs) had no room left for another PRG. Carries
-# test_casm_listing (Increment 3: VMM allocation/metadata/replay); WP51
-# Increment 6 adds test_casm_listcap here alongside it.
+# test_casm_listing (Increment 3: VMM allocation/metadata/replay) and
+# test_casm_listcap (Increment 6: real-path capture harness), plus the
+# latter's own fixtures -- bare disk names (no ".S" suffix), matching
+# test_casm_frame.s's own precedent (these fixtures are consumed only by
+# this test harness's sourceLoad/`.INCLUDE`, not by production casm.s).
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS test_casm_listing
+    PRGS test_casm_listing test_casm_listcap
 )
+add_dependencies(casm_listing_test_d64 casm_test_fixtures)
+foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
+                             casmlc06 casmlc07 casmlc7c casmlc7g
+                             casmlc08 casmlc09 casmlc10)
+    add_custom_command(
+        TARGET casm_listing_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_LISTCAP_FIXTURE}" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${CASM_LISTCAP_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        COMMENT "Appending WP51 Increment 6 fixture ${CASM_LISTCAP_FIXTURE} to casm_listing_test.d64"
+        VERBATIM
+    )
+endforeach()
 
 # Real CASM assembly source, so these carry the ".s" on-disk suffix the CASM
 # source-fixture convention requires (unlike WP46's frame-harness fixtures,

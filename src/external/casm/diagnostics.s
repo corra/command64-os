@@ -107,6 +107,12 @@ diagPrintString:
 ; 2 diagnostic values $01-$13 are contiguous and index bounded parallel tables;
 ; zero, out-of-range, and $FF values use the unknown fallback.
 ;
+; WP51: the range check's upper bound tracks CASM_DIAG_PHASE10_WP51_LAST, not
+; CASM_DIAG_PHASE9_WP47_LAST -- Increment 1 added message-table entries and
+; text for $39-$3C (the four listing diagnostics) but the bound here was never
+; bumped alongside them, so printing any of those four fell through to the
+; generic "unknown" fallback despite real text existing for them.
+;
 ; Inputs:  A = CASM_DIAG_* identifier
 ; Outputs: none
 ; Flags:   undefined after diagPrintString
@@ -115,7 +121,7 @@ diagPrintString:
 diagPrintFatal:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE9_WP47_LAST + 1
+    cmp #CASM_DIAG_PHASE10_WP51_LAST + 1
     bcs dpfUnknown
     sec
     sbc #CASM_DIAG_INIT_FAILED

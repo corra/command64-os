@@ -1131,3 +1131,60 @@ file(WRITE "${OUTPUT_DIR}/casmif4.seq"
     "TARGET4:${CASM_LF}"
     "NOP${CASM_LF}"
 )
+
+# WP51 Increment 6: test_casm_listcap real-path listing-capture fixtures.
+# CASMLC01-CASMLC10 are top-level sources (loaded directly by sourceLoad,
+# bare disk names -- casm_frame.s's own precedent, not the ".S"-suffixed
+# convention); CASMLC7C.S/CASMLC7G.S are `.INCLUDE`-referenced children, so
+# their disk names and operand spellings must match exactly.
+
+# fixEmpty: the minimal non-empty SEQ file -- a bare CR, no other content.
+file(WRITE "${OUTPUT_DIR}/casmlc01.seq" "${CASM_CR}")
+
+# fixNewlineVariants: the same statement, CR/LF/CRLF terminated.
+file(WRITE "${OUTPUT_DIR}/casmlc02.seq" ".BYTE 65${CASM_CR}")
+file(WRITE "${OUTPUT_DIR}/casmlc03.seq" ".BYTE 65${CASM_LF}")
+file(WRITE "${OUTPUT_DIR}/casmlc04.seq" ".BYTE 65${CASM_CRLF}")
+
+# fixFinalUnterminated: no terminator at all before EOF.
+file(WRITE "${OUTPUT_DIR}/casmlc05.seq" ".ORG \$2000${CASM_CR}.BYTE 1,2,3")
+
+# fixDeferredData: .ORG / .BYTE list / .WORD list / a 255-character
+# comment-only line (the Length field's byte-sized boundary), each properly
+# terminated.
+string(REPEAT "X" 254 CASM_LC06_COMMENT_BODY)
+set(CASM_LC06_COMMENT ";${CASM_LC06_COMMENT_BODY}")
+file(WRITE "${OUTPUT_DIR}/casmlc06.seq"
+    ".ORG \$2000${CASM_CR}"
+    ".BYTE 1,2,3,4,5${CASM_CR}"
+    ".WORD \$1234,\$5678${CASM_CR}"
+    "${CASM_LC06_COMMENT}${CASM_CR}"
+)
+
+# fixLabelsInclude: parent/child/grandchild, proving label + `.INCLUDE`
+# zero-byte records, parent-before-child commit ordering, two levels of
+# nesting, and the parent's own resume after both children pop.
+file(WRITE "${OUTPUT_DIR}/casmlc07.seq"
+    ".ORG \$2000${CASM_CR}"
+    "START:${CASM_CR}"
+    ".INCLUDE \"CASMLC7C\"${CASM_CR}"
+    ".BYTE 9${CASM_CR}"
+)
+file(WRITE "${OUTPUT_DIR}/casmlc7c.seq"
+    ".BYTE 1,2${CASM_CR}"
+    ".INCLUDE \"CASMLC7G\"${CASM_CR}"
+)
+file(WRITE "${OUTPUT_DIR}/casmlc7g.seq"
+    ".BYTE 3${CASM_CR}"
+)
+
+# fixRootsSynthetic: two top-level roots, the first with no terminator at
+# all (forces sourceLoad's synthetic inter-root separator LF).
+file(WRITE "${OUTPUT_DIR}/casmlc08.seq" "LBL1:")
+file(WRITE "${OUTPUT_DIR}/casmlc09.seq" "LBL2:${CASM_CR}")
+
+# fixPrgIdentity: assembled twice (capture off, then on) and byte-compared.
+file(WRITE "${OUTPUT_DIR}/casmlc10.seq"
+    ".ORG \$2000${CASM_CR}"
+    ".BYTE 1,2,3,4,5${CASM_CR}"
+)
