@@ -652,3 +652,62 @@ Completion does not activate WP52.
     them except the passcheck `.cfg` size, which does not participate in
     the source hash).
   - No other envelope in this plan's touched set required a change.
+- 2026-08-03: Completed Atomic Increment 8 (static, artifact, cleanup, and
+  regression verification). Pure audit -- no source changes were needed;
+  every item below was checked against the plan's own contracts and found
+  already correct:
+  - `git diff --check` against the WP50 baseline (`4ae8b67`) across every
+    production and test file WP51 touched: clean, no whitespace errors.
+  - Swept `listing.s`, `source.s`, `emit.s`, `casm.s`, `diagnostics.s`,
+    `common.inc`, and both new test harnesses for leftover debug scaffolding
+    (the lettered diagnostic markers increments 3-4's own progress notes
+    describe using and removing): none found in any file.
+  - Carry/stack audit around raw emission, mirror flush, and commits:
+    - `emitByte` (`emit.s`): the stacked byte (`pha` before `emitRawByte`)
+      is popped exactly once on every path -- `pla` directly on success,
+      `tax`/`pla`/`txa` around the failure return (preserving
+      `emitRawByte`'s own diagnostic in `A` while still discarding the
+      stacked byte) -- matching the plan's documented byte-preservation
+      contract exactly.
+    - `listingMirrorByte` (`listing.s`): stacks `A` on entry; every one of
+      its four exit branches (disabled, no-transaction, store-full,
+      normal) pops it back exactly once before returning, so the stack
+      stays balanced regardless of which diagnostic (if any) is returned.
+    - `listingCommitLine`: both the success (`lclClearOk`) and
+      `listingMetaAppend`-failure paths clear `CasmListingTxnActive`
+      before returning, matching "transaction cleared regardless" in its
+      own header; the failure path stashes the diagnostic across the
+      clear with a `pha`/`pla` pair that balances correctly.
+    - No unbalanced stack or clobbered-diagnostic defect found in any of
+      the three.
+  - Compared static and R6 bytes/relocations capture off vs on: this is
+    exactly what `test_casm_listcap`'s `fixPrgIdentity` fixture already
+    does -- `runCaptureAssembly` always calls `relocInit`/`relocFinalize`
+    regardless of `EnableCapture`, so the R6 relocation table and footer
+    `relocFinalize` appends are part of both compared output files, not
+    just the raw emitted bytes; the fixture's full sequential byte
+    comparison (`lcCompareBuffers`) already covers both. User confirmed
+    this fixture passing live in Increment 6; no new run was needed since
+    no code changed here.
+  - Proved the six-slot VMM cleanup claim by inspection: exactly six
+    `vmmStoreAlloc` call sites exist in the entire `casm` source tree --
+    `source.s` (1), `symbols.s` (1), `reloc.s` (1), `include.s` (1, the
+    event log), and `listing.s` (2, metadata + byte mirror) -- confirming
+    listing.s added exactly two, not a third allocation (the plan's own
+    stop condition). `test_casm_listcap`'s `runCaptureAssembly` allocates
+    all six per fixture and calls `resourcesCleanup` after every one of
+    its seven fixtures; since `resourcesCleanup` sweeps the full registry
+    and every later fixture's fresh allocations succeeded live (Increment
+    6), a slot leak would have shown up as a real allocation failure well
+    before the 8-slot registry ceiling. Six live-in-use plus a two-slot
+    margin against the 8-slot ceiling is the true worst case anywhere in
+    this codebase today.
+  - Regression verification: `rm -rf build` + reconfigure builds every
+    target with zero errors and zero warnings, including `image_d64`,
+    `test_image_d64`, `casm_overflow_test_d64`, `casm_include_test_d64`,
+    and `casm_listing_test_d64`; a subsequent no-change rebuild held every
+    build counter stable for `casm`, `test_casm_pass1`,
+    `test_casm_passcheck`, `test_casm_frame`, `test_casm_listing`, and
+    `test_casm_listcap`.
+  - No DOX/build/behavior discrepancies found. Increment 8 is complete;
+    Increment 9 (implementation review and user walkthrough) is next.
