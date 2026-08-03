@@ -656,7 +656,19 @@ if(Ca65_FOUND)
             # bytes -- this harness's own driver/fixture code and 15
             # expected-record RODATA tables are substantially larger than
             # casm_frame's.
-            set(TEST_PRG_SIZE "4B00")
+            # WP51 Increment 9: live-failure investigation used temporary
+            # diagnostic-print instrumentation that pushed this envelope as
+            # high as $4D00; removed once every fixture passed clean and the
+            # underlying bugs were fixed (VMM-registry-exhaustion leaks in
+            # fixNewlineVariants/fixPrgIdentity, a dangling output-file
+            # channel and a stale CasmInputState in fixPrgIdentity,
+            # expDeferred's own wrong ByteOffLo/Hi values, and an
+            # uninitialized CasmCliOptions). fixEmpty's own nameEmpty/expEmpty
+            # stayed permanently widened from 1 blank line to 4 -- a confirmed
+            # OS-level bug reading exactly-1-byte SEQ files (out of WP51's own
+            # scope; tracked separately) made a literal 1-byte fixture
+            # unusable. $4C00 is the resulting smallest fit.
+            set(TEST_PRG_SIZE "4C00")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})

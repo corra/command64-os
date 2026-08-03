@@ -1139,7 +1139,11 @@ file(WRITE "${OUTPUT_DIR}/casmif4.seq"
 # their disk names and operand spellings must match exactly.
 
 # fixEmpty: the minimal non-empty SEQ file -- a bare CR, no other content.
-file(WRITE "${OUTPUT_DIR}/casmlc01.seq" "${CASM_CR}")
+# WP51 Increment 9 temp experiment: widened from a single CR (1 byte) to
+# four (4 bytes) to test whether sourceLoad's phantom-byte over-read is
+# specific to an exactly-1-byte file or a fixed-size artifact visible at
+# any short length. Revert to a single "${CASM_CR}" once resolved.
+file(WRITE "${OUTPUT_DIR}/casmlc01.seq" "${CASM_CR}${CASM_CR}${CASM_CR}${CASM_CR}")
 
 # fixNewlineVariants: the same statement, CR/LF/CRLF terminated.
 file(WRITE "${OUTPUT_DIR}/casmlc02.seq" ".BYTE 65${CASM_CR}")

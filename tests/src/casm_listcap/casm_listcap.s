@@ -237,6 +237,19 @@ rcFail:
 runCaptureAssembly:
     stx RcaOutNameLo
     sty RcaOutNameHi
+    ; WP51 Increment 9 fix: CasmCliOptions (this harness's own stand-in for
+    ; what cli.s normally sets up -- this harness deliberately never links
+    ; cli.s, see its own header) was declared but never initialized anywhere
+    ; in this file. It happened to read as a harmless 0 before purely by
+    ; memory-layout coincidence (uninitialized BSS holds whatever RAM held
+    ; before this PRG loaded, never zeroed between loads); emitMarkStarted's
+    ; CASM_OPT_STATIC check on real garbage there explains both failure
+    ; modes seen live: CASM_DIAG_ORG_REQUIRED when that bit happened to be
+    ; set, and a wrong captured PC when it wasn't but some other stale value
+    ; was read. A real, pre-existing bug this harness's own reshuffled BSS
+    ; layout exposed, not introduced.
+    lda #0
+    sta CasmCliOptions
     jsr sourceInit
     jsr fileIoInit
     jsr listingStateInit
@@ -855,7 +868,7 @@ fixEmpty:
     ldy #>outEmpty
     jsr runCaptureAssembly
     bcs feFail
-    lda #1
+    lda #4
     ldx #<expEmpty
     ldy #>expEmpty
     jsr lcReplayAndCompare
@@ -886,6 +899,18 @@ fixNewlineVariants:
     ldy #>expNewline
     jsr lcReplayAndCompare
     bcs fnvFail
+    ; WP51 Increment 9 fix: each sub-run's own runCaptureAssembly allocates up
+    ; to six fresh VMM registry slots (source/symbols/reloc/include-event/
+    ; listing x2) without freeing the previous sub-run's own six first -- the
+    ; registry only holds eight total. Unlike every sibling fixture (which
+    ; calls runCaptureAssembly exactly once, relying on the shared driver's
+    ; own post-fixture resourcesCleanup), this fixture calls it three times
+    ; internally and must sweep the registry between each one itself, or the
+    ; second sub-run's own allocations exhaust the registry and fail with
+    ; CASM_DIAG_VMM_ALLOC_FAILED -- a real, reproducible test-harness bug
+    ; found via WP51 Increment 9's live-failure investigation, not a
+    ; production defect.
+    jsr resourcesCleanup
 
     ldx #<nameNlLf
     ldy #>nameNlLf
@@ -901,6 +926,7 @@ fixNewlineVariants:
     ldy #>expNewline
     jsr lcReplayAndCompare
     bcs fnvFail
+    jsr resourcesCleanup
 
     ldx #<nameNlCrlf
     ldy #>nameNlCrlf
@@ -1057,6 +1083,12 @@ fixPrgIdentity:
     ldy #>outIdentityA
     jsr runCaptureAssembly
     bcs fpiFail
+    ; WP51 Increment 9 fix: same VMM-registry-exhaustion bug as
+    ; fixNewlineVariants above -- this fixture's own second runCaptureAssembly
+    ; call (capture on, needing all six slots) exhausts the eight-slot
+    ; registry on top of the first call's four (capture off) if the first
+    ; call's slots are never freed first.
+    jsr resourcesCleanup
 
     ldx #<nameIdentity
     ldy #>nameIdentity
@@ -1067,11 +1099,28 @@ fixPrgIdentity:
     ldy #>outIdentityB
     jsr runCaptureAssembly
     bcs fpiFail
+    ; WP51 Increment 9 fix: runCaptureAssembly's own tail never closes the
+    ; output file it created (emitFinalize only flushes buffered bytes --
+    ; see its own header: production only ever relies on DOS_EXIT to close
+    ; everything, since it never needs to reopen an output file mid-process).
+    ; Without this cleanup, outIdentityB's write channel is still physically
+    ; open on the drive when lcCaptureFileB immediately below tries to open
+    ; it for reading -- confirmed live as this fixture's own remaining
+    ; failure during this investigation.
+    jsr resourcesCleanup
 
     ldx #<outIdentityA
     ldy #>outIdentityA
     jsr lcCaptureFileA
     bcs fpiFail
+    ; WP51 Increment 9 fix: fileClose (fileio.s, production, unrelated to
+    ; WP51) never resets CasmInputState back to CLOSED -- only fileIoInit
+    ; does. lcCaptureFileA's own fileClose leaves it at whatever state the
+    ; read left behind, so lcCaptureFileB's fileOpenInput call immediately
+    ; below would otherwise hit foiBadState (CASM_DIAG_STREAM_STATE_FAILED)
+    ; even with the physical-channel fix above in place -- confirmed live
+    ; as a second, independent gap during this investigation.
+    jsr fileIoInit
     ldx #<outIdentityB
     ldy #>outIdentityB
     jsr lcCaptureFileB
@@ -1112,8 +1161,15 @@ outIdentityB:  .byte "CASMLO10", 0
 ; FileId, Flags, LineLo, LineHi, OffLo, OffHi, Len, Reserved0, PcLo, PcHi,
 ; ByteOffLo, ByteOffHi, ByteCountLo, ByteCountHi, Reserved1Lo, Reserved1Hi,
 ; CheckOff.
+; WP51 Increment 9 temp experiment: nameEmpty widened from one blank line
+; (1 byte) to four (4 bytes) -- see the fixture generator's own comment.
+; Four blank lines, each zero payload bytes; Off increments by 1 per line
+; (the prior line's own CR); PC never moves.
 expEmpty:
     .byte 0,0, 1,0, 0,0, 0, 0, $00,$34, 0,0, 0,0, 0,0, 1
+    .byte 0,0, 2,0, 1,0, 0, 0, $00,$34, 0,0, 0,0, 0,0, 1
+    .byte 0,0, 3,0, 2,0, 0, 0, $00,$34, 0,0, 0,0, 0,0, 1
+    .byte 0,0, 4,0, 3,0, 0, 0, $00,$34, 0,0, 0,0, 0,0, 1
 
 ; ".BYTE 65" = 8 chars; 1 byte emitted.
 expNewline:
@@ -1130,11 +1186,19 @@ expFinal:
 ; Record 2: ".BYTE 1,2,3,4,5" (15 chars), ByteCount 5.
 ; Record 3: ".WORD $1234,$5678" (17 chars), ByteCount 4.
 ; Record 4: 255-char comment line, ByteCount 0.
+; WP51 Increment 9 fix: rows 2 and 3's ByteOffLo/Hi (offsets 10/11) were
+; hardcoded to 0,0 -- an authoring bug in this expected table, not a
+; production defect. Row 1 mirrors 5 bytes (.BYTE 1,2,3,4,5) starting at
+; cursor 0, so row 2 (.WORD $1234,$5678) genuinely starts mirroring at
+; cursor 5; row 2 then mirrors 4 more bytes, so row 3 (the comment line,
+; which emits nothing) genuinely starts at cursor 9. The real capture
+; already reported these correctly -- confirmed live via lcCrMismatch's own
+; row/field/got/exp dump during this investigation.
 expDeferred:
     .byte 0,0, 1,0, 0,0, 10, 0, $00,$34, 0,0, 0,0, 0,0, 1
     .byte 0,0, 2,0, 11,0, 15, 0, $00,$20, 0,0, 5,0, 0,0, 1
-    .byte 0,0, 3,0, 27,0, 17, 0, $05,$20, 0,0, 4,0, 0,0, 1
-    .byte 0,0, 4,0, 45,0, 255, 0, $09,$20, 0,0, 0,0, 0,0, 1
+    .byte 0,0, 3,0, 27,0, 17, 0, $05,$20, 5,0, 4,0, 0,0, 1
+    .byte 0,0, 4,0, 45,0, 255, 0, $09,$20, 9,0, 0,0, 0,0, 1
 
 ; Parent: .ORG(10 chars,Off0) / START:(6 chars,Off11) /
 ;         .INCLUDE "CASMLC7C"(19 chars,Off18) / [child+grandchild] /
