@@ -23,7 +23,7 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
       routing verification.
 - [x] Increment 2: registry storage, explicit startup initialization, build,
       and zero-state verification.
-- [ ] Increment 3: registry helper implementation and contract verification.
+- [x] Increment 3: registry helper implementation and contract verification.
 - [ ] Increment 4: full regression, artifact audit, documentation, DOX, and
       user-confirmed walkthrough.
 
@@ -74,3 +74,28 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
   were zero again. Both sessions returned normally to `c64[8]:>`.
 - DOX closeout added and indexed `src/external/debug/AGENTS.md` to record the
   new durable VMM ownership and registry-initialization contracts.
+
+## Increment 3 Evidence
+
+- Added `parseReuHandle`, `findFreeReuHandle`, and `getReuRecord` with explicit
+  register, carry, selector, parser-position, and stack contracts.
+- Exported only the three helper labels at object-link scope for deterministic
+  monitor verification; this changed no runtime bytes or public OS API.
+- DEBUG build 1119 succeeded at 6,885 code bytes and 762 relocation points,
+  adding 102 helper bytes over Increment 2. Build 1118 had identical runtime
+  bytes; 1119 adds verification metadata only. `image_d64` built successfully.
+- Loaded-image tracing established `parseReuHandle=$39CE`,
+  `findFreeReuHandle=$3A01`, `getReuRecord=$3A15`, registry `$52D1-$52E4`, and
+  `inputBuf=$526C` for build 1119 at standard `$3800` load address.
+- `parseReuHandle` accepted inactive-permitted handle 2, returned inactive
+  selector 6 when active state was required, returned missing selector 2 for
+  empty input, and returned range selector 4 for handle 4. The internal mode
+  stack byte balanced on every path before the synthetic test RTS.
+- `findFreeReuHandle` returned the lowest free slots 0 and 2 for controlled
+  registry patterns, then returned registry-full selector 7 when all slots
+  were active.
+- `getReuRecord` returned `X=$AB`/`Y=$CD` for active handle 2, returned inactive
+  selector 6 for handle 1, and invalid-handle selector 5 for handle 4 while
+  preserving candidate `X` on both failures.
+- Verification used direct monitor-controlled helper invocation and terminated
+  the synthetic-stack session rather than resuming it. No VMM API was called.

@@ -8,7 +8,8 @@
         routing complete; malformed tokens rejected before stub dispatch
   - [x] Increment 2: 20-byte registry and explicit startup initialization;
         DEBUG build 1117 and VICE zero/reset/stub-preservation checks passed
-  - [ ] Increment 3: registry helper implementation and contract verification
+  - [x] Increment 3: all three registry helpers implemented; DEBUG build 1119
+        and direct VICE carry/register/selector path verification passed
   - [ ] Increment 4: regression, artifact audit, DOX, and walkthrough
   - [ ] Obtain explicit user confirmation before marking WP2 complete
 

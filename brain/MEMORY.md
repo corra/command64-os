@@ -62,7 +62,8 @@
   (`reuActive`, `reuSegHi`, `reuBank`, `reuParagraphLo`, and
   `reuParagraphHi`) for four local handles, adding exactly 20 bytes. Startup
   clears every field explicitly. No private zero-page or OS parameter-cell
-  ownership changed.
+  ownership changed. In DEBUG build 1119 at standard `$3800` load address, the
+  registry occupies `$52D1-$52E4`.
 - **DEBUG ca65 migration (historical build 1100)**: `debug.prg` builds from
   `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 had
   a matching `$2C00` header, R6 footer, 716 relocations, and loaded end `$4B36`.

@@ -61,6 +61,7 @@ REU_ERR_CLEANUP          = $0F
 REU_HANDLE_COUNT = 4
 
 .import __MAIN_START__
+.export parseReuHandle, findFreeReuHandle, getReuRecord
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -401,6 +402,95 @@ irrLoop:
     sta reuParagraphHi, x
     dex
     bpl irrLoop
+    rts
+
+; Parses one DEBUG-local REU handle.
+; In: Y = operand position; A=0 permits inactive, A<>0 requires active.
+; Out success: X=handle, Y after operand, A=0, C=0.
+; Out failure: A=REU_ERR_MISSING_ARG, REU_ERR_VALUE_RANGE, or
+; REU_ERR_INACTIVE_HANDLE; C=1. The mode stack byte is balanced on every path.
+parseReuHandle:
+    pha
+    jsr skipSpaces
+    lda inputBuf, y
+    beq prhMissing
+
+    jsr parseHexArg
+    bcs prhRange
+    lda HexValHi
+    bne prhRange
+    lda HexValLo
+    cmp #REU_HANDLE_COUNT
+    bcs prhRange
+    tax
+
+    pla
+    beq prhSuccess
+    lda reuActive, x
+    beq prhInactive
+prhSuccess:
+    lda #0
+    clc
+    rts
+
+prhMissing:
+    pla
+    lda #REU_ERR_MISSING_ARG
+    sec
+    rts
+prhRange:
+    pla
+    lda #REU_ERR_VALUE_RANGE
+    sec
+    rts
+prhInactive:
+    lda #REU_ERR_INACTIVE_HANDLE
+    sec
+    rts
+
+; Finds the lowest-numbered inactive registry slot.
+; Out success: X=handle, A=0, C=0. Out full: A=REU_ERR_REGISTRY_FULL, C=1.
+findFreeReuHandle:
+    ldx #0
+ffrhLoop:
+    lda reuActive, x
+    beq ffrhSuccess
+    inx
+    cpx #REU_HANDLE_COUNT
+    bcc ffrhLoop
+    lda #REU_ERR_REGISTRY_FULL
+    sec
+    rts
+ffrhSuccess:
+    lda #0
+    clc
+    rts
+
+; Returns an active registry record's raw VMM identity.
+; In: X=handle. Out success: X=SegHi, Y=Bank, A=0, C=0.
+; Out failure: A=REU_ERR_INVALID_HANDLE or REU_ERR_INACTIVE_HANDLE, C=1;
+; X remains the candidate handle.
+getReuRecord:
+    cpx #REU_HANDLE_COUNT
+    bcs grrInvalid
+    lda reuActive, x
+    beq grrInactive
+    lda reuBank, x
+    pha
+    lda reuSegHi, x
+    tax
+    pla
+    tay
+    lda #0
+    clc
+    rts
+grrInvalid:
+    lda #REU_ERR_INVALID_HANDLE
+    sec
+    rts
+grrInactive:
+    lda #REU_ERR_INACTIVE_HANDLE
+    sec
     rts
 
 cmdDump:
