@@ -5,10 +5,24 @@
   - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp4.md`
   - Branch: `feature/debug-reu-address-wp4` (based on `debug` after WP3
     merge, commit `597ec59`)
-  - Plan approved 2026-08-04; implementation not yet started
-  - [ ] Increment 1: `XS handle`
-  - [ ] Increment 2: bare `XS`
-  - [ ] Increment 3: regression, documentation, DOX, and walkthrough
+  - Plan approved 2026-08-04
+  - [x] Increment 1: `XS handle`; DEBUG build 1123 (7,615 code bytes, 893
+        relocation points); VICE-verified `XS handle` output is
+        byte-identical to that allocation's original `XA` line; invalid
+        (`XS 9`), inactive (freed then re-queried), and trailing-input
+        (`XS 1 EXTRA`) cases all reject before any OS call
+  - [x] Increment 2: bare `XS`; VICE-verified zero/one/two-allocation cases
+        print the correct rows or `NONE`; REU-disabled (post-reset, true
+        hardware-off state confirmed via `vmmInitialized` at `$1FA0`)
+        correctly shows `VMM INACTIVE` and all-zero counters
+  - [x] Increment 3: static grep confirmed zero `DOS_VMM_READ`/
+        `DOS_VMM_WRITE` call sites; BSS growth is exactly 24 bytes
+        (`sysInfoBuf`); `image_d64` and `test_image_d64` built with no
+        warnings; CHANGELOG.md and brain/MEMORY.md updated, including a
+        flagged (not fixed) finding that `ahGetSystemInfo`'s
+        `ALLOC=`/`FREE=` page counters are unstable across calls despite
+        `TOTAL`/`ALLOC`/`FREE` always summing correctly — root cause is in
+        `src/command64/api.asm`/`vmm.asm`, outside WP4's `debug.s` scope
 
 - [x] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
       syntax WP3 allocation lifecycle (`XA`/`XD`/`Q` cleanup)
