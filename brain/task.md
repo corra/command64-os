@@ -1,6 +1,17 @@
 # Project Tasks
 
-- [ ] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
+- [ ] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
+      syntax WP5 unified `XM` parsing and preflight
+  - Plan: `brain/plans/2026-08-06-debug-reu-address-syntax-wp5.md`
+  - Branch: `feature/debug-reu-address-wp5` (based on `debug` after WP4
+    merge, commit `b81afcf`)
+  - Plan approved 2026-08-06; implementation not yet started
+  - [ ] Increment 1: `parseVmmOffset` and flat/page equivalence
+  - [ ] Increment 2: full grammar and `requireEnd`
+  - [ ] Increment 3: window validation
+  - [ ] Increment 4: regression, documentation, DOX, and walkthrough
+
+- [x] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
       syntax WP4 status reporting (`XS`/`XS handle`)
   - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp4.md`
   - Branch: `feature/debug-reu-address-wp4` (based on `debug` after WP3
