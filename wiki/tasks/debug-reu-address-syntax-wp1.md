@@ -19,7 +19,7 @@ Taskwarrior UUID: `adfecaf3-212c-4e91-bcf5-f1c79f673eae`
 
 - [x] Increment 1: add the parser helpers and build the focused `debug` target.
 - [x] Increment 2: integrate and verify permissive `=` parsing in `G`.
-- [ ] Increment 3: integrate and verify permissive `=` parsing in shared `T`/`P`.
+- [x] Increment 3: integrate and verify permissive `=` parsing in shared `T`/`P`.
 - [ ] Increment 4: run focused regressions, artifact review, DOX closeout, and
       the user-confirmed walkthrough.
 
@@ -52,9 +52,35 @@ Taskwarrior UUID: `adfecaf3-212c-4e91-bcf5-f1c79f673eae`
 - VICE booted `build/image.d64`, proved the Command64 banner, and launched
   DEBUG 0.4.0 build 1113 by name from the shell.
 - Bare `G 5000` and `G=5000`, `G =5000`, `G= 5000`, and `G = 5000` all
-  executed the same safe `$5000` sentinel routine.
+  executed the same `$5000` sentinel routine. Increment 3 subsequently proved
+  that `$5000-$51C3` overlaps the current relocated DEBUG image, so Increment
+  4 must rerun this matrix at `$6000+` before final acceptance.
 - `G =`, `G ==`, `G =G000`, `G =10000`, `G =5000 EXTRA`,
   `G =0001:0000`, and `G 5000 EXTRA` printed `ERROR` and left the sentinel
   unchanged.
 - A no-argument `G` used the pre-established `currentAddr`, and `Q` returned
   to the `c64[8]:>` shell prompt.
+
+## Increment 3 Evidence
+
+- `cmdTraceProceedCommon` now parses into `HexValLo/Hi`, validates end-of-input,
+  and only then commits both bytes of `regPC`.
+- CMake built DEBUG build 1114 successfully: 6,595 code bytes and 723
+  relocation points inside the configured 8KB `MAIN` envelope; `image_d64`
+  also built successfully.
+- The first runtime setup used `$5000/$5100`, overwrote relocated DEBUG, and
+  produced invalid proceed evidence. It was classified as a setup failure;
+  the session was discarded and the one allowed clean recovery used `$6000+`.
+- Clean-recovery `T` and `P` tests accepted bare, `=address`, spaced-before,
+  spaced-after, and fully spaced forms. Five NOP steps advanced PC from `$6000`
+  through `$6005`; no-argument `T` advanced to `$6006`.
+- Missing, doubled, non-hex, five-digit, trailing-count, trailing-text, and
+  page-qualified operands printed `ERROR`. A following `R` proved `regPC`
+  remained `$6006` after all invalid `T` and `P` commands.
+- `P =6100` stepped over `JSR $6110` to `$6103` and incremented the `$6201`
+  subroutine sentinel. No-argument `P` then executed `INC $6200`, advanced to
+  `$6106`, and left both sentinels equal to `$01`.
+- Existing ROM handling remained unchanged: `T =D000` reported the ROM-target
+  error; `P =D000` used its established skip-and-display behavior.
+- `Q` returned to `c64[8]:>`. Increment 4 must correct the stale mirrored DEBUG
+  test-plan scratch-range guidance before final acceptance.

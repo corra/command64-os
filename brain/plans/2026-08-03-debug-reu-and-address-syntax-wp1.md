@@ -438,8 +438,10 @@ All emulator work must follow `.agents/workflows/vice-mcp-testing.md`.
 3. Boot Command64 first and prove the first line begins
    `Command 64-DOS Version`.
 4. Launch `debug` by name from the Command64 shell; never Autostart DEBUG.
-5. Establish safe test routines in the documented DEBUG scratch range, using
-   existing DEBUG commands or a CMake-built harness.
+5. Establish safe test routines at `$6000+`, using existing DEBUG commands or
+   a CMake-built harness. The older `$5000+` test-plan guidance overlaps the
+   current relocated DEBUG image through approximately `$51C3` and must not be
+   used until Increment 4 corrects the mirrored test plan.
 6. Use routines with deterministic effects:
    - An `RTS`-terminated routine with a memory sentinel for `G`.
    - A short safe-RAM instruction sequence with known next PCs for `T`.

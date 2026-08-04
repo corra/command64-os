@@ -9,8 +9,11 @@
   - [x] Increment 2: `G` integrated and verified under VICE on DEBUG build
         1113; valid bare/`=` forms matched, invalid forms did not execute, and
         no-argument behavior remained compatible
-  - [ ] Increment 3: integrate and verify shared `T`/`P`
+  - [x] Increment 3: shared `T`/`P` integrated and verified under VICE on
+        DEBUG build 1114; invalid forms preserved PC, trace/proceed behavior
+        and ROM handling remained compatible
   - [ ] Increment 4: focused regression, artifact review, DOX, and walkthrough
+        including safe `$6000+` rerun and stale test-plan range correction
   - [ ] Obtain explicit user confirmation before marking WP1 complete
 
 - [x] Taskwarrior UUID `13a45324`: CASM Phase 1 native application scaffold

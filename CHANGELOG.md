@@ -16,13 +16,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **DEBUG WP1 Increment 2 permissive `G =address` syntax**: `G` now accepts
-  optional MS-DOS-style `=` syntax with spaces before or after the delimiter,
-  while preserving bare-address and no-argument behavior. Complete-command
-  validation now rejects missing, malformed, page-qualified, oversized, and
-  trailing operands before changing the execution target or running code.
-  DEBUG build 1113 was verified through Command64 under VICE with a safe RAM
-  sentinel routine.
+- **DEBUG WP1 permissive execution-address syntax**: `G`, `T`, and `P` now
+  accept optional MS-DOS-style `=` syntax with spaces before or after the
+  delimiter, while preserving bare-address and no-argument behavior.
+  Complete-command validation rejects missing, malformed, page-qualified,
+  oversized, and trailing operands before execution or target-state mutation.
+  DEBUG build 1114 was verified through Command64 under VICE with safe-RAM
+  trace and proceed routines.
 - **CASM Phase 10 WP51 Listing Stores and Capture Events**: bumped to
   `V0.1.52`. Adds source-owned physical-line completion tracking
   (`sourceSetLineCapture`/`sourceTakeCompletedLine`), a new `listing.s`

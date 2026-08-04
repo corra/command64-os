@@ -1691,21 +1691,22 @@ cmdProceed:
     sta traceMode
 
 cmdTraceProceedCommon:
-    jsr skipSpaces
+    jsr parseOptionalEquals
     lda inputBuf, y
-    beq ctpcNoArgs
-    
+    bne ctpcParseAddr
+    bcs ctpcErr             ; '=' requires an address
+    jmp ctpcNoArgs
+
+ctpcParseAddr:
     jsr parseHexArg
+    bcs ctpcErr
+    jsr requireEnd
     bcs ctpcErr
     lda HexValLo
     sta regPC
     lda HexValHi
     sta regPC + 1
-    
-    jsr skipSpaces
-    lda inputBuf, y
-    bne ctpcErr
-    
+
 ctpcNoArgs:
     jsr launchProgram
     rts
