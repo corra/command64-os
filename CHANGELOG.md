@@ -22,7 +22,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Complete-command validation rejects missing, malformed, page-qualified,
   oversized, and trailing operands before execution or target-state mutation.
   DEBUG build 1114 was verified through Command64 under VICE with safe-RAM
-  trace and proceed routines.
+  trace and proceed routines. Corrected the mirrored DEBUG test plan: current
+  relocated DEBUG occupies approximately `$3800-$51C2`, so writable fixtures
+  now use the documented `$6000+` translation rule instead of stale
+  `$4000/$5000` examples.
 - **CASM Phase 10 WP51 Listing Stores and Capture Events**: bumped to
   `V0.1.52`. Adds source-owned physical-line completion tracking
   (`sourceSetLineCapture`/`sourceTakeCompletedLine`), a new `listing.s`

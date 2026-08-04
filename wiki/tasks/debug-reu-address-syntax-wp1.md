@@ -20,17 +20,17 @@ Taskwarrior UUID: `adfecaf3-212c-4e91-bcf5-f1c79f673eae`
 - [x] Increment 1: add the parser helpers and build the focused `debug` target.
 - [x] Increment 2: integrate and verify permissive `=` parsing in `G`.
 - [x] Increment 3: integrate and verify permissive `=` parsing in shared `T`/`P`.
-- [ ] Increment 4: run focused regressions, artifact review, DOX closeout, and
+- [x] Increment 4: run focused regressions, artifact review, DOX closeout, and
       the user-confirmed walkthrough.
 
 ## Acceptance
 
-- [ ] Valid bare and `=` forms select identical targets.
-- [ ] No-argument behavior remains unchanged.
-- [ ] Invalid `G` commands execute no target code.
-- [ ] Invalid `T` and `P` commands preserve `regPC` and breakpoint state.
-- [ ] DEBUG builds without warnings or errors and remains relocatable.
-- [ ] The user confirms the manual walkthrough before WP1 is marked complete.
+- [x] Valid bare and `=` forms select identical targets.
+- [x] No-argument behavior remains unchanged.
+- [x] Invalid `G` commands execute no target code.
+- [x] Invalid `T` and `P` commands preserve `regPC` and breakpoint state.
+- [x] DEBUG builds without warnings or errors and remains relocatable.
+- [x] The user confirmed the manual walkthrough on 2026-08-04.
 
 ## Increment 1 Evidence
 
@@ -84,3 +84,27 @@ Taskwarrior UUID: `adfecaf3-212c-4e91-bcf5-f1c79f673eae`
   error; `P =D000` used its established skip-and-display behavior.
 - `Q` returned to `c64[8]:>`. Increment 4 must correct the stale mirrored DEBUG
   test-plan scratch-range guidance before final acceptance.
+
+## Increment 4 Completion Candidate
+
+- Corrected all three mirrored test-plan safety gates with one authoritative
+  translation rule: legacy `$4000/$5000` fixtures move to `$6000+`,
+  `$4500/$5500` fixtures move to `$6500+`, and relocated loads use `$7000+`.
+- A no-change `debug` rebuild retained build 1114. `debug`, `image_d64`, and
+  `test_image_d64` all built successfully.
+- Static review confirmed 6,595 code bytes, 723 relocation points, the unchanged
+  8KB `MAIN` envelope, and no new zero-page or BSS ownership.
+- A fresh VICE 3.10 session reran the full `G`, `T`, and `P` matrix at
+  `$6000+`. Valid spacing forms were equivalent; no-argument behavior was
+  preserved; all malformed, oversized, page-qualified, count, and trailing
+  forms failed before execution or target-state mutation.
+- Final sentinels were `06 01 01`: six `G` executions, one proceeded caller
+  increment, and one proceeded subroutine increment. Invalid commands left
+  these values and the established trace/proceed PCs unchanged.
+- Existing ROM handling and `Q` shell return passed.
+- Walkthrough:
+  `brain/walkthroughs/2026-08-04-debug-reu-address-syntax-wp1.md`.
+- DOX closeout found no purpose, ownership, workflow, structural, or durable
+  contract change requiring an AGENTS update.
+- The user confirmed the walkthrough on 2026-08-04; Increment 4 and WP1 are
+  complete.
