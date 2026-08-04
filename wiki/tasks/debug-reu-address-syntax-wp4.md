@@ -37,7 +37,7 @@ Taskwarrior UUID: `4141acb7-d8a7-4cb1-babd-9628f24616df`
 - [x] No new VMM/system-info-adjacent private zero-page state; BSS growth
       is exactly 24 bytes (`sysInfoBuf`).
 - [x] DEBUG remains relocatable and inside its existing linker envelope.
-- [ ] The user confirms the walkthrough before WP4 is marked complete.
+- [x] The user confirms the walkthrough before WP4 is marked complete.
 
 ## Evidence
 

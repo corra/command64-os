@@ -26,6 +26,7 @@
   - [x] WP1 `G`/`T`/`P`/`Q` regression re-verified 2026-08-05 against build
         1123 using a checkpoint/register-based procedure (see WP3 entry
         below for the method); no longer a manual-only check
+  - [x] User confirmed WP4 completion on 2026-08-04
 
 - [x] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
       syntax WP3 allocation lifecycle (`XA`/`XD`/`Q` cleanup)

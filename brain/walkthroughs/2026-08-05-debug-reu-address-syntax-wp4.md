@@ -1,6 +1,6 @@
 # DEBUG REU/Address Syntax WP4 Walkthrough
 
-**Status:** Awaiting user confirmation
+**Status:** Confirmed by user 2026-08-04
 
 **Build:** DEBUG 0.4.0 build 1123
 
@@ -128,7 +128,8 @@ Expected: `VMM INACTIVE`, `PAGES TOTAL=0000 ALLOC=0000 FREE=0000`, `NONE`.
 
 ## Confirmation Gate
 
-Do not mark WP4 complete until the user confirms this walkthrough and
-accepts the unresolved MCT-scan caveat (Section above) as out-of-scope
-follow-up work rather than a WP4 blocker. The `G`/`T`/`P`/`Q` regression
-check is now fully automated evidence (Section above), not a manual item.
+The user confirmed this walkthrough on 2026-08-04, accepting the
+unresolved MCT-scan caveat (Section above) as out-of-scope follow-up work
+rather than a WP4 blocker. WP4 is marked complete in the wiki task,
+`brain/task.md`, and Taskwarrior UUID
+`4141acb7-d8a7-4cb1-babd-9628f24616df`.
