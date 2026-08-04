@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **DEBUG REU command guide**: Replaced the obsolete statement that `XA`,
+  `XD`, `XM`, and `XS` are unavailable with a detailed guide to VMM units,
+  page rounding, DEBUG's four-handle local registry, allocation ownership
+  limits, command grammar, output fields, cleanup behavior, boundary checks,
+  generic error reporting, and MS-DOS EMS differences. The guide explicitly
+  distinguishes `XS`'s system-wide page counters from its DEBUG-local records
+  and identifies the current WP5 `XM PREFLIGHT OK` result as validation only,
+  with no data transfer until WP6. Expanded the guide with a C64-RAM/REU memory
+  model, worked paragraph/page/padding and offset calculations, annotated
+  lifecycle and handle-reuse sessions, `XS` interpretation scenarios, exact-end
+  and overflow matrices, a sentinel-based no-transfer demonstration,
+  troubleshooting guidance, and a safe-operation checklist.
+
 ### Fixed
 
 - **DOS_GET_APP_INFO occupied-slot buffer corruption** ($5D, `src/command64/api.asm`): `ahGetAppInfo`'s occupied-slot write path used `STA (PrintPtrLo), X`, not a real 6502 addressing mode (only `(zp,X)`/`(zp),Y` exist); Kick Assembler silently assembled it as absolute,X off `PrintPtrLo`'s own zero-page address, so every field except `NameLen` was written into OS zero page instead of the caller's buffer, while `Carry` still reported success. Found via WP7 (Applications page) live testing — no automated test previously exercised an occupied slot. `PS`/`APPS` (`aptList`) is unaffected; it reads the app table directly and never used this addressing pattern. Fixed by rewriting all writes to real `(PrintPtrLo), Y` indirect-indexed addressing. See the WP3 plan's WP7 Amendment for detail.

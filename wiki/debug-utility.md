@@ -72,6 +72,485 @@ DEBUG uses a single-character command structure. All numerical values are in **h
 * **`T [address]`**: **Trace**. Single-steps exactly one instruction, restoring registers, executing, trapping via `BRK`, and printing the updated register context and next disassembled instruction.
 * **`P [address]`**: **Proceed**. Steps *over* subroutine calls (`JSR`), loops, or interrupts, executing the entire subroutine/loop without stopping and breaking on the instruction immediately following it.
 
+### REU Extended Memory
+
+The `X` command family gives DEBUG controlled access to Commodore REU memory
+through the Command64 OS Virtual Memory Manager (VMM). DEBUG never programs the
+REU DMA registers directly. All allocation and release operations use OS VMM
+services, and the current `XM` implementation validates a proposed transfer but
+does not yet move data.
+
+REU command operands are hexadecimal and must be separated by spaces. DEBUG
+accepts command letters and hexadecimal digits without regard to shifted or
+unshifted case.
+
+| Command | Purpose |
+| :--- | :--- |
+| **`XA paragraphs`** | Allocate REU storage and assign a DEBUG handle. |
+| **`XD handle`** | Release one allocation owned by this DEBUG session. |
+| **`XM handle offset address length direction`** | Validate a proposed transfer between an allocation and C64 memory. |
+| **`XS [handle]`** | Show VMM page counters and DEBUG allocation records, or one selected record. |
+
+#### Mental Model: C64 RAM and REU Memory
+
+The 6510 CPU can directly address only its 64 KiB C64 address space. REU memory
+is separate storage; an REU byte does not appear at a normal CPU address and
+cannot be inspected with `D` or changed with `E`. Data must be transferred
+between an REU allocation and a buffer in C64 RAM:
+
+```text
+                 Command64 VMM allocation
+                 selected by DEBUG handle
+                +-------------------------+
+REU storage     | allocation-relative     |
+(not directly   | offset                  |
+CPU-addressable)|                         |
+                +------------+------------+
+                             |
+                             | intended XM R/W transfer
+                             | (preflight-only in WP5)
+                             v
+                +------------+------------+
+C64 address     | ordinary C64 RAM buffer |
+space           | selected by address     |
+                +-------------------------+
+```
+
+This is why `XM` needs two addresses. The REU operand is an offset relative to
+the beginning of a DEBUG allocation. The C64 operand is an absolute address in
+the CPU's `$0000-$FFFF` address space. They describe opposite ends of one
+proposed transfer; neither is a substitute for the other.
+
+| Layer | Responsibility |
+| :--- | :--- |
+| **OS VMM** | Detects the REU, reserves contiguous 4 KiB pages, returns a starting segment/bank, releases allocations, and reports global page counts. |
+| **DEBUG registry** | Assigns handles `0`-`3` to allocations made by this DEBUG session and retains each exact paragraph request. |
+| **DEBUG command** | Parses operands and checks that a proposed operation stays inside both the selected allocation and C64 address space. Current WP5 `XM` stops after these checks. |
+
+#### REU Units and Addresses
+
+The REU and VMM use several related units. They are not interchangeable:
+
+| Field or unit | Meaning |
+| :--- | :--- |
+| **Paragraph** | 16 bytes. `XA` receives its requested size in paragraphs. |
+| **Page** | 4 KiB, or `$0100` paragraphs. The OS allocator reserves complete pages. |
+| **Handle** | A DEBUG-local selector from `0` through `3`. It is not an OS process ID, filename, or globally unique allocation number. |
+| **`SEG`** | High byte of the allocation's bank-relative VMM segment returned by the OS. |
+| **`BANK`** | VMM/REU bank containing the allocation start. Together, `SEG` and `BANK` identify the OS allocation for release and access. |
+| **Flat offset** | A 16-bit byte offset from the beginning of the selected allocation, from `$0000` through `$FFFF`. |
+| **Page-relative offset** | `page:offset`, where page is `$0-$F` and offset is `$000-$FFF`; DEBUG normalizes this to `page * $1000 + offset`. |
+
+An allocation request is rounded up to complete 4 KiB pages. For example,
+`XA 0001` requests 1 paragraph (16 bytes), reports `PARA=0001` and
+`SIZE=0010`, but consumes one complete VMM page. `XM` deliberately validates
+against the exact requested byte capacity (`PARA * 16`), not against unused
+space in the rounded page. The padding therefore cannot be accessed through
+that DEBUG handle.
+
+#### Worked Size Calculations
+
+Use these formulas to interpret an `XA` request:
+
+```text
+exact bytes    = paragraphs * $10
+reserved pages = (paragraphs + $00FF) / $0100
+reserved bytes = reserved pages * $1000
+```
+
+The page formula uses integer division. Adding `$00FF` before dividing rounds
+every partial page up to a complete page.
+
+| `XA` request | Exact capacity | Reserved pages | Reserved storage | Unaddressable padding |
+| :---: | ---: | ---: | ---: | ---: |
+| `0001` | `$0010` = 16 bytes | `01` | `$1000` = 4 KiB | `$0FF0` bytes |
+| `0100` | `$1000` = 4 KiB | `01` | `$1000` = 4 KiB | None |
+| `0101` | `$1010` = 4,112 bytes | `02` | `$2000` = 8 KiB | `$0FF0` bytes |
+| `0800` | `$8000` = 32 KiB | `08` | `$8000` = 32 KiB | None |
+| `1000` | `$10000` = 64 KiB | `10` | `$10000` = 64 KiB | None |
+
+For `XA 0101`, `XS` reports `PARA=0101 PAGES=02 SIZE=1010`. Although the OS
+must reserve `$2000` bytes, the handle's valid offsets stop at `$100F`. Offset
+`$1010` is the first byte outside the exact allocation and is rejected. The
+remaining `$0FF0` bytes are allocator padding, not extra capacity granted to
+the DEBUG user.
+
+#### Worked Offset Calculations
+
+Flat and page-relative offsets describe the same allocation-relative byte
+position:
+
+```text
+flat offset = page * $1000 + in-page offset
+```
+
+| Page-relative form | Calculation | Equivalent flat form |
+| :---: | :--- | :---: |
+| `0:000` | `$0 * $1000 + $000` | `0000` |
+| `0:FFF` | `$0 * $1000 + $FFF` | `0FFF` |
+| `1:000` | `$1 * $1000 + $000` | `1000` |
+| `1:234` | `$1 * $1000 + $234` | `1234` |
+| `F:FFF` | `$F * $1000 + $FFF` | `FFFF` |
+
+These commands select the same REU window:
+
+```text
+XM 0 1234 6000 0020 R
+XM 0 1:234 6000 0020 R
+```
+
+`SEG` and `BANK` are not entered in `XM`. They identify where the OS placed the
+allocation, while the `XM` offset identifies a byte within it. DEBUG combines
+its stored `SEG`/`BANK` record with the supplied offset. Treating `SEG` as an
+offset would select the wrong logical location.
+
+#### Allocation Records and Ownership
+
+DEBUG maintains four private allocation records. Each active record contains
+the handle, starting segment, bank, and requested paragraph count. These records
+exist only for allocations made by the current DEBUG invocation:
+
+* Bare `XS` obtains total, allocated, and free page counts from the OS, so those
+  counters describe the complete VMM.
+* The allocation rows following the counters come only from DEBUG's private
+  four-record registry. They do not enumerate allocations made by the OS or by
+  other applications.
+* Command64 currently does not attach an application name or owner identity to
+  an OS VMM allocation. DEBUG therefore cannot identify which application
+  accounts for pages visible only in the global counters.
+* A handle is valid only while its DEBUG record is active. Restarting DEBUG
+  creates a new, empty registry; old numeric handles have no meaning in the new
+  session.
+
+#### `XA paragraphs` - Allocate
+
+`XA` accepts `$0001-$1000` paragraphs, corresponding to 16 bytes through
+64 KiB of exact requested capacity. A successful allocation uses the lowest
+free DEBUG handle and prints:
+
+```text
+handle: SEG=xx BANK=xx PARA=xxxx PAGES=xx SIZE=xxxx
+```
+
+The fields mean:
+
+| Field | Interpretation |
+| :--- | :--- |
+| `handle` | DEBUG handle `00`-`03`; commands accept the equivalent one-digit form. |
+| `SEG` / `BANK` | Starting VMM address returned by `DOS_ALLOC_MEM`. |
+| `PARA` | Exact paragraph request supplied to `XA`. |
+| `PAGES` | Whole VMM pages reserved: `(paragraphs + $00FF) / $0100`, rounded down after the addition. |
+| `SIZE` | Exact requested capacity in bytes. `$1000` paragraphs is displayed as the five-digit value `10000` (64 KiB). |
+
+Examples:
+
+```text
+-XA 0001
+00: SEG=02 BANK=00 PARA=0001 PAGES=01 SIZE=0010
+
+-XA 0100
+01: SEG=03 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+
+-XA 1000
+02: SEG=04 BANK=00 PARA=1000 PAGES=10 SIZE=10000
+```
+
+`XA 0000` and values above `1000` are rejected. A fifth simultaneous
+allocation is rejected because all four DEBUG handles are in use, even if the
+OS still has free REU pages. Conversely, allocation can fail before all DEBUG
+handles are occupied if the VMM is unavailable or lacks a sufficiently large
+contiguous page run.
+
+#### `XD handle` - Release
+
+`XD` releases one active DEBUG allocation through `DOS_FREE_MEM`. Handles range
+from `0` through `3`. Success is silent and clears the local record; the next
+`XA` may reuse that handle. Invalid, inactive, and out-of-range handles are
+rejected.
+
+```text
+-XD 1
+-XS 1
+ERROR
+```
+
+If the OS rejects the release, DEBUG leaves the record active so it remains
+visible and the operation can be retried. This prevents a failed free from
+being mistaken for a successful release.
+
+#### `XS [handle]` - Status
+
+`XS handle` prints the selected active record in exactly the same format as its
+original `XA` result:
+
+```text
+-XS 1
+01: SEG=03 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+```
+
+Bare `XS` prints global VMM state and then DEBUG-local records:
+
+```text
+-XS
+VMM ACTIVE
+PAGES TOTAL=1000 ALLOC=0002 FREE=0FFE
+00: SEG=02 BANK=00 PARA=0001 PAGES=01 SIZE=0010
+01: SEG=03 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+```
+
+The counter values above are illustrative; OS services and other applications
+may already own pages before DEBUG starts.
+
+`TOTAL`, `ALLOC`, and `FREE` count 4 KiB pages in hexadecimal. `TOTAL=1000`
+therefore means 4096 pages, not 4096 bytes. `ALLOC + FREE` should equal
+`TOTAL`. If no DEBUG records are active, `XS` prints `NONE`; this does not prove
+that the global VMM has no allocations. Compare `ALLOC` with the listed DEBUG
+rows, accounting for page rounding, to detect pages allocated elsewhere.
+
+The current OS page-count reporting has a known unresolved stability issue:
+`ALLOC` and `FREE` have been observed to change unexpectedly between status
+queries, although their sum continues to equal `TOTAL`. Treat these counters as
+diagnostic data rather than an ownership ledger.
+
+#### `XM ... R|W` - Transfer Preflight
+
+The complete grammar is:
+
+```text
+XM handle offset address length R
+XM handle page:offset address length W
+```
+
+`handle` selects an active DEBUG allocation. `offset` is allocation-relative;
+it may be a flat 16-bit byte offset or a `page:offset` pair. `address` is a
+16-bit C64 address and `length` is a nonzero 16-bit byte count.
+
+Direction is stated from the C64 CPU's perspective:
+
+| Direction | Intended data flow |
+| :---: | :--- |
+| `R` | Read from the selected REU allocation into C64 memory. |
+| `W` | Write from C64 memory into the selected REU allocation. |
+
+Before accepting the command, DEBUG proves both half-open windows are valid:
+
+```text
+REU window: [allocation offset, allocation offset + length)
+C64 window: [C64 address, C64 address + length)
+```
+
+The REU window must fit within the exact `PARA * 16` capacity. The C64 window
+may end exactly at `$10000` (for example, `$FF00` plus `$0100`) but may not wrap
+through `$0000`. The page-relative form requires page `$0-$F` and an in-page
+offset no greater than `$0FFF`. A zero length, trailing operand, unknown
+direction, inactive handle, or either overflowing window is rejected before
+any VMM transfer service can be called.
+
+```text
+-XM 0 0000 6000 0010 R
+XM PREFLIGHT OK
+
+-XM 0 0:000 6000 0010 W
+XM PREFLIGHT OK
+```
+
+**Current limitation:** `XM PREFLIGHT OK` means only that parsing and both
+window checks succeeded. The current WP5 implementation does not call
+`DOS_VMM_READ` or `DOS_VMM_WRITE` and does not alter C64 or REU memory. Actual
+chunked transfer is reserved for WP6. Do not use the success message as evidence
+that data moved.
+
+#### Session Cleanup
+
+`Q` attempts to release every active DEBUG allocation before returning to the
+shell. It checks all four records even if one release fails. Successfully freed
+records are cleared; failed records remain active. If any allocation remains,
+DEBUG prints `ERROR` and stays running so `XS` can inspect the state and `XD` or
+`Q` can retry cleanup. This behavior avoids silently leaking a known allocation.
+
+An abnormal exit, reset, crash, or execution path that bypasses `Q` cannot run
+this cleanup. The OS does not currently reclaim VMM allocations by application
+owner, so such allocations can remain reserved until explicitly freed or until
+the VMM is reinitialized.
+
+#### Complete Session: Allocate, Inspect, Validate, and Release
+
+This session requests 4 KiB, examines the resulting record, validates both
+intended transfer directions, releases the allocation, and confirms that its
+handle is inactive:
+
+```text
+-XA 0100
+00: SEG=02 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+```
+
+Handle `0` now represents exactly `$1000` bytes at allocation-relative offsets
+`$0000-$0FFF`. `SEG=02 BANK=00` is the placement chosen by the OS; later
+commands use handle `0`, not those placement fields.
+
+```text
+-XS 0
+00: SEG=02 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+
+-XM 0 0000 6000 0100 W
+XM PREFLIGHT OK
+```
+
+The proposed `W` would copy `$0100` bytes from C64 `$6000-$60FF` to allocation
+offsets `$0000-$00FF`. Under WP5 this is validation only, so neither range is
+modified.
+
+```text
+-XM 0 0:F00 7000 0100 R
+XM PREFLIGHT OK
+```
+
+The proposed `R` would copy the allocation's final `$0100` bytes, offsets
+`$0F00-$0FFF`, into C64 `$7000-$70FF`. The transfer ends exactly at allocation
+offset `$1000`, so the half-open window fits.
+
+```text
+-XD 0
+-XS 0
+ERROR
+```
+
+`XD` is silent on success. The subsequent error is expected: handle `0` is no
+longer active.
+
+#### Complete Session: Multiple Handles and Slot Reuse
+
+DEBUG always assigns the lowest inactive handle:
+
+```text
+-XA 0001
+00: SEG=02 BANK=00 PARA=0001 PAGES=01 SIZE=0010
+-XA 0100
+01: SEG=03 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+-XA 0200
+02: SEG=04 BANK=00 PARA=0200 PAGES=02 SIZE=2000
+
+-XD 1
+-XA 0080
+01: SEG=03 BANK=00 PARA=0080 PAGES=01 SIZE=0800
+```
+
+The new allocation reuses DEBUG handle `1`. Its `SEG`/`BANK` may or may not
+match the previous allocation because placement is decided independently by the
+OS allocator. Never assume that reusing a handle also reuses an REU address or
+preserves old data.
+
+#### Reading Bare `XS` in Different Situations
+
+The rows and counters answer different questions:
+
+| Observation | Interpretation |
+| :--- | :--- |
+| `VMM INACTIVE`, zero counters, `NONE` | The OS VMM is unavailable, normally because no supported REU was detected at initialization. `XA` cannot succeed. |
+| `VMM ACTIVE`, `ALLOC=0000`, `NONE` | The VMM is available and currently reports no reserved pages; DEBUG owns no records. |
+| `VMM ACTIVE`, nonzero `ALLOC`, one or more rows | The counters include every OS allocation; the rows describe only allocations made by this DEBUG session. |
+| `VMM ACTIVE`, nonzero `ALLOC`, `NONE` | Pages are reserved outside the current DEBUG registry, or remain from an abnormal lifecycle. DEBUG cannot name their owner or release them by a DEBUG handle. |
+| Rows account for fewer pages than `ALLOC` | The difference belongs outside this DEBUG registry. Account for each row using its `PAGES` field, not `PARA`. |
+
+For example:
+
+```text
+VMM ACTIVE
+PAGES TOTAL=1000 ALLOC=0005 FREE=0FFB
+00: SEG=04 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+01: SEG=05 BANK=00 PARA=0101 PAGES=02 SIZE=1010
+```
+
+The two rows account for three pages (`01 + 02`), while `ALLOC=0005` reports
+five globally allocated pages. The remaining two pages are outside this DEBUG
+session. Nothing in this output identifies the allocating application.
+
+#### Boundary Examples
+
+Assume handle `0` came from `XA 0100`, giving exact offsets `$0000-$0FFF`:
+
+| Command | Result | Reason |
+| :--- | :---: | :--- |
+| `XM 0 0FF0 6000 0010 R` | `XM PREFLIGHT OK` | REU end is exactly `$1000`; final included offset is `$0FFF`. |
+| `XM 0 0FF0 6000 0011 R` | `ERROR` | REU end would be `$1001`, one byte beyond capacity. |
+| `XM 0 1000 6000 0001 R` | `ERROR` | The starting offset is already at the exclusive end. |
+| `XM 0 0:FFF 6000 0001 R` | `XM PREFLIGHT OK` | One byte at the last position of page 0 fits. |
+| `XM 0 1:000 6000 0001 R` | `ERROR` | Flat offset `$1000` is outside this one-page exact capacity. |
+| `XM 0 10:000 6000 0001 R` | `ERROR` | Page `$10` is outside the grammar's `$0-$F` range. |
+| `XM 0 0:1000 6000 0001 R` | `ERROR` | In-page offset `$1000` exceeds `$0FFF`. |
+| `XM 0 0000 FF00 0100 R` | `XM PREFLIGHT OK` | C64 window ends exactly at `$10000`; final included address is `$FFFF`. |
+| `XM 0 0000 FF00 0101 R` | `ERROR` | C64 window would wrap to `$0000`. |
+| `XM 0 0000 6000 0000 R` | `ERROR` | Zero-length transfers are not meaningful and are rejected. |
+
+For a padded `XA 0101` allocation, offsets `$0000-$100F` are valid even though
+two pages were reserved:
+
+```text
+-XM 0 100F 6000 0001 R
+XM PREFLIGHT OK
+-XM 0 1010 6000 0001 R
+ERROR
+```
+
+The second command cannot use allocator padding merely because `PAGES=02`.
+
+#### Demonstrating WP5's No-Transfer Behavior
+
+This session places recognizable bytes in C64 RAM, performs a valid `R`
+preflight that would overwrite them if DMA occurred, and dumps the bytes again:
+
+```text
+-XA 0100
+00: SEG=02 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+-E 6000 AA 55 12 34
+-D 6000 L 0004
+6000: AA 55 12 34
+-XM 0 0000 6000 0004 R
+XM PREFLIGHT OK
+-D 6000 L 0004
+6000: AA 55 12 34
+```
+
+The unchanged sentinel confirms the current behavior: `XM` parsed and validated
+the command, but did not read from the REU. A `W` preflight likewise does not
+write C64 data into REU storage. After WP6 implements chunked transfers, this
+example must be revised because a successful `R` will then replace the C64
+sentinel with REU data.
+
+#### Troubleshooting REU Commands
+
+Because DEBUG currently prints generic `ERROR`, diagnose failures from command
+state and boundaries:
+
+| Symptom | Likely cause | Check | Corrective action |
+| :--- | :--- | :--- | :--- |
+| `XA` fails immediately | VMM inactive, invalid paragraph count, or malformed/trailing input | Run bare `XS`; verify `$0001-$1000` and spaces between operands | Enable/configure an REU before OS boot, or correct the request. |
+| Fifth `XA` fails while `FREE` is nonzero | All four DEBUG registry slots are active | Run bare `XS` and count rows | Release an unneeded handle with `XD`; OS free pages do not increase DEBUG's four-handle limit. |
+| `XA` fails with a free handle and nonzero `FREE` | No sufficiently large contiguous page run, or unstable OS counter data | Compare requested `PAGES` with status; try a smaller request | Release allocations or reboot/reinitialize only when safe. Do not assume total free pages are contiguous. |
+| `XD`, `XS handle`, or `XM` fails | Handle is malformed, outside `0`-`3`, or inactive | Run bare `XS` and inspect listed handles | Use an active listed handle; handles from a previous DEBUG session are invalid. |
+| `XM` fails near allocation end | Offset plus length exceeds exact `SIZE` | Convert `PARA * $10`; compare the exclusive end | Reduce offset or length. Do not calculate from rounded `PAGES`. |
+| `XM` fails near `$FFFF` | C64 address plus length wraps beyond `$10000` | Calculate the exclusive C64 end | Reduce length or choose a lower C64 address. |
+| `XM` prints `XM PREFLIGHT OK` but memory is unchanged | Expected WP5 behavior; no transfer call exists | Dump the C64 buffer before and after | Treat success as validation only until WP6 is implemented. |
+| `Q` prints `ERROR` and DEBUG remains open | At least one OS release failed | Run `XS` to see records that remain active | Retry `XD handle` or `Q`; do not force exit if preserving allocator state matters. |
+| Bare `XS` prints `NONE` but `ALLOC` is nonzero | Allocations exist outside DEBUG's local registry | Compare global `ALLOC` with listed rows | DEBUG cannot identify or release those allocations by local handle. |
+
+#### Safe Operating Checklist
+
+* Use `XS` before allocating to establish VMM availability and a diagnostic
+  baseline.
+* Calculate exact capacity from `PARA`; use `PAGES` only to understand physical
+  VMM consumption.
+* Keep track of each handle's purpose. A handle identifies a DEBUG record, not
+  an application or permanent REU address.
+* Validate the final byte on both sides: `offset + length - 1` for REU and
+  `address + length - 1` for C64 RAM.
+* Until WP6 lands, regard `XM PREFLIGHT OK` as syntax and bounds confirmation
+  only.
+* Release individual allocations with `XD` when finished and leave DEBUG through
+  `Q` so its cleanup pass runs.
+* After a cleanup error, inspect with `XS` and retry rather than assuming the
+  allocation was freed.
+
 ---
 
 ## Examples in Action
@@ -517,6 +996,15 @@ DEBUG reports errors with a brief message followed by a return to the `-` prompt
 | `error: cannot trace target in ROM` | `T`, `P` | The decoded next-instruction target falls entirely within ROM (`$A000–$BFFF` or `$D000–$FFFF`), so no software breakpoint can be written. |
 | `unknown register` | `R` | The register name provided is not one of `A`, `X`, `Y`, `P`, `S`, or `PC`. |
 | `value out of range` | `R` | A 16-bit entry was expected but a value larger than `$FFFF` was entered, or a byte entry received a value larger than `$FF`. |
+| `ERROR` | `XA` | Missing or trailing input; paragraph count outside `$0001-$1000`; all four DEBUG handles active; VMM unavailable; or no suitable contiguous allocation. |
+| `ERROR` | `XD` | Missing, malformed, out-of-range, or inactive handle; trailing input; or OS release failure. A failed OS release leaves the record active. |
+| `ERROR` | `XS` | Malformed, out-of-range, or inactive handle; trailing input; or failure obtaining OS system information. |
+| `ERROR` | `XM` | Missing or trailing input; malformed value; inactive handle; invalid `page:offset`; zero length; direction other than `R`/`W`; REU window beyond exact allocation capacity; or C64 window wrapping beyond `$FFFF`. |
+| `ERROR` | `Q` | At least one active DEBUG allocation could not be released. DEBUG remains running and preserves each failed record. |
+
+REU handlers internally distinguish these cases, but the current user interface
+renders all of them as the generic uppercase `ERROR`. Inspect the command and,
+where applicable, use `XS` to distinguish registry state from VMM availability.
 
 ---
 
@@ -555,7 +1043,6 @@ C64 `DEBUG` omits the `=` prefix. The entry address is always the first bare hex
 | :---: | :--- |
 | **`I port`** | MS-DOS input-from-port instruction. The 6502 has no `IN` opcode; all I/O is memory-mapped. Use `D` or `E` on the relevant SID/VIC/CIA address instead. |
 | **`O port byte`** | MS-DOS output-to-port instruction. Same reason as `I`; write to the memory-mapped register directly. |
-| **`XA`**, **`XD`**, **`XM`**, **`XS`** | EMS (Expanded Memory Specification) commands. Not applicable; C64 extended memory (REU) is managed by the OS VMM, not DEBUG. |
 
 ### Behavioral Differences from MS-DOS DEBUG
 
@@ -569,6 +1056,7 @@ C64 `DEBUG` omits the `=` prefix. The entry address is always the first bare hex
 | **Numeric output radix** | Always hexadecimal; prefix `0x` not used. | Same — all values are hexadecimal, no prefix. |
 | **`D` row width** | 16 bytes per row. | 8 bytes per row (optimized for the 40-column C64 display). |
 | **PETSCII character column** | ASCII character column beside hex bytes. | PETSCII character column beside hex bytes (printable PETSCII `$20–$7E`). |
+| **Extended-memory commands** | `XA`, `XD`, `XM`, and `XS` operate on EMS handles and pages. | The command names are retained, but they operate on Commodore REU storage through Command64 VMM services. Handles and address semantics are Command64-specific; current `XM` performs preflight only. |
 
 ---
 
