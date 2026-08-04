@@ -662,6 +662,9 @@ malformed `X` tokens are rejected without state changes.
 
 ### WP3: Allocation Lifecycle
 
+Detailed implementation plan:
+`brain/plans/2026-08-05-debug-reu-address-syntax-wp3.md`.
+
 1. Implement `XA` preflight validation and slot selection.
 2. Call `DOS_ALLOC_MEM` and register successful grants.
 3. Roll back an unregistrable successful grant.
