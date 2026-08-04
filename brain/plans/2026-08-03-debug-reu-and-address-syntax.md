@@ -713,6 +713,9 @@ forms produce the same normalized state.
 
 ### WP6: Chunked `XM` Transfers
 
+Detailed implementation plan:
+`brain/plans/2026-08-06-debug-reu-address-syntax-wp6.md`.
+
 1. Implement chunk selection with a maximum of 256 bytes.
 2. Implement `stageReuTransfer`.
 3. Implement `advanceReuTransfer`.

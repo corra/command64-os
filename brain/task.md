@@ -1,5 +1,24 @@
 # Project Tasks
 
+- [ ] Taskwarrior (`2386a65f-c972-4f69-8c83-0b4032a8fd97`): DEBUG REU/address
+      syntax WP6 chunked `XM` transfers
+  - Plan: `brain/plans/2026-08-06-debug-reu-address-syntax-wp6.md`
+  - Branch: `feature/debug-reu-address-wp6` (based on `debug` after WP5
+    merge, commit `28ae49f`)
+  - Plan approved 2026-08-06; implementation not yet started
+  - Precise envelope headroom confirmed: 159 bytes free before this WP
+    (debug.s has no separate BSS segment, so `reloc.py`'s 8,033 code-byte
+    figure for build 1124 already is the true `MAIN` footprint). Plan
+    expands `MAIN` from `$2000` to `$2400` (`CMakeLists.txt:185`) as a
+    prerequisite, keeping DEBUG's occupied range at `$3800-$5C00` with a
+    1024-byte margin below the `$6000` test-fixture convention.
+  - [ ] Increment 0: envelope expansion
+  - [ ] Increment 1: `stageReuTransfer`/`advanceReuTransfer`
+  - [ ] Increment 2: transfer loop and real DMA
+  - [ ] Increment 3: partial-failure path (static review only — no safe
+        live fault-injection trigger identified; agreed with user)
+  - [ ] Increment 4: regression, documentation, DOX, and walkthrough
+
 - [x] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
       syntax WP5 unified `XM` parsing and preflight
   - Plan: `brain/plans/2026-08-06-debug-reu-address-syntax-wp5.md`
