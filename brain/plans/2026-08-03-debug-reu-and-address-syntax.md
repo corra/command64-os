@@ -646,6 +646,9 @@ not execute or change target state.
 
 ### WP2: Extended Dispatch and REU Registry
 
+Detailed implementation plan:
+`brain/plans/2026-08-04-debug-reu-address-syntax-wp2.md`.
+
 1. Add exact `X` subcommand dispatch.
 2. Add registry BSS and explicit startup initialization.
 3. Add `parseReuHandle`.

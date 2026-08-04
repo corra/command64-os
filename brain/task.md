@@ -1,5 +1,16 @@
 # Project Tasks
 
+- [/] Taskwarrior (`91036469-8479-4a27-83ab-e74158f2fdea`): DEBUG REU/address
+      syntax WP2 extended dispatch and registry foundation
+  - Plan: `brain/plans/2026-08-04-debug-reu-address-syntax-wp2.md`
+  - Branch: `feature/debug-reu-address-wp2`
+  - [x] Increment 1: exact dispatch, stubs, selectors, build 1116, and VICE
+        routing complete; malformed tokens rejected before stub dispatch
+  - [ ] Increment 2: registry storage and explicit startup initialization
+  - [ ] Increment 3: registry helper implementation and contract verification
+  - [ ] Increment 4: regression, artifact audit, DOX, and walkthrough
+  - [ ] Obtain explicit user confirmation before marking WP2 complete
+
 - [x] Taskwarrior (`adfecaf3-212c-4e91-bcf5-f1c79f673eae`): DEBUG REU/address
       syntax WP1 parser foundation and permissive `=`
   - Plan: `brain/plans/2026-08-03-debug-reu-and-address-syntax-wp1.md`
