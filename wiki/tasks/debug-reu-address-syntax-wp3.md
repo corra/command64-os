@@ -75,10 +75,15 @@ Static verification: `grep` confirms zero `DOS_VMM_READ`/`DOS_VMM_WRITE`/
 bytes (`reuXferParaLo`, `reuXferParaHi`, `reuXferSlot`) beyond WP2's
 20-byte registry; `image_d64` and `test_image_d64` both build clean.
 
-Not re-verified in this pass: WP1's `G`/`T`/`P` smoke tests. A first
-attempt reused `$6000`/`$6100` as safe execution targets without first
-poking fixture bytes there (unlike the stateful VICE session WP1/WP2 used),
-which crashed the fresh `image.d64` boot back to BASIC — a test-setup gap,
-not a WP3 code change, since `cmdGo`/`cmdTraceProceedCommon` are untouched
-by this work package. Flagged for the user to confirm via the manual
-walkthrough.
+**Update 2026-08-05**: WP1's `G`/`T`/`P` smoke tests are now re-verified
+by an automated checkpoint/register-based procedure (non-temporary `exec`
+checkpoints at `$6000` and DEBUG's computed breakpoint target `$6101`,
+inspected via `vice_read_registers`/`vice_read_memory` instead of
+screen-text OCR), replacing the earlier manual-only re-check. See
+`brain/walkthroughs/2026-08-05-debug-reu-address-syntax-wp3.md`'s "WP1
+`G`/`T`/`P` Regression: Now Automated" section for the full method,
+including the finding that temporary checkpoints did not reliably hold
+execution for inspection in this MCP. (An initial attempt in this pass
+had reused `$6000`/`$6100` without poking fixture bytes first, crashing a
+fresh boot back to BASIC — a test-setup gap, not a WP3 code defect, since
+`cmdGo`/`cmdTraceProceedCommon` are untouched by this work package.)

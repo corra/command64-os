@@ -565,6 +565,18 @@ prasCrLf:
     jsr KernalChROUT
     rts
 
+; WP4: stages an active registry slot for display and prints one XA-format
+; summary line for it via printReuAllocSummary.
+; In: X = an active registry slot.
+; Clobbers: A, X, Y; reuXferSlot and reuXferParaLo/Hi (already scratch).
+printReuStatusOne:
+    stx reuXferSlot
+    lda reuParagraphLo, x
+    sta reuXferParaLo
+    lda reuParagraphHi, x
+    sta reuXferParaHi
+    jmp printReuAllocSummary
+
 ; WP3: XD handle - release a DEBUG-owned VMM block.
 ; In: Y = operand position (leading spaces already skipped by cmdExtended).
 cmdReuFree:
@@ -604,8 +616,98 @@ crfFreeFailed:
 
 cmdReuMove:
     jmp reuStub
+
+; WP4: XS [handle] - report VMM/registry status.
+; In: Y = operand position (leading spaces already skipped by cmdExtended).
 cmdReuStatus:
-    jmp reuStub
+    lda inputBuf, y
+    bne crsHandleForm
+    jmp crsSystemForm
+
+crsHandleForm:
+    lda #1                  ; require an active handle
+    jsr parseReuHandle
+    bcc crsHandleOk
+    jmp reuError             ; A already holds parseReuHandle's selector
+crsHandleOk:
+    jsr requireEnd
+    bcc crsHandlePrint
+    lda #REU_ERR_TRAILING_INPUT
+    jmp reuError
+crsHandlePrint:
+    jsr printReuStatusOne     ; X still holds the parsed handle
+    clc
+    rts
+
+crsSystemForm:
+    ldx #<sysInfoBuf
+    ldy #>sysInfoBuf
+    lda #DOS_GET_SYSTEM_INFO
+    jsr OS_API
+    bcs crsInfoFailed
+
+    lda sysInfoBuf + SYS_INFO_OFF_VMM_FLG
+    and #1
+    beq crsInactive
+    lda #<msgReuVmmActive
+    ldy #>msgReuVmmActive
+    jmp crsPrintVmmLine
+crsInactive:
+    lda #<msgReuVmmInactive
+    ldy #>msgReuVmmInactive
+crsPrintVmmLine:
+    jsr API_PRINT_STR
+
+    lda #<msgReuPagesTotal
+    ldy #>msgReuPagesTotal
+    jsr API_PRINT_STR
+    lda sysInfoBuf + SYS_INFO_OFF_TOT_HI
+    jsr printHex8
+    lda sysInfoBuf + SYS_INFO_OFF_TOT_LO
+    jsr printHex8
+    lda #<msgReuPagesAlloc
+    ldy #>msgReuPagesAlloc
+    jsr API_PRINT_STR
+    lda sysInfoBuf + SYS_INFO_OFF_ALC_HI
+    jsr printHex8
+    lda sysInfoBuf + SYS_INFO_OFF_ALC_LO
+    jsr printHex8
+    lda #<msgReuPagesFree
+    ldy #>msgReuPagesFree
+    jsr API_PRINT_STR
+    lda sysInfoBuf + SYS_INFO_OFF_FRE_HI
+    jsr printHex8
+    lda sysInfoBuf + SYS_INFO_OFF_FRE_LO
+    jsr printHex8
+    lda #$0D
+    jsr KernalChROUT
+
+    lda #0
+    sta DebugTemp             ; "any active slot seen" flag; printReuStatusOne
+                               ; clobbers reuXferParaLo/Hi/Slot, not DebugTemp
+    ldx #0
+crsSweepLoop:
+    lda reuActive, x
+    beq crsSweepNext
+    inc DebugTemp
+    jsr printReuStatusOne
+    ldx reuXferSlot          ; printReuStatusOne/printReuAllocSummary clobber X
+crsSweepNext:
+    inx
+    cpx #REU_HANDLE_COUNT
+    bcc crsSweepLoop
+
+    lda DebugTemp
+    bne crsSweepDone
+    lda #<msgReuNone
+    ldy #>msgReuNone
+    jsr API_PRINT_STR
+crsSweepDone:
+    clc
+    rts
+
+crsInfoFailed:
+    jmp reuError              ; A already holds OS_API's returned error code
 
 reuStub:
     lda #<msgStub
@@ -3839,6 +3941,26 @@ msgReu64K:
     .byte "10000"
     .byte 0
 
+; WP4 XS system-section fragments.
+msgReuVmmActive:
+    .byte "VMM ACTIVE"
+    .byte $0D, 0
+msgReuVmmInactive:
+    .byte "VMM INACTIVE"
+    .byte $0D, 0
+msgReuPagesTotal:
+    .byte "PAGES TOTAL="
+    .byte 0
+msgReuPagesAlloc:
+    .byte " ALLOC="
+    .byte 0
+msgReuPagesFree:
+    .byte " FREE="
+    .byte 0
+msgReuNone:
+    .byte "NONE"
+    .byte $0D, 0
+
 ; UI label/separator strings (shared across print sites via API_PRINT_STR)
 sepColonSp:
     .byte ": "
@@ -4014,3 +4136,6 @@ reuParagraphHi: .res REU_HANDLE_COUNT, 0
 reuXferParaLo: .byte 0
 reuXferParaHi: .byte 0
 reuXferSlot:   .byte 0
+
+; WP4 XS scratch: DOS_GET_SYSTEM_INFO destination record.
+sysInfoBuf: .res SYS_INFO_SIZE, 0

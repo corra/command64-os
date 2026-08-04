@@ -680,6 +680,9 @@ Exit criterion: allocations cannot leak through registration failure, normal
 
 ### WP4: Status Reporting
 
+Detailed implementation plan:
+`brain/plans/2026-08-05-debug-reu-address-syntax-wp4.md`.
+
 1. Implement `XS` and `XS handle`.
 2. Report VMM availability.
 3. Report each active DEBUG allocation.

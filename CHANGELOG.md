@@ -16,6 +16,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG WP4 REU status reporting**: `XS handle` prints one active
+  allocation's summary in the exact format `XA` already produces for it
+  (`<handle>: SEG=xx BANK=xx PARA=xxxx PAGES=xx SIZE=xxxx`), rejecting
+  invalid, inactive, or out-of-range handles and trailing input before any
+  OS call. Bare `XS` queries `DOS_GET_SYSTEM_INFO` and prints `VMM
+  ACTIVE`/`VMM INACTIVE` (only the OS's real `VmmFlags` bit 0; the struct's
+  documented "probed" bit is never actually populated by
+  `ahGetSystemInfo`, so WP4 does not report it) plus
+  `PAGES TOTAL=/ALLOC=/FREE=`, followed by every active DEBUG allocation or
+  a `NONE` line. **Caveat found during verification**: the `ALLOC=`/`FREE=`
+  page counters (from `ahGetSystemInfo`'s `$C000-$CFFF` Memory Control
+  Table scan) were observed to decrease between two consecutive `XS` calls
+  despite only new allocations happening in between (no frees) — `TOTAL`,
+  `ALLOC`, and `FREE` always summed correctly, but the `ALLOC` count itself
+  appears unstable. This is outside DEBUG's own display logic (`debug.s`
+  only prints the struct's bytes as returned) and points at
+  `src/command64/api.asm`'s `ahGetSystemInfo` MCT scan or `vmm.asm`'s page
+  marking; flagged for separate investigation, not fixed here.
 - **DEBUG WP3 REU allocation lifecycle**: `XA paragraphs` allocates
   `$0001-$1000` paragraphs through `DOS_ALLOC_MEM`, registers the grant in a
   DEBUG-local handle, and prints `<handle>: SEG=xx BANK=xx PARA=xxxx

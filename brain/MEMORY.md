@@ -74,6 +74,24 @@
   the allocation. No new private zero-page or OS parameter-cell ownership.
   `XM`/`XS` remain WP2 stubs; still no `DOS_VMM_READ`/`DOS_VMM_WRITE`/
   `DOS_GET_SYSTEM_INFO` call anywhere in `debug.s`.
+- **DEBUG WP4 status reporting**: `XS`/`XS handle` are real (no longer
+  stubs). Adds a 24-byte `sysInfoBuf` BSS buffer (`DOS_GET_SYSTEM_INFO`
+  destination record) and reuses WP3's `reuXferSlot`/`reuXferParaLo/Hi`
+  scratch plus a new `printReuStatusOne` wrapper around the WP3
+  `printReuAllocSummary` printer, so `XS handle` output is byte-identical
+  to that allocation's `XA` line by construction. Reports only
+  `VmmFlags` bit 0 (active) — `ahGetSystemInfo` never sets a distinct
+  "probed" bit despite the struct comment. **Found during WP4 VICE
+  verification**: `ahGetSystemInfo`'s `VmmAllocPages`/`VmmFreePages`
+  (from its `$C000-$CFFF` MCT scan) are unstable — observed to decrease
+  across consecutive calls with only new allocations in between, though
+  `TOTAL`/`ALLOC`/`FREE` always sum to 4096. Not a `debug.s` defect (WP4
+  only displays the struct's bytes); the root cause is in
+  `src/command64/api.asm`/`vmm.asm` and is unresolved, flagged for
+  separate investigation. Also confirmed a VICE-harness-only nuance while
+  testing: the `REU` VICE resource does not take hardware effect until a
+  reset — setting it before `vice_load_program`'s autostart is not
+  sufficient by itself; a `vice_reset` (or power cycle) is needed first.
 - **DEBUG ca65 migration (historical build 1100)**: `debug.prg` builds from
   `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 had
   a matching `$2C00` header, R6 footer, 716 relocations, and loaded end `$4B36`.

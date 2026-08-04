@@ -1,6 +1,34 @@
 # Project Tasks
 
-- [ ] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
+- [ ] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
+      syntax WP4 status reporting (`XS`/`XS handle`)
+  - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp4.md`
+  - Branch: `feature/debug-reu-address-wp4` (based on `debug` after WP3
+    merge, commit `597ec59`)
+  - Plan approved 2026-08-04
+  - [x] Increment 1: `XS handle`; DEBUG build 1123 (7,615 code bytes, 893
+        relocation points); VICE-verified `XS handle` output is
+        byte-identical to that allocation's original `XA` line; invalid
+        (`XS 9`), inactive (freed then re-queried), and trailing-input
+        (`XS 1 EXTRA`) cases all reject before any OS call
+  - [x] Increment 2: bare `XS`; VICE-verified zero/one/two-allocation cases
+        print the correct rows or `NONE`; REU-disabled (post-reset, true
+        hardware-off state confirmed via `vmmInitialized` at `$1FA0`)
+        correctly shows `VMM INACTIVE` and all-zero counters
+  - [x] Increment 3: static grep confirmed zero `DOS_VMM_READ`/
+        `DOS_VMM_WRITE` call sites; BSS growth is exactly 24 bytes
+        (`sysInfoBuf`); `image_d64` and `test_image_d64` built with no
+        warnings; CHANGELOG.md and brain/MEMORY.md updated, including a
+        flagged (not fixed) finding that `ahGetSystemInfo`'s
+        `ALLOC=`/`FREE=` page counters are unstable across calls despite
+        `TOTAL`/`ALLOC`/`FREE` always summing correctly — root cause is in
+        `src/command64/api.asm`/`vmm.asm`, outside WP4's `debug.s` scope
+  - [x] WP1 `G`/`T`/`P`/`Q` regression re-verified 2026-08-05 against build
+        1123 using a checkpoint/register-based procedure (see WP3 entry
+        below for the method); no longer a manual-only check
+  - [x] User confirmed WP4 completion on 2026-08-04
+
+- [x] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
       syntax WP3 allocation lifecycle (`XA`/`XD`/`Q` cleanup)
   - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp3.md`
   - Branch: `feature/debug-reu-address-wp3` (based on `debug` after WP2 merge,
@@ -28,6 +56,20 @@
         warnings; CHANGELOG.md, brain/MEMORY.md, and the WP3 task spec
         updated
   - [x] User confirmed WP3 completion on 2026-08-04
+  - [x] WP1 `G`/`T`/`P`/`Q` regression re-verified 2026-08-05: a
+        checkpoint-based procedure (non-temporary `exec` checkpoints at
+        `$6000` and DEBUG's computed breakpoint target `$6101`, held and
+        inspected via `vice_read_registers`/`vice_read_memory` instead of
+        screen-text OCR) replaces the earlier manual-only re-check.
+        Confirmed `PC=$6000` on `G =6000`, `PC=$6101` on both `T =6100`
+        and `P =6100` (matching DEBUG's installed `$00` BRK byte there),
+        byte restoration to `EA` after each trap, and clean `c64[8]:>`
+        return after `Q`. Finding: *temporary* checkpoints did not
+        reliably hold the pause for inspection in this MCP (execution had
+        already continued by the time state was read); non-temporary
+        checkpoints, explicitly deleted after use, held reliably. Detailed
+        procedure recorded in
+        `brain/walkthroughs/2026-08-05-debug-reu-address-syntax-wp3.md`.
 
 - [x] Taskwarrior (`91036469-8479-4a27-83ab-e74158f2fdea`): DEBUG REU/address
       syntax WP2 extended dispatch and registry foundation

@@ -21,6 +21,8 @@ assembler, execution controls, and DEBUG-local VMM allocation state.
 - Keep persistent REU state out of private zero page `$70-$7F` and OS parameter
   cells `$66-$6C`.
 - Validate complete commands and address windows before execution or VMM calls.
+- Report system-wide VMM status only through `DOS_GET_SYSTEM_INFO`; never read
+  the OS Memory Control Table (`$C000-$CFFF`) directly.
 
 # Work Guidance
 
