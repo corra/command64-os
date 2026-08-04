@@ -35,7 +35,7 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
 - [x] Registry helpers satisfy documented carry/register/error contracts.
 - [x] WP2 adds no VMM API call and no private zero-page state.
 - [x] DEBUG remains relocatable and inside its existing linker envelope.
-- [ ] The user confirms the walkthrough before WP2 is marked complete.
+- [x] The user confirms the walkthrough before WP2 is marked complete.
 
 ## Increment 1 Evidence
 

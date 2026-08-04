@@ -1,6 +1,6 @@
 # Project Tasks
 
-- [/] Taskwarrior (`91036469-8479-4a27-83ab-e74158f2fdea`): DEBUG REU/address
+- [x] Taskwarrior (`91036469-8479-4a27-83ab-e74158f2fdea`): DEBUG REU/address
       syntax WP2 extended dispatch and registry foundation
   - Plan: `brain/plans/2026-08-04-debug-reu-address-syntax-wp2.md`
   - Branch: `feature/debug-reu-address-wp2`
@@ -21,7 +21,7 @@
         against safe RTS/NOP fixtures with clean shell return; static grep
         confirms zero `DOS_ALLOC_MEM`/`DOS_FREE_MEM`/`DOS_VMM_READ`/
         `DOS_VMM_WRITE`/`DOS_GET_SYSTEM_INFO` call sites in `debug.s`
-  - [ ] Obtain explicit user confirmation before marking WP2 complete
+  - [x] User confirmed WP2 completion on 2026-08-04
 
 - [x] Taskwarrior (`adfecaf3-212c-4e91-bcf5-f1c79f673eae`): DEBUG REU/address
       syntax WP1 parser foundation and permissive `=`

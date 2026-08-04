@@ -1,6 +1,6 @@
 # DEBUG REU/Address Syntax WP2 Walkthrough
 
-**Status:** Awaiting user confirmation
+**Status:** Confirmed by user 2026-08-04
 
 **Build:** DEBUG 0.4.0 build 1119
 
@@ -119,7 +119,6 @@ Expected:
 
 ## Confirmation Gate
 
-Please run the sections above (or review the automated VICE evidence) and
-confirm the results match. WP2 Increment 4 and the overall WP2 task may be
-marked complete in the wiki task, `brain/task.md`, and Taskwarrior UUID
-`91036469-8479-4a27-83ab-e74158f2fdea` only after this confirmation.
+The user confirmed this walkthrough on 2026-08-04. WP2 Increment 4 and the
+overall WP2 task are marked complete in the wiki task, `brain/task.md`, and
+Taskwarrior UUID `91036469-8479-4a27-83ab-e74158f2fdea`.
