@@ -614,8 +614,277 @@ crfFreeFailed:
     lda #REU_ERR_CLEANUP
     jmp reuError
 
+; WP5: XM handle offset|page:offset address length R|W - validate a
+; transfer window. No DMA yet; WP6 performs the actual transfer.
+; In: Y = operand position (leading spaces already skipped by cmdExtended).
 cmdReuMove:
-    jmp reuStub
+    lda #1                   ; require an active handle
+    jsr parseReuHandle
+    bcc crmHandleOk
+    jmp reuError              ; A already holds parseReuHandle's selector
+crmHandleOk:
+    stx reuMoveHandle
+
+    jsr skipSpaces
+    jsr parseVmmOffset
+    bcc crmOffsetOk
+    jmp reuError              ; A already holds parseVmmOffset's selector
+crmOffsetOk:
+
+    jsr skipSpaces
+    lda inputBuf, y
+    bne crmHasAddr
+    lda #REU_ERR_MISSING_ARG
+    jmp reuError
+crmHasAddr:
+    jsr parseHexArg
+    bcc crmAddrOk
+    lda #REU_ERR_VALUE_RANGE
+    jmp reuError
+crmAddrOk:
+    lda HexValLo
+    sta reuMoveAddrLo
+    lda HexValHi
+    sta reuMoveAddrHi
+
+    jsr skipSpaces
+    lda inputBuf, y
+    bne crmHasLen
+    lda #REU_ERR_MISSING_ARG
+    jmp reuError
+crmHasLen:
+    jsr parseHexArg
+    bcc crmLenOk
+    lda #REU_ERR_VALUE_RANGE
+    jmp reuError
+crmLenOk:
+    lda HexValLo
+    ora HexValHi
+    bne crmLenNonzero
+    lda #REU_ERR_VALUE_RANGE   ; zero length is a valid hex parse, invalid transfer
+    jmp reuError
+crmLenNonzero:
+    lda HexValLo
+    sta reuMoveLenLo
+    lda HexValHi
+    sta reuMoveLenHi
+
+    jsr skipSpaces
+    lda inputBuf, y
+    bne crmHasDir
+    lda #REU_ERR_MISSING_ARG
+    jmp reuError
+crmHasDir:
+    ; Normalize shifted/unshifted, matching cmdExtended's approach.
+    cmp #'A'
+    bcc crmDirNotLetter
+    cmp #'Z' + 1
+    bcs crmDirNotLetter
+    and #$7F
+crmDirNotLetter:
+    cmp #'r'
+    beq crmDirRead
+    cmp #'w'
+    beq crmDirWrite
+    lda #REU_ERR_DIRECTION
+    jmp reuError
+crmDirRead:
+    lda #0
+    sta reuMoveDir
+    jmp crmDirDone
+crmDirWrite:
+    lda #1
+    sta reuMoveDir
+crmDirDone:
+    iny                       ; advance past the direction character
+
+    jsr requireEnd
+    bcc crmEndOk
+    lda #REU_ERR_TRAILING_INPUT
+    jmp reuError
+crmEndOk:
+
+    ldx reuMoveHandle
+    jsr validateReuWindow
+    bcc crmReuWindowOk
+    jmp reuError              ; A already holds REU_ERR_ALLOC_WINDOW
+crmReuWindowOk:
+    jsr validateC64Window
+    bcc crmC64WindowOk
+    jmp reuError              ; A already holds REU_ERR_C64_WINDOW
+crmC64WindowOk:
+
+    lda #<msgReuMovePreflightOk
+    ldy #>msgReuMovePreflightOk
+    jsr API_PRINT_STR
+    clc
+    rts
+
+; Parses one XM allocation-relative offset operand: a flat 16-bit hex
+; value, or a page:offset pair (page<=$000F, offset<=$0FFF). Both forms
+; normalize to the same flat 16-bit value.
+; In: Y = operand's first byte.
+; Out success: reuMoveOffLo/Hi holds the normalized offset; Y past the
+; operand; A=0; C=0.
+; Out failure: A=REU_ERR_VALUE_RANGE or REU_ERR_PAGE_OFFSET; C=1.
+; Clobbers: A, X, Y; reuXferParaLo/Hi (transient page/offset scratch --
+; see brain/plans/2026-08-06-debug-reu-address-syntax-wp5.md Section 7 for
+; why this reuse of WP3's scratch is safe).
+parseVmmOffset:
+    jsr parseHexArg
+    bcs pvoRange
+    lda inputBuf, y
+    cmp #':'
+    beq pvoPageForm
+
+    ; Flat form: HexValLo/Hi is already the normalized offset. Its 16-bit
+    ; range is already guaranteed by parseHexArg's 4-digit cap.
+    lda HexValLo
+    sta reuMoveOffLo
+    lda HexValHi
+    sta reuMoveOffHi
+    lda #0
+    clc
+    rts
+
+pvoPageForm:
+    ; Stash the page number (first component) before the second
+    ; parseHexArg call overwrites HexValLo/Hi.
+    lda HexValLo
+    sta reuXferParaLo
+    lda HexValHi
+    sta reuXferParaHi
+    iny
+    jsr parseHexArg
+    bcs pvoRange
+
+    ; Require page <= $000F.
+    lda reuXferParaHi
+    bne pvoPageErr
+    lda reuXferParaLo
+    cmp #$10
+    bcs pvoPageErr
+
+    ; Require offset <= $0FFF.
+    lda HexValHi
+    cmp #$10
+    bcs pvoPageErr
+
+    ; flatOffset high byte = (page << 4) | offset's high nibble;
+    ; flatOffset low byte = offset's low byte unchanged.
+    lda reuXferParaLo
+    asl
+    asl
+    asl
+    asl
+    ora HexValHi
+    sta reuMoveOffHi
+    lda HexValLo
+    sta reuMoveOffLo
+    lda #0
+    clc
+    rts
+
+pvoPageErr:
+    lda #REU_ERR_PAGE_OFFSET
+    sec
+    rts
+pvoRange:
+    lda #REU_ERR_VALUE_RANGE
+    sec
+    rts
+
+; Validates that [reuMoveOffLo/Hi, reuMoveOffLo/Hi + reuMoveLenLo/Hi) lies
+; within the selected allocation's exact byte capacity, including the
+; paragraphs==$1000 (exactly 65536-byte) boundary case.
+; In: X = the selected active handle.
+; Out: C=0 on success; C=1 and A=REU_ERR_ALLOC_WINDOW on failure.
+; Clobbers: A, X, Y; reuXferParaLo/Hi (end scratch); val1/val1+1 (capacity
+; scratch -- transient, general command scratch, same as cgDo's use).
+validateReuWindow:
+    lda reuMoveOffLo
+    clc
+    adc reuMoveLenLo
+    sta reuXferParaLo
+    lda reuMoveOffHi
+    adc reuMoveLenHi
+    sta reuXferParaHi
+    bcs vrwCarry
+
+    ; No carry: true end < $10000. Compare directly against capacity.
+    lda reuParagraphHi, x
+    cmp #$10
+    beq vrwOk                 ; capacity is exactly $10000; any end<$10000 fits
+
+    ; capacity = paragraphs << 4 (safe: paragraphs < $1000 here)
+    lda reuParagraphLo, x
+    sta val1
+    lda reuParagraphHi, x
+    sta val1 + 1
+    ldy #4
+vrwShift:
+    asl val1
+    rol val1 + 1
+    dey
+    bne vrwShift
+
+    ; end (reuXferParaLo/Hi) <= capacity (val1/val1+1)?
+    lda reuXferParaHi
+    cmp val1 + 1
+    bcc vrwOk
+    bne vrwFail
+    lda reuXferParaLo
+    cmp val1
+    bcc vrwOk
+    beq vrwOk
+    bcs vrwFail
+
+vrwCarry:
+    ; True end = $10000 + endLo/Hi. Valid only when endLo/Hi == 0 (true
+    ; end is exactly $10000) AND the allocation's capacity is also
+    ; exactly $10000.
+    lda reuXferParaLo
+    ora reuXferParaHi
+    bne vrwFail
+    lda reuParagraphHi, x
+    cmp #$10
+    bne vrwFail
+
+vrwOk:
+    clc
+    rts
+vrwFail:
+    lda #REU_ERR_ALLOC_WINDOW
+    sec
+    rts
+
+; Validates that [reuMoveAddrLo/Hi, reuMoveAddrLo/Hi + reuMoveLenLo/Hi)
+; does not wrap past $FFFF.
+; Out: C=0 on success; C=1 and A=REU_ERR_C64_WINDOW on failure.
+; Clobbers: A, X.
+validateC64Window:
+    lda reuMoveAddrLo
+    clc
+    adc reuMoveLenLo
+    tax                       ; stash the wrapped low byte of the end
+    lda reuMoveAddrHi
+    adc reuMoveLenHi
+    bcc vcwOk                 ; no carry: true end < $10000, always valid
+
+    ; Carry set: valid only if the wrapped end is exactly $0000 (true end
+    ; is exactly $10000, i.e. the window runs up through $FFFF).
+    cmp #0
+    bne vcwFail
+    cpx #0
+    bne vcwFail
+
+vcwOk:
+    clc
+    rts
+vcwFail:
+    lda #REU_ERR_C64_WINDOW
+    sec
+    rts
 
 ; WP4: XS [handle] - report VMM/registry status.
 ; In: Y = operand position (leading spaces already skipped by cmdExtended).
@@ -3961,6 +4230,12 @@ msgReuNone:
     .byte "NONE"
     .byte $0D, 0
 
+; WP5 XM temporary preflight-success indicator (WP6 replaces this with the
+; real transfer's own success/failure reporting).
+msgReuMovePreflightOk:
+    .byte "XM PREFLIGHT OK"
+    .byte $0D, 0
+
 ; UI label/separator strings (shared across print sites via API_PRINT_STR)
 sepColonSp:
     .byte ": "
@@ -4139,3 +4414,14 @@ reuXferSlot:   .byte 0
 
 ; WP4 XS scratch: DOS_GET_SYSTEM_INFO destination record.
 sysInfoBuf: .res SYS_INFO_SIZE, 0
+
+; WP5 XM transfer state: parsed handle, normalized allocation-relative
+; offset, C64 address, length, and direction (0=R fetch, 1=W stash).
+reuMoveHandle: .byte 0
+reuMoveOffLo:  .byte 0
+reuMoveOffHi:  .byte 0
+reuMoveAddrLo: .byte 0
+reuMoveAddrHi: .byte 0
+reuMoveLenLo:  .byte 0
+reuMoveLenHi:  .byte 0
+reuMoveDir:    .byte 0
