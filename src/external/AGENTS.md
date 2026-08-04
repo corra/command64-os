@@ -54,5 +54,6 @@ The purpose of the `src/external` directory is to contain external user space ap
 # Child DOX Index
 
 - [casm/AGENTS.md](casm/AGENTS.md)
+- [debug/AGENTS.md](debug/AGENTS.md)
 - [dash/AGENTS.md](dash/AGENTS.md)
 - [pacman/AGENTS.md](pacman/AGENTS.md)

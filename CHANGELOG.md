@@ -16,6 +16,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG WP2 extended-command dispatch foundation**: exact `XA`, `XD`, `XM`,
+  and `XS` tokens now route to distinct temporary handlers with consistent
+  shifted/unshifted PETSCII normalization. Malformed prefixes such as `XAA`,
+  `XMAP`, `XA0100`, and `XA:0100` are rejected before handler dispatch.
+  Internal REU error selectors are defined for later lifecycle and transfer
+  work. WP2 Increment 2 adds a four-handle, 20-byte DEBUG-local allocation
+  registry and explicitly clears every field at startup. No allocation or VMM
+  API call is made yet. Increment 3 adds checked handle parsing, lowest-free-slot
+  selection, and active-record identity lookup with distinct internal failure
+  selectors.
 - **DEBUG WP1 permissive execution-address syntax**: `G`, `T`, and `P` now
   accept optional MS-DOS-style `=` syntax with spaces before or after the
   delimiter, while preserving bare-address and no-argument behavior.

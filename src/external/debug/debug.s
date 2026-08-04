@@ -41,7 +41,27 @@ MODE_IND = 11 ; Indirect
 MODE_IZX = 12 ; Indirect,X
 MODE_IZY = 13 ; Indirect,Y
 
+; --- Internal REU Error Selectors ---
+REU_ERR_SYNTAX           = $01
+REU_ERR_MISSING_ARG      = $02
+REU_ERR_TRAILING_INPUT   = $03
+REU_ERR_VALUE_RANGE      = $04
+REU_ERR_INVALID_HANDLE   = $05
+REU_ERR_INACTIVE_HANDLE  = $06
+REU_ERR_REGISTRY_FULL    = $07
+REU_ERR_VMM_UNAVAILABLE  = $08
+REU_ERR_VMM_NOMEM        = $09
+REU_ERR_PAGE_OFFSET      = $0A
+REU_ERR_ALLOC_WINDOW     = $0B
+REU_ERR_C64_WINDOW       = $0C
+REU_ERR_DIRECTION        = $0D
+REU_ERR_PARTIAL_TRANSFER = $0E
+REU_ERR_CLEANUP          = $0F
+
+REU_HANDLE_COUNT = 4
+
 .import __MAIN_START__
+.export parseReuHandle, findFreeReuHandle, getReuRecord
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -64,6 +84,8 @@ start:
     lda #0
     sta currentAddr
     sta currentAddr + 1
+
+    jsr initReuRegistry
     
     ; 3. Welcome message
     lda #<startupMsg
@@ -235,8 +257,12 @@ _d10t:
     jmp cmdTrace
 _d10p:
     cmp #'p'
-    bne _d11
+    bne _d10x
     jmp cmdProceed
+_d10x:
+    cmp #'x'
+    bne _d11
+    jmp cmdExtended
 _d11:
     
     ; Unknown command
@@ -265,6 +291,207 @@ API_EXIT:
 ; ---------------------------------------------------------------------------
 cmdQuit:
     jmp API_EXIT
+
+; Parses exact two-character extended command tokens.
+; In: Y points immediately after 'X'.
+cmdExtended:
+    lda inputBuf, y
+
+    ; Normalize shifted to unshifted for comparison, matching dispatch.
+    cmp #'A'
+    bcc ceNotLetter
+    cmp #'Z' + 1
+    bcs ceNotLetter
+    and #$7F
+ceNotLetter:
+    cmp #'a'
+    beq ceAlloc
+    cmp #'d'
+    beq ceFree
+    cmp #'m'
+    beq ceMove
+    cmp #'s'
+    beq ceStatus
+    lda #REU_ERR_SYNTAX
+    jmp reuError
+
+ceAlloc:
+    iny
+    jsr requireExtendedTokenEnd
+    bcs ceError
+    jsr skipSpaces
+    jmp cmdReuAlloc
+ceFree:
+    iny
+    jsr requireExtendedTokenEnd
+    bcs ceError
+    jsr skipSpaces
+    jmp cmdReuFree
+ceMove:
+    iny
+    jsr requireExtendedTokenEnd
+    bcs ceError
+    jsr skipSpaces
+    jmp cmdReuMove
+ceStatus:
+    iny
+    jsr requireExtendedTokenEnd
+    bcs ceError
+    jsr skipSpaces
+    jmp cmdReuStatus
+
+ceError:
+    jmp reuError
+
+; Requires null or a space immediately after an extended command token.
+; In: Y points after the second token character.
+; Out: C=0 for a token boundary; C=1 and A=REU_ERR_SYNTAX otherwise.
+requireExtendedTokenEnd:
+    lda inputBuf, y
+    beq reteSuccess
+    cmp #' '
+    beq reteSuccess
+    lda #REU_ERR_SYNTAX
+    sec
+    rts
+reteSuccess:
+    clc
+    rts
+
+; Distinct WP2 routing stubs. Later work packages replace these handlers.
+cmdReuAlloc:
+    jmp reuStub
+cmdReuFree:
+    jmp reuStub
+cmdReuMove:
+    jmp reuStub
+cmdReuStatus:
+    jmp reuStub
+
+reuStub:
+    lda #<msgStub
+    ldy #>msgStub
+    jsr API_PRINT_STR
+    rts
+
+; Reports a selected REU error through the current generic message.
+; In: A = REU_ERR_* selector. Out: A restored, C=1. X preserved; Y clobbered.
+reuError:
+    pha
+    txa
+    pha
+    lda #<errUnknown
+    ldy #>errUnknown
+    jsr API_PRINT_STR
+    pla
+    tax
+    pla
+    sec
+    rts
+
+; Clears all fields in DEBUG's four-slot REU allocation registry.
+; Clobbers A, X, and flags. Preserves Y.
+initReuRegistry:
+    lda #0
+    ldx #REU_HANDLE_COUNT - 1
+irrLoop:
+    sta reuActive, x
+    sta reuSegHi, x
+    sta reuBank, x
+    sta reuParagraphLo, x
+    sta reuParagraphHi, x
+    dex
+    bpl irrLoop
+    rts
+
+; Parses one DEBUG-local REU handle.
+; In: Y = operand position; A=0 permits inactive, A<>0 requires active.
+; Out success: X=handle, Y after operand, A=0, C=0.
+; Out failure: A=REU_ERR_MISSING_ARG, REU_ERR_VALUE_RANGE, or
+; REU_ERR_INACTIVE_HANDLE; C=1. The mode stack byte is balanced on every path.
+parseReuHandle:
+    pha
+    jsr skipSpaces
+    lda inputBuf, y
+    beq prhMissing
+
+    jsr parseHexArg
+    bcs prhRange
+    lda HexValHi
+    bne prhRange
+    lda HexValLo
+    cmp #REU_HANDLE_COUNT
+    bcs prhRange
+    tax
+
+    pla
+    beq prhSuccess
+    lda reuActive, x
+    beq prhInactive
+prhSuccess:
+    lda #0
+    clc
+    rts
+
+prhMissing:
+    pla
+    lda #REU_ERR_MISSING_ARG
+    sec
+    rts
+prhRange:
+    pla
+    lda #REU_ERR_VALUE_RANGE
+    sec
+    rts
+prhInactive:
+    lda #REU_ERR_INACTIVE_HANDLE
+    sec
+    rts
+
+; Finds the lowest-numbered inactive registry slot.
+; Out success: X=handle, A=0, C=0. Out full: A=REU_ERR_REGISTRY_FULL, C=1.
+findFreeReuHandle:
+    ldx #0
+ffrhLoop:
+    lda reuActive, x
+    beq ffrhSuccess
+    inx
+    cpx #REU_HANDLE_COUNT
+    bcc ffrhLoop
+    lda #REU_ERR_REGISTRY_FULL
+    sec
+    rts
+ffrhSuccess:
+    lda #0
+    clc
+    rts
+
+; Returns an active registry record's raw VMM identity.
+; In: X=handle. Out success: X=SegHi, Y=Bank, A=0, C=0.
+; Out failure: A=REU_ERR_INVALID_HANDLE or REU_ERR_INACTIVE_HANDLE, C=1;
+; X remains the candidate handle.
+getReuRecord:
+    cpx #REU_HANDLE_COUNT
+    bcs grrInvalid
+    lda reuActive, x
+    beq grrInactive
+    lda reuBank, x
+    pha
+    lda reuSegHi, x
+    tax
+    pla
+    tay
+    lda #0
+    clc
+    rts
+grrInvalid:
+    lda #REU_ERR_INVALID_HANDLE
+    sec
+    rts
+grrInactive:
+    lda #REU_ERR_INACTIVE_HANDLE
+    sec
+    rts
 
 cmdDump:
     jsr skipSpaces
@@ -3514,3 +3741,11 @@ fileNameLen: .byte 0
 fileType:    .byte $50    ; Default: 'P' (PRG)
 fileNameBuf: .res 32, 0
 mnemBuf:     .res 3, 0
+
+; DEBUG-local VMM allocation registry. Raw VMM identity is never a command
+; handle; only nonzero reuActive entries authorize later lifecycle operations.
+reuActive:      .res REU_HANDLE_COUNT, 0
+reuSegHi:       .res REU_HANDLE_COUNT, 0
+reuBank:        .res REU_HANDLE_COUNT, 0
+reuParagraphLo: .res REU_HANDLE_COUNT, 0
+reuParagraphHi: .res REU_HANDLE_COUNT, 0

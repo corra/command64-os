@@ -1,5 +1,28 @@
 # Project Tasks
 
+- [x] Taskwarrior (`91036469-8479-4a27-83ab-e74158f2fdea`): DEBUG REU/address
+      syntax WP2 extended dispatch and registry foundation
+  - Plan: `brain/plans/2026-08-04-debug-reu-address-syntax-wp2.md`
+  - Branch: `feature/debug-reu-address-wp2`
+  - [x] Increment 1: exact dispatch, stubs, selectors, build 1116, and VICE
+        routing complete; malformed tokens rejected before stub dispatch
+  - [x] Increment 2: 20-byte registry and explicit startup initialization;
+        DEBUG build 1117 and VICE zero/reset/stub-preservation checks passed
+  - [x] Increment 3: all three registry helpers implemented; DEBUG build 1119
+        and direct VICE carry/register/selector path verification passed
+  - [x] Increment 4: DEBUG build 1119 rebuilt clean (6,885 code bytes, 762
+        relocation points, within the 8KB `MAIN` envelope); `image_d64` and
+        `test_image_d64` built with no warnings; VICE matrix on `image.d64`
+        confirmed bare/argument `XA`/`XD`/`XM`/`XS` route to the temporary
+        stub, `X`/`X A`/`XX`/`X?`/`XAA`/`XMAP`/`XA0100`/`XA:0100` all reject
+        with no stub text, lowercase `xa` normalizes identically, and stub
+        handlers make no memory writes (static: each is `jmp reuStub` ->
+        `API_PRINT_STR` only); re-ran WP1 `G =6000`/`T =6100`/`P =6100`/`Q`
+        against safe RTS/NOP fixtures with clean shell return; static grep
+        confirms zero `DOS_ALLOC_MEM`/`DOS_FREE_MEM`/`DOS_VMM_READ`/
+        `DOS_VMM_WRITE`/`DOS_GET_SYSTEM_INFO` call sites in `debug.s`
+  - [x] User confirmed WP2 completion on 2026-08-04
+
 - [x] Taskwarrior (`adfecaf3-212c-4e91-bcf5-f1c79f673eae`): DEBUG REU/address
       syntax WP1 parser foundation and permissive `=`
   - Plan: `brain/plans/2026-08-03-debug-reu-and-address-syntax-wp1.md`
