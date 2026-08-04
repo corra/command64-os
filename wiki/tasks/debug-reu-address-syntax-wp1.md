@@ -18,7 +18,7 @@ Taskwarrior UUID: `adfecaf3-212c-4e91-bcf5-f1c79f673eae`
 ## Increments
 
 - [x] Increment 1: add the parser helpers and build the focused `debug` target.
-- [ ] Increment 2: integrate and verify permissive `=` parsing in `G`.
+- [x] Increment 2: integrate and verify permissive `=` parsing in `G`.
 - [ ] Increment 3: integrate and verify permissive `=` parsing in shared `T`/`P`.
 - [ ] Increment 4: run focused regressions, artifact review, DOX closeout, and
       the user-confirmed walkthrough.
@@ -39,3 +39,22 @@ Taskwarrior UUID: `adfecaf3-212c-4e91-bcf5-f1c79f673eae`
 - CMake built DEBUG build 1112 successfully: 6,580 code bytes and 721
   relocation points inside the configured 8KB `MAIN` envelope.
 - No BSS, zero-page, or OS parameter-cell ownership changed.
+
+## Increment 2 Evidence
+
+- Corrected `parseOptionalEquals` to return carry set when `=` was consumed;
+  this distinguishes `G =` from a valid no-argument `G` without new storage.
+- `cmdGo` now validates the complete command before committing `val1` or
+  reaching `cgIndirect`.
+- CMake built DEBUG build 1113 successfully: 6,593 code bytes and 723
+  relocation points inside the configured 8KB `MAIN` envelope; `image_d64`
+  also built successfully.
+- VICE booted `build/image.d64`, proved the Command64 banner, and launched
+  DEBUG 0.4.0 build 1113 by name from the shell.
+- Bare `G 5000` and `G=5000`, `G =5000`, `G= 5000`, and `G = 5000` all
+  executed the same safe `$5000` sentinel routine.
+- `G =`, `G ==`, `G =G000`, `G =10000`, `G =5000 EXTRA`,
+  `G =0001:0000`, and `G 5000 EXTRA` printed `ERROR` and left the sentinel
+  unchanged.
+- A no-argument `G` used the pre-established `currentAddr`, and `Q` returned
+  to the `c64[8]:>` shell prompt.

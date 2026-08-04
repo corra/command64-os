@@ -381,9 +381,10 @@ Contract:
 - Skip spaces.
 - If the current character is `=`, consume it and following spaces.
 - Return with `Y` at the address or terminator.
+- Return carry set if `=` was consumed and carry clear otherwise.
 - Do not parse the address.
-- Do not require callers to retain whether `=` was present in the initial
-  implementation.
+- Callers use the carry result to distinguish a valid no-argument command from
+  a missing address after `=`.
 
 Apply only in `cmdGo` and `cmdTraceProceedCommon`.
 

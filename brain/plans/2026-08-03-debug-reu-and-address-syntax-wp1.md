@@ -164,17 +164,18 @@ Output:
 - If the next byte is `=`, consume it and all following spaces.
 - Return with `Y` at the first address byte or null terminator.
 - Do not consume any non-space byte other than one optional `=`.
+- Return carry set if `=` was consumed and carry clear otherwise.
 
 Preservation and clobbers:
 
 - `A` and processor flags are clobbered.
 - `Y` advances as documented.
 - `X`, `HexValLo`, and `HexValHi` are preserved.
-- Carry has no caller-visible meaning.
+- Carry reports whether `=` was consumed.
 
-The helper does not report whether `=` was present. The callers do not need
-that state because both address forms have identical behavior and an empty
-operand fails through the common argument check.
+The carry result is required even though both address forms select the same
+target: it distinguishes a valid no-argument command from a missing address
+after a consumed `=`.
 
 The helper must be called only by `cmdGo` and
 `cmdTraceProceedCommon` in WP1. `parseHexArg` remains unchanged so `=`, `:`,
@@ -187,9 +188,10 @@ and other punctuation do not become globally accepted delimiters.
 Required control flow:
 
 1. Call `parseOptionalEquals`.
-2. Inspect `inputBuf,Y`.
-3. If null, retain the existing no-argument path that copies `currentAddr` to
-   `val1`.
+2. Retain carry as the `=`-consumed result and inspect `inputBuf,Y` without
+   changing carry.
+3. If null with carry clear, retain the existing no-argument path that copies
+   `currentAddr` to `val1`; if null with carry set, report a missing address.
 4. Otherwise call `parseHexArg`.
 5. On parse failure, branch to the existing command error path.
 6. Call `requireEnd` before changing `val1` or executing anything.
@@ -197,9 +199,9 @@ Required control flow:
 8. Copy `HexValLo/HexValHi` to `val1` only after complete validation.
 9. Continue through the existing `cgIndirect` path.
 
-`G =` reaches step 4 with a null byte and fails `parseHexArg`; it must not fall
-back to `currentAddr`. A command with no `=` reaches step 3 and preserves the
-existing default.
+`G =` reaches step 3 with carry set and must not fall back to `currentAddr`. A
+command with no `=` reaches step 3 with carry clear and preserves the existing
+default.
 
 Although `val1` is scratch state, delaying its update until after `requireEnd`
 makes the parse transaction explicit and guarantees that no invalid command
@@ -211,8 +213,10 @@ Required control flow:
 
 1. Preserve the existing `traceMode` setup in `cmdTrace` and `cmdProceed`.
 2. Call `parseOptionalEquals`.
-3. Inspect `inputBuf,Y`.
-4. If null, retain the current `regPC` and continue to `launchProgram`.
+3. Retain carry as the `=`-consumed result and inspect `inputBuf,Y` without
+   changing carry.
+4. If null with carry clear, retain the current `regPC` and continue to
+   `launchProgram`; if null with carry set, report a missing address.
 5. Otherwise call `parseHexArg`.
 6. On parse failure, branch to `ctpcErr`.
 7. Call `requireEnd` while the candidate address remains in

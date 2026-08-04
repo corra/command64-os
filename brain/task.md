@@ -6,7 +6,9 @@
   - Branch: `feature/debug-reu-address-wp1-plan`
   - [x] Increment 1: added `requireEnd` and `parseOptionalEquals`; DEBUG build
         1112 succeeded with 6,580 code bytes and 721 relocation points
-  - [ ] Increment 2: integrate and verify `G`
+  - [x] Increment 2: `G` integrated and verified under VICE on DEBUG build
+        1113; valid bare/`=` forms matched, invalid forms did not execute, and
+        no-argument behavior remained compatible
   - [ ] Increment 3: integrate and verify shared `T`/`P`
   - [ ] Increment 4: focused regression, artifact review, DOX, and walkthrough
   - [ ] Obtain explicit user confirmation before marking WP1 complete

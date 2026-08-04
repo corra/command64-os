@@ -1652,13 +1652,16 @@ csDone:
     rts
 
 cmdGo:
-    jsr skipSpaces
+    jsr parseOptionalEquals
     lda inputBuf, y
-    beq cgUseDefault
+    bne cgParseAddr
+    bcs cgErr               ; '=' requires an address
+    jmp cgUseDefault
+cgParseAddr:
     jsr parseHexArg
-    bcc cgAddrOk
-    jmp cdErr
-cgAddrOk:
+    bcs cgErr
+    jsr requireEnd
+    bcs cgErr
     lda HexValLo
     sta val1
     lda HexValHi
@@ -1675,6 +1678,8 @@ cgDo:
     rts
 cgIndirect:
     jmp (val1)
+cgErr:
+    jmp cdErr
 
 cmdTrace:
     lda #0
@@ -3179,16 +3184,19 @@ reDone:
 
 ; Skips execution-command spacing and one optional '=' plus following spaces.
 ; In: Y = index immediately after G, T, or P.
-; Out: Y points at the address or null terminator. A/flags clobbered; X and
-;      HexValLo/Hi preserved. Carry has no defined meaning.
+; Out: Y points at the address or null terminator. C=1 if '=' was consumed,
+;      C=0 otherwise. A/flags clobbered; X and HexValLo/Hi preserved.
 parseOptionalEquals:
     jsr skipSpaces
     lda inputBuf, y
     cmp #'='
-    bne poeDone
+    beq poeEquals
+    clc
+    rts
+poeEquals:
     iny
     jsr skipSpaces
-poeDone:
+    sec
     rts
 
 ; Parses hex starting at inputBuf,y
