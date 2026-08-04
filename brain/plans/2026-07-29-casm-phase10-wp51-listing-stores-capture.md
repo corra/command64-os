@@ -791,3 +791,19 @@ Completion does not activate WP52.
   fixtures pass** on the final, cleaned-up build. Full clean rebuild and a
   no-change rebuild (stable `casm`/`test_casm_listcap` build counters) both
   verified. Increment 9 is complete.
+- 2026-08-03: Completed Atomic Increment 10 (version bump, synchronize,
+  request closure). User approved WP51 completion and directed this
+  increment. Bumped `VERSION_STAGE` `"51"` -> `"52"` in `casm.s` (the only
+  production change this increment authorizes). A full clean rebuild
+  (`rm -rf build`, reconfigure, `-j4`) reproduced build `1222` (advanced
+  once from `1221`) with zero errors across every target, including
+  `image_d64`, `test_image_d64`, `casm_overflow_test_d64`,
+  `casm_include_test_d64`, and `casm_listing_test_d64`; a subsequent
+  no-change rebuild held the counter stable. `build/casm.prg` is 20,555
+  bytes. Recorded the walkthrough in
+  `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`
+  and synchronized `CHANGELOG.md`, `brain/task.md`, `wiki/tasks/casm.md`,
+  and `wiki/tasks/casm-phase10-symbol-map-listing.md`. WP51's Completion
+  Gate is met at CASM `0.1.52` build `1222`; closure requested from the
+  user (Task Warrior task `a64fa847-1b46-44fd-be3b-8ad7b1055c92` left open
+  pending that explicit confirmation).

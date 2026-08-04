@@ -38,10 +38,11 @@ requires a dedicated detailed plan and explicit user approval.
       and ABI freeze. Active under approved plan
       `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`.
       No production behavior changes; completion target `0.1.51`.
-- [ ] `a64fa847-1b46-44fd-be3b-8ad7b1055c92`: WP51 listing stores and capture
-      events. Approved plan:
-      `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`.
-      Completion target `0.1.52`; blocked by WP50.
+- [x] `a64fa847-1b46-44fd-be3b-8ad7b1055c92`: WP51 listing stores and capture
+      events. Complete at CASM `0.1.52` build 1222, user-approved
+      2026-08-03, per
+      `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md` and
+      `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`.
 - [ ] `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: WP52 deterministic symbol map;
       approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.

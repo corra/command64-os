@@ -1466,14 +1466,15 @@ Symbol Map and Listing, remains inactive and separately gated.**
       2026-07-31, per
       `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md` and
       `brain/walkthroughs/2026-07-31-casm-phase10-wp50-contract-reconciliation.md`.
-- [ ] WP51 `a64fa847-1b46-44fd-be3b-8ad7b1055c92`: listing stores and capture
-      events. Approved plan:
-      `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`.
-      WP50 complete; WP51 not yet activated.
+- [x] WP51 `a64fa847-1b46-44fd-be3b-8ad7b1055c92`: listing stores and capture
+      events. Complete at CASM `0.1.52` build 1222, user-approved
+      2026-08-03, per
+      `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md` and
+      `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`.
 - [ ] WP52 `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: deterministic symbol map.
       Approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
-      Blocked by WP51.
+      WP51 complete; WP52 not yet activated.
 - [ ] WP53 `aa57f461-36a9-455c-966f-ac484ec57b41`: listing naming,
       serialization, and cleanup. Approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
@@ -1485,8 +1486,8 @@ Symbol Map and Listing, remains inactive and separately gated.**
 - [ ] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
       and Phase 10 completion gate. Blocked by WP54.
 
-**WP50 is complete at CASM `0.1.51` build 1206, user-approved 2026-07-31.
-WP51-WP55 remain blocked pending WP51's own explicit activation.**
+**WP51 is complete at CASM `0.1.52` build 1222, user-approved 2026-08-03.
+WP52-WP55 remain blocked pending WP52's own explicit activation.**
 
 ## Optional Feature - Progress and Processing Indication
 

@@ -16,6 +16,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 WP51 Listing Stores and Capture Events**: bumped to
+  `V0.1.52`. Adds source-owned physical-line completion tracking
+  (`sourceSetLineCapture`/`sourceTakeCompletedLine`), a new `listing.s`
+  module with two conditional 65,536-byte VMM stores (4,096 fixed 16-byte
+  metadata records; a buffered emitted-byte mirror), pass-driver line
+  transactions wired into `emitByte`, `casmRunPass`, and `crpInclude`, and
+  four new diagnostics (`$39`-`$3C`: name collision, records full, bytes
+  full, replay mismatch). `/L` remains rejected by production orchestration
+  until WP54 — nothing in this increment is reachable outside the two new
+  dedicated harnesses, `test_casm_listing` (11 fixtures, direct
+  allocation/metadata/mirror/boundary coverage) and `test_casm_listcap` (7
+  fixtures, a real two-pass assembly with capture genuinely enabled,
+  including PRG-identity comparison against capture-off). Both harnesses
+  confirmed passing live under VICE; five real bugs were found and fixed
+  during the runtime walkthrough, all in the `test_casm_listcap` harness
+  itself (VMM-registry exhaustion from missing `resourcesCleanup` calls
+  between repeated internal sub-runs, a wrong-expected-data authoring bug,
+  an uninitialized CLI-options stand-in, a dangling output write channel,
+  and a workaround for a separate, pre-existing `fileio.s` `fileClose` gap
+  tracked as Task Warrior task 42). See
+  `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md` and
+  `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`.
 - **CASM Phase 10 WP50 Contract Reconciliation and ABI Freeze**: bumped to
   `V0.1.51`. Re-traced the approved Phase 10 (symbol map/native listing)
   contract against the live Phase 9 source with no discrepancy found (token
