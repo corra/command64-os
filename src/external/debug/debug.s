@@ -58,6 +58,8 @@ REU_ERR_DIRECTION        = $0D
 REU_ERR_PARTIAL_TRANSFER = $0E
 REU_ERR_CLEANUP          = $0F
 
+REU_HANDLE_COUNT = 4
+
 .import __MAIN_START__
 
 .segment "HEADER"
@@ -81,6 +83,8 @@ start:
     lda #0
     sta currentAddr
     sta currentAddr + 1
+
+    jsr initReuRegistry
     
     ; 3. Welcome message
     lda #<startupMsg
@@ -382,6 +386,21 @@ reuError:
     tax
     pla
     sec
+    rts
+
+; Clears all fields in DEBUG's four-slot REU allocation registry.
+; Clobbers A, X, and flags. Preserves Y.
+initReuRegistry:
+    lda #0
+    ldx #REU_HANDLE_COUNT - 1
+irrLoop:
+    sta reuActive, x
+    sta reuSegHi, x
+    sta reuBank, x
+    sta reuParagraphLo, x
+    sta reuParagraphHi, x
+    dex
+    bpl irrLoop
     rts
 
 cmdDump:
@@ -3632,3 +3651,11 @@ fileNameLen: .byte 0
 fileType:    .byte $50    ; Default: 'P' (PRG)
 fileNameBuf: .res 32, 0
 mnemBuf:     .res 3, 0
+
+; DEBUG-local VMM allocation registry. Raw VMM identity is never a command
+; handle; only nonzero reuActive entries authorize later lifecycle operations.
+reuActive:      .res REU_HANDLE_COUNT, 0
+reuSegHi:       .res REU_HANDLE_COUNT, 0
+reuBank:        .res REU_HANDLE_COUNT, 0
+reuParagraphLo: .res REU_HANDLE_COUNT, 0
+reuParagraphHi: .res REU_HANDLE_COUNT, 0

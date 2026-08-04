@@ -58,7 +58,16 @@
   base/current-line start and a seven-byte completed-line sidecar. No zero-page,
   MAIN, VMM, source, or artifact change occurs in WP50's planning increment.
 - **Generalized Multi-Digit Version Stage System**: Migrated all `ca65` external applications and test suites in the repository from character equates to preprocessor `.define` string macros. This removes the single-digit version stage limitation, allowing `casm` to advance past `0.1.8` to `0.1.9` and later `0.1.10+` without code size or compile errors. All 8 external applications and 11 test entry points have been updated.
-- **DEBUG ca65 migration**: `debug.prg` now builds from `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 verified with matching `$2C00` header, `R6` relocation footer, 716 relocation entries, and loaded end address `$4B36` (below the `$5000` scratch range used by the manual test plan).
+- **DEBUG WP2 REU registry**: DEBUG owns five four-byte linked arrays
+  (`reuActive`, `reuSegHi`, `reuBank`, `reuParagraphLo`, and
+  `reuParagraphHi`) for four local handles, adding exactly 20 bytes. Startup
+  clears every field explicitly. No private zero-page or OS parameter-cell
+  ownership changed.
+- **DEBUG ca65 migration (historical build 1100)**: `debug.prg` builds from
+  `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 had
+  a matching `$2C00` header, R6 footer, 716 relocations, and loaded end `$4B36`.
+  Current builds are larger; the DEBUG test plan now reserves `$6000+` for
+  writable fixtures.
 - **ca65 primary test migration**: The 9 already-ported tests (`api`, `bank`, `color`, `dev`, `extcls`, `file`, `handle`, `hello`, `vmm`) now build as primary `test_<name>` ca65/ld65 targets using their existing `BUILD_TEST_<NAME>` counters. The duplicate `test_ca65_<name>` path and old Kick sources were retired; `reloc.asm` remains Kick-specific.
 - **test app naming cleanup**: Redundant `<name>test` ca65 test apps now use
   feature-only public names: `test_api`, `test_bank`, `test_dev`, `test_file`,

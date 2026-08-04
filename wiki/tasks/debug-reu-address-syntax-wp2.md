@@ -21,7 +21,7 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
 
 - [x] Increment 1: exact extended dispatch, stubs, selectors, build, and VICE
       routing verification.
-- [ ] Increment 2: registry storage, explicit startup initialization, build,
+- [x] Increment 2: registry storage, explicit startup initialization, build,
       and zero-state verification.
 - [ ] Increment 3: registry helper implementation and contract verification.
 - [ ] Increment 4: full regression, artifact audit, documentation, DOX, and
@@ -55,3 +55,22 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
 - `X`, `X A`, `XX`, `X?`, `XAA`, `XMAP`, `XA0100`, and `XA:0100` printed
   `ERROR` without stub output.
 - `Q` returned to `c64[8]:>`. No registry state or VMM API call exists yet.
+
+## Increment 2 Evidence
+
+- Added `REU_HANDLE_COUNT = 4` and five four-byte arrays: `reuActive`,
+  `reuSegHi`, `reuBank`, `reuParagraphLo`, and `reuParagraphHi`.
+- Added `initReuRegistry` before the startup banner. It explicitly clears all
+  20 bytes while preserving `Y`; no zero-page or OS parameter-cell state was
+  added.
+- DEBUG build 1117 succeeded at 6,783 code bytes and 754 relocation points.
+  Growth from Increment 1 is 46 bytes: exactly 20 registry bytes and 26 bytes
+  of initialization call/routine code. `image_d64` also built successfully.
+- At standard `$3800` load address, the registry occupies `$526B-$527E`.
+  VICE observed 20 zero bytes at the first DEBUG prompt.
+- Monitor setup replaced all fields with `01..14`; `XA`, `XD`, `XM`, and `XS`
+  stubs preserved the pattern exactly, proving no stub state mutation.
+- After `Q` and a second shell-launched DEBUG session, all 20 registry bytes
+  were zero again. Both sessions returned normally to `c64[8]:>`.
+- DOX closeout added and indexed `src/external/debug/AGENTS.md` to record the
+  new durable VMM ownership and registry-initialization contracts.
