@@ -1,6 +1,6 @@
 # DEBUG REU/Address Syntax WP5 Walkthrough
 
-**Status:** Awaiting user confirmation
+**Status:** Confirmed by user 2026-08-06
 
 **Build:** DEBUG 0.4.0 build 1124
 
@@ -167,6 +167,7 @@ disassembles `NOP`; `P =6100` proceeds to `PC=$6101` and disassembles
 
 ## Confirmation Gate
 
-Do not mark WP5 complete until the user confirms this walkthrough and
-acknowledges the envelope headroom warning above as a planning input for
-WP6, not a WP5 blocker.
+The user confirmed this walkthrough on 2026-08-06, including the envelope
+headroom warning above as a planning input for WP6, not a WP5 blocker.
+WP5 is marked complete in the wiki task, `brain/task.md`, and Taskwarrior
+UUID `a4809e03-ee37-4973-8fc6-2896bf2ea69c`.

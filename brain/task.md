@@ -1,6 +1,6 @@
 # Project Tasks
 
-- [ ] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
+- [x] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
       syntax WP5 unified `XM` parsing and preflight
   - Plan: `brain/plans/2026-08-06-debug-reu-address-syntax-wp5.md`
   - Branch: `feature/debug-reu-address-wp5` (based on `debug` after WP4
@@ -29,6 +29,7 @@
         `test_image_d64` built with no warnings; CHANGELOG.md and
         brain/MEMORY.md updated, including a flag that WP6 has very
         little `MAIN` envelope headroom remaining
+  - [x] User confirmed WP5 completion on 2026-08-06
 
 - [x] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
       syntax WP4 status reporting (`XS`/`XS handle`)

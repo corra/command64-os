@@ -39,7 +39,7 @@ Taskwarrior UUID: `a4809e03-ee37-4973-8fc6-2896bf2ea69c`
 - [x] No new VMM API call (`DOS_VMM_READ`/`DOS_VMM_WRITE`); no new private
       zero-page state; BSS growth is exactly 8 bytes.
 - [x] DEBUG remains relocatable and inside its existing linker envelope.
-- [ ] The user confirms the walkthrough before WP5 is marked complete.
+- [x] The user confirms the walkthrough before WP5 is marked complete.
 
 ## Evidence
 
