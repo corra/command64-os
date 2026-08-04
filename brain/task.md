@@ -10,7 +10,17 @@
         DEBUG build 1117 and VICE zero/reset/stub-preservation checks passed
   - [x] Increment 3: all three registry helpers implemented; DEBUG build 1119
         and direct VICE carry/register/selector path verification passed
-  - [ ] Increment 4: regression, artifact audit, DOX, and walkthrough
+  - [x] Increment 4: DEBUG build 1119 rebuilt clean (6,885 code bytes, 762
+        relocation points, within the 8KB `MAIN` envelope); `image_d64` and
+        `test_image_d64` built with no warnings; VICE matrix on `image.d64`
+        confirmed bare/argument `XA`/`XD`/`XM`/`XS` route to the temporary
+        stub, `X`/`X A`/`XX`/`X?`/`XAA`/`XMAP`/`XA0100`/`XA:0100` all reject
+        with no stub text, lowercase `xa` normalizes identically, and stub
+        handlers make no memory writes (static: each is `jmp reuStub` ->
+        `API_PRINT_STR` only); re-ran WP1 `G =6000`/`T =6100`/`P =6100`/`Q`
+        against safe RTS/NOP fixtures with clean shell return; static grep
+        confirms zero `DOS_ALLOC_MEM`/`DOS_FREE_MEM`/`DOS_VMM_READ`/
+        `DOS_VMM_WRITE`/`DOS_GET_SYSTEM_INFO` call sites in `debug.s`
   - [ ] Obtain explicit user confirmation before marking WP2 complete
 
 - [x] Taskwarrior (`adfecaf3-212c-4e91-bcf5-f1c79f673eae`): DEBUG REU/address

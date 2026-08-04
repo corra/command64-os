@@ -24,17 +24,17 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
 - [x] Increment 2: registry storage, explicit startup initialization, build,
       and zero-state verification.
 - [x] Increment 3: registry helper implementation and contract verification.
-- [ ] Increment 4: full regression, artifact audit, documentation, DOX, and
+- [x] Increment 4: full regression, artifact audit, documentation, DOX, and
       user-confirmed walkthrough.
 
 ## Acceptance
 
-- [ ] Only exact `XA`, `XD`, `XM`, and `XS` tokens route to stubs or handlers.
-- [ ] Malformed `X` tokens fail without state changes.
-- [ ] Four registry slots initialize deterministically.
-- [ ] Registry helpers satisfy documented carry/register/error contracts.
-- [ ] WP2 adds no VMM API call and no private zero-page state.
-- [ ] DEBUG remains relocatable and inside its existing linker envelope.
+- [x] Only exact `XA`, `XD`, `XM`, and `XS` tokens route to stubs or handlers.
+- [x] Malformed `X` tokens fail without state changes.
+- [x] Four registry slots initialize deterministically.
+- [x] Registry helpers satisfy documented carry/register/error contracts.
+- [x] WP2 adds no VMM API call and no private zero-page state.
+- [x] DEBUG remains relocatable and inside its existing linker envelope.
 - [ ] The user confirms the walkthrough before WP2 is marked complete.
 
 ## Increment 1 Evidence
@@ -99,3 +99,29 @@ Taskwarrior UUID: `91036469-8479-4a27-83ab-e74158f2fdea`
   preserving candidate `X` on both failures.
 - Verification used direct monitor-controlled helper invocation and terminated
   the synthetic-stack session rather than resuming it. No VMM API was called.
+
+## Increment 4 Evidence
+
+- Rebuilt `debug` clean: 6,885 code bytes and 762 relocation points, identical
+  to build 1119's runtime bytes; still inside the unchanged 8KB `MAIN`
+  envelope. `image_d64` and `test_image_d64` both built with no warnings or
+  errors attributable to WP2.
+- VICE booted `build/image.d64`, proved the Command64 banner, and launched
+  DEBUG 0.4.0 build 1119 by name.
+- Accepted-token matrix: bare `XA`, `XD`, `XM`, `XS` and argument forms
+  `XA 0100`, `XD 0`, `XM 0 0000 6000 0001 R`, `XS 0` all printed
+  `not yet implemented`.
+- Rejected-token matrix: `X`, `X A`, `XX`, `X?`, `XAA`, `XMAP`, `XA0100`, and
+  `XA:0100` all printed `error` with no stub text.
+- Shift/case form: lowercase `xa` normalized identically to `XA`.
+- Static audit: `cmdReuAlloc`/`cmdReuFree`/`cmdReuMove`/`cmdReuStatus` each
+  resolve to `jmp reuStub`, and `reuStub` calls only `API_PRINT_STR` -- no
+  stub reaches a memory-writing instruction, so registry state cannot change
+  through dispatch. `grep` for `DOS_ALLOC_MEM`, `DOS_FREE_MEM`,
+  `DOS_VMM_READ`, `DOS_VMM_WRITE`, and `DOS_GET_SYSTEM_INFO` in `debug.s`
+  returned zero matches.
+- WP1 regression: `G =6000` (RTS fixture), `T =6100` and `P =6100` (NOP/RTS
+  fixture) all executed and returned as documented; `Q` returned cleanly to
+  `c64[8]:>`.
+- No new private zero-page symbol was introduced; the registry remains the
+  20-byte BSS block added in Increment 2.
