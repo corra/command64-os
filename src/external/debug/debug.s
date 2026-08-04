@@ -3163,6 +3163,34 @@ ssLoop:
 ssDone:
     rts
 
+; Requires the remainder of inputBuf to contain only spaces.
+; In: Y = current input index.
+; Out: C=0 at the null terminator; C=1 at the first trailing byte.
+;      Y points at that byte and A contains it. X and HexValLo/Hi preserved.
+requireEnd:
+    jsr skipSpaces
+    lda inputBuf, y
+    beq reDone
+    sec
+    rts
+reDone:
+    clc
+    rts
+
+; Skips execution-command spacing and one optional '=' plus following spaces.
+; In: Y = index immediately after G, T, or P.
+; Out: Y points at the address or null terminator. A/flags clobbered; X and
+;      HexValLo/Hi preserved. Carry has no defined meaning.
+parseOptionalEquals:
+    jsr skipSpaces
+    lda inputBuf, y
+    cmp #'='
+    bne poeDone
+    iny
+    jsr skipSpaces
+poeDone:
+    rts
+
 ; Parses hex starting at inputBuf,y
 ; Result in HexValLo/Hi. Returns C=0 on success.
 parseHexArg:
