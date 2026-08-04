@@ -1,6 +1,37 @@
 # Project Tasks
 
-- [ ] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
+- [x] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
+      syntax WP5 unified `XM` parsing and preflight
+  - Plan: `brain/plans/2026-08-06-debug-reu-address-syntax-wp5.md`
+  - Branch: `feature/debug-reu-address-wp5` (based on `debug` after WP4
+    merge, commit `b81afcf`)
+  - Plan approved 2026-08-06
+  - [x] Increment 1-3 implemented together: DEBUG build 1124 (8,033 code
+        bytes, 959 relocation points, still within the 8KB `MAIN`
+        envelope but with little headroom left); VICE-verified all four
+        flat/`page:offset` equivalence pairs against a 64KB allocation
+        produce identical `XM PREFLIGHT OK` results; all five malformed
+        `page:offset` forms (`0001:1000`, `0010:0000`, `0001:`, plus the
+        parser's own zero-digit/5-digit rejections) reject correctly;
+        allocation-window boundary matrix against a 4KB allocation
+        (exact-fill accept, one-byte-over reject, final-byte accept,
+        one-past-capacity reject) and the 64KB-allocation boundary
+        (`000F:0FFF`+length-1 accept, +length-2 reject) both pass exactly;
+        C64-window wrap (`FFFF`+length-2 reject, +length-1 accept) passes;
+        direction/trailing-input/missing-arg/zero-length/invalid-and-
+        inactive-handle cases all reject with the correct selector
+  - [x] Increment 4: static grep confirmed zero `DOS_VMM_READ`/
+        `DOS_VMM_WRITE` call sites; BSS growth is exactly 8 bytes; `G`/
+        `T`/`P`/`Q` regression re-verified via the checkpoint/register
+        procedure ([[reference-vice-checkpoint-verification]]) —
+        `PC=$6000` on `G`, `PC=$6101` on both `T` and `P`, clean `Q`
+        return with the remaining allocation cleaned up; `image_d64` and
+        `test_image_d64` built with no warnings; CHANGELOG.md and
+        brain/MEMORY.md updated, including a flag that WP6 has very
+        little `MAIN` envelope headroom remaining
+  - [x] User confirmed WP5 completion on 2026-08-06
+
+- [x] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
       syntax WP4 status reporting (`XS`/`XS handle`)
   - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp4.md`
   - Branch: `feature/debug-reu-address-wp4` (based on `debug` after WP3

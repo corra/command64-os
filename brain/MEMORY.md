@@ -92,6 +92,25 @@
   testing: the `REU` VICE resource does not take hardware effect until a
   reset — setting it before `vice_load_program`'s autostart is not
   sufficient by itself; a `vice_reset` (or power cycle) is needed first.
+- **DEBUG WP5 XM parsing and preflight**: `XM` parses its full grammar
+  (handle, flat or `page:offset` operand, C64 address, length, `R`/`W`
+  direction) and validates both windows before any DMA — still no
+  `DOS_VMM_READ`/`DOS_VMM_WRITE` call anywhere in `debug.s`. Adds 8 bytes
+  of dedicated transfer state (`reuMoveHandle`, `reuMoveOffLo/Hi`,
+  `reuMoveAddrLo/Hi`, `reuMoveLenLo/Hi`, `reuMoveDir`); `parseVmmOffset`
+  reuses WP3's `reuXferParaLo/Hi` as transient page/offset-parsing
+  scratch, and `validateReuWindow` reuses the general-purpose `val1`/
+  `val1+1` zero-page cells (already used transiently by other commands,
+  e.g. `G`'s indirect jump) for its capacity computation — no new private
+  zero-page ownership. Both window validators use carry-preserving 17-bit
+  -safe addition to correctly accept the two genuine boundary cases (a
+  REU allocation of exactly 64KB ending a transfer exactly at its
+  capacity; a C64 transfer ending exactly at `$10000`/`$FFFF` inclusive)
+  while rejecting everything one byte beyond. DEBUG build 1124: 8,033
+  code bytes, 959 relocation points — still within the 8KB `MAIN`
+  envelope, but headroom is now tight (roughly 160 bytes of code budget
+  before BSS, out of the original 8192-byte combined envelope) heading
+  into WP6, which adds chunked-transfer state and logic on top.
 - **DEBUG ca65 migration (historical build 1100)**: `debug.prg` builds from
   `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 had
   a matching `$2C00` header, R6 footer, 716 relocations, and loaded end `$4B36`.

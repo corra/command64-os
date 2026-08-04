@@ -16,6 +16,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG WP5 REU transfer parsing and preflight**: `XM handle
+  offset|page:offset address length R|W` now parses its full grammar and
+  validates both the REU-side and C64-side transfer windows before any
+  DMA (no `DOS_VMM_READ`/`DOS_VMM_WRITE` call exists yet — WP6 performs
+  the actual transfer). Flat and `page:offset` operands normalize to
+  identical state; the allocation-window check correctly handles the
+  `$1000`-paragraph (exactly 65536-byte) allocation's boundary case, and
+  the C64-window check rejects a transfer that would wrap past `$FFFF`
+  without silently continuing at `$0000`. On full validation success,
+  prints a temporary `XM PREFLIGHT OK` indicator (WP6 replaces this with
+  the real transfer's own reporting). DEBUG build 1124: 8,033 code bytes,
+  959 relocation points, still within the 8KB `MAIN` envelope but with
+  little headroom left for WP6.
 - **DEBUG WP4 REU status reporting**: `XS handle` prints one active
   allocation's summary in the exact format `XA` already produces for it
   (`<handle>: SEG=xx BANK=xx PARA=xxxx PAGES=xx SIZE=xxxx`), rejecting

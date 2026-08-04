@@ -696,6 +696,9 @@ before issuing page-relative `XM` commands.
 
 ### WP5: Unified `XM` Parsing and Preflight
 
+Detailed implementation plan:
+`brain/plans/2026-08-06-debug-reu-address-syntax-wp5.md`.
+
 1. Add dedicated transfer BSS state.
 2. Implement `parseVmmOffset` for both flat and `page:offset` forms.
 3. Parse C64 address, length, and direction.
