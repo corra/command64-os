@@ -1,6 +1,16 @@
 # Project Tasks
 
-- [ ] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
+- [ ] Taskwarrior (`4141acb7-d8a7-4cb1-babd-9628f24616df`): DEBUG REU/address
+      syntax WP4 status reporting (`XS`/`XS handle`)
+  - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp4.md`
+  - Branch: `feature/debug-reu-address-wp4` (based on `debug` after WP3
+    merge, commit `597ec59`)
+  - Plan approved 2026-08-04; implementation not yet started
+  - [ ] Increment 1: `XS handle`
+  - [ ] Increment 2: bare `XS`
+  - [ ] Increment 3: regression, documentation, DOX, and walkthrough
+
+- [x] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
       syntax WP3 allocation lifecycle (`XA`/`XD`/`Q` cleanup)
   - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp3.md`
   - Branch: `feature/debug-reu-address-wp3` (based on `debug` after WP2 merge,
