@@ -1,5 +1,22 @@
 # Project Tasks
 
+- [x] Taskwarrior (`adfecaf3-212c-4e91-bcf5-f1c79f673eae`): DEBUG REU/address
+      syntax WP1 parser foundation and permissive `=`
+  - Plan: `brain/plans/2026-08-03-debug-reu-and-address-syntax-wp1.md`
+  - Branch: `feature/debug-reu-address-wp1-plan`
+  - [x] Increment 1: added `requireEnd` and `parseOptionalEquals`; DEBUG build
+        1112 succeeded with 6,580 code bytes and 721 relocation points
+  - [x] Increment 2: `G` integrated and verified under VICE on DEBUG build
+        1113; valid bare/`=` forms matched, invalid forms did not execute, and
+        no-argument behavior remained compatible
+  - [x] Increment 3: shared `T`/`P` integrated and verified under VICE on
+        DEBUG build 1114; invalid forms preserved PC, trace/proceed behavior
+        and ROM handling remained compatible
+  - [x] Increment 4: focused regression, artifact review, DOX, and walkthrough
+        including safe `$6000+` rerun and stale test-plan range correction
+        completed; user confirmed the walkthrough on 2026-08-04
+  - [x] User confirmed WP1 completion on 2026-08-04
+
 - [x] Taskwarrior UUID `13a45324`: CASM Phase 1 native application scaffold
   - [x] `ef6a001e` Create synchronized task records and CASM-local DOX contract
   - [x] `7b318ab7` Declare approved zero-page, base-RAM, and module ABI

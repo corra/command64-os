@@ -117,7 +117,11 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 ## Test Suite 3: Memory Manipulation (`D`, `E`, `F`, `M`, `C`, `S`)
 
 > [!IMPORTANT]
-> **Safety Constraint**: All memory manipulation tests in this suite must target the scratch range `$5000+`, which is safe from memory collisions with the resident `debug` program (located at `$2000-$376B`). Never use `E`, `F`, `M`, or `W`/`L` writes against addresses inside `$2000-$376B` — doing so overwrites the running debugger's own code/data.
+> **Safety Constraint**: Current relocatable DEBUG builds load at `$3800` and
+> build 1114 occupies through approximately `$51C2`. Use `$6000+` for every
+> writable fixture. Legacy examples below that use a `$4000` or `$5000` base
+> must be translated to `$6000` while preserving relative offsets; translate
+> `$4500` or `$5500` to `$6500`. Never write inside `$3800-$51C2`.
 
 ### Test 3.1: Memory Dump (`D`)
 
@@ -381,7 +385,10 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 #### Test 7.3.1: Load with Empty Filename
 
 > [!IMPORTANT]
-> **Safety Constraint**: Loads relocated away from a file's header address must target `$6000+`, kept clear of both the resident `debug` program (`$2000-$376B`) and the `$4000` scratch range used by the assembler/trace/proceed test suites (8-12). Loads at the file's own header address rely on the `$5000` scratch range established in Suite 7.2.
+> **Safety Constraint**: Apply Suite 3's address-translation rule. Files saved
+> from a legacy `$5000` header example must instead use `$6000`; relocated-load
+> cases must use `$7000+` so source and destination remain distinct and both
+> stay clear of resident DEBUG through approximately `$51C2`.
 
 - **Procedure**:
   1. Start a fresh `debug` session.
@@ -641,7 +648,10 @@ This suite verifies that the interactive assembler correctly prompts, reads, par
 ## Test Suite 10: Single-Step Instruction Tracing (`T`)
 
 > [!IMPORTANT]
-> **Safety Constraint**: All manual tracing/proceed tests must use target addresses (e.g. `$4000+`) that are safe from memory collisions with the resident `debug` program itself (located at `$2000-$376B`), unless they are explicitly intended to test boundary conditions or destructive behavior.
+> **Safety Constraint**: Apply Suite 3's address-translation rule to all
+> assembler, trace, and proceed examples: use `$6000` instead of `$4000` and
+> `$6500` instead of `$4500`. Current DEBUG occupies approximately
+> `$3800-$51C2`; tracing or assembling there corrupts the debugger.
 
 ### Test 10.1: Default Trace (Current PC)
 
