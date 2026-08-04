@@ -80,7 +80,10 @@ the likely root cause is in `src/command64/api.asm`'s MCT scan or
 `vmm.asm`'s page marking. Flagged in `CHANGELOG.md` and
 `brain/MEMORY.md` for separate investigation.
 
-Not re-verified in this pass: WP1's `G`/`T`/`P` smoke tests (unmodified by
-WP4; same gap noted in the WP3 walkthrough — fixture bytes need `E 6000
-60`/`E 6100 EA EA EA 60` poked first on a fresh boot). Flagged for the user
-to confirm via the manual walkthrough, same as WP3.
+**Update 2026-08-05**: WP1's `G`/`T`/`P` smoke tests (unmodified by WP4)
+are now re-verified against build 1123 by the same automated
+checkpoint/register-based procedure developed for WP3 — see
+`brain/walkthroughs/2026-08-05-debug-reu-address-syntax-wp3.md`'s "WP1
+`G`/`T`/`P` Regression: Now Automated" section. `G =6000` and `T`/`P
+=6100` land exactly on `PC=$6000`/`$6101` as checkpoint-confirmed, and `Q`
+returns cleanly to `c64[8]:>`.

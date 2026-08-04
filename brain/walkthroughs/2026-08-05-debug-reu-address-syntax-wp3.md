@@ -44,15 +44,48 @@
   - `XD 0` -> `ERROR` (no active handle, rejected before any OS call)
   - `Q` -> clean return to `c64[8]:>` with nothing to clean up
 
-## Not Yet Re-Verified: WP1 `G`/`T`/`P` Regression
+## WP1 `G`/`T`/`P` Regression: Now Automated (2026-08-05)
 
 WP3 does not modify `cmdGo` or `cmdTraceProceedCommon`, so this is a
-regression check, not new WP3 behavior. An automated re-check attempted in
-this pass reused `$6000`/`$6100` as execution targets on a freshly booted
+regression check, not new WP3 behavior. An initial automated re-check
+attempt reused `$6000`/`$6100` as execution targets on a freshly booted
 `image.d64` without first poking fixture bytes there, which crashed back to
-BASIC -- a test-setup gap (the fixture bytes from WP1/WP2's own walkthrough
-session were not present on a clean boot), not a WP3 code defect. Please
-run this manually as part of confirming the walkthrough:
+BASIC -- a test-setup gap, not a WP3 code defect. A corrected,
+checkpoint/register-based procedure (developed and proven during WP4) has
+since re-verified this cleanly without a human in the loop:
+
+1. Poke fixtures and verify by memory read, not by trusting keyboard echo:
+   `E 6000 60`, `E 6100 EA EA EA 60`, then `vice_read_memory` confirms
+   `$6000=60` and `$6100-6103=EAEAEA60`.
+2. `G =6000`: set a non-temporary `exec` checkpoint at `$6000`
+   (`vice_set_checkpoint`), feed `G =6000`, resume, then
+   `vice_read_registers` confirms `PC=$6000` -- deterministic proof of
+   transfer, no screen-text decoding involved. Delete the checkpoint,
+   resume again, and the emulator returns cleanly to the `-` prompt (the
+   installed `RTS` pops the `jsr cgIndirect` return address, per
+   `cmdGo`/`cgIndirect` in `debug.s`).
+3. `T =6100` / `P =6100`: DEBUG's `launchProgram` genuinely executes the
+   target on real hardware and installs a `BRK` ($00) at the computed
+   breakpoint target (`decodeTargets`' default case: `regPC + instruction
+   length` = `$6101` for the 1-byte `NOP`), redirecting `CBINV` to trap it.
+   A non-temporary `exec` checkpoint at `$6101` reliably halts there;
+   `vice_read_registers` confirms `PC=$6101` directly, and
+   `vice_read_memory` at that moment shows the installed `$00`. Resuming
+   lets `myBrkHandler` restore the original `EA` byte (confirmed by a
+   follow-up memory read) and return to the DEBUG prompt.
+4. `Q` returns to `c64[8]:>`, confirmed by screen text as a secondary
+   check now that the primary assertions are memory/register-based.
+
+**Caveat found while developing this**: a *temporary* checkpoint
+(`temporary:true`) did not reliably hold the pause for inspection -- the
+first `T =6100` attempt with a temporary checkpoint had already run past
+it into DEBUG's KERNAL keyboard-wait loop by the time registers were read,
+even with no sleep in between some checks. Switching to a non-temporary
+checkpoint, explicitly deleted after each use, held the pause reliably
+both times it was tried. Use non-temporary checkpoints for any future
+hold-and-inspect verification against DEBUG's `G`/`T`/`P`.
+
+Full verified sequence:
 
 ```text
 E 6000 60
@@ -63,12 +96,14 @@ P =6100
 Q
 ```
 
-Expected:
+Confirmed:
 
 - `G =6000` executes the installed `RTS` and returns to the `-` prompt
-  without printing an error.
-- `T =6100` traces to `PC=$6101` and disassembles `NOP`.
-- `P =6100` proceeds to `PC=$6101` and disassembles `NOP`.
+  without printing an error (checkpoint-verified `PC=$6000` before return).
+- `T =6100` traces to `PC=$6101` (checkpoint-verified) and restores the
+  original `NOP` byte on return.
+- `P =6100` proceeds to `PC=$6101` (checkpoint-verified) and restores the
+  original `NOP` byte on return.
 - `Q` returns to a shell prompt matching `c64[<device>]:>`.
 
 ## `XA` Allocation Confirmation

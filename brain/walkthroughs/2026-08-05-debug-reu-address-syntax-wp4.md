@@ -52,11 +52,18 @@ likely points at the MCT scan in `api.asm` or page marking in `vmm.asm`.
 Recorded in `CHANGELOG.md` and `brain/MEMORY.md`; flagged for a separate
 investigation, not fixed here.
 
-## Not Yet Re-Verified: WP1 `G`/`T`/`P` Regression
+## WP1 `G`/`T`/`P` Regression: Automated (2026-08-05)
 
-Same gap as the WP3 walkthrough: WP4 does not modify `cmdGo` or
-`cmdTraceProceedCommon`. Please run this manually as part of confirming
-the walkthrough:
+WP4 does not modify `cmdGo` or `cmdTraceProceedCommon`. This gap (manual
+in the initial WP3/WP4 passes) is now closed with a checkpoint/register-
+based procedure — see `brain/walkthroughs/2026-08-05-debug-reu-address-
+syntax-wp3.md`'s "WP1 `G`/`T`/`P` Regression: Now Automated" section for
+the full method and findings (non-temporary checkpoints only; verify
+fixture pokes and trace/proceed landings by `vice_read_memory`/
+`vice_read_registers`, not screen text). Re-run against this WP4 build
+(1123) with the same sequence and got the same results: `G =6000` and
+`T`/`P =6100` land exactly on `PC=$6000`/`$6101` as checkpoint-confirmed,
+and `Q` returns cleanly to `c64[8]:>`.
 
 ```text
 E 6000 60
@@ -121,7 +128,7 @@ Expected: `VMM INACTIVE`, `PAGES TOTAL=0000 ALLOC=0000 FREE=0000`, `NONE`.
 
 ## Confirmation Gate
 
-Do not mark WP4 complete until the user confirms this walkthrough,
-including the `G`/`T`/`P` regression check this automated pass could not
-complete, and accepts the unresolved MCT-scan caveat (Section above) as
-out-of-scope follow-up work rather than a WP4 blocker.
+Do not mark WP4 complete until the user confirms this walkthrough and
+accepts the unresolved MCT-scan caveat (Section above) as out-of-scope
+follow-up work rather than a WP4 blocker. The `G`/`T`/`P`/`Q` regression
+check is now fully automated evidence (Section above), not a manual item.
