@@ -64,6 +64,16 @@
   clears every field explicitly. No private zero-page or OS parameter-cell
   ownership changed. In DEBUG build 1119 at standard `$3800` load address, the
   registry occupies `$52D1-$52E4`.
+- **DEBUG WP3 allocation lifecycle**: `XA`/`XD` are real (no longer stubs);
+  `Q` routes through `freeAllReu`, which sweeps all four registry slots with
+  no early exit and exits only when every active slot is freed. Adds three
+  more linked bytes (`reuXferParaLo`, `reuXferParaHi`, `reuXferSlot`)
+  reused as scratch across the `DOS_ALLOC_MEM`/`DOS_FREE_MEM` `OS_API`
+  calls (which clobber `A`/`X`/`Y`); `XA` also reuses `reuXferParaLo/Hi` to
+  compute the display-only page count and byte capacity after registering
+  the allocation. No new private zero-page or OS parameter-cell ownership.
+  `XM`/`XS` remain WP2 stubs; still no `DOS_VMM_READ`/`DOS_VMM_WRITE`/
+  `DOS_GET_SYSTEM_INFO` call anywhere in `debug.s`.
 - **DEBUG ca65 migration (historical build 1100)**: `debug.prg` builds from
   `src/external/debug/debug.s` via ca65/ld65 and `add_ca65_app`; build 1100 had
   a matching `$2C00` header, R6 footer, 716 relocations, and loaded end `$4B36`.

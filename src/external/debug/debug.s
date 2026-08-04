@@ -289,8 +289,63 @@ API_EXIT:
 ; ---------------------------------------------------------------------------
 ; Command Handlers
 ; ---------------------------------------------------------------------------
+; WP3: route Q through cleanup of every DEBUG-owned REU allocation. Exit
+; only when every active slot is freed; otherwise report cleanup failure
+; and remain in DEBUG so the allocations can be inspected or retried.
 cmdQuit:
+    jsr freeAllReu
+    bcs cqCleanupFailed
     jmp API_EXIT
+cqCleanupFailed:
+    jmp reuError             ; A already holds REU_ERR_CLEANUP
+
+; Attempts DOS_FREE_MEM for every active registry slot. Never stops early:
+; a rejected free leaves that slot active for a later retry. reuXferParaLo
+; and reuXferSlot are reused here as scratch (XA/XD never run concurrently
+; with Q's cleanup pass).
+; Out: C=0 if every active slot ended inactive.
+;      C=1 and A=REU_ERR_CLEANUP if at least one slot is still active.
+freeAllReu:
+    lda #0
+    sta reuXferParaLo        ; 0 = no failures observed yet
+    ldx #0
+farLoop:
+    lda reuActive, x
+    beq farAdvance
+    stx reuXferSlot
+    lda reuBank, x
+    pha
+    lda reuSegHi, x
+    tax
+    pla
+    tay
+    lda #DOS_FREE_MEM
+    jsr OS_API
+    ldx reuXferSlot
+    bcs farMarkFailed
+    lda #0
+    sta reuActive, x
+    sta reuSegHi, x
+    sta reuBank, x
+    sta reuParagraphLo, x
+    sta reuParagraphHi, x
+    jmp farAdvance
+farMarkFailed:
+    lda #1
+    sta reuXferParaLo
+farAdvance:
+    inx
+    cpx #REU_HANDLE_COUNT
+    bcc farLoop
+
+    lda reuXferParaLo
+    beq farAllOk
+    lda #REU_ERR_CLEANUP
+    sec
+    rts
+farAllOk:
+    clc
+    rts
 
 ; Parses exact two-character extended command tokens.
 ; In: Y points immediately after 'X'.
@@ -358,11 +413,195 @@ reteSuccess:
     clc
     rts
 
-; Distinct WP2 routing stubs. Later work packages replace these handlers.
+; WP3: XA paragraphs - allocate a VMM block and register a DEBUG handle.
+; In: Y = operand position (leading spaces already skipped by cmdExtended).
 cmdReuAlloc:
-    jmp reuStub
+    lda inputBuf, y
+    bne craHasArg
+    lda #REU_ERR_MISSING_ARG
+    jmp reuError
+craHasArg:
+    jsr parseHexArg
+    bcs craRange
+    jsr requireEnd
+    bcs craTrailing
+
+    ; Validate $0001-$1000 paragraphs.
+    lda HexValHi
+    cmp #$11
+    bcs craRange            ; Hi >= $11 -> value >= $1100, too big
+    cmp #$10
+    bne craCheckZero        ; Hi < $10 -> only the zero case remains
+    lda HexValLo
+    bne craRange            ; Hi == $10, Lo <> 0 -> > $1000
+    jmp craValid            ; exactly $1000
+craCheckZero:
+    lda HexValLo
+    ora HexValHi
+    bne craValid
+    lda #REU_ERR_VALUE_RANGE
+    jmp reuError
+
+craValid:
+    lda HexValLo
+    sta reuXferParaLo
+    lda HexValHi
+    sta reuXferParaHi
+
+    jsr findFreeReuHandle
+    bcs craFull
+    stx reuXferSlot
+
+    lda #DOS_ALLOC_MEM
+    ldx reuXferParaLo
+    ldy reuXferParaHi
+    jsr OS_API
+    bcs craAllocFailed
+
+    ; Success: X=SegHi, Y=Bank. Stack them so the free slot can be loaded
+    ; into X for indexed registry stores.
+    tya
+    pha
+    txa
+    pha
+    ldx reuXferSlot
+    pla
+    sta reuSegHi, x
+    pla
+    sta reuBank, x
+    lda reuXferParaLo
+    sta reuParagraphLo, x
+    lda reuXferParaHi
+    sta reuParagraphHi, x
+    lda #1
+    sta reuActive, x
+
+    jsr printReuAllocSummary
+    clc
+    rts
+
+craFull:
+    lda #REU_ERR_REGISTRY_FULL
+    jmp reuError
+craAllocFailed:
+    cmp #VMM_ERR_INVALID
+    beq craUnavailable
+    lda #REU_ERR_VMM_NOMEM
+    jmp reuError
+craUnavailable:
+    lda #REU_ERR_VMM_UNAVAILABLE
+    jmp reuError
+craRange:
+    lda #REU_ERR_VALUE_RANGE
+    jmp reuError
+craTrailing:
+    lda #REU_ERR_TRAILING_INPUT
+    jmp reuError
+
+; Prints "<handle>: SEG=xx BANK=xx PARA=xxxx PAGES=xx SIZE=xxxx" (or
+; SIZE=10000 for the exact 64KB allocation). In: reuXferSlot is the just
+; -registered handle. Clobbers A, X, Y; reuXferParaLo/Hi are destroyed.
+printReuAllocSummary:
+    lda reuXferSlot
+    jsr printHex8
+    lda #<msgReuSeg
+    ldy #>msgReuSeg
+    jsr API_PRINT_STR
+    ldx reuXferSlot
+    lda reuSegHi, x
+    jsr printHex8
+    lda #<msgReuBank
+    ldy #>msgReuBank
+    jsr API_PRINT_STR
+    ldx reuXferSlot
+    lda reuBank, x
+    jsr printHex8
+    lda #<msgReuPara
+    ldy #>msgReuPara
+    jsr API_PRINT_STR
+    lda reuXferParaHi
+    jsr printHex8
+    lda reuXferParaLo
+    jsr printHex8
+    lda #<msgReuPages
+    ldy #>msgReuPages
+    jsr API_PRINT_STR
+
+    ; Page count = high byte of (paragraphs + 255).
+    lda reuXferParaLo
+    clc
+    adc #255
+    lda reuXferParaHi
+    adc #0
+    jsr printHex8
+
+    lda #<msgReuSize
+    ldy #>msgReuSize
+    jsr API_PRINT_STR
+
+    ; Byte capacity: paragraphs == $1000 is the one 17-bit case (65536).
+    lda reuXferParaHi
+    cmp #$10
+    bne prasShift
+    lda #<msgReu64K
+    ldy #>msgReu64K
+    jsr API_PRINT_STR
+    jmp prasCrLf
+
+prasShift:
+    ldx #4
+prasShiftLoop:
+    asl reuXferParaLo
+    rol reuXferParaHi
+    dex
+    bne prasShiftLoop
+    lda reuXferParaHi
+    jsr printHex8
+    lda reuXferParaLo
+    jsr printHex8
+
+prasCrLf:
+    lda #$0D
+    jsr KernalChROUT
+    rts
+
+; WP3: XD handle - release a DEBUG-owned VMM block.
+; In: Y = operand position (leading spaces already skipped by cmdExtended).
 cmdReuFree:
-    jmp reuStub
+    lda #1                  ; require an active handle
+    jsr parseReuHandle
+    bcc crfHandleOk
+    jmp reuError             ; A already holds parseReuHandle's selector
+crfHandleOk:
+    jsr requireEnd
+    bcc crfEndOk
+    lda #REU_ERR_TRAILING_INPUT
+    jmp reuError
+crfEndOk:
+    stx reuXferSlot          ; X is unclobbered by requireEnd; stash anyway
+    jsr getReuRecord         ; In: X=handle. Out: X=SegHi, Y=Bank, C=0.
+    bcc crfRecordOk
+    jmp reuError             ; A already holds getReuRecord's selector
+
+crfRecordOk:
+    lda #DOS_FREE_MEM
+    jsr OS_API
+    bcs crfFreeFailed
+
+    ldx reuXferSlot
+    lda #0
+    sta reuActive, x
+    sta reuSegHi, x
+    sta reuBank, x
+    sta reuParagraphLo, x
+    sta reuParagraphHi, x
+    clc
+    rts
+
+crfFreeFailed:
+    lda #REU_ERR_CLEANUP
+    jmp reuError
+
 cmdReuMove:
     jmp reuStub
 cmdReuStatus:
@@ -3580,6 +3819,26 @@ msgStub:
     .byte "not yet implemented"
     .byte $0D, 0
 
+; WP3 XA allocation summary label fragments (no CR; joined with printHex8).
+msgReuSeg:
+    .byte ": SEG="
+    .byte 0
+msgReuBank:
+    .byte " BANK="
+    .byte 0
+msgReuPara:
+    .byte " PARA="
+    .byte 0
+msgReuPages:
+    .byte " PAGES="
+    .byte 0
+msgReuSize:
+    .byte " SIZE="
+    .byte 0
+msgReu64K:
+    .byte "10000"
+    .byte 0
+
 ; UI label/separator strings (shared across print sites via API_PRINT_STR)
 sepColonSp:
     .byte ": "
@@ -3749,3 +4008,9 @@ reuSegHi:       .res REU_HANDLE_COUNT, 0
 reuBank:        .res REU_HANDLE_COUNT, 0
 reuParagraphLo: .res REU_HANDLE_COUNT, 0
 reuParagraphHi: .res REU_HANDLE_COUNT, 0
+
+; WP3 XA scratch: validated paragraph count and free slot, staged across
+; findFreeReuHandle and the DOS_ALLOC_MEM OS_API call (both clobber A/X/Y).
+reuXferParaLo: .byte 0
+reuXferParaHi: .byte 0
+reuXferSlot:   .byte 0

@@ -16,6 +16,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG WP3 REU allocation lifecycle**: `XA paragraphs` allocates
+  `$0001-$1000` paragraphs through `DOS_ALLOC_MEM`, registers the grant in a
+  DEBUG-local handle, and prints `<handle>: SEG=xx BANK=xx PARA=xxxx
+  PAGES=xx SIZE=xxxx` (`SIZE=10000` for the exact 64KB allocation). `XD
+  handle` releases an active handle through `DOS_FREE_MEM` and clears the
+  record only on success, preserving it for retry on a rejected free. `Q`
+  now routes through `freeAllReu`, which attempts release of every active
+  DEBUG-owned allocation with no early exit and clears each slot only after
+  its individual free succeeds; `Q` exits only when cleanup fully succeeds,
+  otherwise it reports an error and returns to the DEBUG prompt with the
+  remaining allocations intact. `XM` and `XS` remain WP2 stubs. No
+  `DOS_VMM_READ`, `DOS_VMM_WRITE`, or `DOS_GET_SYSTEM_INFO` call is added.
 - **DEBUG WP2 extended-command dispatch foundation**: exact `XA`, `XD`, `XM`,
   and `XS` tokens now route to distinct temporary handlers with consistent
   shifted/unshifted PETSCII normalization. Malformed prefixes such as `XAA`,

@@ -1,5 +1,34 @@
 # Project Tasks
 
+- [ ] Taskwarrior (`49b81383-9e58-4f51-95f2-f7f7ad3a0427`): DEBUG REU/address
+      syntax WP3 allocation lifecycle (`XA`/`XD`/`Q` cleanup)
+  - Plan: `brain/plans/2026-08-05-debug-reu-address-syntax-wp3.md`
+  - Branch: `feature/debug-reu-address-wp3` (based on `debug` after WP2 merge,
+    commit `bd5539d`)
+  - [x] Increment 1: `XA` allocation; DEBUG build 1120 (7,203 code bytes, 822
+        relocation points); VICE-verified `XA 0001`/`0100`/`1000` register and
+        print the documented `SEG=/BANK=/PARA=/PAGES=/SIZE=` summary
+        (`1000` paragraphs correctly shows `SIZE=10000`); `XA 0000`/`1001`
+        rejected with no registry change; registry-full rejected on the 5th
+        concurrent allocation
+  - [x] Increment 2: `XD` release; DEBUG build 1121 (7,265 code bytes, 835
+        relocation points); VICE-verified a valid handle frees silently, a
+        repeated `XD` reports inactive, and an out-of-range handle (`XD 9`)
+        rejects before any OS call
+  - [x] Increment 3: `freeAllReu` and `Q` routing; DEBUG build 1122 (7,349
+        code bytes, 851 relocation points, within the 8KB `MAIN` envelope);
+        VICE-verified `Q` with four active allocations releases all four and
+        returns to `c64[8]:>`; a DEBUG restart confirmed all four handles
+        report inactive (no leaked allocation); REU-disabled boot confirmed
+        `XA`/`XD` fail cleanly and `Q` with no allocations exits normally
+  - [x] Increment 4: static grep confirmed zero `DOS_VMM_READ`/
+        `DOS_VMM_WRITE`/`DOS_GET_SYSTEM_INFO` call sites; BSS growth is
+        exactly 3 bytes (`reuXferParaLo/Hi`, `reuXferSlot`) beyond WP2's
+        20-byte registry; `image_d64` and `test_image_d64` built with no
+        warnings; CHANGELOG.md, brain/MEMORY.md, and the WP3 task spec
+        updated
+  - [x] User confirmed WP3 completion on 2026-08-04
+
 - [x] Taskwarrior (`91036469-8479-4a27-83ab-e74158f2fdea`): DEBUG REU/address
       syntax WP2 extended dispatch and registry foundation
   - Plan: `brain/plans/2026-08-04-debug-reu-address-syntax-wp2.md`
@@ -22,6 +51,7 @@
         confirms zero `DOS_ALLOC_MEM`/`DOS_FREE_MEM`/`DOS_VMM_READ`/
         `DOS_VMM_WRITE`/`DOS_GET_SYSTEM_INFO` call sites in `debug.s`
   - [x] User confirmed WP2 completion on 2026-08-04
+  - [x] Merged into `debug` (commit `bd5539d`) on 2026-08-04
 
 - [x] Taskwarrior (`adfecaf3-212c-4e91-bcf5-f1c79f673eae`): DEBUG REU/address
       syntax WP1 parser foundation and permissive `=`
