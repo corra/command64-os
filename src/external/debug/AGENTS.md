@@ -34,7 +34,11 @@ assembler, execution controls, and DEBUG-local VMM allocation state.
 # Verification
 
 - Build through CMake and confirm DEBUG remains relocatable and within its
-  configured 8KB `MAIN` envelope.
+  configured `MAIN` envelope (`$2400` bytes at `$3800`, ceiling `$5C00`, set
+  by `add_ca65_app(debug ...)` in `CMakeLists.txt`). Keep DEBUG's occupied
+  end address below `$6000` — that address range is reserved by convention
+  for manual test fixtures (`E`/`F` pokes) and must never overlap DEBUG's own
+  running code.
 - Run DEBUG through Command64 under `.agents/workflows/vice-mcp-testing.md`.
 - Verify registry initialization, ownership checks, and cleanup behavior with
   direct memory evidence where applicable.

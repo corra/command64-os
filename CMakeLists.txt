@@ -182,7 +182,7 @@ add_kickass_target(command64
 # missing ca65/ld65 toolchain fails the entire configure rather than
 # silently skipping this target.
 if(Ca65_FOUND)
-    add_ca65_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012 "2000")
+    add_ca65_app(debug "${DEBUG_ENTRY}" DEBUG_SRCS 1012 "2400")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for DEBUG target")
 endif()

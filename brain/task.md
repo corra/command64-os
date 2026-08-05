@@ -1,23 +1,36 @@
 # Project Tasks
 
-- [ ] Taskwarrior (`2386a65f-c972-4f69-8c83-0b4032a8fd97`): DEBUG REU/address
+- [x] Taskwarrior (`2386a65f-c972-4f69-8c83-0b4032a8fd97`): DEBUG REU/address
       syntax WP6 chunked `XM` transfers
   - Plan: `brain/plans/2026-08-06-debug-reu-address-syntax-wp6.md`
   - Branch: `feature/debug-reu-address-wp6` (based on `debug` after WP5
     merge, commit `28ae49f`)
-  - Plan approved 2026-08-06; implementation not yet started
+  - Plan approved 2026-08-06; user confirmed the walkthrough 2026-08-04;
+    complete
   - Precise envelope headroom confirmed: 159 bytes free before this WP
     (debug.s has no separate BSS segment, so `reloc.py`'s 8,033 code-byte
     figure for build 1124 already is the true `MAIN` footprint). Plan
     expands `MAIN` from `$2000` to `$2400` (`CMakeLists.txt:185`) as a
     prerequisite, keeping DEBUG's occupied range at `$3800-$5C00` with a
     1024-byte margin below the `$6000` test-fixture convention.
-  - [ ] Increment 0: envelope expansion
-  - [ ] Increment 1: `stageReuTransfer`/`advanceReuTransfer`
-  - [ ] Increment 2: transfer loop and real DMA
-  - [ ] Increment 3: partial-failure path (static review only — no safe
+  - [x] Increment 0: envelope expansion (`$2000`->`$2400`); build stayed
+        8,033 code bytes, confirming the expansion alone is inert
+  - [x] Increment 1: `stageReuTransfer`/`advanceReuTransfer` added (build
+        1125: 8,187 code bytes, 999 relocation points)
+  - [x] Increment 2: transfer loop and real DMA wired into `cmdReuMove`
+        (build 1126: 8,288 code bytes, 1,024 relocation points; 928 bytes
+        headroom remaining in the 9,216-byte `MAIN` envelope)
+  - [x] Increment 3: partial-failure path (static review only — no safe
         live fault-injection trigger identified; agreed with user)
-  - [ ] Increment 4: regression, documentation, DOX, and walkthrough
+  - [x] Increment 4: VICE-verified round-trip (single-chunk and 768-byte
+        3-chunk), 4KB page-boundary crossing, flat/page-relative operand
+        equivalence, exact-end-of-64KB-allocation transfer, and rejection
+        (no DMA) of over-capacity/invalid-handle/invalid-direction/
+        malformed-page-offset commands; `image_d64`/`test_image_d64` build
+        clean; CHANGELOG, `wiki`/`docs/debug-utility.md`,
+        `wiki`/`docs/debug-test-plan.md`, and
+        `src/external/debug/AGENTS.md` updated. Awaiting user confirmation
+        of the manual walkthrough before closeout.
 
 - [x] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
       syntax WP5 unified `XM` parsing and preflight

@@ -21,6 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lifecycle and handle-reuse sessions, `XS` interpretation scenarios, exact-end
   and overflow matrices, a sentinel-based no-transfer demonstration,
   troubleshooting guidance, and a safe-operation checklist.
+  Replaced the fixed-width C64 RAM/REU illustration with a Mermaid flowchart
+  that distinguishes the intended `R` and `W` paths and the WP5 validation-only
+  boundary.
 
 ### Fixed
 
@@ -31,6 +34,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **DEBUG WP6 real chunked `XM` transfers**: `XM handle offset|page:offset
+  address length R|W` now performs a real, chunked `DOS_VMM_READ`/
+  `DOS_VMM_WRITE` transfer after WP5's parsing/validation succeeds, replacing
+  the temporary `XM PREFLIGHT OK` indicator with `XM XFER=xxxx OK` (or
+  `XM XFER=xxxx FAILED` on a runtime OS failure, followed by the generic
+  error path). Transfers are split into bounded chunks of at most 256 bytes
+  (never 0, avoiding the REU zero-means-65536-byte quirk); every OS_API
+  parameter is restaged fresh before each chunk via `stageReuTransfer`, and
+  `advanceReuTransfer` advances the REU offset, C64 address, remaining
+  length, and transferred-byte count after each successful chunk. A runtime
+  failure stops immediately and reports exact transferred-so-far progress
+  through `REU_ERR_PARTIAL_TRANSFER`. No parser, handle, direction, or
+  preflight bounds error can reach the transfer loop — all of WP5's
+  validation still runs first. Required expanding DEBUG's `MAIN` linker
+  envelope from `$2000` to `$2400` bytes (`CMakeLists.txt`), keeping DEBUG's
+  occupied range (`$3800-$5C00` at build 1126, 8,288 code bytes) a
+  1024-byte margin below the `$6000+` test-fixture convention. VICE-verified:
+  byte-exact round-trip for single-chunk and multi-chunk (768-byte, 3-chunk)
+  transfers, 4KB page-boundary crossing, flat/page-relative operand
+  equivalence, exact-end-of-64KB-allocation transfer, and rejection (no DMA)
+  of over-capacity requests, invalid handles, invalid directions, and
+  malformed page offsets. The partial-failure reporting path was verified by
+  static code review only — no safe live fault-injection trigger exists for
+  a single-threaded DEBUG command (agreed with user during WP6 planning).
 - **DEBUG WP5 REU transfer parsing and preflight**: `XM handle
   offset|page:offset address length R|W` now parses its full grammar and
   validates both the REU-side and C64-side transfer windows before any

@@ -118,10 +118,13 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
 
 > [!IMPORTANT]
 > **Safety Constraint**: Current relocatable DEBUG builds load at `$3800` and
-> build 1114 occupies through approximately `$51C2`. Use `$6000+` for every
-> writable fixture. Legacy examples below that use a `$4000` or `$5000` base
-> must be translated to `$6000` while preserving relative offsets; translate
-> `$4500` or `$5500` to `$6500`. Never write inside `$3800-$51C2`.
+> build 1124 occupies through approximately `$5761`. DEBUG's linker envelope
+> (`MAIN`) was expanded from `$2000` to `$2400` bytes for WP6, giving a ceiling
+> of `$5C00` with a 1024-byte margin below the `$6000+` test-fixture
+> convention. Use `$6000+` for every writable fixture. Legacy examples below
+> that use a `$4000` or `$5000` base must be translated to `$6000` while
+> preserving relative offsets; translate `$4500` or `$5500` to `$6500`. Never
+> write inside `$3800-$5C00`.
 
 ### Test 3.1: Memory Dump (`D`)
 

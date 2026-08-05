@@ -713,12 +713,7 @@ crmReuWindowOk:
     bcc crmC64WindowOk
     jmp reuError              ; A already holds REU_ERR_C64_WINDOW
 crmC64WindowOk:
-
-    lda #<msgReuMovePreflightOk
-    ldy #>msgReuMovePreflightOk
-    jsr API_PRINT_STR
-    clc
-    rts
+    jmp executeReuTransfer
 
 ; Parses one XM allocation-relative offset operand: a flat 16-bit hex
 ; value, or a page:offset pair (page<=$000F, offset<=$0FFF). Both forms
@@ -885,6 +880,148 @@ vcwFail:
     lda #REU_ERR_C64_WINDOW
     sec
     rts
+
+; WP6: computes the next chunk's length (min(remaining, 256)) and stages
+; every DOS_VMM_READ/DOS_VMM_WRITE OS_API parameter fresh from WP5's/WP6's
+; transfer state. Never constructs a zero-length chunk: remaining is always
+; nonzero when called (the transfer loop checks first), so a zero low byte
+; with a zero high byte cannot occur here.
+; In: reuMoveHandle/OffLo/Hi/AddrLo/Hi/LenLo/Hi already reflect the current
+; transfer position.
+; Out: reuMoveChunkLo/Hi = this iteration's chunk length; VmmSegLo/Hi,
+; VmmBank, VmmOffLo/Hi, HexValLo/Hi staged; X/Y = reuMoveAddrLo/Hi.
+; Clobbers: A, X, Y.
+stageReuTransfer:
+    lda reuMoveLenHi
+    bne srtMaxChunk
+    lda reuMoveLenLo         ; remainingHi=0: remainingLo is 1-255, never 0
+    sta reuMoveChunkLo
+    lda #0
+    sta reuMoveChunkHi
+    jmp srtStage
+srtMaxChunk:
+    lda #0
+    sta reuMoveChunkLo
+    lda #1
+    sta reuMoveChunkHi        ; chunkLen = 256 ($0100)
+srtStage:
+    lda #0
+    sta VmmSegLo              ; VmmSegLo is reserved; always literal 0
+    ldx reuMoveHandle
+    lda reuSegHi, x
+    sta VmmSegHi
+    lda reuBank, x
+    sta VmmBank
+    lda reuMoveOffLo
+    sta VmmOffLo
+    lda reuMoveOffHi
+    sta VmmOffHi
+    lda reuMoveChunkLo
+    sta HexValLo
+    lda reuMoveChunkHi
+    sta HexValHi
+    ldx reuMoveAddrLo
+    ldy reuMoveAddrHi
+    rts
+
+; WP6: advances the transfer cursors after a chunk OS_API already reported
+; C=0 for. Cannot overflow/underflow mid-transfer: validateReuWindow and
+; validateC64Window already proved the final end-exclusive values fit, and
+; chunkLen <= remaining by stageReuTransfer's own construction.
+; In: reuMoveChunkLo/Hi = the chunk length just successfully transferred.
+; Out: reuMoveOffLo/Hi, reuMoveAddrLo/Hi advanced; reuMoveLenLo/Hi (remaining)
+; decremented; reuMoveXferLo/Hi (transferred-so-far) incremented.
+; Clobbers: A.
+advanceReuTransfer:
+    lda reuMoveOffLo
+    clc
+    adc reuMoveChunkLo
+    sta reuMoveOffLo
+    lda reuMoveOffHi
+    adc reuMoveChunkHi
+    sta reuMoveOffHi
+
+    lda reuMoveAddrLo
+    clc
+    adc reuMoveChunkLo
+    sta reuMoveAddrLo
+    lda reuMoveAddrHi
+    adc reuMoveChunkHi
+    sta reuMoveAddrHi
+
+    lda reuMoveLenLo
+    sec
+    sbc reuMoveChunkLo
+    sta reuMoveLenLo
+    lda reuMoveLenHi
+    sbc reuMoveChunkHi
+    sta reuMoveLenHi
+
+    lda reuMoveXferLo
+    clc
+    adc reuMoveChunkLo
+    sta reuMoveXferLo
+    lda reuMoveXferHi
+    adc reuMoveChunkHi
+    sta reuMoveXferHi
+    rts
+
+; WP6: the real XM chunked transfer loop, reached only after every WP5
+; parsing/validation step (handle, offset, C64 address, length, direction,
+; end-of-input, allocation window, C64 window) has already succeeded -- no
+; parser, handle, direction, or preflight bounds error can reach this label.
+; In: WP5's transfer state fully populated by cmdReuMove.
+; Out success: prints "XM XFER=xxxx OK"; C=0.
+; Out partial failure: prints "XM XFER=xxxx FAILED", then routes through
+; reuError with A=REU_ERR_PARTIAL_TRANSFER; C=1.
+executeReuTransfer:
+    lda #0
+    sta reuMoveXferLo
+    sta reuMoveXferHi
+ertLoop:
+    lda reuMoveLenLo
+    ora reuMoveLenHi
+    beq ertSuccess
+    jsr stageReuTransfer
+    lda reuMoveDir
+    beq ertDirRead
+    lda #DOS_VMM_WRITE
+    jmp ertDispatch
+ertDirRead:
+    lda #DOS_VMM_READ
+ertDispatch:
+    jsr OS_API
+    bcs ertFailed
+    jsr advanceReuTransfer
+    jmp ertLoop
+
+ertSuccess:
+    lda #<msgReuXferPrefix
+    ldy #>msgReuXferPrefix
+    jsr API_PRINT_STR
+    lda reuMoveXferHi
+    jsr printHex8
+    lda reuMoveXferLo
+    jsr printHex8
+    lda #<msgReuXferOk
+    ldy #>msgReuXferOk
+    jsr API_PRINT_STR
+    clc
+    rts
+
+ertFailed:
+    lda #<msgReuXferPrefix
+    ldy #>msgReuXferPrefix
+    jsr API_PRINT_STR
+    lda reuMoveXferHi
+    jsr printHex8
+    lda reuMoveXferLo
+    jsr printHex8
+    lda #<msgReuXferFailed
+    ldy #>msgReuXferFailed
+    jsr API_PRINT_STR
+    lda #REU_ERR_PARTIAL_TRANSFER
+    jmp reuError
 
 ; WP4: XS [handle] - report VMM/registry status.
 ; In: Y = operand position (leading spaces already skipped by cmdExtended).
@@ -4230,10 +4367,16 @@ msgReuNone:
     .byte "NONE"
     .byte $0D, 0
 
-; WP5 XM temporary preflight-success indicator (WP6 replaces this with the
-; real transfer's own success/failure reporting).
-msgReuMovePreflightOk:
-    .byte "XM PREFLIGHT OK"
+; WP6 XM transfer result strings. reuMoveXferHi/Lo (via printHex8 twice) are
+; printed between the prefix and the OK/FAILED suffix.
+msgReuXferPrefix:
+    .byte "XM XFER="
+    .byte 0
+msgReuXferOk:
+    .byte " OK"
+    .byte $0D, 0
+msgReuXferFailed:
+    .byte " FAILED"
     .byte $0D, 0
 
 ; UI label/separator strings (shared across print sites via API_PRINT_STR)
@@ -4425,3 +4568,15 @@ reuMoveAddrHi: .byte 0
 reuMoveLenLo:  .byte 0
 reuMoveLenHi:  .byte 0
 reuMoveDir:    .byte 0
+
+; WP6 XM transfer scratch: current chunk length (1-256, computed fresh each
+; iteration by stageReuTransfer) and the running transferred-byte count (for
+; progress reporting on both success and partial failure). Dedicated state,
+; not a reuse of reuXferParaLo/Hi -- stageReuTransfer/advanceReuTransfer run
+; during the transfer loop, long after parseVmmOffset's own scratch use has
+; finished, but giving the chunk length its own bytes avoids reasoning about
+; that lifetime at all.
+reuMoveChunkLo: .byte 0
+reuMoveChunkHi: .byte 0
+reuMoveXferLo:  .byte 0
+reuMoveXferHi:  .byte 0

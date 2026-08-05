@@ -98,22 +98,22 @@ is separate storage; an REU byte does not appear at a normal CPU address and
 cannot be inspected with `D` or changed with `E`. Data must be transferred
 between an REU allocation and a buffer in C64 RAM:
 
-```text
-                 Command64 VMM allocation
-                 selected by DEBUG handle
-                +-------------------------+
-REU storage     | allocation-relative     |
-(not directly   | offset                  |
-CPU-addressable)|                         |
-                +------------+------------+
-                             |
-                             | intended XM R/W transfer
-                             | (preflight-only in WP5)
-                             v
-                +------------+------------+
-C64 address     | ordinary C64 RAM buffer |
-space           | selected by address     |
-                +-------------------------+
+```mermaid
+flowchart TB
+    subgraph REU["REU storage - not directly CPU-addressable"]
+        HANDLE["DEBUG handle 0-3"] --> ALLOCATION["Command64 VMM allocation"]
+        ALLOCATION --> OFFSET["Allocation-relative offset"]
+    end
+
+    subgraph C64["C64 64 KiB address space"]
+        ADDRESS["Absolute C64 address"] --> BUFFER["Ordinary C64 RAM buffer"]
+    end
+
+    OFFSET -.->|R: REU to C64 RAM| BUFFER
+    BUFFER -.->|W: C64 RAM to REU| OFFSET
+    LIMIT["XM validates both windows, then transfers in chunks of up to 256 bytes"]
+    LIMIT --- OFFSET
+    LIMIT --- BUFFER
 ```
 
 This is why `XM` needs two addresses. The REU operand is an offset relative to
@@ -125,7 +125,7 @@ proposed transfer; neither is a substitute for the other.
 | :--- | :--- |
 | **OS VMM** | Detects the REU, reserves contiguous 4 KiB pages, returns a starting segment/bank, releases allocations, and reports global page counts. |
 | **DEBUG registry** | Assigns handles `0`-`3` to allocations made by this DEBUG session and retains each exact paragraph request. |
-| **DEBUG command** | Parses operands and checks that a proposed operation stays inside both the selected allocation and C64 address space. Current WP5 `XM` stops after these checks. |
+| **DEBUG command** | Parses operands, checks that the operation stays inside both the selected allocation and C64 address space, then performs the transfer in bounded chunks. |
 
 #### REU Units and Addresses
 
@@ -312,7 +312,7 @@ The current OS page-count reporting has a known unresolved stability issue:
 queries, although their sum continues to equal `TOTAL`. Treat these counters as
 diagnostic data rather than an ownership ledger.
 
-#### `XM ... R|W` - Transfer Preflight
+#### `XM ... R|W` - Transfer
 
 The complete grammar is:
 
@@ -327,12 +327,12 @@ it may be a flat 16-bit byte offset or a `page:offset` pair. `address` is a
 
 Direction is stated from the C64 CPU's perspective:
 
-| Direction | Intended data flow |
+| Direction | Data flow |
 | :---: | :--- |
 | `R` | Read from the selected REU allocation into C64 memory. |
 | `W` | Write from C64 memory into the selected REU allocation. |
 
-Before accepting the command, DEBUG proves both half-open windows are valid:
+Before performing any transfer, DEBUG proves both half-open windows are valid:
 
 ```text
 REU window: [allocation offset, allocation offset + length)
@@ -346,19 +346,25 @@ offset no greater than `$0FFF`. A zero length, trailing operand, unknown
 direction, inactive handle, or either overflowing window is rejected before
 any VMM transfer service can be called.
 
+Once both windows validate, DEBUG performs the transfer in bounded chunks of
+at most 256 bytes, restaging every OS parameter fresh before each chunk. A
+successful transfer prints the exact number of bytes moved:
+
 ```text
 -XM 0 0000 6000 0010 R
-XM PREFLIGHT OK
+XM XFER=0010 OK
 
 -XM 0 0:000 6000 0010 W
-XM PREFLIGHT OK
+XM XFER=0010 OK
 ```
 
-**Current limitation:** `XM PREFLIGHT OK` means only that parsing and both
-window checks succeeded. The current WP5 implementation does not call
-`DOS_VMM_READ` or `DOS_VMM_WRITE` and does not alter C64 or REU memory. Actual
-chunked transfer is reserved for WP6. Do not use the success message as evidence
-that data moved.
+A runtime OS failure stops the transfer immediately and reports exactly how
+many bytes were moved before the failure, followed by the generic error text:
+
+```text
+XM XFER=0080 FAILED
+ERROR
+```
 
 #### Session Cleanup
 
@@ -393,21 +399,20 @@ commands use handle `0`, not those placement fields.
 00: SEG=02 BANK=00 PARA=0100 PAGES=01 SIZE=1000
 
 -XM 0 0000 6000 0100 W
-XM PREFLIGHT OK
+XM XFER=0100 OK
 ```
 
-The proposed `W` would copy `$0100` bytes from C64 `$6000-$60FF` to allocation
-offsets `$0000-$00FF`. Under WP5 this is validation only, so neither range is
-modified.
+The `W` copies `$0100` bytes from C64 `$6000-$60FF` to allocation offsets
+`$0000-$00FF`.
 
 ```text
 -XM 0 0:F00 7000 0100 R
-XM PREFLIGHT OK
+XM XFER=0100 OK
 ```
 
-The proposed `R` would copy the allocation's final `$0100` bytes, offsets
-`$0F00-$0FFF`, into C64 `$7000-$70FF`. The transfer ends exactly at allocation
-offset `$1000`, so the half-open window fits.
+The `R` copies the allocation's final `$0100` bytes, offsets `$0F00-$0FFF`,
+into C64 `$7000-$70FF`. The transfer ends exactly at allocation offset
+`$1000`, so the half-open window fits.
 
 ```text
 -XD 0
@@ -471,14 +476,14 @@ Assume handle `0` came from `XA 0100`, giving exact offsets `$0000-$0FFF`:
 
 | Command | Result | Reason |
 | :--- | :---: | :--- |
-| `XM 0 0FF0 6000 0010 R` | `XM PREFLIGHT OK` | REU end is exactly `$1000`; final included offset is `$0FFF`. |
+| `XM 0 0FF0 6000 0010 R` | `XM XFER=0010 OK` | REU end is exactly `$1000`; final included offset is `$0FFF`. |
 | `XM 0 0FF0 6000 0011 R` | `ERROR` | REU end would be `$1001`, one byte beyond capacity. |
 | `XM 0 1000 6000 0001 R` | `ERROR` | The starting offset is already at the exclusive end. |
-| `XM 0 0:FFF 6000 0001 R` | `XM PREFLIGHT OK` | One byte at the last position of page 0 fits. |
+| `XM 0 0:FFF 6000 0001 R` | `XM XFER=0001 OK` | One byte at the last position of page 0 fits. |
 | `XM 0 1:000 6000 0001 R` | `ERROR` | Flat offset `$1000` is outside this one-page exact capacity. |
 | `XM 0 10:000 6000 0001 R` | `ERROR` | Page `$10` is outside the grammar's `$0-$F` range. |
 | `XM 0 0:1000 6000 0001 R` | `ERROR` | In-page offset `$1000` exceeds `$0FFF`. |
-| `XM 0 0000 FF00 0100 R` | `XM PREFLIGHT OK` | C64 window ends exactly at `$10000`; final included address is `$FFFF`. |
+| `XM 0 0000 FF00 0100 R` | `XM XFER=0100 OK` | C64 window ends exactly at `$10000`; final included address is `$FFFF`. |
 | `XM 0 0000 FF00 0101 R` | `ERROR` | C64 window would wrap to `$0000`. |
 | `XM 0 0000 6000 0000 R` | `ERROR` | Zero-length transfers are not meaningful and are rejected. |
 
@@ -487,17 +492,17 @@ two pages were reserved:
 
 ```text
 -XM 0 100F 6000 0001 R
-XM PREFLIGHT OK
+XM XFER=0001 OK
 -XM 0 1010 6000 0001 R
 ERROR
 ```
 
 The second command cannot use allocator padding merely because `PAGES=02`.
 
-#### Demonstrating WP5's No-Transfer Behavior
+#### Demonstrating a Round-Trip Transfer
 
-This session places recognizable bytes in C64 RAM, performs a valid `R`
-preflight that would overwrite them if DMA occurred, and dumps the bytes again:
+This session stashes recognizable bytes from C64 RAM into REU, clears the C64
+source range, then fetches the bytes back and confirms they are identical:
 
 ```text
 -XA 0100
@@ -505,17 +510,20 @@ preflight that would overwrite them if DMA occurred, and dumps the bytes again:
 -E 6000 AA 55 12 34
 -D 6000 L 0004
 6000: AA 55 12 34
+-XM 0 0000 6000 0004 W
+XM XFER=0004 OK
+-E 6000 00 00 00 00
+-D 6000 L 0004
+6000: 00 00 00 00
 -XM 0 0000 6000 0004 R
-XM PREFLIGHT OK
+XM XFER=0004 OK
 -D 6000 L 0004
 6000: AA 55 12 34
 ```
 
-The unchanged sentinel confirms the current behavior: `XM` parsed and validated
-the command, but did not read from the REU. A `W` preflight likewise does not
-write C64 data into REU storage. After WP6 implements chunked transfers, this
-example must be revised because a successful `R` will then replace the C64
-sentinel with REU data.
+The restored sentinel confirms the round trip: `W` moved the four bytes into
+the allocation, and the subsequent `R` fetched the same bytes back into C64
+RAM after the source range was cleared.
 
 #### Troubleshooting REU Commands
 
@@ -530,7 +538,7 @@ state and boundaries:
 | `XD`, `XS handle`, or `XM` fails | Handle is malformed, outside `0`-`3`, or inactive | Run bare `XS` and inspect listed handles | Use an active listed handle; handles from a previous DEBUG session are invalid. |
 | `XM` fails near allocation end | Offset plus length exceeds exact `SIZE` | Convert `PARA * $10`; compare the exclusive end | Reduce offset or length. Do not calculate from rounded `PAGES`. |
 | `XM` fails near `$FFFF` | C64 address plus length wraps beyond `$10000` | Calculate the exclusive C64 end | Reduce length or choose a lower C64 address. |
-| `XM` prints `XM PREFLIGHT OK` but memory is unchanged | Expected WP5 behavior; no transfer call exists | Dump the C64 buffer before and after | Treat success as validation only until WP6 is implemented. |
+| `XM` prints `XM XFER=xxxx FAILED` | A runtime OS failure interrupted the transfer mid-chunk | Note the printed count; it is the exact number of bytes moved before the failure | Retry the remaining window (offset + printed count, length reduced by it), or investigate the OS/VMM failure before retrying. |
 | `Q` prints `ERROR` and DEBUG remains open | At least one OS release failed | Run `XS` to see records that remain active | Retry `XD handle` or `Q`; do not force exit if preserving allocator state matters. |
 | Bare `XS` prints `NONE` but `ALLOC` is nonzero | Allocations exist outside DEBUG's local registry | Compare global `ALLOC` with listed rows | DEBUG cannot identify or release those allocations by local handle. |
 
@@ -544,8 +552,9 @@ state and boundaries:
   an application or permanent REU address.
 * Validate the final byte on both sides: `offset + length - 1` for REU and
   `address + length - 1` for C64 RAM.
-* Until WP6 lands, regard `XM PREFLIGHT OK` as syntax and bounds confirmation
-  only.
+* A partial `XM XFER=xxxx FAILED` result means exactly `xxxx` bytes moved
+  before the failure; use that count to resume or verify, not the originally
+  requested length.
 * Release individual allocations with `XD` when finished and leave DEBUG through
   `Q` so its cleanup pass runs.
 * After a cleanup error, inspect with `XS` and retry rather than assuming the
