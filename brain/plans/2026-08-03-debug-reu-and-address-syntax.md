@@ -730,6 +730,9 @@ commands, with no wrap or out-of-bounds DMA.
 
 ### WP7: Integrated Regression and Documentation
 
+Detailed implementation plan:
+`brain/plans/2026-08-04-debug-reu-address-syntax-wp7.md`.
+
 1. Build shipping and test disk images.
 2. Inspect relocation and linker output.
 3. Run the existing DEBUG regression suite.

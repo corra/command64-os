@@ -29,8 +29,28 @@
         malformed-page-offset commands; `image_d64`/`test_image_d64` build
         clean; CHANGELOG, `wiki`/`docs/debug-utility.md`,
         `wiki`/`docs/debug-test-plan.md`, and
-        `src/external/debug/AGENTS.md` updated. Awaiting user confirmation
-        of the manual walkthrough before closeout.
+        `src/external/debug/AGENTS.md` updated. User confirmed the
+        walkthrough 2026-08-04; merged onto `debug` at `ebe2b05`.
+
+- [ ] Taskwarrior (`683f2802-9cba-409f-b5bc-881e349e15b2`): DEBUG REU/address
+      syntax WP7 integrated regression and documentation (final WP)
+  - Plan: `brain/plans/2026-08-04-debug-reu-address-syntax-wp7.md`
+  - Branch: `feature/debug-reu-address-wp7` (based on `debug` after WP6
+    merge, commit `ebe2b05`)
+  - Plan drafted 2026-08-04; not yet approved or started
+  - Formalizes `=`-syntax and REU regression as permanent Test Suites 14-15
+    in `wiki/debug-test-plan.md`; runs the full regression under VICE with
+    REU enabled and disabled; bumps DEBUG `0.4.0` -> `0.5.0`; DOX closeout;
+    final documentation sweep; closes the parent plan on user confirmation
+  - [ ] Increment 0: author Test Suites 14-15
+  - [ ] Increment 1: version bump (`0.4.0` -> `0.5.0`), build, update
+        illustrative version strings
+  - [ ] Increment 2: REU-enabled full regression (Suites 1-15)
+  - [ ] Increment 3: REU-disabled regression (Suites 1-13 + Test 15.5)
+  - [ ] Increment 4: DOX closeout
+  - [ ] Increment 5: final documentation sweep; regenerate `release/`
+  - [ ] Increment 6: combined walkthrough, user confirmation, parent plan
+        closure
 
 - [x] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
       syntax WP5 unified `XM` parsing and preflight
