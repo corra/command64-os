@@ -13,6 +13,13 @@
 
 ## Current State (2026-07-29)
 
+- **Standalone external-app feasibility study in user review**: The study at
+  `brain/plans/2026-08-04-standalone-external-apps-feasibility.md` recommends
+  shared application cores with Command64 and standalone platform adapters,
+  sequencing DEBUG before EDLIN and deferring CASM until shared file/REU layers
+  are proven. No source, build, memory-map, or release behavior is authorized or
+  changed by the study.
+
 - Phase 2A, 2B, 2C, and 2D complete (2D = INT 21h BRK service bus).
 - Phase 3 complete (File System Integration).
 - Phase 4 complete (DEBUG external utility, including Phase 1 Peer Review corrections, prefix parsing, and custom SEQ/USR loaders).

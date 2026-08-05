@@ -16,8 +16,18 @@ This file serves as the shared repository for architectural decisions, technical
 | 2026-07-08 | Gap-Buffer VI Editor | Implemented a user-space vi-alike text editor using a Gap Buffer for O(1) edits, supporting line numbering, word/line operations, and horizontal/vertical scrolling. | Active |
 | 2026-07-15 | Pac-Man generated maze topology | `autotile.py` owns logical path/wall/gate/pellet topology; neighboring cells infer normal render shapes and validated overrides handle visually ambiguous corners. CMake regenerates `mazeWalls` before Pac-Man assembly. | Active |
 | 2026-07-27 | User programs default to `$3800` | Resident `ShellExt` growth consumed the old `$3400` boundary. Fresh builds use `$3800/$3900`; CASM retains its independent `$3400` R6 emission origin and external-name dispatch relocates before execution. | Active |
+| 2026-08-04 | Standalone external-app architecture recommendation | Standalone DEBUG, EDLIN, and CASM are feasible, but production source forks would create unacceptable drift. Preserve one application core and use Command64/standalone platform adapters; prototype DEBUG first, use EDLIN's RAM fallback next, and defer CASM until shared file and REU runtimes are proven. | Proposed |
 
 ## Technical Findings
+
+- **[2026-08-04] Standalone external-app feasibility**: Current ca65 external
+  apps depend on a relocatable Command64 artifact, `OS_API=$1000`, shared
+  parameter zero page, shell command-buffer/exit conventions, and application-
+  specific file/VMM services. Fixed-origin standalone PRGs are feasible through
+  narrow platform adapters. DEBUG has the smallest useful boundary, EDLIN has a
+  credible 2 KiB no-REU fallback, and CASM's bounded architecture requires a
+  multi-allocation REU runtime for practical parity. See
+  `brain/plans/2026-08-04-standalone-external-apps-feasibility.md`.
 
 - **[2026-05-01] Workspace Initialization**: Successfully established the PRAR-compliant state management structure.
 - **[2026-05-01] Boot Architecture Divergence**: PC boot is modular/sequential (MBR → IO.SYS → MSDOS.SYS → COMMAND.COM). C64 boot is minimalist/direct from fixed ROM (`*$0801`). Ported system must *emulate the effect* of structured handoffs through explicit initialization in the Service Bus, not actually take over boot ROM.
