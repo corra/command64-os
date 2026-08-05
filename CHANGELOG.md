@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planning
+
+- **Standalone external-application feasibility study**: Assessed standalone
+  C64 editions of DEBUG, EDLIN, and CASM while preserving their Command64
+  builds. The study recommends one shared application core with Command64 and
+  standalone platform adapters, rejects production source forks, identifies
+  DEBUG as the first proof of concept, and treats full standalone CASM as an
+  REU-dependent later phase. It records ABI, build, memory, file, REU,
+  maintenance, testing, licensing, effort, roadmap, and stop-condition
+  findings in
+  `brain/plans/2026-08-04-standalone-external-apps-feasibility.md`.
+
 ### Documentation
 
 - **DEBUG REU command guide**: Replaced the obsolete statement that `XA`,
@@ -14,16 +26,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   page rounding, DEBUG's four-handle local registry, allocation ownership
   limits, command grammar, output fields, cleanup behavior, boundary checks,
   generic error reporting, and MS-DOS EMS differences. The guide explicitly
-  distinguishes `XS`'s system-wide page counters from its DEBUG-local records
-  and identifies the current WP5 `XM PREFLIGHT OK` result as validation only,
-  with no data transfer until WP6. Expanded the guide with a C64-RAM/REU memory
-  model, worked paragraph/page/padding and offset calculations, annotated
-  lifecycle and handle-reuse sessions, `XS` interpretation scenarios, exact-end
-  and overflow matrices, a sentinel-based no-transfer demonstration,
-  troubleshooting guidance, and a safe-operation checklist.
-  Replaced the fixed-width C64 RAM/REU illustration with a Mermaid flowchart
-  that distinguishes the intended `R` and `W` paths and the WP5 validation-only
-  boundary.
+  distinguishes `XS`'s system-wide page counters from its DEBUG-local records.
+  Expanded the guide with a C64-RAM/REU memory model, worked paragraph/page/
+  padding and offset calculations, annotated lifecycle and handle-reuse
+  sessions, `XS` interpretation scenarios, exact-end and overflow matrices, a
+  round-trip transfer demonstration, troubleshooting guidance, and a
+  safe-operation checklist. Replaced the fixed-width C64 RAM/REU illustration
+  with a Mermaid flowchart. Updated throughout for WP6's real `XM` transfer
+  (superseding the WP5-era `XM PREFLIGHT OK`/no-transfer language).
+- **DEBUG WP7 regression suites and version bump**: Added permanent Test
+  Suite 14 (`=` execution address syntax for `G`/`T`/`P`) and Test Suite 15
+  (REU command family lifecycle, status, page-offset parsing, transfer
+  round-trips/boundaries, and REU-disabled behavior) to
+  `wiki`/`docs/debug-test-plan.md`, formalizing what WP1-WP6 had previously
+  verified only in their own throwaway plan-doc matrices. Ran the full
+  regression (Suites 1-15) under VICE with REU enabled, and Suites 1-13 plus
+  Test 15.5 with REU disabled (toggled via the VICE `REU` resource) — no
+  regressions found. Bumped DEBUG from `0.4.0` to `0.5.0` (build 1128) for
+  the combined `=`-syntax and REU-command feature, per Design Decision #15
+  deferred since WP1. Also fixed a real product gap found during the
+  regression: `debug.s`'s own in-app `?` help text (`debugHelpMsg`) had never
+  been updated across WP1-WP6 despite the file's maintenance rule requiring
+  it — it was missing the entire `XA`/`XD`/`XM`/`XS` family and didn't note
+  `G`/`T`/`P`'s optional `=` prefix. Added the missing lines (+123 code
+  bytes, build 1128).
 
 ### Fixed
 

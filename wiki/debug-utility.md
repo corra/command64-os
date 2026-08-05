@@ -1,8 +1,8 @@
 # DEBUG Utility User Guide
 
-**Version:** 0.4.0 (C64 Command64 OS Port: Build 1101)
+**Version:** 0.5.0 (C64 Command64 OS Port: Build 1128)
 **Origin:** MS-DOS 4.0 / C64 Port
-**Target Address:** $2000
+**Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 
 ## Overview
 
@@ -76,9 +76,9 @@ DEBUG uses a single-character command structure. All numerical values are in **h
 
 The `X` command family gives DEBUG controlled access to Commodore REU memory
 through the Command64 OS Virtual Memory Manager (VMM). DEBUG never programs the
-REU DMA registers directly. All allocation and release operations use OS VMM
-services, and the current `XM` implementation validates a proposed transfer but
-does not yet move data.
+REU DMA registers directly. All allocation, release, and transfer operations
+use OS VMM services; `XM` validates a proposed transfer window and then
+performs the real chunked transfer.
 
 REU command operands are hexadecimal and must be separated by spaces. DEBUG
 accepts command letters and hexadecimal digits without regard to shifted or
@@ -88,7 +88,7 @@ unshifted case.
 | :--- | :--- |
 | **`XA paragraphs`** | Allocate REU storage and assign a DEBUG handle. |
 | **`XD handle`** | Release one allocation owned by this DEBUG session. |
-| **`XM handle offset address length direction`** | Validate a proposed transfer between an allocation and C64 memory. |
+| **`XM handle offset address length direction`** | Transfer data between an allocation and C64 memory, after validating the proposed window. |
 | **`XS [handle]`** | Show VMM page counters and DEBUG allocation records, or one selected record. |
 
 #### Mental Model: C64 RAM and REU Memory
@@ -583,7 +583,7 @@ This section provides exhaustive examples demonstrating every command and syntax
 
     ```text
     -V
-    DEBUG v0.4.0.1101
+    DEBUG v0.5.0.1128
     ```
 
 * **Quit Utility (`Q`)**:

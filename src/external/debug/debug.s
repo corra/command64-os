@@ -8,7 +8,7 @@
 
 ; --- Version Information ---
 .define VERSION_MAJOR "0"
-.define VERSION_MINOR "4"
+.define VERSION_MINOR "5"
 .define VERSION_STAGE "0" ; Release 0.4.0 ca65 migration
 .include "build_debug.inc"
 
@@ -4298,11 +4298,19 @@ debugHelpMsg:
     .byte $0D
     .byte "R           - SHOW REGISTERS"
     .byte $0D
-    .byte "G [ADDR]    - GO (EXECUTE)"
+    .byte "G [=ADDR]   - GO (EXECUTE)"
     .byte $0D
-    .byte "T [ADDR]    - TRACE STEP-INTO"
+    .byte "T [=ADDR]   - TRACE STEP-INTO"
     .byte $0D
-    .byte "P [ADDR]    - PROCEED STEP-OVER"
+    .byte "P [=ADDR]   - PROCEED STEP-OVER"
+    .byte $0D
+    .byte "XA PARAS    - ALLOC REU (VMM)"
+    .byte $0D
+    .byte "XD HANDLE   - FREE REU ALLOC"
+    .byte $0D
+    .byte "XM ARGS R/W - REU XFER (SEE DOCS)"
+    .byte $0D
+    .byte "XS [HANDLE] - SHOW REU STATUS"
     .byte $0D
     .byte "N [FILE]    - NAME FILE"
     .byte $0D

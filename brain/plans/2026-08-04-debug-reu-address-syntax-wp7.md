@@ -1,6 +1,6 @@
 # DEBUG REU and Address Syntax WP7 Detailed Plan
 
-**Status:** Draft, pending approval
+**Status:** Approved; implementation in progress
 
 **Created:** 2026-08-04
 
@@ -320,18 +320,24 @@ Exit criterion: user confirms the walkthrough; parent plan is closed.
 
 ## 8. Approval Questions
 
-1. Is formalizing Suites 14-15 into the permanent `wiki/debug-test-plan.md`
-   approved, rather than leaving WP1-6's plan-doc matrices as the only
-   record?
-2. Is the `0.4.0` -> `0.5.0` minor version bump approved as written (Section
-   5), including updating the four illustrative version-string doc sites?
-3. Is the REU-disabled toggle method (Section 2, item 5 — confirm via
+Resolved 2026-08-04:
+
+1. Formalizing Suites 14-15 into the permanent `wiki/debug-test-plan.md` is
+   approved as written.
+2. The `0.4.0` -> `0.5.0` minor version bump (Section 5), including updating
+   the four illustrative version-string doc sites, is approved as written.
+3. The REU-disabled toggle method (Section 2, item 5 — confirm via
    `vice_get_setting`/`vice_set_setting` or a fresh `-reu`-flagged relaunch,
-   not a raw-state poke) approved for Increment 3?
-4. If Increment 2 or 3 finds a genuine regression, is "stop and report to
-   the user rather than silently fixing under WP7" the correct response
-   (Section 3.2), or should minor, obviously-safe fixes be made inline with
-   the finding documented afterward?
+   not a raw-state poke) is approved for Increment 3.
+4. Resolved: minor, obviously-safe fixes discovered during regression are
+   made inline, with the finding documented in the increment's evidence
+   record; anything larger is stopped on and reported to the user rather
+   than patched under WP7's scope. Section 3.2's "no grammar/behavior
+   changes" line means WP7 does not *redesign* command behavior — a narrow,
+   obviously-correct bug fix (e.g., an off-by-one, a wrong selector, a stale
+   doc string) found during regression is in scope to fix inline; anything
+   touching grammar, validation semantics, or requiring a design judgment
+   call is reported instead.
 
 ## 9. Completion Gate
 

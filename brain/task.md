@@ -32,25 +32,41 @@
         `src/external/debug/AGENTS.md` updated. User confirmed the
         walkthrough 2026-08-04; merged onto `debug` at `ebe2b05`.
 
-- [ ] Taskwarrior (`683f2802-9cba-409f-b5bc-881e349e15b2`): DEBUG REU/address
+- [x] Taskwarrior (`683f2802-9cba-409f-b5bc-881e349e15b2`): DEBUG REU/address
       syntax WP7 integrated regression and documentation (final WP)
   - Plan: `brain/plans/2026-08-04-debug-reu-address-syntax-wp7.md`
   - Branch: `feature/debug-reu-address-wp7` (based on `debug` after WP6
     merge, commit `ebe2b05`)
-  - Plan drafted 2026-08-04; not yet approved or started
+  - Plan approved 2026-08-04 (test-suite formalization, version bump, REU
+    toggle method, and "fix minor safe issues inline, report larger ones"
+    all confirmed)
   - Formalizes `=`-syntax and REU regression as permanent Test Suites 14-15
     in `wiki/debug-test-plan.md`; runs the full regression under VICE with
     REU enabled and disabled; bumps DEBUG `0.4.0` -> `0.5.0`; DOX closeout;
     final documentation sweep; closes the parent plan on user confirmation
-  - [ ] Increment 0: author Test Suites 14-15
-  - [ ] Increment 1: version bump (`0.4.0` -> `0.5.0`), build, update
-        illustrative version strings
-  - [ ] Increment 2: REU-enabled full regression (Suites 1-15)
-  - [ ] Increment 3: REU-disabled regression (Suites 1-13 + Test 15.5)
-  - [ ] Increment 4: DOX closeout
-  - [ ] Increment 5: final documentation sweep; regenerate `release/`
-  - [ ] Increment 6: combined walkthrough, user confirmation, parent plan
-        closure
+  - [x] Increment 0: authored Test Suites 14-15 in
+        `wiki`/`docs/debug-test-plan.md`
+  - [x] Increment 1: version bump (`0.4.0` -> `0.5.0`); build 1127, 8,288
+        code bytes (unchanged); updated the four illustrative
+        `DEBUG v0.4.0.1101` doc strings and `wiki/debug-utility.md`'s stale
+        header/REU-summary text found during the sweep
+  - [x] Increment 2: REU-enabled full regression (Suites 1-15) under VICE —
+        no failures; confirmed `REU=1` via `vice_get_setting` before
+        starting, not assumed
+  - [x] Increment 3: REU-disabled regression (Suites 1-13 + Test 15.5) under
+        VICE — no failures; REU toggled off/on via `vice_set_setting`
+  - [x] Increment 4: DOX closeout — no drift found beyond WP6's own update
+  - [x] Increment 5: final documentation sweep (`user-manual.md`,
+        `programmers-reference.md` — no stale claims found) and `release/`
+        regenerated
+  - [x] Real product gap found during the walkthrough (user-prompted): the
+        in-app `?` help text (`debugHelpMsg`) had never been updated across
+        WP1-WP6 despite `debug.s`'s own maintenance rule — missing the
+        entire `X` family and the `=` prefix note on `G`/`T`/`P`. Fixed
+        inline (format-matching addition, no behavior change); build 1128,
+        8,411 code bytes (+123); VICE-confirmed `?` output correct.
+  - [x] Increment 6: combined walkthrough presented and confirmed by the
+        user 2026-08-04, after the help-text fix; merged onto `debug`
 
 - [x] Taskwarrior (`a4809e03-ee37-4973-8fc6-2896bf2ea69c`): DEBUG REU/address
       syntax WP5 unified `XM` parsing and preflight

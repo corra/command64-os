@@ -20,7 +20,7 @@ Ensure the technical integrity, stability, and MS-DOS parity of the `DEBUG` util
    C64:> debug
    ```
 
-4. Verify the startup message displays (e.g., `DEBUG v0.4.0.1101`) followed by the prompt:
+4. Verify the startup message displays (e.g., `DEBUG v0.5.0.1128`) followed by the prompt:
 
    ```bash
    -
@@ -816,3 +816,137 @@ This suite verifies that the interactive assembler correctly prompts, reads, par
     ```
 
   - The warm start displays cleanly, and typing BASIC commands (like `PRINT 1+1`) works and prints outputs (confirming the BASIC ROM mapping was fully restored before jumping to KERNAL warm start).
+
+---
+
+## Test Suite 14: Permissive Execution Address Syntax (`G`, `T`, `P`)
+
+### Test 14.1: Equivalent Bare and `=` Forms
+
+- **Input**: `G 4000`, `G=4000`, `G =4000`, `G= 4000`, `G = 4000`
+- **Procedure**:
+  1. Assemble `RTS` at `$4000`.
+  2. Execute each of the five forms above in turn, confirming a clean return
+     to the `-` prompt after each (a bare `RTS` target is safe to `G` to
+     directly).
+  3. Repeat the same five address forms for `T` and `P`, using `R` after
+     each to confirm `regPC` was set to `$4000` before the trace/proceed
+     executed.
+- **Pass Criteria**:
+  - All five forms of each command reach identical target state (`$4000`).
+  - Whitespace around `=` (`G=4000`, `G =4000`, `G= 4000`, `G = 4000`) does
+    not change the result.
+
+### Test 14.2: No-Argument Behavior Unchanged
+
+- **Input**: `G`, `T`, `P` (no address)
+- **Procedure**:
+  1. Set `currentAddr` via a prior `D`/`G` and `regPC` via a prior `T`/`P`.
+  2. Execute bare `G`, `T`, `P` and confirm each still targets the
+     pre-existing state exactly as Test Suites 5, 10, and 11 already
+     establish.
+- **Pass Criteria**: no-argument behavior is identical to pre-WP1 DEBUG; `=`
+  syntax is never required.
+
+### Test 14.3: Negative Grammar
+
+- **Input**: `G =`, `G ==`, `G =G000`, `G =10000`, `G =4000 EXTRA`,
+  `T =4000 02`, `P =4000 02`, `G =0001:0000`
+- **Procedure**: Execute each form in turn, recording `regPC`/`currentAddr`
+  before and after.
+- **Pass Criteria**:
+  - Every form prints `error`.
+  - No form executes, traces, proceeds, or changes `regPC`/`currentAddr`
+    from its pre-command value.
+
+---
+
+## Test Suite 15: REU Command Family (`XA`, `XD`, `XM`, `XS`)
+
+> [!IMPORTANT]
+> Requires REU emulation enabled (`-reu -reusize 512` or the equivalent
+> persisted VICE setting) except Test 15.5, which requires it disabled.
+
+### Test 15.1: Allocation Lifecycle
+
+- **Input**: `XA 0001`, `XA 0100`, `XA 1000`, `XA 0000`, `XA 1001`, `XD`, `Q`
+- **Procedure**:
+  1. `XA 0001` (minimum, 16 bytes), `XA 0100` (4KB), `XA 1000` (64KB
+     boundary) — verify each prints `<handle>: SEG=xx BANK=xx PARA=xxxx
+     PAGES=xx SIZE=xxxx` with `SIZE=0010`, `SIZE=1000`, `SIZE=10000`
+     respectively.
+  2. `XA 0000` and `XA 1001` — verify both are rejected with `ERROR`.
+  3. From an empty registry, issue four successive valid `XA`s to fill all
+     four handles, then a fifth — verify the fifth is rejected even though
+     REU pages remain free (registry-full, not out-of-memory).
+  4. `XD` on a valid handle — verify it is silent on success; repeat `XD` on
+     the same handle — verify it is rejected.
+  5. Allocate at least one handle, then `Q` — verify DEBUG returns cleanly
+     to the `command64` shell with no `ERROR`.
+- **Pass Criteria**: capacities and rejections match exactly; the registry
+  enforces a four-handle ceiling independent of OS free-page count; `Q`
+  releases every active allocation before exiting.
+
+### Test 15.2: Status Reporting
+
+- **Input**: `XS`, `XS handle`
+- **Procedure**:
+  1. Bare `XS` with an empty registry — verify `NONE`.
+  2. Allocate one or more handles; bare `XS` — verify `VMM ACTIVE`,
+     `PAGES TOTAL=`/`ALLOC=`/`FREE=`, and one row per active allocation.
+  3. `XS handle` for a valid handle — verify one matching row; for an
+     invalid, out-of-range, or inactive handle — verify `ERROR` with no OS
+     call side effect.
+- **Pass Criteria**: reported fields match the registry exactly; invalid
+  handles are rejected before any OS call.
+
+### Test 15.3: Page-Offset Parsing
+
+- **Input**: equivalence pairs `0000`/`0000:0000`, `0FFF`/`0000:0FFF`,
+  `1000`/`0001:0000`, `1020`/`0001:0020`, `FFFF`/`000F:0FFF`; malformed
+  forms `:`, `0001:`, `:0020`, `0001::0020`, `0001:1000`, `0010:0000`,
+  `000G:0000`, `0001:000G`, `0001:0020X`
+- **Procedure**: Against a 64KB allocation (`XA 1000`), issue each
+  equivalence pair as the offset operand of an otherwise-identical `XM`
+  command and confirm both forms of a pair select the same REU location
+  (verify via a small `R`/`W` round-trip); issue each malformed form and
+  confirm rejection.
+- **Pass Criteria**: every equivalence pair addresses identical REU bytes;
+  every malformed form prints `ERROR` before any OS call.
+
+### Test 15.4: Transfer Round-Trips and Boundaries
+
+- **Input**: see `wiki/debug-utility.md`'s round-trip and boundary examples
+  (Section "Complete Session", "Boundary Examples")
+- **Procedure**:
+  1. Single-byte transfer at offset `$0000` and at the final valid byte of a
+     4KB allocation (`$0FFF`); verify both round-trip byte-exact via `D`/`C`.
+  2. A transfer ending exactly at allocation capacity; a transfer one byte
+     beyond capacity (verify rejection, no DMA).
+  3. A transfer crossing a 256-byte chunk boundary (multi-chunk, e.g. 768
+     bytes) and one crossing a 4KB page boundary (`0000:0FFF` to
+     `0001:0000`); verify byte-exact via direct memory comparison, not just
+     absence of `ERROR`.
+  4. Flat and page-relative operands addressing the same location (e.g.
+     `1000` and `0001:0000`); verify identical data.
+  5. Zero length, invalid direction, missing operands, trailing garbage, and
+     a C64-side address wrap (`address + length > $10000` without landing
+     exactly on it); verify all rejected before any DMA.
+- **Pass Criteria**: every successful transfer prints the exact `XM
+  XFER=xxxx OK` byte count and is independently verified byte-exact; every
+  rejected case produces `ERROR` with no data movement.
+
+### Test 15.5: REU-Disabled Environment
+
+- **Input**: `XS`, `XA 0100`, `XM 0 0000 6000 0010 R`, `XD 0`, `G`, `Q`
+- **Procedure**:
+  1. Boot Command64 with REU emulation disabled.
+  2. `XS` — verify `VMM INACTIVE` with zero counters and `NONE`.
+  3. `XA 0100` — verify a clean `ERROR`, VMM-unavailable selector, no
+     registry mutation.
+  4. `XM 0 0000 6000 0010 R` (no active handle possible) — verify `ERROR`.
+  5. `XD 0` — verify `ERROR` (no active handle) without an OS call.
+  6. Confirm ordinary commands (`G`, `D`, `E`, etc.) still function normally.
+  7. `Q` — verify a clean exit with nothing to clean up.
+- **Pass Criteria**: every REU command fails cleanly and immediately; no
+  crash, hang, or corruption; non-REU DEBUG functionality is unaffected.
