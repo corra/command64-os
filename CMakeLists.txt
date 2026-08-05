@@ -287,7 +287,14 @@ if(Ca65_FOUND)
     # column array overflowed $4200 by 60 measured bytes. One page is the
     # smallest aligned increase; the final site-line/traceback corrections
     # leave 85 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4900")
+    # (WP49-WP51's envelope moved to $4900 without a recorded comment trail
+    # entry here -- not touched by WP52.)
+    # WP52: $4900 -> $4B00 -- the new map.s module (symbolsReadByIndex's
+    # caller, record validation, and private hex/decimal row formatters)
+    # overflowed $4900 by 362 measured bytes; $4A00 (+256) would still
+    # overflow, so $4B00 (+512) is the smallest round-page step that fits,
+    # leaving 150 bytes headroom, below the plan's preapproved $4F00 ceiling.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4B00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -452,6 +459,21 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_map")
+            # WP52: map.s plus the symbol table it reads through
+            # symbolsReadByIndex. Does NOT link diagnostics.s -- this harness
+            # provides its own diagPrintFatal/diagPrintString stand-ins
+            # (matching casm_symbols.s's/casm_listing.s's own precedent for
+            # avoiding diagnostics.s's transitive lexer.s/source.s
+            # dependencies).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/map.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
         if(TEST_NAME STREQUAL "casm_reloc")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
@@ -496,7 +518,10 @@ if(Ca65_FOUND)
             # emitByte cannot resolve the symbol otherwise, whether or not this
             # harness's own driver ever enables capture. $4500 overflowed by
             # 418 measured bytes.
-            set(TEST_PRG_SIZE "4700")
+            # WP52: symbolsReadByIndex's addition to symbols.s (linked whole,
+            # same as every module here) overflowed $4700 by 10 measured
+            # bytes; $4800 (+256) is the smallest round-page step above that.
+            set(TEST_PRG_SIZE "4800")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -530,7 +555,9 @@ if(Ca65_FOUND)
             # BSS end was 0x7AF6, only 0x42F6 above $3800) -- $4300 is the
             # true smallest 256-byte-aligned fit, 266 bytes tighter than the
             # $4400 carried over from increment 5's own rough overflow retry.
-            set(TEST_PRG_SIZE "4300")
+            # WP52: symbolsReadByIndex's addition to symbols.s (linked whole)
+            # overflowed $4300 by 95 measured bytes; $4400 (+256) fits.
+            set(TEST_PRG_SIZE "4400")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -795,11 +822,11 @@ set(IMAGE_BASE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${CO
 # reviewed manifest backs it.
 set(IMAGE_PRG_TARGETS ${IMAGE_BASE_PRG_TARGETS} dash)
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_BASE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
-# test_l15release ships on casm_overflow_test_d64 instead (see that target's
-# own comment) -- test.d64 sits at the 1541 directory track's hard 144-entry
-# ceiling, and adding one more entry there would bump an unrelated fixture
-# off. Remove it from the generic test.d64 packaging list so it isn't
-# double-packaged.
+# test_l15release ships on casm_listing_test_d64 instead (see that target's
+# own comment; moved there from casm_overflow_test_d64 at WP52) -- test.d64
+# sits at the 1541 directory track's hard 144-entry ceiling, and adding one
+# more entry there would bump an unrelated fixture off. Remove it from the
+# generic test.d64 packaging list so it isn't double-packaged.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_l15release)
 # WP44's include harness is intentionally packaged on casm_overflow_test_d64:
 # test.d64 is already at the 1541 directory-entry ceiling.
@@ -815,6 +842,14 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listing)
 # WP51 increment 6's real-path capture harness: its own casm_listing_test_d64
 # disk, same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listcap)
+# WP52's symbol-map harness joins casm_listing_test_d64 for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_map)
+# WP52: symbolsReadByIndex's addition to symbols.s (linked whole by
+# test_casm_passcheck, same as test_casm_pass1) left test.d64 2 blocks short
+# of its own byte-space ceiling. Moved to casm_listing_test_d64 (523 blocks
+# free) rather than trimming test.d64's content -- not a directory-entry
+# relocation like the others above, but the same "no room left" reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_passcheck)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1113,18 +1148,18 @@ add_dependencies(command64_casm_utils_d64 dash_ref)
 # from the generic CASM_REF_NAMES -> test.d64 loop below since its matching
 # .seq inputs live only on this disk, not test.d64.
 #
-# test_l15release also lives here, despite having nothing to do with CASM:
-# test.d64 sits at the 1541 directory track's hard 144-entry ceiling (not a
-# byte-space limit -- 139 blocks were still free), so adding it there would
-# have bumped an unrelated fixture off. This disk is mechanically just "a
-# D64 with spare directory entries," not CASM-exclusive in practice, and
-# reusing it was smaller-blast-radius than standing up a new disk image
-# for one 4-block test PRG. See brain/plans/label-l15-cache-release.md.
+# test_l15release lived here despite having nothing to do with CASM (see
+# brain/plans/label-l15-cache-release.md), but WP52's map.s growth in
+# casm.prg (this disk's own production binary) overflowed casm_overflow_
+# test.d64's byte-space ceiling by a few blocks -- it was already down to 1
+# free block before WP52. Moved to casm_listing_test_d64 (523 blocks free)
+# instead: a 4-block, fixture-free PRG relocates with zero coupling risk,
+# smaller blast radius than trimming any of this disk's real CASM fixtures.
 add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp test_l15release test_casm_include test_casm_catalog test_casm_frame test_casm_event
+    PRGS casm comp test_casm_include test_casm_catalog test_casm_frame test_casm_event
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1156,11 +1191,17 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # latter's own fixtures -- bare disk names (no ".S" suffix), matching
 # test_casm_frame.s's own precedent (these fixtures are consumed only by
 # this test harness's sourceLoad/`.INCLUDE`, not by production casm.s).
+# WP52's test_casm_map joins here too, for the same test.d64 ceiling reason
+# -- it carries no fixtures of its own (real symbols/VMM only, no source
+# .seq fixtures). test_casm_passcheck (byte-space, not directory-entry;
+# self-contained, no sourceLoad/fixture coupling) and test_l15release
+# (relocated off casm_overflow_test.d64; also fixture-free) join for the
+# same underlying "WP52's symbols.s growth left no room" reason.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS test_casm_listing test_casm_listcap
+    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

@@ -1762,10 +1762,46 @@
         and
         `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`;
         Task Warrior task closed, WP52 unblocked
-  - [ ] WP52 (`0bf2e86b-0bd0-443a-b84b-b2c258e98181`): deterministic symbol
+  - [x] WP52 (`0bf2e86b-0bd0-443a-b84b-b2c258e98181`): deterministic symbol
         map; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`;
-        WP51 complete, WP52 not yet activated
+        branch `feature/casm-phase10-wp52` (based on `casm-phase10` after
+        catching it up to `main`, commit `a69ccd8`)
+    - [x] `symbolsReadByIndex` added to `symbols.s` (stateless, definition-
+          order record read by index; distinct from the hash-chain-walking
+          `symbolsFindChain`)
+    - [x] `CASM_DIAG_SYMBOL_MAP_INVALID` ($42) added with its own
+          contiguity assertion and `diagPrintFatal` case (kept out of the
+          dense message-table array to avoid pre-filling WP53's still-
+          unimplemented $3D-$41 reserved range)
+    - [x] `map.s` added: `mapPrint`/`mapValidateRecord`/`mapFormatRow`/
+          private hex+decimal formatters; linked into production `casm`
+          via the existing source glob, with no `casm.s` call site (`/M`
+          stays NOT IMPLEMENTED until WP54, per plan)
+    - [x] `tests/src/casm_map/casm_map.s` harness: 16 fixtures (empty/one/
+          full table, insertion order vs. hash order, case sensitivity,
+          31-byte name, boundary addresses, repeated printing, read-index
+          bounds, invalid NameLen/Flags/padding, VMM failure via a freed
+          slot) -- VICE-verified 16/16 PASS on `casm_listing_test_d64`
+    - [x] Envelope: casm.prg `$4900` -> `$4B00` (+512, 150 bytes headroom
+          after map.s's 362-byte overflow); test_casm_pass1 `$4700`->`$4800`
+          and test_casm_passcheck `$4300`->`$4400` (symbols.s linked whole)
+    - [x] Disk capacity fallout (symbols.s growth cascading into two
+          already-near-capacity test disks) resolved per user direction:
+          test_casm_passcheck and test_l15release relocated from
+          test.d64/casm_overflow_test.d64 to casm_listing_test_d64
+          (523->442 blocks free there; both origin disks back to their
+          pre-WP52 headroom)
+    - [x] CASM version bumped `0.1.52` -> `0.1.53` (build unchanged in
+          code size; version-string length identical)
+    - [x] Regression: production `casm`, `test_casm_map` (16/16),
+          `test_casm_passcheck` (2/2) all VICE-verified clean;
+          `test_casm_symbols` initially hung after a device-switch
+          mid-session (device/IEC anomaly, not a real assertion failure) --
+          user reset the machine and confirmed `test_casm_symbols` passes
+          in full
+    - [x] User confirmed the walkthrough 2026-08-05; ready to commit and
+          merge onto `casm-phase10`
   - [ ] WP53 (`aa57f461-36a9-455c-966f-ac484ec57b41`): listing naming,
         serialization, and cleanup; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`;

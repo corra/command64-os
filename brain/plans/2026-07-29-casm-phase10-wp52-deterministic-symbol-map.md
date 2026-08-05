@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-wp52-deterministic-symbol-map
 created: 2026-07-29
-status: approved-blocked
+status: implemented
 taskwarrior: 0bf2e86b-0bd0-443a-b84b-b2c258e98181
 depends-on: a64fa847-1b46-44fd-be3b-8ad7b1055c92
 ---
@@ -135,3 +135,55 @@ does not activate WP53.
 
 - 2026-07-29: User approved this plan. WP52 remains pending and blocked by
   WP51; no implementation is authorized.
+- 2026-08-05: WP51 complete; implementation authorized on
+  `feature/casm-phase10-wp52` (based on `casm-phase10` caught up to `main`,
+  `a69ccd8`). Implemented in order:
+  1. `symbolsReadByIndex` (`symbols.s`): stateless read-by-index, matching
+     the plan's ABI exactly (X/Y index in; `CASM_STREAM_DATA`/`_EOF` out;
+     offset computed by a 6-bit shift, mirroring `symbolsFindChain`'s own
+     cursor-offset math).
+  2. `CASM_DIAG_SYMBOL_MAP_INVALID` ($42) in `common.inc`, with its own
+     contiguity assertion following WP53's reserved-but-unimplemented
+     range. Given `diagPrintFatal`'s message table only tracks the
+     `CASM_DIAG_PHASE10_WP51_LAST` bound, $42 is checked as an early
+     special case in `diagPrintFatal` rather than densely filling WP53's
+     unimplemented $3D-$41 gap with placeholder text that isn't this
+     work package's to write.
+  3. `map.s`: `mapPrint`, `mapValidateRecord`, `mapFormatRow`, and private
+     buffer-writing hex/decimal formatters (deliberately independent of
+     `diagnostics.s`'s own print-directly formatters, per the plan).
+     Picked up automatically by CASM's source glob; no `casm.s` call site
+     added, so `/M` remains NOT IMPLEMENTED as required.
+  4. `tests/src/casm_map/casm_map.s`: 16 fixtures against real
+     symbols/VMM/resources, with a local `diagPrintString` stand-in sink
+     (captures one targeted row per `mapPrint` call via a caller-set call
+     index, never retaining all rows at once). Two fixtures
+     (`maporder1`/`mapcase1`, later split into `maporder1a/b` and
+     `mapcase1a/b` while diagnosing) initially failed from a harness bug,
+     not a `map.s` bug: `symbolsInsert`'s `X=ValLo, Y=ValHi` contract was
+     read backwards when choosing test values, computing `$0011` instead
+     of the intended `$1100`. Confirmed via `mapone1`'s already-correct
+     fixture, which proved `map.s`'s own Hi-then-Lo hex formatting was
+     right all along. Fixed and VICE-verified 16/16 PASS on
+     `casm_listing_test_d64`.
+  5. Envelope: production `casm` overflowed `$4900` by 362 bytes; `$4B00`
+     (+512) fits with 150 bytes headroom. `symbols.s`'s growth, linked
+     whole by every harness that touches it, also overflowed
+     `test_casm_pass1` (`$4700`->`$4800`) and `test_casm_passcheck`
+     (`$4300`->`$4400`).
+  6. That same growth cascaded into two test disks already near their own
+     ceiling: `test.d64` (2 blocks short) and `casm_overflow_test.d64`
+     (already at 1 free block pre-WP52, confirmed via a clean baseline
+     checkout). User approved relocating `test_casm_passcheck` and
+     `test_l15release` (both fixture-free, no same-disk coupling) to
+     `casm_listing_test_d64` (523 -> 442 blocks free there) rather than
+     trimming either origin disk's real content.
+  7. CASM bumped `0.1.52` -> `0.1.53` (code size unchanged; same-length
+     version string).
+  8. Regression: production `casm`, `test_casm_map` (16/16), and
+     `test_casm_passcheck` (2/2) all VICE-verified clean under a fresh
+     boot. `test_casm_symbols` was not completed -- its load hung after a
+     `9:`/`8:` device switch mid-session, an apparent IEC/device-switch
+     anomaly unrelated to any assertion in the harness itself; the user
+     reset the machine and confirmed `test_casm_symbols` passes in full.
+  User confirmed the walkthrough 2026-08-05. WP52 complete.

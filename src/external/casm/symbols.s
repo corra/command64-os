@@ -15,11 +15,12 @@
 ; against every registered slot regardless of which module registered it.
 ;
 ; What this module does NOT do: no label/expression grammar (that is
-; parser.s's job), no binding into exprEvaluate's resolver slot (that is
+; parser.s's job), and no binding into exprEvaluate's resolver slot (that is
 ; WP28's job, though symbolsLookup's calling convention is deliberately
-; identical to that resolver ABI so no adapter code will be needed), and no
-; "look up symbol by record index" accessor (deferred; see the WP27 plan's
-; Dependency Review item 12).
+; identical to that resolver ABI so no adapter code will be needed).
+; symbolsReadByIndex (WP52) is the "look up symbol by record index"
+; accessor once deferred here (see the WP27 plan's Dependency Review item
+; 12) -- stateless, definition-order iteration for map.s, not a hash lookup.
 ;
 ; Scratch discipline: CasmValue0Lo/CasmValue0Hi are vwPrepareTransfer's own
 ; clobbered scratch (documented in vmm_store.s), and this exact class of bug
@@ -41,6 +42,7 @@
 .export symbolsInit
 .export symbolsInsert
 .export symbolsLookup
+.export symbolsReadByIndex
 .export CasmSymbolVmmSlot
 
 .segment "BSS"
@@ -435,3 +437,73 @@ slNotFound:
 
 slPropagate:
     rts                      ; A/C already set for the internal-error case
+
+; ---------------------------------------------------------------------------
+; symbolsReadByIndex
+; WP52: stateless read of one symbol record by its record index, for
+; deterministic definition-order reporting (map.s's mapPrint). Unlike
+; symbolsFindChain's hash-bucket chain walk, this never inspects
+; CasmSymbolBuckets or any Next field -- the index is the caller's own
+; iteration cursor, not a chain position.
+;
+; Inputs:  X/Y = record index (Lo/Hi)
+; Outputs: C clear, A = CASM_STREAM_DATA, CasmVmmBuffer holds the 64-byte
+;              record at that index
+;          C clear, A = CASM_STREAM_EOF (index >= CasmSymbolCount; no VMM
+;              transfer; repeat-stable -- calling again with the same or a
+;              larger index returns CASM_STREAM_EOF again)
+;          C set, A = CASM_DIAG_VMM_TRANSFER_FAILED (rejected vmmWindowRead)
+; Clobbers: A, X, Y, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi, CasmVmmBuffer, and
+;           OS API-defined volatile registers
+; ---------------------------------------------------------------------------
+symbolsReadByIndex:
+    stx CasmVmmOffLo
+    sty CasmVmmOffHi
+
+    ; 16-bit unsigned compare: index >= CasmSymbolCount -> EOF. Computes
+    ; index - count and tests the final carry (set = no borrow = index >=
+    ; count), without disturbing CasmVmmOffLo/OffHi (still needed below).
+    txa
+    sec
+    sbc CasmSymbolCount
+    tya
+    sbc CasmSymbolCount + 1
+    bcs srbiEof
+
+    ; VMM offset = index * CASM_SYMBOL_REC_SIZE (64): a single 16-bit
+    ; left-shift-by-6, unrolled (matches symbolsFindChain's cursor offset
+    ; math exactly).
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+
+    lda #CASM_SYMBOL_REC_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmSymbolVmmSlot
+    jsr vmmWindowRead
+    bcs srbiFail
+
+    lda #CASM_STREAM_DATA
+    clc
+    rts
+
+srbiEof:
+    lda #CASM_STREAM_EOF
+    clc
+    rts
+
+srbiFail:
+    lda #CASM_DIAG_VMM_TRANSFER_FAILED
+    sec
+    rts

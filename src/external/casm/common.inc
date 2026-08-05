@@ -705,6 +705,8 @@ CASM_DIAG_LISTING_CLOSE_FAILED  = $3F
 CASM_DIAG_LISTING_DELETE_FAILED = $40
 CASM_DIAG_LISTING_SHORT_WRITE   = $41
 CASM_DIAG_PHASE10_WP53_LAST = CASM_DIAG_LISTING_SHORT_WRITE
+CASM_DIAG_SYMBOL_MAP_INVALID = $42  ; mapPrint: corrupt symbol record (locationless)
+CASM_DIAG_PHASE10_WP52_LAST = CASM_DIAG_SYMBOL_MAP_INVALID
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -754,6 +756,8 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_LISTING_DELETE_FAILED = CASM_DIAG_LISTING_CLOSE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
 .assert CASM_DIAG_LISTING_SHORT_WRITE = CASM_DIAG_LISTING_DELETE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE10_WP53_LAST = $41, error, "CASM WP53 diagnostic range changed"
+.assert CASM_DIAG_SYMBOL_MAP_INVALID = CASM_DIAG_PHASE10_WP53_LAST + 1, error, "CASM WP52 diagnostics must follow WP53's reserved range"
+.assert CASM_DIAG_PHASE10_WP52_LAST = $42, error, "CASM WP52 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

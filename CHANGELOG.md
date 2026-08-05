@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **DEBUG REU examples in action**: Added annotated `XS`, `XA`, `XM`, `XD`,
+  and `Q` workflows to the DEBUG manual's numbered examples, including a
+  write/read round trip, flat and page-relative offsets, multi-chunk transfers,
+  exact-end acceptance, REU/C64 overflow rejection, handle release, and
+  automatic cleanup. Corrected the stale parity note that still described `XM`
+  as preflight-only after WP6 implemented real transfers.
+
 - **DEBUG REU command guide**: Replaced the obsolete statement that `XA`,
   `XD`, `XM`, and `XS` are unavailable with a detailed guide to VMM units,
   page rounding, DEBUG's four-handle local registry, allocation ownership
@@ -60,6 +67,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 WP52 deterministic symbol map**: Added `symbolsReadByIndex`
+  (`symbols.s`), a stateless definition-order record accessor distinct from
+  the hash-chain-walking `symbolsFindChain`, and a new `map.s` module
+  (`mapPrint`/`mapValidateRecord`/`mapFormatRow` plus private hex/decimal row
+  formatters) implementing `/M`'s output format (`$HHHH LABEL` rows in
+  insertion order, a final `NNN SYMBOLS` total). `map.s` is linked into
+  production `casm` but has no `casm.s` call site yet -- `/M` remains NOT
+  IMPLEMENTED until WP54 wires it into the CLI. Added
+  `CASM_DIAG_SYMBOL_MAP_INVALID` ($42) for corrupt records (bad NameLen,
+  DEFINED clear, reserved flag bits set, or nonzero reserved padding).
+  Verified with a new 16-fixture harness (`tests/src/casm_map`) covering
+  empty/one/full (512-symbol) tables, insertion order vs. hash-bucket order,
+  case sensitivity, 31-byte names, boundary addresses, repeated/deterministic
+  printing, read-index bounds, and VMM-failure/corruption diagnostics.
+  Required expanding `casm.prg`'s envelope (`$4900`->`$4B00`) and two
+  whole-linking test harnesses' envelopes (`test_casm_pass1` `$4700`->`$4800`,
+  `test_casm_passcheck` `$4300`->`$4400`); the same `symbols.s` growth also
+  overflowed `test.d64`'s and `casm_overflow_test.d64`'s already-tight disk
+  capacity, resolved by relocating `test_casm_passcheck` and
+  `test_l15release` to `casm_listing_test_d64`. CASM bumped `0.1.52` ->
+  `0.1.53`.
 - **DEBUG WP6 real chunked `XM` transfers**: `XM handle offset|page:offset
   address length R|W` now performs a real, chunked `DOS_VMM_READ`/
   `DOS_VMM_WRITE` transfer after WP5's parsing/validation succeeds, replacing

@@ -113,12 +113,21 @@ diagPrintString:
 ; bumped alongside them, so printing any of those four fell through to the
 ; generic "unknown" fallback despite real text existing for them.
 ;
+; WP52: CASM_DIAG_SYMBOL_MAP_INVALID ($42) sits above WP53's reserved-but-
+; unimplemented $3D-$41 range, which has no message-table text yet. Rather
+; than densely filling that gap with placeholder copy for a diagnostic no
+; code path raises yet (WP53's job, not this one), $42 is checked as its own
+; early case, leaving the parallel-array table's contiguous range and bound
+; exactly as WP51 left them.
+;
 ; Inputs:  A = CASM_DIAG_* identifier
 ; Outputs: none
 ; Flags:   undefined after diagPrintString
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 diagPrintFatal:
+    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
+    beq dpfSymbolMapInvalid
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
     cmp #CASM_DIAG_PHASE10_WP51_LAST + 1
@@ -136,6 +145,10 @@ diagPrintFatal:
     ; WP15: append the source location and caret when the raise site recorded
     ; one. Self-gating, so diagnostics with no source position are unchanged.
     jmp diagPrintSourceContext
+dpfSymbolMapInvalid:
+    ldx #<msgSymbolMapInvalid
+    ldy #>msgSymbolMapInvalid
+    jmp diagPrintString
 dpfUnknown:
     ldx #<msgUnknown
     ldy #>msgUnknown
@@ -1361,6 +1374,8 @@ msgListingBytesFull:
     .byte "CASM: LISTING BYTES FULL", PetCr, 0
 msgListingReplayMismatch:
     .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
+msgSymbolMapInvalid:
+    .byte "CASM: SYMBOL MAP INVALID", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:
