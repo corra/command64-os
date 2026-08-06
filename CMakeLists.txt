@@ -501,6 +501,23 @@ if(Ca65_FOUND)
             # $2B00 is the smallest aligned step that fits.
             set(TEST_PRG_SIZE "2B00")
         endif()
+        if(TEST_NAME STREQUAL "casm_spancommit")
+            # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
+            # fileCreateOutput/fileOpenInput/fileClose) plus resources.s for
+            # resourcesInit/resourcesCleanup's registry bookkeeping.
+            # resources.s references diagnostics.s's diagPrintFatal (its own
+            # exitFatal path) and vmm_store.s's vmmStoreFree (its own VMM
+            # cleanup path); neither is reachable from this harness's
+            # all-success flow (no case registers a VMM allocation, and none
+            # calls exitFatal), so the harness stubs both itself rather than
+            # pulling in either whole subsystem -- diagnostics.s alone drags
+            # in state.s/lexer.s/source.s/include.s transitively.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1200")
+        endif()
         if(TEST_NAME STREQUAL "casm_cliderive")
             # WP53 increment 1: cli.s alone (CommandBuffer is a fixed absolute
             # address per command64.inc, not a linked symbol, so no other
@@ -886,6 +903,8 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_cliderive)
 # WP53 increment 2's span-reader harness joins it for the same reason; it
 # also needs casmlc02, which already lives on that disk.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_spanread)
+# WP53 increment 3's commit/abort harness joins it for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_spancommit)
 # WP52: symbolsReadByIndex's addition to symbols.s (linked whole by
 # test_casm_passcheck, same as test_casm_pass1) left test.d64 2 blocks short
 # of its own byte-space ceiling. Moved to casm_listing_test_d64 (523 blocks
@@ -1247,7 +1266,7 @@ add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread
+    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

@@ -26,6 +26,7 @@
 .export inputStreamReadInto
 .export inputStreamClose
 .export outputAbort
+.export outputCommit
 
 .export CasmIoBuffer
 .export CasmInputHandle
@@ -38,6 +39,7 @@
 .export CasmOutputState
 .export CasmOutputCreated
 .export CasmOutputValid
+.export CasmOutputCommitted
 
 .segment "BSS"
 
@@ -52,6 +54,7 @@ CasmOutputSlot:    .res 1
 CasmOutputState:   .res 1
 CasmOutputCreated: .res 1
 CasmOutputValid:   .res 1
+CasmOutputCommitted: .res 1
 CasmRequestLo:     .res 1
 CasmRequestHi:     .res 1
 CasmCloseSlot:     .res 1
@@ -85,6 +88,7 @@ fileIoInit:
     sta CasmInputTotalHi
     sta CasmOutputCreated
     sta CasmOutputValid
+    sta CasmOutputCommitted
     sta CasmRequestLo
     sta CasmRequestHi
     sta CasmCloseSlot
@@ -504,10 +508,75 @@ iscFailed:
     rts
 
 ; ---------------------------------------------------------------------------
+; outputCommit
+; Close and release the output PRG's registry slot once Pass 2's real
+; emission and relocation finalization have both already succeeded, and mark
+; the PRG committed. Committed is permanent and one-way for this run: once
+; set, outputAbort will never delete the file, no matter what runs and then
+; fails afterward (WP53's listing serializer, WP54's sequencing).
+;
+; Deliberately does not reuse outputAbort's own close handling: that path is
+; entangled with delete and primary-diagnostic-preservation logic that does
+; not apply to a clean success-path commit. WP53 links this routine but adds
+; no production call site; WP54 owns calling it from casm.s's real Pass 2
+; tail, immediately after relocFinalize succeeds.
+;
+; Inputs:    CasmOutputState = CASM_FILE_STATE_OPEN (the PRG is still open)
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmOutputCommitted =
+;                     CASM_OUTPUT_COMMITTED; handle/slot released, state
+;                     CLOSED
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED on a bad
+;                     precondition state, or A = CASM_DIAG_OUTPUT_CLOSE_FAILED
+;                     if the OS close failed (state becomes CLOSE_FAILED,
+;                     left registered for central cleanup to retry, matching
+;                     outputAbort's own failed-close handling below); either
+;                     way CasmOutputCommitted is left CASM_OUTPUT_NOT_COMMITTED
+; Preserves: none
+; Clobbers:  A, X, Y and fileClose clobbers
+; ---------------------------------------------------------------------------
+outputCommit:
+    lda CasmOutputState
+    cmp #CASM_FILE_STATE_OPEN
+    bne ocBadState
+    lda CasmOutputHandle
+    ldx CasmOutputSlot
+    ldy #CASM_DIAG_OUTPUT_CLOSE_FAILED
+    jsr fileClose
+    bcs ocCloseFailed
+    lda #CASM_INVALID_HANDLE
+    sta CasmOutputHandle
+    lda #CASM_INVALID_SLOT
+    sta CasmOutputSlot
+    lda #CASM_FILE_STATE_CLOSED
+    sta CasmOutputState
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+ocCloseFailed:
+    lda #CASM_FILE_STATE_CLOSE_FAILED
+    sta CasmOutputState
+    lda #CASM_DIAG_OUTPUT_CLOSE_FAILED
+    sec
+    rts
+ocBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; outputAbort
 ; Best-effort close and delete for a Phase 5-created incomplete output while
 ; preserving the primary failure. Phase 2 compiles this path but does not call
 ; it from production orchestration.
+;
+; WP53: a committed PRG (CasmOutputCommitted = CASM_OUTPUT_COMMITTED, set
+; only by a successful outputCommit) is never deleted here, regardless of
+; CasmOutputCreated -- outputCommit already closed the handle on the success
+; path, so this becomes a pure no-op returning the preserved primary. This is
+; the "committed PRGs are never deleted" half of WP53's PRG commit contract;
+; outputCommit above is the other half.
 ;
 ; Inputs:    A = primary CASM_DIAG_* value, or CASM_DIAG_NONE
 ; Outputs:   A = preserved primary, or first cleanup diagnostic if none
@@ -541,6 +610,8 @@ oaCloseFailed:
     jmp oaReturn
 
 oaDelete:
+    lda CasmOutputCommitted
+    bne oaReturn          ; WP53: committed PRGs are never deleted
     lda CasmOutputCreated
     beq oaReturn
     ldx #<CasmOutputName

@@ -417,6 +417,13 @@ CASM_OUTPUT_CREATED     = $01
 CASM_OUTPUT_INVALID     = $00
 CASM_OUTPUT_VALID       = $01
 
+; WP53: the PRG's permanent, one-way commit state for this run. Set only by
+; outputCommit on a successful close, after emit/relocation finalization has
+; both succeeded. outputAbort consults this before ever deleting the output
+; file -- see outputAbort's own amended comment (fileio.s).
+CASM_OUTPUT_NOT_COMMITTED = $00
+CASM_OUTPUT_COMMITTED     = $01
+
 ; ---------------------------------------------------------------------------
 ; Phase 3 source and lexer contract
 ; ---------------------------------------------------------------------------
