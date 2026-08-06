@@ -94,6 +94,8 @@
 .export cliSourceSlotLo  ; this harness's own two-entry copy, see BSS section
 .export cliSourceSlotHi
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
+.export CasmListingName  ; listing.s's WP53 file I/O references these
+.export CasmListingLen
 .export CasmCliOptions   ; emit.s reads this; harness's own zero-initialized
                           ; copy, matching test_casm_pass1.s's own precedent
 
@@ -700,6 +702,11 @@ CasmSourceLens:  .res 2
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
 CasmCliOptions:  .res 1
+; WP53 increment 4: listing.s's new `.LST` file I/O (linked whole, unused
+; by this harness) references these (cli.s), which this harness does not
+; link either.
+CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
+CasmListingLen:  .res 1
 
 .segment "RODATA"
 

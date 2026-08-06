@@ -200,6 +200,7 @@ CASM_PETSCII_COLON = $3A
 CASM_PETSCII_SEMICOLON = $3B
 CASM_PETSCII_LESS  = $3C
 CASM_PETSCII_GREATER = $3E
+CASM_PETSCII_AT    = $40  ; WP53: CBM DOS's native open-for-write replace marker
 CASM_PETSCII_UPPER_A = $41
 CASM_PETSCII_UPPER_Z = $5A
 CASM_PETSCII_UNDERSCORE = $5F
@@ -1158,5 +1159,28 @@ CASM_SOURCE_CAPTURE_ENABLED                   = %10000000
 CASM_LISTING_STATE_NONE     = $00  ; listingStateInit only; no VMM acquired
 CASM_LISTING_STATE_ENABLED  = $01  ; listingCaptureInit succeeded; capturing
 CASM_LISTING_STATE_COMPLETE = $02  ; listingCaptureFinalize succeeded
+
+; WP53 increment 4: the `.LST` file's own I/O lifecycle -- deliberately
+; distinct from CASM_LISTING_STATE_* above (WP51's in-memory capture
+; transaction state; unrelated concept, same "listing" word). Reuses
+; CASM_FILE_STATE_* (fileio.s) for open/closed/close-failed exactly as PRG
+; output already does; these four are the parts PRG output does not need.
+CASM_LISTFILE_NOT_OPENED = $00
+CASM_LISTFILE_OPENED     = $01
+CASM_LISTFILE_INVALID    = $00
+CASM_LISTFILE_VALID      = $01
+CASM_LISTFILE_NOT_COMMITTED    = $00
+CASM_LISTFILE_COMMITTED        = $01
+CASM_LISTFILE_DELETE_NOT_PENDING = $00
+CASM_LISTFILE_DELETE_PENDING     = $01
+
+; CasmListingName (cli.s) is bounded by CASM_FILENAME_BUFFER_SIZE (64,
+; CASM_FILENAME_MAX + 1). The real DOS_OPEN_FILE name embeds "@0:" (3 bytes)
+; immediately after any device-prefix colon, or prepended if none exists, so
+; the open-name buffer needs room for the longest possible CasmListingName
+; plus those 3 bytes plus its own terminating null: 63 + 3 + 1 = 67. $44 (68)
+; is the next round value at or above that.
+CASM_LISTING_OPEN_NAME_SIZE = $44
+.assert CASM_LISTING_OPEN_NAME_SIZE >= CASM_FILENAME_MAX + 3 + 1, error, "CASM listing open-name buffer too small for CasmListingName plus the embedded @0: marker"
 
 .endif

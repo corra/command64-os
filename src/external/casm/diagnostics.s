@@ -113,12 +113,15 @@ diagPrintString:
 ; bumped alongside them, so printing any of those four fell through to the
 ; generic "unknown" fallback despite real text existing for them.
 ;
-; WP52: CASM_DIAG_SYMBOL_MAP_INVALID ($42) sits above WP53's reserved-but-
-; unimplemented $3D-$41 range, which has no message-table text yet. Rather
-; than densely filling that gap with placeholder copy for a diagnostic no
-; code path raises yet (WP53's job, not this one), $42 is checked as its own
-; early case, leaving the parallel-array table's contiguous range and bound
-; exactly as WP51 left them.
+; WP52: CASM_DIAG_SYMBOL_MAP_INVALID ($42) is checked as its own early case
+; rather than folded into the parallel-array table below, leaving that
+; table's contiguous range and bound exactly as WP51 left them.
+;
+; WP53 increment 4: activates $3D-$41 (the five listing-file diagnostics),
+; through their own small parallel table (diagListMessageLo/Hi) rather than
+; extending the main one -- these five are locationless (no
+; diagPrintSourceContext call), unlike every entry in the main table, so
+; they could not share its tail unconditionally even if renumbered into it.
 ;
 ; Inputs:  A = CASM_DIAG_* identifier
 ; Outputs: none
@@ -126,8 +129,25 @@ diagPrintString:
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 diagPrintFatal:
+    cmp #CASM_DIAG_LISTING_CREATE_FAILED
+    bcc dpfMainRange
+    cmp #CASM_DIAG_LISTING_SHORT_WRITE + 1
+    bcc dpfListingRange
     cmp #CASM_DIAG_SYMBOL_MAP_INVALID
     beq dpfSymbolMapInvalid
+    jmp dpfUnknown
+dpfListingRange:
+    sec
+    sbc #CASM_DIAG_LISTING_CREATE_FAILED
+    tax
+    lda diagListMessageLo, x
+    pha
+    lda diagListMessageHi, x
+    tay
+    pla
+    tax
+    jmp diagPrintString          ; locationless -- no diagPrintSourceContext
+dpfMainRange:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
     cmp #CASM_DIAG_PHASE10_WP51_LAST + 1
@@ -1254,6 +1274,27 @@ diagMessageHiEnd:
 .assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE10_WP51_LAST, error, "CASM diagnostic low table is incomplete"
 .assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE10_WP51_LAST, error, "CASM diagnostic high table is incomplete"
 
+; WP53 increment 4: the five listing-file I/O diagnostics' own small table,
+; indexed by (A - CASM_DIAG_LISTING_CREATE_FAILED) -- see diagPrintFatal's
+; own header comment for why these are not folded into the main table above.
+diagListMessageLo:
+    .byte <msgListingCreateFailed
+    .byte <msgListingWriteFailed
+    .byte <msgListingCloseFailed
+    .byte <msgListingDeleteFailed
+    .byte <msgListingShortWrite
+diagListMessageLoEnd:
+diagListMessageHi:
+    .byte >msgListingCreateFailed
+    .byte >msgListingWriteFailed
+    .byte >msgListingCloseFailed
+    .byte >msgListingDeleteFailed
+    .byte >msgListingShortWrite
+diagListMessageHiEnd:
+
+.assert diagListMessageLoEnd - diagListMessageLo = CASM_DIAG_LISTING_SHORT_WRITE - CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM listing diagnostic low table is incomplete"
+.assert diagListMessageHiEnd - diagListMessageHi = CASM_DIAG_LISTING_SHORT_WRITE - CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM listing diagnostic high table is incomplete"
+
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
 msgRegistryFull:
@@ -1376,6 +1417,19 @@ msgListingReplayMismatch:
     .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
 msgSymbolMapInvalid:
     .byte "CASM: SYMBOL MAP INVALID", PetCr, 0
+; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
+; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
+; below indexes this same order.
+msgListingCreateFailed:
+    .byte "CASM: LISTING CREATE FAILED", PetCr, 0
+msgListingWriteFailed:
+    .byte "CASM: LISTING WRITE FAILED", PetCr, 0
+msgListingCloseFailed:
+    .byte "CASM: LISTING CLOSE FAILED", PetCr, 0
+msgListingDeleteFailed:
+    .byte "CASM: LISTING DELETE FAILED", PetCr, 0
+msgListingShortWrite:
+    .byte "CASM: LISTING SHORT WRITE", PetCr, 0
 msgUnknown:
     .byte "CASM: INTERNAL ERROR", PetCr, 0
 msgPhase2Ready:

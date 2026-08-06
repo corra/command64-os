@@ -101,15 +101,26 @@ file:
 | --- | --- | --- |
 | `system` (default) | Soft reset; images stay attached | **No** |
 | `drive9` (per-drive) | Resets the drive; no host re-read | **No** |
-| `power_cycle` | Hard reset; **detaches** the images | **No** — and worse |
+| `power_cycle` | Hard reset | **Yes**, via a fresh autostart |
 
-After `power_cycle` the machine comes up to bare BASIC with nothing
-attached, and `vice_load_program` then fails with `general failure`, so the
-instance cannot be recovered for disk work through the MCP at all.
+**`power_cycle` is the right tool** — no need to kill the process. After it,
+`vice_load_program` on the rebuilt `.d64` attaches and autostarts it fresh,
+picking up the new content. (An earlier note here claimed `power_cycle`
+detaches images and leaves the instance unusable; that was wrong. The
+`general failure` behind that claim was a **missing file**, not detachment —
+see the next section.)
 
-**The only reliable refresh is a new VICE process** with the image passed in
-`vice_start.extra_args`. That needs the monitor port free, so a stale owner
-must be closed first — the user's call.
+The real limitation is *which* drive: `vice_load_program` only ever targets
+**drive 8**, and there is no MCP call that attaches an image to drive 9-11 on
+a running instance. Only `vice_start.extra_args` can, and that needs the
+monitor port free.
+
+**So do not design a test around a two-drive layout.** If a harness needs
+both the OS and its own fixtures, put `command64` on the harness's own disk
+so it is self-bootable on drive 8 (this is what `casm_listing_test_d64`
+does). Swapping the disk under a resident Command64 is not an alternative:
+`vice_load_program` destroys the OS session even with `run: false`, because
+it issues a BASIC `LOAD"*",8,1`.
 
 Cheap way to tell stale bytes from a real failure: search the host image and
 the emulator's RAM for a known distinctive byte sequence and compare. If RAM

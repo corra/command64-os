@@ -116,13 +116,18 @@ the actual fault:
 | --- | --- |
 | Machine/OS state is wrong | `system`, then re-boot Command64 |
 | A drive is wedged | `drive<N>` |
-| A `.d64` was rebuilt on the host | **New process** — no reset mode works |
+| A `.d64` was rebuilt on the host | `power_cycle`, then autostart it again |
 
-**Measured, not assumed:** with a rebuilt image carrying a new file, `system` and `drive9`
-both keep serving the **stale** image, and `power_cycle` **detaches** the images entirely —
-after it the machine boots to bare BASIC and `vice_load_program` fails with
-`general failure`, leaving the instance unusable for disk work. Re-attaching a drive other
-than 8 is not exposed by the MCP at all.
+**Measured, not assumed:** with a rebuilt image carrying a new file, `system` and `drive<N>`
+both keep serving the **stale** image. `power_cycle` followed by a fresh
+`vice_load_program` picks up the new content — **killing the process is not required**.
+
+The real limitation is *which drive*: `vice_load_program` only ever targets **drive 8**, and
+no MCP call attaches an image to drives 9-11 on a running instance. **Do not design a test
+around a two-drive layout** — put `command64` on the harness's own disk so it is
+self-bootable on drive 8. Swapping the disk under a resident Command64 is not an
+alternative: `vice_load_program` destroys the OS session even with `run: false` (it issues
+a BASIC `LOAD"*",8,1`), which is exactly what the Autostart invariant above forbids.
 
 One clean restart is allowed per test:
 

@@ -35,6 +35,17 @@
 .import CasmSourceCompletedLineHi
 .import CasmPc
 
+; WP53 increment 4: the `.LST` file's own I/O. resourceRegisterHandle and
+; fileClose (fileio.s) are fully generic already -- neither knows or cares
+; whether the handle they manage is the PRG output or the listing file -- so
+; the create/close paths below reuse them directly instead of duplicating
+; their registry/close logic. CasmListingName/Len (cli.s, WP53 increment 1)
+; is this module's only source for the real on-disk name.
+.import resourceRegisterHandle
+.import fileClose
+.import CasmListingName
+.import CasmListingLen
+
 .export listingStateInit
 .export listingCaptureInit
 .export listingMetaAppend
@@ -44,6 +55,20 @@
 .export listingMirrorByte
 .export listingCommitLine
 .export listingCaptureFinalize
+.export listingFileInit
+.export listingCreate
+.export listingWrite
+.export listingClose
+.export listingDelete
+.export listingAbort
+.export CasmListFileHandle
+.export CasmListFileSlot
+.export CasmListFileState
+.export CasmListFileOpened
+.export CasmListFileValid
+.export CasmListFileCommitted
+.export CasmListFileDeletePending
+.export CasmListingOpenName
 .export CasmListingState
 .export CasmListingMetaVmmSlot
 .export CasmListingByteVmmSlot
@@ -78,6 +103,25 @@ CasmListingRecordCountLo: .res 1
 CasmListingRecordCountHi: .res 1
 CasmListingReplayIndexLo: .res 1
 CasmListingReplayIndexHi: .res 1
+
+; WP53 increment 4: the `.LST` file's own I/O lifecycle -- see
+; CASM_LISTFILE_*'s own header comment (common.inc) for why this is a
+; separate state block from CasmListingState above. CasmListFilePrimary/
+; CasmListRequestLo/Hi are private scratch, not exported: mirrors
+; fileio.s's own CasmFilePrimary/CasmRequestLo/Hi precedent exactly (a
+; caller-invisible detail of listingAbort's primary-diagnostic preservation
+; and listingWrite's short-write detection, respectively).
+CasmListFileHandle:        .res 1
+CasmListFileSlot:          .res 1
+CasmListFileState:         .res 1
+CasmListFileOpened:        .res 1
+CasmListFileValid:         .res 1
+CasmListFileCommitted:     .res 1
+CasmListFileDeletePending: .res 1
+CasmListFilePrimary:       .res 1
+CasmListRequestLo:         .res 1
+CasmListRequestHi:         .res 1
+CasmListingOpenName:       .res CASM_LISTING_OPEN_NAME_SIZE
 
 ; WP51 increment 4: byte-mirror endpoint and buffered flush stage.
 ; CasmListingByteCursorLo/Hi is the next free offset in the byte-mirror VMM
@@ -742,4 +786,396 @@ lcfNoSidecar:
     lda #CASM_DIAG_NONE
     clc
 lcfRet:
+    rts
+
+; =============================================================================
+; WP53 increment 4: `.LST` file ownership and I/O
+;
+; Everything below is dedicated to the real on-disk listing file: creating
+; it (with CBM DOS's native replace-on-open behavior), writing to it,
+; closing it, deleting it, and a best-effort abort. All five map directly to
+; CASM_DIAG_LISTING_CREATE_FAILED/WRITE_FAILED/CLOSE_FAILED/DELETE_FAILED/
+; SHORT_WRITE ($3D-$41). WP53 links every routine here but adds no
+; production call site -- `/L` stays rejected until WP54, which also owns
+; calling listingCreate/listingWrite/listingClose/outputCommit in the real
+; Pass 2 tail, in the plan's own required order (PRG committed before any
+; listing write).
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; listingFileInit (WP53)
+; Initialize all `.LST` file I/O state to closed/none. Does not touch
+; CasmListingState or any WP51 capture field -- a wholly separate lifecycle,
+; see CASM_LISTFILE_*'s own header comment (common.inc).
+;
+; Inputs:    none
+; Outputs:   A = CASM_DIAG_NONE, C clear, Z set
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+listingFileInit:
+    lda #CASM_INVALID_HANDLE
+    sta CasmListFileHandle
+    lda #CASM_INVALID_SLOT
+    sta CasmListFileSlot
+    lda #CASM_FILE_STATE_CLOSED
+    sta CasmListFileState
+    lda #0
+    sta CasmListFileOpened
+    sta CasmListFileValid
+    sta CasmListFileCommitted
+    sta CasmListFileDeletePending
+    sta CasmListRequestLo
+    sta CasmListRequestHi
+    sta CasmListFilePrimary
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; listingBuildOpenName (private, WP53)
+; Build CasmListingOpenName from CasmListingName with CBM DOS's native
+; "@0:" replace marker inserted immediately after a device-prefix colon, or
+; prepended if CasmListingName has none -- WP50's frozen file-ownership
+; resolution: "<device-digits>:@0:<basename>.LST" or "@0:<basename>.LST".
+; No existence probe and no create-vs-replace branch: the drive itself
+; replaces an existing same-name file transparently, the same behavior
+; test_casm_listwrite proves through the real OS/VICE path.
+;
+; A CasmListingName can contain at most one colon (cliDeriveListingName only
+; ever copies a colon from a source name's own leading device prefix, the
+; sole position that grammar allows), so the first colon found, if any, is
+; unambiguously the device prefix -- no scan-to-last-colon logic is needed
+; here, unlike cliDeriveOutputName/cliDeriveListingName's own dot scans.
+;
+; Inputs:    CasmListingName/CasmListingLen already derived (WP53
+;            increment 1)
+; Outputs:   CasmListingOpenName holds the null-terminated open name
+; Preserves: none
+; Clobbers:  A, X, Y
+; ---------------------------------------------------------------------------
+listingBuildOpenName:
+    ldx #0
+lbonScan:
+    cpx CasmListingLen
+    beq lbonNoColon
+    lda CasmListingName, x
+    cmp #CASM_PETSCII_COLON
+    beq lbonFoundColon
+    inx
+    jmp lbonScan
+lbonFoundColon:
+    inx                           ; X = index right after the colon
+    jmp lbonCopyHead
+lbonNoColon:
+    ldx #0
+lbonCopyHead:
+    ; Copy CasmListingName[0..X-1] verbatim into CasmListingOpenName[0..X-1].
+    stx CasmListRequestLo          ; stash split point
+    ldy #0
+lbonHeadLoop:
+    cpy CasmListRequestLo
+    beq lbonMarker
+    lda CasmListingName, y
+    sta CasmListingOpenName, y
+    iny
+    jmp lbonHeadLoop
+lbonMarker:
+    ; Y == CasmListRequestLo here; write '@','0',':' at that offset.
+    lda #CASM_PETSCII_AT
+    sta CasmListingOpenName, y
+    iny
+    lda #CASM_PETSCII_DIGIT_0
+    sta CasmListingOpenName, y
+    iny
+    lda #CASM_PETSCII_COLON
+    sta CasmListingOpenName, y
+    iny
+    ; Copy the remainder of CasmListingName[X..] (including its null) from
+    ; CasmListRequestLo onward into CasmListingOpenName starting at Y.
+    ldx CasmListRequestLo
+lbonTailLoop:
+    lda CasmListingName, x
+    sta CasmListingOpenName, y
+    beq lbonDone
+    inx
+    iny
+    jmp lbonTailLoop
+lbonDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; listingCreate (WP53)
+; Create (or transparently replace) the real `.LST` file and register its
+; handle. Listing type is SEQ, always write mode.
+;
+; Inputs:    CasmListFileState == CASM_FILE_STATE_CLOSED; CasmListingName/
+;            Len already derived
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmListFileHandle/Slot
+;                     valid; CasmListFileState = OPEN; Opened/Valid = true
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED (bad
+;                     precondition state) or CASM_DIAG_LISTING_CREATE_FAILED
+;                     (rejected DOS_OPEN_FILE or registration)
+; Preserves: none
+; Clobbers:  A, X, Y, HexValLo/Hi, FileHandle, OS API volatile state
+; Scratch:   CasmValue1Lo
+; ---------------------------------------------------------------------------
+listingCreate:
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_CLOSED
+    bne lcrBadState
+    jsr listingBuildOpenName
+    lda #CASM_FILE_MODE_WRITE
+    sta HexValLo
+    lda #CASM_PETSCII_S
+    sta HexValHi
+    ldx #<CasmListingOpenName
+    ldy #>CasmListingOpenName
+    lda #DOS_OPEN_FILE
+    jsr OS_API
+    bcs lcrCreateFailed
+    sta CasmValue1Lo
+    jsr resourceRegisterHandle
+    bcs lcrRegistrationFailed
+    stx CasmListFileSlot
+    lda CasmValue1Lo
+    sta CasmListFileHandle
+    lda #CASM_FILE_STATE_OPEN
+    sta CasmListFileState
+    lda #CASM_LISTFILE_OPENED
+    sta CasmListFileOpened
+    lda #CASM_LISTFILE_VALID
+    sta CasmListFileValid
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lcrRegistrationFailed:
+    lda CasmValue1Lo
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    lda #CASM_DIAG_LISTING_CREATE_FAILED
+    sec
+    rts
+lcrCreateFailed:
+    lda #CASM_DIAG_LISTING_CREATE_FAILED
+    sec
+    rts
+lcrBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingWrite (WP53)
+; Write one bounded block to the managed listing output and reject short
+; writes. Mirrors fileio.s's fileWrite exactly, targeting the listing
+; file's own handle/state instead of the PRG output's.
+;
+; Inputs:    X/Y = source pointer (low/high); CasmIoLenLo/Hi = requested
+;            byte count; CasmListFileState == CASM_FILE_STATE_OPEN
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmIoLenLo/Hi = actual
+;                     byte count (== requested)
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED,
+;                     CASM_DIAG_LISTING_WRITE_FAILED, or
+;                     CASM_DIAG_LISTING_SHORT_WRITE; the latter two also set
+;                     CasmListFileValid = CASM_LISTFILE_INVALID
+; Preserves: none
+; Clobbers:  A, X, Y, HexValLo/Hi, FileHandle, OS API volatile state
+; ---------------------------------------------------------------------------
+listingWrite:
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_OPEN
+    bne lwrBadState
+    lda CasmIoLenLo
+    sta CasmListRequestLo
+    sta HexValLo
+    lda CasmIoLenHi
+    sta CasmListRequestHi
+    sta HexValHi
+    lda CasmListFileHandle
+    sta FileHandle
+    lda #DOS_WRITE_FILE
+    jsr OS_API
+    php
+    lda HexValLo
+    sta CasmIoLenLo
+    lda HexValHi
+    sta CasmIoLenHi
+    plp
+    bcs lwrWriteFailed
+    lda CasmIoLenLo
+    cmp CasmListRequestLo
+    bne lwrShortWrite
+    lda CasmIoLenHi
+    cmp CasmListRequestHi
+    bne lwrShortWrite
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwrWriteFailed:
+    lda #CASM_LISTFILE_INVALID
+    sta CasmListFileValid
+    lda #CASM_DIAG_LISTING_WRITE_FAILED
+    sec
+    rts
+lwrShortWrite:
+    lda #CASM_LISTFILE_INVALID
+    sta CasmListFileValid
+    lda #CASM_DIAG_LISTING_SHORT_WRITE
+    sec
+    rts
+lwrBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingClose (WP53)
+; Close and release the listing handle through fileio.s's generic fileClose.
+; A failed close leaves CasmListFileState == CLOSE_FAILED and the
+; handle/slot registered, exactly as fileio.s's own close paths do -- a
+; later retry (via a direct call or through listingAbort) attempts the same
+; close again since state never reaches CLOSED.
+;
+; Inputs:    CasmListFileState == CASM_FILE_STATE_OPEN
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; handle/slot released,
+;                     state CLOSED
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED (bad
+;                     precondition state) or CASM_DIAG_LISTING_CLOSE_FAILED
+;                     (state becomes CLOSE_FAILED)
+; Preserves: none
+; Clobbers:  A, X, Y and fileClose clobbers
+; ---------------------------------------------------------------------------
+listingClose:
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_OPEN
+    bne lclBadState
+    lda CasmListFileHandle
+    ldx CasmListFileSlot
+    ldy #CASM_DIAG_LISTING_CLOSE_FAILED
+    jsr fileClose
+    bcs lclFailed
+    lda #CASM_INVALID_HANDLE
+    sta CasmListFileHandle
+    lda #CASM_INVALID_SLOT
+    sta CasmListFileSlot
+    lda #CASM_FILE_STATE_CLOSED
+    sta CasmListFileState
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lclFailed:
+    lda #CASM_FILE_STATE_CLOSE_FAILED
+    sta CasmListFileState
+    lda #CASM_DIAG_LISTING_CLOSE_FAILED
+    sec
+    rts
+lclBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingDelete (WP53)
+; Delete CasmListingName (the plain name -- never the "@0:"-embedded open
+; name, which exists only to reach DOS_OPEN_FILE) through the native file
+; service. A dedicated routine rather than reusing fileio.s's own
+; fileDelete: that routine's failure diagnostic is the PRG-output-specific
+; CASM_DIAG_OUTPUT_DELETE_FAILED, not the listing-specific $40 WP53's own
+; diagnostic contiguity requires.
+;
+; Inputs:    CasmListingName already derived
+; Outputs:   C clear, A = CASM_DIAG_NONE on success
+;            C set, A = CASM_DIAG_LISTING_DELETE_FAILED on failure
+; Preserves: none
+; Clobbers:  A, X, Y, OS API volatile state
+; ---------------------------------------------------------------------------
+listingDelete:
+    ldx #<CasmListingName
+    ldy #>CasmListingName
+    lda #DOS_DELETE_FILE
+    jsr OS_API
+    bcs ldlFailed
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+ldlFailed:
+    lda #CASM_DIAG_LISTING_DELETE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingAbort (WP53)
+; Best-effort close and delete for an incomplete listing file, preserving
+; the caller's primary diagnostic -- mirrors fileio.s's outputAbort exactly,
+; with one addition: a committed listing (CasmListFileCommitted ==
+; CASM_LISTFILE_COMMITTED) is never deleted, regardless of
+; CasmListFileOpened. WP53 links this routine but calls it from no
+; production site; WP54 owns wiring it into the real failure path.
+;
+; A failed close returns immediately without attempting delete (state stays
+; CLOSE_FAILED, so a repeated call retries the close). A failed delete sets
+; CasmListFileDeletePending and leaves CasmListFileOpened true, so a
+; repeated call retries the delete; CasmListFileDeletePending itself is
+; observability, not load-bearing for that retry -- CasmListFileOpened
+; alone already drives it, exactly as CasmOutputCreated alone already
+; drives outputAbort's own retry.
+;
+; Inputs:    A = primary CASM_DIAG_* value, or CASM_DIAG_NONE
+; Outputs:   A = preserved primary, or first cleanup diagnostic if none
+;            C set when returned A is nonzero, clear otherwise
+; Preserves: none
+; Clobbers:  A, X, Y and listingClose/listingDelete clobbers
+; Scratch:   CasmListFilePrimary
+; ---------------------------------------------------------------------------
+listingAbort:
+    sta CasmListFilePrimary
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_CLOSED
+    beq laDelete
+    jsr listingClose
+    bcc laDelete
+    ; listingClose already set CasmListFileState/A/C for a close failure.
+    jsr laRecordSecondary
+    jmp laReturn
+
+laDelete:
+    lda CasmListFileCommitted
+    bne laReturn                  ; WP53: committed listings are never deleted
+    lda CasmListFileOpened
+    beq laReturn
+    jsr listingDelete
+    bcc laDeleteDone
+    pha
+    lda #CASM_LISTFILE_DELETE_PENDING
+    sta CasmListFileDeletePending
+    pla
+    jsr laRecordSecondary
+    jmp laReturn
+laDeleteDone:
+    lda #CASM_LISTFILE_NOT_OPENED
+    sta CasmListFileOpened
+    lda #CASM_LISTFILE_DELETE_NOT_PENDING
+    sta CasmListFileDeletePending
+
+laReturn:
+    lda CasmListFilePrimary
+    beq laSuccess
+    sec
+    rts
+laSuccess:
+    clc
+    rts
+
+; Input: A = secondary diagnostic. Preserve a nonzero primary.
+laRecordSecondary:
+    pha
+    lda CasmListFilePrimary
+    bne laKeepPrimary
+    pla
+    sta CasmListFilePrimary
+    rts
+laKeepPrimary:
+    pla
     rts

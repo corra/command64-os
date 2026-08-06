@@ -83,6 +83,9 @@
 .export CasmSourceCompletedFileId
 .export CasmSourceCompletedLineLo
 .export CasmSourceCompletedLineHi
+.export fileClose
+.export CasmListingName
+.export CasmListingLen
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -1670,6 +1673,20 @@ stclStubNone:
     clc
     rts
 
+; ---------------------------------------------------------------------------
+; fileClose (stub, WP53 increment 4)
+; listing.s's new listingClose references this (fileio.s); this harness
+; links resources.s already (for resourceRegisterHandle, which
+; listingCreate also references and which this harness's own registry
+; state genuinely exercises via other calls) but not fileio.s itself, so
+; only fileClose needs a local stand-in. Never called by this harness's
+; own fixtures.
+; ---------------------------------------------------------------------------
+fileClose:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
 .segment "RODATA"
 
 passMsg:
@@ -1690,6 +1707,11 @@ CasmSourceCompletedLength:  .res 1
 CasmSourceCompletedFileId:  .res 1
 CasmSourceCompletedLineLo:  .res 1
 CasmSourceCompletedLineHi:  .res 1
+; WP53 increment 4: listing.s's new listingBuildOpenName/listingDelete
+; reference these (cli.s); this harness does not link cli.s. Never written
+; or read by this harness's own fixtures.
+CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
+CasmListingLen:  .res 1
 LoopHi:    .res 1
 SlotCount: .res 1
 SlotTable: .res 8
