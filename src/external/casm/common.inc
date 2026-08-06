@@ -212,6 +212,7 @@ CASM_PETSCII_O     = $4F
 CASM_PETSCII_P     = $50
 CASM_PETSCII_R     = $52
 CASM_PETSCII_S     = $53
+CASM_PETSCII_T     = $54
 
 ; Phase 9 WP44 quoted include operand grammar. Filename payload bytes preserve
 ; their original PETSCII spelling; quote is the delimiter and is therefore not

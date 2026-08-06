@@ -294,7 +294,11 @@ if(Ca65_FOUND)
     # overflowed $4900 by 362 measured bytes; $4A00 (+256) would still
     # overflow, so $4B00 (+512) is the smallest round-page step that fits,
     # leaving 150 bytes headroom, below the plan's preapproved $4F00 ceiling.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4B00")
+    # WP53 increment 1: $4B00 -> $4C00 -- CasmListingName[64]/CasmListingLen
+    # and cliDeriveListingName overflowed $4B00 by 55 measured bytes; $4C00
+    # (+256) is the smallest round-page step that fits, staying below the
+    # plan's preapproved $5800 ceiling.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4C00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -473,6 +477,15 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_cliderive")
+            # WP53 increment 1: cli.s alone (CommandBuffer is a fixed absolute
+            # address per command64.inc, not a linked symbol, so no other
+            # module is required).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/cli.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
         endif()
         if(TEST_NAME STREQUAL "casm_reloc")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -844,6 +857,9 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listing)
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listcap)
 # WP52's symbol-map harness joins casm_listing_test_d64 for the same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_map)
+# WP53 increment 1's cli-derivation harness joins casm_listing_test_d64 for
+# the same reason (test.d64's directory-entry ceiling).
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_cliderive)
 # WP52: symbolsReadByIndex's addition to symbols.s (linked whole by
 # test_casm_passcheck, same as test_casm_pass1) left test.d64 2 blocks short
 # of its own byte-space ceiling. Moved to casm_listing_test_d64 (523 blocks
@@ -1197,11 +1213,15 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # self-contained, no sourceLoad/fixture coupling) and test_l15release
 # (relocated off casm_overflow_test.d64; also fixture-free) join for the
 # same underlying "WP52's symbols.s growth left no room" reason.
+# WP53 increment 1's test_casm_cliderive joins here too: test.d64 remains at
+# its directory-entry ceiling, this fixture is self-contained (cli.s state
+# only, no sourceLoad/fixture coupling), and this image has ample room
+# (442 blocks free as of WP52).
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release
+    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
