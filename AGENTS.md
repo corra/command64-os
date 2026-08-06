@@ -137,6 +137,7 @@ TODO: Pare down [Do's & Dont's]
 
 + `codebase-memory-mcp`: Used for searching the codebase
 + `c64-testing`: VICE automation used only under `.agents/workflows/vice-mcp-testing.md`
+  + USAGE GUIDE: `C64_MCP_USAGE.md`
 + `task-warrior-mcp`: Used for managing tasks
 + `sequential-thinking-mcp`: Used for sequential thinking
 

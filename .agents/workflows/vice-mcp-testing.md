@@ -4,26 +4,30 @@ description: Run Command64 OS and application tests safely through the VICE MCP
 
 # VICE MCP Testing Workflow
 
-This workflow is mandatory whenever an agent uses a VICE MCP to test Command64. It adds
+**This workflow is mandatory whenever an agent uses a VICE MCP to test Command64**. It adds
 the Command64 boot and shell contract to the MCP's generic lifecycle contract. Tool-server
 aliases such as `c64-testing` are configuration details; discover and use the `vice_*`
 capabilities rather than depending on an alias.
 
 ## Non-negotiable invariants
 
-- Boot Command64 before launching any Command64 application or test harness.
-- Prove Command64 startup by reading `Command 64-DOS Version` on the first screen line.
-- Launch an application by entering its application name at the Command64 shell.
-- Never use `vice_load_program`/VICE Autostart for an application after Command64 is
-  resident. Autostart may reset to BASIC and destroy the OS session.
-- Treat a BASIC `READY.` screen as proof that the Command64 prerequisite is absent.
+- **Prove you own the emulator** before anything else. `vice_start` returns a monitor
+  address **even when the process it launched never bound that port**. If another `x64sc`
+  already holds it, every later call silently drives **that** instance, with **its** disks.
+- **Re-attach a rebuilt image.** Rebuilding a `.d64` on the host does **not** change what an
+  already-attached drive serves. Rebuild-and-rerun in the same session **proves nothing**.
+- **Boot Command64** before launching any Command64 application or test harness.
+- **Prove Command64** startup by reading `Command 64-DOS Version` on the first screen line.
+- Launch an application by entering its application name at the **Command64 shell**.
+- **NEVER** use `vice_load_program`/VICE Autostart for an application **AFTER** Command64 is resident. Autostart may reset to BASIC and destroy the OS session.
+- **Treat a BASIC `READY.` screen** as proof that the **Command64 prerequisite is absent**.
 - Prove a normal application exit by observing the shell prompt `c64[<device>]:>`, where
   `<device>` is one or more decimal digits and may change during a session.
-- A timeout is not an application failure. Classify it using the failure rules below.
+- A **timeout is not an application failure**. Classify it using the failure rules below.
 
 ## Disk selection
 
-Choose the image before starting VICE. Do not assume every harness is on `test.d64`.
+Choose the image **before starting VICE**. Do not assume every harness is on `test.d64`.
 
 | Image | Use |
 |---|---|
@@ -52,10 +56,23 @@ Never promote a context based only on a successful tool response.
 
 ## Procedure
 
-1. Build the required CMake disk-image target before emulator testing.
+1. Build the required CMake disk-image target before emulator testing. If VICE is already
+   running with that image attached, the rebuild **has not reached it** — restart with the
+   image in `vice_start.extra_args` before re-testing.
 2. Select the D64 and define the application's start, assertion, and exit evidence.
 3. Start a fresh MCP-owned VICE instance in `launch` mode with the D64 attached to the
-   intended device through `vice_start.extra_args`.
+   intended device through `vice_start.extra_args`. Then **verify the instance you launched
+   actually owns the monitor port** — a returned `monitor_address` is not proof:
+
+```bash
+ss -ltnp | grep 6502          # which PID actually holds the port
+ps -eo pid,lstart,cmd | grep [x]64sc
+```
+
+   The owning PID must be the one just launched, and its command line must carry the
+   `-binarymonitor` and `-8`/`-9` arguments you passed. A long-running `x64sc` **without**
+   those flags is the user's own session: `vice_stop` will **not** kill it, so it survives
+   every restart. Clearing it is **destructive to the user's session — ask first**.
 4. Use `vice_load_program` to Autostart the selected D64 at the directory index verified
    for `command64`. Autostart is permitted for this initial OS boot because establishing a
    fresh OS session is the intended reset/load/run action. Do not assume an unverified
@@ -77,17 +94,14 @@ Never promote a context based only on a successful tool response.
 
 ## Timing and pause discipline
 
-- Do not pause during reset, disk loading, Command64 boot, keyboard command processing,
+- **Do not pause** during reset, disk loading, Command64 boot, keyboard command processing,
   application loading, or application startup unless a planned checkpoint is the expected
   synchronization event.
-- Use temporary stopping checkpoints where possible.
-- Record why execution is stopped before inspecting it, then resume exactly once when the
-  inspection is complete.
-- Do not use repeated `vice_run`, screen reads, register reads, or identical tool calls as
-  a substitute for a missing wait primitive.
-- Make at most two observations for one transition; the second must be independent or
-  stronger where possible.
-- Declare a workload-specific deadline before launch. Disk size, true-drive emulation, and
+- Use temporary stopping checkpoints **ONLY** where possible.
+- **Record why execution is stopped** before inspecting it, then resume exactly once when the inspection is complete.
+- **Do not use repeated** `vice_run`, screen reads, register reads, or identical tool calls as a substitute for a missing wait primitive.
+- **Make at most two observations** for one transition; **the second must be independent or stronger** where possible.
+- Declare a workload-specific deadline **before launch**. Disk size, true-drive emulation, and
   application initialization may require substantially more than a generic two- or
   five-second delay. Do not classify an application before its declared deadline.
 
@@ -95,12 +109,12 @@ Never promote a context based only on a successful tool response.
 
 One clean restart is allowed per test:
 
-1. Stop/disconnect the MCP session and kill the MCP-launched VICE process if needed.
+1. Stop/disconnect the MCP session and kill the MCP-launched VICE process **ONLYif needed** prefer **`Power Cycle Machine`**
 2. Discard all assumed emulator, OS, application, and checkpoint state.
 3. Start a new VICE instance and repeat from disk selection and Command64 boot.
 4. If the same stage fails again, stop calling tools and preserve the evidence.
 
-Do not repeat a timed-out state-changing call against an uncertain session.
+**Do not repeat** a timed-out state-changing call against an uncertain session.
 
 ## Result classification
 
@@ -116,6 +130,13 @@ Do not repeat a timed-out state-changing call against an uncertain session.
 Returning to BASIC after application Autostart is a harness/workflow failure, not evidence
 that the application failed. Failure to observe `c64[<device>]:>` proves only that shell
 return was not established; use independent evidence before assigning a product failure.
+
+**A rebuilt artifact that keeps producing a byte-identical old result is a harness failure
+until proven otherwise.** Do not theorize a product bug — relocation, device, or OS — while
+the emulator's provenance is unproven. Check port ownership and image freshness **first**.
+The decisive cheap test: search the host image and emulator RAM for a distinctive byte
+sequence. **If RAM holds bytes that exist in no file on disk, you are driving something
+stale**, and every observation made through it is void.
 
 ## Test report
 
@@ -134,11 +155,11 @@ Use this exact canary when validating an agent or MCP configuration.
 2. Start a fresh MCP-owned `x64sc` with `build/test.d64` attached to device 8.
 3. Autostart file index 0 from `build/test.d64`; this boots `command64`.
 4. Allow a bounded two-second OS boot window, then capture one screenshot.
-5. Require `Command 64-DOS Version` and a prompt matching `c64[<device>]:>`.
+5. Require `Command 64-DOS Version` and a prompt matching `c64[<device>]:>` **at boot time**.
 6. Send the full documented application name through converted ASCII input:
 
 ```json
-{"encoding":"ascii","text":"TEST_CASM_PASSCHECK\n"}
+{"encoding":"ascii","text":"test_casm_passcheck\n"}
 ```
 
 7. Resume emulation once if the prior inspection left it stopped.
@@ -161,3 +182,5 @@ trial; the harness subsequently completed with `CASM PASSCHECK: PASS`.
 
 See `brain/walkthroughs/2026-07-26-vice-mcp-controlled-trial.md` for the recorded evidence
 and failure-analysis history.
+
+See `C64_MCP_USAGE.md` for guidlines and additional findings. Update `C64_MCP_USAGE.md` as required.
