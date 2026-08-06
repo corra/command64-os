@@ -478,6 +478,29 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1400")
         endif()
+        if(TEST_NAME STREQUAL "casm_spanread")
+            # WP53 increment 2: source.s plus the modules it needs to reach a
+            # real VMM-backed loaded store (fileio/state/vmm_store/resources)
+            # and diagnostics.s for source.s's echo-buffer state. Does NOT
+            # link cli.s: its own single-slot CasmSourceNames/CasmSourceCount/
+            # cliSourceSlotLo/Hi stand-in, matching casm_listcap.s's
+            # precedent.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            # Measured envelope growth: $2000 overflowed RODATA by 119,
+            # $2100 then overflowed BSS (source.s's frame arrays and file
+            # table) by 1208, and adding include.s for diagnostics.s's
+            # catalog references overflowed $2600 by a further 1088.
+            # $2B00 is the smallest aligned step that fits.
+            set(TEST_PRG_SIZE "2B00")
+        endif()
         if(TEST_NAME STREQUAL "casm_cliderive")
             # WP53 increment 1: cli.s alone (CommandBuffer is a fixed absolute
             # address per command64.inc, not a linked symbol, so no other
@@ -860,6 +883,9 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_map)
 # WP53 increment 1's cli-derivation harness joins casm_listing_test_d64 for
 # the same reason (test.d64's directory-entry ceiling).
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_cliderive)
+# WP53 increment 2's span-reader harness joins it for the same reason; it
+# also needs casmlc02, which already lives on that disk.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_spanread)
 # WP52: symbolsReadByIndex's addition to symbols.s (linked whole by
 # test_casm_passcheck, same as test_casm_pass1) left test.d64 2 blocks short
 # of its own byte-space ceiling. Moved to casm_listing_test_d64 (523 blocks
@@ -1221,7 +1247,7 @@ add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive
+    PRGS test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

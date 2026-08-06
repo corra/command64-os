@@ -16,6 +16,7 @@ capabilities rather than depending on an alias.
   already holds it, every later call silently drives **that** instance, with **its** disks.
 - **Re-attach a rebuilt image.** Rebuilding a `.d64` on the host does **not** change what an
   already-attached drive serves. Rebuild-and-rerun in the same session **proves nothing**.
+  **No `vice_reset` mode refreshes it** — see Recovery. Only a new process does.
 - **Boot Command64** before launching any Command64 application or test harness.
 - **Prove Command64** startup by reading `Command 64-DOS Version` on the first screen line.
 - Launch an application by entering its application name at the **Command64 shell**.
@@ -107,9 +108,28 @@ ps -eo pid,lstart,cmd | grep [x]64sc
 
 ## Recovery
 
+`vice_reset` takes a `mode`: `system` (default, soft — images stay attached), `power_cycle`
+(hard), and `drive8`..`drive11` (per-drive). Prefer the least invasive mode that can fix
+the actual fault:
+
+| Fault | Correct action |
+| --- | --- |
+| Machine/OS state is wrong | `system`, then re-boot Command64 |
+| A drive is wedged | `drive<N>` |
+| A `.d64` was rebuilt on the host | **New process** — no reset mode works |
+
+**Measured, not assumed:** with a rebuilt image carrying a new file, `system` and `drive9`
+both keep serving the **stale** image, and `power_cycle` **detaches** the images entirely —
+after it the machine boots to bare BASIC and `vice_load_program` fails with
+`general failure`, leaving the instance unusable for disk work. Re-attaching a drive other
+than 8 is not exposed by the MCP at all.
+
 One clean restart is allowed per test:
 
-1. Stop/disconnect the MCP session and kill the MCP-launched VICE process **ONLYif needed** prefer **`Power Cycle Machine`**
+1. Stop/disconnect the MCP session. Prefer **`Power Cycle Machine`** over killing the
+   process for machine-state faults — but note it cannot refresh a rebuilt image, and a
+   stale monitor-port owner survives `vice_stop` entirely. Killing a VICE process the MCP
+   did not launch is **the user's call — ask**.
 2. Discard all assumed emulator, OS, application, and checkpoint state.
 3. Start a new VICE instance and repeat from disk selection and Command64 boot.
 4. If the same stage fails again, stop calling tools and preserve the evidence.
@@ -124,7 +144,10 @@ One clean restart is allowed per test:
 - **Harness failure:** MCP transport, VICE lifecycle, monitor state, pause timing, or
   synchronization failed.
 - **Setup failure:** The build, image, application, fixture, path, device, or prerequisite
-  is absent or wrong.
+  is absent or wrong. A bare `general failure` from `vice_load_program` is normally this,
+  not a harness failure: the path does not exist or is unreadable. Check `ls -la build/*.d64`
+  before touching emulator state, and remember a missing image makes its
+  `vice_start.extra_args` attach a silent no-op.
 - **Inconclusive:** The machine state cannot be established safely.
 
 Returning to BASIC after application Autostart is a harness/workflow failure, not evidence

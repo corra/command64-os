@@ -90,14 +90,53 @@ clearing the port needs an explicit kill, and that is the user's call.
 
 Rebuilding the image on the host does **not** update what a running VICE
 serves; the drive keeps serving the image as attached. Rebuilding *and*
-re-running in the same session proves nothing. After rebuilding an image,
-re-attach it — in practice, restart VICE with the image in
-`vice_start.extra_args` — then re-run.
+re-running in the same session proves nothing.
+
+`vice_reset` takes a `mode` (`system`, `power_cycle`, `drive8`..`drive11`).
+None of them refreshes a rebuilt image. Measured directly, by rebuilding a
+`.d64` with a new file on it and then asking the running emulator for that
+file:
+
+| `vice_reset` mode | Effect | Sees rebuilt image? |
+| --- | --- | --- |
+| `system` (default) | Soft reset; images stay attached | **No** |
+| `drive9` (per-drive) | Resets the drive; no host re-read | **No** |
+| `power_cycle` | Hard reset; **detaches** the images | **No** — and worse |
+
+After `power_cycle` the machine comes up to bare BASIC with nothing
+attached, and `vice_load_program` then fails with `general failure`, so the
+instance cannot be recovered for disk work through the MCP at all.
+
+**The only reliable refresh is a new VICE process** with the image passed in
+`vice_start.extra_args`. That needs the monitor port free, so a stale owner
+must be closed first — the user's call.
 
 Cheap way to tell stale bytes from a real failure: search the host image and
 the emulator's RAM for a known distinctive byte sequence and compare. If RAM
 holds bytes that exist in no file on disk, the emulator is serving something
 stale.
+
+Cheap way to tell stale bytes from a real failure: search the host image and
+the emulator's RAM for a known distinctive byte sequence and compare. If RAM
+holds bytes that exist in no file on disk, the emulator is serving something
+stale.
+
+### `general failure` from `vice_load_program` usually means "no such file"
+
+The MCP reports a bare `general failure` with no detail when the path does
+not exist or is not readable by the VICE process. It reads exactly like an
+emulator or monitor fault and is not one. Before touching emulator state,
+check the artifact:
+
+```bash
+ls -la build/*.d64
+```
+
+A missing image also means any `vice_start.extra_args` attach for it silently
+did nothing, so that drive is simply empty — rebuild the image, then relaunch
+so the attach actually happens. Seen when `build/test.d64` alone had gone
+missing while every other image was present; `cmake --build build --target
+test_image_d64` recreated it and autostart worked immediately.
 
 ### Keyboard encoding: shell commands vs filenames
 
