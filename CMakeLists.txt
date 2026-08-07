@@ -568,7 +568,11 @@ if(Ca65_FOUND)
             # after increment 5's own growth, then a further 305 after this
             # increment's own test additions; $2000 (+2048 from the
             # original $1800) is a comfortably round step above both.
-            set(TEST_PRG_SIZE "2000")
+            # WP53 increment 7: $2000 -> $2100 -- three new failure/boundary
+            # cases (byte+source continuation together, aggregate flush
+            # boundary, mid-replay validate failure through listingWriteFile)
+            # overflowed $2000 by 169 measured bytes.
+            set(TEST_PRG_SIZE "2100")
         endif()
         if(TEST_NAME STREQUAL "casm_cliderive")
             # WP53 increment 1: cli.s alone (CommandBuffer is a fixed absolute

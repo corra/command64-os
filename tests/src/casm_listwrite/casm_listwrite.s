@@ -72,6 +72,8 @@
 .import listingMetaAppend
 .import listingCaptureFinalize
 .import listingWriteFile
+.import vmmWindowWrite
+.import CasmListingMetaVmmSlot
 .import CasmListingPendingFileId
 .import CasmListingPendingFlags
 .import CasmListingPendingLineLo
@@ -227,6 +229,18 @@ start:
     jsr resourcesCleanup
 
     jsr writeFileHeaderChunk32
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr writeFileByteAndSourceContinuationTogether
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr writeFileAggregateFlushBoundary
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr writeFileValidateFailureMidReplayAborts
     jsr reportCase
     jsr resourcesCleanup
 
@@ -1272,6 +1286,351 @@ wfhc32Fail:
     sec
     rts
 
+; =============================================================================
+; WP53 increment 7: failure harness, linkage without activation, regressions
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; writeFileByteAndSourceContinuationTogether
+; One record needing both a byte-continuation and a source-continuation
+; (see expectedByteAndSourceTogether's own header comment).
+; ---------------------------------------------------------------------------
+writeFileByteAndSourceContinuationTogether:
+    jsr beginCapture
+    bcc :+
+    jmp wfbsFail
+:
+    lda #$00
+    sta CasmPc
+    lda #$40
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp wfbsFail
+:
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #<bsBytes
+    sta CasmPtr1Lo
+    lda #>bsBytes
+    sta CasmPtr1Hi
+    ldx #6
+    jsr mirrorBytesFromA
+    bcc :+
+    jmp wfbsFail
+:
+    lda #0
+    sta CasmListingTxnActive
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda #1
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    lda #<(fakeSrcLine4 - fakeSourceText)
+    sta CasmListingPendingOffsetLo
+    lda #>(fakeSrcLine4 - fakeSourceText)
+    sta CasmListingPendingOffsetHi
+    lda #20
+    sta CasmListingPendingLen
+    lda #$00
+    sta CasmListingPendingPcLo
+    lda #$40
+    sta CasmListingPendingPcHi
+    lda #6
+    sta CasmListingPendingByteCountLo
+    lda #0
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wfbsFail
+:
+    jsr listingCaptureFinalize
+    bcc :+
+    jmp wfbsFail
+:
+    ldx #<nameByteAndSourceTogether
+    ldy #>nameByteAndSourceTogether
+    jsr setListingName
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    jsr listingWriteFile
+    bcc :+
+    jmp wfbsFail
+:
+    lda CasmListFileCommitted
+    bne :+
+    jmp wfbsFail
+:
+    ldx #<expectedByteAndSourceTogether
+    ldy #>expectedByteAndSourceTogether
+    jmp readBackAndCompareBig
+wfbsFail:
+    sec
+    rts
+
+bsBytes: .byte $AA, $BB, $CC, $DD, $EE, $FF
+
+; ---------------------------------------------------------------------------
+; writeFileAggregateFlushBoundary
+; One header row plus seven trivial (zero-byte/zero-source) detail rows --
+; 8 rows * 41 bytes = 328 bytes, comfortably past the 256-byte aggregate.
+; lwAppendRow's own flush-before-overflow threshold (215) fires once: rows
+; 1-6 fit in one aggregate (246 bytes), row 7 forces a flush before it can
+; be appended, and the final partial aggregate (row 7 + row 8 = 82 bytes)
+; flushes at close. Verified by total size across two bounded reads (a
+; single fileRead is capped at CasmIoBuffer's own 256 bytes) rather than
+; full content -- the frozen row layout and continuation math are already
+; proven byte-exact elsewhere; this case is only about the flush boundary
+; itself.
+; ---------------------------------------------------------------------------
+writeFileAggregateFlushBoundary:
+    jsr beginCapture
+    bcc :+
+    jmp wfabFail
+:
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
+    ldx #1
+wfabLineLoop:
+    stx WfabLine
+    jsr listingBeginLine
+    bcc :+
+    jmp wfabFail
+:
+    lda #0
+    sta CasmListingTxnActive
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda WfabLine
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    sta CasmListingPendingOffsetLo
+    sta CasmListingPendingOffsetHi
+    sta CasmListingPendingLen
+    sta CasmListingPendingPcLo
+    sta CasmListingPendingPcHi
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #0
+    sta CasmListingPendingByteCountLo
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wfabFail
+:
+    ldx WfabLine
+    inx
+    cpx #8
+    bcc wfabLineLoop
+
+    jsr listingCaptureFinalize
+    bcc :+
+    jmp wfabFail
+:
+    ldx #<nameFlushBoundary
+    ldy #>nameFlushBoundary
+    jsr setListingName
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    jsr listingWriteFile
+    bcc :+
+    jmp wfabFail
+:
+    lda CasmListFileCommitted
+    bne :+
+    jmp wfabFail
+:
+    ldx #<nameFlushBoundary
+    ldy #>nameFlushBoundary
+    jsr fileOpenInput
+    bcc :+
+    jmp wfabFail
+:
+    lda #0
+    sta WfabTotalLo
+    sta WfabTotalHi
+    lda #250
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx #<CasmIoBuffer
+    ldy #>CasmIoBuffer
+    jsr fileRead
+    bcc :+
+    jmp wfabFail
+:
+    lda CasmIoLenLo
+    clc
+    adc WfabTotalLo
+    sta WfabTotalLo
+    bcc :+
+    inc WfabTotalHi
+:
+    lda #250
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx #<CasmIoBuffer
+    ldy #>CasmIoBuffer
+    jsr fileRead
+    bcc :+
+    jmp wfabFail
+:
+    lda CasmIoLenLo
+    clc
+    adc WfabTotalLo
+    sta WfabTotalLo
+    bcc :+
+    inc WfabTotalHi
+:
+    ; 8 rows * 41 bytes = 328 = $0148
+    lda WfabTotalLo
+    cmp #<328
+    bne wfabFail
+    lda WfabTotalHi
+    cmp #>328
+    bne wfabFail
+    clc
+    rts
+wfabFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; writeFileValidateFailureMidReplayAborts
+; Two valid trivial records, then the second record's own FLAGS byte is
+; corrupted directly in the metadata VMM store (an unreachable-in-practice
+; internal disagreement, matching listingValidateRecord's own increment 5
+; proof, but this time reached through the real listingWriteFile
+; orchestration). listingWriteFile must fail with
+; CASM_DIAG_LISTING_REPLAY_MISMATCH, leave the listing uncommitted, and
+; leave no listing file behind -- the frozen "a pre-finalization listing...
+; failure is fatal" / cleanup-never-leaks-an-incomplete-file contract,
+; proven through lwfAbortPath's own listingAbort call rather than
+; listingAbort in isolation (already proven by increment 4's own cases).
+; ---------------------------------------------------------------------------
+writeFileValidateFailureMidReplayAborts:
+    jsr beginCapture
+    bcc :+
+    jmp wvfmFail
+:
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp wvfmFail
+:
+    lda #0
+    sta CasmListingTxnActive
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda #1
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    sta CasmListingPendingOffsetLo
+    sta CasmListingPendingOffsetHi
+    sta CasmListingPendingLen
+    sta CasmListingPendingPcLo
+    sta CasmListingPendingPcHi
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #0
+    sta CasmListingPendingByteCountLo
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wvfmFail
+:
+    jsr listingBeginLine
+    bcc :+
+    jmp wvfmFail
+:
+    lda #0
+    sta CasmListingTxnActive
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda #2
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    sta CasmListingPendingOffsetLo
+    sta CasmListingPendingOffsetHi
+    sta CasmListingPendingLen
+    sta CasmListingPendingPcLo
+    sta CasmListingPendingPcHi
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #0
+    sta CasmListingPendingByteCountLo
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wvfmFail
+:
+    jsr listingCaptureFinalize
+    bcc :+
+    jmp wvfmFail
+:
+    ; Corrupt record[1]'s FLAGS byte (absolute offset 16+1=17): set a bit
+    ; outside CASM_LISTING_META_FLAG_FINAL_UNTERMINATED.
+    lda #%00000010
+    sta CasmVmmBuffer
+    lda #1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    lda #17
+    sta CasmVmmOffLo
+    lda #0
+    sta CasmVmmOffHi
+    ldx CasmListingMetaVmmSlot
+    jsr vmmWindowWrite
+    bcc :+
+    jmp wvfmFail
+:
+    ldx #<nameValidateFailMidReplay
+    ldy #>nameValidateFailMidReplay
+    jsr setListingName
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    jsr listingWriteFile
+    bcs wvfmGotFailure
+    jmp wvfmFail                  ; unexpectedly succeeded
+wvfmGotFailure:
+    cmp #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    beq :+
+    jmp wvfmFail
+:
+    lda CasmListFileCommitted
+    beq :+
+    jmp wvfmFail                  ; must not be committed
+:
+    ; The incomplete listing must have been deleted -- a readback open must fail.
+    ldx #<nameValidateFailMidReplay
+    ldy #>nameValidateFailMidReplay
+    jsr fileOpenInput
+    bcs :+
+    jmp wvfmFail                  ; unexpectedly opened -- should be gone
+:
+    clc
+    rts
+wvfmFail:
+    sec
+    rts
+
 ; ---------------------------------------------------------------------------
 ; Stubs for listing.s's WP51 capture-code dependencies (see the .export
 ; block above). Unreachable from every case in this file.
@@ -1408,6 +1767,7 @@ fakeSourceText:
 fakeSrcLine1: .byte "lda #$01;test1"    ; 14 chars
 fakeSrcLine2: .byte "rts"               ; 3 chars
 fakeSrcLine3: .byte "abcdefghijklmno"   ; 15 chars
+fakeSrcLine4: .byte "abcdefghijklmnopqrst" ; 20 chars, WP53 increment 7
 fakeSourceTextEnd:
 
 nameNoPrefix:  .byte "SPLW01.LST", 0
@@ -1472,6 +1832,24 @@ expectedHeaderChunk32:
     .byte "82:00001 0000                           ", $0D
     .byte 0
 
+; writeFileByteAndSourceContinuationTogether's own expected content (WP53
+; increment 7): one record needing both a byte-continuation (6 emitted
+; bytes: primary shows 4, continuation shows 2) and a source-continuation
+; (20 source bytes: primary shows 14, continuation shows 6) together,
+; proving the frozen "primary row, then all byte continuations, then all
+; source continuations" order with both kinds genuinely present at once --
+; every earlier case only ever exercised one kind per record.
+expectedByteAndSourceTogether:
+    .byte "file 00: MAIN.S                         ", $0D
+    .byte "00:00001 4000 aa bb cc dd abcdefghijklmn", $0D
+    .byte "         4004 ee ff                     ", $0D
+    .byte "                          opqrst        ", $0D
+    .byte 0
+
+nameByteAndSourceTogether: .byte "SPLW09.LST", 0
+nameFlushBoundary:         .byte "SPLW10.LST", 0
+nameValidateFailMidReplay: .byte "SPLW11.LST", 0
+
 passMsg: .byte "CASM LISTWRITE: PASS", $0D, 0
 failMsg: .byte "CASM LISTWRITE: FAIL", $0D, 0
 
@@ -1479,6 +1857,9 @@ failMsg: .byte "CASM LISTWRITE: FAIL", $0D, 0
 
 FailCount:  .res 1
 TestDevice: .res 1
+WfabLine:    .res 1
+WfabTotalLo: .res 1
+WfabTotalHi: .res 1
 
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE  ; link-only; never used here
 CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
