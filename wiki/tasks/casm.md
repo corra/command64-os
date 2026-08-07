@@ -1471,23 +1471,24 @@ Symbol Map and Listing, remains inactive and separately gated.**
       2026-08-03, per
       `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md` and
       `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`.
-- [ ] WP52 `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: deterministic symbol map.
-      Approved plan:
+- [x] WP52 `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: deterministic symbol map.
+      Complete, per
       `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
-      WP51 complete; WP52 not yet activated.
-- [ ] WP53 `aa57f461-36a9-455c-966f-ac484ec57b41`: listing naming,
-      serialization, and cleanup. Approved plan:
-      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
-      Blocked by WP52.
+- [x] WP53 `aa57f461-36a9-455c-966f-ac484ec57b41`: listing naming,
+      serialization, and cleanup. Complete at CASM `0.1.54` build 1237,
+      user-approved 2026-08-06, per
+      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`
+      and
+      `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`.
 - [ ] WP54 `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: production integration.
       Approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-      Blocked by WP53.
+      WP53 complete; WP54 not yet activated.
 - [ ] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
       and Phase 10 completion gate. Blocked by WP54.
 
-**WP51 is complete at CASM `0.1.52` build 1222, user-approved 2026-08-03.
-WP52-WP55 remain blocked pending WP52's own explicit activation.**
+**WP53 is complete at CASM `0.1.54` build 1237, user-approved 2026-08-06.
+WP54-WP55 remain blocked pending WP54's own explicit activation.**
 
 ## Optional Feature - Progress and Processing Indication
 

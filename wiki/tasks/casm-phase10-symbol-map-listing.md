@@ -43,18 +43,19 @@ requires a dedicated detailed plan and explicit user approval.
       2026-08-03, per
       `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md` and
       `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`.
-- [ ] `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: WP52 deterministic symbol map;
-      approved plan:
+- [x] `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: WP52 deterministic symbol map;
+      complete, per
       `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
-      Completion target `0.1.53`; blocked by WP51.
-- [ ] `aa57f461-36a9-455c-966f-ac484ec57b41`: WP53 listing naming,
-      serialization, and cleanup. Approved plan:
-      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
-      Completion target `0.1.54`; blocked by WP52.
+- [x] `aa57f461-36a9-455c-966f-ac484ec57b41`: WP53 listing naming,
+      serialization, and cleanup. Complete at CASM `0.1.54` build 1237,
+      user-approved 2026-08-06, per
+      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`
+      and
+      `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`.
 - [ ] `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: WP54 production integration;
       approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-      Completion target `0.1.55`; blocked by WP53.
+      Completion target `0.1.55`; WP53 complete, WP54 not yet activated.
 - [ ] `94d98a2b-7ad4-49f0-bf33-38702690eca9`: WP55 verification, walkthrough,
       and phase gate; approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.

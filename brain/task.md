@@ -1802,14 +1802,52 @@
           in full
     - [x] User confirmed the walkthrough 2026-08-05; ready to commit and
           merge onto `casm-phase10`
-  - [ ] WP53 (`aa57f461-36a9-455c-966f-ac484ec57b41`): listing naming,
+  - [x] WP53 (`aa57f461-36a9-455c-966f-ac484ec57b41`): listing naming,
         serialization, and cleanup; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`;
-        blocked by WP52
+        branch `feature/casm-phase10-wp53`
+    - [x] Increment 1: `cliDeriveListingName` (`cli.s`) + `test_casm_cliderive`
+          (7/7 PASS via shell)
+    - [x] Increment 2: `sourceReadSpanChunk` (`source.s`) + `test_casm_spanread`
+          (8/8 PASS via shell)
+    - [x] Increment 3: `outputCommit`/`CasmOutputCommitted` (`fileio.s`),
+          `outputAbort` amended so a committed PRG is never deleted +
+          `test_casm_spancommit` (5/5 PASS via shell)
+    - [x] Increment 4: `.LST` file I/O (`listingFileInit`/`Create`/`Write`/
+          `Close`/`Delete`/`Abort`, `listing.s`), diagnostics `$3D`-`$41`
+          activated, CBM DOS's native `@0:` replace-on-open marker proven
+          against a real stale-file replace + `test_casm_listwrite` (5/5
+          PASS via VICE)
+    - [x] Increment 5: `listingValidateRecord`/`listingResolveFilename`
+          (`listing.s`) + 12 new `test_casm_listwrite` fixtures, 17/17 PASS
+          via VICE; found/fixed a test-fixture A-clobber bug during
+          verification (not a product bug)
+    - [x] Increment 6: `listingWriteFile` (`listing.s`), the full `.LST`
+          serializer (row/header formatters, aggregate buffering with
+          flush-before-split) + 3 new fixtures (empty listing, byte-exact
+          golden-path readback, 31/32-char header chunk), 20/20 PASS via
+          VICE; found/fixed two real bugs -- a production charmap bug
+          (`"FILE "` header text needed lowercase ca65 source to match the
+          hex formatter's unshifted output) and a test-fixture bug
+          (`listingMirrorByte` clobbers Y internally, silently drifting a
+          loop index held across the call)
+    - [x] Increment 7: 3 new fixtures closing coverage gaps (byte+source
+          continuation together, aggregate-flush boundary, mid-replay
+          validation failure through the real `listingWriteFile`
+          orchestration), 23/23 PASS via VICE, no bugs found
+    - [x] Full clean rebuild + no-change rebuild both stable (md5-identical
+          `casm.prg`); regression pass of `test_casm_listing`/
+          `test_casm_listcap`/`test_casm_map` all VICE-confirmed clean;
+          production `casm` sanity (prints version banner, runs normally,
+          `/L`/`/M` still `NOT IMPLEMENTED`)
+    - [x] CASM version bumped `0.1.53` -> `0.1.54` (build `1236` -> `1237`)
+    - [x] User approved 2026-08-06; walkthrough
+          `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`;
+          Task Warrior task closed, WP54 unblocked
   - [ ] WP54 (`f4b598fd-bab1-4394-9415-c71e3ea1cfa5`): production integration;
         approved plan
         `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`;
-        blocked by WP53
+        WP53 complete, WP54 not yet activated
   - [ ] WP55 (`94d98a2b-7ad4-49f0-bf33-38702690eca9`): verification,
         walkthrough, and phase gate; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`;

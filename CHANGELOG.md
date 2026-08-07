@@ -67,6 +67,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 WP53 listing naming, serialization, and cleanup**: Added
+  `.LST` name derivation (`cliDeriveListingName`, `cli.s`), PRG commit
+  protection (`outputCommit`/`CasmOutputCommitted`, `fileio.s` -- a committed
+  PRG is never deleted by a later listing failure), real listing-file
+  ownership (`listingCreate`/`Write`/`Close`/`Delete`/`Abort`, `listing.s`,
+  embedding CBM DOS's native `@0:` replace-on-open marker per WP50's frozen
+  file-ownership resolution), a random-access source reader
+  (`sourceReadSpanChunk`, `source.s`, exposing no source slot), replay
+  validation and filename resolution (`listingValidateRecord`/
+  `listingResolveFilename`), and the full row/aggregate serializer
+  (`listingWriteFile`) implementing the frozen 40-column listing format:
+  file headers with 31-byte name-chunk continuations, detail rows with
+  independent byte- and source-continuations, uppercase hex, 5-digit
+  zero-padded line numbers, and exact verbatim source bytes, buffered
+  through the reused `CasmIoBuffer` with flush-before-split. Five new
+  diagnostics (`$3D`-`$41`: create/write/close/delete/short-write failed).
+  `listingWriteFile` and `outputCommit` are linked into production `casm`
+  but have no `casm.s` call site yet -- `/L` remains NOT IMPLEMENTED until
+  WP54 wires it into the CLI. Verified with `tests/src/casm_listwrite` (23
+  fixtures across all seven implementation increments, including a
+  byte-exact comparison of a real written-back `.LST` file against the
+  frozen format's own named boundaries -- 0/4/5 emitted bytes, 14/15/20
+  source bytes, 31/32-character header continuation, an aggregate-flush
+  boundary, and a mid-replay corruption case reached through the real
+  `listingWriteFile` orchestration), all VICE-confirmed passing, alongside a
+  clean regression pass of `test_casm_listing`/`test_casm_listcap`/
+  `test_casm_map`. Two real bugs were found and fixed during verification:
+  a test-fixture A-register clobber that made a passing check report as a
+  failure regardless of actual behavior, and a genuine `listing.s` bug where
+  the `"FILE "` header-prefix text was written in uppercase ca65 source
+  (producing shifted PETSCII) instead of lowercase (matching the arithmetic
+  hex-digit formatter's own unshifted output). Required expanding `casm`'s
+  envelope (`$4F00`->`$5500` across increments 5-6) and five whole-linking
+  test harnesses' envelopes. CASM bumped `0.1.53` -> `0.1.54`.
 - **CASM Phase 10 WP52 deterministic symbol map**: Added `symbolsReadByIndex`
   (`symbols.s`), a stateless definition-order record accessor distinct from
   the hash-chain-walking `symbolsFindChain`, and a new `map.s` module
