@@ -64,6 +64,31 @@
 .import CasmListResolvedName
 .import CasmListResolvedNameLen
 
+; WP53 increment 6: formatters and aggregate serializer.
+.import listingStateInit
+.import listingCaptureInit
+.import listingBeginLine
+.import listingMirrorByte
+.import listingMetaAppend
+.import listingCaptureFinalize
+.import listingWriteFile
+.import CasmListingPendingFileId
+.import CasmListingPendingFlags
+.import CasmListingPendingLineLo
+.import CasmListingPendingLineHi
+.import CasmListingPendingOffsetLo
+.import CasmListingPendingOffsetHi
+.import CasmListingPendingLen
+.import CasmListingPendingPcLo
+.import CasmListingPendingPcHi
+.import CasmListingPendingByteOffLo
+.import CasmListingPendingByteOffHi
+.import CasmListingPendingByteCountLo
+.import CasmListingPendingByteCountHi
+.import CasmListingByteCursorLo
+.import CasmListingByteCursorHi
+.import CasmListingTxnActive
+
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
 .export CasmListingName
 .export CasmListingLen
@@ -91,6 +116,15 @@
 .export includeCatalogRead
 .export includeDeviceStrLo
 .export includeDeviceStrHi
+; WP53 increment 6: CasmSourceState is source.s's own traversal-closed
+; signal, one of listingWriteFile's own preconditions; source.s is not
+; linked here (same minimal-linkage precedent as every other cross-module
+; stand-in above), so this local export stands in for it. sourceReadSpanChunk
+; is a fully controllable fake (see its own body below), not a stand-in
+; state byte -- listingWriteFile's real source-byte reads all go through it.
+.export CasmSourceState
+.export sourceReadSpanChunk
+.import CasmOutputCommitted
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -116,6 +150,17 @@ start:
     sta CasmIncludeCatalogCount
     lda #$FF
     sta FakeCatalogFailIndex
+    lda #CASM_SOURCE_STATE_CLOSED
+    sta CasmSourceState
+    ; WP53 increment 6: BSS is not guaranteed zero at PRG load (a .prg image
+    ; carries no bytes for its own BSS region, so a re-run within the same
+    ; VICE session can see whatever the previous run left behind) --
+    ; CasmSourceCompletedFlags must start clear (bit 0/VALID clear) or
+    ; listingCaptureFinalize's own "no unconsumed sidecar" precondition
+    ; rejects every one of this increment's own cases, none of which ever
+    ; legitimately sets it (they all bypass the real listingCommitLine).
+    lda #0
+    sta CasmSourceCompletedFlags
 
     jsr createWriteCloseRoundtrip
     jsr reportCase
@@ -172,6 +217,18 @@ start:
 
     jsr validatePropagatesVmmTransferFailure
     jsr reportCase
+
+    jsr writeFileEmptyListing
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr writeFileGoldenPath
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr writeFileHeaderChunk32
+    jsr reportCase
+    jsr resourcesCleanup
 
     lda #$0D
     jsr KernalChROUT
@@ -301,6 +358,49 @@ rbacExpectEnd:
     clc
     rts
 rbacFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; readBackAndCompareBig (WP53 increment 6)
+; Same contract as readBackAndCompare, but requests up to 250 bytes (still
+; one CasmIoBuffer-bounded fileRead) for the multi-row content
+; listingWriteFile itself produces -- readBackAndCompare's own hard-coded
+; 32-byte request is too small for any of this increment's own cases.
+; ---------------------------------------------------------------------------
+readBackAndCompareBig:
+    stx CasmPtr1Lo
+    sty CasmPtr1Hi
+    ldx #<CasmListingName
+    ldy #>CasmListingName
+    jsr fileOpenInput
+    bcc :+
+    jmp rbacbFail
+:
+    lda #250
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx #<CasmIoBuffer
+    ldy #>CasmIoBuffer
+    jsr fileRead
+    bcc :+
+    jmp rbacbFail
+:
+    ldy #0
+rbacbLoop:
+    lda (CasmPtr1Lo), y
+    beq rbacbExpectEnd
+    cmp CasmIoBuffer, y
+    bne rbacbFail
+    iny
+    jmp rbacbLoop
+rbacbExpectEnd:
+    cpy CasmIoLenLo
+    bne rbacbFail
+    clc
+    rts
+rbacbFail:
     sec
     rts
 
@@ -824,6 +924,354 @@ vptfFail:
     sec
     rts
 
+; =============================================================================
+; WP53 increment 6: listingWriteFile -- formatters and aggregate serializer
+;
+; Each case drives the real capture API (listingCaptureInit/BeginLine/
+; MirrorByte, real byte-mirror VMM) to get genuine emitted-byte content,
+; then appends its own metadata records directly via CasmListingPending*/
+; listingMetaAppend (skipping the real listingCommitLine/sourceTakeCompletedLine
+; sidecar entirely -- listingMetaAppend's own contract does not require it;
+; see test_casm_listing.s's own identical precedent), then calls the real
+; listingWriteFile and reads the real resulting `.LST` file back for an
+; exact byte comparison against a Python-verified expected string. This is
+; the strongest available proof short of a live VICE run: real VMM storage,
+; real DOS file I/O, real formatting code, only the source-text and
+; catalog lookups are controllable fakes (see their own headers above).
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; beginCapture (private)
+; Shared setup: fresh file/listing/capture state for one case.
+; Outputs: C/A as listingCaptureInit
+; ---------------------------------------------------------------------------
+beginCapture:
+    jsr fileIoInit
+    jsr listingFileInit
+    jsr listingStateInit
+    jmp listingCaptureInit
+
+; ---------------------------------------------------------------------------
+; mirrorBytesFromA (private)
+; Mirror X bytes, each byte value read from tblLo/Hi[0..X-1] (a private
+; RODATA table set by the caller into CasmPtr1Lo/Hi), via real
+; listingMirrorByte calls. Advances CasmPtr1Lo/Hi itself rather than using a
+; Y-register index across the call: listingMirrorByte clobbers Y internally
+; (it indexes CasmListingStage by CasmListingStageLen), so a loop index held
+; in Y across that call silently drifts.
+; Input:     X = count (0-5 in this file's own cases), CasmPtr1Lo/Hi = table
+; Outputs:   C/A as listingMirrorByte (stops and propagates on first failure)
+; ---------------------------------------------------------------------------
+mirrorBytesFromA:
+    cpx #0
+    beq mbfaDone
+mbfaLoop:
+    ldy #0
+    lda (CasmPtr1Lo), y
+    jsr listingMirrorByte
+    bcs mbfaFail
+    inc CasmPtr1Lo
+    bne mbfaNoCarry
+    inc CasmPtr1Hi
+mbfaNoCarry:
+    dex
+    bne mbfaLoop
+mbfaDone:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+mbfaFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; writeFileEmptyListing
+; Zero captured records: listingWriteFile must still succeed, creating and
+; committing a genuinely empty `.LST` file -- the frozen "an empty source
+; produces an empty listing file" rule. (A zero-byte SEQ file cannot be
+; reopened for readback on real CBM DOS -- see project-casm-zero-size-seq-
+; open -- so this case verifies success/commit only, not a content
+; readback.)
+; ---------------------------------------------------------------------------
+writeFileEmptyListing:
+    jsr beginCapture
+    bcs wfelFail
+    jsr listingCaptureFinalize
+    bcs wfelFail
+    ldx #<nameEmptyListing
+    ldy #>nameEmptyListing
+    jsr setListingName
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    jsr listingWriteFile
+    bcs wfelFail
+    lda CasmListFileCommitted
+    beq wfelFail
+    clc
+    rts
+wfelFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; writeFileGoldenPath
+; Three physical lines under one top-level file header (see
+; expectedGoldenPath's own header comment for exactly which frozen
+; boundaries each line exercises).
+; ---------------------------------------------------------------------------
+writeFileGoldenPath:
+    jsr beginCapture
+    bcc :+
+    jmp wfgpFail
+:
+
+    ; --- Line 1: PC=$3400, 4 emitted bytes, 14 source bytes ---
+    lda #$00
+    sta CasmPc
+    lda #$34
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp wfgpFail
+:
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #<line1Bytes
+    sta CasmPtr1Lo
+    lda #>line1Bytes
+    sta CasmPtr1Hi
+    ldx #4
+    jsr mirrorBytesFromA
+    bcc :+
+    jmp wfgpFail
+:
+    lda #0
+    sta CasmListingTxnActive
+    lda #0
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda #1
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    lda #<(fakeSrcLine1 - fakeSourceText)
+    sta CasmListingPendingOffsetLo
+    lda #>(fakeSrcLine1 - fakeSourceText)
+    sta CasmListingPendingOffsetHi
+    lda #14
+    sta CasmListingPendingLen
+    lda #$00
+    sta CasmListingPendingPcLo
+    lda #$34
+    sta CasmListingPendingPcHi
+    lda #4
+    sta CasmListingPendingByteCountLo
+    lda #0
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wfgpFail
+:
+
+    ; --- Line 2: PC=$3404, 5 emitted bytes (byte-continuation), 3 source bytes ---
+    lda #$04
+    sta CasmPc
+    lda #$34
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp wfgpFail
+:
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #<line2Bytes
+    sta CasmPtr1Lo
+    lda #>line2Bytes
+    sta CasmPtr1Hi
+    ldx #5
+    jsr mirrorBytesFromA
+    bcc :+
+    jmp wfgpFail
+:
+    lda #0
+    sta CasmListingTxnActive
+    lda #0
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda #2
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    lda #<(fakeSrcLine2 - fakeSourceText)
+    sta CasmListingPendingOffsetLo
+    lda #>(fakeSrcLine2 - fakeSourceText)
+    sta CasmListingPendingOffsetHi
+    lda #3
+    sta CasmListingPendingLen
+    lda #$04
+    sta CasmListingPendingPcLo
+    lda #$34
+    sta CasmListingPendingPcHi
+    lda #5
+    sta CasmListingPendingByteCountLo
+    lda #0
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wfgpFail
+:
+
+    ; --- Line 3: PC=$3409, 0 emitted bytes, 15 source bytes (source-continuation) ---
+    lda #$09
+    sta CasmPc
+    lda #$34
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp wfgpFail
+:
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #0
+    sta CasmListingTxnActive
+    sta CasmListingPendingFileId
+    sta CasmListingPendingFlags
+    lda #3
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    lda #<(fakeSrcLine3 - fakeSourceText)
+    sta CasmListingPendingOffsetLo
+    lda #>(fakeSrcLine3 - fakeSourceText)
+    sta CasmListingPendingOffsetHi
+    lda #15
+    sta CasmListingPendingLen
+    lda #$09
+    sta CasmListingPendingPcLo
+    lda #$34
+    sta CasmListingPendingPcHi
+    lda #0
+    sta CasmListingPendingByteCountLo
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wfgpFail
+:
+
+    jsr listingCaptureFinalize
+    bcc :+
+    jmp wfgpFail
+:
+    ldx #<nameGoldenPath
+    ldy #>nameGoldenPath
+    jsr setListingName
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    jsr listingWriteFile
+    bcc :+
+    jmp wfgpFail
+:
+    lda CasmListFileCommitted
+    beq wfgpFail
+    ldx #<expectedGoldenPath
+    ldy #>expectedGoldenPath
+    jmp readBackAndCompareBig
+wfgpFail:
+    sec
+    rts
+
+line1Bytes: .byte $A9, $01, $8D, $00
+line2Bytes: .byte $11, $22, $33, $44, $55
+
+; ---------------------------------------------------------------------------
+; writeFileHeaderChunk32
+; One included-file header whose resolved name is exactly one byte past
+; CASM_LISTING_HEADER_CHUNK_SIZE (31), forcing exactly one continuation
+; row, plus one trivial zero-byte/zero-source detail row (the detail-row
+; formatter itself is already fully proven by writeFileGoldenPath).
+; Temporarily raises CasmIncludeCatalogCount to reach the third fake
+; catalog entry, restoring it to 2 before returning either way so every
+; later case's own out-of-range assumption still holds.
+; ---------------------------------------------------------------------------
+writeFileHeaderChunk32:
+    jsr beginCapture
+    bcc :+
+    jmp wfhc32Restore
+:
+
+    lda #0
+    sta CasmPc
+    sta CasmPc + 1
+    jsr listingBeginLine
+    bcc :+
+    jmp wfhc32Restore
+:
+    lda #0
+    sta CasmListingTxnActive
+    lda #$82
+    sta CasmListingPendingFileId
+    lda #0
+    sta CasmListingPendingFlags
+    lda #1
+    sta CasmListingPendingLineLo
+    lda #0
+    sta CasmListingPendingLineHi
+    sta CasmListingPendingOffsetLo
+    sta CasmListingPendingOffsetHi
+    sta CasmListingPendingLen
+    sta CasmListingPendingPcLo
+    sta CasmListingPendingPcHi
+    lda CasmListingByteCursorLo
+    sta CasmListingPendingByteOffLo
+    lda CasmListingByteCursorHi
+    sta CasmListingPendingByteOffHi
+    lda #0
+    sta CasmListingPendingByteCountLo
+    sta CasmListingPendingByteCountHi
+    jsr listingMetaAppend
+    bcc :+
+    jmp wfhc32Restore
+:
+
+    jsr listingCaptureFinalize
+    bcc :+
+    jmp wfhc32Restore
+:
+    ldx #<nameHeaderChunk
+    ldy #>nameHeaderChunk
+    jsr setListingName
+    lda #CASM_OUTPUT_COMMITTED
+    sta CasmOutputCommitted
+    lda #3
+    sta CasmIncludeCatalogCount
+    jsr listingWriteFile
+    pha
+    php
+    lda #2
+    sta CasmIncludeCatalogCount
+    plp
+    pla
+    bcs wfhc32Fail
+    lda CasmListFileCommitted
+    beq wfhc32Fail
+    ldx #<expectedHeaderChunk32
+    ldy #>expectedHeaderChunk32
+    jsr readBackAndCompareBig
+    bcs wfhc32Fail
+    clc
+    rts
+wfhc32Restore:
+    lda #2
+    sta CasmIncludeCatalogCount
+wfhc32Fail:
+    sec
+    rts
+
 ; ---------------------------------------------------------------------------
 ; Stubs for listing.s's WP51 capture-code dependencies (see the .export
 ; block above). Unreachable from every case in this file.
@@ -874,6 +1322,38 @@ icrNameDone:
     clc
     rts
 
+; ---------------------------------------------------------------------------
+; sourceReadSpanChunk (fake, WP53 increment 6)
+; Controllable stand-in for source.s's real VMM-backed routine.
+; listingWriteFile's row formatters only depend on the contract -- absolute
+; offset in CasmVmmOffLo/Hi, length 1-14 in CasmIoLenLo (Hi always 0 here),
+; bytes landing in CasmVmmBuffer, C/A result -- not on real VMM storage or
+; the loaded-length bound the real routine also checks (every case here
+; only ever requests a span this harness itself already knows is in
+; bounds), so this indexes fakeSourceText directly by the given offset.
+; ---------------------------------------------------------------------------
+sourceReadSpanChunk:
+    lda #<fakeSourceText
+    clc
+    adc CasmVmmOffLo
+    sta CasmPtr1Lo
+    lda #>fakeSourceText
+    adc CasmVmmOffHi
+    sta CasmPtr1Hi
+    ldx CasmIoLenLo
+    beq srscTestDone              ; length 0 never requested, but stay safe
+    ldy #0
+srscTestLoop:
+    lda (CasmPtr1Lo), y
+    sta CasmVmmBuffer, y
+    iny
+    dex
+    bne srscTestLoop
+srscTestDone:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
 .segment "RODATA"
 
 ; WP53 increment 5: real device-string table, identical to include.s's own
@@ -900,13 +1380,35 @@ nameUtil: .byte "8:UTIL.S", 0
 ; Two real entries (id 0, 1, devices 8/9); CasmIncludeCatalogCount stays 2
 ; so id 2 is used only to prove listingResolveFilename's own out-of-range
 ; gate, never reaching this table.
-fakeCatalogDevice: .byte 8, 9
-fakeCatalogNameLo: .byte <fakeCatalogName0, <fakeCatalogName1
-fakeCatalogNameHi: .byte >fakeCatalogName0, >fakeCatalogName1
+;
+; WP53 increment 6: a third entry (id 2, device 9) is appended for
+; writeFileHeaderChunk32's own header-continuation proof -- a 30-character
+; catalog name, "9:" + 30 = 32-character resolved name, one byte past
+; CASM_LISTING_HEADER_CHUNK_SIZE (31). writeFileHeaderChunk32 temporarily
+; raises CasmIncludeCatalogCount to 3 to reach it, then restores 2
+; immediately afterward so every later case's own out-of-range assumption
+; (id 2 invalid) still holds.
+fakeCatalogDevice: .byte 8, 9, 9
+fakeCatalogNameLo: .byte <fakeCatalogName0, <fakeCatalogName1, <fakeCatalogName2
+fakeCatalogNameHi: .byte >fakeCatalogName0, >fakeCatalogName1, >fakeCatalogName2
 fakeCatalogName0:  .byte "SUB.S", 0
 fakeCatalogName1:  .byte "DEEP.S", 0
+fakeCatalogName2:  .byte "n12345678901234567890123456789", 0  ; 30 chars
 nameSub:  .byte "8:SUB.S", 0
 nameDeep: .byte "9:DEEP.S", 0
+
+; WP53 increment 6: flat fake source text for the fake sourceReadSpanChunk
+; below. listingWriteFile's real source reads never see this harness's own
+; FILEID at all (sourceReadSpanChunk's real contract is a flat absolute
+; VMM-store offset, with no per-file structure) -- offsets into this table
+; are computed at assemble time via label arithmetic (fakeSrcLineN minus
+; fakeSourceText) rather than hand-counted, so a future edit here can never
+; silently desync a case's own hard-coded offset.
+fakeSourceText:
+fakeSrcLine1: .byte "lda #$01;test1"    ; 14 chars
+fakeSrcLine2: .byte "rts"               ; 3 chars
+fakeSrcLine3: .byte "abcdefghijklmno"   ; 15 chars
+fakeSourceTextEnd:
 
 nameNoPrefix:  .byte "SPLW01.LST", 0
 ; Device prefix deliberately names device 8 (the boot device), not another
@@ -924,6 +1426,52 @@ contentHello: .byte "hello", 0
 contentOld:   .byte "oldstaledata", 0
 contentNew:   .byte "newdata", 0
 
+nameEmptyListing: .byte "SPLW06.LST", 0
+nameGoldenPath:   .byte "SPLW07.LST", 0
+nameHeaderChunk:  .byte "SPLW08.LST", 0
+
+; ---------------------------------------------------------------------------
+; WP53 increment 6: expected listingWriteFile output, byte-exact.
+;
+; Every string below was generated and column-verified with a Python
+; simulation of the exact frozen row layout (lwPutByteGroup's own
+; leading-space/separator/pad behavior included) before being pasted here,
+; rather than hand-counted -- see the WP53 increment 6 session notes for
+; the generator. Each row is exactly 40 content bytes plus one trailing
+; PETSCII CR; padding spaces are literal characters in these strings, not
+; a run-length count, so nothing here can silently drift out of column
+; alignment without the string's own visible width changing.
+; ---------------------------------------------------------------------------
+
+; writeFileGoldenPath's own expected content: one header row (no
+; continuation, "MAIN.S" is short), then three physical lines --
+; line 1 primary-only (exactly 4 emitted bytes, exactly 14 source bytes:
+; the plan's own "four"/"14" boundary, neither needs a continuation),
+; line 2 primary plus one byte-continuation (5 emitted bytes: the plan's
+; own "five" boundary), line 3 primary plus one source-continuation (zero
+; emitted bytes: the plan's own "zero" boundary; 15 source bytes: the
+; plan's own "15" boundary).
+expectedGoldenPath:
+    .byte "file 00: MAIN.S                         ", $0D
+    .byte "00:00001 3400 a9 01 8d 00 lda #$01;test1", $0D
+    .byte "00:00002 3404 11 22 33 44 rts           ", $0D
+    .byte "         3408 55                        ", $0D
+    .byte "00:00003 3409             abcdefghijklmn", $0D
+    .byte "                          o             ", $0D
+    .byte 0
+
+; writeFileHeaderChunk32's own expected content: an included-file header
+; whose resolved name ("9:" + a 30-character catalog name = 32 characters)
+; is exactly one byte past CASM_LISTING_HEADER_CHUNK_SIZE (31), forcing
+; exactly one continuation row; then one trivial zero-byte/zero-source
+; detail row (this case is only about the header, not the detail row
+; formatter -- already fully proven by writeFileGoldenPath).
+expectedHeaderChunk32:
+    .byte "file 82: 9:n1234567890123456789012345678", $0D
+    .byte "         9                              ", $0D
+    .byte "82:00001 0000                           ", $0D
+    .byte 0
+
 passMsg: .byte "CASM LISTWRITE: PASS", $0D, 0
 failMsg: .byte "CASM LISTWRITE: FAIL", $0D, 0
 
@@ -936,8 +1484,11 @@ CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE  ; link-only; never used here
 CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
 CasmListingLen:  .res 1
 
-; Stand-ins for listing.s's WP51 capture-code dependencies; never written
-; or read by any case in this file.
+; Stand-ins for listing.s's WP51 capture-code dependencies. WP53 increment
+; 6's own cases write CasmPc directly (listingBeginLine's own starting-PC
+; input) and drive real listingBeginLine/listingMirrorByte calls, but never
+; call the real listingCommitLine -- so CasmSourceCompletedFlags and its
+; siblings below stay genuinely unused, standing in only for the link.
 CasmPc:                     .res 2
 CasmSourceCompletedFlags:   .res 1
 CasmSourceCompletedStartLo: .res 1
@@ -946,6 +1497,13 @@ CasmSourceCompletedLength:  .res 1
 CasmSourceCompletedFileId:  .res 1
 CasmSourceCompletedLineLo:  .res 1
 CasmSourceCompletedLineHi:  .res 1
+; WP53 increment 6: source.s's own traversal-closed signal (see the
+; .export above for why this is a local stand-in). CASM_SOURCE_STATE_CLOSED
+; is 0, so this field's own zero-init already satisfies listingWriteFile's
+; precondition without any case needing to set it explicitly -- listed here
+; anyway since relying on incidental RAM zero-init is not something any
+; other field in this file does.
+CasmSourceState: .res 1
 
 ; WP53 increment 5: listingResolveFilename dependencies. CasmSourceCount and
 ; CasmIncludeCatalogCount are set to 2 in start (cliSourceSlotLo/Hi's own

@@ -310,7 +310,12 @@ if(Ca65_FOUND)
     # WP53 increment 5: $4F00 -> $5000 -- listingValidateRecord/
     # listingResolveFilename plus CasmListResolvedName[68] overflowed $4F00
     # by 170 measured bytes.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "5000")
+    # WP53 increment 6: $5000 -> $5500 -- the formatters and aggregate
+    # serializer (listingWriteFile and its private row/header/chunk
+    # routines) overflowed $5000 by 1052 measured bytes; $5400 (+1024)
+    # would still overflow, so $5500 (+1280) is the smallest round-page
+    # step that fits.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "5500")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -470,7 +475,14 @@ if(Ca65_FOUND)
             # harness, which exercises only WP51's capture API) overflowed
             # $1300 by 354 measured bytes; $1700 (+1024) is the smallest
             # round-page step that fits.
-            set(TEST_PRG_SIZE "1700")
+            # WP53 increment 6: $1700 -> $1D00 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $1700 by 221 measured CODE bytes; $1800
+            # still overflowed RODATA by 13, then $1900 overflowed BSS by
+            # 414 (ld65 reports one memory-area overflow at a time, so each
+            # step only reveals the next); $1D00 (+1536) is the smallest
+            # round-page step that clears all three.
+            set(TEST_PRG_SIZE "1D00")
         endif()
         if(TEST_NAME STREQUAL "casm_symbols")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -549,7 +561,14 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1800")
+            # WP53 increment 6: $1800 -> $2000 -- listingWriteFile's own
+            # formatters/serializer (listing.s is linked whole) plus this
+            # harness's own new golden-path/header-chunk cases and their
+            # expected-content RODATA overflowed $1800 by 96 measured bytes
+            # after increment 5's own growth, then a further 305 after this
+            # increment's own test additions; $2000 (+2048 from the
+            # original $1800) is a comfortably round step above both.
+            set(TEST_PRG_SIZE "2000")
         endif()
         if(TEST_NAME STREQUAL "casm_cliderive")
             # WP53 increment 1: cli.s alone (CommandBuffer is a fixed absolute
@@ -615,7 +634,12 @@ if(Ca65_FOUND)
             # WP53 increment 5: $4B00 -> $4C00 -- listing.s's new
             # listingValidateRecord/listingResolveFilename (unused by this
             # harness) overflowed $4B00 by 190 measured bytes.
-            set(TEST_PRG_SIZE "4C00")
+            # WP53 increment 6: $4C00 -> $5100 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $4C00 by 1072 measured bytes; $5000
+            # (+1024) would still overflow, so $5100 (+1280) is the
+            # smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5100")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -660,7 +684,11 @@ if(Ca65_FOUND)
             # harness) overflowed $4700 by 275 measured bytes; $4800 (+256)
             # still overflowed by 19 (275 > 256), so $4900 (+512) is the
             # smallest round-page step that fits.
-            set(TEST_PRG_SIZE "4900")
+            # WP53 increment 6: $4900 -> $4D00 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $4900 by 901 measured bytes; $4D00
+            # (+1024) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "4D00")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -766,7 +794,11 @@ if(Ca65_FOUND)
             # WP53 increment 5: $4B00 -> $4C00 -- listing.s's new
             # listingValidateRecord/listingResolveFilename (unused by this
             # harness) overflowed $4B00 by 125 measured bytes.
-            set(TEST_PRG_SIZE "4C00")
+            # WP53 increment 6: $4C00 -> $5000 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $4C00 by 1007 measured bytes; $5000
+            # (+1024) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5000")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -821,7 +853,11 @@ if(Ca65_FOUND)
             # $4F00 by 297 measured bytes; $5000 (+256) would still
             # overflow, so $5100 (+512) is the smallest round-page step
             # that fits.
-            set(TEST_PRG_SIZE "5100")
+            # WP53 increment 6: $5100 -> $5500 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $5100 by 923 measured bytes; $5500
+            # (+1024) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5500")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})

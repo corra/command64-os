@@ -1193,4 +1193,33 @@ CASM_LISTING_RESOLVED_NAME_SIZE = $44
 .assert CASM_LISTING_RESOLVED_NAME_SIZE >= 2 + 1 + CASM_INCLUDE_FILENAME_MAX + 1, error, "CASM listing resolved-name buffer too small for an included header"
 .assert CASM_LISTING_RESOLVED_NAME_SIZE >= CASM_FILENAME_BUFFER_SIZE, error, "CASM listing resolved-name buffer too small for a top-level header"
 
+; WP53 increment 6: frozen row/column layout (parent plan's "Listing
+; Content" -- File Headers/Detail Rows/Continuations sections). Every row
+; is exactly CASM_LISTING_ROW_WIDTH bytes of content plus one trailing
+; PETSCII CR; the CR is never counted in any column width below.
+CASM_LISTING_ROW_WIDTH        = 40
+CASM_LISTING_ROW_SIZE         = 41  ; CASM_LISTING_ROW_WIDTH + 1 (CR)
+
+; File header: "FILE HH: " occupies columns 1-9 on the first row of a
+; transition (blank on continuation rows); up to this many filename bytes
+; follow in columns 10-40 on every header row, first or continuation.
+CASM_LISTING_HEADER_PREFIX_WIDTH = 9
+CASM_LISTING_HEADER_CHUNK_SIZE   = 31
+.assert CASM_LISTING_HEADER_PREFIX_WIDTH + CASM_LISTING_HEADER_CHUNK_SIZE = CASM_LISTING_ROW_WIDTH, error, "CASM listing header prefix+chunk must fill the row exactly"
+
+; Detail row: columns 1-8 (identity+colon+5-digit line+space), blank on a
+; byte-continuation or source-continuation row.
+CASM_LISTING_ROW_HEAD_WIDTH   = 8
+; Columns 9-13 (space+4-digit hex PC), blank on a source-continuation row.
+CASM_LISTING_ROW_ADDR_WIDTH   = 5
+; Columns 14-25 (space+"HH HH HH HH"), blank on a source-continuation row.
+CASM_LISTING_ROW_BYTES_WIDTH  = 12
+CASM_LISTING_ROW_BYTES_MAX    = 4   ; emitted bytes shown per row
+; Column 26 (space), always present before the source column.
+CASM_LISTING_ROW_GAP_WIDTH    = 1
+; Columns 27-40: up to this many exact source bytes, blank on a
+; byte-continuation row.
+CASM_LISTING_ROW_SOURCE_MAX   = 14
+.assert CASM_LISTING_ROW_HEAD_WIDTH + CASM_LISTING_ROW_ADDR_WIDTH + CASM_LISTING_ROW_BYTES_WIDTH + CASM_LISTING_ROW_GAP_WIDTH + CASM_LISTING_ROW_SOURCE_MAX = CASM_LISTING_ROW_WIDTH, error, "CASM listing detail row columns must fill the row exactly"
+
 .endif

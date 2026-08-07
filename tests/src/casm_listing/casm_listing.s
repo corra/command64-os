@@ -94,6 +94,13 @@
 .export includeCatalogRead
 .export includeDeviceStrLo
 .export includeDeviceStrHi
+; WP53 increment 6: listing.s's new listingWriteFile references these
+; (source.s/fileio.s); this harness links neither and never calls
+; listingWriteFile.
+.export sourceReadSpanChunk
+.export CasmSourceState
+.export CasmOutputCommitted
+.export CasmIoBuffer
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -1708,6 +1715,17 @@ fileClose:
     clc
     rts
 
+; ---------------------------------------------------------------------------
+; sourceReadSpanChunk (stub, WP53 increment 6)
+; listing.s's new listingWriteFile references this (source.s); this harness
+; links neither and never calls listingWriteFile. Unreachable in practice,
+; but still a required link symbol.
+; ---------------------------------------------------------------------------
+sourceReadSpanChunk:
+    lda #CASM_DIAG_VMM_TRANSFER_FAILED
+    sec
+    rts
+
 .segment "RODATA"
 
 ; WP53 increment 5: listing.s's new listingResolveFilename references these
@@ -1727,6 +1745,13 @@ FailCount: .res 1
 LoopLo:    .res 1
 StubHasPending: .res 1
 CasmPc: .res 2
+
+; WP53 increment 6: listing.s's new listingWriteFile references these
+; (source.s/fileio.s); this harness links neither and never calls
+; listingWriteFile.
+CasmSourceState:     .res 1
+CasmOutputCommitted: .res 1
+CasmIoBuffer:        .res CASM_IO_BUFFER_SIZE
 CasmSourceCompletedFlags:   .res 1
 CasmSourceCompletedStartLo: .res 1
 CasmSourceCompletedStartHi: .res 1
