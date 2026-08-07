@@ -307,7 +307,10 @@ if(Ca65_FOUND)
     # $4E00 by a further 112 bytes; $4F00 (+256) is the smallest round-page
     # step that fits that, still below the plan's preapproved $5800
     # ceiling.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4F00")
+    # WP53 increment 5: $4F00 -> $5000 -- listingValidateRecord/
+    # listingResolveFilename plus CasmListResolvedName[68] overflowed $4F00
+    # by 170 measured bytes.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "5000")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -609,7 +612,10 @@ if(Ca65_FOUND)
             # drives Pass 1) overflowed $4800 by 579 measured bytes; $4A00
             # (+512) still overflowed by 67, so $4B00 (+768) is the
             # smallest round-page step that fits.
-            set(TEST_PRG_SIZE "4B00")
+            # WP53 increment 5: $4B00 -> $4C00 -- listing.s's new
+            # listingValidateRecord/listingResolveFilename (unused by this
+            # harness) overflowed $4B00 by 190 measured bytes.
+            set(TEST_PRG_SIZE "4C00")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -649,7 +655,12 @@ if(Ca65_FOUND)
             # file I/O state/routines (unused by this harness) overflowed
             # $4400 by 664 measured bytes; $4700 (+768) is the smallest
             # round-page step that fits.
-            set(TEST_PRG_SIZE "4700")
+            # WP53 increment 5: $4700 -> $4900 -- listing.s's new
+            # listingValidateRecord/listingResolveFilename (unused by this
+            # harness) overflowed $4700 by 275 measured bytes; $4800 (+256)
+            # still overflowed by 19 (275 > 256), so $4900 (+512) is the
+            # smallest round-page step that fits.
+            set(TEST_PRG_SIZE "4900")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -752,7 +763,10 @@ if(Ca65_FOUND)
             # file I/O state/routines (unused by this harness) overflowed
             # $4700 by 770 measured bytes; $4B00 (+1024) is the smallest
             # round-page step that fits.
-            set(TEST_PRG_SIZE "4B00")
+            # WP53 increment 5: $4B00 -> $4C00 -- listing.s's new
+            # listingValidateRecord/listingResolveFilename (unused by this
+            # harness) overflowed $4B00 by 125 measured bytes.
+            set(TEST_PRG_SIZE "4C00")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -802,7 +816,12 @@ if(Ca65_FOUND)
             # harness, which never enables listing capture with a real
             # output) overflowed $4C00 by 686 measured bytes; $4F00 (+768)
             # is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "4F00")
+            # WP53 increment 5: $4F00 -> $5100 -- listingValidateRecord/
+            # listingResolveFilename (unused by this harness) overflowed
+            # $4F00 by 297 measured bytes; $5000 (+256) would still
+            # overflow, so $5100 (+512) is the smallest round-page step
+            # that fits.
+            set(TEST_PRG_SIZE "5100")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})

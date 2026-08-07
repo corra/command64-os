@@ -46,6 +46,22 @@
 .import CasmListingName
 .import CasmListingLen
 
+; WP53 increment 5: replay validation and filename resolution. cliSourceSlotLo/
+; Hi and CasmSourceCount are cli.s's own already-established top-level
+; identity table (the same one diagnostics.s's diagPrintIncludeIdentity
+; consumes for the identical FILE_ID decode). includeCatalogRead/
+; CasmIncludeRecordStage/CasmIncludeCatalogCount/includeDeviceStrLo/Hi are
+; include.s's own catalog, already carrying exactly the resolved device and
+; prefix-stripped name WP53's header format needs -- no new catalog field.
+.import cliSourceSlotLo
+.import cliSourceSlotHi
+.import CasmSourceCount
+.import includeCatalogRead
+.import CasmIncludeRecordStage
+.import CasmIncludeCatalogCount
+.import includeDeviceStrLo
+.import includeDeviceStrHi
+
 .export listingStateInit
 .export listingCaptureInit
 .export listingMetaAppend
@@ -61,6 +77,10 @@
 .export listingClose
 .export listingDelete
 .export listingAbort
+.export listingValidateRecord
+.export listingResolveFilename
+.export CasmListResolvedName
+.export CasmListResolvedNameLen
 .export CasmListFileHandle
 .export CasmListFileSlot
 .export CasmListFileState
@@ -122,6 +142,22 @@ CasmListFilePrimary:       .res 1
 CasmListRequestLo:         .res 1
 CasmListRequestHi:         .res 1
 CasmListingOpenName:       .res CASM_LISTING_OPEN_NAME_SIZE
+
+; WP53 increment 5: replay validation and filename resolution.
+; CasmListValidExpectedByteOffLo/Hi is listingValidateRecord's own running
+; cursor -- reset to 0 alongside the replay cursor (listingReplayReset),
+; advanced by each validated record's own byte count. Together, "this
+; record's BYTEOFF equals the running expected offset" and "the running
+; offset only ever advances by exactly one record's own BYTECOUNT" are
+; WP53's "monotonic byte ranges" and "valid byte range" checks unified into
+; one comparison; see listingValidateRecord's own header for why a separate
+; upper-bound comparison against the byte-mirror store's own extent is not
+; needed. CasmListResolvedName/Len is listingResolveFilename's public
+; output.
+CasmListValidExpectedByteOffLo: .res 1
+CasmListValidExpectedByteOffHi: .res 1
+CasmListResolvedName:           .res CASM_LISTING_RESOLVED_NAME_SIZE
+CasmListResolvedNameLen:        .res 1
 
 ; WP51 increment 4: byte-mirror endpoint and buffered flush stage.
 ; CasmListingByteCursorLo/Hi is the next free offset in the byte-mirror VMM
@@ -362,8 +398,15 @@ lmaRet:
 ; capture (CasmListingState == COMPLETE) -- WP53's serializer replays only
 ; after Pass 2 agreement and PRG finalization succeed.
 ;
+; WP53 increment 5: also resets CasmListValidExpectedByteOffLo/Hi to 0 --
+; listingValidateRecord's own running byte-mirror cursor. The two resets
+; belong together: every real caller starts a fresh replay pass and
+; validates every record it reads, so there is no scenario where one
+; cursor should reset without the other.
+;
 ; Inputs:    CasmListingState == CASM_LISTING_STATE_COMPLETE
-; Outputs:   Success: A = CASM_DIAG_NONE, C clear; replay cursor = 0
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; replay cursor = 0;
+;            CasmListValidExpectedByteOffLo/Hi = 0
 ;            Failure: A = CASM_DIAG_STREAM_STATE_FAILED, C set
 ; Clobbers:  A
 ; ---------------------------------------------------------------------------
@@ -378,6 +421,8 @@ lrrOk:
     lda #0
     sta CasmListingReplayIndexLo
     sta CasmListingReplayIndexHi
+    sta CasmListValidExpectedByteOffLo
+    sta CasmListValidExpectedByteOffHi
     lda #CASM_DIAG_NONE
     clc
     rts
@@ -1178,4 +1223,238 @@ laRecordSecondary:
     rts
 laKeepPrimary:
     pla
+    rts
+
+; =============================================================================
+; WP53 increment 5: replay validation and filename resolution
+;
+; listingValidateRecord checks one already-replayed metadata record for
+; internal consistency before WP53's serializer (increment 6) formats or
+; replays anything from it. listingResolveFilename turns a record's packed
+; FILE_ID into the display name WP53's header format requires. Both raise
+; CASM_DIAG_LISTING_REPLAY_MISMATCH ($3C) on a structural disagreement, and
+; propagate CASM_DIAG_VMM_TRANSFER_FAILED unchanged from a genuine catalog
+; read failure -- WP53's own "generic VMM diagnostics on transfer failure"
+; rule, distinguishing corruption (a real bug) from a real I/O failure
+; (which is not).
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; listingValidateRecord (WP53)
+; Validate the metadata record currently in CasmVmmBuffer (as left by the
+; most recent listingReplayNext call). A structural sanity check against
+; capture-time corruption or a WP51/WP53 internal bug -- every field here
+; was already produced by this module's own capture path, never by
+; anything a legitimate source file can directly control.
+;
+; Checks, each raising CASM_DIAG_LISTING_REPLAY_MISMATCH on its own
+; disagreement:
+;   - FLAGS has no bit set outside CASM_LISTING_META_FLAG_FINAL_UNTERMINATED
+;   - RESERVED0 and both RESERVED1 bytes are zero
+;   - OFF_LO/HI + LEN does not overflow 16 bits (a self-contained bound;
+;     whether the span actually lies within the loaded source is proven
+;     later, by the serializer's own sourceReadSpanChunk call -- this
+;     module has no source.s dependency and WP53's stop conditions forbid
+;     adding one)
+;   - PC_LO/HI + BYTECOUNT_LO/HI does not overflow 16 bits
+;   - BYTEOFF_LO/HI exactly equals CasmListValidExpectedByteOffLo/Hi (0 for
+;     the first record since listingReplayReset, otherwise the previous
+;     record's own end) -- WP53's "monotonic byte ranges" and "valid byte
+;     range" checks unified into one comparison: byte-mirror spans that
+;     are exactly contiguous from zero can never exceed the store's own
+;     recorded extent, so no separate upper-bound comparison against
+;     CasmListingByteCursorLo/Hi is needed
+;   - the record's FILEID resolves to a real file (listingResolveFilename)
+;
+; Inputs:    CasmVmmBuffer holds one record, as left by listingReplayNext;
+;            listingReplayReset already called for this pass (also resets
+;            the running expected-byte-offset this routine advances)
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmListValidExpectedByteOff
+;            Lo/Hi advanced past this record's own byte-mirror span;
+;            CasmListResolvedName/Len holds its resolved display name
+;            (listingResolveFilename's own output)
+;            Fail:    C set, A = CASM_DIAG_LISTING_REPLAY_MISMATCH or a
+;            propagated CASM_DIAG_VMM_TRANSFER_FAILED; expected offset
+;            unchanged
+; Preserves: none
+; Clobbers:  A, X, Y and listingResolveFilename's own clobbers
+; ---------------------------------------------------------------------------
+listingValidateRecord:
+    ; Clears bit 0 (CASM_LISTING_META_FLAG_FINAL_UNTERMINATED); any bit
+    ; still set afterward is unknown.
+    lda CasmVmmBuffer + CASM_LISTING_META_FLAGS
+    and #%11111110
+    bne lvrMismatch
+
+    lda CasmVmmBuffer + CASM_LISTING_META_RESERVED0
+    bne lvrMismatch
+    lda CasmVmmBuffer + CASM_LISTING_META_RESERVED1
+    bne lvrMismatch
+    lda CasmVmmBuffer + CASM_LISTING_META_RESERVED1 + 1
+    bne lvrMismatch
+
+    ; Source span bound: OFF + LEN must not overflow 16 bits.
+    lda CasmVmmBuffer + CASM_LISTING_META_OFF_LO
+    clc
+    adc CasmVmmBuffer + CASM_LISTING_META_LEN
+    lda CasmVmmBuffer + CASM_LISTING_META_OFF_HI
+    adc #0
+    bcs lvrMismatch
+
+    ; Address/count bound: PC + BYTECOUNT must not overflow 16 bits.
+    lda CasmVmmBuffer + CASM_LISTING_META_PC_LO
+    clc
+    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_LO
+    lda CasmVmmBuffer + CASM_LISTING_META_PC_HI
+    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_HI
+    bcs lvrMismatch
+
+    ; Byte-mirror span: this record's own BYTEOFF must exactly equal the
+    ; running expected offset.
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTEOFF_LO
+    cmp CasmListValidExpectedByteOffLo
+    bne lvrMismatch
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTEOFF_HI
+    cmp CasmListValidExpectedByteOffHi
+    bne lvrMismatch
+
+    ; File identity must resolve.
+    lda CasmVmmBuffer + CASM_LISTING_META_FILEID
+    jsr listingResolveFilename
+    bcs lvrPropagate
+
+    ; Advance the running expected offset by this record's own byte count.
+    lda CasmListValidExpectedByteOffLo
+    clc
+    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_LO
+    sta CasmListValidExpectedByteOffLo
+    lda CasmListValidExpectedByteOffHi
+    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_HI
+    sta CasmListValidExpectedByteOffHi
+
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lvrPropagate:
+    rts                          ; listingResolveFilename already set A/C
+lvrMismatch:
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingResolveFilename (WP53)
+; Resolve a packed FILE_ID into WP53's own listing-header display name.
+; Top-level headers preserve the original CLI spelling verbatim (a direct
+; copy of the matching CasmSourceNames slot, via cli.s's own
+; cliSourceSlotLo/Hi table); included headers use the catalog's own
+; resolved decimal device, a colon, and its prefix-stripped name ("8:NAME"
+; through "11:NAME") -- WP50's frozen wording, requiring no Phase 9 catalog
+; record growth: CASM_INCLUDE_PHYS_REC_DEVICE and _NAME already hold
+; exactly these two pieces. Same FILE_ID decode diagnostics.s's own
+; diagPrintIncludeIdentity already uses, and the same device-string table
+; (includeDeviceStrLo/Hi) include.s's own includeSynthesizeOpenName uses --
+; this routine builds into its own buffer rather than reusing
+; CasmIncludeOpenName, which is a transient scratch owned by a completely
+; different call path (a catalog-load miss) that could be live at an
+; unrelated time.
+;
+; Inputs:    A = packed FILE_ID (bit 7 frame kind, bits 0-6 id)
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmListResolvedName
+;            holds the null-terminated display name, CasmListResolvedNameLen
+;            its length (excluding the null)
+;            Fail:    C set, A = CASM_DIAG_LISTING_REPLAY_MISMATCH (id out
+;            of range for its own kind) or CASM_DIAG_VMM_TRANSFER_FAILED
+;            (propagated from a rejected includeCatalogRead)
+; Preserves: none
+; Clobbers:  A, X, Y, CasmPtr0Lo/Hi, and includeCatalogRead's own clobbers
+; ---------------------------------------------------------------------------
+listingResolveFilename:
+    pha
+    and #CASM_DIAG_FILEID_FRAME_FLAG
+    bne lrfFrame
+
+    ; Top level: verbatim copy of CasmSourceNames[id].
+    pla
+    and #CASM_DIAG_FILEID_ID_MASK
+    cmp CasmSourceCount
+    bcs lrfMismatch
+    tax
+    lda cliSourceSlotLo, x
+    sta CasmPtr0Lo
+    lda cliSourceSlotHi, x
+    sta CasmPtr0Hi
+    ldy #0
+lrfTopLoop:
+    lda (CasmPtr0Lo), y
+    sta CasmListResolvedName, y
+    beq lrfTopDone
+    iny
+    cpy #CASM_LISTING_RESOLVED_NAME_SIZE - 1
+    bcc lrfTopLoop
+    lda #0
+    sta CasmListResolvedName, y
+lrfTopDone:
+    sty CasmListResolvedNameLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lrfFrame:
+    pla
+    and #CASM_DIAG_FILEID_ID_MASK
+    cmp CasmIncludeCatalogCount
+    bcs lrfMismatch
+    jsr includeCatalogRead
+    bcs lrfPropagate
+
+    ; Resolved decimal device digit string.
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_DEVICE
+    sec
+    sbc #CASM_DEVICE_MIN
+    tax
+    lda includeDeviceStrLo, x
+    sta CasmPtr0Lo
+    lda includeDeviceStrHi, x
+    sta CasmPtr0Hi
+    ldy #0
+lrfDeviceLoop:
+    lda (CasmPtr0Lo), y
+    beq lrfDeviceDone
+    sta CasmListResolvedName, y
+    iny
+    jmp lrfDeviceLoop
+lrfDeviceDone:
+    lda #CASM_PETSCII_COLON
+    sta CasmListResolvedName, y
+    iny
+
+    ; Prefix-stripped catalog name, continuing the same destination index
+    ; (now in X: indirect-indexed addressing only supports Y, and Y is
+    ; needed again to re-start at the source's own index 0).
+    tya
+    tax
+    ldy #0
+lrfNameLoop:
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_NAME, y
+    sta CasmListResolvedName, x
+    beq lrfNameDone
+    iny
+    inx
+    cpx #CASM_LISTING_RESOLVED_NAME_SIZE - 1
+    bcc lrfNameLoop
+    lda #0
+    sta CasmListResolvedName, x
+lrfNameDone:
+    stx CasmListResolvedNameLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lrfPropagate:
+    rts                          ; includeCatalogRead already set A/C
+lrfMismatch:
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
     rts

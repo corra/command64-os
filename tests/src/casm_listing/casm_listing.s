@@ -86,6 +86,14 @@
 .export fileClose
 .export CasmListingName
 .export CasmListingLen
+.export CasmSourceCount
+.export cliSourceSlotLo
+.export cliSourceSlotHi
+.export CasmIncludeCatalogCount
+.export CasmIncludeRecordStage
+.export includeCatalogRead
+.export includeDeviceStrLo
+.export includeDeviceStrHi
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -1674,6 +1682,19 @@ stclStubNone:
     rts
 
 ; ---------------------------------------------------------------------------
+; includeCatalogRead (stub, WP53 increment 5)
+; listing.s's new listingResolveFilename references this (include.s); this
+; harness links neither and never calls listingResolveFilename. Unreachable
+; in practice (CasmIncludeCatalogCount stays 0 above, so any real call
+; would already have taken the "id out of range" path), but still a
+; required link symbol.
+; ---------------------------------------------------------------------------
+includeCatalogRead:
+    lda #CASM_DIAG_VMM_TRANSFER_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; fileClose (stub, WP53 increment 4)
 ; listing.s's new listingClose references this (fileio.s); this harness
 ; links resources.s already (for resourceRegisterHandle, which
@@ -1688,6 +1709,12 @@ fileClose:
     rts
 
 .segment "RODATA"
+
+; WP53 increment 5: listing.s's new listingResolveFilename references these
+; (include.s); this harness links neither and never reaches the code path
+; that indexes them (see includeCatalogRead's own stub comment above).
+includeDeviceStrLo: .byte 0, 0, 0, 0
+includeDeviceStrHi: .byte 0, 0, 0, 0
 
 passMsg:
     .byte "CASM LISTING: PASS", PetCr, 0
@@ -1712,6 +1739,16 @@ CasmSourceCompletedLineHi:  .res 1
 ; or read by this harness's own fixtures.
 CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
 CasmListingLen:  .res 1
+; WP53 increment 5: listing.s's new listingResolveFilename references these
+; (cli.s/include.s); this harness links neither. Never called by this
+; harness's own fixtures (only WP51's capture API), so trivial stand-ins
+; suffice -- CasmSourceCount stays 0, so any real call would take the
+; "id out of range" path rather than reading through cliSourceSlotLo/Hi.
+CasmSourceCount:  .res 1
+cliSourceSlotLo:  .res 1
+cliSourceSlotHi:  .res 1
+CasmIncludeCatalogCount: .res 1
+CasmIncludeRecordStage:  .res CASM_INCLUDE_PHYS_REC_SIZE
 LoopHi:    .res 1
 SlotCount: .res 1
 SlotTable: .res 8

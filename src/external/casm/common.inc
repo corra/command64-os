@@ -1183,4 +1183,14 @@ CASM_LISTFILE_DELETE_PENDING     = $01
 CASM_LISTING_OPEN_NAME_SIZE = $44
 .assert CASM_LISTING_OPEN_NAME_SIZE >= CASM_FILENAME_MAX + 3 + 1, error, "CASM listing open-name buffer too small for CasmListingName plus the embedded @0: marker"
 
+; WP53 increment 5: listingResolveFilename's output buffer. An included
+; header's longest possible form is a 2-digit device ("10"/"11") + colon +
+; the longest catalog name (CASM_INCLUDE_FILENAME_MAX) + null: 2 + 1 + 63 +
+; 1 = 67. A top-level header's longest form is CASM_FILENAME_BUFFER_SIZE
+; (64). $44 (68) covers both with the same round value CASM_LISTING_OPEN_
+; NAME_SIZE already uses.
+CASM_LISTING_RESOLVED_NAME_SIZE = $44
+.assert CASM_LISTING_RESOLVED_NAME_SIZE >= 2 + 1 + CASM_INCLUDE_FILENAME_MAX + 1, error, "CASM listing resolved-name buffer too small for an included header"
+.assert CASM_LISTING_RESOLVED_NAME_SIZE >= CASM_FILENAME_BUFFER_SIZE, error, "CASM listing resolved-name buffer too small for a top-level header"
+
 .endif

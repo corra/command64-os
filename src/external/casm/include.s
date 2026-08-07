@@ -68,6 +68,11 @@
 .export includeEventReplay
 .export includeReplayReset
 .export includeReplayFinalCheck
+; WP53 increment 5: listing.s's listingResolveFilename reuses this table
+; directly rather than duplicating it, matching includeSynthesizeOpenName's
+; own device-string formatting exactly.
+.export includeDeviceStrLo
+.export includeDeviceStrHi
 
 .export CasmIncludeMetaSlot
 .export CasmIncludeCatalogCount
