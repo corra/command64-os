@@ -954,6 +954,126 @@ This section provides exhaustive examples demonstrating every command and syntax
     -P 2000           ; Set virtual PC to $2000 and step-over
     ```
 
+### 16. REU Extended Memory (`XA`, `XD`, `XM`, `XS`)
+
+These examples assume Command64 was booted with an REU available. Allocation
+addresses and global page counts are illustrative; `SEG`, `BANK`, `ALLOC`, and
+`FREE` can differ when other OS components already own pages.
+
+* **Check VMM Availability (`XS`)**:
+
+    ```text
+    -XS
+    VMM ACTIVE
+    PAGES TOTAL=1000 ALLOC=0002 FREE=0FFE
+    NONE
+    ```
+
+    The counters are hexadecimal counts of 4 KiB pages. `NONE` means this DEBUG
+    session owns no handles, not that the global allocated count is zero.
+
+* **Allocate and Inspect 4 KiB (`XA`, `XS handle`)**:
+
+    ```text
+    -XA 0100
+    00: SEG=02 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+    -XS 0
+    00: SEG=02 BANK=00 PARA=0100 PAGES=01 SIZE=1000
+    ```
+
+    `$0100` paragraphs equal `$1000` bytes and occupy one VMM page. DEBUG assigns
+    the lowest free handle. Later commands select handle `0`; they do not take
+    the displayed `SEG` and `BANK` as operands.
+
+* **Write to REU and Read Back (`XM ... W`, `XM ... R`)**:
+
+    ```text
+    -E 6000 11 22 33 44 55 66 77 88
+    -XM 0 0000 6000 0008 W
+    XM XFER=0008 OK
+    -E 6000 00 00 00 00 00 00 00 00
+    -XM 0 0000 6000 0008 R
+    XM XFER=0008 OK
+    -D 6000 L 0008
+    6000: 11 22 33 44 55 66 77 88
+    ```
+
+    `W` copies eight bytes from C64 RAM into allocation offsets `$0000-$0007`.
+    After the C64 bytes are cleared, `R` restores them from REU. `XFER=0008` is
+    the exact number of bytes moved, not the allocation size.
+
+* **Use Equivalent Flat and Page-Relative Offsets**:
+
+    ```text
+    -XA 0200
+    01: SEG=03 BANK=00 PARA=0200 PAGES=02 SIZE=2000
+    -E 6100 DE AD BE EF
+    -XM 1 1234 6100 0004 W
+    XM XFER=0004 OK
+    -XM 1 1:234 6200 0004 R
+    XM XFER=0004 OK
+    -D 6200 L 0004
+    6200: DE AD BE EF
+    ```
+
+    `1234` and `1:234` identify the same allocation-relative byte because
+    `$1 * $1000 + $234 = $1234`.
+
+* **Transfer More Than One Internal Chunk**:
+
+    ```text
+    -XM 1 0000 6000 0300 W
+    XM XFER=0300 OK
+    ```
+
+    `$0300` bytes require three bounded chunks. DEBUG dispatches them internally
+    and reports one total; users do not split transfers at 256-byte boundaries.
+
+* **Accept Exact Ends and Reject Overflows**:
+
+    Handle `0` has exact offsets `$0000-$0FFF`:
+
+    ```text
+    -XM 0 0FF0 6000 0010 R
+    XM XFER=0010 OK
+    -XM 0 0FF0 6000 0011 R
+    ERROR
+    -XM 0 0000 FF00 0100 R
+    XM XFER=0100 OK
+    -XM 0 0000 FF00 0101 R
+    ERROR
+    ```
+
+    The valid windows end exactly at their exclusive `$1000` and `$10000`
+    boundaries. Adding one byte would exceed the allocation or wrap C64
+    addressing through `$0000`, so validation rejects it before DMA.
+
+* **Release and Confirm an Inactive Handle (`XD`)**:
+
+    ```text
+    -XD 0
+    -XS 0
+    ERROR
+    -XS
+    VMM ACTIVE
+    PAGES TOTAL=1000 ALLOC=0004 FREE=0FFC
+    01: SEG=03 BANK=00 PARA=0200 PAGES=02 SIZE=2000
+    ```
+
+    `XD` is silent on success. Handle `0` becomes inactive while handle `1`
+    remains listed. The next allocation reuses handle `0` before a higher slot.
+
+* **Exit with Automatic Cleanup (`Q`)**:
+
+    ```text
+    -Q
+    C64:>
+    ```
+
+    `Q` frees every active DEBUG allocation before returning to the shell. If a
+    release fails, DEBUG prints `ERROR` and remains open so `XS` can identify
+    surviving records and cleanup can be retried.
+
 ---
 
 ## Processor Status Register Bits
@@ -1065,7 +1185,7 @@ C64 `DEBUG` omits the `=` prefix. The entry address is always the first bare hex
 | **Numeric output radix** | Always hexadecimal; prefix `0x` not used. | Same — all values are hexadecimal, no prefix. |
 | **`D` row width** | 16 bytes per row. | 8 bytes per row (optimized for the 40-column C64 display). |
 | **PETSCII character column** | ASCII character column beside hex bytes. | PETSCII character column beside hex bytes (printable PETSCII `$20–$7E`). |
-| **Extended-memory commands** | `XA`, `XD`, `XM`, and `XS` operate on EMS handles and pages. | The command names are retained, but they operate on Commodore REU storage through Command64 VMM services. Handles and address semantics are Command64-specific; current `XM` performs preflight only. |
+| **Extended-memory commands** | `XA`, `XD`, `XM`, and `XS` operate on EMS handles and pages. | The command names are retained, but they operate on Commodore REU storage through Command64 VMM services. Handles and address semantics are Command64-specific; `XM` validates both windows and performs bounded chunked transfers. |
 
 ---
 

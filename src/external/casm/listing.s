@@ -35,6 +35,47 @@
 .import CasmSourceCompletedLineHi
 .import CasmPc
 
+; WP53 increment 4: the `.LST` file's own I/O. resourceRegisterHandle and
+; fileClose (fileio.s) are fully generic already -- neither knows or cares
+; whether the handle they manage is the PRG output or the listing file -- so
+; the create/close paths below reuse them directly instead of duplicating
+; their registry/close logic. CasmListingName/Len (cli.s, WP53 increment 1)
+; is this module's only source for the real on-disk name.
+.import resourceRegisterHandle
+.import fileClose
+.import CasmListingName
+.import CasmListingLen
+
+; WP53 increment 5: replay validation and filename resolution. cliSourceSlotLo/
+; Hi and CasmSourceCount are cli.s's own already-established top-level
+; identity table (the same one diagnostics.s's diagPrintIncludeIdentity
+; consumes for the identical FILE_ID decode). includeCatalogRead/
+; CasmIncludeRecordStage/CasmIncludeCatalogCount/includeDeviceStrLo/Hi are
+; include.s's own catalog, already carrying exactly the resolved device and
+; prefix-stripped name WP53's header format needs -- no new catalog field.
+.import cliSourceSlotLo
+.import cliSourceSlotHi
+.import CasmSourceCount
+.import includeCatalogRead
+.import CasmIncludeRecordStage
+.import CasmIncludeCatalogCount
+.import includeDeviceStrLo
+.import includeDeviceStrHi
+
+; WP53 increment 6: formatters and aggregate serializer. sourceReadSpanChunk
+; (source.s, WP53 increment 2) is the only source-byte access this module
+; ever performs -- no direct source-slot/VMM-cursor access, matching every
+; earlier increment's own "no source I/O" discipline. CasmSourceState/
+; CASM_SOURCE_STATE_CLOSED is source.s's own traversal-closed signal
+; (sourceClose); CasmOutputCommitted/CASM_OUTPUT_COMMITTED is fileio.s's own
+; PRG-commit signal (WP53 increment 3, outputCommit) -- both are
+; listingWriteFile's own required preconditions, restated from the plan's
+; own "Serializer" section.
+.import sourceReadSpanChunk
+.import CasmSourceState
+.import CasmOutputCommitted
+.import CasmIoBuffer
+
 .export listingStateInit
 .export listingCaptureInit
 .export listingMetaAppend
@@ -44,6 +85,25 @@
 .export listingMirrorByte
 .export listingCommitLine
 .export listingCaptureFinalize
+.export listingFileInit
+.export listingCreate
+.export listingWrite
+.export listingClose
+.export listingDelete
+.export listingAbort
+.export listingValidateRecord
+.export listingResolveFilename
+.export CasmListResolvedName
+.export CasmListResolvedNameLen
+.export listingWriteFile
+.export CasmListFileHandle
+.export CasmListFileSlot
+.export CasmListFileState
+.export CasmListFileOpened
+.export CasmListFileValid
+.export CasmListFileCommitted
+.export CasmListFileDeletePending
+.export CasmListingOpenName
 .export CasmListingState
 .export CasmListingMetaVmmSlot
 .export CasmListingByteVmmSlot
@@ -78,6 +138,107 @@ CasmListingRecordCountLo: .res 1
 CasmListingRecordCountHi: .res 1
 CasmListingReplayIndexLo: .res 1
 CasmListingReplayIndexHi: .res 1
+
+; WP53 increment 4: the `.LST` file's own I/O lifecycle -- see
+; CASM_LISTFILE_*'s own header comment (common.inc) for why this is a
+; separate state block from CasmListingState above. CasmListFilePrimary/
+; CasmListRequestLo/Hi are private scratch, not exported: mirrors
+; fileio.s's own CasmFilePrimary/CasmRequestLo/Hi precedent exactly (a
+; caller-invisible detail of listingAbort's primary-diagnostic preservation
+; and listingWrite's short-write detection, respectively).
+CasmListFileHandle:        .res 1
+CasmListFileSlot:          .res 1
+CasmListFileState:         .res 1
+CasmListFileOpened:        .res 1
+CasmListFileValid:         .res 1
+CasmListFileCommitted:     .res 1
+CasmListFileDeletePending: .res 1
+CasmListFilePrimary:       .res 1
+CasmListRequestLo:         .res 1
+CasmListRequestHi:         .res 1
+CasmListingOpenName:       .res CASM_LISTING_OPEN_NAME_SIZE
+
+; WP53 increment 5: replay validation and filename resolution.
+; CasmListValidExpectedByteOffLo/Hi is listingValidateRecord's own running
+; cursor -- reset to 0 alongside the replay cursor (listingReplayReset),
+; advanced by each validated record's own byte count. Together, "this
+; record's BYTEOFF equals the running expected offset" and "the running
+; offset only ever advances by exactly one record's own BYTECOUNT" are
+; WP53's "monotonic byte ranges" and "valid byte range" checks unified into
+; one comparison; see listingValidateRecord's own header for why a separate
+; upper-bound comparison against the byte-mirror store's own extent is not
+; needed. CasmListResolvedName/Len is listingResolveFilename's public
+; output.
+CasmListValidExpectedByteOffLo: .res 1
+CasmListValidExpectedByteOffHi: .res 1
+CasmListResolvedName:           .res CASM_LISTING_RESOLVED_NAME_SIZE
+CasmListResolvedNameLen:        .res 1
+
+; listingValidateRecord's own stash of this record's BYTECOUNT_LO/HI, saved
+; before calling listingResolveFilename -- for a frame (included) FILE_ID,
+; that call reaches includeCatalogRead, which overwrites CasmVmmBuffer as its
+; own VMM transfer scratch (its header says so explicitly). Reading
+; BYTECOUNT back out of CasmVmmBuffer after that call returns would read
+; whatever includeCatalogRead's own transfer left behind instead of this
+; record's real byte count.
+CasmListValidByteCountLo:       .res 1
+CasmListValidByteCountHi:       .res 1
+
+; WP53 increment 6: formatters and aggregate serializer.
+;
+; CasmListCurrentRecord is a private 16-byte snapshot of the record
+; currently being formatted, taken from CasmVmmBuffer right after
+; listingValidateRecord accepts it -- every row formatter reads fields from
+; here instead, because formatting a row calls sourceReadSpanChunk and the
+; byte-mirror reader below, both of which overwrite CasmVmmBuffer via the
+; same vmmWindowRead contract listingReplayNext itself uses.
+;
+; CasmListRowBuffer/CasmListRowCursor is one row under construction: the
+; cursor is the next free column offset (0-40), reset to 0 at the start of
+; every row, and every row formatter advances it as it writes. Buffers:
+; current record 16 bytes, row CASM_LISTING_ROW_SIZE bytes (40 + CR) -- the
+; plan's own "Buffers" section.
+;
+; CasmListAggregateLen is how many bytes of CasmIoBuffer (reused as the
+; 256-byte aggregate only after traversal closes, per the plan) are already
+; filled and not yet flushed via listingWrite.
+;
+; CasmListLastFileId/CasmListHaveLastFileId track the most recently emitted
+; row's own packed file identity, so a file-header (and its continuation
+; rows) is emitted exactly when it changes -- including reverting to an
+; already-seen identity, matching "returning from an include emits a new
+; file-transition header before the next parent row." HaveLastFileId
+; distinguishes "no row emitted yet" (always emit a header) from "last
+; row's identity happened to be the same packed byte."
+;
+; CasmListRunPcLo/Hi, CasmListRunByteOffLo/Hi, CasmListRunByteCountLo/Hi,
+; CasmListRunSrcOffLo/Hi, CasmListRunSrcLen are one record's own running
+; cursors while its rows are emitted: PC/ByteOff/ByteCount advance together
+; as byte-continuation rows consume the emitted-byte mirror; SrcOff/SrcLen
+; advance together, independently, as source-continuation rows consume the
+; source span -- the plan's own "byte and source continuations are
+; independent" rule. CasmListLastChunkLen and CasmListHeaderFileId/Offset
+; are private scratch for the chunking loops themselves; CasmListCopyCount
+; is lwPutRawBytes/lwAppendRow's own private copy-loop counter.
+CasmListCurrentRecord:      .res CASM_LISTING_META_REC_SIZE
+CasmListRowBuffer:          .res CASM_LISTING_ROW_SIZE
+CasmListRowCursor:          .res 1
+CasmListAggregateLen:       .res 1
+CasmListLastFileId:         .res 1
+CasmListHaveLastFileId:     .res 1
+CasmListRunPcLo:            .res 1
+CasmListRunPcHi:            .res 1
+CasmListRunByteOffLo:       .res 1
+CasmListRunByteOffHi:       .res 1
+CasmListRunByteCountLo:     .res 1
+CasmListRunByteCountHi:     .res 1
+CasmListRunSrcOffLo:        .res 1
+CasmListRunSrcOffHi:        .res 1
+CasmListRunSrcLen:          .res 1
+CasmListLastChunkLen:       .res 1
+CasmListHeaderFileId:       .res 1
+CasmListHeaderOffset:       .res 1
+CasmListCopyCount:          .res 1
 
 ; WP51 increment 4: byte-mirror endpoint and buffered flush stage.
 ; CasmListingByteCursorLo/Hi is the next free offset in the byte-mirror VMM
@@ -318,8 +479,15 @@ lmaRet:
 ; capture (CasmListingState == COMPLETE) -- WP53's serializer replays only
 ; after Pass 2 agreement and PRG finalization succeed.
 ;
+; WP53 increment 5: also resets CasmListValidExpectedByteOffLo/Hi to 0 --
+; listingValidateRecord's own running byte-mirror cursor. The two resets
+; belong together: every real caller starts a fresh replay pass and
+; validates every record it reads, so there is no scenario where one
+; cursor should reset without the other.
+;
 ; Inputs:    CasmListingState == CASM_LISTING_STATE_COMPLETE
-; Outputs:   Success: A = CASM_DIAG_NONE, C clear; replay cursor = 0
+; Outputs:   Success: A = CASM_DIAG_NONE, C clear; replay cursor = 0;
+;            CasmListValidExpectedByteOffLo/Hi = 0
 ;            Failure: A = CASM_DIAG_STREAM_STATE_FAILED, C set
 ; Clobbers:  A
 ; ---------------------------------------------------------------------------
@@ -334,6 +502,8 @@ lrrOk:
     lda #0
     sta CasmListingReplayIndexLo
     sta CasmListingReplayIndexHi
+    sta CasmListValidExpectedByteOffLo
+    sta CasmListValidExpectedByteOffHi
     lda #CASM_DIAG_NONE
     clc
     rts
@@ -743,3 +913,1448 @@ lcfNoSidecar:
     clc
 lcfRet:
     rts
+
+; =============================================================================
+; WP53 increment 4: `.LST` file ownership and I/O
+;
+; Everything below is dedicated to the real on-disk listing file: creating
+; it (with CBM DOS's native replace-on-open behavior), writing to it,
+; closing it, deleting it, and a best-effort abort. All five map directly to
+; CASM_DIAG_LISTING_CREATE_FAILED/WRITE_FAILED/CLOSE_FAILED/DELETE_FAILED/
+; SHORT_WRITE ($3D-$41). WP53 links every routine here but adds no
+; production call site -- `/L` stays rejected until WP54, which also owns
+; calling listingCreate/listingWrite/listingClose/outputCommit in the real
+; Pass 2 tail, in the plan's own required order (PRG committed before any
+; listing write).
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; listingFileInit (WP53)
+; Initialize all `.LST` file I/O state to closed/none. Does not touch
+; CasmListingState or any WP51 capture field -- a wholly separate lifecycle,
+; see CASM_LISTFILE_*'s own header comment (common.inc).
+;
+; Inputs:    none
+; Outputs:   A = CASM_DIAG_NONE, C clear, Z set
+; Preserves: X, Y
+; Clobbers:  A, processor flags
+; ---------------------------------------------------------------------------
+listingFileInit:
+    lda #CASM_INVALID_HANDLE
+    sta CasmListFileHandle
+    lda #CASM_INVALID_SLOT
+    sta CasmListFileSlot
+    lda #CASM_FILE_STATE_CLOSED
+    sta CasmListFileState
+    lda #0
+    sta CasmListFileOpened
+    sta CasmListFileValid
+    sta CasmListFileCommitted
+    sta CasmListFileDeletePending
+    sta CasmListRequestLo
+    sta CasmListRequestHi
+    sta CasmListFilePrimary
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; listingBuildOpenName (private, WP53)
+; Build CasmListingOpenName from CasmListingName with CBM DOS's native
+; "@0:" replace marker inserted immediately after a device-prefix colon, or
+; prepended if CasmListingName has none -- WP50's frozen file-ownership
+; resolution: "<device-digits>:@0:<basename>.LST" or "@0:<basename>.LST".
+; No existence probe and no create-vs-replace branch: the drive itself
+; replaces an existing same-name file transparently, the same behavior
+; test_casm_listwrite proves through the real OS/VICE path.
+;
+; A CasmListingName can contain at most one colon (cliDeriveListingName only
+; ever copies a colon from a source name's own leading device prefix, the
+; sole position that grammar allows), so the first colon found, if any, is
+; unambiguously the device prefix -- no scan-to-last-colon logic is needed
+; here, unlike cliDeriveOutputName/cliDeriveListingName's own dot scans.
+;
+; Inputs:    CasmListingName/CasmListingLen already derived (WP53
+;            increment 1)
+; Outputs:   CasmListingOpenName holds the null-terminated open name
+; Preserves: none
+; Clobbers:  A, X, Y
+; ---------------------------------------------------------------------------
+listingBuildOpenName:
+    ldx #0
+lbonScan:
+    cpx CasmListingLen
+    beq lbonNoColon
+    lda CasmListingName, x
+    cmp #CASM_PETSCII_COLON
+    beq lbonFoundColon
+    inx
+    jmp lbonScan
+lbonFoundColon:
+    inx                           ; X = index right after the colon
+    jmp lbonCopyHead
+lbonNoColon:
+    ldx #0
+lbonCopyHead:
+    ; Copy CasmListingName[0..X-1] verbatim into CasmListingOpenName[0..X-1].
+    stx CasmListRequestLo          ; stash split point
+    ldy #0
+lbonHeadLoop:
+    cpy CasmListRequestLo
+    beq lbonMarker
+    lda CasmListingName, y
+    sta CasmListingOpenName, y
+    iny
+    jmp lbonHeadLoop
+lbonMarker:
+    ; Y == CasmListRequestLo here; write '@','0',':' at that offset.
+    lda #CASM_PETSCII_AT
+    sta CasmListingOpenName, y
+    iny
+    lda #CASM_PETSCII_DIGIT_0
+    sta CasmListingOpenName, y
+    iny
+    lda #CASM_PETSCII_COLON
+    sta CasmListingOpenName, y
+    iny
+    ; Copy the remainder of CasmListingName[X..] (including its null) from
+    ; CasmListRequestLo onward into CasmListingOpenName starting at Y.
+    ldx CasmListRequestLo
+lbonTailLoop:
+    lda CasmListingName, x
+    sta CasmListingOpenName, y
+    beq lbonDone
+    inx
+    iny
+    jmp lbonTailLoop
+lbonDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; listingCreate (WP53)
+; Create (or transparently replace) the real `.LST` file and register its
+; handle. Listing type is SEQ, always write mode.
+;
+; Inputs:    CasmListFileState == CASM_FILE_STATE_CLOSED; CasmListingName/
+;            Len already derived
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmListFileHandle/Slot
+;                     valid; CasmListFileState = OPEN; Opened/Valid = true
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED (bad
+;                     precondition state) or CASM_DIAG_LISTING_CREATE_FAILED
+;                     (rejected DOS_OPEN_FILE or registration)
+; Preserves: none
+; Clobbers:  A, X, Y, HexValLo/Hi, FileHandle, OS API volatile state
+; Scratch:   CasmValue1Lo
+; ---------------------------------------------------------------------------
+listingCreate:
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_CLOSED
+    bne lcrBadState
+    jsr listingBuildOpenName
+    lda #CASM_FILE_MODE_WRITE
+    sta HexValLo
+    lda #CASM_PETSCII_S
+    sta HexValHi
+    ldx #<CasmListingOpenName
+    ldy #>CasmListingOpenName
+    lda #DOS_OPEN_FILE
+    jsr OS_API
+    bcs lcrCreateFailed
+    sta CasmValue1Lo
+    jsr resourceRegisterHandle
+    bcs lcrRegistrationFailed
+    stx CasmListFileSlot
+    lda CasmValue1Lo
+    sta CasmListFileHandle
+    lda #CASM_FILE_STATE_OPEN
+    sta CasmListFileState
+    lda #CASM_LISTFILE_OPENED
+    sta CasmListFileOpened
+    lda #CASM_LISTFILE_VALID
+    sta CasmListFileValid
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lcrRegistrationFailed:
+    lda CasmValue1Lo
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    lda #CASM_DIAG_LISTING_CREATE_FAILED
+    sec
+    rts
+lcrCreateFailed:
+    lda #CASM_DIAG_LISTING_CREATE_FAILED
+    sec
+    rts
+lcrBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingWrite (WP53)
+; Write one bounded block to the managed listing output and reject short
+; writes. Mirrors fileio.s's fileWrite exactly, targeting the listing
+; file's own handle/state instead of the PRG output's.
+;
+; Inputs:    X/Y = source pointer (low/high); CasmIoLenLo/Hi = requested
+;            byte count; CasmListFileState == CASM_FILE_STATE_OPEN
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmIoLenLo/Hi = actual
+;                     byte count (== requested)
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED,
+;                     CASM_DIAG_LISTING_WRITE_FAILED, or
+;                     CASM_DIAG_LISTING_SHORT_WRITE; the latter two also set
+;                     CasmListFileValid = CASM_LISTFILE_INVALID
+; Preserves: none
+; Clobbers:  A, X, Y, HexValLo/Hi, FileHandle, OS API volatile state
+; ---------------------------------------------------------------------------
+listingWrite:
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_OPEN
+    bne lwrBadState
+    lda CasmIoLenLo
+    sta CasmListRequestLo
+    sta HexValLo
+    lda CasmIoLenHi
+    sta CasmListRequestHi
+    sta HexValHi
+    lda CasmListFileHandle
+    sta FileHandle
+    lda #DOS_WRITE_FILE
+    jsr OS_API
+    php
+    lda HexValLo
+    sta CasmIoLenLo
+    lda HexValHi
+    sta CasmIoLenHi
+    plp
+    bcs lwrWriteFailed
+    lda CasmIoLenLo
+    cmp CasmListRequestLo
+    bne lwrShortWrite
+    lda CasmIoLenHi
+    cmp CasmListRequestHi
+    bne lwrShortWrite
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwrWriteFailed:
+    lda #CASM_LISTFILE_INVALID
+    sta CasmListFileValid
+    lda #CASM_DIAG_LISTING_WRITE_FAILED
+    sec
+    rts
+lwrShortWrite:
+    lda #CASM_LISTFILE_INVALID
+    sta CasmListFileValid
+    lda #CASM_DIAG_LISTING_SHORT_WRITE
+    sec
+    rts
+lwrBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingClose (WP53)
+; Close and release the listing handle through fileio.s's generic fileClose.
+; A failed close leaves CasmListFileState == CLOSE_FAILED and the
+; handle/slot registered, exactly as fileio.s's own close paths do -- a
+; later retry (via a direct call or through listingAbort) attempts the same
+; close again since state never reaches CLOSED.
+;
+; Inputs:    CasmListFileState == CASM_FILE_STATE_OPEN
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; handle/slot released,
+;                     state CLOSED
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED (bad
+;                     precondition state) or CASM_DIAG_LISTING_CLOSE_FAILED
+;                     (state becomes CLOSE_FAILED)
+; Preserves: none
+; Clobbers:  A, X, Y and fileClose clobbers
+; ---------------------------------------------------------------------------
+listingClose:
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_OPEN
+    bne lclBadState
+    lda CasmListFileHandle
+    ldx CasmListFileSlot
+    ldy #CASM_DIAG_LISTING_CLOSE_FAILED
+    jsr fileClose
+    bcs lclFailed
+    lda #CASM_INVALID_HANDLE
+    sta CasmListFileHandle
+    lda #CASM_INVALID_SLOT
+    sta CasmListFileSlot
+    lda #CASM_FILE_STATE_CLOSED
+    sta CasmListFileState
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lclFailed:
+    lda #CASM_FILE_STATE_CLOSE_FAILED
+    sta CasmListFileState
+    lda #CASM_DIAG_LISTING_CLOSE_FAILED
+    sec
+    rts
+lclBadState:
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingDelete (WP53)
+; Delete CasmListingName (the plain name -- never the "@0:"-embedded open
+; name, which exists only to reach DOS_OPEN_FILE) through the native file
+; service. A dedicated routine rather than reusing fileio.s's own
+; fileDelete: that routine's failure diagnostic is the PRG-output-specific
+; CASM_DIAG_OUTPUT_DELETE_FAILED, not the listing-specific $40 WP53's own
+; diagnostic contiguity requires.
+;
+; Inputs:    CasmListingName already derived
+; Outputs:   C clear, A = CASM_DIAG_NONE on success
+;            C set, A = CASM_DIAG_LISTING_DELETE_FAILED on failure
+; Preserves: none
+; Clobbers:  A, X, Y, OS API volatile state
+; ---------------------------------------------------------------------------
+listingDelete:
+    ldx #<CasmListingName
+    ldy #>CasmListingName
+    lda #DOS_DELETE_FILE
+    jsr OS_API
+    bcs ldlFailed
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+ldlFailed:
+    lda #CASM_DIAG_LISTING_DELETE_FAILED
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingAbort (WP53)
+; Best-effort close and delete for an incomplete listing file, preserving
+; the caller's primary diagnostic -- mirrors fileio.s's outputAbort exactly,
+; with one addition: a committed listing (CasmListFileCommitted ==
+; CASM_LISTFILE_COMMITTED) is never deleted, regardless of
+; CasmListFileOpened. WP53 links this routine but calls it from no
+; production site; WP54 owns wiring it into the real failure path.
+;
+; A failed close returns immediately without attempting delete (state stays
+; CLOSE_FAILED, so a repeated call retries the close). A failed delete sets
+; CasmListFileDeletePending and leaves CasmListFileOpened true, so a
+; repeated call retries the delete; CasmListFileDeletePending itself is
+; observability, not load-bearing for that retry -- CasmListFileOpened
+; alone already drives it, exactly as CasmOutputCreated alone already
+; drives outputAbort's own retry.
+;
+; Inputs:    A = primary CASM_DIAG_* value, or CASM_DIAG_NONE
+; Outputs:   A = preserved primary, or first cleanup diagnostic if none
+;            C set when returned A is nonzero, clear otherwise
+; Preserves: none
+; Clobbers:  A, X, Y and listingClose/listingDelete clobbers
+; Scratch:   CasmListFilePrimary
+; ---------------------------------------------------------------------------
+listingAbort:
+    sta CasmListFilePrimary
+    lda CasmListFileState
+    cmp #CASM_FILE_STATE_CLOSED
+    beq laDelete
+    jsr listingClose
+    bcc laDelete
+    ; listingClose already set CasmListFileState/A/C for a close failure.
+    jsr laRecordSecondary
+    jmp laReturn
+
+laDelete:
+    lda CasmListFileCommitted
+    bne laReturn                  ; WP53: committed listings are never deleted
+    lda CasmListFileOpened
+    beq laReturn
+    jsr listingDelete
+    bcc laDeleteDone
+    pha
+    lda #CASM_LISTFILE_DELETE_PENDING
+    sta CasmListFileDeletePending
+    pla
+    jsr laRecordSecondary
+    jmp laReturn
+laDeleteDone:
+    lda #CASM_LISTFILE_NOT_OPENED
+    sta CasmListFileOpened
+    lda #CASM_LISTFILE_DELETE_NOT_PENDING
+    sta CasmListFileDeletePending
+
+laReturn:
+    lda CasmListFilePrimary
+    beq laSuccess
+    sec
+    rts
+laSuccess:
+    clc
+    rts
+
+; Input: A = secondary diagnostic. Preserve a nonzero primary.
+laRecordSecondary:
+    pha
+    lda CasmListFilePrimary
+    bne laKeepPrimary
+    pla
+    sta CasmListFilePrimary
+    rts
+laKeepPrimary:
+    pla
+    rts
+
+; =============================================================================
+; WP53 increment 5: replay validation and filename resolution
+;
+; listingValidateRecord checks one already-replayed metadata record for
+; internal consistency before WP53's serializer (increment 6) formats or
+; replays anything from it. listingResolveFilename turns a record's packed
+; FILE_ID into the display name WP53's header format requires. Both raise
+; CASM_DIAG_LISTING_REPLAY_MISMATCH ($3C) on a structural disagreement, and
+; propagate CASM_DIAG_VMM_TRANSFER_FAILED unchanged from a genuine catalog
+; read failure -- WP53's own "generic VMM diagnostics on transfer failure"
+; rule, distinguishing corruption (a real bug) from a real I/O failure
+; (which is not).
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; listingValidateRecord (WP53)
+; Validate the metadata record currently in CasmVmmBuffer (as left by the
+; most recent listingReplayNext call). A structural sanity check against
+; capture-time corruption or a WP51/WP53 internal bug -- every field here
+; was already produced by this module's own capture path, never by
+; anything a legitimate source file can directly control.
+;
+; Checks, each raising CASM_DIAG_LISTING_REPLAY_MISMATCH on its own
+; disagreement:
+;   - FLAGS has no bit set outside CASM_LISTING_META_FLAG_FINAL_UNTERMINATED
+;   - RESERVED0 and both RESERVED1 bytes are zero
+;   - OFF_LO/HI + LEN does not overflow 16 bits (a self-contained bound;
+;     whether the span actually lies within the loaded source is proven
+;     later, by the serializer's own sourceReadSpanChunk call -- this
+;     module has no source.s dependency and WP53's stop conditions forbid
+;     adding one)
+;   - PC_LO/HI + BYTECOUNT_LO/HI does not overflow 16 bits
+;   - BYTEOFF_LO/HI exactly equals CasmListValidExpectedByteOffLo/Hi (0 for
+;     the first record since listingReplayReset, otherwise the previous
+;     record's own end) -- WP53's "monotonic byte ranges" and "valid byte
+;     range" checks unified into one comparison: byte-mirror spans that
+;     are exactly contiguous from zero can never exceed the store's own
+;     recorded extent, so no separate upper-bound comparison against
+;     CasmListingByteCursorLo/Hi is needed
+;   - the record's FILEID resolves to a real file (listingResolveFilename)
+;
+; Inputs:    CasmVmmBuffer holds one record, as left by listingReplayNext;
+;            listingReplayReset already called for this pass (also resets
+;            the running expected-byte-offset this routine advances)
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmListValidExpectedByteOff
+;            Lo/Hi advanced past this record's own byte-mirror span;
+;            CasmListResolvedName/Len holds its resolved display name
+;            (listingResolveFilename's own output)
+;            Fail:    C set, A = CASM_DIAG_LISTING_REPLAY_MISMATCH or a
+;            propagated CASM_DIAG_VMM_TRANSFER_FAILED; expected offset
+;            unchanged
+; Preserves: none
+; Clobbers:  A, X, Y and listingResolveFilename's own clobbers
+; ---------------------------------------------------------------------------
+listingValidateRecord:
+    ; Clears bit 0 (CASM_LISTING_META_FLAG_FINAL_UNTERMINATED); any bit
+    ; still set afterward is unknown.
+    lda CasmVmmBuffer + CASM_LISTING_META_FLAGS
+    and #%11111110
+    bne lvrMismatch
+
+    lda CasmVmmBuffer + CASM_LISTING_META_RESERVED0
+    bne lvrMismatch
+    lda CasmVmmBuffer + CASM_LISTING_META_RESERVED1
+    bne lvrMismatch
+    lda CasmVmmBuffer + CASM_LISTING_META_RESERVED1 + 1
+    bne lvrMismatch
+
+    ; Source span bound: OFF + LEN must not overflow 16 bits.
+    lda CasmVmmBuffer + CASM_LISTING_META_OFF_LO
+    clc
+    adc CasmVmmBuffer + CASM_LISTING_META_LEN
+    lda CasmVmmBuffer + CASM_LISTING_META_OFF_HI
+    adc #0
+    bcs lvrMismatch
+
+    ; Address/count bound: PC + BYTECOUNT must not overflow 16 bits.
+    lda CasmVmmBuffer + CASM_LISTING_META_PC_LO
+    clc
+    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_LO
+    lda CasmVmmBuffer + CASM_LISTING_META_PC_HI
+    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_HI
+    bcs lvrMismatch
+
+    ; Byte-mirror span: this record's own BYTEOFF must exactly equal the
+    ; running expected offset.
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTEOFF_LO
+    cmp CasmListValidExpectedByteOffLo
+    bne lvrMismatch
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTEOFF_HI
+    cmp CasmListValidExpectedByteOffHi
+    bne lvrMismatch
+
+    ; Stash this record's own byte count before resolving its filename --
+    ; listingResolveFilename reaches includeCatalogRead for a frame FILE_ID,
+    ; which overwrites CasmVmmBuffer as its own VMM transfer scratch, so
+    ; BYTECOUNT_LO/HI must not be re-read from there afterward.
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_LO
+    sta CasmListValidByteCountLo
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_HI
+    sta CasmListValidByteCountHi
+
+    ; File identity must resolve.
+    lda CasmVmmBuffer + CASM_LISTING_META_FILEID
+    jsr listingResolveFilename
+    bcs lvrPropagate
+
+    ; Advance the running expected offset by this record's own byte count.
+    lda CasmListValidExpectedByteOffLo
+    clc
+    adc CasmListValidByteCountLo
+    sta CasmListValidExpectedByteOffLo
+    lda CasmListValidExpectedByteOffHi
+    adc CasmListValidByteCountHi
+    sta CasmListValidExpectedByteOffHi
+
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lvrPropagate:
+    rts                          ; listingResolveFilename already set A/C
+lvrMismatch:
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; listingResolveFilename (WP53)
+; Resolve a packed FILE_ID into WP53's own listing-header display name.
+; Top-level headers preserve the original CLI spelling verbatim (a direct
+; copy of the matching CasmSourceNames slot, via cli.s's own
+; cliSourceSlotLo/Hi table); included headers use the catalog's own
+; resolved decimal device, a colon, and its prefix-stripped name ("8:NAME"
+; through "11:NAME") -- WP50's frozen wording, requiring no Phase 9 catalog
+; record growth: CASM_INCLUDE_PHYS_REC_DEVICE and _NAME already hold
+; exactly these two pieces. Same FILE_ID decode diagnostics.s's own
+; diagPrintIncludeIdentity already uses, and the same device-string table
+; (includeDeviceStrLo/Hi) include.s's own includeSynthesizeOpenName uses --
+; this routine builds into its own buffer rather than reusing
+; CasmIncludeOpenName, which is a transient scratch owned by a completely
+; different call path (a catalog-load miss) that could be live at an
+; unrelated time.
+;
+; Inputs:    A = packed FILE_ID (bit 7 frame kind, bits 0-6 id)
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; CasmListResolvedName
+;            holds the null-terminated display name, CasmListResolvedNameLen
+;            its length (excluding the null)
+;            Fail:    C set, A = CASM_DIAG_LISTING_REPLAY_MISMATCH (id out
+;            of range for its own kind) or CASM_DIAG_VMM_TRANSFER_FAILED
+;            (propagated from a rejected includeCatalogRead)
+; Preserves: none
+; Clobbers:  A, X, Y, CasmPtr0Lo/Hi, and includeCatalogRead's own clobbers
+; ---------------------------------------------------------------------------
+listingResolveFilename:
+    pha
+    and #CASM_DIAG_FILEID_FRAME_FLAG
+    bne lrfFrame
+
+    ; Top level: verbatim copy of CasmSourceNames[id].
+    pla
+    and #CASM_DIAG_FILEID_ID_MASK
+    cmp CasmSourceCount
+    bcs lrfMismatch
+    tax
+    lda cliSourceSlotLo, x
+    sta CasmPtr0Lo
+    lda cliSourceSlotHi, x
+    sta CasmPtr0Hi
+    ldy #0
+lrfTopLoop:
+    lda (CasmPtr0Lo), y
+    sta CasmListResolvedName, y
+    beq lrfTopDone
+    iny
+    cpy #CASM_LISTING_RESOLVED_NAME_SIZE - 1
+    bcc lrfTopLoop
+    lda #0
+    sta CasmListResolvedName, y
+lrfTopDone:
+    sty CasmListResolvedNameLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lrfFrame:
+    pla
+    and #CASM_DIAG_FILEID_ID_MASK
+    cmp CasmIncludeCatalogCount
+    bcs lrfMismatch
+    jsr includeCatalogRead
+    bcs lrfPropagate
+
+    ; Resolved decimal device digit string.
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_DEVICE
+    sec
+    sbc #CASM_DEVICE_MIN
+    tax
+    lda includeDeviceStrLo, x
+    sta CasmPtr0Lo
+    lda includeDeviceStrHi, x
+    sta CasmPtr0Hi
+    ldy #0
+lrfDeviceLoop:
+    lda (CasmPtr0Lo), y
+    beq lrfDeviceDone
+    sta CasmListResolvedName, y
+    iny
+    jmp lrfDeviceLoop
+lrfDeviceDone:
+    lda #CASM_PETSCII_COLON
+    sta CasmListResolvedName, y
+    iny
+
+    ; Prefix-stripped catalog name, continuing the same destination index
+    ; (now in X: indirect-indexed addressing only supports Y, and Y is
+    ; needed again to re-start at the source's own index 0).
+    tya
+    tax
+    ldy #0
+lrfNameLoop:
+    lda CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_NAME, y
+    sta CasmListResolvedName, x
+    beq lrfNameDone
+    iny
+    inx
+    cpx #CASM_LISTING_RESOLVED_NAME_SIZE - 1
+    bcc lrfNameLoop
+    lda #0
+    sta CasmListResolvedName, x
+lrfNameDone:
+    stx CasmListResolvedNameLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lrfPropagate:
+    rts                          ; includeCatalogRead already set A/C
+lrfMismatch:
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
+    rts
+
+; =============================================================================
+; WP53 increment 6: formatters and aggregate serializer
+;
+; listingWriteFile is the only production entry point below; everything
+; else is private. It replays every captured record (listingReplayNext),
+; validates and resolves it (increment 5's listingValidateRecord/
+; listingResolveFilename), formats it into the parent plan's frozen
+; File Headers/Detail Rows/Continuations column layout, and buffers the
+; result through CasmIoBuffer into the real `.LST` file (increment 4's
+; listingCreate/listingWrite/listingClose). Any failure at any point routes
+; through listingAbort exactly once, from the single lwfAbortPath tail
+; below -- the same close-preserve-primary-then-delete-uncommitted
+; discipline every other WP53 failure path already uses.
+;
+; WP53 links this routine but calls it from no production site; WP54 owns
+; calling it from casm.s's real Pass 2 tail, after outputCommit.
+; =============================================================================
+
+; ---------------------------------------------------------------------------
+; lwHexNibble (private)
+; Input:     A = nibble (0-15)
+; Output:    A = uppercase unshifted-PETSCII hex digit
+; Clobbers:  A
+; ---------------------------------------------------------------------------
+lwHexNibble:
+    cmp #10
+    bcc lwhnDigit
+    clc
+    adc #55                      ; 10 -> 'A' ($41)
+    rts
+lwhnDigit:
+    clc
+    adc #CASM_PETSCII_DIGIT_0
+    rts
+
+; ---------------------------------------------------------------------------
+; lwPutChar (private)
+; Write one literal byte at CasmListRowCursor; advance the cursor by 1.
+; Input:     A = byte to write
+; Clobbers:  A, Y
+; ---------------------------------------------------------------------------
+lwPutChar:
+    ldy CasmListRowCursor
+    sta CasmListRowBuffer, y
+    iny
+    sty CasmListRowCursor
+    rts
+
+; ---------------------------------------------------------------------------
+; lwPutHexByte (private)
+; Write two uppercase hex digits for A at CasmListRowCursor; advance the
+; cursor by 2.
+; Input:     A = byte value
+; Clobbers:  A, Y
+; ---------------------------------------------------------------------------
+lwPutHexByte:
+    pha
+    lsr a
+    lsr a
+    lsr a
+    lsr a
+    jsr lwHexNibble
+    jsr lwPutChar
+    pla
+    and #$0F
+    jsr lwHexNibble
+    jmp lwPutChar
+
+; ---------------------------------------------------------------------------
+; lwPutSpaces (private)
+; Write A space bytes at CasmListRowCursor; advance the cursor by A. A=0 is
+; a no-op.
+; Input:     A = count (0-40)
+; Clobbers:  A, X, Y
+; ---------------------------------------------------------------------------
+lwPutSpaces:
+    tax
+    beq lwpsDone
+    ldy CasmListRowCursor
+lwpsLoop:
+    lda #CASM_PETSCII_SPACE
+    sta CasmListRowBuffer, y
+    iny
+    dex
+    bne lwpsLoop
+    sty CasmListRowCursor
+lwpsDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; lwPutRawBytes (private)
+; Copy A bytes verbatim from (CasmPtr0Lo/Hi)[0..A-1] to CasmListRowCursor;
+; advance the cursor by A. A=0 is a no-op. No translation of any kind.
+; Input:     A = count, CasmPtr0Lo/Hi = source pointer
+; Clobbers:  A, X, Y, CasmListCopyCount
+; ---------------------------------------------------------------------------
+lwPutRawBytes:
+    sta CasmListCopyCount
+    beq lwprbDone
+    ldy #0
+    ldx CasmListRowCursor
+lwprbLoop:
+    lda (CasmPtr0Lo), y
+    sta CasmListRowBuffer, x
+    iny
+    inx
+    dec CasmListCopyCount
+    bne lwprbLoop
+    stx CasmListRowCursor
+lwprbDone:
+    rts
+
+; ---------------------------------------------------------------------------
+; lwPutDec5 (private)
+; Write a 5-digit zero-padded decimal for the 16-bit value in
+; CasmValue0Lo/Hi at CasmListRowCursor; advance the cursor by 5. Value must
+; be < 100000 (always true: the largest possible physical line number is
+; CASM_LISTING_META_MAX = 4096).
+; Input:     CasmValue0Lo/Hi = 16-bit value
+; Clobbers:  A, X, Y, CasmValue0Lo/Hi
+; ---------------------------------------------------------------------------
+lwPutDec5:
+    ldx #0
+lwd5TenK:
+    lda CasmValue0Lo
+    sec
+    sbc #<10000
+    tay
+    lda CasmValue0Hi
+    sbc #>10000
+    bcc lwd5TenKDone
+    sty CasmValue0Lo
+    sta CasmValue0Hi
+    inx
+    jmp lwd5TenK
+lwd5TenKDone:
+    txa
+    jsr lwd5Emit
+
+    ldx #0
+lwd5Thou:
+    lda CasmValue0Lo
+    sec
+    sbc #<1000
+    tay
+    lda CasmValue0Hi
+    sbc #>1000
+    bcc lwd5ThouDone
+    sty CasmValue0Lo
+    sta CasmValue0Hi
+    inx
+    jmp lwd5Thou
+lwd5ThouDone:
+    txa
+    jsr lwd5Emit
+
+    ldx #0
+lwd5Hun:
+    lda CasmValue0Lo
+    sec
+    sbc #<100
+    tay
+    lda CasmValue0Hi
+    sbc #>100
+    bcc lwd5HunDone
+    sty CasmValue0Lo
+    sta CasmValue0Hi
+    inx
+    jmp lwd5Hun
+lwd5HunDone:
+    txa
+    jsr lwd5Emit
+
+    ldx #0
+lwd5Ten:
+    lda CasmValue0Lo
+    sec
+    sbc #<10
+    tay
+    lda CasmValue0Hi
+    sbc #>10
+    bcc lwd5TenDone
+    sty CasmValue0Lo
+    sta CasmValue0Hi
+    inx
+    jmp lwd5Ten
+lwd5TenDone:
+    txa
+    jsr lwd5Emit
+
+    lda CasmValue0Lo             ; remaining 1s digit: 0-9, Hi guaranteed 0
+    jmp lwd5Emit
+
+lwd5Emit:
+    clc
+    adc #CASM_PETSCII_DIGIT_0
+    jmp lwPutChar
+
+; ---------------------------------------------------------------------------
+; lwReadByteMirrorChunk (private)
+; Read CasmIoLenLo/Hi bytes (always 1-4 here) from the byte-mirror VMM store
+; at absolute offset CasmVmmOffLo/Hi into CasmVmmBuffer. No range validation
+; against the store's own extent: increment 5's listingValidateRecord
+; already proved BYTEOFF/BYTECOUNT are self-consistent and monotonic (see
+; its own header comment for why no upper-bound check is needed here
+; either).
+; Output:    C clear on success; C set + A = CASM_DIAG_VMM_TRANSFER_FAILED
+;            on a genuine transfer failure
+; Clobbers:  A, X, Y, CasmVmmBuffer
+; ---------------------------------------------------------------------------
+lwReadByteMirrorChunk:
+    ldx CasmListingByteVmmSlot
+    jmp vmmWindowRead
+
+; ---------------------------------------------------------------------------
+; lwPutByteGroup (private)
+; Format up to CASM_LISTING_ROW_BYTES_MAX bytes from CasmVmmBuffer[0..A-1]
+; as "HH HH HH HH" (space-separated, space-padded for any missing entries)
+; at CasmListRowCursor, preceded by one leading space; advance the cursor by
+; CASM_LISTING_ROW_BYTES_WIDTH. A=0 produces an all-spaces group (the
+; frozen "zero-byte line uses spaces, not placeholder values" rule).
+; Input:     A = valid byte count in CasmVmmBuffer (0-4)
+; Clobbers:  A, X, Y
+; ---------------------------------------------------------------------------
+lwPutByteGroup:
+    pha
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+    pla
+    sta CasmListCopyCount         ; valid count, reused here as a plain scratch
+    ldx #0
+lwpbgLoop:
+    cpx #0
+    beq lwpbgNoSep
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+lwpbgNoSep:
+    cpx CasmListCopyCount
+    bcs lwpbgPad
+    lda CasmVmmBuffer, x
+    jsr lwPutHexByte
+    jmp lwpbgNext
+lwpbgPad:
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+lwpbgNext:
+    inx
+    cpx #CASM_LISTING_ROW_BYTES_MAX
+    bne lwpbgLoop
+    rts
+
+; ---------------------------------------------------------------------------
+; lwPutSourceCols (private)
+; Copy A exact bytes from CasmVmmBuffer[0..A-1] at CasmListRowCursor,
+; space-padded to CASM_LISTING_ROW_SOURCE_MAX; advance the cursor by
+; CASM_LISTING_ROW_SOURCE_MAX.
+; Input:     A = valid byte count in CasmVmmBuffer (0-14)
+; Clobbers:  A, X, Y, CasmPtr0Lo/Hi, CasmListCopyCount
+; ---------------------------------------------------------------------------
+lwPutSourceCols:
+    pha
+    lda #<CasmVmmBuffer
+    sta CasmPtr0Lo
+    lda #>CasmVmmBuffer
+    sta CasmPtr0Hi
+    pla
+    pha
+    jsr lwPutRawBytes
+    pla
+    sta CasmListCopyCount
+    lda #CASM_LISTING_ROW_SOURCE_MAX
+    sec
+    sbc CasmListCopyCount
+    jmp lwPutSpaces
+
+; ---------------------------------------------------------------------------
+; lwEmitByteGroupRow (private)
+; Format one row's worth (up to CASM_LISTING_ROW_BYTES_MAX) of the
+; remaining emitted-byte mirror at the current CasmListRowCursor, reading
+; through lwReadByteMirrorChunk when any bytes remain. Advances
+; CasmListRunPcLo/Hi and CasmListRunByteOffLo/Hi by, and subtracts from
+; CasmListRunByteCountLo/Hi, the amount actually consumed (0-4, left in
+; CasmListLastChunkLen).
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            on a propagated byte-mirror read failure (running state
+;            unchanged)
+; Clobbers:  A, X, Y, CasmVmmBuffer, CasmVmmOffLo/Hi, CasmIoLenLo/Hi,
+;            CasmListLastChunkLen
+; ---------------------------------------------------------------------------
+lwEmitByteGroupRow:
+    lda CasmListRunByteCountHi
+    bne lwebgrTakeFour
+    lda CasmListRunByteCountLo
+    cmp #CASM_LISTING_ROW_BYTES_MAX
+    bcc lwebgrTakeLo
+lwebgrTakeFour:
+    lda #CASM_LISTING_ROW_BYTES_MAX
+    jmp lwebgrHaveChunk
+lwebgrTakeLo:
+    lda CasmListRunByteCountLo
+lwebgrHaveChunk:
+    sta CasmListLastChunkLen
+    beq lwebgrNoRead
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    lda CasmListRunByteOffLo
+    sta CasmVmmOffLo
+    lda CasmListRunByteOffHi
+    sta CasmVmmOffHi
+    jsr lwReadByteMirrorChunk
+    bcs lwebgrFail
+lwebgrNoRead:
+    lda CasmListLastChunkLen
+    jsr lwPutByteGroup
+
+    lda CasmListRunPcLo
+    clc
+    adc CasmListLastChunkLen
+    sta CasmListRunPcLo
+    bcc lwebgrNoCarryPc
+    inc CasmListRunPcHi
+lwebgrNoCarryPc:
+    lda CasmListRunByteOffLo
+    clc
+    adc CasmListLastChunkLen
+    sta CasmListRunByteOffLo
+    bcc lwebgrNoCarryOff
+    inc CasmListRunByteOffHi
+lwebgrNoCarryOff:
+    lda CasmListRunByteCountLo
+    sec
+    sbc CasmListLastChunkLen
+    sta CasmListRunByteCountLo
+    bcs lwebgrNoBorrow
+    dec CasmListRunByteCountHi
+lwebgrNoBorrow:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwebgrFail:
+    rts                           ; lwReadByteMirrorChunk already set A/C
+
+; ---------------------------------------------------------------------------
+; lwEmitSourceRow (private)
+; Format one row's worth (up to CASM_LISTING_ROW_SOURCE_MAX) of the
+; remaining source span at the current CasmListRowCursor, reading through
+; sourceReadSpanChunk when any bytes remain. Advances CasmListRunSrcOffLo/Hi
+; by, and subtracts from CasmListRunSrcLen, the amount actually consumed
+; (0-14, left in CasmListLastChunkLen).
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            on a propagated source read failure (running state unchanged)
+; Clobbers:  A, X, Y, CasmVmmBuffer, CasmVmmOffLo/Hi, CasmIoLenLo/Hi,
+;            CasmPtr0Lo/Hi, CasmListLastChunkLen, CasmListCopyCount
+; ---------------------------------------------------------------------------
+lwEmitSourceRow:
+    lda CasmListRunSrcLen
+    cmp #CASM_LISTING_ROW_SOURCE_MAX
+    bcc lwesrTakeAll
+    lda #CASM_LISTING_ROW_SOURCE_MAX
+    jmp lwesrHaveChunk
+lwesrTakeAll:
+    lda CasmListRunSrcLen
+lwesrHaveChunk:
+    sta CasmListLastChunkLen
+    beq lwesrNoRead
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    lda CasmListRunSrcOffLo
+    sta CasmVmmOffLo
+    lda CasmListRunSrcOffHi
+    sta CasmVmmOffHi
+    jsr sourceReadSpanChunk
+    bcs lwesrFail
+lwesrNoRead:
+    lda CasmListLastChunkLen
+    jsr lwPutSourceCols
+
+    lda CasmListRunSrcOffLo
+    clc
+    adc CasmListLastChunkLen
+    sta CasmListRunSrcOffLo
+    bcc lwesrNoCarry
+    inc CasmListRunSrcOffHi
+lwesrNoCarry:
+    lda CasmListRunSrcLen
+    sec
+    sbc CasmListLastChunkLen
+    sta CasmListRunSrcLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwesrFail:
+    rts                           ; sourceReadSpanChunk already set A/C
+
+; ---------------------------------------------------------------------------
+; lwAppendRow (private)
+; Append the CASM_LISTING_ROW_SIZE-byte row in CasmListRowBuffer (built via
+; CasmListRowCursor, already ending with its own trailing PETSCII CR) to the
+; aggregate (CasmIoBuffer), flushing first through listingWrite if it would
+; not otherwise fit. Never splits a row across a flush and never issues a
+; zero-length write.
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            on a listingWrite failure (listingWrite itself already marked
+;            the listing invalid)
+; Clobbers:  A, X, Y, CasmIoBuffer, CasmIoLenLo/Hi, CasmListAggregateLen
+; ---------------------------------------------------------------------------
+lwAppendRow:
+    lda CasmListAggregateLen
+    cmp #256 - CASM_LISTING_ROW_SIZE + 1
+    bcc lwarNoFlush
+    jsr lwFlushAggregate
+    bcs lwarFail
+lwarNoFlush:
+    ldy #0
+    ldx CasmListAggregateLen
+lwarCopy:
+    lda CasmListRowBuffer, y
+    sta CasmIoBuffer, x
+    iny
+    inx
+    cpy #CASM_LISTING_ROW_SIZE
+    bne lwarCopy
+    stx CasmListAggregateLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwarFail:
+    rts                           ; lwFlushAggregate already set A/C
+
+; ---------------------------------------------------------------------------
+; lwFlushAggregate (private)
+; Write the aggregate's current content (if any) through listingWrite and
+; reset it empty. A zero-length aggregate is a no-op success -- WP53's own
+; "never issue zero-length writes" rule.
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            on a listingWrite failure (aggregate content left unflushed)
+; Clobbers:  A, X, Y, CasmIoLenLo/Hi
+; ---------------------------------------------------------------------------
+lwFlushAggregate:
+    lda CasmListAggregateLen
+    beq lwfaNothing
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx #<CasmIoBuffer
+    ldy #>CasmIoBuffer
+    jsr listingWrite
+    bcs lwfaFail
+    lda #0
+    sta CasmListAggregateLen
+lwfaNothing:
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwfaFail:
+    rts                           ; listingWrite already set A/C
+
+; ---------------------------------------------------------------------------
+; lwEmitFileHeader (private)
+; Emit "FILE HH: " (columns 1-9) plus up to CASM_LISTING_HEADER_CHUNK_SIZE
+; bytes of CasmListResolvedName in columns 10-40 on the first row, then
+; blank-prefix continuation rows carrying the remaining name in the same
+; 31-byte chunks, until the complete name has been written -- the frozen
+; "File Headers" section.
+; Input:     A = raw packed FILEID byte; CasmListResolvedName/Len already
+;            resolved (listingResolveFilename)
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            on a row-append failure
+; Clobbers:  A, X, Y, CasmListRowBuffer, CasmListRowCursor, CasmListHeaderFileId,
+;            CasmListHeaderOffset, CasmListLastChunkLen, CasmPtr0Lo/Hi,
+;            CasmListCopyCount, CasmIoBuffer, CasmIoLenLo/Hi, CasmListAggregateLen
+; ---------------------------------------------------------------------------
+lwEmitFileHeader:
+    sta CasmListHeaderFileId
+    lda #0
+    sta CasmListHeaderOffset
+
+lwefhFirstRow:
+    lda #0
+    sta CasmListRowCursor
+    lda #<lwHeaderPrefixText
+    sta CasmPtr0Lo
+    lda #>lwHeaderPrefixText
+    sta CasmPtr0Hi
+    lda #5
+    jsr lwPutRawBytes
+    lda CasmListHeaderFileId
+    jsr lwPutHexByte
+    lda #<lwHeaderColonSpaceText
+    sta CasmPtr0Lo
+    lda #>lwHeaderColonSpaceText
+    sta CasmPtr0Hi
+    lda #2
+    jsr lwPutRawBytes
+    jmp lwefhChunk
+
+lwefhContRow:
+    lda #0
+    sta CasmListRowCursor
+    lda #CASM_LISTING_HEADER_PREFIX_WIDTH
+    jsr lwPutSpaces
+
+lwefhChunk:
+    lda CasmListResolvedNameLen
+    sec
+    sbc CasmListHeaderOffset
+    cmp #CASM_LISTING_HEADER_CHUNK_SIZE
+    bcc lwefhTakeRemaining
+    lda #CASM_LISTING_HEADER_CHUNK_SIZE
+    jmp lwefhHaveChunk
+lwefhTakeRemaining:
+    lda CasmListResolvedNameLen
+    sec
+    sbc CasmListHeaderOffset
+lwefhHaveChunk:
+    sta CasmListLastChunkLen
+
+    lda #<CasmListResolvedName
+    clc
+    adc CasmListHeaderOffset
+    sta CasmPtr0Lo
+    lda #>CasmListResolvedName
+    adc #0
+    sta CasmPtr0Hi
+    lda CasmListLastChunkLen
+    jsr lwPutRawBytes
+
+    lda #CASM_LISTING_ROW_WIDTH
+    sec
+    sbc CasmListRowCursor
+    jsr lwPutSpaces
+    lda #CASM_PETSCII_CR
+    jsr lwPutChar
+    jsr lwAppendRow
+    bcs lwefhFail
+
+    lda CasmListHeaderOffset
+    clc
+    adc CasmListLastChunkLen
+    sta CasmListHeaderOffset
+    cmp CasmListResolvedNameLen
+    bcc lwefhContRow
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwefhFail:
+    rts                           ; lwAppendRow already set A/C
+
+; Lowercase ca65 source: the C64 target charmap turns lowercase letters into
+; unshifted PETSCII (matching lwHexNibble's own arithmetic output, "10 ->
+; 'A'" via CASM_PETSCII_UPPER_A = $41, not the shifted range uppercase
+; source text would produce) -- see reference-casm-petscii-identifier-case.
+; The written bytes still render as uppercase "FILE" on a real display.
+lwHeaderPrefixText:    .byte "file "
+lwHeaderColonSpaceText: .byte ": "
+
+; ---------------------------------------------------------------------------
+; lwEmitDetailRows (private)
+; Emit the primary row, then all byte-continuation rows, then all
+; source-continuation rows, for the validated record in
+; CasmListCurrentRecord -- the frozen "Detail Rows"/"Continuations"
+; sections, in the plan's own required emission order.
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            on a propagated read or row-append failure
+; Clobbers:  A, X, Y and every private routine's own clobbers above
+; ---------------------------------------------------------------------------
+lwEmitDetailRows:
+    lda CasmListCurrentRecord + CASM_LISTING_META_PC_LO
+    sta CasmListRunPcLo
+    lda CasmListCurrentRecord + CASM_LISTING_META_PC_HI
+    sta CasmListRunPcHi
+    lda CasmListCurrentRecord + CASM_LISTING_META_BYTEOFF_LO
+    sta CasmListRunByteOffLo
+    lda CasmListCurrentRecord + CASM_LISTING_META_BYTEOFF_HI
+    sta CasmListRunByteOffHi
+    lda CasmListCurrentRecord + CASM_LISTING_META_BYTECOUNT_LO
+    sta CasmListRunByteCountLo
+    lda CasmListCurrentRecord + CASM_LISTING_META_BYTECOUNT_HI
+    sta CasmListRunByteCountHi
+    lda CasmListCurrentRecord + CASM_LISTING_META_OFF_LO
+    sta CasmListRunSrcOffLo
+    lda CasmListCurrentRecord + CASM_LISTING_META_OFF_HI
+    sta CasmListRunSrcOffHi
+    lda CasmListCurrentRecord + CASM_LISTING_META_LEN
+    sta CasmListRunSrcLen
+
+    ; --- Primary row ---
+    lda #0
+    sta CasmListRowCursor
+    lda CasmListCurrentRecord + CASM_LISTING_META_FILEID
+    jsr lwPutHexByte
+    lda #CASM_PETSCII_COLON
+    jsr lwPutChar
+    lda CasmListCurrentRecord + CASM_LISTING_META_LINE_LO
+    sta CasmValue0Lo
+    lda CasmListCurrentRecord + CASM_LISTING_META_LINE_HI
+    sta CasmValue0Hi
+    jsr lwPutDec5
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+    lda CasmListRunPcHi
+    jsr lwPutHexByte
+    lda CasmListRunPcLo
+    jsr lwPutHexByte
+    jsr lwEmitByteGroupRow
+    bcs lwedrFail
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+    jsr lwEmitSourceRow
+    bcs lwedrFail
+    lda #CASM_PETSCII_CR
+    jsr lwPutChar
+    jsr lwAppendRow
+    bcs lwedrFail
+
+    ; --- Byte-continuation rows ---
+lwedrByteLoop:
+    lda CasmListRunByteCountLo
+    ora CasmListRunByteCountHi
+    beq lwedrByteDone
+    lda #0
+    sta CasmListRowCursor
+    lda #CASM_LISTING_ROW_HEAD_WIDTH
+    jsr lwPutSpaces
+    lda #CASM_PETSCII_SPACE
+    jsr lwPutChar
+    lda CasmListRunPcHi
+    jsr lwPutHexByte
+    lda CasmListRunPcLo
+    jsr lwPutHexByte
+    jsr lwEmitByteGroupRow
+    bcs lwedrFail
+    lda #(CASM_LISTING_ROW_GAP_WIDTH + CASM_LISTING_ROW_SOURCE_MAX)
+    jsr lwPutSpaces
+    lda #CASM_PETSCII_CR
+    jsr lwPutChar
+    jsr lwAppendRow
+    bcs lwedrFail
+    jmp lwedrByteLoop
+lwedrByteDone:
+
+    ; --- Source-continuation rows ---
+lwedrSrcLoop:
+    lda CasmListRunSrcLen
+    beq lwedrSrcDone
+    lda #0
+    sta CasmListRowCursor
+    lda #(CASM_LISTING_ROW_HEAD_WIDTH + CASM_LISTING_ROW_ADDR_WIDTH + CASM_LISTING_ROW_BYTES_WIDTH + CASM_LISTING_ROW_GAP_WIDTH)
+    jsr lwPutSpaces
+    jsr lwEmitSourceRow
+    bcs lwedrFail
+    lda #CASM_PETSCII_CR
+    jsr lwPutChar
+    jsr lwAppendRow
+    bcs lwedrFail
+    jmp lwedrSrcLoop
+lwedrSrcDone:
+
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwedrFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; lwEmitRecordRows (private)
+; Emit a file-header (and its continuations) when CasmListCurrentRecord's
+; own packed FILEID differs from the previous row's (or no row has been
+; emitted yet this pass), then this record's detail rows.
+; Output:    C clear + A = CASM_DIAG_NONE on success; C set + A = diagnostic
+;            otherwise
+; Clobbers:  A, X, Y and lwEmitFileHeader/lwEmitDetailRows's own clobbers
+; ---------------------------------------------------------------------------
+lwEmitRecordRows:
+    lda CasmListCurrentRecord + CASM_LISTING_META_FILEID
+    ldx CasmListHaveLastFileId
+    beq lwerrNeedHeader
+    cmp CasmListLastFileId
+    bne lwerrNeedHeader
+    jmp lwerrDetail
+lwerrNeedHeader:
+    sta CasmListLastFileId
+    lda #1
+    sta CasmListHaveLastFileId
+    lda CasmListCurrentRecord + CASM_LISTING_META_FILEID
+    jsr lwEmitFileHeader
+    bcs lwerrFail
+lwerrDetail:
+    jsr lwEmitDetailRows
+    bcs lwerrFail
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+lwerrFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; listingWriteFile (WP53)
+; Serialize the complete captured listing to the real `.LST` file: create
+; it, replay every metadata record in append order, validate and resolve
+; each, format it into the frozen row layout, buffer and write through
+; CasmIoBuffer, close, and mark committed. Reparses no source and
+; re-evaluates nothing -- every byte comes from listingReplayNext, the
+; source VMM (sourceReadSpanChunk), or the byte mirror
+; (lwReadByteMirrorChunk).
+;
+; Inputs:    CasmListingState == CASM_LISTING_STATE_COMPLETE; CasmListingLen
+;            != 0 (name already derived); CasmSourceState ==
+;            CASM_SOURCE_STATE_CLOSED; CasmOutputCommitted ==
+;            CASM_OUTPUT_COMMITTED; CasmListFileState == CASM_FILE_STATE_CLOSED
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE; the `.LST` file holds the
+;            complete formatted listing; CasmListFileCommitted =
+;            CASM_LISTFILE_COMMITTED
+;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED on a bad
+;            precondition (nothing created, no cleanup performed), or the
+;            diagnostic from a failing create/read/validate/write/close,
+;            already passed through listingAbort once a listing file was
+;            actually created (preserves the primary diagnostic, closes and
+;            deletes the incomplete file, never deletes a committed one --
+;            moot here since commit only happens after a clean close)
+; Preserves: none
+; Clobbers:  A, X, Y and every routine above's own clobbers
+; ---------------------------------------------------------------------------
+listingWriteFile:
+    lda CasmListingState
+    cmp #CASM_LISTING_STATE_COMPLETE
+    beq lwfCapOk
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+lwfCapOk:
+    lda CasmListingLen
+    bne lwfNameOk
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+lwfNameOk:
+    lda CasmSourceState
+    cmp #CASM_SOURCE_STATE_CLOSED
+    beq lwfSrcOk
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+lwfSrcOk:
+    lda CasmOutputCommitted
+    cmp #CASM_OUTPUT_COMMITTED
+    beq lwfPrgOk
+    lda #CASM_DIAG_STREAM_STATE_FAILED
+    sec
+    rts
+lwfPrgOk:
+    jsr listingCreate
+    bcs lwfCreateFail
+
+    jsr listingReplayReset
+    bcs lwfAbortPath
+
+    lda #0
+    sta CasmListAggregateLen
+    sta CasmListHaveLastFileId
+
+lwfLoop:
+    jsr listingReplayNext
+    bcs lwfAbortPath
+    cmp #CASM_STREAM_EOF
+    beq lwfFlushEnd
+
+    ; Snapshot the record before validating it -- listingValidateRecord
+    ; calls listingResolveFilename, which for an included FILE_ID reaches
+    ; includeCatalogRead and overwrites CasmVmmBuffer as its own VMM
+    ; transfer scratch. lwEmitRecordRows below must format this record's
+    ; real fields, not whatever that catalog read left behind.
+    ldy #0
+lwfCopyRec:
+    lda CasmVmmBuffer, y
+    sta CasmListCurrentRecord, y
+    iny
+    cpy #CASM_LISTING_META_REC_SIZE
+    bne lwfCopyRec
+
+    jsr listingValidateRecord
+    bcs lwfAbortPath
+
+    jsr lwEmitRecordRows
+    bcs lwfAbortPath
+    jmp lwfLoop
+
+lwfFlushEnd:
+    jsr lwFlushAggregate
+    bcs lwfAbortPath
+    jsr listingClose
+    bcs lwfAbortPath
+    lda #CASM_LISTFILE_COMMITTED
+    sta CasmListFileCommitted
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lwfCreateFail:
+    rts                           ; listingCreate already set A/C; nothing
+                                   ; was created, so no abort is needed
+
+lwfAbortPath:
+    jmp listingAbort              ; tail call; A already holds the failing
+                                   ; diagnostic on entry

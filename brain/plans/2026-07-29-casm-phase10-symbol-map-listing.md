@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-symbol-map-listing
 created: 2026-07-29
-status: approved-inactive
+status: complete
 taskwarrior: 32e09eea-691d-40bc-aa7a-7d2299fe093b
 ---
 
@@ -549,3 +549,19 @@ implemented, verified, reviewed, walked through, and explicitly approved; all
 task/documentation records agree; `/M` and `/L` preserve PRG identity; and the
 user explicitly authorizes the `0.2.0` completion promotion. Until then the
 phase and all unapproved work packages remain pending.
+
+## Progress
+
+- 2026-08-08: **Phase 10 is complete.** WP50-WP55 all individually planned,
+  approved, implemented, verified, reviewed, walked through, and
+  user-approved (see each WP's own plan/walkthrough,
+  `wiki/tasks/casm.md`, and `wiki/tasks/casm-phase10-symbol-map-listing.md`
+  for the full per-WP record). `/M` and `/L` are both fully implemented in
+  production `casm`, proven to preserve PRG/R6 identity across the full
+  option matrix by both WP54's own fixture matrix and WP55's independent
+  re-verification. The user explicitly authorized the `0.2.0` completion
+  promotion the same day WP55's own completion was approved; applied per
+  `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`'s
+  increment 7. CASM stands at `0.2.0` build `1260`, live-verified via VICE
+  (`CASM V0.2.0.1260`), no assembly/listing/map behavior changed beyond
+  the version/build artifact itself.

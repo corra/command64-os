@@ -10,8 +10,8 @@ depends-on: 0bf2e86b-0bd0-443a-b84b-b2c258e98181
 
 ## Status
 
-Approved but blocked by WP52 completion. No implementation is active.
-Completion target: CASM `0.1.54`.
+Complete at CASM `0.1.54` build `1237`, user-approved 2026-08-06. See
+`brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`.
 
 ## Objective
 
@@ -152,3 +152,18 @@ WP54.
 
 - 2026-07-29: User approved this plan. WP53 remains blocked by WP52; no
   implementation is authorized.
+- 2026-08-06: WP52 complete; WP53 activated and implemented across all 8
+  atomic increments. Increments 1-7 (implementation): commits `080f590`,
+  `af607b1`, `04c924e`, `7b9621a`, `628451c`, `0c74da7`, `3710d64`. Two real
+  bugs found and fixed during verification (increment 5 test-fixture
+  A-clobber; increment 6 production charmap bug in `listing.s`'s header
+  prefix text, plus a test-fixture `listingMirrorByte`-clobbers-Y bug).
+  Increment 8 (this): full clean-rebuild + no-change-rebuild stability
+  confirmed, live VICE regression across `test_casm_listwrite` (23/23),
+  `test_casm_listing`, `test_casm_listcap`, `test_casm_map`, and production
+  `casm` sanity; every Stop Condition re-verified against the final diff;
+  user approved completion; `VERSION_STAGE` bumped `"53"` -> `"54"`
+  (CASM `0.1.54` build `1237`). `/L` remains gated -- WP54 owns production
+  activation. See
+  `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`
+  for full detail.

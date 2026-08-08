@@ -15,8 +15,8 @@
 .include "common.inc"
 
 .define VERSION_MAJOR "0"
-.define VERSION_MINOR "1"
-.define VERSION_STAGE "53"
+.define VERSION_MINOR "2"
+.define VERSION_STAGE "0"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -25,12 +25,19 @@
 .import cliInit
 .import cliParse
 .import cliDeriveOutputName
+.import cliDeriveListingName
 .import CasmCliOptions
 .import fileIoInit
 .import sourceInit
 .import listingStateInit
+.import listingFileInit
 .import listingBeginLine
 .import listingCommitLine
+.import listingCaptureInit
+.import listingCaptureFinalize
+.import listingWriteFile
+.import listingAbort
+.import mapPrint
 .import sourceLoad
 .import sourceOpen
 .import sourceClose
@@ -81,6 +88,7 @@
 .import CasmOutputName
 .import fileCreateOutput
 .import outputAbort
+.import outputCommit
 .import emitInit
 .import emitInstruction
 .import emitDirective
@@ -113,6 +121,16 @@ start:
     ; failure, NOT IMPLEMENTED, ...) would otherwise print a stale, garbage
     ; "AT LINE .../COL ..." trailer left over from whatever the RAM held.
     jsr diagClearLoc
+    ; WP54: initialize both listing lifecycles (capture state and `.LST` file
+    ; state) before resourcesInit ever runs, not after source/file/CLI init as
+    ; WP51/WP53 originally placed listingStateInit -- both routines are pure
+    ; BSS clears with no OS/VMM call, so they cannot fail, and doing this
+    ; first guarantees artifactsAbort below can safely inspect
+    ; CasmListingState/CasmListFileState from the very first fatal exit
+    ; onward. Mirrors diagClearLoc's own placement immediately above, for the
+    ; identical "stale BSS at a locationless early fatal" reason.
+    jsr listingStateInit
+    jsr listingFileInit
     jsr resourcesInit
     bcs startInitFatal
     jsr cliInit
@@ -121,11 +139,6 @@ start:
     bcs startInitFatal
     jsr sourceInit
     bcs startInitFatal
-    ; WP51: unconditional and harmless while /M and /L are rejected below --
-    ; keeps every listing hook a deterministic no-op (listingStateInit
-    ; acquires no resource) rather than leaving CasmListingState uninitialized
-    ; BSS until WP54 wires production /L activation.
-    jsr listingStateInit
     lda #CASM_PHASE_CLI_FILE
     sta CasmPhase
 
@@ -136,18 +149,21 @@ start:
     jsr cliParse
     bcs startInitFatal
 
-    ; WP13 makes output operational: a successful assembly writes a PRG by
-    ; default, and /S (static) selects that now-default output mode. The map
-    ; and listing options remain unimplemented.
-    lda CasmCliOptions
-    and #(CASM_OPT_MAP | CASM_OPT_LIST)
-    beq startOptionsReady
-    lda #CASM_DIAG_NOT_IMPLEMENTED
-    jmp exitFatal
-
-startOptionsReady:
+    ; WP54: /M and /L are now activated below; only /O/S/E remain relevant
+    ; here, and CASM_OPT_ALL already accepted every option cliParse itself
+    ; recognizes, so there is nothing left to reject.
     jsr cliDeriveOutputName
     bcs startInitFatal
+
+    ; WP54: the listing name derives from the output name and is needed only
+    ; for /L; deriving it before symbol/source/include/lexer setup matches
+    ; the plan's "before source/resource work" ordering.
+    lda CasmCliOptions
+    and #CASM_OPT_LIST
+    beq startListingNameDone
+    jsr cliDeriveListingName
+    bcs startInitFatal
+startListingNameDone:
 
     jsr symbolsInit
     bcs startInitFatal
@@ -181,13 +197,21 @@ startPass1:
     ; automatically no-op under CASM_PASS_MODE_MEASURE (emit.s), so it is
     ; safe to drive the full dispatch here before fileCreateOutput ever runs.
     jsr emitInit
-    bcs startFatalNear
+    bcs startFatalNear1
     lda #CASM_PASS_MODE_MEASURE
     sta CasmPassMode
     jsr casmRunPass
-    bcs startFatalNear          ; outputAbort is a safe no-op: no output
+    bcs startFatalNear1         ; outputAbort is a safe no-op: no output
                                  ; file was ever created this pass
+    jmp startPass1Continue
 
+startFatalNear1:
+    ; Trampoline: WP54's growing Pass 2 tail pushed startFatalNear itself out
+    ; of branch range from these two Pass 1 checks -- this one reaches
+    ; startFatal directly instead.
+    jmp startFatal
+
+startPass1Continue:
     ; WP30: snapshot Pass 1's final program counter for the end-of-Pass-2
     ; agreement check below.
     lda CasmPc
@@ -209,6 +233,16 @@ startPass1:
     ; consume in full.
     jsr includeReplayReset
     bcs startFatalNear
+    ; WP54: enable listing capture (both VMM stores plus source-side line
+    ; capture) only for /L, and only after the rewind/replay reset above --
+    ; capture must observe Pass 2's real traversal from its very first
+    ; statement.
+    lda CasmCliOptions
+    and #CASM_OPT_LIST
+    beq startListingCaptureDone
+    jsr listingCaptureInit
+    bcs startFatalNear
+startListingCaptureDone:
     jsr lexerInit
     bcs startFatalNear
     ldx #<CasmOutputName
@@ -244,15 +278,57 @@ startPass1:
     jsr emitCheckPassAgreement
     bcs startFatalNear
 
+    ; WP54: close out listing capture (flush the final byte-mirror stage,
+    ; disable source-side capture) before emitFinalize/relocFinalize touch
+    ; the output file -- capture only ever observes Pass 2's own dispatch,
+    ; which just ended.
+    lda CasmCliOptions
+    and #CASM_OPT_LIST
+    beq startListingFinalizeDone
+    jsr listingCaptureFinalize
+    bcs startFatalNear
+startListingFinalizeDone:
+
     jsr emitFinalize
     bcs startFatalNear
     ; WP41: append the relocation table and R6 footer, unconditionally --
     ; relocFinalize itself no-ops for a static assembly (Phase 0C.14/18).
     jsr relocFinalize
     bcs startFatalNear
-    jsr diagPrintPhase2Ready
     jsr sourceClose
     bcs startFatalNear
+
+    ; WP54: commit the PRG before any listing/map work -- once committed,
+    ; artifactsAbort's outputAbort will never delete it, so a later listing
+    ; or map failure retains a complete, valid PRG.
+    jsr outputCommit
+    bcs startFatalNear
+
+    ; WP54: serialize the complete `.LST` file only for /L, only after the
+    ; PRG itself is safely committed. listingWriteFile owns its own internal
+    ; create/replay/format/write/close/commit sequence and its own abort on
+    ; failure (never deletes an already-committed PRG).
+    lda CasmCliOptions
+    and #CASM_OPT_LIST
+    beq startListingWriteDone
+    jsr listingWriteFile
+    bcs startFatalNear
+startListingWriteDone:
+
+    ; WP54: print the deterministic symbol map only for /M, only after the
+    ; PRG (and any /L listing) are already committed. diagClearLoc first:
+    ; CasmDiagLoc* still holds whatever the last statement stamped, which
+    ; would otherwise misleadingly attach itself to a locationless map
+    ; failure.
+    lda CasmCliOptions
+    and #CASM_OPT_MAP
+    beq startMapDone
+    jsr diagClearLoc
+    jsr mapPrint
+    bcs startFatalNear
+startMapDone:
+
+    jsr diagPrintPhase2Ready
     jmp exitSuccess
 
 startFatalNear:
@@ -646,8 +722,34 @@ crpStageEvent:
     rts
 
 startFatal:
-    ; Best-effort delete of any partial output while preserving the primary
-    ; diagnostic in A, then route through central cleanup.
+    ; Best-effort delete of any partial listing/output artifacts while
+    ; preserving the primary diagnostic in A, then route through central
+    ; cleanup.
+    jmp artifactsAbort
+
+; ---------------------------------------------------------------------------
+; artifactsAbort (private, WP54)
+; Unified fatal routing for every artifact this run may have created: the
+; `.LST` listing file (if any) and the PRG output file. Chains listing.s's
+; and fileio.s's own already-independently-safe abort routines, each of
+; which is a documented no-op when nothing was ever created and never
+; deletes an already-committed artifact -- calling both unconditionally on
+; every fatal exit, regardless of how far initialization got or which
+; options were active, is always safe.
+;
+; Both listingAbort and outputAbort share the identical "A in = primary (or
+; CASM_DIAG_NONE), A out = primary or first cleanup diagnostic" contract, so
+; chaining them here composes correctly: whichever of (the caller's primary,
+; a listing cleanup failure, an output cleanup failure) occurred first is
+; the one that survives to exitFatal.
+;
+; Inputs:    A = primary CASM_DIAG_* value, or CASM_DIAG_NONE
+; Outputs:   does not return; falls into exitFatal with A = preserved
+;            primary or first cleanup failure
+; Clobbers:  A, X, Y and listingAbort/outputAbort's own clobbers
+; ---------------------------------------------------------------------------
+artifactsAbort:
+    jsr listingAbort
     jsr outputAbort
     jmp exitFatal
 

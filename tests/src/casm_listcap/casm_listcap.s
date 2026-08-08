@@ -143,6 +143,8 @@
 .export cliSourceSlotLo
 .export cliSourceSlotHi
 .export CasmOutputName
+.export CasmListingName
+.export CasmListingLen
 .export CasmCliOptions
 
 .segment "HEADER"
@@ -1256,6 +1258,10 @@ CasmSourceLens:  .res 2
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
 CasmCliOptions:  .res 1
+; WP53 increment 4: listing.s (linked whole) now references these -- never
+; touched by this harness, which does not exercise the new `.LST` file I/O.
+CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
+CasmListingLen:  .res 1
 
 .segment "RODATA"
 

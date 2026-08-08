@@ -122,6 +122,8 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
     + Do: Use a VICE MCP only under `.agents/workflows/vice-mcp-testing.md`, including its
       Command64 boot prerequisite, bounded observation/recovery rules, and evidence-based
       failure classification.
+    + Do: Start the emulator with `tools/vice_mcp_start.sh start` before any MCP call — the
+      MCP server is embedded in VICE itself, so nothing can launch it from inside MCP.
     + Don't: Launch Command64 applications from BASIC or with VICE Autostart; boot
       Command64 first and launch applications by name from its shell.
     + Don't: **NEVER** Use a web based emulator as a fall back.
@@ -136,7 +138,10 @@ TODO: Pare down [Do's & Dont's]
 ## MCPs
 
 + `codebase-memory-mcp`: Used for searching the codebase
-+ `c64-testing`: VICE automation used only under `.agents/workflows/vice-mcp-testing.md`
++ `c64`: VICE-embedded MCP server (HTTP, `x64sc -mcpserver`), used only under
+  `.agents/workflows/vice-mcp-testing.md`. Start/stop via `tools/vice_mcp_start.sh` — there is
+  no MCP tool to launch or kill the emulator process itself.
+  + USAGE GUIDE: `C64_MCP_USAGE.md`
 + `task-warrior-mcp`: Used for managing tasks
 + `sequential-thinking-mcp`: Used for sequential thinking
 
