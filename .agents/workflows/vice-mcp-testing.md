@@ -4,31 +4,56 @@ description: Run Command64 OS and application tests safely through the VICE MCP
 
 # VICE MCP Testing Workflow
 
-**This workflow is mandatory whenever an agent uses a VICE MCP to test Command64**. It adds
-the Command64 boot and shell contract to the MCP's generic lifecycle contract. Tool-server
-aliases such as `c64-testing` are configuration details; discover and use the `vice_*`
-capabilities rather than depending on an alias.
+**This workflow is mandatory whenever an agent uses the VICE MCP to test Command64**. It adds
+the Command64 boot and shell contract to the MCP's generic lifecycle contract. The `c64`
+server alias is a configuration detail; discover and use the `vice_*` capabilities rather than
+depending on it. For the full tool list and parameters, see `C64_MCP_USAGE.md`'s Command
+Reference.
+
+The MCP server is embedded directly in VICE (`x64sc -mcpserver`, HTTP JSON-RPC on `/mcp`) —
+there is no separate MCP process to install or configure.
 
 ## Non-negotiable invariants
 
-- **Prove you own the emulator** before anything else. `vice_start` returns a monitor
-  address **even when the process it launched never bound that port**. If another `x64sc`
-  already holds it, every later call silently drives **that** instance, with **its** disks.
+- **Prove you own the emulator** before anything else. This MCP has no tool that launches or
+  kills the emulator process — `x64sc -mcpserver` must already be running before any MCP call
+  can succeed. Use `tools/vice_mcp_start.sh status --port <N>` to confirm a live, *answering*
+  instance, not just a bound port — VICE can log `Failed to start HTTP server` and still leave
+  a stub socket listening that never answers a single request. `vice_ping` returning
+  `{"status":"ok",...}` is the only real proof.
 - **Re-attach a rebuilt image.** Rebuilding a `.d64` on the host does **not** change what an
-  already-attached drive serves. Rebuild-and-rerun in the same session **proves nothing**.
-  **No `vice_reset` mode refreshes it** — see Recovery. Only a new process does.
+  already-attached drive serves. Use `vice_disk_detach` + `vice_disk_attach` on the affected
+  unit to make a running instance see a rebuilt image — a full restart is not required for
+  this (see Recovery).
 - **Boot Command64** before launching any Command64 application or test harness.
-- **Prove Command64** startup by reading `Command 64-DOS Version` on the first screen line.
+- **Prove Command64 startup** by reading the first screen row (see State verification) and
+  requiring `Command 64-DOS Version` (case as decoded — see the screen-code note below).
 - Launch an application by entering its application name at the **Command64 shell**.
-- **NEVER** use `vice_load_program`/VICE Autostart for an application **AFTER** Command64 is resident. Autostart may reset to BASIC and destroy the OS session.
+- **NEVER** call `vice_autostart` for an application **AFTER** Command64 is resident. It
+  issues a `LOAD"*",8,1`/reset-to-BASIC sequence and will destroy the OS session.
 - **Treat a BASIC `READY.` screen** as proof that the **Command64 prerequisite is absent**.
 - Prove a normal application exit by observing the shell prompt `c64[<device>]:>`, where
   `<device>` is one or more decimal digits and may change during a session.
 - A **timeout is not an application failure**. Classify it using the failure rules below.
 
-## Disk selection
+## Starting the emulator
 
-Choose the image **before starting VICE**. Do not assume every harness is on `test.d64`.
+There is no MCP tool for this step — it is a shell prerequisite:
+
+```bash
+tools/vice_mcp_start.sh start --port 6510
+tools/vice_mcp_start.sh status --port 6510
+tools/vice_mcp_start.sh stop --port 6510
+```
+
+The script refuses to start a second instance on a port something already holds, and does
+not return success until `vice_ping` actually answers — it does not trust a bound port alone.
+If it reports a PID holding the port that never answers, that PID is not MCP-owned by this
+script; **killing a VICE process you did not just start is the user's call — ask first**.
+
+## Disk selection and attachment
+
+Choose the image(s) **before** attaching. Do not assume every harness is on `test.d64`.
 
 | Image | Use |
 |---|---|
@@ -37,15 +62,19 @@ Choose the image **before starting VICE**. Do not assume every harness is on `te
 | `build/casm_overflow_test.d64` | Newer harnesses and fixtures that do not fit on `test.d64`; the historical name does not make it CASM-exclusive |
 | Other dedicated D64 | Use when the test's build target or documentation explicitly requires it |
 
-Confirm the selected image exists and contains the required application or harness before
-starting an emulator test. C64 directory entries are physically limited to 16 characters,
-but that truncation does not replace the documented user-facing Command64 application
-name. A missing, wrong, or guessed application name is a setup failure.
+Confirm the selected image exists (`ls -la build/*.d64`) before attaching. Attach explicitly
+with `vice_disk_attach {unit, path}` — units 8-11 are all independently attachable on a
+running instance, so a harness that needs both the OS and its own fixtures does not have to
+be self-bootable on one disk, though keeping it that way is still simplest.
+
+C64 directory entries are physically limited to 16 characters, but that truncation does not
+replace the documented user-facing Command64 application name. A missing, wrong, or guessed
+application name is a setup failure.
 
 ## Session state
 
-Track connection, ownership, execution state, selected media, current machine context,
-checkpoints, last operation, and recovery count. Machine context is one of:
+Track connection, ownership, execution state, attached media per unit, current machine
+context, checkpoints, last operation, and recovery count. Machine context is one of:
 
 - `basic`
 - `command64_booting`
@@ -55,88 +84,107 @@ checkpoints, last operation, and recovery count. Machine context is one of:
 
 Never promote a context based only on a successful tool response.
 
+## State verification
+
+There is no screen-text tool. Read screen state directly out of screen RAM instead:
+
+```json
+{"name": "vice_memory_read", "arguments": {"address": "$0400", "size": 40, "encoding": "hex"}}
+```
+
+Each row is 40 bytes starting at `$0400 + 40*row` (rows 0-24). The bytes are **C64 screen
+codes**, not ASCII/PETSCII — they need a table, not a straight hex-to-char cast. Command64
+runs the character ROM's lowercase/uppercase charset (mixed-case display), where:
+
+- Screen code `$01`-`$1A` → lowercase `a`-`z`
+- Screen code `$41`-`$5A` → uppercase `A`-`Z`
+- Screen code `$20` → space
+- Screen code `$30`-`$39` → digits `0`-`9`
+- Screen code `$00` → `@`
+
+This is the same `vice_memory_read` tool the upstream README uses to read the BASIC ROM entry
+point, applied to screen RAM instead. **Verify the table against a `vice_display_screenshot`
+the first time you rely on it in a session**; do not carry forward an unverified decode
+across a whole test run. Color RAM (`$D800`-`$DBE7`, mapped low nibble only) is available the
+same way if a check ever needs it, but text content almost never requires it.
+
+Prefer this over screenshots for routine text assertions — it does not require image
+inspection and is cheaper to parse programmatically. Use `vice_display_screenshot` when
+glyph identity, color, or layout (not just character content) is what's being verified.
+
 ## Procedure
 
 1. Build the required CMake disk-image target before emulator testing. If VICE is already
-   running with that image attached, the rebuild **has not reached it** — restart with the
-   image in `vice_start.extra_args` before re-testing.
-2. Select the D64 and define the application's start, assertion, and exit evidence.
-3. Start a fresh MCP-owned VICE instance in `launch` mode with the D64 attached to the
-   intended device through `vice_start.extra_args`. Then **verify the instance you launched
-   actually owns the monitor port** — a returned `monitor_address` is not proof:
-
-```bash
-ss -ltnp | grep 6502          # which PID actually holds the port
-ps -eo pid,lstart,cmd | grep [x]64sc
-```
-
-   The owning PID must be the one just launched, and its command line must carry the
-   `-binarymonitor` and `-8`/`-9` arguments you passed. A long-running `x64sc` **without**
-   those flags is the user's own session: `vice_stop` will **not** kill it, so it survives
-   every restart. Clearing it is **destructive to the user's session — ask first**.
-4. Use `vice_load_program` to Autostart the selected D64 at the directory index verified
-   for `command64`. Autostart is permitted for this initial OS boot because establishing a
-   fresh OS session is the intended reset/load/run action. Do not assume an unverified
-   `file_index` when `command64` is not the image's first program.
-5. Observe the screen no more than twice while waiting for startup. Require the first line
-   to begin `Command 64-DOS Version`; otherwise machine context remains `unknown` or
-   `basic`.
-6. At the Command64 shell, use `vice_feed_keyboard` with `encoding: "ascii"` to send the
-   verified D64 application name followed by newline (`\n`), which the MCP converts to
-   PETSCII Return (`$0D`). Do not issue a BASIC `LOAD` or `RUN`, and do not call
-   `vice_load_program` for the application.
-7. Wait for application-start evidence using, in preference order, a temporary checkpoint,
-   memory sentinel, stable expected screen text, or combined PC and screen/memory evidence.
-8. Perform assertions. Use screenshots as supporting evidence, not the sole assertion when
-   deterministic evidence exists.
-9. For an application expected to exit, require the shell prompt matching
-   `c64[<device>]:>` before reporting successful return. The device number is variable.
-10. Delete test-created checkpoints and stop the MCP session.
+   running with that image attached, the rebuild **has not reached it** — detach and
+   re-attach the affected unit (see Disk selection) before re-testing.
+2. Select the D64(s) and define the application's start, assertion, and exit evidence.
+3. Confirm a live MCP-answering instance with `tools/vice_mcp_start.sh status`, starting one
+   if needed.
+4. Attach the selected image(s) with `vice_disk_attach`, explicit per unit.
+5. Use `vice_autostart` to boot the selected D64 at the directory index verified for
+   `command64`. Autostart is permitted for this initial OS boot because establishing a fresh
+   OS session is the intended reset/load/run action. Do not assume an unverified `index` when
+   `command64` is not the image's first program.
+6. Observe screen state (see State verification) no more than twice while waiting for
+   startup. Require the first row to decode to `Command 64-DOS Version`; otherwise machine
+   context remains `unknown` or `basic`.
+7. At the Command64 shell, use `vice_keyboard_type` with the verified D64 application name
+   followed by `\n`. Shell commands are lowercase-only case-sensitive — send lowercase text
+   and leave `petscii_upper` at its default. Do not issue a BASIC `LOAD` or `RUN`, and do not
+   call `vice_autostart` for the application. If exact bytes matter (a filename character
+   `vice_keyboard_type`'s ASCII mapping can't represent), use `vice_keyboard_petscii` with
+   explicit byte values — verify every non-alphanumeric byte against a PETSCII table first;
+   ASCII `$5F` is left-arrow in PETSCII, not underscore, and a hand-rolled mistake here fails
+   silently and looks exactly like a missing file.
+8. Wait for application-start evidence using, in preference order, a temporary checkpoint,
+   memory sentinel, stable decoded screen text, or combined PC and memory evidence.
+9. Perform assertions. Use `vice_display_screenshot` as supporting evidence, not the sole
+   assertion when deterministic evidence exists.
+10. For an application expected to exit, require the shell prompt matching `c64[<device>]:>`
+    before reporting successful return. The device number is variable.
+11. Delete test-created checkpoints (`vice_checkpoint_delete`) and stop the instance with
+    `tools/vice_mcp_start.sh stop` if this workflow started it.
 
 ## Timing and pause discipline
 
 - **Do not pause** during reset, disk loading, Command64 boot, keyboard command processing,
   application loading, or application startup unless a planned checkpoint is the expected
   synchronization event.
-- Use temporary stopping checkpoints **ONLY** where possible.
-- **Record why execution is stopped** before inspecting it, then resume exactly once when the inspection is complete.
-- **Do not use repeated** `vice_run`, screen reads, register reads, or identical tool calls as a substitute for a missing wait primitive.
-- **Make at most two observations** for one transition; **the second must be independent or stronger** where possible.
+- Use temporary stopping checkpoints (`vice_checkpoint_add` with `stop: true`, deleted after)
+  **ONLY** where possible.
+- **Record why execution is stopped** before inspecting it, then resume exactly once
+  (`vice_execution_run`) when the inspection is complete.
+- **Do not use repeated** `vice_execution_run`, memory reads, register reads, or identical
+  tool calls as a substitute for a missing wait primitive.
+- **Make at most two observations** for one transition; **the second must be independent or
+  stronger** where possible.
 - Declare a workload-specific deadline **before launch**. Disk size, true-drive emulation, and
   application initialization may require substantially more than a generic two- or
   five-second delay. Do not classify an application before its declared deadline.
 
 ## Recovery
 
-`vice_reset` takes a `mode`: `system` (default, soft — images stay attached), `power_cycle`
-(hard), and `drive8`..`drive11` (per-drive). Prefer the least invasive mode that can fix
-the actual fault:
+`vice_machine_reset` takes a `mode`: `soft` (default — CPU reset, images stay attached) or
+`hard` (power cycle). There is no per-drive reset. To fix a stuck drive or refresh a rebuilt
+image, detach and re-attach that unit with `vice_disk_detach` / `vice_disk_attach` instead.
 
 | Fault | Correct action |
 | --- | --- |
-| Machine/OS state is wrong | `system`, then re-boot Command64 |
-| A drive is wedged | `drive<N>` |
-| A `.d64` was rebuilt on the host | `power_cycle`, then autostart it again |
+| Machine/OS state is wrong | `vice_machine_reset {mode: "soft"}`, then re-boot Command64 |
+| A drive is wedged, or a `.d64` was rebuilt on the host | `vice_disk_detach` then `vice_disk_attach` on that unit |
+| Nothing else works | `vice_machine_reset {mode: "hard"}`, then autostart again |
 
-**Measured, not assumed:** with a rebuilt image carrying a new file, `system` and `drive<N>`
-both keep serving the **stale** image. `power_cycle` followed by a fresh
-`vice_load_program` picks up the new content — **killing the process is not required**.
-
-The real limitation is *which drive*: `vice_load_program` only ever targets **drive 8**, and
-no MCP call attaches an image to drives 9-11 on a running instance. **Do not design a test
-around a two-drive layout** — put `command64` on the harness's own disk so it is
-self-bootable on drive 8. Swapping the disk under a resident Command64 is not an
-alternative: `vice_load_program` destroys the OS session even with `run: false` (it issues
-a BASIC `LOAD"*",8,1`), which is exactly what the Autostart invariant above forbids.
+Consider `vice_snapshot_save` before a risky operation in a long session — restoring with
+`vice_snapshot_load` can be cheaper than a full reboot-and-reattach cycle when the fault is
+localized and reproducible.
 
 One clean restart is allowed per test:
 
-1. Stop/disconnect the MCP session. Prefer **`Power Cycle Machine`** over killing the
-   process for machine-state faults — but note it cannot refresh a rebuilt image, and a
-   stale monitor-port owner survives `vice_stop` entirely. Killing a VICE process the MCP
-   did not launch is **the user's call — ask**.
+1. Stop the instance with `tools/vice_mcp_start.sh stop` for machine-state faults that
+   `vice_machine_reset` didn't fix. Killing a VICE process this workflow did not start is
+   **the user's call — ask**.
 2. Discard all assumed emulator, OS, application, and checkpoint state.
-3. Start a new VICE instance and repeat from disk selection and Command64 boot.
+3. Start a new instance and repeat from disk selection and Command64 boot.
 4. If the same stage fails again, stop calling tools and preserve the evidence.
 
 **Do not repeat** a timed-out state-changing call against an uncertain session.
@@ -146,13 +194,12 @@ One clean restart is allowed per test:
 - **Product failure:** MCP and VICE remain responsive, the correct disk and Command64
   banner are proven, application start is proven, and observed behavior contradicts the
   assertion.
-- **Harness failure:** MCP transport, VICE lifecycle, monitor state, pause timing, or
+- **Harness failure:** MCP transport, VICE lifecycle, decode-table mismatch, pause timing, or
   synchronization failed.
 - **Setup failure:** The build, image, application, fixture, path, device, or prerequisite
-  is absent or wrong. A bare `general failure` from `vice_load_program` is normally this,
-  not a harness failure: the path does not exist or is unreadable. Check `ls -la build/*.d64`
-  before touching emulator state, and remember a missing image makes its
-  `vice_start.extra_args` attach a silent no-op.
+  is absent or wrong. Check `ls -la build/*.d64` before touching emulator state — a missing
+  image makes its `vice_disk_attach` call fail explicitly, which is useful: an attach error
+  is a setup failure, not a harness fault.
 - **Inconclusive:** The machine state cannot be established safely.
 
 Returning to BASIC after application Autostart is a harness/workflow failure, not evidence
@@ -161,54 +208,49 @@ return was not established; use independent evidence before assigning a product 
 
 **A rebuilt artifact that keeps producing a byte-identical old result is a harness failure
 until proven otherwise.** Do not theorize a product bug — relocation, device, or OS — while
-the emulator's provenance is unproven. Check port ownership and image freshness **first**.
-The decisive cheap test: search the host image and emulator RAM for a distinctive byte
-sequence. **If RAM holds bytes that exist in no file on disk, you are driving something
-stale**, and every observation made through it is void.
+the emulator's provenance is unproven. Check instance liveness (`vice_ping`) and image
+freshness (re-attach) **first**. The decisive cheap test: `vice_memory_search` for a
+distinctive byte sequence known to be new. **If RAM holds bytes that exist in no file on
+disk, you are driving something stale**, and every observation made through it is void.
 
 ## Test report
 
-Record the build target and D64, application name, VICE version and monitor address when
-available, Command64 banner evidence, application-start evidence, assertion evidence,
-shell-return evidence, checkpoint IDs, recovery attempt, and final classification.
+Record the build target and D64(s), application name, VICE version (`vice_ping`), attached
+units, Command64 banner evidence, application-start evidence, assertion evidence,
+shell-return evidence, checkpoint IDs, recovery attempts, and final classification.
 
 When the MCP is unavailable, do not use a web emulator. Ask the user to perform the same
 workflow in a supported local VICE instance and report the evidence.
 
 ## Controlled canary
 
-Use this exact canary when validating an agent or MCP configuration.
+Use this exact canary when validating an agent or MCP configuration change. It has not yet
+been run end-to-end against this server — treat the first run as verification of the workflow
+itself, not just the harness under test, and update this section with the recorded evidence
+once it has.
 
 1. Build `test_image_d64` through CMake and confirm `build/test.d64` exists.
-2. Start a fresh MCP-owned `x64sc` with `build/test.d64` attached to device 8.
-3. Autostart file index 0 from `build/test.d64`; this boots `command64`.
-4. Allow a bounded two-second OS boot window, then capture one screenshot.
-5. Require `Command 64-DOS Version` and a prompt matching `c64[<device>]:>` **at boot time**.
-6. Send the full documented application name through converted ASCII input:
+2. `tools/vice_mcp_start.sh start`, then confirm with `status`.
+3. `vice_disk_attach {unit: 8, path: ".../build/test.d64"}`.
+4. `vice_autostart` file index 0 from `build/test.d64`; this boots `command64`.
+5. Allow a bounded two-second OS boot window, then decode screen row 0 (see State
+   verification).
+6. Require `Command 64-DOS Version` and a prompt matching `c64[<device>]:>` **at boot time**.
+7. Send the full documented application name via `vice_keyboard_type`:
 
-```json
-{"encoding":"ascii","text":"test_casm_passcheck\n"}
-```
+   ```json
+   {"name": "vice_keyboard_type", "arguments": {"text": "test_casm_passcheck\n"}}
+   ```
 
-7. Resume emulation once if the prior inspection left it stopped.
-8. The harness is 63 blocks. Allow up to 60 seconds under true-drive emulation before the
+8. Resume emulation once (`vice_execution_run`) if the prior inspection left it stopped.
+9. The harness is 63 blocks. Allow up to 60 seconds under true-drive emulation before the
    first assertion observation; do not poll during that window.
-9. Capture screen text or one screenshot. Require `CASM PASSCHECK: PASS` followed by a
-   prompt matching `c64[<device>]:>`.
-10. Stop the MCP-owned VICE process.
+10. Decode screen text or capture one screenshot. Require `CASM PASSCHECK: PASS` followed by
+    a prompt matching `c64[<device>]:>`.
+11. `tools/vice_mcp_start.sh stop`.
 
-If converted ASCII input is under diagnosis, the equivalent exact PETSCII input is:
+Do not substitute the physical 16-character directory rendering `test.casm.passch` for the
+documented application name.
 
-```json
-{"encoding":"petscii_hex","data_hex":"d4c5d3d4a4c3c1d3cda4d0c1d3d3c3c8c5c3cb0d"}
-```
-
-Do not substitute the physical 16-character directory rendering
-`test.casm.passch` for the documented application name. Short two- and five-second
-application windows produced misleading `loading...` observations during the original
-trial; the harness subsequently completed with `CASM PASSCHECK: PASS`.
-
-See `brain/walkthroughs/2026-07-26-vice-mcp-controlled-trial.md` for the recorded evidence
-and failure-analysis history.
-
-See `C64_MCP_USAGE.md` for guidlines and additional findings. Update `C64_MCP_USAGE.md` as required.
+See `C64_MCP_USAGE.md` for the full command reference and additional findings. Update
+`C64_MCP_USAGE.md` as required.

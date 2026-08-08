@@ -1,225 +1,187 @@
-# c64-testing MCP Usage Guide
+# c64 MCP Usage Guide
 
-Testing with `c64-testing` MCP should largely follow certain guidelines laid out here.
+`c64` is the VICE-embedded MCP server: `x64sc -mcpserver`, HTTP JSON-RPC on `/mcp`, started
+via `tools/vice_mcp_start.sh` (there is no MCP tool to launch or kill the emulator process
+itself — see `.agents/workflows/vice-mcp-testing.md` for the full testing procedure this
+guide supports).
 
-## OS and Applications
+## Command Reference
 
-Applications for *Command 64 OS* **MUST BE RUN FROM COMMAND 64's SHELL** they **CANNOT** be *LOADed from BASIC* or else they will fail.
+Verified directly against a live `tools/list` call (2026-08-06), not transcribed from prose —
+tool names are underscored (`vice_execution_run`), not dotted. 60 tools across 12 categories,
+plus 4 protocol-internal entries (`initialize`, `notifications_initialized`, `tools_list`,
+`tools_call`) not listed below. If a tool ever isn't where this table says, trust a live
+`tools/list` over this document and file a correction. Full upstream docs:
+`tools/VICE-MCP-README.md`.
 
-## Patience and Performance
+**Execution** — `vice_ping()` liveness/version check · `vice_execution_run()` ·
+`vice_execution_pause()` · `vice_execution_step({count?, stepOver?})` ·
+`vice_run_until({address?, cycles?})`
 
-The C64`s 6502 processor is a 1Mhz processor and the emulator reproduces this. As a result commands can take quite a while to load and execute. Give them time.
+**Registers** — `vice_registers_get()` · `vice_registers_set({register, value})`
+(`register`: `PC|A|X|Y|SP|N|V|B|D|I|Z|C`)
 
-### Warp Mode
+**Memory** — `vice_memory_read({address, size, bank?, encoding?})` ·
+`vice_memory_write({address, data})` · `vice_memory_banks()` ·
+`vice_memory_search({start, end, pattern, mask?, max_results?})` ·
+`vice_memory_fill({start, end, pattern})` ·
+`vice_memory_compare({mode: "ranges"|"snapshot", ...})`
 
-A "warp mode" is availble and may be used in extreme cases to speed execution but beware this has the possibilty of scewing performance and timing issues. If *warp mode* is used it should be **DISABLED AFTER A TEST OR TASK HAS BEEN COMPLETED**; it should alse be disabled as a **diagnostic step** if testing seems **UNSTABLE**
+**Checkpoints** — `vice_checkpoint_add({start, end?, stop?, load?, store?, exec?})` ·
+`vice_checkpoint_delete({checkpoint_num})` · `vice_checkpoint_list()` ·
+`vice_checkpoint_toggle({checkpoint_num, enabled})` ·
+`vice_checkpoint_set_condition({checkpoint_num, condition})` ·
+`vice_checkpoint_set_ignore_count({checkpoint_num, count})` ·
+`vice_checkpoint_group_create({name, checkpoint_ids?})` ·
+`vice_checkpoint_group_add({group, checkpoint_ids})` ·
+`vice_checkpoint_group_toggle({group, enabled})` · `vice_checkpoint_group_list()`
 
-#### Warm Mode Example
+**Sprites** — `vice_sprite_get({sprite?})` ·
+`vice_sprite_set({sprite, x?, y?, enabled?, multicolor?, expand_x?, expand_y?, priority_foreground?, color?})` ·
+`vice_sprite_inspect({sprite_number, format?})` (`format`: `ascii`|`binary`|`png_base64`)
 
-Some applications or opperations can be long running or loading as indicated in `PATIENCE and PERFORMANCE` and example is building `dash`. *Loading `casm`* is a long process and *building `dash`*, which is a non-trivial application, takes even longer; this can take several minutes. This is one example case where using *warp mode* might be appropriate.
+**Chip state** — `vice_vicii_get_state()` · `vice_vicii_set_state({registers})` ·
+`vice_sid_get_state()` · `vice_sid_set_state({registers})` ·
+`vice_cia_get_state({cia?})` (1 or 2, omit for both) ·
+`vice_cia_set_state({cia1_registers?, cia2_registers?})`
 
-## Character Set/Map and Mode
+**Disk** — `vice_disk_attach({unit, path})` · `vice_disk_detach({unit})` ·
+`vice_disk_list({unit})` · `vice_disk_read_sector({unit, track, sector})` (units 8-11)
 
-*Command 64 OS* uses the mixed mode which *displays* **Upper and Lowercase** but they still map to their respective **PETSCII** character set. Case matters in many situations.
+**Machine** — `vice_autostart({path, program?, run?, index?})` ·
+`vice_machine_reset({mode?: "soft"|"hard", run_after?})` · `vice_machine_config_get()` ·
+`vice_machine_config_set({resources})`
 
-## Commands
+**Display** — `vice_display_screenshot({path?, format?, return_base64?})` ·
+`vice_display_get_dimensions()`
 
-Commands are case sensitive in *Command 64* both in the shell itself and *external applications*
+**Input** — `vice_keyboard_type({text, petscii_upper?})` ·
+`vice_keyboard_petscii({data})` (exact PETSCII bytes) ·
+`vice_keyboard_key_press({key, modifiers?, hold_frames?, hold_ms?})` ·
+`vice_keyboard_key_release({key, modifiers?})` · `vice_keyboard_restore({pressed?})` ·
+`vice_keyboard_matrix({key?, row?, col?, pressed?, hold_frames?, hold_ms?})` ·
+`vice_keyboard_chord({keys, hold_frames?, hold_ms?})` ·
+`vice_joystick_set({port?, direction?, fire?})` ·
+`vice_joystick_tap({port?, direction?, fire?, duration_frames?, duration_ms?})`
 
-### Example
+**Debug** — `vice_disassemble({address, count?, show_symbols?})` ·
+`vice_symbols_load({path, format?})` (`format`: `auto`|`kickasm`|`vice`|`simple`) ·
+`vice_symbols_lookup({name?, address?})` ·
+`vice_watch_add({address, size?, type?, condition?})` · `vice_backtrace({depth?})` ·
+`vice_cycles_stopwatch({action: "reset"|"read"|"reset_and_read"})`
 
-+ The `flush` command reads and clears a device's *status and error*
-  + `flush` will *succeed*
-  + `FLUSH` will *fail* causing the device to be in an error state.
-  
-## Potential Build Artifacts
+**Snapshots** — `vice_snapshot_save({name, description?, include_roms?, include_disks?})` ·
+`vice_snapshot_load({name})` · `vice_snapshot_list()`
 
-Building a single application *with the build system* is acceptable but it must be added to a *.d64* image which *must be attached* or else it will not be availble for testing. This may be performed manually or by rebuilding the image if the test application has been adde to the build harness.
+Not present in this build despite being described in `tools/VICE-MCP-README.md`'s overview table:
+checkpoint auto-snapshot (`set_auto_snapshot`/`clear_auto_snapshot`), execution tracing
+(`trace.start`/`trace.stop`), and interrupt logging (`interrupt.log.*`). The README's own
+Project Status section marks tracing/interrupt-logging as still in progress; auto-snapshot
+isn't in its detailed Tool Reference section either despite the overview table mentioning it.
+Treat the overview table as aspirational and the live `tools/list` as ground truth.
 
-## State and Testing
+## Command64 OS testing guidelines
 
-**State matters**. If the emultor has been paused either explicitly or as a side-effect of a MCP command it must be restarted or tests will continue to fail.
+Applications for *Command 64 OS* **MUST BE RUN FROM COMMAND 64's SHELL** — they **CANNOT** be
+*LOADed from BASIC* or they will fail.
 
-### Consuming Responses
+**Patience**: the emulated 6502 runs at real 1MHz. Commands and loads can take a while; give
+them time before classifying a timeout as a failure. `warp mode`
+(`vice_machine_config_set {"resources": {"WarpMode": 1}}`) can speed up long operations
+(building `dash`, loading `casm`) but **disable it afterward** (`WarpMode: 0`) — it can skew
+timing-sensitive tests, and disabling it is also a useful diagnostic step if a test seems
+unstable.
 
-+ *Reading the screen text* to evaluate a response or potential state is *prefered over screenshots*
-+ *Screen shots* should *only* be used when reading the screen text does not or cannot provide enough context. Be mindful, they may pause the emulator.
+**Case matters**. Command64 uses the mixed-case charset (see the workflow doc's State
+verification section for the screen-code table this implies), and both shell commands and
+external application commands are case-sensitive — `flush` succeeds, `FLUSH` fails and leaves
+the device in an error state.
 
-### Breakpoint
+**Build artifacts** must be added to a `.d64` image and that image attached
+(`vice_disk_attach`) before they're testable — rebuild the image, or add the file manually.
 
-Breakponts are a valuable mechanic for testing but must be resumed after reading machine state.
+**State matters**: a paused emulator (explicit or as a side effect of an MCP call) must be
+resumed (`vice_execution_run`) or subsequent tests will keep failing against stale state.
 
-### Reseting
+**Reading state**: decode screen RAM (`vice_memory_read` on `$0400`+, see the workflow doc)
+over screenshots for routine text assertions — there's no dedicated screen-text tool. Use
+`vice_display_screenshot` only when a decoded read can't answer the question (glyph identity,
+color, layout).
 
-Reseting the emulator is a inevitability. It is preferable to **initiate a machine reset** instead of killing the process. **Killing the process and restarting** is acceptable as a last resort to reset the machine.
+**Resetting**: prefer `vice_machine_reset` over killing the process. Killing and restarting
+(`tools/vice_mcp_start.sh stop` then `start`) is a last resort.
 
-### Detaching
+**When finished testing**, stop the instance you started (`tools/vice_mcp_start.sh stop`) and
+return control to the user. Never stop an instance you did not start without asking first.
 
-When finished testing you **must detach and return control to the user**
+## Discoveries and lessons
 
-# Usage Discoveries and Lessons
+Update this section with usage discoveries as they're found.
 
-Update this `Discoveries and Lessons` with usage **discoveries and "lessons"** to prevent future mistakes.
+### A stub socket can outlive a failed HTTP bind — `vice_ping` is the only proof of life
 
-## Discoviers and Lessons
+VICE can log `MCP-Transport: Error - Failed to start HTTP server on port <N>` and yet the OS
+still shows that PID holding a `LISTEN` socket on the port (`ss -ltnp`, `lsof -i :<N>`).
+Requests against a socket in that state either hang indefinitely or return a bare
+`Received HTTP/0.9 when not allowed` from curl — never a JSON-RPC response. A bound port is
+not evidence of a working server. Confirm with an actual `vice_ping` round-trip
+(`tools/vice_mcp_start.sh status` does this) before trusting anything else. This was caused by
+a previous instance still holding the port at bind time in every case observed — check for a
+competing process before assuming a given launch itself is broken.
 
-### Verify which VICE process owns the monitor port before trusting anything
+### Reproduce documented curl examples exactly
 
-`vice_start` in `launch` mode returns a monitor address **even when it did not
-get that port**. If another `x64sc` is already listening on `127.0.0.1:6502`
-(for example one the user started by hand hours earlier), the newly launched
-process cannot bind it, and every subsequent MCP call silently drives the
-*other* instance — with whatever disks *it* has attached.
-
-Symptom: a freshly rebuilt harness keeps producing the old, pre-fix result no
-matter how many times you rebuild, restart, or reset.
-
-Confirm ownership before drawing conclusions:
-
-```bash
-ss -ltnp | grep 6502          # which PID actually holds the monitor port
-ps -eo pid,lstart,cmd | grep [x]64sc
-```
-
-A long-running `x64sc` with no `-binarymonitor` flags in its command line is
-almost certainly the user's own session, not an MCP-owned one. `vice_stop`
-only kills instances the MCP itself launched, so a stale owner survives it —
-clearing the port needs an explicit kill, and that is the user's call.
-
-### A rebuilt `.d64` does not reach an already-attached drive
-
-Rebuilding the image on the host does **not** update what a running VICE
-serves; the drive keeps serving the image as attached. Rebuilding *and*
-re-running in the same session proves nothing.
-
-`vice_reset` takes a `mode` (`system`, `power_cycle`, `drive8`..`drive11`).
-None of them refreshes a rebuilt image. Measured directly, by rebuilding a
-`.d64` with a new file on it and then asking the running emulator for that
-file:
-
-| `vice_reset` mode | Effect | Sees rebuilt image? |
-| --- | --- | --- |
-| `system` (default) | Soft reset; images stay attached | **No** |
-| `drive9` (per-drive) | Resets the drive; no host re-read | **No** |
-| `power_cycle` | Hard reset | **Yes**, via a fresh autostart |
-
-**`power_cycle` is the right tool** — no need to kill the process. After it,
-`vice_load_program` on the rebuilt `.d64` attaches and autostarts it fresh,
-picking up the new content. (An earlier note here claimed `power_cycle`
-detaches images and leaves the instance unusable; that was wrong. The
-`general failure` behind that claim was a **missing file**, not detachment —
-see the next section.)
-
-The real limitation is *which* drive: `vice_load_program` only ever targets
-**drive 8**, and there is no MCP call that attaches an image to drive 9-11 on
-a running instance. Only `vice_start.extra_args` can, and that needs the
-monitor port free.
-
-**So do not design a test around a two-drive layout.** If a harness needs
-both the OS and its own fixtures, put `command64` on the harness's own disk
-so it is self-bootable on drive 8 (this is what `casm_listing_test_d64`
-does). Swapping the disk under a resident Command64 is not an alternative:
-`vice_load_program` destroys the OS session even with `run: false`, because
-it issues a BASIC `LOAD"*",8,1`.
-
-Cheap way to tell stale bytes from a real failure: search the host image and
-the emulator's RAM for a known distinctive byte sequence and compare. If RAM
-holds bytes that exist in no file on disk, the emulator is serving something
-stale.
-
-Cheap way to tell stale bytes from a real failure: search the host image and
-the emulator's RAM for a known distinctive byte sequence and compare. If RAM
-holds bytes that exist in no file on disk, the emulator is serving something
-stale.
-
-### `general failure` from `vice_load_program` usually means "no such file"
-
-The MCP reports a bare `general failure` with no detail when the path does
-not exist or is not readable by the VICE process. It reads exactly like an
-emulator or monitor fault and is not one. Before touching emulator state,
-check the artifact:
-
-```bash
-ls -la build/*.d64
-```
-
-A missing image also means any `vice_start.extra_args` attach for it silently
-did nothing, so that drive is simply empty — rebuild the image, then relaunch
-so the attach actually happens. Seen when `build/test.d64` alone had gone
-missing while every other image was present; `cmake --build build --target
-test_image_d64` recreated it and autostart worked immediately.
+`tools/VICE-MCP-README.md`'s `## Talk to It` examples use multi-line `--data` payloads with real
+`\n` line breaks in the request text (e.g. `"text": "test_casm_passcheck\n"`). Minifying a
+payload to one line is fine; changing the method name or dropping fields is not — reproduce
+the exact shape before concluding a request failure is the server's fault.
 
 ### Keyboard encoding: shell commands vs filenames
 
-`vice_feed_keyboard` with `encoding: "ascii"` maps **lowercase** source text to
-unshifted PETSCII (`$41`-`$5A`) and **uppercase** source text to shifted
-PETSCII (`+$80`). **Built-in shell commands accept only the unshifted form**,
-so:
+`vice_keyboard_type` maps text to PETSCII with `petscii_upper` (default `true`, meaning
+uppercase ASCII input displays as uppercase). Command64's shell accepts only unshifted
+PETSCII for built-in commands, so:
 
-+ Type shell commands in **lowercase**: `drive 9`, `dir`.
-+ `{"encoding":"ascii","text":"DRIVE 9\n"}` **fails** with
-  `Bad command or file name` — the uppercase maps to shifted bytes.
+- Type shell commands in **lowercase**: `drive 9`, `dir`.
+- Filenames are more forgiving — the OS normalizes them — but typing everything lowercase
+  covers both cases with one rule.
 
-Filenames are more forgiving than commands — the OS normalizes them, and
-uppercase `TEST_CASM_CLIDER` loaded successfully where uppercase `DRIVE 9`
-did not (the controlled canary's shifted `petscii_hex` filename works for the
-same reason). Do not rely on that asymmetry: **type everything lowercase** and
-one rule covers both.
+For exact bytes, `vice_keyboard_petscii` takes raw PETSCII values directly. Do not hand-derive
+a byte for `_`: ASCII `$5F` is left-arrow in PETSCII, not underscore (the underscore in these
+filenames is `$A4`). A wrong byte here fails silently and looks exactly like a missing file.
 
-Do not hand-roll `petscii_hex` for anything containing `_`. ASCII `$5F` is
-**left-arrow** in PETSCII, not underscore; the underscore in these filenames is
-`$A4`. Hand-rolled hex silently produces `test←casm←clider`, which then fails
-to load and looks exactly like a broken device or a missing file. Let the
-`ascii` encoding do the conversion.
+### Reading a result from memory beats screen-scraping it
 
-### `vice_read_screen_text` cannot show you case
-
-The decoder renders unshifted PETSCII as ASCII **uppercase** and shifted
-PETSCII as `?`. So `DRIVE 9` in a screen-text read means the *unshifted*
-(correct, on-screen-lowercase) bytes, and a row of `?????` means shifted bytes.
-Never conclude "case is correct" from a screen-text read. When case or exact
-glyphs matter, take a screenshot — this is the documented exception to
-preferring screen text.
-
-Also read short result rows carefully: `FFFF...` is four failures followed by
-three passes, not a truncated line.
-
-### Reading a result is more reliable than screen-scraping it
-
-A harness that ends in `DOS_EXIT` can scroll or clear its own output. When the
-result must be unambiguous, read the harness's own counter out of memory
-instead: build with `ca65 -g` / `ld65 --dbgfile`, look the symbol up, and read
-it.
+A harness that ends by returning to a prompt can scroll or clear its own output. When the
+result must be unambiguous, read the harness's own counter out of memory instead: build with
+`ca65 -g` / `ld65 --dbgfile`, look the symbol up, and read it directly
+(`vice_memory_read`/`vice_symbols_lookup`).
 
 ```bash
 grep '"FailCount"' out.dbg     # -> val=0x3CEE
 ```
 
-Then break at the reporting branch and read that address; `00` is a pass. This
-was the evidence that separated a genuine logic bug from a stale image.
+Break at the reporting branch (`vice_checkpoint_add`) and read that address; `00` is a pass.
 
 ### Standalone runs are a diagnostic tool, not verification
 
-Running a harness PRG directly at its link base (load it, set `PC`, run) is a
-legitimate way to isolate pure-logic behaviour from the loader, relocator, and
-shell. It is **not** product verification — per this document, applications
-must be run from Command 64's shell. Use a standalone run to localize a bug,
-then re-verify through the shell before calling anything done.
+Running a harness PRG directly at its link base (load it, set `PC`, run) is a legitimate way
+to isolate pure-logic behavior from the loader, relocator, and shell. It is **not** product
+verification — applications must be run from Command 64's shell for that. Use a standalone
+run to localize a bug, then re-verify through the shell before calling anything done.
 
 ### ca65 charmap: fixture literals must be lowercase
 
-With ca65's C64 target charmap, a source literal `"8:FOO.S"` assembles to
-*shifted* PETSCII (`$C6 $CF $CF`), while `"8:foo.s"` assembles to *unshifted*
-(`$46 $4F $4F`). CASM's routines emit unshifted constants
-(`CASM_PETSCII_P/R/G/L/S/T`), so expected-value fixtures compared against them
-must be written **lowercase** in the `.s` source. Uppercase literals produce a
-harness that fails against correct production code. See
-`reference-casm-petscii-identifier-case`.
+With ca65's C64 target charmap, a source literal `"8:FOO.S"` assembles to *shifted* PETSCII
+(`$C6 $CF $CF`), while `"8:foo.s"` assembles to *unshifted* (`$46 $4F $4F`). CASM's routines
+emit unshifted constants (`CASM_PETSCII_P/R/G/L/S/T`), so expected-value fixtures compared
+against them must be written **lowercase** in the `.s` source — uppercase literals produce a
+harness that fails against correct production code. See `reference-casm-petscii-identifier-case`.
 
 ### Pacing
 
-Screen reads and other monitor queries pause the emulator; resume with
-`vice_run` before assuming a command has progressed. A read immediately after
-`vice_feed_keyboard` typically shows the *previous* state — resume, wait, then
-read. Loading a small harness from a `.d64` under true drive emulation takes
-tens of seconds; do not classify a run as failed before its deadline.
+Memory/register reads and other queries can pause the emulator; resume with
+`vice_execution_run` before assuming a command has progressed. A read immediately after
+`vice_keyboard_type` typically shows the *previous* state — resume, wait, then read. Loading a
+small harness from a `.d64` under true drive emulation takes tens of seconds; do not classify
+a run as failed before its deadline.
