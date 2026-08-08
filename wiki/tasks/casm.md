@@ -1480,15 +1480,22 @@ Symbol Map and Listing, remains inactive and separately gated.**
       `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`
       and
       `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`.
-- [ ] WP54 `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: production integration.
-      Approved plan:
+- [x] WP54 `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: production integration —
+      `/M` and `/L` fully wired into `casm.s`'s real `start`/`casmRunPass`
+      sequence. Complete at CASM `0.1.55` build 1257, user-approved
+      2026-08-08, per
       `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-      WP53 complete; WP54 not yet activated.
+      Increment 1's dedicated failure-injection harness was formally
+      dropped from scope (user decision) in favor of increment 6's live
+      production-fixture matrix as Completion Gate evidence — see the
+      plan's own Progress log.
 - [ ] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
-      and Phase 10 completion gate. Blocked by WP54.
+      and Phase 10 completion gate. Unblocked now that WP54 is complete; not
+      yet started.
 
-**WP53 is complete at CASM `0.1.54` build 1237, user-approved 2026-08-06.
-WP54-WP55 remain blocked pending WP54's own explicit activation.**
+**WP54 is complete at CASM `0.1.55` build 1257, user-approved 2026-08-08.
+`/M` and `/L` are both fully implemented in production `casm`. WP55 (the
+phase-level completion gate) is unblocked but not yet started.**
 
 ## Optional Feature - Progress and Processing Indication
 

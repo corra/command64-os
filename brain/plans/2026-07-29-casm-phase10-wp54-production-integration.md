@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-wp54-production-integration
 created: 2026-07-29
-status: approved-blocked
+status: complete
 taskwarrior: f4b598fd-bab1-4394-9415-c71e3ea1cfa5
 depends-on: aa57f461-36a9-455c-966f-ac484ec57b41
 ---
@@ -10,7 +10,8 @@ depends-on: aa57f461-36a9-455c-966f-ac484ec57b41
 
 ## Status
 
-Approved but blocked by WP53 completion. Completion target: CASM `0.1.55`.
+**Complete.** User-approved 2026-08-08. CASM bumped `0.1.54` -> `0.1.55`
+(build 1258), live-verified via VICE (`CASM V0.1.55.1258`).
 
 ## Objective
 
@@ -442,3 +443,63 @@ records. Does not activate WP55.
   needs the user's review/approval (Completion Gate item), then
   increment 8 (version bump to stable `0.1.55` + synchronized docs/
   CHANGELOG/wiki/task records) can proceed.
+- 2026-08-08: User approved the walkthrough summary ("Commit it and begin
+  increment 8"). Increment 8 (version bump + synchronized docs/CHANGELOG/
+  wiki/task records) executed:
+  - `VERSION_STAGE` bumped `"54"` -> `"55"` in `casm.s` (the sole code
+    change; a version-only completion increment per this project's
+    established pattern from WP50-53). Full 25-target rebuild clean; build
+    counter advanced exactly once (`1257` -> `1258`); code size unchanged
+    at 18553 bytes (a 2-character string literal swap has no size delta).
+    Live-verified via VICE: booted `casm_phase10_test.d64` fresh, ran
+    `casm` with no source argument, confirmed `CASM V0.1.55.1258` then
+    `CASM: SOURCE FILE REQUIRED` on real emulated hardware.
+  - `CHANGELOG.md`: added a WP54 entry under `### Added`, ahead of the
+    existing WP53 entry, following the same format/depth WP52/WP53 used.
+  - `wiki/casm-utility.md` (mirrored verbatim to `docs/casm-utility.md`):
+    version banner bumped, Phase 10 status callout rewritten (no longer
+    "planning-only"), `/M`/`/L` parameter descriptions rewritten to
+    describe real behavior, a new "Map and Listing Output (`/M`, `/L`)"
+    section added with concrete examples, and both switches removed from
+    "Not Yet Supported" (replaced with the real remaining gap: an `/O`/`/L`
+    output-name collision hangs rather than replacing, a pre-existing
+    `fileCreateOutput` limitation, not a WP54 regression).
+  - `wiki/casm-programmers-reference.md`: status banner rewritten (was
+    still describing Phase 10 as "planning-only, no code landed" despite
+    WP50-53 having shipped modules already); architecture diagram gained
+    `map.s`/`listing.s` nodes; the `start` call-sequence description in
+    §1 updated to the real WP54 order; §5's CLI table `/M`/`/L` rows marked
+    implemented; a new §17 "Symbol Map & Listing Output (Phase 10,
+    complete)" added, covering `map.s`'s `mapPrint` contract, `listing.s`'s
+    two lifecycles (capture and file), the WP54 wiring/artifact-safety
+    order, and the real WP54 `CasmVmmBuffer`-clobber bug fix; old §17
+    Coverage renumbered to §18 (content updated: `/M`/`/L` moved to
+    "Works", diagnostic count corrected to 66, the `fileCreateOutput` gap
+    added as a real "not yet implemented" item); old §18 Diagnostic
+    Reference renumbered to §19 (added the 10 missing Phase 10 rows,
+    `$39`-`$42`, and corrected the `$0A` `NOT_IMPLEMENTED` row to no longer
+    list `/M`/`/L`); old §19 Extending renumbered to §20. All internal
+    anchors and the two cross-references from `casm-utility.md` updated to
+    match.
+  - `wiki/tasks/casm.md` and `wiki/tasks/casm-phase10-symbol-map-listing.md`:
+    WP54 checked off complete with completion metadata; WP55 lines updated
+    from "Blocked by WP54" to "Unblocked, not yet started." Phase 10's own
+    Acceptance checklist left unchecked deliberately — that belongs to
+    WP55's own verification-walkthrough-completion-gate, not this WP.
+  - `brain/walkthroughs/2026-08-08-casm-phase10-wp54-production-integration.md`
+    added, matching WP53's own walkthrough-doc precedent (checked before
+    writing this entry, not assumed): Scope, the increment-1 scope
+    deviation, Implementation Review, Runtime Walkthrough, Envelope/
+    Regression, Version-Only Completion Increment, and Completion Gate
+    sections.
+  - Taskwarrior task 36 marked `Completed` (`task 36 done`), matching
+    WP53's own precedent (task 35/`aa57f461` was marked `Completed` with an
+    `End` date on its own user approval, not left `Pending`) — verified by
+    checking task 35's actual history before writing this entry, since an
+    earlier draft of this note incorrectly guessed the opposite convention.
+
+**WP54 is complete.** `/M` and `/L` are both fully implemented in
+production CASM `0.1.55` (build 1258). WP55 (verification, walkthrough, and
+the Phase 10 completion gate) is unblocked and ready to start whenever the
+user wants to begin it — it is a separate, not-yet-approved plan and this
+document does not activate it.

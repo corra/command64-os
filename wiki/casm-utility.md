@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.1.50` (build 1204)
+**Version:** `0.1.55` (build 1257)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
@@ -15,14 +15,14 @@ bounded expression evaluator, source-file inclusion via `.INCLUDE`, and
 produces relocatable output by default so the same PRG can run at any load
 address the OS chooses.
 
-> **CASM Phase 9 is complete (labels/expressions/multi-file/relocation/
-> include processing all shipped).** Phase 10 (symbol map and listing
-> output for `/M`/`/L`) is planning-only so far — those two switches are
-> accepted on the command line but have no effect yet. Everything else
-> documented below as supported is real and has been verified end-to-end,
-> including in production via [DASH](dash-utility.md), which assembles
-> through a seven-file `.INCLUDE` chain. See
-> [Not Yet Supported](#not-yet-supported) for the remaining gaps.
+> **CASM Phase 10 is complete (labels/expressions/multi-file/relocation/
+> include processing/symbol map/listing output all shipped).** `/M` and
+> `/L` are fully implemented — see [Map and Listing
+> Output](#map-and-listing-output-m-l) below. Everything documented below as
+> supported is real and has been verified end-to-end, including in
+> production via [DASH](dash-utility.md), which assembles through a
+> seven-file `.INCLUDE` chain. See [Not Yet
+> Supported](#not-yet-supported) for the remaining gaps.
 
 ## Command Syntax
 
@@ -45,10 +45,18 @@ CASM <source>... [/O:<output>] [/S] [/M] [/L]
 - **`/S`**: static output. The assembly must supply its own `.ORG`, and the
   resulting PRG carries no relocation trailer — use this for a program that
   will only ever run at one fixed address.
-- **`/M`** and **`/L`**: map file and listing file. **Accepted but not yet
-  implemented** — CASM parses these switches with no error, but they
-  currently have no effect. Phase 10 is what will make them do something;
-  don't rely on them yet.
+- **`/M`**: print a deterministic symbol map after a successful assembly —
+  one `$HHHH LABEL` row per symbol, in definition order, plus a final
+  `NNN SYMBOLS` total.
+- **`/L`**: write a `.LST` source listing alongside the PRG. The name is
+  derived from the output name the same way the PRG name is derived from the
+  source name (extension swapped for `.LST`), unless overridden — see
+  [Map and Listing Output](#map-and-listing-output-m-l).
+
+`/M` and `/L` may be combined, and either may be used alone. Both run only
+after the PRG itself is successfully committed to disk, so a listing or map
+failure never costs an already-valid PRG (see
+[Map and Listing Output](#map-and-listing-output-m-l)).
 
 Options may appear before or after the source filenames, in any order, and
 are matched case-insensitively (`/o:out.prg` works the same as `/O:OUT.PRG`).
@@ -228,6 +236,52 @@ Rules:
 See [DASH](dash-utility.md) for a real, shipping seven-file program built
 entirely through one `.INCLUDE` chain from a single entry file.
 
+## Map and Listing Output (`/M`, `/L`)
+
+Both options run only after a successful assembly, in a fixed order: PRG
+first, then `/L`'s listing, then `/M`'s map. Each stage's output is
+committed before the next one starts, so a failure at any stage retains
+everything already committed and only suppresses what would have come
+after — a listing failure still leaves a complete, valid PRG; a map failure
+still leaves a complete, valid PRG and listing. Nothing about the PRG
+itself changes — its bytes are identical whether or not `/M`/`/L` are given
+(see [Programmer's Reference §17](casm-programmers-reference.md#17-symbol-map--listing-output-phase-10-complete)
+for the underlying guarantee).
+
+### `/M`: Symbol Map
+
+Prints one row per symbol, in the order each was first defined (not
+alphabetical, not hash-table order), followed by a total:
+
+```text
+$3400 START
+$340E MSG
+002 SYMBOLS
+```
+
+### `/L`: Source Listing
+
+Writes a `.LST` file alongside the PRG: a 40-column listing with a file
+header (source filename, chunked across continuation lines if it doesn't
+fit one), then one detail row per source line showing that line's starting
+address, the bytes it emitted, and its exact verbatim source text —
+including lines inside an `.INCLUDE`d file, each attributed to its own
+file and line number. Without `/O:`, the `.LST` name is derived from the
+*output* name the same way the output name itself is derived from the
+source name (extension replaced with `.LST`); rerunning `CASM` against a
+`.LST` name that already exists on disk is subject to the same
+replace-on-open behavior as the PRG itself.
+
+### Combining Both
+
+```text
+CASM DEMO.CSM /M /L
+```
+
+Produces `DEMO.PRG`, `DEMO.LST`, and the symbol map printed to the screen,
+in that order — PRG first (so it's safe the moment it appears), listing
+second, map last.
+
 ## Practical Examples
 
 ### Example 1: A Minimal Static Program
@@ -330,7 +384,7 @@ bytes of the label's relocated address into X/Y before calling
 
 CASM stops at the first error and reports a specific diagnostic rather than
 a generic failure. A few representative cases (see the [Programmer's
-Reference diagnostic table](casm-programmers-reference.md#18-diagnostic-reference)
+Reference diagnostic table](casm-programmers-reference.md#19-diagnostic-reference)
 for the complete list):
 
 | Source | Result |
@@ -381,18 +435,20 @@ internal failure — print the message line alone.
 ## Not Yet Supported
 
 These will produce a specific error rather than silently doing the wrong
-thing — see the [Programmer's Reference §17](casm-programmers-reference.md#17-coverage-what-works-today)
+thing — see the [Programmer's Reference §18](casm-programmers-reference.md#18-coverage-what-works-today)
 for status and rationale:
 
 - **`.STATIC` / `.RELOC` directives** — use `/S` plus `.ORG` instead.
-- **`/M` (map file) and `/L` (listing file) output.** Accepted on the
-  command line but have no effect; Phase 10 will implement them.
 - **Multiplicative or parenthesized expression arithmetic** — `(A+B)*2` and
   similar are not supported; only one symbol/literal plus an optional
   `±NUMBER` addend.
 - **More than 8 top-level source files, 32 distinct included files, 16
-  include-nesting levels, 512 distinct labels, 4096 relocation entries, or
-  65,535 bytes of combined source.**
+  include-nesting levels, 512 distinct labels, 4096 relocation entries,
+  4096 listing records (`/L`), or 65,535 bytes of combined source.**
+- **Rerunning `CASM` against an output (or `/L`) name that already exists
+  on disk** hangs rather than replacing or failing fast (a pre-existing
+  gap, not specific to `/M`/`/L`) — use a distinct `/O:` name per run, or
+  delete the stale file first.
 
 ## Source
 

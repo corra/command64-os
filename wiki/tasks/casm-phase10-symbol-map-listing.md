@@ -52,14 +52,20 @@ requires a dedicated detailed plan and explicit user approval.
       `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`
       and
       `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`.
-- [ ] `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: WP54 production integration;
+- [x] `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: WP54 production integration;
       approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-      Completion target `0.1.55`; WP53 complete, WP54 not yet activated.
+      Complete at CASM `0.1.55` build 1257, user-approved 2026-08-08. `/M`
+      and `/L` are both fully wired into production `casm.s`. Increment 1's
+      dedicated failure-injection harness was formally dropped from scope
+      (user decision, recorded in the plan's Progress log) in favor of
+      increment 6's live production-fixture matrix as Completion Gate
+      evidence.
 - [ ] `94d98a2b-7ad4-49f0-bf33-38702690eca9`: WP55 verification, walkthrough,
       and phase gate; approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
-      Completion target `0.1.56`. Blocked by WP54.
+      Completion target `0.1.56`. Unblocked now that WP54 is complete; not
+      yet started.
 - [ ] Obtain explicit Phase 10 completion approval.
 - [ ] Apply the separate completion-only `0.2.0` promotion.
 

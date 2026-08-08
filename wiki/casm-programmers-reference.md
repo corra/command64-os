@@ -8,18 +8,20 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 9 complete (build 1204, version 0.1.50).** Phase 10
-> (symbol map and listing output, WP50-55) is planning-only so far — WP50
-> (contract reconciliation/ABI freeze) is active, WP51-55 are blocked behind
-> it, and no Phase 10 code has landed yet.
+> **Status: Phase 10 WP54 complete (build 1257, version 0.1.55).** `/M`
+> (symbol map) and `/L` (listing file) are both fully wired into production
+> `casm.s` and produce real output on every assembly that requests them —
+> see [§17](#17-symbol-map--listing-output-phase-10-complete). Phase 10's
+> only remaining item is WP55, a verification-walkthrough/phase-gate
+> increment with no new functionality of its own.
 > CASM performs a real two-pass assembly with labels, a bounded expression
 > evaluator, a VMM-backed symbol table, up to eight concatenated top-level
-> source files, native R6-relocatable output, and — as of WP47 — a fully
-> wired `.INCLUDE` dispatch (see [Coverage](#17-coverage-what-works-today)).
-> `.INCLUDE` is not merely built and fixture-tested: `casmRunPass` now
-> dispatches it for real, and DASH's production build
-> (`CASM DMAIN.S /O:DASH.PRG`) exercises this path on every assembly — see
-> [§16](#16-include-processing-phase-9-complete). See
+> source files, native R6-relocatable output, a fully wired `.INCLUDE`
+> dispatch (WP47), and a deterministic symbol map / source listing (WP50-54)
+> — see [Coverage](#18-coverage-what-works-today). `.INCLUDE` is not merely
+> built and fixture-tested: `casmRunPass` dispatches it for real, and DASH's
+> production build (`CASM DMAIN.S /O:DASH.PRG`) exercises this path on every
+> assembly — see [§16](#16-include-processing-phase-9-complete). See
 > [wiki/tasks/casm.md](tasks/casm.md) for the live task list. Treat anything
 > marked "not yet implemented" below as exactly that, not as a documentation
 > gap.
@@ -48,10 +50,14 @@ flowchart TD
     diagnostics["diagnostics.s — structured diagnostic printing"]
     emit["emit.s — PC tracking, pass gate, PRG emission"]
     state["state.s — source/lexer/token BSS records (leaf)"]
+    map["map.s — /M deterministic symbol map"]
+    listing["listing.s — /L capture + .LST serialization"]
 
-    casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc
+    casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc & map & listing
     include --> vmm & source
     emit --> parser & opcodes & fileio & lexer & reloc
+    map --> symbols
+    listing --> vmm & fileio & source & include
     parser --> lexer & state & expr & symbols & emit
     expr --> lexer & state & diagnostics
     symbols --> vmm
@@ -83,19 +89,30 @@ flowchart LR
     rel --> foot["relocFinalize → table + R6 footer"]
 ```
 
-`casm.s: start` runs this sequence: `diagClearLoc → resourcesInit → cliInit →
-fileIoInit → sourceInit → cliParse → cliDeriveOutputName → symbolsInit →
+`casm.s: start` runs this sequence: `diagClearLoc → listingStateInit →
+listingFileInit → resourcesInit → cliInit → fileIoInit → sourceInit →
+cliParse → cliDeriveOutputName → (/L: cliDeriveListingName) → symbolsInit →
 sourceLoad → sourceOpen → lexerInit`, then two passes of the shared
-`casmRunPass` dispatch:
+`casmRunPass` dispatch. `listingStateInit`/`listingFileInit` run before
+`resourcesInit` specifically (WP54, deviating from Phase 10's original plan
+wording) — both are pure BSS clears that cannot fail, and running them first
+guarantees the unified `artifactsAbort` fatal path can safely inspect listing
+state from the very first fatal exit onward.
 
 - **Pass 1** (`CASM_PASS_MODE_MEASURE`): `emitInit`, then `casmRunPass`.
   No output file exists yet — `emitRawByte` no-ops in measure mode — so the
   pass only measures addresses and defines labels. Its final `CasmPc` is
   snapshotted into `CasmPass1FinalPc`.
-- **Pass 2** (`CASM_PASS_MODE_EMIT`): `sourceRewind → lexerInit →
-  fileCreateOutput → relocInit → emitInit`, then `casmRunPass` for real, now
-  that every label resolves. Then `emitCheckPassAgreement → emitFinalize →
-  relocFinalize → sourceClose → exitSuccess`.
+- **Pass 2** (`CASM_PASS_MODE_EMIT`): `sourceRewind → includeReplayReset →
+  (/L: listingCaptureInit) → lexerInit → fileCreateOutput → relocInit →
+  emitInit`, then `casmRunPass` for real, now that every label resolves.
+  Then, in order: `includeReplayFinalCheck → emitCheckPassAgreement → (/L:
+  listingCaptureFinalize) → emitFinalize → relocFinalize → sourceClose →
+  outputCommit → (/L: listingWriteFile) → (/M: diagClearLoc + mapPrint) →
+  diagPrintPhase2Ready → exitSuccess`. The PRG is always committed
+  (`outputCommit`) before any requested `/L` listing or `/M` map work, so a
+  later listing/map failure can never cost an already-valid PRG — see
+  [§17](#17-symbol-map--listing-output-phase-10-complete).
 
 Every `bcs` after an init or pipeline call routes to `exitFatal` (via
 `outputAbort` once an output file exists) — see
@@ -125,7 +142,7 @@ touching the filesystem — see [§16](#16-include-processing-phase-9-complete).
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.1.48`).
+  `casm.s` (currently `0.1.55`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 
@@ -191,8 +208,10 @@ buffer) is read but never modified.
 | *(bare filename)* | Source file — **1 to 8** of them (`CASM_SOURCE_COUNT_MAX`), concatenated in command-line order | implemented |
 | `/O:<name>` | Explicit output filename (≤63 chars) | implemented |
 | `/S` | Static output: the assembly must supply its own `.ORG`, and the PRG carries no relocation trailer | implemented |
-| `/M` | Map file | parsed but rejected: `start` in `casm.s` fatals with `CASM_DIAG_NOT_IMPLEMENTED` if this bit is set |
-| `/L` | Listing file | same as `/M` — parsed, then rejected |
+| `/M` | Map file: prints the deterministic symbol map (`mapPrint`, `map.s`) after the PRG (and any `/L` listing) is committed | implemented (WP52 module, WP54 wiring) |
+| `/L` | Listing file: derives a `.LST` name (`cliDeriveListingName`), captures Pass 2's traversal, and serializes the frozen 40-column listing format (`listingWriteFile`, `listing.s`) after the PRG is committed | implemented (WP51/WP53 modules, WP54 wiring) |
+
+See [§17](#17-symbol-map--listing-output-phase-10-complete) for the map/listing output formats and module internals.
 
 Option letters are matched case-insensitively (`AND #$5F` before comparison);
 filename bytes are copied verbatim, never case-folded. Duplicate options and
@@ -782,10 +801,101 @@ inputs and has **no** dependency on `include.s`; the caller resolves the child
 through `includeCatalogLoad` first. The layering stays one-way — `include.s`
 imports from `source.s`, never the reverse.
 
-## 17. Coverage: What Works Today
+## 17. Symbol Map & Listing Output (Phase 10, complete)
 
-As of build 1204 / v0.1.50 (Phase 9 complete; Phase 10 WP50 planning-only,
-WP51-55 unstarted):
+`/M` and `/L` are both fully wired into production `casm.s` as of WP54; the
+underlying modules (`map.s` WP52, `listing.s` WP50/WP51/WP53) were built and
+fixture-tested in earlier increments with no live call site, then wired into
+the real `start`/`casmRunPass` sequence by WP54 (see [§1](#1-architecture)).
+Neither module owns any resource the other's abort path doesn't already know
+how to release — see [§4](#4-resource-ownership--exit-contract)'s
+`artifactsAbort`.
+
+### 17.1 Symbol map (`/M`, `map.s`)
+
+One exported routine, `mapPrint`, walks symbol records in **definition
+(insertion) order** via `symbolsReadByIndex` — deliberately never
+`CasmSymbolBuckets` hash-chain order, so the same source always prints the
+same map regardless of hash placement. Output is a header, one `$HHHH LABEL`
+row per symbol (uppercase hex address, then the symbol's own PETSCII
+spelling), and a final `NNN SYMBOLS` total. `mapPrint` owns no VMM/file/
+source resource itself — `symbolsReadByIndex` is its only VMM access, through
+the symbol table's already-registered slot — and formats each row into its
+own private buffer (`CasmMapRowBuf`, 40 bytes: `"$HHHH "` + up to a 31-byte
+name + CR + null) rather than reusing `diagnostics.s`'s character-at-a-time
+hex/decimal printers, since a complete row must be built before printing.
+Failure is `CASM_DIAG_SYMBOL_MAP_INVALID` (a corrupt record: bad `NameLen`,
+`DEFINED` clear, reserved flag bits set, or nonzero reserved padding) or a
+propagated `CASM_DIAG_VMM_TRANSFER_FAILED`; both are locationless.
+
+### 17.2 Listing capture and `.LST` serialization (`/L`, `listing.s`)
+
+Two independent lifecycles, both owned by `listing.s` and both initialized
+unconditionally in `start` (WP54) so they are always safe BSS regardless of
+whether `/L` was requested:
+
+- **Capture** (`listingCaptureInit`/`listingCaptureFinalize`, active only
+  between them, and only under `/L`): records one 16-byte metadata record
+  per source line (`CASM_LISTING_META_REC_SIZE`; fields `FILEID`, `FLAGS`,
+  `LINE`, source `OFF`/`LEN`, starting `PC`, and the emitted `BYTEOFF`/
+  `BYTECOUNT` range) via `listingBeginLine`/`listingCommitLine`, plus a
+  parallel byte-mirror of every emitted byte via `listingMirrorByte`, up to
+  `CASM_LISTING_META_MAX` = 4096 records. Capture observes Pass 2's real
+  traversal — it starts only after `sourceRewind`/`includeReplayReset` and
+  ends before `emitFinalize`/`relocFinalize` touch the output file (see
+  [§1](#1-architecture)). Overflow is `CASM_DIAG_LISTING_RECORDS_FULL` /
+  `CASM_DIAG_LISTING_BYTES_FULL`; a capture-time transaction-discipline
+  violation is `CASM_DIAG_LISTING_REPLAY_MISMATCH`.
+- **File** (`listingFileInit`, always; `listingCreate`/`listingWriteFile`/
+  `listingClose`/`listingDelete`/`listingAbort` under `/L`): owns the actual
+  `.LST` CBM DOS handle, including the WP53 `@0:` replace-on-open marker
+  (`cliDeriveListingName` derives the name from the output name, mirroring
+  `cliDeriveOutputName`'s own extension-swap rule). `listingWriteFile` is the
+  aggregate serializer: it replays every captured record
+  (`listingReplayReset`/`listingReplayNext`), validates each one against the
+  running expected byte offset (`listingValidateRecord`, which also resolves
+  the record's owning filename via `listingResolveFilename` — including
+  `.INCLUDE`d files, through `includeCatalogRead`), and formats the frozen
+  40-column output: file headers with 31-byte name-chunk continuations,
+  detail rows with independent byte- and source-continuations, uppercase
+  hex, 5-digit zero-padded line numbers, and exact verbatim source bytes,
+  buffered through the reused `CasmIoBuffer` with flush-before-split. A
+  `listingValidateRecord` mismatch is the same
+  `CASM_DIAG_LISTING_REPLAY_MISMATCH` diagnostic as a capture-time violation
+  (the check is symmetric); file I/O failures are `CASM_DIAG_LISTING_
+  CREATE_FAILED`/`WRITE_FAILED`/`CLOSE_FAILED`/`DELETE_FAILED`/
+  `SHORT_WRITE`. `listingAbort` is a documented no-op when nothing was ever
+  created and never deletes an already-committed listing.
+
+  A record belonging to an included file resolves through
+  `includeCatalogRead`, which — as its own header documents — overwrites
+  `CasmVmmBuffer` as its own VMM transfer scratch. `listingValidateRecord`
+  and `listingWriteFile`'s own record-snapshot both learned this the hard
+  way (a real WP54 bug, fixed same-day): each now stashes the fields it
+  still needs (`CasmListValidByteCountLo/Hi`; the `CasmListCurrentRecord`
+  snapshot) *before* calling `listingResolveFilename`, not after.
+
+### 17.3 Wiring order and artifact safety (`casm.s`, WP54)
+
+`/M` and `/L` are independent CLI bits (`CASM_OPT_MAP`/`CASM_OPT_LIST`) and
+may be combined. The completion order — deliberately fixed, not incidental —
+is: PRG commit (`outputCommit`) **before** any listing write, and listing
+write **before** the map print, so a later-stage failure never costs an
+earlier one's already-valid artifact: a listing failure retains the
+committed PRG and suppresses the map/success line; a map failure retains
+the committed PRG and listing and suppresses only the success line. The
+unified `artifactsAbort` (chains `listingAbort` then `outputAbort`, both
+already independently safe against deleting a committed artifact) handles
+every fatal exit uniformly, regardless of how far initialization got or
+which options were active. See [§1](#1-architecture) for the full call
+sequence and `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`
+for the increment-by-increment implementation record.
+
+## 18. Coverage: What Works Today
+
+As of build 1257 / v0.1.55 (Phase 9 complete; Phase 10 WP50-54 complete,
+WP55 — a verification-walkthrough/phase-gate increment with no new
+functionality — remaining):
 
 **Works:**
 - All 56 legal, documented 6502 mnemonics across every addressing mode they
@@ -807,30 +917,36 @@ WP51-55 unstarted):
 - **Two output modes**: static (`/S` plus an explicit `.ORG`) and, by
   default, R6-relocatable output at origin `$3400` with a relocation table
   and footer the OS's own loader understands.
+- **`/M` (deterministic symbol map) and `/L` (source listing) output**,
+  fully wired (WP54) into the real assembly pipeline — see
+  [§17](#17-symbol-map--listing-output-phase-10-complete). Both may be
+  combined; either, both, or neither may be requested per assembly.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (60 distinct `CASM_DIAG_*` codes —
-  [§18](#18-diagnostic-reference)).
+  diagnostic per failure (66 distinct `CASM_DIAG_*` codes —
+  [§19](#19-diagnostic-reference)).
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
 rather than being silently accepted):
 - **`.STATIC` / `.RELOC` directives** — `CASM_DIAG_NOT_IMPLEMENTED`; use
   `/S` and `.ORG` instead.
-- **`/M` (map) and `/L` (listing) output** — CLI-parsed with no error, but
-  `start` fatals with `CASM_DIAG_NOT_IMPLEMENTED` if either bit is set.
-  Phase 10 (WP51-55) is planning-only and will implement these; no Phase 10
-  code has landed.
 - **Combined sources over 64K** — `sourceLoad`'s checked total overflows at
   65,536 bytes (`CASM_DIAG_SOURCE_OFFSET_OVERFLOW`).
 - **Multiplicative or parenthesized expression arithmetic** —
   `CASM_DIAG_EXPR_UNSUPPORTED`.
+- **`fileCreateOutput` has no replace-on-exists marker** (pre-existing,
+  Phase 2/WP13-era, unlike `listingCreate`'s WP53-era `@0:`-aware open):
+  rerunning `casm` against an output name that already exists on disk hangs
+  in a KERNAL IEC retry loop rather than replacing or failing fast. Use a
+  distinct `/O:` name per run, or delete the stale output first. Tracked as
+  a follow-up, not a WP54 regression.
 
 Bounded capacities worth knowing before writing large source: 512 symbols,
 4,096 relocation entries, 31-byte identifiers, 8 source files, 64KB combined
-source. Frozen for Phase 9, in place but not yet exercised by a live
-assembly: 32 distinct included files, 16 nesting levels, 63-byte include
-filenames.
+source, 4,096 listing records per assembly (`/L`). Frozen for Phase 9, in
+place but not yet exercised by a live assembly: 32 distinct included files,
+16 nesting levels, 63-byte include filenames.
 
-## 18. Diagnostic Reference
+## 19. Diagnostic Reference
 
 All diagnostics are stable one-byte identifiers (`CASM_DIAG_*`) with a fixed
 PETSCII message, looked up via a parallel low/high address table in
@@ -913,7 +1029,7 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$07` | `DUPLICATE_OPTION` | DUPLICATE OPTION |  | `cli.s` |
 | `$08` | `UNKNOWN_OPTION` | UNKNOWN OPTION |  | `cli.s` |
 | `$09` | `FILENAME_TOO_LONG` | FILENAME TOO LONG |  | `cli.s` |
-| `$0A` | `NOT_IMPLEMENTED` | FEATURE NOT IMPLEMENTED |  | `casm.s` (`/M`,`/L`), `emit.s` (`.STATIC`/`.RELOC`) |
+| `$0A` | `NOT_IMPLEMENTED` | FEATURE NOT IMPLEMENTED |  | `emit.s` (`.STATIC`/`.RELOC`) |
 | `$0B` | `INPUT_OPEN_FAILED` | CANNOT OPEN INPUT |  | `fileio.s` |
 | `$0C` | `INPUT_READ_FAILED` | INPUT READ FAILED |  | `fileio.s` |
 | `$0D` | `INPUT_CLOSE_FAILED` | INPUT CLOSE FAILED |  | `fileio.s`/`source.s` |
@@ -960,9 +1076,22 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$36` | `INCLUDE_CYCLE_DETECTED` | INCLUDE CYCLE DETECTED | ✓ | `source.s` (candidate already in the active frame chain) *(WP46 range ends here)* |
 | `$37` | `INCLUDE_EVENT_LOG_FULL` | INCLUDE EVENT LOG FULL |  | `include.s` (128 include events) |
 | `$38` | `INCLUDE_REPLAY_MISMATCH` | INCLUDE REPLAY MISMATCH |  | `casm.s` (Pass 2's `includeCatalogLookup` disagrees with Pass 1's recorded result — defensive internal invariant) *(Phase 9/WP47 range ends here)* |
+| `$39` | `LISTING_NAME_COLLISION` | LISTING NAME COLLISION | ✓ | `cli.s` (`cliDeriveListingName`: derived `.LST` name collides with the PRG output name) |
+| `$3A` | `LISTING_RECORDS_FULL` | LISTING RECORDS FULL |  | `listing.s` (`listingCommitLine`: metadata store at `CASM_LISTING_META_MAX` = 4096) |
+| `$3B` | `LISTING_BYTES_FULL` | LISTING BYTES FULL |  | `listing.s` (`listingMirrorByte`: byte mirror at capacity) |
+| `$3C` | `LISTING_REPLAY_MISMATCH` | LISTING REPLAY MISMATCH |  | `listing.s` (capture/replay transaction discipline violated — same check fires from `listingCommitLine` at capture time and `listingValidateRecord` at serialization time) *(Phase 10/WP51 range ends here)* |
+| `$3D` | `LISTING_CREATE_FAILED` | LISTING CREATE FAILED |  | `listing.s` (`listingCreate`) |
+| `$3E` | `LISTING_WRITE_FAILED` | LISTING WRITE FAILED |  | `listing.s` (`listingWrite`/`listingWriteFile`) |
+| `$3F` | `LISTING_CLOSE_FAILED` | LISTING CLOSE FAILED |  | `listing.s` (`listingClose`) |
+| `$40` | `LISTING_DELETE_FAILED` | LISTING DELETE FAILED |  | `listing.s` (`listingDelete`/`listingAbort`) |
+| `$41` | `LISTING_SHORT_WRITE` | LISTING SHORT WRITE |  | `listing.s` (`listingWrite`: actual byte count ≠ requested) *(Phase 10/WP53 range ends here)* |
+| `$42` | `SYMBOL_MAP_INVALID` | SYMBOL MAP INVALID |  | `map.s` (`mapPrint`: corrupt symbol record — bad `NameLen`, `DEFINED` clear, reserved flag bits set, or nonzero reserved padding) *(Phase 10/WP52 range ends here)* |
 | `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
-## 19. Extending CASM
+See [§17](#17-symbol-map--listing-output-phase-10-complete) for the map/
+listing modules these diagnostics belong to.
+
+## 20. Extending CASM
 
 - **New directive**: add a `CASM_DIRECTIVE_*` constant and its name string in
   `lexer.s` (`dirOrgStr` etc. + the `compareTokenText` chain in

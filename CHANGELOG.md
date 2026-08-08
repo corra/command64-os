@@ -67,6 +67,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 WP54 production integration**: Activated `/M` and `/L` in
+  `casm.s`'s real `start`/`casmRunPass` sequence, replacing the
+  `NOT IMPLEMENTED` block WP51-53 left in place while their underlying
+  modules (`map.s`, `listing.s`) shipped with no live call site. Wired
+  `cliDeriveListingName`, `listingCaptureInit`/`Finalize`, `outputCommit`,
+  `listingWriteFile`, and `diagClearLoc`+`mapPrint` into the plan's exact
+  specified order: PRG committed before any listing write, listing before
+  the map, so a later-stage failure never costs an earlier one's already-
+  valid artifact. Added a unified `artifactsAbort` (chains `listingAbort`
+  then `outputAbort`) replacing the old direct `outputAbort` fatal routing.
+  Live-verified via VICE MCP against real production fixtures: `banner.s`
+  (~350 lines) through all four option combinations, plus a dedicated new
+  `casm_phase10_test_d64` disk exercising 5 fixture categories (static/`/S`,
+  R6/forward-reference, multi-root cross-file, 31-char map-row boundary,
+  `.INCLUDE` with a reference crossing the file boundary) — 15/15 `comp`
+  byte-identity checks against the no-options baseline passed, covering
+  R6/relocation identity with no separate check needed. Found and fixed a
+  real bug during that verification: `.INCLUDE`d records under `/L` failed
+  `CASM: LISTING REPLAY MISMATCH` because `listingValidateRecord` and
+  `listingWriteFile` both re-read a record's `BYTECOUNT`/fields from
+  `CasmVmmBuffer` *after* calling `listingResolveFilename`, which for an
+  included file reaches `includeCatalogRead` and overwrites that same
+  buffer as its own VMM transfer scratch (documented in its own header) —
+  fixed by stashing the needed fields before the resolve call. Also found,
+  but left unfixed as pre-existing and out of scope: `fileCreateOutput`
+  (Phase 2/WP13-era) has no CBM DOS `@0:` replace marker, so rerunning
+  `casm` against an existing output name hangs in a KERNAL IEC retry loop
+  rather than replacing or failing fast. Envelope unchanged at 18,553 code
+  bytes (both `$3800`/`$3900` origins), 4.63KB below the pre-approved
+  `$5B00` cap, no zero-page growth. A full 25-target regression build (all
+  `test_casm_*` harnesses, `casm` itself, and every CASM disk image) and a
+  targeted code review against every plan Stop Condition found no further
+  issues. Per user direction, increment 1's dedicated `test_casm_phase10`
+  failure-injection harness was formally dropped from WP54's scope in favor
+  of the live production-fixture matrix as Completion Gate evidence — see
+  `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`'s
+  Progress log for the full record. CASM bumped `0.1.54` -> `0.1.55`.
 - **CASM Phase 10 WP53 listing naming, serialization, and cleanup**: Added
   `.LST` name derivation (`cliDeriveListingName`, `cli.s`), PRG commit
   protection (`outputCommit`/`CasmOutputCommitted`, `fileio.s` -- a committed
