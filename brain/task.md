@@ -1900,8 +1900,13 @@
     - [x] User approved 2026-08-08; walkthrough
           `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`;
           Task Warrior task closed
-  - [ ] Obtain explicit completion approval before the separate `0.2.0`
-        promotion
+  - [x] Obtain explicit completion approval before the separate `0.2.0`
+        promotion. User-approved 2026-08-08 ("Approved. Finally, merge onto
+        casm-phase10"). Applied: `VERSION_MINOR`/`VERSION_STAGE` in `casm.s`
+        changed together (`"1"`/`"56"` -> `"2"`/`"0"`), build `1259` ->
+        `1260`, code size -1 byte (harmless string-literal delta),
+        no-change rebuild stable, 25-target regression clean, live-verified
+        via VICE (`CASM V0.2.0.1260`). **CASM Phase 10 is complete.**
 
 # Deferred Optional Work
 

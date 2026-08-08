@@ -1455,9 +1455,10 @@ Symbol Map and Listing, remains inactive and separately gated.**
 
 ## Phase 10 - Symbol Map and Listing
 
-- [ ] Parent Taskwarrior `32e09eea-691d-40bc-aa7a-7d2299fe093b`: implement
+- [x] Parent Taskwarrior `32e09eea-691d-40bc-aa7a-7d2299fe093b`: implement
       deterministic `/M` symbol-map output and native `/L` listing files without
-      changing generated PRG bytes.
+      changing generated PRG bytes. Complete at CASM `0.2.0` build 1260,
+      user-approved 2026-08-08.
 - Approved governing plan:
   `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
 - Milestone task: `wiki/tasks/casm-phase10-symbol-map-listing.md`.
@@ -1503,13 +1504,16 @@ Symbol Map and Listing, remains inactive and separately gated.**
       fault-injection gap for four raw-I/O listing diagnostics; this OS's
       `LOAD` always relocating regardless of a static CASM output's own
       `.ORG`; `MORE` having no abort key; a VICE-testing process note).
-- [ ] Obtain explicit Phase 10 completion approval before the separate
-      `0.1.56` -> `0.2.0` promotion.
+- [x] Obtain explicit Phase 10 completion approval before the separate
+      `0.1.56` -> `0.2.0` promotion. Approved 2026-08-08; promotion
+      applied: `VERSION_MINOR`/`VERSION_STAGE` changed together in
+      `casm.s`, build `1259` -> `1260`, live-verified via VICE
+      (`CASM V0.2.0.1260`).
 
-**WP55 is complete at CASM `0.1.56` build 1259, user-approved 2026-08-08.
-Phase 10's own completion gate has now passed; the master-plan Phase 10
-milestone itself remains open pending a separate, explicit `0.2.0`
-promotion approval.**
+**Phase 10 is complete.** CASM stands at `0.2.0` build 1260, user-approved
+2026-08-08. `/M` and `/L` are both fully implemented in production `casm`,
+independently re-verified by WP55, with no assembly, listing, or map
+behavior changed beyond the version/build artifact itself.
 
 ## Optional Feature - Progress and Processing Indication
 

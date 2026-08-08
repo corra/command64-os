@@ -67,6 +67,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 complete: `/M` and `/L` verified and promoted to `0.2.0`**:
+  WP55 independently re-verified the complete `/M`/`/L` implementation
+  WP50-54 delivered — a baseline reconciliation (found and fixed a
+  stale-doc gap), a 9-item full-path code review tracing actual code
+  rather than inferring behavior from names, 13/13 relevant harnesses
+  passing live under VICE, an audit of PRG/R6 identity, the 4,096-record
+  and 65,536-byte bounds, and failure-injection coverage against the
+  frozen contract, and a 4-session live runtime walkthrough. Added three
+  new live production-level proofs beyond WP54's own evidence:
+  `CASM: LISTING NAME COLLISION` firing for real for the first time in
+  the project's history with clean same-session recovery afterward
+  (proving no stale handle/resource leaked), a direct `comp` proving
+  included/flattened equivalence survives `/M /L` (replacing a previously
+  transitive proof), and on-device `.LST`/map inspection — not just byte
+  comparison — for both a static and a relocatable program, including
+  live confirmation of the `.INCLUDE` parent-resume file-header
+  re-transition. Disclosed four non-blocking findings: the
+  `CREATE_FAILED`/`CLOSE_FAILED`/`DELETE_FAILED`/`SHORT_WRITE` listing
+  diagnostics have no independent fault-injection coverage anywhere in
+  this codebase (a pre-existing pattern predating Phase 10, shared by
+  `fileio.s`'s own identical-shape Phase 2 diagnostics — accepted as a
+  disclosed gap, worth a follow-up task for real fault-injection
+  infrastructure); this OS's `LOAD` command always relocates a program to
+  the first free memory region, never honoring a static CASM output's own
+  `.ORG` header (a pre-existing `LOAD`/kernel behavior unrelated to CASM,
+  in tension with CASM's own static-output documentation); the `MORE`
+  shell command has no documented way to abort mid-file. CASM bumped
+  `0.1.54` -> `0.1.55` (WP54) -> `0.1.56` (WP55) -> `0.2.0` (the
+  completion-only Phase 10 promotion, changing no assembly behavior,
+  listing format, map format, or output bytes beyond CASM's own
+  version/build artifact). See
+  `brain/walkthroughs/2026-08-08-casm-phase10-wp54-production-integration.md`
+  and
+  `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`
+  for the full record.
 - **CASM Phase 10 WP54 production integration**: Activated `/M` and `/L` in
   `casm.s`'s real `start`/`casmRunPass` sequence, replacing the
   `NOT IMPLEMENTED` block WP51-53 left in place while their underlying

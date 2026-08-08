@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-wp55-verification-walkthrough-completion-gate
 created: 2026-07-29
-status: wp55-complete-phase10-open
+status: complete
 taskwarrior: 94d98a2b-7ad4-49f0-bf33-38702690eca9
 depends-on: f4b598fd-bab1-4394-9415-c71e3ea1cfa5
 ---
@@ -10,10 +10,10 @@ depends-on: f4b598fd-bab1-4394-9415-c71e3ea1cfa5
 
 ## Status
 
-**WP55 complete.** User-approved 2026-08-08. CASM bumped `0.1.55` ->
-`0.1.56` (build 1259), live-verified via VICE (`CASM V0.1.56.1259`). Phase
-10 overall is **not yet complete** — the `0.2.0` promotion (increment 7)
-requires a separate, explicit user approval, not yet given.
+**Complete.** WP55 user-approved 2026-08-08 (CASM `0.1.56` build 1259).
+Phase 10 completion separately user-approved the same day; the `0.2.0`
+promotion is applied — CASM stands at `0.2.0` build `1260`, live-verified
+via VICE (`CASM V0.2.0.1260`).
 
 Parent plan: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
 Prerequisite plans: WP50-WP54, required complete and user-approved before this
@@ -894,3 +894,23 @@ build artifact effects.
   Completion Gate, this closes WP55 itself — Phase 10 overall remains
   open pending a *separate*, explicit user approval of the `0.2.0`
   completion promotion (increment 7), not yet given.
+- 2026-08-08 (continued): User separately and explicitly approved Phase 10
+  completion ("Approved. Finally, merge onto casm-phase10"). Increment 7
+  executed: applied the completion-only version change from `0.1.56` to
+  `0.2.0` in `casm.s` (`VERSION_MINOR` `"1"` -> `"2"`, `VERSION_STAGE`
+  `"56"` -> `"0"` — both change together in this one completion-only step,
+  unlike every prior WP-level bump which only touched `VERSION_STAGE`).
+  Build counter advanced exactly once (`1259` -> `1260`); code size
+  shrank by exactly 1 byte (18553 -> 18552 — `"56"` -> `"0"` is one fewer
+  string-literal byte, harmless). No-change rebuild held both the build
+  counter and `casm.prg`/`casm_base.prg`'s md5 stable. Full 25-target
+  regression rebuild clean. Live-verified via VICE: booted
+  `casm_phase10_test.d64`, ran `casm` with no source argument, confirmed
+  `CASM V0.2.0.1260` then `CASM: SOURCE FILE REQUIRED`. No assembly
+  behavior, listing format, map format, or output bytes changed — exactly
+  the promotion's own "no assembly behavior change beyond CASM's own
+  version/build artifact effects" requirement.
+
+  **Phase 10 is complete.** CASM stands at `0.2.0` build `1260`. This is
+  the final state this plan and its parent
+  (`brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`) produce.

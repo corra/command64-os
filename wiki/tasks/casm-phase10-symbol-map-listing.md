@@ -1,6 +1,6 @@
 # CASM Phase 10 - Symbol Map and Listing
 
-Status: [ ]
+Status: [x] Complete at CASM `0.2.0` build `1260`, user-approved 2026-08-08
 Taskwarrior: 34 (`32e09eea-691d-40bc-aa7a-7d2299fe093b`)
 Plan: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`
 
@@ -10,8 +10,9 @@ Implement deterministic `/M` symbol-map output and native `/L` listing files
 without changing generated static or R6 PRG bytes. This is the CASM master
 plan's Phase 10 and the gated CASM 0.2 developer-usability milestone.
 
-The governing plan is approved. No production work package is active; each WP
-requires a dedicated detailed plan and explicit user approval.
+**Achieved.** `/M` and `/L` are both fully implemented in production `casm`,
+independently re-verified by WP55, with the completion-only `0.2.0` promotion
+applied.
 
 ## Approved Contract
 
@@ -72,8 +73,11 @@ requires a dedicated detailed plan and explicit user approval.
       `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
       Complete at CASM `0.1.56` build 1259, user-approved 2026-08-08, per
       `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
-- [ ] Obtain explicit Phase 10 completion approval.
-- [ ] Apply the separate completion-only `0.2.0` promotion.
+- [x] Obtain explicit Phase 10 completion approval. User-approved 2026-08-08.
+- [x] Apply the separate completion-only `0.2.0` promotion. Applied:
+      `VERSION_MINOR` `"1"` -> `"2"`, `VERSION_STAGE` `"56"` -> `"0"` in
+      `casm.s`; build `1259` -> `1260`; live-verified via VICE
+      (`CASM V0.2.0.1260`); no assembly/listing/map behavior changed.
 
 ## Acceptance
 
@@ -93,11 +97,10 @@ requires a dedicated detailed plan and explicit user approval.
       WP55 walkthrough's Disclosed Findings.)
 - [x] Existing CASM regression suites and all Phase 10 harnesses pass.
 - [x] The complete implementation review passes before runtime acceptance.
-- [ ] The user completes the native walkthrough and explicitly approves Phase
-      10 completion.
+- [x] The user completes the native walkthrough and explicitly approves Phase
+      10 completion. Approved 2026-08-08 ("Approved. Finally, merge onto
+      casm-phase10").
 
-WP55's own walkthrough is complete and user-approved (2026-08-08), closing
-every acceptance item above except the last: that one specifically requires
-a *separate* explicit Phase 10 completion approval (the `0.2.0` promotion),
-which is intentionally a distinct, later decision from approving WP55
-itself. Do not mark this task done until that final item is also checked.
+Every acceptance item is checked and the user has explicitly approved both
+WP55's own completion and, separately, Phase 10 completion. This task is
+done.

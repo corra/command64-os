@@ -8,12 +8,14 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 10 WP54 complete (build 1257, version 0.1.55).** `/M`
+> **Status: Phase 10 complete (build 1260, version 0.2.0).** `/M`
 > (symbol map) and `/L` (listing file) are both fully wired into production
 > `casm.s` and produce real output on every assembly that requests them —
-> see [§17](#17-symbol-map--listing-output-phase-10-complete). Phase 10's
-> only remaining item is WP55, a verification-walkthrough/phase-gate
-> increment with no new functionality of its own.
+> see [§17](#17-symbol-map--listing-output-phase-10-complete). WP55
+> independently re-verified WP50-54's complete implementation (baseline
+> reconciliation, full-path code review, live harness/identity/bounds/
+> failure-injection verification, a 4-session runtime walkthrough) before
+> the user approved the completion-only `0.1.56` -> `0.2.0` promotion.
 > CASM performs a real two-pass assembly with labels, a bounded expression
 > evaluator, a VMM-backed symbol table, up to eight concatenated top-level
 > source files, native R6-relocatable output, a fully wired `.INCLUDE`
@@ -142,7 +144,7 @@ touching the filesystem — see [§16](#16-include-processing-phase-9-complete).
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.1.55`).
+  `casm.s` (currently `0.2.0`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 
@@ -893,9 +895,7 @@ for the increment-by-increment implementation record.
 
 ## 18. Coverage: What Works Today
 
-As of build 1257 / v0.1.55 (Phase 9 complete; Phase 10 WP50-54 complete,
-WP55 — a verification-walkthrough/phase-gate increment with no new
-functionality — remaining):
+As of build 1260 / v0.2.0 (Phase 9 complete; Phase 10 complete):
 
 **Works:**
 
