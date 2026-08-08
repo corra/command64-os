@@ -1844,14 +1844,37 @@
     - [x] User approved 2026-08-06; walkthrough
           `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`;
           Task Warrior task closed, WP54 unblocked
-  - [ ] WP54 (`f4b598fd-bab1-4394-9415-c71e3ea1cfa5`): production integration;
+  - [x] WP54 (`f4b598fd-bab1-4394-9415-c71e3ea1cfa5`): production integration;
         approved plan
-        `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`;
-        WP53 complete, WP54 not yet activated
+        `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`
+    - [x] Activated `/M` and `/L` in `casm.s`'s real `start`/`casmRunPass`
+          sequence: `cliDeriveListingName`, `listingCaptureInit`/`Finalize`,
+          `outputCommit`, `listingWriteFile`, `diagClearLoc`+`mapPrint` wired
+          in the plan's exact specified order (PRG committed before listing,
+          listing before map); unified `artifactsAbort` fatal routing
+    - [x] Increment 1's dedicated `test_casm_phase10` failure-injection
+          harness formally dropped from scope (user decision) in favor of
+          increment 6's live production-fixture matrix as Completion Gate
+          evidence
+    - [x] 5 fixture categories x 4 option combinations on a new
+          `casm_phase10_test_d64` disk, 15/15 `comp` byte-identity checks
+          against baseline; found and fixed a real bug (`.INCLUDE` under
+          `/L` failed `LISTING REPLAY MISMATCH` from a `CasmVmmBuffer`
+          clobber in `listingResolveFilename`/`includeCatalogRead`), fixed
+          in `listing.s`, re-verified clean
+    - [x] Formal envelope/regression pass: 18553 code bytes at both
+          `$3800`/`$3900` origins, 4.63KB below the `$5B00` cap, no
+          zero-page growth; 25-target regression build clean; code review
+          against every plan Stop Condition, no findings; live post-fix
+          spot-check (`comp` `FILES COMPARE OK`)
+    - [x] CASM version bumped `0.1.54` -> `0.1.55` (build `1257` -> `1258`)
+    - [x] User approved 2026-08-08; walkthrough
+          `brain/walkthroughs/2026-08-08-casm-phase10-wp54-production-integration.md`;
+          Task Warrior task closed, WP55 unblocked
   - [ ] WP55 (`94d98a2b-7ad4-49f0-bf33-38702690eca9`): verification,
         walkthrough, and phase gate; approved plan
         `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`;
-        blocked by WP54
+        WP54 complete, WP55 activated 2026-08-08
   - [ ] Obtain explicit completion approval before the separate `0.2.0`
         promotion
 

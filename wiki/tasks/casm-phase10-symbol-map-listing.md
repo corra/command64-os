@@ -34,10 +34,16 @@ requires a dedicated detailed plan and explicit user approval.
 
 ## Work Packages
 
-- [/] `ad82f04d-0d34-4902-9a2c-ae27292902cf`: WP50 contract reconciliation
-      and ABI freeze. Active under approved plan
-      `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`.
-      No production behavior changes; completion target `0.1.51`.
+- [x] `ad82f04d-0d34-4902-9a2c-ae27292902cf`: WP50 contract reconciliation
+      and ABI freeze. Complete at CASM `0.1.51` build 1206, user-approved
+      2026-07-31, per
+      `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`
+      and
+      `brain/walkthroughs/2026-07-31-casm-phase10-wp50-contract-reconciliation.md`.
+      No production behavior changes. (This row was still marked `[/]`
+      in-progress here despite Taskwarrior and `wiki/tasks/casm.md` both
+      showing it complete since 2026-07-31 — a stale-doc gap found and
+      fixed during WP55's baseline reconciliation, 2026-08-08.)
 - [x] `a64fa847-1b46-44fd-be3b-8ad7b1055c92`: WP51 listing stores and capture
       events. Complete at CASM `0.1.52` build 1222, user-approved
       2026-08-03, per
@@ -64,8 +70,7 @@ requires a dedicated detailed plan and explicit user approval.
 - [ ] `94d98a2b-7ad4-49f0-bf33-38702690eca9`: WP55 verification, walkthrough,
       and phase gate; approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
-      Completion target `0.1.56`. Unblocked now that WP54 is complete; not
-      yet started.
+      Completion target `0.1.56`. WP54 complete; WP55 activated 2026-08-08.
 - [ ] Obtain explicit Phase 10 completion approval.
 - [ ] Apply the separate completion-only `0.2.0` promotion.
 

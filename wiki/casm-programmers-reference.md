@@ -898,6 +898,7 @@ WP55 — a verification-walkthrough/phase-gate increment with no new
 functionality — remaining):
 
 **Works:**
+
 - All 56 legal, documented 6502 mnemonics across every addressing mode they
   support (implied, accumulator, immediate, zero page [,X/,Y], absolute
   [,X/,Y], indirect, `(zp,X)`, `(zp),Y`, relative).
@@ -927,6 +928,7 @@ functionality — remaining):
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
 rather than being silently accepted):
+
 - **`.STATIC` / `.RELOC` directives** — `CASM_DIAG_NOT_IMPLEMENTED`; use
   `/S` and `.ORG` instead.
 - **Combined sources over 64K** — `sourceLoad`'s checked total overflows at
