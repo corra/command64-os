@@ -61,35 +61,43 @@ requires a dedicated detailed plan and explicit user approval.
 - [x] `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: WP54 production integration;
       approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-      Complete at CASM `0.1.55` build 1257, user-approved 2026-08-08. `/M`
+      Complete at CASM `0.1.55` build 1258, user-approved 2026-08-08. `/M`
       and `/L` are both fully wired into production `casm.s`. Increment 1's
       dedicated failure-injection harness was formally dropped from scope
       (user decision, recorded in the plan's Progress log) in favor of
       increment 6's live production-fixture matrix as Completion Gate
       evidence.
-- [ ] `94d98a2b-7ad4-49f0-bf33-38702690eca9`: WP55 verification, walkthrough,
+- [x] `94d98a2b-7ad4-49f0-bf33-38702690eca9`: WP55 verification, walkthrough,
       and phase gate; approved plan:
       `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
-      Completion target `0.1.56`. WP54 complete; WP55 activated 2026-08-08.
+      Complete at CASM `0.1.56` build 1259, user-approved 2026-08-08, per
+      `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
 - [ ] Obtain explicit Phase 10 completion approval.
 - [ ] Apply the separate completion-only `0.2.0` promotion.
 
 ## Acceptance
 
-- [ ] `/M` output is exact, deterministic, and supports 0-512 symbols.
-- [ ] `/L` output obeys the exact file-header, detail-row, continuation,
+- [x] `/M` output is exact, deterministic, and supports 0-512 symbols.
+- [x] `/L` output obeys the exact file-header, detail-row, continuation,
       PETSCII, CR, and filename contracts.
-- [ ] Blank, comment, label, directive, multi-root, include, and final partial
+- [x] Blank, comment, label, directive, multi-root, include, and final partial
       physical lines retain correct PC and provenance.
-- [ ] 4,096/4,097 line and emitted-byte endpoint bounds fail before wraparound.
-- [ ] `/M`, `/L`, `/M /L`, `/S`, and `/O` combinations preserve PRG bytes and
+- [x] 4,096/4,097 line and emitted-byte endpoint bounds fail before wraparound.
+- [x] `/M`, `/L`, `/M /L`, `/S`, and `/O` combinations preserve PRG bytes and
       R6 relocation records.
-- [ ] Listing failures preserve primary diagnostics, clean incomplete listings,
-      retain finalized PRGs, and leak no handles or VMM allocations.
-- [ ] Existing CASM regression suites and all Phase 10 harnesses pass.
-- [ ] The complete implementation review passes before runtime acceptance.
+- [x] Listing failures preserve primary diagnostics, clean incomplete listings,
+      retain finalized PRGs, and leak no handles or VMM allocations. (WP55
+      disclosed one accepted gap: `CREATE`/`CLOSE`/`DELETE`/`SHORT_WRITE`
+      have no independent fault-injection coverage, a pre-existing
+      codebase-wide pattern predating Phase 10, not fixed here — see the
+      WP55 walkthrough's Disclosed Findings.)
+- [x] Existing CASM regression suites and all Phase 10 harnesses pass.
+- [x] The complete implementation review passes before runtime acceptance.
 - [ ] The user completes the native walkthrough and explicitly approves Phase
       10 completion.
 
-Do not mark this task done until every acceptance item is checked and the user
-explicitly approves the completed walkthrough.
+WP55's own walkthrough is complete and user-approved (2026-08-08), closing
+every acceptance item above except the last: that one specifically requires
+a *separate* explicit Phase 10 completion approval (the `0.2.0` promotion),
+which is intentionally a distinct, later decision from approving WP55
+itself. Do not mark this task done until that final item is also checked.

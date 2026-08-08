@@ -1,7 +1,7 @@
 ---
 feature: casm-phase10-wp55-verification-walkthrough-completion-gate
 created: 2026-07-29
-status: approved-blocked
+status: wp55-complete-phase10-open
 taskwarrior: 94d98a2b-7ad4-49f0-bf33-38702690eca9
 depends-on: f4b598fd-bab1-4394-9415-c71e3ea1cfa5
 ---
@@ -10,12 +10,10 @@ depends-on: f4b598fd-bab1-4394-9415-c71e3ea1cfa5
 
 ## Status
 
-Approved but blocked by WP54 completion. WP55 adds no production behavior of its own; its only eventual
-production change is the separate completion-only `0.1.56` version increment
-and, after explicit Phase 10 approval, the completion-only `0.2.0` promotion
-described by the parent plan. A discovered defect stops WP55 until its root
-cause, exact remediation, tests, and resource impact receive an amended plan
-and explicit approval.
+**WP55 complete.** User-approved 2026-08-08. CASM bumped `0.1.55` ->
+`0.1.56` (build 1259), live-verified via VICE (`CASM V0.1.56.1259`). Phase
+10 overall is **not yet complete** — the `0.2.0` promotion (increment 7)
+requires a separate, explicit user approval, not yet given.
 
 Parent plan: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
 Prerequisite plans: WP50-WP54, required complete and user-approved before this
@@ -879,3 +877,20 @@ build artifact effects.
   **Increment 5 (all four walkthrough sessions) is complete.** Proceeding
   to compile `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`
   next, then presenting it to the user for approval.
+- 2026-08-08 (continued): User approved the walkthrough ("Perform a commit
+  then begin increment 6"). Committed the full WP55 verification/
+  walkthrough record (`7509368`). Increment 6 executed: applied the only
+  production change this increment authorizes, `VERSION_STAGE` `"55"` ->
+  `"56"` in `casm.s`. Build counter advanced exactly once (`1258` ->
+  `1259`); code size held stable at 18553 bytes (2-character string swap,
+  no size delta); a subsequent no-change rebuild held both the build
+  counter and `casm.prg`/`casm_base.prg`'s md5 stable. Full 25-target
+  regression rebuild (all `test_casm_*` harnesses, `casm`, every CASM
+  disk image) completed clean. Live-verified via VICE: booted
+  `casm_phase10_test.d64` fresh, ran `casm` with no source argument,
+  confirmed `CASM V0.1.56.1259` then `CASM: SOURCE FILE REQUIRED`.
+
+  **WP55 is complete at CASM `0.1.56` build `1259`.** Per the plan's own
+  Completion Gate, this closes WP55 itself — Phase 10 overall remains
+  open pending a *separate*, explicit user approval of the `0.2.0`
+  completion promotion (increment 7), not yet given.

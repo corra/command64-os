@@ -1871,10 +1871,35 @@
     - [x] User approved 2026-08-08; walkthrough
           `brain/walkthroughs/2026-08-08-casm-phase10-wp54-production-integration.md`;
           Task Warrior task closed, WP55 unblocked
-  - [ ] WP55 (`94d98a2b-7ad4-49f0-bf33-38702690eca9`): verification,
+  - [x] WP55 (`94d98a2b-7ad4-49f0-bf33-38702690eca9`): verification,
         walkthrough, and phase gate; approved plan
-        `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`;
-        WP54 complete, WP55 activated 2026-08-08
+        `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`
+    - [x] Baseline reconciliation (found/fixed one stale-doc gap, no
+          behavior discrepancies) and a 9-item full-path code review, both
+          tracing actual code rather than inferring from names
+    - [x] 13/13 relevant harnesses (the plan's four named Phase 10
+          harnesses plus 9 directly-related regressions) PASS live under
+          VICE, including `test_casm_include`/`catalog`/`event` dispatched
+          from a second attached unit
+    - [x] PRG/R6 identity/bounds/failure-injection/resource-reuse audit:
+          bounds and naming fully proven by existing real-routine-loop
+          fixtures; disclosed one accepted gap (`CREATE`/`CLOSE`/`DELETE`/
+          `SHORT_WRITE` listing diagnostics have no independent
+          fault-injection coverage anywhere in this codebase, a
+          pre-existing pattern predating Phase 10, not introduced by it);
+          3 new live production-level proofs added (`LISTING NAME
+          COLLISION` firing for real with same-session recovery, and a
+          direct `comp` proving included/flattened equivalence survives
+          `/M /L`)
+    - [x] 4-session runtime walkthrough: on-device `.LST`/map inspection
+          plus load-and-run behavioral confirmation for a static
+          (`casmemit1.s`) and relocatable (`banner.s`) program, and live
+          confirmation of the `.INCLUDE` parent-resume file-header
+          re-transition, cross-validated against the `/M` map
+    - [x] CASM version bumped `0.1.55` -> `0.1.56` (build `1258` -> `1259`)
+    - [x] User approved 2026-08-08; walkthrough
+          `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`;
+          Task Warrior task closed
   - [ ] Obtain explicit completion approval before the separate `0.2.0`
         promotion
 

@@ -1489,14 +1489,27 @@ Symbol Map and Listing, remains inactive and separately gated.**
       dropped from scope (user decision) in favor of increment 6's live
       production-fixture matrix as Completion Gate evidence — see the
       plan's own Progress log.
-- [ ] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
-      and Phase 10 completion gate. Approved plan:
-      `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
-      WP54 complete; WP55 activated 2026-08-08.
+- [x] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
+      and Phase 10 completion gate. Complete at CASM `0.1.56` build 1259,
+      user-approved 2026-08-08, per
+      `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`
+      and
+      `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
+      Independently re-verified WP50-54's complete `/M`/`/L`
+      implementation: baseline reconciliation, a 9-item full-path code
+      review, 13/13 harnesses live under VICE, a PRG/R6 identity/bounds/
+      failure-injection audit, and a 4-session live runtime walkthrough.
+      Four non-blocking findings disclosed (a pre-existing, codebase-wide
+      fault-injection gap for four raw-I/O listing diagnostics; this OS's
+      `LOAD` always relocating regardless of a static CASM output's own
+      `.ORG`; `MORE` having no abort key; a VICE-testing process note).
+- [ ] Obtain explicit Phase 10 completion approval before the separate
+      `0.1.56` -> `0.2.0` promotion.
 
-**WP54 is complete at CASM `0.1.55` build 1258, user-approved 2026-08-08.
-`/M` and `/L` are both fully implemented in production `casm`. WP55 (the
-phase-level completion gate) is now active.**
+**WP55 is complete at CASM `0.1.56` build 1259, user-approved 2026-08-08.
+Phase 10's own completion gate has now passed; the master-plan Phase 10
+milestone itself remains open pending a separate, explicit `0.2.0`
+promotion approval.**
 
 ## Optional Feature - Progress and Processing Indication
 
