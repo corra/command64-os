@@ -1407,6 +1407,67 @@ foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
     )
 endforeach()
 
+# 6e. CASM Phase 10 WP54 production-integration fixture disk (increment 6).
+# Its own new image, not test.d64 (already at its 144-entry directory
+# ceiling per WP9's own "Dir track full" incident) and not
+# casm_listing_test_d64/casm_include_test_d64 (each lacks either command64
+# or casm.prg, so neither is bootable standalone on the VICE MCP's
+# single-attachable device 8; see WP53 increment 4's own "Carrying the OS
+# here makes the disk usable standalone" precedent, which this repeats).
+#
+# Carries command64, casm, and comp so the whole increment 6 matrix runs
+# from this one disk: each fixture is assembled four times (no options,
+# `/M`, `/L`, `/M /L`, each with its own `/O:` name -- fileCreateOutput has
+# no replace-on-open marker, see project-casm-filecreateoutput-no-replace
+# memory, so a shared name across the four would hang rather than
+# reassemble) and then COMP proves the `/M`/`/L`/`/M /L` PRGs are
+# byte-for-byte identical to the no-options baseline -- COMP's whole-file
+# comparison covers the trailing R6 footer too, so no separate relocation-
+# table check is needed. Fixture selection favors coverage-per-run over
+# exhaustiveness, chosen after WP54's own live-VICE timing experience
+# (`banner.s`, ~350 lines, took 15-30+ minutes per run under true-drive
+# emulation) made a full combinatorial sweep impractical:
+#   - casmemit1.seq (assembled with `/S`): static output, directives,
+#     multiple addressing modes.
+#   - casmreloc1.seq: relocatable/R6 footer plus a forward symbol reference
+#     (MSG, referenced before its own definition).
+#   - casmip1.seq (`.INCLUDE`s casmic1.s): nested include with a reference
+#     crossing the include boundary in both directions (forward into the
+#     child, backward out of it) -- also the code path most likely to
+#     interact badly with listing capture, since crpInclude commits the
+#     parent's own line before pushing the child frame.
+#   - casmmfa.seq + casmmfb.seq: two top-level roots with a forward
+#     reference across the file boundary.
+#   - casmmaxid1.seq: the 31-character maximum-length identifier, exercising
+#     `/M`'s map-row name-width formatting at its boundary.
+add_c64_disk_image(casm_phase10_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp
+)
+add_dependencies(casm_phase10_test_d64 casm_test_fixtures)
+foreach(WP54_FIXTURE casmemit1 casmreloc1 casmmfa casmmfb casmmaxid1)
+    add_custom_command(
+        TARGET casm_phase10_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_FIXTURE}.s" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${WP54_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
+        COMMENT "Appending WP54 increment 6 fixture ${WP54_FIXTURE}.s to casm_phase10_test.d64"
+        VERBATIM
+    )
+endforeach()
+foreach(WP54_INC_FIXTURE casmip1 casmic1)
+    add_custom_command(
+        TARGET casm_phase10_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_INC_FIXTURE}.s" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${WP54_INC_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
+        COMMENT "Appending WP54 increment 6 include fixture ${WP54_INC_FIXTURE}.s to casm_phase10_test.d64"
+        VERBATIM
+    )
+endforeach()
+
 # Real CASM assembly source, so these carry the ".s" on-disk suffix the CASM
 # source-fixture convention requires (unlike WP46's frame-harness fixtures,
 # which are consumed only by a test harness and use bare names). Lowercase

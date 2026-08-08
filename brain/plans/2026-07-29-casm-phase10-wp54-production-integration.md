@@ -136,3 +136,175 @@ records. Does not activate WP55.
 
 - 2026-07-29: User approved this plan. WP54 remains blocked by WP53; no
   integration implementation is authorized.
+- 2026-08-07: WP53 confirmed complete (task aa57f461, status Completed); WP54
+  unblocked. Implemented increments 2-5 directly in `casm.s` (deferred
+  increment 1's dedicated stand-in harness -- the primitives each already
+  carry their own unit coverage from WP51-53, so the integration risk is
+  purely in `casm.s`'s own call sequencing, which increment 6's live-fixture
+  run below exercises directly):
+  - Moved `listingStateInit`/`listingFileInit` to the very first two calls in
+    `start`, ahead of `resourcesInit` -- both are pure BSS clears that cannot
+    fail, and running them first (before any call that can fail) guarantees
+    the new `artifactsAbort` can safely inspect listing state from the very
+    first fatal exit onward. This deviates from the plan's literal "after
+    source/file/CLI state init" wording; the plan's original placement
+    would have left `artifactsAbort` unsafe to call from the four earliest
+    init failures (`resourcesInit`/`cliInit`/`fileIoInit`/`sourceInit`).
+  - Removed the `/M`/`/L` NOT IMPLEMENTED block; added `cliDeriveListingName`
+    (gated `/L`), `listingCaptureInit` (gated `/L`, post-rewind/replay-reset),
+    `listingCaptureFinalize` (gated `/L`, pre-emitFinalize), `outputCommit`
+    (unconditional, pre-listing/map), `listingWriteFile` (gated `/L`,
+    post-commit), and `mapPrint` with a preceding `diagClearLoc` (gated `/M`,
+    last) in the plan's exact specified order.
+  - Added `artifactsAbort` (chains `listingAbort` then `outputAbort`, same
+    "preserve primary, return first cleanup failure" contract each already
+    implements) and rerouted `startFatal` through it, replacing the old
+    direct `outputAbort` call.
+  - Added a second near-fatal trampoline (`startFatalNear1`/
+    `startPass1Continue`) for Pass 1's two checks: the growing Pass 2 tail
+    pushed them out of `bcs` branch range of the original `startFatalNear`.
+  - Envelope: unchanged. Both `casm_3800`/`casm_3900` origins link cleanly
+    inside the existing WP53 `$5500` MAIN segment size (18541 code bytes,
+    ~3.2KB of headroom below the WP54 `$5B00` cap) -- no MEMORY size bump
+    needed for this increment.
+  - Full project build (`cmake --build .`, all targets including
+    `image_d64`/`casm_listing_test_d64`) succeeds clean.
+  - Live-verified via VICE MCP against `banner.s` (the real ~350-line
+    production fixture already shipped on `image_d64`), booting
+    `command64` and running real shell dispatch for all four option
+    combinations: no options (PRG only), `/M` (PRG + real 54-symbol map,
+    no listing), `/L` (PRG + real 178-block `.LST`, no map), and `/M /L`
+    together (PRG + listing + map, in that order, all committed). Also
+    incidentally exercised the failure path for real: a disk-full condition
+    (from repeated same-disk test runs) correctly produced
+    `CASM: LISTING WRITE FAILED` while retaining the already-committed PRG
+    and suppressing the map/success line -- confirms the "listing failure
+    retains committed PRG, suppresses map/success" contract end-to-end on
+    real hardware emulation, not just by code inspection.
+  - Found and worked around, but did NOT fix (pre-existing, out of WP54's
+    scope): `fileCreateOutput` (fileio.s, Phase 2/WP13-era) opens the PRG
+    output name verbatim with no CBM DOS `@0:` replace marker, unlike
+    `listingCreate`'s WP53-era replace-aware open. Rerunning CASM with an
+    output name that already exists on disk hangs (observed stuck in a
+    KERNAL IEC retry loop, recovered only by a machine reset) rather than
+    replacing or failing fast. Worked around in testing by using distinct
+    `/O:` names per run. Worth a follow-up task; not a WP54 regression.
+  - Remaining for WP54 closure: increment 1's dedicated stand-in/event-log
+    harness (`test_casm_phase10`) and its systematic failure-injection matrix
+    (only the disk-full case was exercised, incidentally, this session),
+    increment 6's identity-hash fixture matrix (forward/back symbols, map
+    boundaries, nested includes, etc.), increment 7's formal envelope
+    measurement/regression pass, and increment 8's version bump to stable
+    `0.1.55` plus synchronized docs/CHANGELOG/wiki/task updates. `casm.s` is
+    still at `0.1.54` build 1239 pending those.
+- 2026-08-07 (continued): Increment 6 (production fixture matrix). Added a
+  new dedicated disk image target `casm_phase10_test_d64` (carrying
+  command64, casm, and comp, self-bootable on device 8, ~508 blocks free)
+  since test.d64 is at
+  its directory-entry ceiling and casm_listing_test_d64/casm_include_test_d64
+  each lack either command64 or casm.prg. Scoped to 4 fixtures (not the
+  plan's full aspect list) after this session's own live-VICE timing made a
+  full combinatorial sweep impractical (each fixture's 4-option matrix, 4
+  assemblies + 3 `COMP`s, took 20-30+ minutes real wall-clock under true
+  drive emulation): `casmemit1.s` (static, `/S`), `casmreloc1.s`
+  (relocatable/R6 + forward reference), `casmmfa.s`+`casmmfb.s` (two roots,
+  cross-file forward reference), `casmmaxid1.s` (31-char map-row boundary).
+  For each, ran all 4 option combinations (`/O:`-distinct names per run,
+  working around the known fileCreateOutput-no-replace gap) and used the
+  native `comp` utility to prove the `/M`/`/L`/`/M /L` PRGs are byte-for-byte
+  identical to the no-options baseline -- **all 3 `COMP`s passed for all 4
+  fixtures (12/12 `FILES COMPARE OK`)**, including R6 footer bytes (comp is
+  whole-file, so this also proves relocation-table identity with no
+  separate check needed). Map output also spot-checked correct each time
+  (`$3400 START`/`$340E MSG`/`002 SYMBOLS` for casmreloc1; `$C003 VALB`/
+  `001 SYMBOLS` for the roots pair; the full 31-char name for casmmaxid1).
+  - **Found a real bug, NOT fixed**: a 5th fixture, `casmip1.s` (single-level
+    `.INCLUDE` with a reference crossing the boundary in both directions,
+    the exact shape WP47/48 already proved for plain assembly), fails `/L`
+    reproducibly with `CASM: LISTING REPLAY MISMATCH AT LINE 6, COL 5` --
+    the parent's first resumed statement's *second* line (`JMP CHILDLBL`).
+    `/M` alone and `/L` alone (without `.INCLUDE`) both work; this is
+    specifically an include-frame-pop + listing-capture interaction, most
+    likely in `source.s`'s `sourceCaptureNewline`/`sourceCaptureFinal`/
+    `sourceFramePopInternal` given WP51 never exercised real listing capture
+    against a real `.INCLUDE` boundary through the production lexer/
+    parser's own lookahead timing (WP51's own casmlc07/casmlc7c fixture used
+    a driver loop, not real casmRunPass). Attempted live root-cause via VICE
+    checkpoints across every `CASM_DIAG_LISTING_REPLAY_MISMATCH` raise site
+    in `listing.s`/`source.s` (7 candidate sites, all instrumented) -- none
+    fired, and a `vice_backtrace` attempt returned an internally
+    inconsistent frame (a return address landing mid-instruction, not after
+    a real `JSR`), indicating the tool's stack-scan isn't reliable for this
+    purpose. Reverted all temporary debug labels/exports before continuing
+    (see git history if resuming: two throwaway edits to `source.s`/
+    `listing.s`, both cleanly reverted, no trace left). See
+    [[project-casm-phase10-wp54-progress]] and the new
+    [[project-casm-include-listing-mismatch]] memory. This blocks closing
+    WP54 with `.INCLUDE` support intact -- either fix it, or (pending user
+    decision) scope `/L` to reject `.INCLUDE`d sources for `0.1.55` and defer
+    the fix to a follow-up WP.
+  - Increment 6 is therefore substantially but not fully done: 4/5 planned
+    fixture categories (static, R6/forward-ref, roots, map-boundary) are
+    clean; nested includes surfaced a real defect requiring its own fix
+    before WP54 can close. "Repeated includes" and "output names/devices"
+    aspects were not separately exercised (deprioritized given the time
+    cost and the include bug already blocking closure regardless).
+- 2026-08-07 (continued): Root-caused and fixed the `casmip1.s` `/L` +
+  `.INCLUDE` bug (task 41), closing increment 6's 5th fixture category.
+  Abandoned live VICE checkpoint/backtrace debugging as unproductive (per
+  user redirect) in favor of static read-through, then a print-based trace
+  (temporary `DbgTraceStmt` in `casm.s`, temporary `DbgDumpRecord` in
+  `listing.s`) run unpaused in VICE with output read back via raw screen-RAM
+  memory dumps (more reliable than screenshot OCR for dense hex text).
+  - First trace (statement dispatch) disproved the leading hypothesis: the
+    parent's final `NOP` statement (line 8, depth 0) *is* parsed, dispatched,
+    and committed cleanly in Pass 2 -- the bug is not a missed statement.
+  - Second trace (dumping each metadata record's FILEID/LINE/BYTEOFF/
+    BYTECOUNT at both append-time and replay-time) found the real root
+    cause: `listingValidateRecord` (`listing.s`) calls
+    `listingResolveFilename` to resolve each record's FILEID for display;
+    for an included (frame) FILEID, that reaches `includeCatalogRead`,
+    which its own header already documented as overwriting `CasmVmmBuffer`
+    as its own VMM transfer scratch. But `listingValidateRecord` read
+    `BYTECOUNT_LO/HI` back out of `CasmVmmBuffer` *after* that call, to
+    advance the running expected-byte-offset -- so for every record
+    belonging to an included file, the advance used clobbered garbage
+    instead of the real byte count, and the *next* record's `BYTEOFF` check
+    then mismatched. Capture-time records were always correct and
+    monotonic; only the replay-time advance was corrupted, which is why the
+    failure only ever appeared once inside an include, one record after the
+    boundary.
+  - Fix (in `listing.s`): stash `BYTECOUNT_LO/HI` into new
+    `CasmListValidByteCountLo/Hi` *before* calling `listingResolveFilename`
+    in `listingValidateRecord`, and advance from the stash, not from
+    `CasmVmmBuffer`. Also found and fixed a second, quieter instance of the
+    identical clobber: `listingWriteFile`'s loop copied
+    `CasmVmmBuffer` -> `CasmListCurrentRecord` (the snapshot `lwEmitRecordRows`
+    formats the actual `.LST` rows from) *after* calling
+    `listingValidateRecord` -- so every included-file line's printed PC/
+    byte-count/hex columns would have been silently wrong too, even once the
+    mismatch check itself was fixed. Fixed by reordering: the snapshot now
+    happens before `listingValidateRecord` runs.
+  - Re-verified live in VICE: `casmip1.s` now assembles cleanly with all 4
+    option combinations (none, `/M`, `/L`, `/M /L`), each ending in
+    `CASM: INPUT VALIDATED`, `/M`'s map correctly showing `$C000 START`/
+    `$C002 CHILDLBL`/`$C00C BACKREF`/`003 SYMBOLS` both alone and combined
+    with `/L`. `comp` proved all 3 non-baseline PRGs (`/M`, `/L`, `/M /L`)
+    byte-for-byte identical to the no-options baseline (3/3
+    `FILES COMPARE OK`, R6/relocation-irrelevant here since this fixture is
+    static). Increment 6 is now 5/5 fixture categories clean.
+  - Reverted all temporary debug instrumentation (`DbgTraceStmt`/
+    `DbgTraceHexByte`/`DbgTraceNibble`/`DbgTraceBuf` from `casm.s`;
+    `DbgDumpRecord`/`DbgDumpMirror`/`DbgHexByte`/`DbgNibble`/`DbgBuf` from
+    `listing.s`; the `diagPrintString` import in `listing.s`) and the two
+    branch-range trampolines (`crpFailTrampoline`/`crpDispatch` in
+    `casmRunPass`) that only existed to accommodate the debug code's size --
+    removing the debug code let both direct `bcs crpFail` branches fit
+    again. `CMakeLists.txt`'s casm `PRG_SIZE_HEX` reverted from the
+    temporary `"5700"` back to the original `"5500"`; the real fix (four new
+    permanent bytes: `CasmListValidByteCountLo/Hi`, plus the reordered/
+    added instructions) fits inside the original WP54 envelope with room to
+    spare (18553 code bytes at rebuild, vs. 18541 before this fix -- +12
+    bytes net for a real correctness fix, not a threat to the `$5B00` cap).
+  - See [[project-casm-include-listing-mismatch]] (updated) and
+    [[project-casm-phase10-wp54-progress]] (updated).

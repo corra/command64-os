@@ -174,6 +174,16 @@ CasmListValidExpectedByteOffHi: .res 1
 CasmListResolvedName:           .res CASM_LISTING_RESOLVED_NAME_SIZE
 CasmListResolvedNameLen:        .res 1
 
+; listingValidateRecord's own stash of this record's BYTECOUNT_LO/HI, saved
+; before calling listingResolveFilename -- for a frame (included) FILE_ID,
+; that call reaches includeCatalogRead, which overwrites CasmVmmBuffer as its
+; own VMM transfer scratch (its header says so explicitly). Reading
+; BYTECOUNT back out of CasmVmmBuffer after that call returns would read
+; whatever includeCatalogRead's own transfer left behind instead of this
+; record's real byte count.
+CasmListValidByteCountLo:       .res 1
+CasmListValidByteCountHi:       .res 1
+
 ; WP53 increment 6: formatters and aggregate serializer.
 ;
 ; CasmListCurrentRecord is a private 16-byte snapshot of the record
@@ -1389,6 +1399,15 @@ listingValidateRecord:
     cmp CasmListValidExpectedByteOffHi
     bne lvrMismatch
 
+    ; Stash this record's own byte count before resolving its filename --
+    ; listingResolveFilename reaches includeCatalogRead for a frame FILE_ID,
+    ; which overwrites CasmVmmBuffer as its own VMM transfer scratch, so
+    ; BYTECOUNT_LO/HI must not be re-read from there afterward.
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_LO
+    sta CasmListValidByteCountLo
+    lda CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_HI
+    sta CasmListValidByteCountHi
+
     ; File identity must resolve.
     lda CasmVmmBuffer + CASM_LISTING_META_FILEID
     jsr listingResolveFilename
@@ -1397,10 +1416,10 @@ listingValidateRecord:
     ; Advance the running expected offset by this record's own byte count.
     lda CasmListValidExpectedByteOffLo
     clc
-    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_LO
+    adc CasmListValidByteCountLo
     sta CasmListValidExpectedByteOffLo
     lda CasmListValidExpectedByteOffHi
-    adc CasmVmmBuffer + CASM_LISTING_META_BYTECOUNT_HI
+    adc CasmListValidByteCountHi
     sta CasmListValidExpectedByteOffHi
 
     lda #CASM_DIAG_NONE
@@ -2301,9 +2320,11 @@ lwfLoop:
     cmp #CASM_STREAM_EOF
     beq lwfFlushEnd
 
-    jsr listingValidateRecord
-    bcs lwfAbortPath
-
+    ; Snapshot the record before validating it -- listingValidateRecord
+    ; calls listingResolveFilename, which for an included FILE_ID reaches
+    ; includeCatalogRead and overwrites CasmVmmBuffer as its own VMM
+    ; transfer scratch. lwEmitRecordRows below must format this record's
+    ; real fields, not whatever that catalog read left behind.
     ldy #0
 lwfCopyRec:
     lda CasmVmmBuffer, y
@@ -2311,6 +2332,9 @@ lwfCopyRec:
     iny
     cpy #CASM_LISTING_META_REC_SIZE
     bne lwfCopyRec
+
+    jsr listingValidateRecord
+    bcs lwfAbortPath
 
     jsr lwEmitRecordRows
     bcs lwfAbortPath
