@@ -140,6 +140,7 @@
 .export sourceDrainLineTail
 .export sourceSetLineCapture
 .export sourceTakeCompletedLine
+.export sourceReadSpanChunk
 .export CasmSourceCompletedStartLo
 .export CasmSourceCompletedStartHi
 .export CasmSourceCompletedLength
@@ -1911,6 +1912,94 @@ sourceTakeCompletedLine:
 stclNone:
     lda #0
     clc
+    rts
+
+; ---------------------------------------------------------------------------
+; sourceReadSpanChunk (WP53)
+; Read an arbitrary absolute span of the already-loaded combined source store
+; into CasmVmmBuffer, so WP53's listing serializer can replay the source
+; spans WP51 recorded. Deliberately a random-access reader, not a traversal
+; step: it installs no refill block, advances no cursor, touches no frame
+; stack, publishes no completed-line sidecar, and changes neither
+; CasmSourceState nor CasmSourceApiMode -- so it is safe to call after
+; traversal has closed, which is exactly when the serializer runs.
+;
+; The source registry slot stays private to this module: a caller names a
+; span, never a slot. That keeps WP53's "exposes no source slot" stop
+; condition structural rather than conventional.
+;
+; A zero-length request is rejected rather than quietly succeeding. The
+; serializer has no legitimate zero-byte span, so one means its recorded
+; metadata disagrees with the store -- the same class of fault as an
+; out-of-range span, and therefore the same diagnostic.
+;
+; Inputs:    CasmVmmOffLo/Hi = absolute offset into the combined store
+;            CasmIoLenLo/Hi  = byte count, 1..CASM_VMM_BUFFER_SIZE
+; Outputs:   Success: C clear, A = CASM_DIAG_NONE, CasmVmmBuffer[0..len-1]
+;                     holds the requested bytes
+;            Fail:    C set, A = CASM_DIAG_LISTING_REPLAY_MISMATCH when the
+;                     request disagrees with the authoritative loaded extent
+;                     (zero or oversized length, non-zero length high byte,
+;                     16-bit wrap, or end past CasmSourceLoadedLenLo/Hi);
+;                     A = CASM_DIAG_VMM_TRANSFER_FAILED propagated unchanged
+;                     from vmmWindowRead on a rejected transfer
+; Preserves: all traversal state
+; Clobbers:  A, X, Y, CasmSourceScratch0/1, CasmValue0Lo/Hi (the latter
+;            inside vwPrepareTransfer), and OS API-defined volatile registers
+; Scratch:   CasmSourceScratch0/1 (16-bit end-of-span sum)
+;
+; CasmSourceLoadedLenLo/Hi is the right bound here, not WP46's
+; CasmSourceTopLevelEndLo/Hi: the serializer replays spans from included
+; children too, and those live above the top-level end in the combined
+; store. This routine is not traversal, so the depth-0 overread hazard
+; CasmSourceTopLevelEndLo/Hi exists to prevent does not apply -- every span
+; is explicitly named by a caller that recorded it, not walked into.
+; ---------------------------------------------------------------------------
+sourceReadSpanChunk:
+    ; Length must be 1..CASM_VMM_BUFFER_SIZE so it fits one staged transfer.
+    lda CasmIoLenHi
+    bne srscMismatch
+    lda CasmIoLenLo
+    beq srscMismatch
+    cmp #CASM_VMM_BUFFER_SIZE + 1
+    bcs srscMismatch
+
+    ; end = offset + length (16-bit). A carry out of the high byte means the
+    ; span wrapped past $FFFF, which no real span can do.
+    lda CasmVmmOffLo
+    clc
+    adc CasmIoLenLo
+    sta CasmSourceScratch0
+    lda CasmVmmOffHi
+    adc #0
+    sta CasmSourceScratch1
+    bcs srscMismatch
+
+    ; Reject end > CasmSourceLoadedLenLo/Hi; end == loaded length is the
+    ; legitimate final span and must pass.
+    lda CasmSourceScratch1
+    cmp CasmSourceLoadedLenHi
+    bcc srscInRange
+    bne srscMismatch
+    lda CasmSourceScratch0
+    cmp CasmSourceLoadedLenLo
+    beq srscInRange
+    bcs srscMismatch
+
+srscInRange:
+    ldx CasmSourceVmmSlot
+    jsr vmmWindowRead
+    bcs srscPropagate
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+srscPropagate:
+    rts                          ; vmmWindowRead already set A and carry
+
+srscMismatch:
+    lda #CASM_DIAG_LISTING_REPLAY_MISMATCH
+    sec
     rts
 
 ; ---------------------------------------------------------------------------

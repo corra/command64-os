@@ -108,6 +108,8 @@
 .export cliSourceSlotLo  ; this harness's own single-entry copy, see BSS section
 .export cliSourceSlotHi  ; this harness's own single-entry copy, see BSS section
 .export CasmOutputName   ; fileio.s's outputAbort references this by name
+.export CasmListingName  ; listing.s's WP53 file I/O references these
+.export CasmListingLen
 .export CasmCliOptions   ; WP38: emitInit now reads this; harness's own copy,
                           ; zero-initialized BSS (non-static) -- every fixture's
                           ; own explicit .ORG overwrites emitInit's priming
@@ -865,6 +867,11 @@ CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
 CasmCliOptions:  .res 1
+; WP53 increment 4: listing.s's new `.LST` file I/O (linked whole, unused
+; by this harness) references these (cli.s), which this harness does not
+; link either.
+CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
+CasmListingLen:  .res 1
 
 .segment "RODATA"
 

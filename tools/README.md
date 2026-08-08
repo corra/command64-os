@@ -33,3 +33,17 @@ This directory contains the cross-development tools, compilers, utility scripts,
 
 * **Purpose**: A pre-configured 256KB RAM Expansion Unit (REU) memory image.
 * **Usage**: Configured in C64 emulators (such as VICE) to mock and test REU-enabled features like the Virtual Memory Manager (VMM), environment variables (`SET`, `PATH`), and CPU state preservation.
+
+### 5. VICE MCP Lifecycle Helper (`vice_mcp_start.sh`)
+
+* **Purpose**: Starts, stops, and checks a VICE instance running the built-in MCP server (`x64sc -mcpserver`, HTTP JSON-RPC on `/mcp`). The MCP server has no tool of its own to launch or kill the emulator process — this script is that missing piece, run outside of MCP.
+* **Usage**:
+
+  ```bash
+  tools/vice_mcp_start.sh start [--machine x64sc] [--port 6510] [--host 127.0.0.1] [--token TOKEN]
+  tools/vice_mcp_start.sh status [--port 6510]
+  tools/vice_mcp_start.sh stop [--port 6510]
+  ```
+
+  `start` refuses to run if something already holds the target port, and only reports success once `vice_ping` actually answers — a bound port alone is not proof the server is serving (see `.agents/workflows/vice-mcp-testing.md`). Once it's up, attach disks and control the machine over MCP (`vice_disk_attach`, `vice_autostart`, etc.), not through additional CLI flags to this script.
+* **See also**: `tools/VICE-MCP-README.md` for the full tool reference, `.agents/workflows/vice-mcp-testing.md` for the testing procedure.

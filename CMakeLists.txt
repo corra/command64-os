@@ -287,7 +287,35 @@ if(Ca65_FOUND)
     # column array overflowed $4200 by 60 measured bytes. One page is the
     # smallest aligned increase; the final site-line/traceback corrections
     # leave 85 bytes headroom.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "4900")
+    # (WP49-WP51's envelope moved to $4900 without a recorded comment trail
+    # entry here -- not touched by WP52.)
+    # WP52: $4900 -> $4B00 -- the new map.s module (symbolsReadByIndex's
+    # caller, record validation, and private hex/decimal row formatters)
+    # overflowed $4900 by 362 measured bytes; $4A00 (+256) would still
+    # overflow, so $4B00 (+512) is the smallest round-page step that fits,
+    # leaving 150 bytes headroom, below the plan's preapproved $4F00 ceiling.
+    # WP53 increment 1: $4B00 -> $4C00 -- CasmListingName[64]/CasmListingLen
+    # and cliDeriveListingName overflowed $4B00 by 55 measured bytes; $4C00
+    # (+256) is the smallest round-page step that fits, staying below the
+    # plan's preapproved $5800 ceiling.
+    # WP53 increment 4: $4C00 -> $4E00 -- the `.LST` file I/O state
+    # (CasmListFile*/CasmListingOpenName[68]) and its five routines
+    # (listingFileInit/Create/Write/Close/Delete/Abort) overflowed $4C00 by
+    # 445 measured bytes; $4D00 (+256) would still overflow, so $4E00
+    # (+512) is the smallest round-page step that fits. Then activating the
+    # five listing diagnostics' message text in diagnostics.s overflowed
+    # $4E00 by a further 112 bytes; $4F00 (+256) is the smallest round-page
+    # step that fits that, still below the plan's preapproved $5800
+    # ceiling.
+    # WP53 increment 5: $4F00 -> $5000 -- listingValidateRecord/
+    # listingResolveFilename plus CasmListResolvedName[68] overflowed $4F00
+    # by 170 measured bytes.
+    # WP53 increment 6: $5000 -> $5500 -- the formatters and aggregate
+    # serializer (listingWriteFile and its private row/header/chunk
+    # routines) overflowed $5000 by 1052 measured bytes; $5400 (+1024)
+    # would still overflow, so $5500 (+1280) is the smallest round-page
+    # step that fits.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "5500")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -442,13 +470,116 @@ if(Ca65_FOUND)
             # listingMirrorByte/listingCommitLine/listingCaptureFinalize) plus
             # this harness's own new fixtures overflowed $1000 by 236 bytes;
             # $1100 overflowed by a further 20; $1200 overflowed by 1.
-            set(TEST_PRG_SIZE "1300")
+            # WP53 increment 4: $1300 -> $1700 -- listing.s is linked whole,
+            # so its new `.LST` file I/O state/routines (unused by this
+            # harness, which exercises only WP51's capture API) overflowed
+            # $1300 by 354 measured bytes; $1700 (+1024) is the smallest
+            # round-page step that fits.
+            # WP53 increment 6: $1700 -> $1D00 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $1700 by 221 measured CODE bytes; $1800
+            # still overflowed RODATA by 13, then $1900 overflowed BSS by
+            # 414 (ld65 reports one memory-area overflow at a time, so each
+            # step only reveals the next); $1D00 (+1536) is the smallest
+            # round-page step that clears all three.
+            set(TEST_PRG_SIZE "1D00")
         endif()
         if(TEST_NAME STREQUAL "casm_symbols")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
+        if(TEST_NAME STREQUAL "casm_map")
+            # WP52: map.s plus the symbol table it reads through
+            # symbolsReadByIndex. Does NOT link diagnostics.s -- this harness
+            # provides its own diagPrintFatal/diagPrintString stand-ins
+            # (matching casm_symbols.s's/casm_listing.s's own precedent for
+            # avoiding diagnostics.s's transitive lexer.s/source.s
+            # dependencies).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/map.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_spanread")
+            # WP53 increment 2: source.s plus the modules it needs to reach a
+            # real VMM-backed loaded store (fileio/state/vmm_store/resources)
+            # and diagnostics.s for source.s's echo-buffer state. Does NOT
+            # link cli.s: its own single-slot CasmSourceNames/CasmSourceCount/
+            # cliSourceSlotLo/Hi stand-in, matching casm_listcap.s's
+            # precedent.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            # Measured envelope growth: $2000 overflowed RODATA by 119,
+            # $2100 then overflowed BSS (source.s's frame arrays and file
+            # table) by 1208, and adding include.s for diagnostics.s's
+            # catalog references overflowed $2600 by a further 1088.
+            # $2B00 is the smallest aligned step that fits.
+            # WP53 increment 4: $2B00 -> $2C00 -- include.s's own diagnostics
+            # dependency chain grew with listing.s's `.LST` additions;
+            # $2B00 overflowed by 53 measured bytes.
+            set(TEST_PRG_SIZE "2C00")
+        endif()
+        if(TEST_NAME STREQUAL "casm_spancommit")
+            # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
+            # fileCreateOutput/fileOpenInput/fileClose) plus resources.s for
+            # resourcesInit/resourcesCleanup's registry bookkeeping.
+            # resources.s references diagnostics.s's diagPrintFatal (its own
+            # exitFatal path) and vmm_store.s's vmmStoreFree (its own VMM
+            # cleanup path); neither is reachable from this harness's
+            # all-success flow (no case registers a VMM allocation, and none
+            # calls exitFatal), so the harness stubs both itself rather than
+            # pulling in either whole subsystem -- diagnostics.s alone drags
+            # in state.s/lexer.s/source.s/include.s transitively.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1200")
+        endif()
+        if(TEST_NAME STREQUAL "casm_listwrite")
+            # WP53 increment 4: fileio.s (PRG-side create/write/close used
+            # only to stage createReplacesExisting's stale file) plus
+            # listing.s (the new `.LST` I/O under test) plus resources.s
+            # for registry bookkeeping.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            # WP53 increment 6: $1800 -> $2000 -- listingWriteFile's own
+            # formatters/serializer (listing.s is linked whole) plus this
+            # harness's own new golden-path/header-chunk cases and their
+            # expected-content RODATA overflowed $1800 by 96 measured bytes
+            # after increment 5's own growth, then a further 305 after this
+            # increment's own test additions; $2000 (+2048 from the
+            # original $1800) is a comfortably round step above both.
+            # WP53 increment 7: $2000 -> $2100 -- three new failure/boundary
+            # cases (byte+source continuation together, aggregate flush
+            # boundary, mid-replay validate failure through listingWriteFile)
+            # overflowed $2000 by 169 measured bytes.
+            set(TEST_PRG_SIZE "2100")
+        endif()
+        if(TEST_NAME STREQUAL "casm_cliderive")
+            # WP53 increment 1: cli.s alone (CommandBuffer is a fixed absolute
+            # address per command64.inc, not a linked symbol, so no other
+            # module is required).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/cli.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
@@ -496,7 +627,23 @@ if(Ca65_FOUND)
             # emitByte cannot resolve the symbol otherwise, whether or not this
             # harness's own driver ever enables capture. $4500 overflowed by
             # 418 measured bytes.
-            set(TEST_PRG_SIZE "4700")
+            # WP52: symbolsReadByIndex's addition to symbols.s (linked whole,
+            # same as every module here) overflowed $4700 by 10 measured
+            # bytes; $4800 (+256) is the smallest round-page step above that.
+            # WP53 increment 4: $4800 -> $4B00 -- listing.s's new `.LST`
+            # file I/O state/routines (unused by this harness, which only
+            # drives Pass 1) overflowed $4800 by 579 measured bytes; $4A00
+            # (+512) still overflowed by 67, so $4B00 (+768) is the
+            # smallest round-page step that fits.
+            # WP53 increment 5: $4B00 -> $4C00 -- listing.s's new
+            # listingValidateRecord/listingResolveFilename (unused by this
+            # harness) overflowed $4B00 by 190 measured bytes.
+            # WP53 increment 6: $4C00 -> $5100 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $4C00 by 1072 measured bytes; $5000
+            # (+1024) would still overflow, so $5100 (+1280) is the
+            # smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5100")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -530,7 +677,22 @@ if(Ca65_FOUND)
             # BSS end was 0x7AF6, only 0x42F6 above $3800) -- $4300 is the
             # true smallest 256-byte-aligned fit, 266 bytes tighter than the
             # $4400 carried over from increment 5's own rough overflow retry.
-            set(TEST_PRG_SIZE "4300")
+            # WP52: symbolsReadByIndex's addition to symbols.s (linked whole)
+            # overflowed $4300 by 95 measured bytes; $4400 (+256) fits.
+            # WP53 increment 4: $4400 -> $4700 -- listing.s's new `.LST`
+            # file I/O state/routines (unused by this harness) overflowed
+            # $4400 by 664 measured bytes; $4700 (+768) is the smallest
+            # round-page step that fits.
+            # WP53 increment 5: $4700 -> $4900 -- listing.s's new
+            # listingValidateRecord/listingResolveFilename (unused by this
+            # harness) overflowed $4700 by 275 measured bytes; $4800 (+256)
+            # still overflowed by 19 (275 > 256), so $4900 (+512) is the
+            # smallest round-page step that fits.
+            # WP53 increment 6: $4900 -> $4D00 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $4900 by 901 measured bytes; $4D00
+            # (+1024) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "4D00")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -565,7 +727,10 @@ if(Ca65_FOUND)
             # sourceCaptureFinal/sourceSetLineCapture/sourceTakeCompletedLine
             # plus the frame-stack LineStart array overflowed $1D00 by 153
             # bytes.
-            set(TEST_PRG_SIZE "1E00")
+            # WP53 increment 2: $1E00 -> $1F00. source.s's new
+            # sourceReadSpanChunk (linked whole, unused by this harness)
+            # overflowed $1E00 by 25 measured bytes.
+            set(TEST_PRG_SIZE "1F00")
         endif()
         if(TEST_NAME STREQUAL "casm_event")
             # WP47: include.s (the event log) plus every module it
@@ -587,7 +752,10 @@ if(Ca65_FOUND)
             # WP51 increment 2: source.s's listing-capture additions (sidecar,
             # frame-stack LineStart array, sourceCaptureNewline/Final)
             # overflowed $1D00 by 189 bytes.
-            set(TEST_PRG_SIZE "1E00")
+            # WP53 increment 2: $1E00 -> $1F00. source.s's new
+            # sourceReadSpanChunk (linked whole, unused by this harness)
+            # overflowed $1E00 by 61 measured bytes.
+            set(TEST_PRG_SIZE "1F00")
         endif()
         if(TEST_NAME STREQUAL "casm_frame")
             # WP46: include.s (for includeCatalogLoad) plus the same
@@ -623,7 +791,18 @@ if(Ca65_FOUND)
             # WP51 increment 5: linking listing.s (required by emit.s's new
             # listingMirrorByte call) overflowed $4300 by 609 measured bytes;
             # $4600 still overflowed by a further 97.
-            set(TEST_PRG_SIZE "4700")
+            # WP53 increment 4: $4700 -> $4B00 -- listing.s's new `.LST`
+            # file I/O state/routines (unused by this harness) overflowed
+            # $4700 by 770 measured bytes; $4B00 (+1024) is the smallest
+            # round-page step that fits.
+            # WP53 increment 5: $4B00 -> $4C00 -- listing.s's new
+            # listingValidateRecord/listingResolveFilename (unused by this
+            # harness) overflowed $4B00 by 125 measured bytes.
+            # WP53 increment 6: $4C00 -> $5000 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $4C00 by 1007 measured bytes; $5000
+            # (+1024) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5000")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -668,7 +847,21 @@ if(Ca65_FOUND)
             # OS-level bug reading exactly-1-byte SEQ files (out of WP51's own
             # scope; tracked separately) made a literal 1-byte fixture
             # unusable. $4C00 is the resulting smallest fit.
-            set(TEST_PRG_SIZE "4C00")
+            # WP53 increment 4: $4C00 -> $4F00 -- listing.s is linked whole,
+            # so its new `.LST` file I/O state/routines (unused by this
+            # harness, which never enables listing capture with a real
+            # output) overflowed $4C00 by 686 measured bytes; $4F00 (+768)
+            # is the smallest round-page step that fits.
+            # WP53 increment 5: $4F00 -> $5100 -- listingValidateRecord/
+            # listingResolveFilename (unused by this harness) overflowed
+            # $4F00 by 297 measured bytes; $5000 (+256) would still
+            # overflow, so $5100 (+512) is the smallest round-page step
+            # that fits.
+            # WP53 increment 6: $5100 -> $5500 -- listing.s's new
+            # listingWriteFile formatters/serializer (unused by this
+            # harness) overflowed $5100 by 923 measured bytes; $5500
+            # (+1024) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5500")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -795,11 +988,11 @@ set(IMAGE_BASE_PRG_TARGETS command64 debug ${LABEL_TARGET} ${FORMAT_TARGET} ${CO
 # reviewed manifest backs it.
 set(IMAGE_PRG_TARGETS ${IMAGE_BASE_PRG_TARGETS} dash)
 set(TEST_IMAGE_PRG_TARGETS ${IMAGE_BASE_PRG_TARGETS} ${TEST_TARGETS} ${CA65_APP_SMOKETEST_TARGET})
-# test_l15release ships on casm_overflow_test_d64 instead (see that target's
-# own comment) -- test.d64 sits at the 1541 directory track's hard 144-entry
-# ceiling, and adding one more entry there would bump an unrelated fixture
-# off. Remove it from the generic test.d64 packaging list so it isn't
-# double-packaged.
+# test_l15release ships on casm_listing_test_d64 instead (see that target's
+# own comment; moved there from casm_overflow_test_d64 at WP52) -- test.d64
+# sits at the 1541 directory track's hard 144-entry ceiling, and adding one
+# more entry there would bump an unrelated fixture off. Remove it from the
+# generic test.d64 packaging list so it isn't double-packaged.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_l15release)
 # WP44's include harness is intentionally packaged on casm_overflow_test_d64:
 # test.d64 is already at the 1541 directory-entry ceiling.
@@ -815,6 +1008,34 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listing)
 # WP51 increment 6's real-path capture harness: its own casm_listing_test_d64
 # disk, same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listcap)
+# WP52's symbol-map harness joins casm_listing_test_d64 for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_map)
+# WP53 increment 1's cli-derivation harness joins casm_listing_test_d64 for
+# the same reason (test.d64's directory-entry ceiling).
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_cliderive)
+# WP53 increment 2's span-reader harness joins it for the same reason; it
+# also needs casmlc02, which already lives on that disk.
+#
+# WP53 increment 4: this image now also carries `command64` itself, making
+# it self-bootable. Every harness here previously required a two-drive
+# setup (bootable test.d64 on 8, this disk on 9), but the VICE MCP can only
+# attach an image to drive 8 -- there is no way to place this disk on
+# drive 9 of an already-running emulator, and `vice_load_program` after
+# Command64 is resident destroys the OS session even with `run: false`
+# (verified: it issues a BASIC `LOAD"*",8,1`). Carrying the OS here makes
+# the disk usable standalone on drive 8. Cost is ~60 blocks against 258
+# free.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_spanread)
+# WP53 increment 3's commit/abort harness joins it for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_spancommit)
+# WP53 increment 4's listing-file I/O harness joins it for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listwrite)
+# WP52: symbolsReadByIndex's addition to symbols.s (linked whole by
+# test_casm_passcheck, same as test_casm_pass1) left test.d64 2 blocks short
+# of its own byte-space ceiling. Moved to casm_listing_test_d64 (523 blocks
+# free) rather than trimming test.d64's content -- not a directory-entry
+# relocation like the others above, but the same "no room left" reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_passcheck)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1113,18 +1334,18 @@ add_dependencies(command64_casm_utils_d64 dash_ref)
 # from the generic CASM_REF_NAMES -> test.d64 loop below since its matching
 # .seq inputs live only on this disk, not test.d64.
 #
-# test_l15release also lives here, despite having nothing to do with CASM:
-# test.d64 sits at the 1541 directory track's hard 144-entry ceiling (not a
-# byte-space limit -- 139 blocks were still free), so adding it there would
-# have bumped an unrelated fixture off. This disk is mechanically just "a
-# D64 with spare directory entries," not CASM-exclusive in practice, and
-# reusing it was smaller-blast-radius than standing up a new disk image
-# for one 4-block test PRG. See brain/plans/label-l15-cache-release.md.
+# test_l15release lived here despite having nothing to do with CASM (see
+# brain/plans/label-l15-cache-release.md), but WP52's map.s growth in
+# casm.prg (this disk's own production binary) overflowed casm_overflow_
+# test.d64's byte-space ceiling by a few blocks -- it was already down to 1
+# free block before WP52. Moved to casm_listing_test_d64 (523 blocks free)
+# instead: a 4-block, fixture-free PRG relocates with zero coupling risk,
+# smaller blast radius than trimming any of this disk's real CASM fixtures.
 add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp test_l15release test_casm_include test_casm_catalog test_casm_frame test_casm_event
+    PRGS casm comp test_casm_include test_casm_catalog test_casm_event
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1156,11 +1377,21 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # latter's own fixtures -- bare disk names (no ".S" suffix), matching
 # test_casm_frame.s's own precedent (these fixtures are consumed only by
 # this test harness's sourceLoad/`.INCLUDE`, not by production casm.s).
+# WP52's test_casm_map joins here too, for the same test.d64 ceiling reason
+# -- it carries no fixtures of its own (real symbols/VMM only, no source
+# .seq fixtures). test_casm_passcheck (byte-space, not directory-entry;
+# self-contained, no sourceLoad/fixture coupling) and test_l15release
+# (relocated off casm_overflow_test.d64; also fixture-free) join for the
+# same underlying "WP52's symbols.s growth left no room" reason.
+# WP53 increment 1's test_casm_cliderive joins here too: test.d64 remains at
+# its directory-entry ceiling, this fixture is self-contained (cli.s state
+# only, no sourceLoad/fixture coupling), and this image has ample room
+# (442 blocks free as of WP52).
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS test_casm_listing test_casm_listcap
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
@@ -1172,6 +1403,67 @@ foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
             -w "${CASM_TEST_FIXTURE_DIR}/${CASM_LISTCAP_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
         COMMENT "Appending WP51 Increment 6 fixture ${CASM_LISTCAP_FIXTURE} to casm_listing_test.d64"
+        VERBATIM
+    )
+endforeach()
+
+# 6e. CASM Phase 10 WP54 production-integration fixture disk (increment 6).
+# Its own new image, not test.d64 (already at its 144-entry directory
+# ceiling per WP9's own "Dir track full" incident) and not
+# casm_listing_test_d64/casm_include_test_d64 (each lacks either command64
+# or casm.prg, so neither is bootable standalone on the VICE MCP's
+# single-attachable device 8; see WP53 increment 4's own "Carrying the OS
+# here makes the disk usable standalone" precedent, which this repeats).
+#
+# Carries command64, casm, and comp so the whole increment 6 matrix runs
+# from this one disk: each fixture is assembled four times (no options,
+# `/M`, `/L`, `/M /L`, each with its own `/O:` name -- fileCreateOutput has
+# no replace-on-open marker, see project-casm-filecreateoutput-no-replace
+# memory, so a shared name across the four would hang rather than
+# reassemble) and then COMP proves the `/M`/`/L`/`/M /L` PRGs are
+# byte-for-byte identical to the no-options baseline -- COMP's whole-file
+# comparison covers the trailing R6 footer too, so no separate relocation-
+# table check is needed. Fixture selection favors coverage-per-run over
+# exhaustiveness, chosen after WP54's own live-VICE timing experience
+# (`banner.s`, ~350 lines, took 15-30+ minutes per run under true-drive
+# emulation) made a full combinatorial sweep impractical:
+#   - casmemit1.seq (assembled with `/S`): static output, directives,
+#     multiple addressing modes.
+#   - casmreloc1.seq: relocatable/R6 footer plus a forward symbol reference
+#     (MSG, referenced before its own definition).
+#   - casmip1.seq (`.INCLUDE`s casmic1.s): nested include with a reference
+#     crossing the include boundary in both directions (forward into the
+#     child, backward out of it) -- also the code path most likely to
+#     interact badly with listing capture, since crpInclude commits the
+#     parent's own line before pushing the child frame.
+#   - casmmfa.seq + casmmfb.seq: two top-level roots with a forward
+#     reference across the file boundary.
+#   - casmmaxid1.seq: the 31-character maximum-length identifier, exercising
+#     `/M`'s map-row name-width formatting at its boundary.
+add_c64_disk_image(casm_phase10_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp
+)
+add_dependencies(casm_phase10_test_d64 casm_test_fixtures)
+foreach(WP54_FIXTURE casmemit1 casmreloc1 casmmfa casmmfb casmmaxid1)
+    add_custom_command(
+        TARGET casm_phase10_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_FIXTURE}.s" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${WP54_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
+        COMMENT "Appending WP54 increment 6 fixture ${WP54_FIXTURE}.s to casm_phase10_test.d64"
+        VERBATIM
+    )
+endforeach()
+foreach(WP54_INC_FIXTURE casmip1 casmic1)
+    add_custom_command(
+        TARGET casm_phase10_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_INC_FIXTURE}.s" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${WP54_INC_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
+        COMMENT "Appending WP54 increment 6 include fixture ${WP54_INC_FIXTURE}.s to casm_phase10_test.d64"
         VERBATIM
     )
 endforeach()
@@ -1251,39 +1543,46 @@ add_custom_command(
 # WP46 test_casm_frame fixtures: real CASM statement source (unlike WP45's
 # raw-byte casmcat* fixtures above), but still bare lowercase -f names --
 # see casm_frame.s's own header for why.
+# WP53 increment 4: relocated to casm_listing_test_d64 alongside the harness
+# itself. listing.s's new `.LST` file I/O grew every harness that links it
+# whole, pushing test_casm_frame from 84 blocks over
+# casm_overflow_test.d64's byte-space ceiling (0 blocks free). Moving the
+# largest harness there, with its own fixtures, is a smaller blast radius
+# than trimming this disk's real CASM fixtures -- same reasoning WP52 used
+# when relocating test_l15release/test_casm_passcheck.
 add_custom_command(
-    TARGET casm_overflow_test_d64 POST_BUILD
+    TARGET casm_listing_test_d64 POST_BUILD
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp1.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrc1.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp2" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp2.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc2" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrc2.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc3" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrc3.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp3" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp3.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrcr1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrcr1.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp4" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp4.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrr1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrr1.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrr2" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrr2.seq"
-        "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
-    COMMENT "Appending WP46 test_casm_frame fixtures to casm_overflow_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+    COMMENT "Appending WP46 test_casm_frame fixtures to casm_listing_test.d64"
     VERBATIM
 )
 

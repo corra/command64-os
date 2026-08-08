@@ -21,6 +21,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **DEBUG REU examples in action**: Added annotated `XS`, `XA`, `XM`, `XD`,
+  and `Q` workflows to the DEBUG manual's numbered examples, including a
+  write/read round trip, flat and page-relative offsets, multi-chunk transfers,
+  exact-end acceptance, REU/C64 overflow rejection, handle release, and
+  automatic cleanup. Corrected the stale parity note that still described `XM`
+  as preflight-only after WP6 implemented real transfers.
+
 - **DEBUG REU command guide**: Replaced the obsolete statement that `XA`,
   `XD`, `XM`, and `XS` are unavailable with a detailed guide to VMM units,
   page rounding, DEBUG's four-handle local registry, allocation ownership
@@ -60,6 +67,133 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 10 complete: `/M` and `/L` verified and promoted to `0.2.0`**:
+  WP55 independently re-verified the complete `/M`/`/L` implementation
+  WP50-54 delivered — a baseline reconciliation (found and fixed a
+  stale-doc gap), a 9-item full-path code review tracing actual code
+  rather than inferring behavior from names, 13/13 relevant harnesses
+  passing live under VICE, an audit of PRG/R6 identity, the 4,096-record
+  and 65,536-byte bounds, and failure-injection coverage against the
+  frozen contract, and a 4-session live runtime walkthrough. Added three
+  new live production-level proofs beyond WP54's own evidence:
+  `CASM: LISTING NAME COLLISION` firing for real for the first time in
+  the project's history with clean same-session recovery afterward
+  (proving no stale handle/resource leaked), a direct `comp` proving
+  included/flattened equivalence survives `/M /L` (replacing a previously
+  transitive proof), and on-device `.LST`/map inspection — not just byte
+  comparison — for both a static and a relocatable program, including
+  live confirmation of the `.INCLUDE` parent-resume file-header
+  re-transition. Disclosed four non-blocking findings: the
+  `CREATE_FAILED`/`CLOSE_FAILED`/`DELETE_FAILED`/`SHORT_WRITE` listing
+  diagnostics have no independent fault-injection coverage anywhere in
+  this codebase (a pre-existing pattern predating Phase 10, shared by
+  `fileio.s`'s own identical-shape Phase 2 diagnostics — accepted as a
+  disclosed gap, worth a follow-up task for real fault-injection
+  infrastructure); this OS's `LOAD` command always relocates a program to
+  the first free memory region, never honoring a static CASM output's own
+  `.ORG` header (a pre-existing `LOAD`/kernel behavior unrelated to CASM,
+  in tension with CASM's own static-output documentation); the `MORE`
+  shell command has no documented way to abort mid-file. CASM bumped
+  `0.1.54` -> `0.1.55` (WP54) -> `0.1.56` (WP55) -> `0.2.0` (the
+  completion-only Phase 10 promotion, changing no assembly behavior,
+  listing format, map format, or output bytes beyond CASM's own
+  version/build artifact). See
+  `brain/walkthroughs/2026-08-08-casm-phase10-wp54-production-integration.md`
+  and
+  `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`
+  for the full record.
+- **CASM Phase 10 WP54 production integration**: Activated `/M` and `/L` in
+  `casm.s`'s real `start`/`casmRunPass` sequence, replacing the
+  `NOT IMPLEMENTED` block WP51-53 left in place while their underlying
+  modules (`map.s`, `listing.s`) shipped with no live call site. Wired
+  `cliDeriveListingName`, `listingCaptureInit`/`Finalize`, `outputCommit`,
+  `listingWriteFile`, and `diagClearLoc`+`mapPrint` into the plan's exact
+  specified order: PRG committed before any listing write, listing before
+  the map, so a later-stage failure never costs an earlier one's already-
+  valid artifact. Added a unified `artifactsAbort` (chains `listingAbort`
+  then `outputAbort`) replacing the old direct `outputAbort` fatal routing.
+  Live-verified via VICE MCP against real production fixtures: `banner.s`
+  (~350 lines) through all four option combinations, plus a dedicated new
+  `casm_phase10_test_d64` disk exercising 5 fixture categories (static/`/S`,
+  R6/forward-reference, multi-root cross-file, 31-char map-row boundary,
+  `.INCLUDE` with a reference crossing the file boundary) — 15/15 `comp`
+  byte-identity checks against the no-options baseline passed, covering
+  R6/relocation identity with no separate check needed. Found and fixed a
+  real bug during that verification: `.INCLUDE`d records under `/L` failed
+  `CASM: LISTING REPLAY MISMATCH` because `listingValidateRecord` and
+  `listingWriteFile` both re-read a record's `BYTECOUNT`/fields from
+  `CasmVmmBuffer` *after* calling `listingResolveFilename`, which for an
+  included file reaches `includeCatalogRead` and overwrites that same
+  buffer as its own VMM transfer scratch (documented in its own header) —
+  fixed by stashing the needed fields before the resolve call. Also found,
+  but left unfixed as pre-existing and out of scope: `fileCreateOutput`
+  (Phase 2/WP13-era) has no CBM DOS `@0:` replace marker, so rerunning
+  `casm` against an existing output name hangs in a KERNAL IEC retry loop
+  rather than replacing or failing fast. Envelope unchanged at 18,553 code
+  bytes (both `$3800`/`$3900` origins), 4.63KB below the pre-approved
+  `$5B00` cap, no zero-page growth. A full 25-target regression build (all
+  `test_casm_*` harnesses, `casm` itself, and every CASM disk image) and a
+  targeted code review against every plan Stop Condition found no further
+  issues. Per user direction, increment 1's dedicated `test_casm_phase10`
+  failure-injection harness was formally dropped from WP54's scope in favor
+  of the live production-fixture matrix as Completion Gate evidence — see
+  `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`'s
+  Progress log for the full record. CASM bumped `0.1.54` -> `0.1.55`.
+- **CASM Phase 10 WP53 listing naming, serialization, and cleanup**: Added
+  `.LST` name derivation (`cliDeriveListingName`, `cli.s`), PRG commit
+  protection (`outputCommit`/`CasmOutputCommitted`, `fileio.s` -- a committed
+  PRG is never deleted by a later listing failure), real listing-file
+  ownership (`listingCreate`/`Write`/`Close`/`Delete`/`Abort`, `listing.s`,
+  embedding CBM DOS's native `@0:` replace-on-open marker per WP50's frozen
+  file-ownership resolution), a random-access source reader
+  (`sourceReadSpanChunk`, `source.s`, exposing no source slot), replay
+  validation and filename resolution (`listingValidateRecord`/
+  `listingResolveFilename`), and the full row/aggregate serializer
+  (`listingWriteFile`) implementing the frozen 40-column listing format:
+  file headers with 31-byte name-chunk continuations, detail rows with
+  independent byte- and source-continuations, uppercase hex, 5-digit
+  zero-padded line numbers, and exact verbatim source bytes, buffered
+  through the reused `CasmIoBuffer` with flush-before-split. Five new
+  diagnostics (`$3D`-`$41`: create/write/close/delete/short-write failed).
+  `listingWriteFile` and `outputCommit` are linked into production `casm`
+  but have no `casm.s` call site yet -- `/L` remains NOT IMPLEMENTED until
+  WP54 wires it into the CLI. Verified with `tests/src/casm_listwrite` (23
+  fixtures across all seven implementation increments, including a
+  byte-exact comparison of a real written-back `.LST` file against the
+  frozen format's own named boundaries -- 0/4/5 emitted bytes, 14/15/20
+  source bytes, 31/32-character header continuation, an aggregate-flush
+  boundary, and a mid-replay corruption case reached through the real
+  `listingWriteFile` orchestration), all VICE-confirmed passing, alongside a
+  clean regression pass of `test_casm_listing`/`test_casm_listcap`/
+  `test_casm_map`. Two real bugs were found and fixed during verification:
+  a test-fixture A-register clobber that made a passing check report as a
+  failure regardless of actual behavior, and a genuine `listing.s` bug where
+  the `"FILE "` header-prefix text was written in uppercase ca65 source
+  (producing shifted PETSCII) instead of lowercase (matching the arithmetic
+  hex-digit formatter's own unshifted output). Required expanding `casm`'s
+  envelope (`$4F00`->`$5500` across increments 5-6) and five whole-linking
+  test harnesses' envelopes. CASM bumped `0.1.53` -> `0.1.54`.
+- **CASM Phase 10 WP52 deterministic symbol map**: Added `symbolsReadByIndex`
+  (`symbols.s`), a stateless definition-order record accessor distinct from
+  the hash-chain-walking `symbolsFindChain`, and a new `map.s` module
+  (`mapPrint`/`mapValidateRecord`/`mapFormatRow` plus private hex/decimal row
+  formatters) implementing `/M`'s output format (`$HHHH LABEL` rows in
+  insertion order, a final `NNN SYMBOLS` total). `map.s` is linked into
+  production `casm` but has no `casm.s` call site yet -- `/M` remains NOT
+  IMPLEMENTED until WP54 wires it into the CLI. Added
+  `CASM_DIAG_SYMBOL_MAP_INVALID` ($42) for corrupt records (bad NameLen,
+  DEFINED clear, reserved flag bits set, or nonzero reserved padding).
+  Verified with a new 16-fixture harness (`tests/src/casm_map`) covering
+  empty/one/full (512-symbol) tables, insertion order vs. hash-bucket order,
+  case sensitivity, 31-byte names, boundary addresses, repeated/deterministic
+  printing, read-index bounds, and VMM-failure/corruption diagnostics.
+  Required expanding `casm.prg`'s envelope (`$4900`->`$4B00`) and two
+  whole-linking test harnesses' envelopes (`test_casm_pass1` `$4700`->`$4800`,
+  `test_casm_passcheck` `$4300`->`$4400`); the same `symbols.s` growth also
+  overflowed `test.d64`'s and `casm_overflow_test.d64`'s already-tight disk
+  capacity, resolved by relocating `test_casm_passcheck` and
+  `test_l15release` to `casm_listing_test_d64`. CASM bumped `0.1.52` ->
+  `0.1.53`.
 - **DEBUG WP6 real chunked `XM` transfers**: `XM handle offset|page:offset
   address length R|W` now performs a real, chunked `DOS_VMM_READ`/
   `DOS_VMM_WRITE` transfer after WP5's parsing/validation succeeds, replacing

@@ -200,6 +200,7 @@ CASM_PETSCII_COLON = $3A
 CASM_PETSCII_SEMICOLON = $3B
 CASM_PETSCII_LESS  = $3C
 CASM_PETSCII_GREATER = $3E
+CASM_PETSCII_AT    = $40  ; WP53: CBM DOS's native open-for-write replace marker
 CASM_PETSCII_UPPER_A = $41
 CASM_PETSCII_UPPER_Z = $5A
 CASM_PETSCII_UNDERSCORE = $5F
@@ -212,6 +213,7 @@ CASM_PETSCII_O     = $4F
 CASM_PETSCII_P     = $50
 CASM_PETSCII_R     = $52
 CASM_PETSCII_S     = $53
+CASM_PETSCII_T     = $54
 
 ; Phase 9 WP44 quoted include operand grammar. Filename payload bytes preserve
 ; their original PETSCII spelling; quote is the delimiter and is therefore not
@@ -415,6 +417,13 @@ CASM_OUTPUT_NOT_CREATED = $00
 CASM_OUTPUT_CREATED     = $01
 CASM_OUTPUT_INVALID     = $00
 CASM_OUTPUT_VALID       = $01
+
+; WP53: the PRG's permanent, one-way commit state for this run. Set only by
+; outputCommit on a successful close, after emit/relocation finalization has
+; both succeeded. outputAbort consults this before ever deleting the output
+; file -- see outputAbort's own amended comment (fileio.s).
+CASM_OUTPUT_NOT_COMMITTED = $00
+CASM_OUTPUT_COMMITTED     = $01
 
 ; ---------------------------------------------------------------------------
 ; Phase 3 source and lexer contract
@@ -705,6 +714,8 @@ CASM_DIAG_LISTING_CLOSE_FAILED  = $3F
 CASM_DIAG_LISTING_DELETE_FAILED = $40
 CASM_DIAG_LISTING_SHORT_WRITE   = $41
 CASM_DIAG_PHASE10_WP53_LAST = CASM_DIAG_LISTING_SHORT_WRITE
+CASM_DIAG_SYMBOL_MAP_INVALID = $42  ; mapPrint: corrupt symbol record (locationless)
+CASM_DIAG_PHASE10_WP52_LAST = CASM_DIAG_SYMBOL_MAP_INVALID
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -754,6 +765,8 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_LISTING_DELETE_FAILED = CASM_DIAG_LISTING_CLOSE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
 .assert CASM_DIAG_LISTING_SHORT_WRITE = CASM_DIAG_LISTING_DELETE_FAILED + 1, error, "CASM WP53 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE10_WP53_LAST = $41, error, "CASM WP53 diagnostic range changed"
+.assert CASM_DIAG_SYMBOL_MAP_INVALID = CASM_DIAG_PHASE10_WP53_LAST + 1, error, "CASM WP52 diagnostics must follow WP53's reserved range"
+.assert CASM_DIAG_PHASE10_WP52_LAST = $42, error, "CASM WP52 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -1146,5 +1159,67 @@ CASM_SOURCE_CAPTURE_ENABLED                   = %10000000
 CASM_LISTING_STATE_NONE     = $00  ; listingStateInit only; no VMM acquired
 CASM_LISTING_STATE_ENABLED  = $01  ; listingCaptureInit succeeded; capturing
 CASM_LISTING_STATE_COMPLETE = $02  ; listingCaptureFinalize succeeded
+
+; WP53 increment 4: the `.LST` file's own I/O lifecycle -- deliberately
+; distinct from CASM_LISTING_STATE_* above (WP51's in-memory capture
+; transaction state; unrelated concept, same "listing" word). Reuses
+; CASM_FILE_STATE_* (fileio.s) for open/closed/close-failed exactly as PRG
+; output already does; these four are the parts PRG output does not need.
+CASM_LISTFILE_NOT_OPENED = $00
+CASM_LISTFILE_OPENED     = $01
+CASM_LISTFILE_INVALID    = $00
+CASM_LISTFILE_VALID      = $01
+CASM_LISTFILE_NOT_COMMITTED    = $00
+CASM_LISTFILE_COMMITTED        = $01
+CASM_LISTFILE_DELETE_NOT_PENDING = $00
+CASM_LISTFILE_DELETE_PENDING     = $01
+
+; CasmListingName (cli.s) is bounded by CASM_FILENAME_BUFFER_SIZE (64,
+; CASM_FILENAME_MAX + 1). The real DOS_OPEN_FILE name embeds "@0:" (3 bytes)
+; immediately after any device-prefix colon, or prepended if none exists, so
+; the open-name buffer needs room for the longest possible CasmListingName
+; plus those 3 bytes plus its own terminating null: 63 + 3 + 1 = 67. $44 (68)
+; is the next round value at or above that.
+CASM_LISTING_OPEN_NAME_SIZE = $44
+.assert CASM_LISTING_OPEN_NAME_SIZE >= CASM_FILENAME_MAX + 3 + 1, error, "CASM listing open-name buffer too small for CasmListingName plus the embedded @0: marker"
+
+; WP53 increment 5: listingResolveFilename's output buffer. An included
+; header's longest possible form is a 2-digit device ("10"/"11") + colon +
+; the longest catalog name (CASM_INCLUDE_FILENAME_MAX) + null: 2 + 1 + 63 +
+; 1 = 67. A top-level header's longest form is CASM_FILENAME_BUFFER_SIZE
+; (64). $44 (68) covers both with the same round value CASM_LISTING_OPEN_
+; NAME_SIZE already uses.
+CASM_LISTING_RESOLVED_NAME_SIZE = $44
+.assert CASM_LISTING_RESOLVED_NAME_SIZE >= 2 + 1 + CASM_INCLUDE_FILENAME_MAX + 1, error, "CASM listing resolved-name buffer too small for an included header"
+.assert CASM_LISTING_RESOLVED_NAME_SIZE >= CASM_FILENAME_BUFFER_SIZE, error, "CASM listing resolved-name buffer too small for a top-level header"
+
+; WP53 increment 6: frozen row/column layout (parent plan's "Listing
+; Content" -- File Headers/Detail Rows/Continuations sections). Every row
+; is exactly CASM_LISTING_ROW_WIDTH bytes of content plus one trailing
+; PETSCII CR; the CR is never counted in any column width below.
+CASM_LISTING_ROW_WIDTH        = 40
+CASM_LISTING_ROW_SIZE         = 41  ; CASM_LISTING_ROW_WIDTH + 1 (CR)
+
+; File header: "FILE HH: " occupies columns 1-9 on the first row of a
+; transition (blank on continuation rows); up to this many filename bytes
+; follow in columns 10-40 on every header row, first or continuation.
+CASM_LISTING_HEADER_PREFIX_WIDTH = 9
+CASM_LISTING_HEADER_CHUNK_SIZE   = 31
+.assert CASM_LISTING_HEADER_PREFIX_WIDTH + CASM_LISTING_HEADER_CHUNK_SIZE = CASM_LISTING_ROW_WIDTH, error, "CASM listing header prefix+chunk must fill the row exactly"
+
+; Detail row: columns 1-8 (identity+colon+5-digit line+space), blank on a
+; byte-continuation or source-continuation row.
+CASM_LISTING_ROW_HEAD_WIDTH   = 8
+; Columns 9-13 (space+4-digit hex PC), blank on a source-continuation row.
+CASM_LISTING_ROW_ADDR_WIDTH   = 5
+; Columns 14-25 (space+"HH HH HH HH"), blank on a source-continuation row.
+CASM_LISTING_ROW_BYTES_WIDTH  = 12
+CASM_LISTING_ROW_BYTES_MAX    = 4   ; emitted bytes shown per row
+; Column 26 (space), always present before the source column.
+CASM_LISTING_ROW_GAP_WIDTH    = 1
+; Columns 27-40: up to this many exact source bytes, blank on a
+; byte-continuation row.
+CASM_LISTING_ROW_SOURCE_MAX   = 14
+.assert CASM_LISTING_ROW_HEAD_WIDTH + CASM_LISTING_ROW_ADDR_WIDTH + CASM_LISTING_ROW_BYTES_WIDTH + CASM_LISTING_ROW_GAP_WIDTH + CASM_LISTING_ROW_SOURCE_MAX = CASM_LISTING_ROW_WIDTH, error, "CASM listing detail row columns must fill the row exactly"
 
 .endif

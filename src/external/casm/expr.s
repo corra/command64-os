@@ -623,15 +623,17 @@ CasmExprOverflow: .res 1
 CasmExprTempLo:   .res 1
 CasmExprTempHi:   .res 1
 CasmExprTempExt:  .res 1
-; One pad byte: WP46's lexerFill fix grew CODE (source.s/lexer.s), which
+; Pad bytes: WP46's lexerFill fix grew CODE (source.s/lexer.s), which
 ; shifts the whole BSS segment's own start address in MAIN -- and that
 ; pushed CasmExprResolverAddrLo's low byte onto exactly the $FF the
 ; .assert below exists to catch. Padding here (this symbol's own file, so
 ; it directly controls its offset within expr.o's own BSS layout) is the
 ; targeted fix; padding in some other module's BSS block would not have
 ; worked, since expr.o links before source.o/state.o and its own BSS
-; offset is fixed by everything before *it*, not after.
-CasmExprResolverAddrPad: .res 1
+; offset is fixed by everything before *it*, not after. WP54's listing.s
+; fix grew CODE again and retripped the same assert for
+; TEST_CASM_PASSCHECK specifically; re-tuned from 1 to 2 bytes.
+CasmExprResolverAddrPad: .res 2
 CasmExprResolverAddrLo: .res 1
 CasmExprResolverAddrHi: .res 1
 CasmExprResolverOutput: .res CASM_RESOLVE_SIZE

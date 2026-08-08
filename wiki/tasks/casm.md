@@ -1455,9 +1455,10 @@ Symbol Map and Listing, remains inactive and separately gated.**
 
 ## Phase 10 - Symbol Map and Listing
 
-- [ ] Parent Taskwarrior `32e09eea-691d-40bc-aa7a-7d2299fe093b`: implement
+- [x] Parent Taskwarrior `32e09eea-691d-40bc-aa7a-7d2299fe093b`: implement
       deterministic `/M` symbol-map output and native `/L` listing files without
-      changing generated PRG bytes.
+      changing generated PRG bytes. Complete at CASM `0.2.0` build 1260,
+      user-approved 2026-08-08.
 - Approved governing plan:
   `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`.
 - Milestone task: `wiki/tasks/casm-phase10-symbol-map-listing.md`.
@@ -1471,23 +1472,48 @@ Symbol Map and Listing, remains inactive and separately gated.**
       2026-08-03, per
       `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md` and
       `brain/walkthroughs/2026-08-03-casm-phase10-wp51-listing-stores-capture.md`.
-- [ ] WP52 `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: deterministic symbol map.
-      Approved plan:
+- [x] WP52 `0bf2e86b-0bd0-443a-b84b-b2c258e98181`: deterministic symbol map.
+      Complete, per
       `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
-      WP51 complete; WP52 not yet activated.
-- [ ] WP53 `aa57f461-36a9-455c-966f-ac484ec57b41`: listing naming,
-      serialization, and cleanup. Approved plan:
-      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
-      Blocked by WP52.
-- [ ] WP54 `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: production integration.
-      Approved plan:
+- [x] WP53 `aa57f461-36a9-455c-966f-ac484ec57b41`: listing naming,
+      serialization, and cleanup. Complete at CASM `0.1.54` build 1237,
+      user-approved 2026-08-06, per
+      `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`
+      and
+      `brain/walkthroughs/2026-08-06-casm-phase10-wp53-listing-serialization-cleanup.md`.
+- [x] WP54 `f4b598fd-bab1-4394-9415-c71e3ea1cfa5`: production integration —
+      `/M` and `/L` fully wired into `casm.s`'s real `start`/`casmRunPass`
+      sequence. Complete at CASM `0.1.55` build 1258, user-approved
+      2026-08-08, per
       `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-      Blocked by WP53.
-- [ ] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
-      and Phase 10 completion gate. Blocked by WP54.
+      Increment 1's dedicated failure-injection harness was formally
+      dropped from scope (user decision) in favor of increment 6's live
+      production-fixture matrix as Completion Gate evidence — see the
+      plan's own Progress log.
+- [x] WP55 `94d98a2b-7ad4-49f0-bf33-38702690eca9`: verification, walkthrough,
+      and Phase 10 completion gate. Complete at CASM `0.1.56` build 1259,
+      user-approved 2026-08-08, per
+      `brain/plans/2026-07-29-casm-phase10-wp55-verification-walkthrough-completion-gate.md`
+      and
+      `brain/walkthroughs/2026-08-08-casm-phase10-wp55-verification-walkthrough-completion-gate.md`.
+      Independently re-verified WP50-54's complete `/M`/`/L`
+      implementation: baseline reconciliation, a 9-item full-path code
+      review, 13/13 harnesses live under VICE, a PRG/R6 identity/bounds/
+      failure-injection audit, and a 4-session live runtime walkthrough.
+      Four non-blocking findings disclosed (a pre-existing, codebase-wide
+      fault-injection gap for four raw-I/O listing diagnostics; this OS's
+      `LOAD` always relocating regardless of a static CASM output's own
+      `.ORG`; `MORE` having no abort key; a VICE-testing process note).
+- [x] Obtain explicit Phase 10 completion approval before the separate
+      `0.1.56` -> `0.2.0` promotion. Approved 2026-08-08; promotion
+      applied: `VERSION_MINOR`/`VERSION_STAGE` changed together in
+      `casm.s`, build `1259` -> `1260`, live-verified via VICE
+      (`CASM V0.2.0.1260`).
 
-**WP51 is complete at CASM `0.1.52` build 1222, user-approved 2026-08-03.
-WP52-WP55 remain blocked pending WP52's own explicit activation.**
+**Phase 10 is complete.** CASM stands at `0.2.0` build 1260, user-approved
+2026-08-08. `/M` and `/L` are both fully implemented in production `casm`,
+independently re-verified by WP55, with no assembly, listing, or map
+behavior changed beyond the version/build artifact itself.
 
 ## Optional Feature - Progress and Processing Indication
 

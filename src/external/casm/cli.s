@@ -23,12 +23,15 @@
 .export cliInit
 .export cliParse
 .export cliDeriveOutputName
+.export cliDeriveListingName
 
 .export CasmSourceNames
 .export CasmSourceLens
 .export CasmSourceCount
 .export CasmOutputName
 .export CasmOutputLen
+.export CasmListingName
+.export CasmListingLen
 .export CasmCliOptions
 .export cliSourceSlotLo
 .export cliSourceSlotHi
@@ -40,6 +43,8 @@ CasmSourceLens:  .res CASM_SOURCE_COUNT_MAX
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
 CasmOutputLen:   .res 1
+CasmListingName: .res CASM_FILENAME_BUFFER_SIZE
+CasmListingLen:  .res 1
 CasmCliOptions:  .res 1
 
 .segment "RODATA"
@@ -486,6 +491,114 @@ cdonSourceRequired:
     sec
     rts
 cdonTooLong:
+    lda #CASM_DIAG_FILENAME_TOO_LONG
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; cliDeriveListingName
+; Derive `<output-base>.LST` from the already-derived CasmOutputName, mirroring
+; cliDeriveOutputName's colon/dot scan: only a dot after the last device-prefix
+; colon is treated as an extension separator, and the suffix is replaced (or
+; appended) accordingly. WP53 owns no `/L` filename option, so there is no
+; explicit-name branch -- the listing name always derives from the final
+; output name. Must run after cliDeriveOutputName has succeeded.
+;
+; Inputs:    CasmOutputName/CasmOutputLen (already derived/validated)
+; Outputs:   C clear, A = CASM_PARSE_OK, bounded CasmListingName/CasmListingLen
+;            C set, A = CASM_DIAG_* on failure (malformed, too long, or a
+;            byte-identical collision with CasmOutputName, checked before any
+;            listing resource is touched)
+; Preserves: Y
+; Clobbers:  A, X, processor flags
+; Scratch:   CasmCliScratch (last extension-dot index or $FF)
+; ---------------------------------------------------------------------------
+cliDeriveListingName:
+    lda CasmOutputLen
+    beq cdlnMalformed
+    lda #$FF
+    sta CasmCliScratch
+    ldx #0
+cdlnCopyLoop:
+    cpx CasmOutputLen
+    beq cdlnCopied
+    lda CasmOutputName, x
+    sta CasmListingName, x
+    cmp #CASM_PETSCII_COLON
+    bne cdlnCheckDot
+    lda #$FF
+    sta CasmCliScratch
+    jmp cdlnCopyNext
+cdlnCheckDot:
+    cmp #CASM_PETSCII_DOT
+    bne cdlnCopyNext
+    stx CasmCliScratch
+cdlnCopyNext:
+    inx
+    jmp cdlnCopyLoop
+
+cdlnCopied:
+    lda CasmCliScratch
+    cmp #$FF
+    beq cdlnAppendExtension
+    tax
+    inx
+    cpx #CASM_FILENAME_MAX - 2
+    bcs cdlnTooLong
+    jmp cdlnWriteLst
+
+cdlnAppendExtension:
+    ldx CasmOutputLen
+    cpx #CASM_FILENAME_MAX - 3
+    bcs cdlnTooLong
+    lda #CASM_PETSCII_DOT
+    sta CasmListingName, x
+    inx
+
+cdlnWriteLst:
+    lda #CASM_PETSCII_L
+    sta CasmListingName, x
+    inx
+    lda #CASM_PETSCII_S
+    sta CasmListingName, x
+    inx
+    lda #CASM_PETSCII_T
+    sta CasmListingName, x
+    inx
+    lda #0
+    sta CasmListingName, x
+    stx CasmListingLen
+
+    ; Reject a byte-identical collision with the committed output name before
+    ; any listing resource (file, handle) is touched.
+    lda CasmListingLen
+    cmp CasmOutputLen
+    bne cdlnOk
+    ldx #0
+cdlnCompareLoop:
+    cpx CasmListingLen
+    beq cdlnCollision
+    lda CasmListingName, x
+    cmp CasmOutputName, x
+    bne cdlnOk
+    inx
+    jmp cdlnCompareLoop
+
+cdlnCollision:
+    lda #CASM_DIAG_LISTING_NAME_COLLISION
+    sec
+    rts
+
+cdlnOk:
+    lda #CASM_PARSE_OK
+    clc
+    rts
+
+cdlnMalformed:
+    lda #CASM_DIAG_MALFORMED_OUTPUT_OPTION
+    sec
+    rts
+cdlnTooLong:
     lda #CASM_DIAG_FILENAME_TOO_LONG
     sec
     rts
