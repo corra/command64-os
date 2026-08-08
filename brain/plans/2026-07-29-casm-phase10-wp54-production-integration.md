@@ -308,3 +308,137 @@ records. Does not activate WP55.
     bytes net for a real correctness fix, not a threat to the `$5B00` cap).
   - See [[project-casm-include-listing-mismatch]] (updated) and
     [[project-casm-phase10-wp54-progress]] (updated).
+- 2026-08-07 (continued): Beginning increment 7 (envelope/regressions/review/
+  walkthrough). First resolved a conflict flagged before starting: this
+  plan's own Completion Gate lists "harness/production matrix" as required,
+  but increment 1's dedicated `test_casm_phase10` stand-in/event-log harness
+  was deferred (not built) back in increment 2-5. User decision (asked
+  explicitly): accept increment 6's live-fixture matrix as the
+  harness/production-matrix evidence for gate purposes. Increment 1 is
+  formally dropped from WP54's must-have scope, not merely postponed --
+  its coverage is considered satisfied by: 5/5 production fixture
+  categories x 4 option combinations each, 15/15 `COMP` byte-identity
+  checks (static, R6/forward-ref, multi-root cross-file, map-boundary,
+  `.INCLUDE` with fwd+back ref), one real bug found and fixed through this
+  path (the `casmip1.s` listing/replay mismatch), and one concrete
+  failure-injection contract confirmed live (disk-full -> `LISTING WRITE
+  FAILED`, committed PRG retained, map/success suppressed). This
+  substitutes for, rather than literally satisfies, the plan's original
+  "inject failures at every derivation/init/pass/rewind/allocation/create/
+  finalize/check/close/commit/listing/map stage" language -- recorded here
+  as a deliberate scope deviation, same pattern as the earlier
+  `listingStateInit` ordering deviation. If a future regression surfaces in
+  exactly the call-sequencing area the harness would have covered, revisit
+  building it as a standalone follow-up rather than reopening WP54.
+
+  Increment 7 sub-plan (recorded before executing, per this project's
+  detail-first-then-implement convention):
+  1. Clean build of `casm` at both linked origins (base/next-page pair the
+     relocation diff already produces on every build, e.g. `casm_base.prg`/
+     `casm_next.prg` in `out_casm/`) -- confirm both link with no MEMORY
+     overflow and `reloc.py` produces a clean relocatable `casm.prg`.
+  2. Record the formal envelope: exact code-byte size at this commit,
+     headroom below the pre-approved `$5B00` MAIN cap, and confirm zero page
+     usage is unchanged from WP53 (the plan's "add no zero page" stop
+     condition).
+  3. Build all Phase 10 and prior CASM test targets/images via CMake
+     (`test_casm_*` targets plus `casm_listing_test_d64`,
+     `casm_include_test_d64`, `casm_overflow_test_d64`,
+     `casm_phase10_test_d64`, `command64_casm_utils_d64`, `image_d64`,
+     `test_image_d64`) -- confirms no build-level regression anywhere in the
+     existing CASM test suite from WP54's `casm.s`/`listing.s` changes.
+  4. Spot-check PRG/R6 identity is still intact post-revert (the debug
+     instrumentation added/removed while chasing the `casmip1.s` bug touched
+     `casm.s`'s Pass 2 dispatch trampolines) by re-running `comp` against at
+     least one already-proven fixture, not just trusting the revert.
+  5. Targeted code review of the full WP54 diff (`casm.s`/`listing.s` since
+     the WP53 boundary commit) for the plan's own Stop Conditions: listing
+     before rewind or after PRG create, PRG-before-listing ordering, no
+     simultaneous outputs, no unsafe committed artifacts, `/M` touching no
+     listing resources, unchanged success text beyond ordering, and no
+     accidental pass/replay/PRG/R6 behavior change.
+  6. Prepare a walkthrough summary of increments 2-7 for user review/
+     approval -- the Completion Gate's "review, user walkthrough/approval"
+     items -- before increment 8 touches the version number.
+  This increment does not bump the CASM version; that is increment 8, gated
+  on approval from step 6 here.
+
+  Increment 7 execution (steps 1-3 and 5 of the sub-plan above):
+  - Step 1-2 (envelope): clean build at both origins succeeded
+    (`out_casm/casm_base.prg` at `$3800`, `casm_next.prg` at `$3900`, both
+    18555 bytes / 18553 code bytes, `reloc.py` diff clean). Headroom below
+    the pre-approved `$5B00` cap: 4743 bytes (4.63KB). Headroom below the
+    currently-configured `$5500` MAIN size (unchanged from WP53, no envelope
+    increase needed): 3207 bytes (3.13KB) -- corrects a units slip in an
+    earlier progress note that called the smaller number "headroom below
+    the `$5B00` cap." Confirmed zero page usage unchanged: grepped every
+    `.segment` directive across all of `src/external/casm/*.s` and none use
+    `ZEROPAGE`; the WP54 fix's two new bytes
+    (`CasmListValidByteCountLo/Hi`) are ordinary BSS in `listing.s`.
+  - Step 3 (regression build): built all 17 `test_casm_*` targets, `casm`
+    itself, and 7 disk images (`casm_listing_test_d64`,
+    `casm_include_test_d64`, `casm_overflow_test_d64`,
+    `casm_phase10_test_d64`, `command64_casm_utils_d64`, `image_d64`,
+    `test_image_d64`) in one CMake invocation -- 25 targets, exit code 0, no
+    errors in the build log.
+  - Step 4 (live PRG-identity spot-check): **blocked**, not yet done. The
+    VICE MCP server (`tools/vice_mcp_start.sh`) fails to start --
+    `x64sc`'s own log shows `MCP-Transport: Error - Failed to start HTTP
+    server on port 6510` even immediately after a clean `stop` confirmed the
+    port was free; two independent restart attempts both hit it. Per this
+    project's MCP-unavailable rule, stopped and asked the user rather than
+    improvising (e.g. faking the check via raw memory/state pokes, which
+    [[feedback-vice-testing]] already rules out). User chose to investigate/
+    restart it themselves; this step resumes once the server is back.
+  - Step 5 (code review vs. plan Stop Conditions): reviewed the full
+    `casm.s`/`listing.s`/`expr.s` diff since the WP53 boundary commit
+    (`eaa712e..HEAD`, currently just `68b28f4`). Traced the actual
+    completion-order call sequence in `casm.s` line-by-line against the
+    plan's specified 1-11 order (include replay final check -> pass
+    agreement -> `/L` capture finalize -> emit finalize -> reloc finalize
+    -> source close -> PRG commit -> `/L` listing write -> `/M` map print
+    -> success line -> exit) and the Pass 2 preparation 1-7 order (source
+    rewind -> include replay reset -> `/L` capture init -> lexer init ->
+    output create -> reloc init -> emit init/EMIT mode/casmRunPass) --
+    **both match exactly**, no deviation beyond the already-recorded
+    `listingStateInit` placement. Verified against every Stop Condition:
+    listing capture starts after rewind and PRG commit happens before
+    listing write (order confirmed above); no simultaneous outputs (PRG via
+    `fileCreateOutput` in Pass 2 prep, listing via its own internal
+    create/write/close inside `listingWriteFile`, sequential not
+    concurrent); `artifactsAbort` never deletes a committed artifact (both
+    chained routines document that contract); `/M`'s block calls only
+    `diagClearLoc`+`mapPrint`, no listing import/call; the success line
+    (`diagPrintPhase2Ready`) is unchanged, only moved later in sequence; no
+    Pass 1/replay/PRG/R6 logic changed (Pass 1 only gained a branch-range
+    trampoline, `relocFinalize` call itself untouched). Also reviewed the
+    incidental `expr.s` change (`CasmExprResolverAddrPad` grew 1->2 bytes):
+    legitimate, well-explained BSS-alignment retune for a page-boundary
+    `.assert` in `TEST_CASM_PASSCHECK` re-tripped by the listing.s fix's
+    CODE growth -- not a behavioral change, no PRG/R6 impact (BSS-only).
+    **No findings.**
+  - Step 4 (live PRG-identity spot-check), completed after a VICE MCP
+    server outage was resolved (the server initially failed to bind its
+    HTTP port across two restart attempts; recovered after the user
+    restarted it, reconnect confirmed via `vice_ping`). Booted
+    `casm_phase10_test.d64` fresh in VICE (real Command64-DOS boot,
+    `dir` confirmed `casmreloc1.s` and the rest of increment 6's fixture
+    set present, 508 blocks free), then live-dispatched `casmreloc1.s`
+    twice: `casm casmreloc1.s /O:relbase` (baseline, no options) and
+    `casm casmreloc1.s /O:relml /M /L`, both real assembler runs under
+    true drive emulation, both completing `CASM: INPUT VALIDATED`. The
+    `/M` map output (`$3400 START`/`$340E MSG`/`002 SYMBOLS`) matched
+    increment 6's originally recorded values exactly. `comp relbase relml`
+    reported `FILES COMPARE OK` -- confirms the debug-instrumentation
+    add/revert cycle from the `casmip1.s` bug hunt left PRG output
+    byte-identical for this fixture, i.e. no regression slipped in via
+    that detour. Emulator left running (not paused) throughout and
+    afterward, per user instruction.
+
+  **Increment 7 is now complete**: envelope measured and within cap,
+  full regression build clean across 25 targets, code review found no
+  issues, live spot-check confirms no PRG regression from the debug
+  detour. Remaining before WP54 can close: the walkthrough summary below
+  needs the user's review/approval (Completion Gate item), then
+  increment 8 (version bump to stable `0.1.55` + synchronized docs/
+  CHANGELOG/wiki/task records) can proceed.
