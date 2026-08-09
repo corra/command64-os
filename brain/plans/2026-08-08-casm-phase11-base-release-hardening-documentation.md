@@ -160,17 +160,24 @@ runtime walkthrough and explicitly approves the base release.
 
 ## Open Questions For This Review
 
+**Resolved 2026-08-08 — see Progress below.** All three were confirmed as
+drafted:
+
 1. Does the WP56-63 breakdown above match the intended shape, or should any
-   of these be split, merged, or reordered?
+   of these be split, merged, or reordered? **Confirmed as-is.**
 2. Version target: the master plan gives Phase 11 no explicit version
    number (unlike Phase 10's `0.2` and Phase 12's `0.3`). Default plan,
    absent other direction: each WP bumps `VERSION_STAGE` on its own
    completion (matching every prior phase's pattern), staying within
    `0.2.x` — no `0.3` bump, since that's reserved for Phase 12's new
-   language features. Confirm or redirect.
+   language features. Confirm or redirect. **Confirmed: 0.2.x per-WP
+   bumps.**
 3. WP57's fault-injection infrastructure is the largest unknown in this
    breakdown — worth a design spike/sub-plan before committing to WP58's
    scope, or should WP57 and WP58 be planned together from the start?
+   **Confirmed: WP57 gets its own dedicated design-spike plan first; WP58's
+   detailed plan is written only after WP57 closes and its actual
+   interception mechanism is known.**
 
 ## Progress
 

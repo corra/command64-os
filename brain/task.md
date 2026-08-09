@@ -282,9 +282,28 @@
   - [x] `8612c2a2` WP15: verification and phase closeout; build 1079,
         CASM `0.1.17`
   - Phase 4 approved done by the user on 2026-07-21. Phase 5 is now unblocked.
-  - Carried forward to Phase 11: `CasmOutputCreated` conflates "created" with
-    "opened an existing file"; no `CLD` at entry; no CASM Phase 4 contract
-    section in `brain/KNOWLEDGE.md`.
+  - Carried forward to Phase 11, triaged by WP56 2026-08-08 (see
+    `brain/plans/2026-08-08-casm-phase11-wp56-contract-reconciliation.md`):
+    - `CasmOutputCreated` "conflates created with opened existing" --
+      **retired, no code change.** Traced `fileCreateOutput`
+      (`src/external/casm/fileio.s:163-206`): the flag is only ever set true
+      on genuine creation; a write-mode open against an existing filename
+      currently hangs on KERNAL IEC retry rather than succeeding (that hang
+      is the real, already-tracked issue -- see TW #36, "CASM
+      fileCreateOutput has no @0: replace marker").
+    - No `CLD` at entry -- **not a live bug (corrected 2026-08-08 from
+      WP56's own first pass): `apiHandler` (`src/command64/api.asm:44`)
+      already does `cld` on every `OS_API` call, and CASM's first `OS_API`
+      call (`diagPrintString`'s banner print, `casm.s:147`) is reached
+      before any arithmetic-sensitive code path -- decimal mode is already
+      clear when it matters, but only as an emergent, fragile consequence
+      of that call ordering, not a structural guarantee.** Assigned to
+      WP60 anyway (user-confirmed), reframed as hardening against the
+      implicit ordering invariant (mirror `src/external/dash/dmain.s`'s
+      explicit `CLD`-as-first-instruction), not as a fix for a live defect.
+    - No CASM Phase 4 contract section in `brain/KNOWLEDGE.md` --
+      **confirmed gap, assigned to WP62.** Section jumps from Phase 3
+      (line 132) straight to Phase 5 (line 229).
 
 - [x] Taskwarrior (`3e4eab43-0f48-4db5-843f-c749bcb79d8a`): CASM Phase 4 WP14: execute orchestration and end-to-end binary validation
   - [x] Create detailed implementation plan

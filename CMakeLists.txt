@@ -10,6 +10,8 @@ endif()
 
 project(command64-os VERSION 0.4.1 LANGUAGES NONE)
 
+set(C64_THEME_DIR "" CACHE PATH "Path to local c64_theme repository for OBS notifications")
+
 # Include custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -453,6 +455,19 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
+        endif()
+        if(TEST_NAME STREQUAL "casm_faultinject")
+            # WP57 fault-injection design-spike prototype: links fileio.s
+            # whole (matching casm_vmm's own precedent for linking a real
+            # CASM module into a standalone fixture) to exercise the real,
+            # unmodified fileCreateOutput against a runtime $1000/OS_API
+            # patch this harness installs itself. See
+            # tests/src/casm_faultinject/casm_faultinject.s header.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
         endif()
         if(TEST_NAME STREQUAL "casm_listing")
             # WP51 increment 3: listing.s plus every module listingCaptureInit
