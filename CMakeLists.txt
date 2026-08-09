@@ -457,16 +457,22 @@ if(Ca65_FOUND)
             set(TEST_PRG_SIZE "1000")
         endif()
         if(TEST_NAME STREQUAL "casm_faultinject")
-            # WP57 fault-injection design-spike prototype: links fileio.s
-            # whole (matching casm_vmm's own precedent for linking a real
-            # CASM module into a standalone fixture) to exercise the real,
-            # unmodified fileCreateOutput against a runtime $1000/OS_API
-            # patch this harness installs itself. See
-            # tests/src/casm_faultinject/casm_faultinject.s header.
+            # WP57 fault-injection design-spike prototype (WP58: refactored
+            # onto the shared tests/src/casm_faultinject/faultstub.inc
+            # library): links fileio.s whole (matching casm_vmm's own
+            # precedent for linking a real CASM module into a standalone
+            # fixture) to exercise the real, unmodified fileCreateOutput
+            # against a runtime $1000/OS_API patch this harness installs
+            # itself. See tests/src/casm_faultinject/casm_faultinject.s
+            # header. faultstub.inc is listed here (not just found via -I
+            # "${SRC_DIR}") so a change to it invalidates the hash gate and
+            # triggers a rebuild, matching this loop's own DEPENDS
+            # convention for app-local .inc files.
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
-                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
             set(TEST_PRG_SIZE "1400")
         endif()
         if(TEST_NAME STREQUAL "casm_listing")

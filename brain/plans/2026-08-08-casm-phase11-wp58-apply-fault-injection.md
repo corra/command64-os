@@ -292,3 +292,37 @@ does not, matching WP57's own precedent).
   diagnostic-substitution behavior, extract `faultstub.inc`, refold
   `casm_faultinject.s` onto it, and verify `CASM FAULTINJECT: PASS` still
   holds unchanged) is now authorized to begin.
+- 2026-08-09: Increment 1 complete. Traced `fileDelete` (`fileio.s:366-376`):
+  `fdFailed` substitutes `CASM_DIAG_OUTPUT_DELETE_FAILED` unconditionally on
+  carry-set and never reads `OS_API`'s returned `A` -- the identical
+  SEC-only shape as `fileCreateOutput`, so it needs no richer canned-return
+  descriptor of its own (Open Question 3 resolved: no plan amendment
+  needed). Extracted `faultInstall`/`faultStubEntry` and the control table
+  into `tests/src/casm_faultinject/faultstub.inc`, extending it with
+  `FaultReturnA` (configurable `A` on the canned-failure return, needed by
+  `DOS_ALLOC_MEM`'s branch on `VMM_ERR_INVALID` vs. other rejection -- see
+  `vsaAllocFailed`, `vmm_store.s:134-143`, which `cmp`s `A` directly with no
+  reload) and `FaultSetCount`/`FaultReturnCountLo/Hi` (optional canned
+  `HexValLo/Hi` byte count on that same path, needed so `DOS_READ_FILE`'s
+  fault isn't misread as EOF by `fileRead`). Both default to 0, reproducing
+  WP57's original `SEC`+`A=0` shape exactly for every operation that
+  doesn't yet use them. `fileWrite`'s `SHORT_WRITE` case (a carry-CLEAR
+  success with an under-count, a different shape entirely) is explicitly
+  left out of this descriptor -- deferred to whichever later increment
+  first exercises it, not solved speculatively here. Refactored
+  `casm_faultinject.s` onto the shared include (net +1 line: the `.include`
+  replaces both extracted routines and the control table's `.byte`/`.word`
+  declarations); added `faultstub.inc` to `CMakeLists.txt`'s
+  `TMP_CA65_SRCS_casm_faultinject` so it participates in the hash-gate and
+  per-object `DEPENDS` like every other app-local `.inc`. `cmake --build
+  build --target test_casm_faultinject` succeeded clean (build 1002, 1,508
+  code bytes, +20 over the pre-refactor 1,488 -- the new descriptor fields
+  and the `FaultSetCount` branch in `faultStubEntry`, present but unused by
+  Increment 1's own two cases). Full `test_image_d64` also builds clean.
+  Live-verified in VICE (`build/test.d64`, unit 8, dispatched as
+  `test_casm_faulti` via the shell with the underscore sent as raw PETSCII
+  byte 164, per `reference-vice-shell-underscore-petscii`): screen showed
+  `CASM FAULTINJECT: PASS` and a clean return to `C64[8]:>`, reproducing
+  WP57's exact result -- the shared-library extraction is behavior-
+  preserving, as the Verification section requires before Increment 2 adds
+  any new case on top of it.

@@ -1964,8 +1964,8 @@
       PASS`; no `image_d64`/`test_image_d64` production content changed
     - User confirmed the live demonstration 2026-08-08. **WP57 complete.**
     - WP58's dedicated plan drafted as this WP's final increment
-  - [ ] Taskwarrior #(pending id) (`d297b689-3fba-4e16-81f7-8176b39a07e2`):
-        WP58 apply fault-injection across file/VMM-touching modules
+  - [ ] Taskwarrior #41 (`d297b689-3fba-4e16-81f7-8176b39a07e2`): WP58
+        apply fault-injection across file/VMM-touching modules
     - Plan: `brain/plans/2026-08-08-casm-phase11-wp58-apply-fault-injection.md`
     - Scope: extract `faultstub.inc` from WP57's inline prototype; add
       `fileio.s`'s remaining 4 operations (`WRITE_FAILED`/`SHORT_WRITE`/
@@ -1975,9 +1975,23 @@
       fixture per remaining VMM-holding module (`source.s`/`symbols.s`/
       `reloc.s`/`include.s`) built from that module's own registry/cursor
       contract
-    - User approved the plan 2026-08-09; Increment 1 (trace `fileDelete`,
-      extract `faultstub.inc`, verify `CASM FAULTINJECT: PASS` unchanged)
-      is authorized to begin
+    - User approved the plan 2026-08-09
+    - [x] Increment 1: traced `fileDelete` (`fileio.s:366-376`) -- identical
+          SEC-only shape as `fileCreateOutput`, no plan amendment needed
+          (Open Question 3 resolved). Extracted
+          `tests/src/casm_faultinject/faultstub.inc`, extended with
+          `FaultReturnA` (for `DOS_ALLOC_MEM`'s `VMM_ERR_INVALID` branch)
+          and `FaultSetCount`/`FaultReturnCountLo/Hi` (for `DOS_READ_FILE`'s
+          EOF-vs-error disambiguation), both defaulting to 0 so every
+          existing operation keeps WP57's original shape unchanged.
+          `fileWrite`'s carry-clear `SHORT_WRITE` shape deliberately left
+          out, deferred to whichever increment first needs it. Refactored
+          `casm_faultinject.s` onto the shared include; wired
+          `faultstub.inc` into `CMakeLists.txt`'s `TMP_CA65_SRCS` list for
+          the hash gate. Build 1002, 1,508 code bytes (+20); `test_image_d64`
+          clean. Live-verified in VICE: `CASM FAULTINJECT: PASS`, matching
+          WP57's exact result -- shared-library extraction proven
+          behavior-preserving before Increment 2 adds anything new.
   - WP59-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement
 

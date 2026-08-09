@@ -12,14 +12,15 @@
 ; This harness links fileio.s whole (matching casm_vmm.s's own precedent
 ; for linking a real CASM module into a standalone fixture) and exercises
 ; it directly -- no CASM-source or OS-source change of any kind. The
-; fault-injecting stub (faultStub below) lives in this harness's own CODE
-; segment, not at the separate high-RAM address (e.g. $A000) the WP57 plan
-; resolved for the eventual WP58 scenario: WP58 injects faults into a
-; SEPARATELY loaded, full-size CASM binary coexisting in memory with its
-; own loader, which needs the high-RAM placement; this harness IS both the
-; "loader" and the exerciser in one PRG, so the stub can live anywhere in
-; its own CODE segment. The RAM-placement question WP57's plan already
-; answered remains correctly deferred to WP58, not re-solved here.
+; fault-injecting stub (faultStub, now WP58's shared faultstub.inc) lives in
+; this harness's own CODE segment, not at the separate high-RAM address
+; (e.g. $A000) the WP57 plan resolved for the eventual full-CASM-binary
+; scenario: that scenario injects faults into a SEPARATELY loaded, full-size
+; CASM binary coexisting in memory with its own loader, which needs the
+; high-RAM placement; this harness IS both the "loader" and the exerciser in
+; one PRG, so the stub can live anywhere in its own CODE segment. The
+; RAM-placement question WP57's plan already answered remains correctly
+; deferred to whichever fixture first needs it, not re-solved here.
 ;
 ; faultStub's canned failure return is exactly `SEC` before falling through
 ; to the caller -- no synthesized A/X/Y content -- per WP57's own traced
@@ -27,7 +28,9 @@
 ; its own CASM_DIAG_OUTPUT_CREATE_FAILED constant unconditionally and never
 ; reads OS_API's returned A on the carry-set path, so a genuine KERNAL
 ; failure and this stub's canned failure are indistinguishable at
-; fileCreateOutput's own boundary by construction.
+; fileCreateOutput's own boundary by construction. (WP58 traced fileDelete
+; and found the identical shape -- fdFailed substitutes
+; CASM_DIAG_OUTPUT_DELETE_FAILED unconditionally too.)
 ;
 ; Two proof cases:
 ;   controlRunSucceeds   -- faultStub installed but disarmed: a real create
@@ -201,65 +204,12 @@ afFail:
     sec
     rts
 
-; ---------------------------------------------------------------------------
-; faultInstall
-; Save the real OS_API target (the JMP operand currently at $1001/$1002)
-; into RealApiVector, then redirect that operand to faultStubEntry. Leaves
-; the JMP opcode at $1000 itself untouched -- only the 2-byte target moves --
-; so $1000 remains a valid `jmp` instruction throughout, matching the OS's
-; own "stable entry point" contract (api.asm) as closely as a test-only
-; patch can.
-; ---------------------------------------------------------------------------
-faultInstall:
-    lda $1001
-    sta RealApiVector
-    lda $1002
-    sta RealApiVector+1
-    lda #<faultStubEntry
-    sta $1001
-    lda #>faultStubEntry
-    sta $1002
-    lda #0
-    sta FaultArmed
-    rts
-
-; ---------------------------------------------------------------------------
-; faultStubEntry
-; Reached in place of apiHandler for every OS_API call for the rest of this
-; harness's run. Mirrors apiHandler's own first instruction (cld) so a
-; disarmed or non-matching call is byte-for-byte behaviorally identical to
-; the unpatched OS. Touches only A internally (preserved via the stack) --
-; never X/Y -- since apiHandler's own ABI treats X as an argument register
-; (api.asm: "X is an ARGUMENT register... stx apiSavedX") that every real
-; handler depends on unchanged.
-;
-; Inputs:    A = OS_API function code (the real call's own input, untouched)
-; Outputs:   armed+matched+countdown-expired: C set, A = 0 (canned failure;
-;              CASM's own diagnostics never read A on this path -- see
-;              header note)
-;            otherwise: falls through to the real apiHandler unchanged,
-;              whatever it returns
-; Preserves: X, Y (never touched)
-; Clobbers:  A, processor flags (matches apiHandler's own contract)
-; ---------------------------------------------------------------------------
-faultStubEntry:
-    cld
-    pha
-    lda FaultArmed
-    beq fsPassThrough
-    pla
-    pha
-    cmp FaultFuncCode
-    bne fsPassThrough
-    dec FaultCountdown
-    bne fsPassThrough
-    pla
-    sec
-    lda #0
-    rts
-fsPassThrough:
-    pla
-    jmp (RealApiVector)
+; faultInstall/faultStubEntry and the shared control table (FaultArmed/
+; FaultFuncCode/FaultCountdown/FaultReturnA/FaultSetCount/
+; FaultReturnCountLo/Hi/RealApiVector) now live in faultstub.inc (WP58
+; extraction from this harness's own WP57 prototype). Ends back in the CODE
+; segment, matching the flow below.
+.include "faultstub.inc"
 
 ; ---------------------------------------------------------------------------
 ; diagPrintFatal / vmmStoreFree
@@ -275,11 +225,6 @@ vmmStoreFree:
     rts
 
 .segment "DATA"
-
-FaultArmed:     .byte 0
-FaultFuncCode:  .byte 0
-FaultCountdown: .byte 0
-RealApiVector:  .word 0
 
 nameControl: .byte "8:FTINJ01", 0
 nameArmed:   .byte "8:FTINJ02", 0
