@@ -1528,3 +1528,39 @@ behavior changed beyond the version/build artifact itself.
   not replace Phase 10, Symbol Map and Listing.
 - A full implementation review is mandatory after automated verification and
   before runtime acceptance or merge.
+
+## Future Feature Backlog
+
+Ideas recorded for later consideration. None of these are planned in detail
+yet, activated, or authorized for implementation. Each is outside the master
+plan's numbered phases (`brain/plans/2026-07-16-casm-assembler-implementation-plan.md`).
+Per this project's convention, a dedicated plan (design/ABI review, atomic
+increments, verification matrix) must be written and approved before any
+source edits begin, the same way the progress-indication feature above was
+handled.
+
+- [ ] Taskwarrior `54dff46d-b802-4534-9b29-fc78bb907e26`: **build duration
+      display on completion.** Print elapsed wall/cycle time after CASM
+      finishes, on both the successful summary and a fatal-diagnostic exit.
+      Distinct from the progress-indication feature above, which explicitly
+      excludes elapsed time from its transient/persistent lines (CIA timer
+      ownership and PAL/NTSC conversion policy were out of scope there) --
+      this idea would need to make that same CIA-timer-ownership decision
+      for itself, scoped only to a single before/after duration readout
+      rather than live timing.
+- [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: **progress
+      display.** Already tracked above as an approved-but-deferred plan; not
+      a new idea.
+- [ ] Taskwarrior `0e0de8db-e161-49e5-8da0-3eb3e2146945`: **real-time `/M`
+      symbol map emission.** Today `/M` (`casm.s:318-329`) calls `mapPrint`
+      once, after Pass 2 and any `/L` listing are already committed, which
+      walks the complete VMM-backed symbol table via `symbolsReadByIndex`
+      and prints every row in one batch (`map.s`). This idea would instead
+      emit each symbol's map row as it is defined during assembly (most
+      naturally Pass 1, where `symbolsInsert` first creates the record),
+      rather than as a single post-hoc dump. Needs its own design review:
+      whether Pass 1 is the right emission point given Pass 2 is the pass
+      that currently owns all committed output, how this interacts with
+      `/L`'s existing Pass-2-emission-event model, and whether it changes
+      the deterministic-definition-order guarantee `/M`'s gate depends on
+      (`/M` must still never change generated PRG bytes).

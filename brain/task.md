@@ -1939,3 +1939,20 @@
   - [ ] Implement bounded load, include, pass, and output progress.
   - [ ] Meet the 5% representative and 10% stress slowdown limits.
   - [ ] Complete full implementation review before runtime acceptance or merge.
+
+- [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
+      build duration display on completion (success and failure)
+  - Backlog entry only, recorded 2026-08-08:
+    `wiki/tasks/casm.md` "Future Feature Backlog" section
+  - Distinct from the progress-indication feature above, which explicitly
+    excludes elapsed time; needs its own CIA-timer-ownership decision
+  - No plan drafted yet
+
+- [ ] Taskwarrior #41 (`0e0de8db-e161-49e5-8da0-3eb3e2146945`): CASM optional
+      real-time `/M` symbol map emission during assembly
+  - Backlog entry only, recorded 2026-08-08:
+    `wiki/tasks/casm.md` "Future Feature Backlog" section
+  - Today `/M` (`casm.s:318-329`) batch-prints the full symbol map via
+    `mapPrint` once, after Pass 2 and `/L` are committed; this idea emits
+    each row as it is defined instead
+  - No plan drafted yet

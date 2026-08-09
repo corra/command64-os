@@ -179,6 +179,7 @@ SEGMENTS {
     set(OUT_DIR "${CMAKE_BINARY_DIR}/out_${TARGET_NAME}")
     file(MAKE_DIRECTORY "${OUT_DIR}")
     set(OBJS "")
+    set(FIRST_SRC TRUE)
     foreach(SRC ${ALL_SOURCES})
         get_filename_component(SRC_ABS "${SRC}" ABSOLUTE)
         get_filename_component(SRC_DIR "${SRC_ABS}" DIRECTORY)
@@ -188,9 +189,22 @@ SEGMENTS {
         foreach(EXTRA_DIR ${CA65APP_EXTRA_INCLUDE_DIRS})
             list(APPEND EXTRA_I_FLAGS "-I" "${EXTRA_DIR}")
         endforeach()
+
+        set(WRAPPER_CMD "")
+        if(C64_THEME_DIR)
+            if(FIRST_SRC)
+                set(WRAPPER_CMD "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+                    "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--building" "--error" "--")
+                set(FIRST_SRC FALSE)
+            else()
+                set(WRAPPER_CMD "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+                    "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--error" "--")
+            endif()
+        endif()
+
         add_custom_command(
             OUTPUT "${OBJ}"
-            COMMAND "${CA65_EXECUTABLE}" "${SRC_ABS}"
+            COMMAND ${WRAPPER_CMD} "${CA65_EXECUTABLE}" "${SRC_ABS}"
                 -I "${SRC_DIR}" -I "${CMAKE_SOURCE_DIR}/include/ca65" -I "${INC_DIR}"
                 ${EXTRA_I_FLAGS}
                 -t c64 -o "${OBJ}"
@@ -209,18 +223,30 @@ SEGMENTS {
         list(APPEND OBJS "${OBJ}")
     endforeach()
 
+    set(WRAPPER_LINK_BASE "")
+    set(WRAPPER_LINK_NEXT "")
+    set(WRAPPER_RELOC "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_LINK_BASE "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--error" "--")
+        set(WRAPPER_LINK_NEXT "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--error" "--")
+        set(WRAPPER_RELOC "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--success" "--error" "--")
+    endif()
+
     set(PRG_BASE "${OUT_DIR}/${ENTRY_FILE_NAME}_base.prg")
     set(PRG_NEXT "${OUT_DIR}/${ENTRY_FILE_NAME}_next.prg")
     add_custom_command(
         OUTPUT "${PRG_BASE}"
-        COMMAND "${LD65_EXECUTABLE}" -C "${CFG_BASE}" -o "${PRG_BASE}" ${OBJS}
+        COMMAND ${WRAPPER_LINK_BASE} "${LD65_EXECUTABLE}" -C "${CFG_BASE}" -o "${PRG_BASE}" ${OBJS}
         DEPENDS ${OBJS} "${CFG_BASE}"
         COMMENT "ld65: linking ${TARGET_NAME_UPPER} at $${APP_BASE_HEX} (relocation base build)"
         VERBATIM
     )
     add_custom_command(
         OUTPUT "${PRG_NEXT}"
-        COMMAND "${LD65_EXECUTABLE}" -C "${CFG_NEXT}" -o "${PRG_NEXT}" ${OBJS}
+        COMMAND ${WRAPPER_LINK_NEXT} "${LD65_EXECUTABLE}" -C "${CFG_NEXT}" -o "${PRG_NEXT}" ${OBJS}
         DEPENDS ${OBJS} "${CFG_NEXT}"
         COMMENT "ld65: linking ${TARGET_NAME_UPPER} at $${APP_BASE_HEX_NEXT} (relocation +1 page build)"
         VERBATIM
@@ -235,7 +261,7 @@ SEGMENTS {
     set(OUTPUT_PRG "${CMAKE_BINARY_DIR}/${TARGET_NAME}.prg")
     add_custom_command(
         OUTPUT "${OUTPUT_PRG}"
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/reloc.py" "${PRG_BASE}" "${PRG_NEXT}" "${OUTPUT_PRG}"
+        COMMAND ${WRAPPER_RELOC} "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/reloc.py" "${PRG_BASE}" "${PRG_NEXT}" "${OUTPUT_PRG}"
         DEPENDS "${PRG_BASE}" "${PRG_NEXT}" "${CMAKE_SOURCE_DIR}/tools/reloc.py"
         COMMENT "Building relocatable ${TARGET_NAME_UPPER}.prg"
         VERBATIM
