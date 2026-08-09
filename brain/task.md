@@ -1927,6 +1927,60 @@
         no-change rebuild stable, 25-target regression clean, live-verified
         via VICE (`CASM V0.2.0.1260`). **CASM Phase 10 is complete.**
 
+- [ ] Taskwarrior #37 (`ca5d69aa-b674-4a24-a7fa-55160755d47a`): CASM Phase 11
+      Base-Release Hardening and Documentation
+  - Governing plan:
+    `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
+  - Open questions (WP breakdown, `0.2.x` versioning, WP57-before-WP58
+    sequencing) confirmed as drafted 2026-08-08
+  - [x] Taskwarrior #38 (`636eddce-4777-4ccb-b79f-0e9903fdd10d`): WP56
+        contract reconciliation and audit-risk triage
+    - Plan: `brain/plans/2026-08-08-casm-phase11-wp56-contract-reconciliation.md`
+    - No production source, version, or build change (planning/triage only)
+    - Triaged the 3 Phase 4 carried-forward debt items: `CasmOutputCreated`
+      retired as a stale premise (real issue is TW #36, `fileCreateOutput`'s
+      missing `@0:` replace marker); missing entry `CLD` confirmed as a
+      real narrow hardening gap, assigned to WP60; missing Phase 4
+      `brain/KNOWLEDGE.md` section confirmed, assigned to WP62
+    - Produced the 4-tier module audit-priority register (18 files under
+      `src/external/casm/`) and WP57's dedicated design-spike plan as this
+      WP's own final increment
+    - User approved completion 2026-08-09. **WP56 complete.**
+  - [x] Taskwarrior #39 (`d8b09018-8c17-4c98-8ee7-e32d755952ea`): WP57
+        fault-injection infrastructure design spike
+    - Plan: `brain/plans/2026-08-08-casm-phase11-wp57-fault-injection-design-spike.md`
+    - Traced every file/VMM call site in `fileio.s`/`vmm_store.s` (and by
+      extension `source.s`/`symbols.s`/`reloc.s`/`include.s`, which hold no
+      direct `OS_API` calls of their own) to the single fixed
+      `OS_API = $1000` stub; chose a runtime hook there (Candidate A) over
+      a test-only OS build variant or link-time module substitution
+    - Built `tests/src/casm_faultinject/casm_faultinject.s`: patches the
+      `$1000` `jmp apiHandler` stub's operand to install `faultStubEntry`,
+      proven against the real, unmodified `fileCreateOutput`/
+      `DOS_OPEN_FILE` with a disarmed control case and an armed forced-
+      failure case (no partial `CasmOutputState`/`CasmOutputCreated`
+      registration -- indistinguishable from a genuine failure)
+    - Live-verified in VICE (build 1260 `test.d64`): `CASM FAULTINJECT:
+      PASS`; no `image_d64`/`test_image_d64` production content changed
+    - User confirmed the live demonstration 2026-08-08. **WP57 complete.**
+    - WP58's dedicated plan drafted as this WP's final increment
+  - [ ] Taskwarrior #(pending id) (`d297b689-3fba-4e16-81f7-8176b39a07e2`):
+        WP58 apply fault-injection across file/VMM-touching modules
+    - Plan: `brain/plans/2026-08-08-casm-phase11-wp58-apply-fault-injection.md`
+    - Scope: extract `faultstub.inc` from WP57's inline prototype; add
+      `fileio.s`'s remaining 4 operations (`WRITE_FAILED`/`SHORT_WRITE`/
+      `CLOSE_FAILED`/`DELETE_FAILED` plus `DOS_READ_FILE` EOF-vs-error);
+      build `casm_faultinject_vmm` for `vmm_store.s`'s 4 operations
+      (`DOS_ALLOC_MEM`'s two branches distinguishing no-REU from OOM); one
+      fixture per remaining VMM-holding module (`source.s`/`symbols.s`/
+      `reloc.s`/`include.s`) built from that module's own registry/cursor
+      contract
+    - User approved the plan 2026-08-09; Increment 1 (trace `fileDelete`,
+      extract `faultstub.inc`, verify `CASM FAULTINJECT: PASS` unchanged)
+      is authorized to begin
+  - WP59-WP63 remain unplanned in detail, per this project's
+    per-work-package-plan-approval requirement
+
 # Deferred Optional Work
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional

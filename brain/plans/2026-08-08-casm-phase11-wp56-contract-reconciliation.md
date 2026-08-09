@@ -1,7 +1,7 @@
 ---
 feature: casm-phase11-wp56-contract-reconciliation
 created: 2026-08-08
-status: approved
+status: complete
 taskwarrior: 636eddce-4777-4ccb-b79f-0e9903fdd10d
 depends-on: ca5d69aa-b674-4a24-a7fa-55160755d47a
 ---
@@ -291,3 +291,8 @@ at WP57 or WP60's own completion gate, whichever closes first.
   the fix, assigned to WP60; item 3 (missing Phase 4 `KNOWLEDGE.md` section)
   confirmed by direct inspection (gap between the Phase 3 and Phase 5
   section headings), assigned to WP62. Not yet approved.
+- 2026-08-09: User approved WP56's completion. All completion-gate items
+  satisfied: `brain/task.md`'s Phase 4 carried-forward note updated with the
+  3 dispositions, WP57's dedicated plan drafted and separately closed, and
+  this approval recorded. Taskwarrior `636eddce-4777-4ccb-b79f-0e9903fdd10d`
+  marked done. **WP56 complete.**

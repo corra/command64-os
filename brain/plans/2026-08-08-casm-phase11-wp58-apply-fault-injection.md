@@ -10,7 +10,7 @@ depends-on: d8b09018-8c17-4c98-8ee7-e32d755952ea
 
 ## Status and Authorization
 
-**Proposed, awaiting approval.** WP57 (complete) proved the interception
+**Approved 2026-08-09.** WP57 (complete) proved the interception
 mechanism against exactly one fault (`fileCreateOutput` / `DOS_OPEN_FILE`).
 This plan applies it across the parent plan's full named scope: every
 module that owns a file handle or VMM allocation, and every disclosed
@@ -288,3 +288,7 @@ does not, matching WP57's own precedent).
   Excluded `include.s`'s lone direct `OS_API` call (`DOS_PARSE_PREFIX`,
   pure string parsing, no disk/REU failure shape) with reasoning recorded
   rather than silently dropped. Not yet approved.
+- 2026-08-09: User approved this plan. Increment 1 (trace `fileDelete`'s
+  diagnostic-substitution behavior, extract `faultstub.inc`, refold
+  `casm_faultinject.s` onto it, and verify `CASM FAULTINJECT: PASS` still
+  holds unchanged) is now authorized to begin.
