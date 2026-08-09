@@ -144,6 +144,7 @@ TODO: Pare down [Do's & Dont's]
   + USAGE GUIDE: `C64_MCP_USAGE.md`
 + `task-warrior-mcp`: Used for managing tasks
 + `sequential-thinking-mcp`: Used for sequential thinking
++ `c64-overlay-api`: Used to trigger build and test stream overlay events
 
 ## Agent Roles
 
