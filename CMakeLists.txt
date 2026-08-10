@@ -475,6 +475,34 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
             set(TEST_PRG_SIZE "1400")
         endif()
+        if(TEST_NAME STREQUAL "casm_faultvmm")
+            # WP58 Increment 3: links the real VMM store and resource owner
+            # against the shared runtime OS_API fault hook. Listing the
+            # shared include explicitly keeps it inside the content hash and
+            # object dependency gates.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_faultsource")
+            # WP58 Increment 4: source.s's four VMM call sites with the same
+            # real-module surface proven by casm_spanread, plus the shared
+            # runtime OS_API fault hook.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "2D00")
+        endif()
         if(TEST_NAME STREQUAL "casm_listing")
             # WP51 increment 3: listing.s plus every module listingCaptureInit
             # transitively needs. Does NOT link source.s -- this harness
@@ -1057,6 +1085,11 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listwrite)
 # free) rather than trimming test.d64's content -- not a directory-entry
 # relocation like the others above, but the same "no room left" reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_passcheck)
+# WP58 Increment 3's VMM fault fixture has a distinct collision-safe disk
+# name but test.d64 has no remaining directory entries. Package it on the
+# established overflow image instead.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_faultvmm)
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_faultsource)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1263,7 +1296,7 @@ add_c64_disk_image(command64_casm_utils_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     DISK_LABEL "CASM UTILS"
     DISK_ID "${DISK_ID}"
-    PRGS ${BANNER_TARGET} ${CASM_TARGET} ${COMP_TARGET}
+    PRGS ${BANNER_TARGET} ${CASM_TARGET} ${COMP_TARGET} ${EDLIN_TARGET}
 )
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
@@ -1367,6 +1400,7 @@ add_c64_disk_image(casm_overflow_test_d64
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
+         test_casm_faultvmm test_casm_faultsource
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1702,7 +1736,7 @@ add_custom_command(
 # Gather built binary paths to pass to release script
 get_target_property(CMD64_PATH command64 C64_PRG_PATH)
 get_target_property(DEBUG_PATH debug C64_PRG_PATH)
-set(PRG_PATHS_LIST "${CMD64_PATH};${DEBUG_PATH}")
+set(PRG_PATHS_LIST "${CMD64_PATH}")
 
 foreach(C_TARGET ${C_TARGETS})
     get_target_property(C_PATH ${C_TARGET} C64_PRG_PATH)
@@ -1719,6 +1753,6 @@ add_custom_target(release
         -DRELEASE_DIR="${CMAKE_SOURCE_DIR}/release"
         -DPRG_PATHS="${PRG_PATHS_STR}"
         -P "${CMAKE_SOURCE_DIR}/cmake/PackRelease.cmake"
-    DEPENDS image_d64 test_image_d64
+    DEPENDS image_d64 test_image_d64 command64_casm_utils_d64
     COMMENT "Packaging command64 OS v${OS_VERSION} release archives"
 )

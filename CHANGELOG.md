@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Packaging
+
+- **Release distribution updates**: Included `command64_casm_utils.d64` (development utility disk containing native CASM assembler source code for the `DASH` dashboard, `casm.prg`, `edlin.prg`, `comp.prg`, and verification references) in the packaged release archives. Removed `debug.prg` from the root of the release archives as it is not useful standalone. Updated [RELEASE_README.md](file://packaging/RELEASE_README.md) to explicitly document `command64_casm_utils.d64`, `banner-utility.md`, and `edlin-utility.md`.
+
 ### Planning
 
 - **Standalone external-application feasibility study**: Assessed standalone

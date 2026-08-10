@@ -41,9 +41,9 @@ there is no separate MCP process to install or configure.
 There is no MCP tool for this step — it is a shell prerequisite:
 
 ```bash
-tools/vice_mcp_start.sh start --port 6510
-tools/vice_mcp_start.sh status --port 6510
-tools/vice_mcp_start.sh stop --port 6510
+tools/vice_mcp_start.sh start
+tools/vice_mcp_start.sh status
+tools/vice_mcp_start.sh stop
 ```
 
 The script refuses to start a second instance on a port something already holds, and does
@@ -142,8 +142,9 @@ glyph identity, color, or layout (not just character content) is what's being ve
    assertion when deterministic evidence exists.
 10. For an application expected to exit, require the shell prompt matching `c64[<device>]:>`
     before reporting successful return. The device number is variable.
-11. Delete test-created checkpoints (`vice_checkpoint_delete`) and stop the instance with
-    `tools/vice_mcp_start.sh stop` if this workflow started it.
+11. Delete test-created checkpoints (`vice_checkpoint_delete`) and leave a healthy VICE
+    instance running. The emulator is part of the user's Twitch and YouTube stream layout;
+    stop it only for problem recovery or when the user explicitly asks.
 
 ## Timing and pause discipline
 
@@ -247,7 +248,7 @@ once it has.
    first assertion observation; do not poll during that window.
 10. Decode screen text or capture one screenshot. Require `CASM PASSCHECK: PASS` followed by
     a prompt matching `c64[<device>]:>`.
-11. `tools/vice_mcp_start.sh stop`.
+11. Leave the healthy VICE instance running after recording the result.
 
 Do not substitute the physical 16-character directory rendering `test.casm.passch` for the
 documented application name.

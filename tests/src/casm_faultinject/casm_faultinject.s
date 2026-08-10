@@ -2,12 +2,10 @@
 ; SPDX-License-Identifier: MIT
 ; Copyright (c) 2026 Command64 project contributors
 ;
-; CASM Phase 11 WP57 fault-injection design-spike prototype. Proves the
+; CASM Phase 11 WP57/WP58 file-I/O fault-injection harness. Proves the
 ; recommended interception mechanism (a runtime patch at the single shared
 ; OS_API stub, $1000, per the WP57 plan's "one universal interception
-; point" finding) against exactly one real fault: forcing the Nth
-; DOS_OPEN_FILE call to fail, observed through fileio.s's real, unmodified
-; fileCreateOutput.
+; point" finding) against fileio.s's real, unmodified operations.
 ;
 ; This harness links fileio.s whole (matching casm_vmm.s's own precedent
 ; for linking a real CASM module into a standalone fixture) and exercises
@@ -22,29 +20,14 @@
 ; RAM-placement question WP57's plan already answered remains correctly
 ; deferred to whichever fixture first needs it, not re-solved here.
 ;
-; faultStub's canned failure return is exactly `SEC` before falling through
-; to the caller -- no synthesized A/X/Y content -- per WP57's own traced
-; finding: fileCreateOutput's failure path (fcoCreateFailed) substitutes
-; its own CASM_DIAG_OUTPUT_CREATE_FAILED constant unconditionally and never
-; reads OS_API's returned A on the carry-set path, so a genuine KERNAL
-; failure and this stub's canned failure are indistinguishable at
-; fileCreateOutput's own boundary by construction. (WP58 traced fileDelete
-; and found the identical shape -- fdFailed substitutes
-; CASM_DIAG_OUTPUT_DELETE_FAILED unconditionally too.)
+; faultStub defaults to WP57's original carry-set, A=0 failure shape. WP58
+; adds optional returned A/count fields and a carry-clear success mode for
+; the two fileio contracts that inspect more than carry: fileRead's returned
+; byte count and fileWrite's short-write count.
 ;
-; Two proof cases:
-;   controlRunSucceeds   -- faultStub installed but disarmed: a real create
-;                            against a fresh filename must succeed exactly
-;                            as it would with no fault-injection harness
-;                            present at all (proves the pass-through path
-;                            is a true no-op).
-;   armedRunFails        -- faultStub armed for DOS_OPEN_FILE, countdown 1:
-;                            the next DOS_OPEN_FILE call (the same create
-;                            call, against a DIFFERENT fresh filename) must
-;                            fail with CASM_DIAG_OUTPUT_CREATE_FAILED and
-;                            leave CasmOutputState/CasmOutputCreated exactly
-;                            as a genuine open failure would (CLOSED, not
-;                            created) -- no partial registration.
+; Eight cases cover disarmed pass-through, create failure, write failure,
+; short write, close failure, delete failure, zero-byte EOF normalization,
+; and nonzero read failure. Every case calls the real fileio.s routine.
 .include "command64.inc"
 .include "../../../src/external/casm/common.inc"
 
@@ -58,6 +41,12 @@
 .import resourcesCleanup
 .import fileIoInit
 .import fileCreateOutput
+.import fileRead
+.import fileWrite
+.import fileClose
+.import fileDelete
+.import CasmInputState
+.import CasmInputHandle
 .import CasmOutputState
 .import CasmOutputCreated
 .import CasmOutputHandle
@@ -103,6 +92,24 @@ start:
     jsr armedRunFails
     jsr reportCase
     jsr resourcesCleanup
+
+    jsr writeFailureIsDiagnosed
+    jsr reportCase
+
+    jsr shortWriteIsDiagnosed
+    jsr reportCase
+
+    jsr closeFailureIsDiagnosed
+    jsr reportCase
+
+    jsr deleteFailureIsDiagnosed
+    jsr reportCase
+
+    jsr zeroByteReadIsEof
+    jsr reportCase
+
+    jsr nonzeroReadFailureIsDiagnosed
+    jsr reportCase
 
     lda #$0D
     jsr KernalChROUT
@@ -204,8 +211,194 @@ afFail:
     sec
     rts
 
+; Reset the optional canned-return fields before each case. The carry-set,
+; A=0, no-count shape is the shared stub's default failure contract.
+resetFaultDescriptor:
+    lda #0
+    sta FaultArmed
+    sta FaultReturnA
+    sta FaultReturnSuccess
+    sta FaultSetCount
+    sta FaultReturnCountLo
+    sta FaultReturnCountHi
+    rts
+
+armNextCall:
+    sta FaultFuncCode
+    lda #1
+    sta FaultCountdown
+    sta FaultArmed
+    rts
+
+writeFailureIsDiagnosed:
+    jsr fileIoInit
+    jsr resetFaultDescriptor
+    lda #CASM_FILE_STATE_OPEN
+    sta CasmOutputState
+    lda #CASM_OUTPUT_VALID
+    sta CasmOutputValid
+    lda #1
+    sta CasmOutputHandle
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    lda #DOS_WRITE_FILE
+    jsr armNextCall
+    ldx #<ioByte
+    ldy #>ioByte
+    jsr fileWrite
+    bcc wfFail
+    cmp #CASM_DIAG_OUTPUT_WRITE_FAILED
+    bne wfFail
+    lda CasmOutputValid
+    cmp #CASM_OUTPUT_INVALID
+    bne wfFail
+    clc
+    rts
+wfFail:
+    sec
+    rts
+
+shortWriteIsDiagnosed:
+    jsr fileIoInit
+    jsr resetFaultDescriptor
+    lda #CASM_FILE_STATE_OPEN
+    sta CasmOutputState
+    lda #CASM_OUTPUT_VALID
+    sta CasmOutputValid
+    lda #1
+    sta CasmOutputHandle
+    sta FaultReturnSuccess
+    sta FaultSetCount
+    sta FaultReturnCountLo
+    lda #2
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    sta FaultReturnCountHi
+    lda #DOS_WRITE_FILE
+    jsr armNextCall
+    ldx #<ioBytes
+    ldy #>ioBytes
+    jsr fileWrite
+    bcc swFail
+    cmp #CASM_DIAG_OUTPUT_SHORT_WRITE
+    bne swFail
+    lda CasmIoLenLo
+    cmp #1
+    bne swFail
+    lda CasmIoLenHi
+    bne swFail
+    lda CasmOutputValid
+    cmp #CASM_OUTPUT_INVALID
+    bne swFail
+    clc
+    rts
+swFail:
+    sec
+    rts
+
+closeFailureIsDiagnosed:
+    jsr resetFaultDescriptor
+    lda #DOS_CLOSE_FILE
+    jsr armNextCall
+    lda #1
+    ldx #0
+    ldy #CASM_DIAG_OUTPUT_CLOSE_FAILED
+    jsr fileClose
+    bcc cfFail
+    cmp #CASM_DIAG_OUTPUT_CLOSE_FAILED
+    bne cfFail
+    clc
+    rts
+cfFail:
+    sec
+    rts
+
+deleteFailureIsDiagnosed:
+    jsr resetFaultDescriptor
+    lda #DOS_DELETE_FILE
+    jsr armNextCall
+    ldx #<nameDelete
+    ldy #>nameDelete
+    jsr fileDelete
+    bcc dfFail
+    cmp #CASM_DIAG_OUTPUT_DELETE_FAILED
+    bne dfFail
+    clc
+    rts
+dfFail:
+    sec
+    rts
+
+zeroByteReadIsEof:
+    jsr fileIoInit
+    jsr resetFaultDescriptor
+    lda #CASM_FILE_STATE_OPEN
+    sta CasmInputState
+    lda #1
+    sta CasmInputHandle
+    sta CasmIoLenLo
+    sta FaultSetCount
+    lda #0
+    sta CasmIoLenHi
+    lda #DOS_READ_FILE
+    jsr armNextCall
+    ldx #<ioByte
+    ldy #>ioByte
+    jsr fileRead
+    bcs zeFail
+    cmp #CASM_STREAM_EOF
+    bne zeFail
+    lda CasmInputState
+    cmp #CASM_STREAM_EOF
+    bne zeFail
+    lda CasmIoLenLo
+    ora CasmIoLenHi
+    bne zeFail
+    clc
+    rts
+zeFail:
+    sec
+    rts
+
+nonzeroReadFailureIsDiagnosed:
+    jsr fileIoInit
+    jsr resetFaultDescriptor
+    lda #CASM_FILE_STATE_OPEN
+    sta CasmInputState
+    lda #1
+    sta CasmInputHandle
+    sta CasmIoLenLo
+    sta FaultSetCount
+    sta FaultReturnCountLo
+    lda #0
+    sta CasmIoLenHi
+    sta FaultReturnCountHi
+    lda #DOS_READ_FILE
+    jsr armNextCall
+    ldx #<ioByte
+    ldy #>ioByte
+    jsr fileRead
+    bcc nrFail
+    cmp #CASM_DIAG_INPUT_READ_FAILED
+    bne nrFail
+    lda CasmInputState
+    cmp #CASM_STREAM_ERROR
+    bne nrFail
+    lda CasmIoLenLo
+    cmp #1
+    bne nrFail
+    lda CasmIoLenHi
+    bne nrFail
+    clc
+    rts
+nrFail:
+    sec
+    rts
+
 ; faultInstall/faultStubEntry and the shared control table (FaultArmed/
-; FaultFuncCode/FaultCountdown/FaultReturnA/FaultSetCount/
+; FaultFuncCode/FaultCountdown/FaultReturnA/FaultReturnSuccess/FaultSetCount/
 ; FaultReturnCountLo/Hi/RealApiVector) now live in faultstub.inc (WP58
 ; extraction from this harness's own WP57 prototype). Ends back in the CODE
 ; segment, matching the flow below.
@@ -228,6 +421,9 @@ vmmStoreFree:
 
 nameControl: .byte "8:FTINJ01", 0
 nameArmed:   .byte "8:FTINJ02", 0
+nameDelete:  .byte "8:FTINJ03", 0
+ioBytes:     .byte $11
+ioByte:      .byte $22
 
 CasmOutputName: .res CASM_FILENAME_BUFFER_SIZE
 

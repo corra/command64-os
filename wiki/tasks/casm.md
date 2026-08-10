@@ -1515,6 +1515,37 @@ Symbol Map and Listing, remains inactive and separately gated.**
 independently re-verified by WP55, with no assembly, listing, or map
 behavior changed beyond the version/build artifact itself.
 
+## Phase 11 - Base-Release Hardening and Documentation
+
+- [x] WP56 `636eddce-4777-4ccb-b79f-0e9903fdd10d`: contract reconciliation
+      and audit-risk triage. User-approved 2026-08-09.
+- [x] WP57 `d8b09018-8c17-4c98-8ee7-e32d755952ea`: fault-injection
+      infrastructure design spike. User-approved 2026-08-08; established the
+      runtime `$1000` `OS_API` interception mechanism.
+- [/] WP58 `d297b689-3fba-4e16-81f7-8176b39a07e2`: apply fault injection
+      across file/VMM-touching modules. Plan approved 2026-08-09.
+- [x] WP58 Increment 1: extracted the shared `faultstub.inc` and proved the
+      refactor behavior-preserving in live VICE.
+- [x] WP58 Increment 2: expanded `casm_faultinject` to eight `fileio.s`
+      cases covering create/write/short-write/close/delete/read failures and
+      EOF discrimination. Final build 1005 and `test_image_d64` pass; live VICE
+      printed `........`, `CASM FAULTINJECT: PASS`, and returned to
+      `C64[8]:>`. User-approved 2026-08-09.
+- [x] WP58 Increment 3 complete, user-approved 2026-08-09: added
+      collision-safe `test_casm_faultvmm` with distinct no-REU/OOM and
+      failed free/read/write ownership-retention cases. Final build 1001;
+      `test_image_d64` and `casm_overflow_test_d64` pass. The fixture lives on
+      the overflow image as `test_casm_faultv` because `test.d64` has no free
+      directory entries. Live VICE printed `.....`, `CASM FAULT VMM: PASS`,
+      and returned to `C64[9]:>`.
+- [ ] WP58 Increments 5-7: add and verify state-cleanup fixtures for
+      `symbols.s`, `reloc.s`, and `include.s`, then complete the WP58
+      walkthrough and approval gate.
+- [x] WP58 Increment 4 implementation/verification (acceptance pending):
+      `test_casm_faultsource` covers four source VMM failure/cleanup contracts.
+      Final build 1001; both disk targets clean; live VICE printed `....`,
+      `CASM FAULT SOURCE: PASS`, and returned to `C64[9]:>`.
+
 ## Optional Feature - Progress and Processing Indication
 
 - [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,

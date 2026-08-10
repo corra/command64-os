@@ -68,6 +68,15 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   `casm_include_test.d64`. Running `CASM CASMIDP1.S` must fail in the
   grandchild, name `CASMIDC2.S`, and print two `INCLUDED FROM` lines in
   innermost-to-root order with `LINE 2 COLUMN 5`.
+- WP58's `test_casm_faultvmm` VMM fault-injection harness is packaged only on
+  `casm_overflow_test_d64` under the collision-safe 16-character disk name
+  `test_casm_faultv`; `test.d64` has no free directory entries. Boot
+  Command64 from unit 8, attach the overflow image to unit 9, switch with
+  `9:`, and launch the full documented application name.
+- WP58's `test_casm_faultsource` source-state fault-injection harness is also
+  packaged only on `casm_overflow_test_d64`, under `test_casm_faults`. Launch
+  it by the full documented name after switching the Command64 shell to unit
+  9; allow up to 90 seconds under true-drive emulation.
 - `casmidup1.s`/`casmiduc1.s`/`casmiduc2.s` repeat that failure with an
   unterminated final identifier, proving packed identity and traceback depth
   can be recovered after normal lexer lookahead already popped the child.

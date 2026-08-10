@@ -129,7 +129,7 @@ shared include, proving the extraction changes no behavior (its existing
   `SHORT_WRITE` (two distinct cases against `fileWrite`), `CLOSE_FAILED`,
   `DELETE_FAILED`, and `DOS_READ_FILE`'s EOF-vs-error disambiguation using
   the new canned-byte-count shape.
-- **`casm_faultinject_vmm`** (new, mirrors `casm_vmm.s`'s own module
+- **`casm_faultvmm`** (new; collision-safe basename, mirrors `casm_vmm.s`'s own module
   linkage): `vmm_store.s`'s own 4 operations against its own diagnostics —
   including both `DOS_ALLOC_MEM` branches (no-REU via `VMM_ERR_INVALID`,
   OOM via any other rejection).
@@ -197,7 +197,7 @@ Excluded:
 ## Expected Files
 
 New: `tests/src/casm_faultinject/faultstub.inc` (shared library),
-`tests/src/casm_faultinject_vmm/casm_faultinject_vmm.s`, one new fixture
+`tests/src/casm_faultinject_vmm/casm_faultvmm.s`, one new fixture
 directory per caller module (`casm_faultinject_source`,
 `casm_faultinject_symbols`, `casm_faultinject_reloc`,
 `casm_faultinject_include`, naming TBD to avoid collision with each
@@ -220,7 +220,7 @@ change.
 2. Add `fileio.s`'s remaining 4 operations to `casm_faultinject.s`:
    `WRITE_FAILED`, `SHORT_WRITE`, `CLOSE_FAILED`, `DELETE_FAILED`, plus
    `DOS_READ_FILE`'s EOF-vs-error disambiguation.
-3. Build `casm_faultinject_vmm`: `vmm_store.s`'s own 4 operations against
+3. Build `casm_faultvmm`: `vmm_store.s`'s own 4 operations against
    its own diagnostics, including both `DOS_ALLOC_MEM` branches.
 4. For each of `source.s`/`symbols.s`/`reloc.s`/`include.s`: identify the
    real state-consistency question at each of that module's own VMM call
@@ -232,6 +232,19 @@ change.
    containing `_`, and `reference-vice-checkpoint-verification` for
    state assertions beyond a screen-printed PASS/FAIL).
 7. Produce the WP58 walkthrough and request completion approval.
+
+### Increment 3 Packaging Amendment (Approved 2026-08-09)
+
+`test_casm_faultinject_vmm` collided with the existing fixture after D64's
+16-character filename truncation: both became `test.casm.faulti`, replacing
+rather than coexisting. The fixture basename is therefore `casm_faultvmm`
+(`test.casm.faultv` on disk). Adding that distinct entry then proved
+`test.d64` is at its directory-track ceiling (`ERROR: Dir track full`). User
+approved preserving every existing `test.d64` entry and packaging
+`test_casm_faultvmm` on `casm_overflow_test.d64` instead, matching the
+repository's established overflow-image policy. For Increment 3, this
+amendment supersedes Atomic Increment 5's general `test_image_d64` placement
+requirement; both disk targets must still build clean.
 
 ## Verification
 
@@ -326,3 +339,50 @@ does not, matching WP57's own precedent).
   WP57's exact result -- the shared-library extraction is behavior-
   preserving, as the Verification section requires before Increment 2 adds
   any new case on top of it.
+- 2026-08-09: Increment 2 complete. Added opt-in `FaultReturnSuccess` to the
+  shared stub for `fileWrite`'s carry-clear short-write shape, retaining the
+  carry-set default for all existing cases. Expanded `casm_faultinject` from
+  two to eight real-`fileio.s` cases: disarmed create, forced create failure,
+  write failure, short write, caller-selected close failure, delete failure,
+  zero-byte EOF normalization, and nonzero read failure. The first live run
+  printed `......F.` because the EOF fixture left `FaultSetCount` disabled:
+  `fileRead` had correctly seeded `HexValLo/Hi` with its one-byte request, so
+  the injected carry-set return remained nonzero and correctly selected
+  `CASM_DIAG_INPUT_READ_FAILED`. Enabled an explicit canned zero count and
+  reran; this was a fixture setup defect, not a production finding. Final
+  final build 1005 is 1,919 code bytes with 281 relocation points;
+  `test_image_d64` builds clean. Live VICE 3.10 verification over MCP port
+  7000 printed `........`, `CASM FAULTINJECT: PASS`, and returned normally to
+  `C64[8]:>`. No production source or production image content changed. User
+  approved Increment 2 on 2026-08-09.
+- 2026-08-09: Increment 3 complete and user-approved. Added collision-safe
+  `test_casm_faultvmm`
+  (source `tests/src/casm_faultinject_vmm/casm_faultvmm.s`) linking the real
+  `vmm_store.s`/`resources.s` with shared `faultstub.inc`. Five cases prove
+  `DOS_ALLOC_MEM` returns distinct `CASM_DIAG_VMM_UNAVAILABLE`
+  (`VMM_ERR_INVALID`) and `CASM_DIAG_VMM_ALLOC_FAILED` (`VMM_ERR_NOMEM`),
+  while rejected `DOS_FREE_MEM`/`DOS_VMM_READ`/`DOS_VMM_WRITE` return their
+  expected diagnostics and leave the registry slot owned for retry cleanup.
+  Initial full-image integration found the long planned name collided with
+  existing `test_casm_faultinject` at D64's 16-character limit; the shortened
+  basename fixed that, after which `test.d64` proved its directory track was
+  full. Applied the user-approved packaging amendment above: existing
+  `test.d64` content remains intact and the new 7-block fixture lives on
+  `casm_overflow_test.d64` as `test_casm_faultv` (72 blocks remain). Final
+  build 1001 is 1,335 code bytes with 179 relocation points; no-change rebuild
+  stable; both disk targets build clean. Live VICE 3.10 verification booted
+  Command64 from unit 8, switched to the overflow image on unit 9, printed
+  `.....`, `CASM FAULT VMM: PASS`, and returned normally to `C64[9]:>`.
+- 2026-08-09: Increment 4 implementation and verification complete, pending
+  user acceptance. Added collision-safe `test_casm_faultsource`, covering
+  source allocation failure (no owner), load-write failure (file/VMM owners
+  retained then centrally cleaned), retryable `sourceReadSpanChunk` failure,
+  and `sourceRefill` failure setting source ERROR while preserving cleanup
+  ownership. A first run's third-case failure was a harness expectation error
+  (`casmcat1` contains ASCII `1`, not `A`); corrected without production
+  changes. Final build 1001 is 9,329 code bytes with 1,264 relocations;
+  `test_image_d64` and `casm_overflow_test_d64` build clean, with the latter
+  carrying `test_casm_faults` and 25 blocks free. A hot-reattach rerun wedged
+  during case 2; one workflow-approved soft reset and fresh Command64 boot
+  produced `....`, `CASM FAULT SOURCE: PASS`, and `C64[9]:>`. VICE remained
+  running throughout.

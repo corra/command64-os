@@ -26,10 +26,9 @@
 ; byte count on the carry-set path, so leaving FaultReturnA/FaultSetCount at
 ; their zero defaults reproduces WP57's original SEC-only shape exactly.
 ;
-; fileWrite's SHORT_WRITE case is a carry-CLEAR success with an
-; under-count -- a different shape from the canned-failure path this file
-; builds. Deliberately out of scope here (WP58 Increment 1); left for
-; whichever increment first exercises it.
+; fileWrite's SHORT_WRITE case is a carry-CLEAR success with an under-count.
+; FaultReturnSuccess selects that shape while preserving the carry-set default
+; used by every injected failure.
 ;
 ; This file declares no .segment of its own visible constants beyond the
 ; routines/storage below; the including fixture's CODE/DATA segments are
@@ -71,11 +70,14 @@ faultInstall:
 ;              arms these directly before the targeted call)
 ;            FaultReturnA = A value on the canned-failure return (default 0;
 ;              only DOS_ALLOC_MEM's vsaAllocFailed reads this)
+;            FaultReturnSuccess = nonzero to return carry clear (default 0;
+;              only fileWrite's SHORT_WRITE case needs this)
 ;            FaultSetCount = nonzero to also write FaultReturnCountLo/Hi into
 ;              HexValLo/Hi before returning (only DOS_READ_FILE's fileRead
 ;              reads this on the carry-set path)
-; Outputs:   armed+matched+countdown-expired: C set, A = FaultReturnA
-;              (canned failure; HexValLo/Hi also set when FaultSetCount != 0)
+; Outputs:   armed+matched+countdown-expired: A = FaultReturnA; C set by
+;              default or clear when FaultReturnSuccess != 0 (HexValLo/Hi
+;              also set when FaultSetCount != 0)
 ;            otherwise: falls through to the real apiHandler unchanged,
 ;              whatever it returns
 ; Preserves: X, Y (never touched)
@@ -101,7 +103,14 @@ faultStubEntry:
     lda FaultReturnCountHi
     sta HexValHi
 fsNoCount:
+    lda FaultReturnSuccess
+    bne fsReturnSuccess
     lda FaultReturnA
+    sec
+    rts
+fsReturnSuccess:
+    lda FaultReturnA
+    clc
     rts
 fsPassThrough:
     pla
@@ -113,6 +122,7 @@ FaultArmed:          .byte 0
 FaultFuncCode:       .byte 0
 FaultCountdown:      .byte 0
 FaultReturnA:        .byte 0
+FaultReturnSuccess:  .byte 0
 FaultSetCount:       .byte 0
 FaultReturnCountLo:  .byte 0
 FaultReturnCountHi:  .byte 0

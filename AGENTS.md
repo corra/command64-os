@@ -271,6 +271,9 @@ Default section order:
 
 When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
 
+- Keep a healthy VICE emulator running after tests. It is part of the user's Twitch and
+  YouTube stream layout; stop it only for problem recovery or when the user explicitly asks.
+
 ## Child DOX Index
 
 -[src/AGENTS.md](src/AGENTS.md)

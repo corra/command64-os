@@ -1992,6 +1992,39 @@
           clean. Live-verified in VICE: `CASM FAULTINJECT: PASS`, matching
           WP57's exact result -- shared-library extraction proven
           behavior-preserving before Increment 2 adds anything new.
+    - [x] Increment 2: extended `faultstub.inc` with opt-in
+          `FaultReturnSuccess` while preserving carry-set as the default;
+          expanded `casm_faultinject.s` from 2 to 8 cases covering
+          `WRITE_FAILED`, `SHORT_WRITE`, `CLOSE_FAILED`, `DELETE_FAILED`,
+          zero-byte read EOF normalization, and nonzero
+          `INPUT_READ_FAILED`. The first live run (`......F.`) exposed a
+          fixture setup error: the EOF case had not explicitly replaced
+          fileRead's seeded request count with zero. Corrected by enabling
+          the canned zero count; no production defect or source change.
+          Final build 1005 is 1,919 code bytes with 281 relocation points;
+          `test_image_d64` builds clean. Live VICE 3.10 verification on MCP
+          port 7000 produced `........`, `CASM FAULTINJECT: PASS`, and a
+          normal return to `C64[8]:>`. User approved Increment 2 on
+          2026-08-09.
+    - [x] Increment 3 complete and user-approved 2026-08-09: added
+          collision-safe `test_casm_faultvmm`, with five real-`vmm_store.s`
+          cases distinguishing no-REU from OOM and proving failed free/read/
+          write operations retain ownership for retry cleanup. The original
+          long name collided with Increment 2's fixture at D64's 16-character
+          limit; the distinct name then proved `test.d64`'s directory track
+          full. User approved packaging it on `casm_overflow_test.d64` instead
+          (`test_casm_faultv`, 72 blocks free), preserving all `test.d64`
+          content. Final build 1001: 1,335 code bytes, 179 relocations;
+          no-change rebuild stable; both disk targets clean. Live VICE 3.10:
+          `.....`, `CASM FAULT VMM: PASS`, normal `C64[9]:>` return.
+    - [x] Increment 4 implementation/verification (acceptance pending): added
+          `test_casm_faultsource` with four source allocation/write/read
+          cleanup cases. Corrected one fixture-only trusted-byte expectation
+          (`casmcat1` is ASCII `1`). Final build 1001: 9,329 code bytes,
+          1,264 relocations; both disk targets clean; overflow image has 25
+          blocks free. After one soft-reset recovery from a wedged hot-attach
+          session, live VICE produced `....`, `CASM FAULT SOURCE: PASS`, and
+          a normal `C64[9]:>` return. No production source changed.
   - WP59-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement
 

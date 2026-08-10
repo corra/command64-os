@@ -40,9 +40,9 @@ This directory contains the cross-development tools, compilers, utility scripts,
 * **Usage**:
 
   ```bash
-  tools/vice_mcp_start.sh start [--machine x64sc] [--port 6510] [--host 127.0.0.1] [--token TOKEN]
-  tools/vice_mcp_start.sh status [--port 6510]
-  tools/vice_mcp_start.sh stop [--port 6510]
+  tools/vice_mcp_start.sh start [--machine x64sc] [--port 7000] [--host 127.0.0.1] [--token TOKEN]
+  tools/vice_mcp_start.sh status [--port 7000]
+  tools/vice_mcp_start.sh stop [--port 7000]
   ```
 
   `start` refuses to run if something already holds the target port, and only reports success once `vice_ping` actually answers — a bound port alone is not proof the server is serving (see `.agents/workflows/vice-mcp-testing.md`). Once it's up, attach disks and control the machine over MCP (`vice_disk_attach`, `vice_autostart`, etc.), not through additional CLI flags to this script.
