@@ -1,7 +1,7 @@
 ---
 feature: casm-phase11-wp58-apply-fault-injection
 created: 2026-08-08
-status: approved
+status: complete
 taskwarrior: d297b689-3fba-4e16-81f7-8176b39a07e2
 depends-on: d8b09018-8c17-4c98-8ee7-e32d755952ea
 ---
@@ -386,3 +386,170 @@ does not, matching WP57's own precedent).
   during case 2; one workflow-approved soft reset and fresh Command64 boot
   produced `....`, `CASM FAULT SOURCE: PASS`, and `C64[9]:>`. VICE remained
   running throughout.
+- 2026-08-10: Increment 4's remaining three modules (`symbols.s`, `reloc.s`,
+  `include.s`) completed and live-verified, closing Atomic Increment 4 in
+  full.
+  - `casm_faultsymbols` (basename shortened to `casm_fsym`: the obvious name
+    collided with `test_casm_faultsource` at the D64 16-char truncation
+    boundary, the same defect class Increment 3 hit). Five cases against the
+    real `symbols.s`/`vmm_store.s`/`resources.s`: `DOS_ALLOC_MEM` (no-owner
+    invariant), a chain-walk read failure during `symbolsInsert` (not
+    misread as `CASM_DIAG_DUPLICATE_SYMBOL`, no bump-allocator advance), a
+    write failure during `symbolsInsert` (count unchanged, proven by a
+    retry landing at the expected index), a chain-walk read failure during
+    `symbolsLookup` (propagated, not silently "not found"), and a
+    `symbolsReadByIndex` read failure. First run found two real fixture bugs
+    (not production bugs): three cases loaded the fault function code into
+    `A` via `armNextCall` *after* already loading the real `nameLen`
+    argument, silently corrupting it to 1 -- one case (`insertFind`)
+    accidentally inserted a stray 1-byte record as a side effect, which
+    then caused a later case (`lookupFind`) to "pass" for the wrong reason.
+    Fixed by arming the fault before loading call arguments in all three
+    sites. Build 1002 (1,880 code bytes, 249 relocations); live VICE
+    verified on `casm_overflow_test.d64` (unit 9): `.....`,
+    `CASM FAULT SYMBOLS: PASS`, `C64[8]:>`.
+  - `casm_freloc`: reloc.s's own isolation precedent (CasmPc/CasmPassMode/
+    CasmRelocatableMode as this harness's own stand-ins, `fileWrite`
+    stubbed, matching `casm_reloc.s`). Three cases: `DOS_ALLOC_MEM`
+    (no-owner invariant), a `relocRecord` write failure (count unchanged,
+    proven by a retry's table offset read back through the exported
+    `CasmRelocVmmSlot`), and `relocFinalize`'s first table-copy-chunk read
+    failure (propagates before ever reaching `fileWrite`). Build 1000
+    (1,494 code bytes, 215 relocations); live VICE verified on
+    `casm_overflow_test.d64`: `...`, `CASM FAULT RELOC: PASS`, `C64[8]:>`.
+  - `casm_finc`: include.s's own directly-exported VMM entry points only
+    (`includeCatalogInit`/`includeCatalogRead`/`includeEventRecord`/
+    `includeEventReplay`) -- deliberately does not link `source.s`/
+    `fileio.s`, so `includeCatalogLoad`/`includeCatalogWrite`'s own fault
+    coverage is explicitly deferred (private routine, only reachable via
+    the on-miss path, would need the full heavy link chain for marginal
+    additional coverage over already-proven read/write shapes). Four
+    cases: `DOS_ALLOC_MEM` (no-owner invariant), an `includeCatalogRead`
+    transfer-window failure, an `includeEventRecord` write failure (count
+    unchanged, checked directly via the exported `CasmIncludeEventCount`),
+    and an `includeEventReplay` read failure (cursor unchanged, checked
+    directly via the exported `CasmIncludeEventCursor`). `casm_overflow_
+    test_d64` had only 7 blocks free (too little for this ~9-block PRG,
+    after `casm_freloc` landed there first) -- packaged instead on
+    `casm_listing_test_d64` (149 blocks free, self-contained, no
+    sourceLoad/fixture coupling, matching `test_casm_cliderive`/
+    `test_l15release`'s own placement precedent). Build 1000 (2,047 code
+    bytes, 284 relocations); live VICE verified self-booted directly from
+    `casm_listing_test.d64` on unit 8 (this disk carries `command64`
+    itself): `....`, `CASM FAULT INCLUDE: PASS`, `C64[8]:>`.
+  - Hit the same OS_API-vector wedge Increment 4's `source.s` fixture first
+    disclosed: re-running a fault fixture in the same VICE session without
+    an intervening machine reset leaves `$1000`/`$1001` pointing at the
+    PRIOR run's `faultStubEntry` (never restored -- there is no
+    `faultUninstall`), so the next fixture's own `faultInstall` captures
+    that stale stub address as `RealApiVector` and wedges on its first
+    real `OS_API` passthrough. Confirmed via `vice_registers_get`/
+    `vice_disassemble` (PC stuck bouncing at `faultStubEntry`'s own
+    entry). Not a fixture defect -- a soft `vice_machine_reset` plus a
+    fresh Command64 boot before each fixture's dispatch avoids it
+    reliably, and every case above was reproduced clean after adopting
+    that discipline. Worth a durable note for whoever verifies WP59+
+    fixtures in the same VICE session.
+  - Full project build (`cmake --build build`, all targets) succeeds
+    clean; `test_image_d64`, `casm_overflow_test_d64`, and
+    `casm_listing_test_d64` all build with no errors. No `src/external/
+    casm/` or `src/command64/` (production) source changed -- test
+    infrastructure only, per this plan's own scope.
+  - Atomic Increment 4 is now fully closed across all four in-scope
+    modules (`source.s`, `symbols.s`, `reloc.s`, `include.s`). Remaining
+    before WP58 can close: Atomic Increments 5-7 (wire every fixture into
+    `test_image_d64`/verify live -- already substantially done
+    incrementally above, but not yet formally re-checked as one pass --
+    and the WP58 walkthrough/completion-approval request), plus user
+    acceptance of Increment 4 itself (still pending, per the prior entry
+    above) and of this session's follow-on work.
+- 2026-08-10: Atomic Increment 5 (wire every fixture into its disk target,
+  per Increment 3's packaging amendment superseding the original literal
+  `test_image_d64`-only requirement) formally re-checked as one pass across
+  all six WP58 fault-injection fixtures, not just verified incrementally as
+  each was built:
+
+  | Fixture | Disk | Blocks | Disk free after |
+  | --- | --- | --- | --- |
+  | `test_casm_faultinject` | `test.d64` | 10 | 43 |
+  | `test_casm_faultvmm` | `casm_overflow_test.d64` | 7 | -- |
+  | `test_casm_faultsource` | `casm_overflow_test.d64` | 47 | -- |
+  | `test_casm_fsym` | `casm_overflow_test.d64` | 10 | -- |
+  | `test_casm_freloc` | `casm_overflow_test.d64` | 8 | 7 |
+  | `test_casm_finc` | `casm_listing_test.d64` | 11 | 149 |
+
+  Deleted and freshly rebuilt `test.d64`, `casm_overflow_test.d64`, and
+  `casm_listing_test.d64` from scratch (not incremental `cc1541` appends,
+  which the WP58 Increment 4 session already learned can mask a stale/
+  corrupted prior state) and confirmed every fixture's expected block count
+  in each disk's own build-time directory listing. Followed with a full
+  `cmake --build build` (every target, no restriction) which completed with
+  exit 0 and no errors. `casm_overflow_test.d64` is down to 7 blocks free --
+  any further Phase 11 fixture needing that disk will need a new placement
+  decision, matching `casm_finc`'s own precedent this increment.
+- 2026-08-10: Atomic Increment 6 (live-verify every new and refactored
+  fixture) completed as one consolidated pass across all six WP58
+  fault-injection fixtures, each on its own fresh `vice_machine_reset` +
+  Command64 reboot per the OS_API-vector wedge hazard Increment 4
+  disclosed:
+
+  | Fixture | Result |
+  | --- | --- |
+  | `test_casm_faultinject` | `........` `CASM FAULTINJECT: PASS` (8/8) |
+  | `test_casm_faultvmm` | `.....` `CASM FAULT VMM: PASS` (5/5) |
+  | `test_casm_faultsource` | `....` `CASM FAULT SOURCE: PASS` (4/4) |
+  | `test_casm_fsym` | `.....` `CASM FAULT SYMBOLS: PASS` (5/5) |
+  | `test_casm_freloc` | `...` `CASM FAULT RELOC: PASS` (3/3) |
+  | `test_casm_finc` | `....` `CASM FAULT INCLUDE: PASS` (4/4) |
+
+  `test_casm_faultsource`'s first run in this pass printed
+  `CASM FAULT SOURCE: FAIL` (`.FFF`) -- investigated immediately rather
+  than accepted as a fixture regression, since nothing in Increment 5
+  touched production or fixture source. Root cause: dispatch method, not
+  the fixture. `sourceLoad` allocates VMM first, then does real file I/O
+  against the real `casmcat1` fixture on `casm_overflow_test.d64`; the
+  one-shot `9:test_casm_faultsource` shell dispatch form loads and runs
+  the target but restores `CurrentDevice` to `SavedDevice` (8, per
+  `shell.asm`'s `sdExt` handler) *before* jumping to `UserProgStart` --
+  so the fixture's own real `DOS_OPEN_FILE` call looked for `casmcat1` on
+  `test.d64` (device 8), which doesn't carry that fixture, and every case
+  past the alloc-only first one failed for a reason with nothing to do
+  with fault injection. `allocFailureLeavesNoOwner` (case 1) passed
+  regardless, since it fails at the VMM-alloc step before ever touching a
+  file. Switching to the persistent-drive form (`9:` alone, then the bare
+  command with no prefix -- `sdExtSwitchDrive`'s own shortcut, matching
+  how Increment 4's original verification phrased it as "switched to the
+  overflow image on unit 9") reproduced a clean PASS immediately. Every
+  fixture doing real file I/O must be dispatched this way; VMM-only
+  fixtures (`fsym`/`freloc`/`finc`) are unaffected either way since they
+  never call `DOS_OPEN_FILE`, but this pass used the persistent-drive form
+  uniformly for consistency.
+  Also corrected an oversight the user caught mid-pass: the `c64-overlay-
+  api` `testing` state should be triggered before each dispatch, not just
+  `success`/`pass`/`fail` after -- the first three fixtures in this pass
+  (`faultinject`/`faultvmm`/`faultsource`) were reported without it; every
+  fixture from `fsym` onward includes it.
+  No production or fixture source changed as a result of this increment
+  (the one apparent failure was fully explained by dispatch method, not
+  fixed by editing anything). Atomic Increment 6 is closed.
+- 2026-08-10: Atomic Increment 7 complete. Produced the consolidated
+  WP58 walkthrough at
+  `brain/walkthroughs/2026-08-08-casm-phase11-wp58-apply-fault-injection.md`,
+  covering all seven increments, the two hazards disclosed (the OS_API-
+  vector wedge and the one-shot `9:name` dispatch's `CurrentDevice`
+  revert), the full 29-case/6-fixture live-VICE result table, and the
+  plan's own Verification/Stop-Condition/Open-Questions criteria checked
+  off explicitly. Open Question 2 (add-alongside vs. replace existing
+  full-disk fixtures) was followed by default throughout but never
+  separately re-confirmed by the user mid-plan the way Open Questions 1
+  and 3 were -- flagged in the walkthrough for explicit sign-off alongside
+  the completion-approval request itself. Also cleaned up a stray `--help`
+  D64 image file accidentally created in the repo root by an earlier
+  `cc1541 --help` invocation during this session's own investigation
+  (untracked, unrelated to any fixture, removed before this entry).
+  Walkthrough is the completion-approval request; awaiting explicit user
+  approval before closing WP58/task #40.
+- 2026-08-11: User explicitly approved WP58 completion, including the
+  add-alongside resolution for Open Question 2. WP58 and Taskwarrior task #40
+  are complete. CASM remains `0.2.0` build `1260`; this test-infrastructure
+  package changed no production source and requires no version bump.

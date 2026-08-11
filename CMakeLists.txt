@@ -503,6 +503,65 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
             set(TEST_PRG_SIZE "2D00")
         endif()
+        if(TEST_NAME STREQUAL "casm_fsym")
+            # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
+            # (one vmmStoreAlloc via symbolsInit, one vmmWindowRead shared by
+            # symbolsFindChain, one vmmWindowWrite via symbolsInsert, one
+            # vmmWindowRead via symbolsReadByIndex), plus the shared runtime
+            # OS_API fault hook. Matches casm_symbols.s's own real-module
+            # link set (symbols.s + vmm_store.s + resources.s). Basename
+            # deliberately short ("fsym" not "faultsymbols"): the obvious
+            # name collided with test_casm_faultsource at the D64 16-char
+            # truncation boundary (both reduce to "test_casm_faults"), the
+            # same defect class Increment 3 hit and fixed the same way.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_freloc")
+            # WP58 Increment 4: reloc.s's three OS_API-reachable call sites
+            # (one vmmStoreAlloc via relocInit, one vmmWindowWrite via
+            # relocRecord, one vmmWindowRead via relocFinalize's own
+            # table-copy loop), plus the shared runtime OS_API fault hook.
+            # Matches casm_reloc.s's own isolation precedent (CasmPc/
+            # CasmPassMode/CasmRelocatableMode as this harness's own
+            # exported stand-ins, fileWrite stubbed) rather than linking
+            # emit.s/fileio.s for real. Basename short ("freloc" not
+            # "faultreloc") to match casm_fsym's own truncation-safety
+            # precedent, even though "faultreloc" would not itself have
+            # collided -- keeps the naming convention uniform across every
+            # Increment 4 fixture.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_finc")
+            # WP58 Increment 4: include.s's directly-exported VMM entry
+            # points (includeCatalogInit's vmmStoreAlloc, includeCatalogRead's
+            # vmmWindowRead, includeEventRecord's vmmWindowWrite,
+            # includeEventReplay's vmmWindowRead), plus the shared runtime
+            # OS_API fault hook. Deliberately does NOT link source.s/
+            # fileio.s (unlike casm_catalog's own real-load-path harness):
+            # includeCatalogLoad/includeCatalogWrite's fault coverage is
+            # explicitly deferred (see the fixture's own file header) rather
+            # than paying for the full heavy link chain here. sourceAppendFile
+            # is this harness's own trivial, never-called stub.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
         if(TEST_NAME STREQUAL "casm_listing")
             # WP51 increment 3: listing.s plus every module listingCaptureInit
             # transitively needs. Does NOT link source.s -- this harness
@@ -1090,6 +1149,15 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_passcheck)
 # established overflow image instead.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_faultvmm)
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_faultsource)
+# WP58 Increment 4's symbols.s fault fixture joins them for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_fsym)
+# WP58 Increment 4's reloc.s fault fixture joins them for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_freloc)
+# WP58 Increment 4's include.s fault fixture is self-contained (no
+# sourceLoad/fixture coupling, see its own file header) and lands on
+# casm_listing_test_d64 instead of the overflow disk, which has only 7
+# blocks free -- too little for its ~9-block PRG.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_finc)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1400,7 +1468,7 @@ add_c64_disk_image(casm_overflow_test_d64
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
-         test_casm_faultvmm test_casm_faultsource
+         test_casm_faultvmm test_casm_faultsource test_casm_fsym test_casm_freloc
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1442,11 +1510,13 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # its directory-entry ceiling, this fixture is self-contained (cli.s state
 # only, no sourceLoad/fixture coupling), and this image has ample room
 # (442 blocks free as of WP52).
+# WP58 Increment 4's test_casm_finc joins here for the same "self-contained,
+# ample room" reason -- casm_overflow_test_d64 has only 7 blocks free.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
