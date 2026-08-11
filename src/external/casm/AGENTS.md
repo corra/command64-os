@@ -35,6 +35,13 @@ The `src/external/casm` directory owns CASM, a native Command 64
   traversal.
 - Register every acquired file handle and VMM allocation with the central
   resource owner immediately after acquisition.
+- Listing-file ownership begins immediately after `DOS_OPEN_FILE` succeeds,
+  before central handle registration can fail. `CasmListFileSlot =
+  CASM_INVALID_SLOT` denotes a listing-private unregistered handle: close it
+  directly through `DOS_CLOSE_FILE`; registered handles close through
+  `fileClose`. Both `OPEN` and `CLOSE_FAILED` permit one caller-driven close
+  attempt, retain ownership on failure, and delete an uncommitted listing only
+  after close succeeds.
 - Route every successful and fatal termination path through central cleanup
   before invoking `DOS_EXIT`.
 - Preserve the primary failure when cleanup encounters a secondary failure.

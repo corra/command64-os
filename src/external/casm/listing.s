@@ -1033,7 +1033,9 @@ lbonDone:
 ; ---------------------------------------------------------------------------
 ; listingCreate (WP53)
 ; Create (or transparently replace) the real `.LST` file and register its
-; handle. Listing type is SEQ, always write mode.
+; handle. Listing type is SEQ, always write mode. DOS_OPEN_FILE ownership is
+; recorded before registry insertion so a full registry can be compensated
+; through the same retryable listingAbort path as every later failure.
 ;
 ; Inputs:    CasmListFileState == CASM_FILE_STATE_CLOSED; CasmListingName/
 ;            Len already derived
@@ -1041,7 +1043,9 @@ lbonDone:
 ;                     valid; CasmListFileState = OPEN; Opened/Valid = true
 ;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED (bad
 ;                     precondition state) or CASM_DIAG_LISTING_CREATE_FAILED
-;                     (rejected DOS_OPEN_FILE or registration)
+;                     (rejected DOS_OPEN_FILE or registration). A registration
+;                     failure has already made one abort attempt; failed close
+;                     or delete compensation remains retryable in file state.
 ; Preserves: none
 ; Clobbers:  A, X, Y, HexValLo/Hi, FileHandle, OS API volatile state
 ; Scratch:   CasmValue1Lo
@@ -1061,28 +1065,25 @@ listingCreate:
     jsr OS_API
     bcs lcrCreateFailed
     sta CasmValue1Lo
-    jsr resourceRegisterHandle
-    bcs lcrRegistrationFailed
-    stx CasmListFileSlot
-    lda CasmValue1Lo
     sta CasmListFileHandle
+    lda #CASM_INVALID_SLOT
+    sta CasmListFileSlot
     lda #CASM_FILE_STATE_OPEN
     sta CasmListFileState
     lda #CASM_LISTFILE_OPENED
     sta CasmListFileOpened
     lda #CASM_LISTFILE_VALID
     sta CasmListFileValid
+    lda CasmValue1Lo
+    jsr resourceRegisterHandle
+    bcs lcrRegistrationFailed
+    stx CasmListFileSlot
     lda #CASM_DIAG_NONE
     clc
     rts
 lcrRegistrationFailed:
-    lda CasmValue1Lo
-    sta FileHandle
-    lda #DOS_CLOSE_FILE
-    jsr OS_API
     lda #CASM_DIAG_LISTING_CREATE_FAILED
-    sec
-    rts
+    jmp listingAbort
 lcrCreateFailed:
     lda #CASM_DIAG_LISTING_CREATE_FAILED
     sec
@@ -1158,13 +1159,14 @@ lwrBadState:
 
 ; ---------------------------------------------------------------------------
 ; listingClose (WP53)
-; Close and release the listing handle through fileio.s's generic fileClose.
-; A failed close leaves CasmListFileState == CLOSE_FAILED and the
-; handle/slot registered, exactly as fileio.s's own close paths do -- a
-; later retry (via a direct call or through listingAbort) attempts the same
-; close again since state never reaches CLOSED.
+; Close and release the listing handle. Registered handles use fileio.s's
+; generic fileClose; an acquired handle whose registry insertion failed is
+; closed directly through DOS_CLOSE_FILE. A call accepts OPEN or CLOSE_FAILED
+; and makes exactly one close attempt. Failure retains handle, slot, and
+; opened ownership for a later direct or listingAbort retry.
 ;
-; Inputs:    CasmListFileState == CASM_FILE_STATE_OPEN
+; Inputs:    CasmListFileState == CASM_FILE_STATE_OPEN or
+;            CASM_FILE_STATE_CLOSE_FAILED
 ; Outputs:   Success: C clear, A = CASM_DIAG_NONE; handle/slot released,
 ;                     state CLOSED
 ;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED (bad
@@ -1176,12 +1178,25 @@ lwrBadState:
 listingClose:
     lda CasmListFileState
     cmp #CASM_FILE_STATE_OPEN
+    beq lclStateOk
+    cmp #CASM_FILE_STATE_CLOSE_FAILED
     bne lclBadState
-    lda CasmListFileHandle
+lclStateOk:
     ldx CasmListFileSlot
+    cpx #CASM_INVALID_SLOT
+    beq lclUnregistered
+    lda CasmListFileHandle
     ldy #CASM_DIAG_LISTING_CLOSE_FAILED
     jsr fileClose
     bcs lclFailed
+    jmp lclClosed
+lclUnregistered:
+    lda CasmListFileHandle
+    sta FileHandle
+    lda #DOS_CLOSE_FILE
+    jsr OS_API
+    bcs lclFailed
+lclClosed:
     lda #CASM_INVALID_HANDLE
     sta CasmListFileHandle
     lda #CASM_INVALID_SLOT
@@ -2268,11 +2283,12 @@ lwerrFail:
 ;            CASM_LISTFILE_COMMITTED
 ;            Fail:    C set, A = CASM_DIAG_STREAM_STATE_FAILED on a bad
 ;            precondition (nothing created, no cleanup performed), or the
-;            diagnostic from a failing create/read/validate/write/close,
-;            already passed through listingAbort once a listing file was
-;            actually created (preserves the primary diagnostic, closes and
-;            deletes the incomplete file, never deletes a committed one --
-;            moot here since commit only happens after a clean close)
+;            diagnostic from a failing create/read/validate/write/close.
+;            listingCreate itself performs one abort after registration
+;            failure; every later failure is passed through listingAbort here.
+;            Retry state is retained for production artifactsAbort if either
+;            compensation fails. A committed listing is never deleted (moot
+;            here since commit only happens after a clean close).
 ; Preserves: none
 ; Clobbers:  A, X, Y and every routine above's own clobbers
 ; ---------------------------------------------------------------------------
@@ -2352,8 +2368,8 @@ lwfFlushEnd:
     rts
 
 lwfCreateFail:
-    rts                           ; listingCreate already set A/C; nothing
-                                   ; was created, so no abort is needed
+    rts                           ; listingCreate already made one abort attempt;
+                                   ; production artifactsAbort may retry it
 
 lwfAbortPath:
     jmp listingAbort              ; tail call; A already holds the failing

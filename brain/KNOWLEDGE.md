@@ -20,6 +20,15 @@ This file serves as the shared repository for architectural decisions, technical
 
 ## Technical Findings
 
+- **[2026-08-11] CASM listing-private handle ownership**: A successful
+  `DOS_OPEN_FILE` transfers ownership to `listing.s` before central registry
+  insertion can fail. `CasmListFileSlot = CASM_INVALID_SLOT` distinguishes
+  this bounded unregistered state: `listingClose` calls `DOS_CLOSE_FILE`
+  directly for it, while registered slots continue through `fileClose`.
+  `OPEN` and `CLOSE_FAILED` each permit one caller-driven close attempt;
+  failures retain ownership, and deletion occurs only after close succeeds.
+  This preserves the primary create/write diagnostic and makes later
+  `artifactsAbort` calls safe retries without an internal loop.
 - **[2026-08-04] Standalone external-app feasibility**: Current ca65 external
   apps depend on a relocatable Command64 artifact, `OS_API=$1000`, shared
   parameter zero page, shell command-buffer/exit conventions, and application-

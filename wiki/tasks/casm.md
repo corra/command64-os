@@ -1545,6 +1545,32 @@ behavior changed beyond the version/build artifact itself.
 - [x] WP58 Increments 5-7: all six fixtures are wired to their disk targets,
       freshly rebuilt, consolidated live verification passes 29/29 cases, and
       the walkthrough and completion gate are user-approved.
+- [/] WP59 `4a1fab7c-28af-4404-af39-6f283b552e55`: harden every exported
+      `listing.s`/`map.s` routine and its private transitive paths. Detailed
+      plan approved 2026-08-11.
+- [x] WP59 Increment 1: frozen 19-export contract matrix user-approved.
+- [x] WP59 Increment 2 user-approved 2026-08-11: `test_casm_flist` passes
+      15/15 live in VICE, restores the real
+      API vector before print/exit, and returns to `C64[8]:>`. Build 1001;
+      listing test disk has 126 blocks free. No production CASM change.
+- [x] WP59 Increment 3 user-approved 2026-08-11: eight new deterministic
+      allocation/write/flush/replay/serializer
+      cases bring `test_casm_flist` to 23/23 live VICE passes. Build 1007;
+      `$2200` unchanged; 118 disk blocks free. No production CASM change.
+- [x] WP59 Increment 4 user-approved 2026-08-11: listing lifecycle fixes and
+      deterministic retry/cleanup verification complete.
+      `test_casm_flist` passes 33/33 live in VICE; build 1009, `$2200`
+      unchanged, 112 listing-disk blocks free, no test artifacts remain.
+      Production CASM build 1261 remains `0.2.0`; no public ABI or valid-output
+      format changed.
+- [x] WP59 Increment 5 user-approved 2026-08-11: eight full-serializer cases
+      bring `test_casm_flist` to 41/41
+      live VICE passes. Build 1014; `$2400` test envelope; 105 disk blocks
+      free; no `FLI05*.LST` artifacts. Production CASM unchanged.
+- [ ] WP59 Increment 6 and later: filename/included-device validation
+      hardening and remaining increments not yet committed; separately gated
+      pending user approval.
+- [ ] WP60-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
 

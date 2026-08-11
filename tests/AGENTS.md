@@ -77,6 +77,10 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   packaged only on `casm_overflow_test_d64`, under `test_casm_faults`. Launch
   it by the full documented name after switching the Command64 shell to unit
   9; allow up to 90 seconds under true-drive emulation.
+- WP59 Increment 2's `test_casm_flist` listing contract harness is packaged
+  only on the self-bootable `casm_listing_test.d64`. Launch it from the
+  Command64 shell by its full documented name; the 16-character D64 name is
+  already collision-safe and must not be substituted as a separate contract.
 - `casmidup1.s`/`casmiduc1.s`/`casmiduc2.s` repeat that failure with an
   unterminated final identifier, proving packed identity and traceback depth
   can be recovered after normal lexer lookahead already popped the child.

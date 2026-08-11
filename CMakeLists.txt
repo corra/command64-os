@@ -562,6 +562,24 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
             set(TEST_PRG_SIZE "1400")
         endif()
+        if(TEST_NAME STREQUAL "casm_flist")
+            # WP59 Increment 3: listing.s linked whole with real VMM, resource,
+            # and file lifecycle modules plus the shared OS_API hook. The short basename
+            # remains collision-safe when D64 directory names truncate at 16
+            # characters ("test_casm_flist"). Start with the plan's measured
+            # initial $2200 envelope. WP59 Increment 5's eight serializer
+            # boundary cases overflowed it by 446 measured bytes. With the
+            # current real modules, $2300 overflows BSS by 252 bytes; $2400 is
+            # the smallest fitting round-page envelope ($23FC required).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "2400")
+        endif()
         if(TEST_NAME STREQUAL "casm_listing")
             # WP51 increment 3: listing.s plus every module listingCaptureInit
             # transitively needs. Does NOT link source.s -- this harness
@@ -910,7 +928,9 @@ if(Ca65_FOUND)
             # listingWriteFile formatters/serializer (unused by this
             # harness) overflowed $4C00 by 1007 measured bytes; $5000
             # (+1024) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5000")
+            # WP59 increment 4: retryable listing close/registration cleanup
+            # overflowed $5000 by 18 measured bytes.
+            set(TEST_PRG_SIZE "5100")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1158,6 +1178,9 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_freloc)
 # casm_listing_test_d64 instead of the overflow disk, which has only 7
 # blocks free -- too little for its ~9-block PRG.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_finc)
+# WP59 Increment 2's collision-safe listing contract fixture joins the
+# fixture-free listing disk; test.d64 has no directory entries available.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flist)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1510,13 +1533,14 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # its directory-entry ceiling, this fixture is self-contained (cli.s state
 # only, no sourceLoad/fixture coupling), and this image has ample room
 # (442 blocks free as of WP52).
-# WP58 Increment 4's test_casm_finc joins here for the same "self-contained,
-# ample room" reason -- casm_overflow_test_d64 has only 7 blocks free.
+# WP58 Increment 4's test_casm_finc and WP59's test_casm_flist join here for
+# the same "self-contained, ample room" reason. Their first 16 D64 name
+# characters are distinct, preserving truncation collision safety.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

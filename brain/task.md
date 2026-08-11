@@ -1964,7 +1964,7 @@
       PASS`; no `image_d64`/`test_image_d64` production content changed
     - User confirmed the live demonstration 2026-08-08. **WP57 complete.**
     - WP58's dedicated plan drafted as this WP's final increment
-  - [ ] Taskwarrior #41 (`d297b689-3fba-4e16-81f7-8176b39a07e2`): WP58
+  - [x] Taskwarrior (`d297b689-3fba-4e16-81f7-8176b39a07e2`): WP58
         apply fault-injection across file/VMM-touching modules
     - Plan: `brain/plans/2026-08-08-casm-phase11-wp58-apply-fault-injection.md`
     - Scope: extract `faultstub.inc` from WP57's inline prototype; add
@@ -2017,7 +2017,7 @@
           content. Final build 1001: 1,335 code bytes, 179 relocations;
           no-change rebuild stable; both disk targets clean. Live VICE 3.10:
           `.....`, `CASM FAULT VMM: PASS`, normal `C64[9]:>` return.
-    - [x] Increment 4 implementation/verification (acceptance pending): added
+    - [x] Increment 4 implementation/verification: added
           `test_casm_faultsource` with four source allocation/write/read
           cleanup cases. Corrected one fixture-only trusted-byte expectation
           (`casmcat1` is ASCII `1`). Final build 1001: 9,329 code bytes,
@@ -2025,8 +2025,64 @@
           blocks free. After one soft-reset recovery from a wedged hot-attach
           session, live VICE produced `....`, `CASM FAULT SOURCE: PASS`, and
           a normal `C64[9]:>` return. No production source changed.
-  - WP59-WP63 remain unplanned in detail, per this project's
-    per-work-package-plan-approval requirement
+    - Increments 4-7 completed all source/symbol/relocation/include fixtures,
+      disk wiring, full build, consolidated live verification, and walkthrough.
+      All 29 cases across six fixtures pass. User approved completion
+      2026-08-11; WP58 changed test infrastructure only and left CASM at
+      `0.2.0` build `1260`. **WP58 complete.**
+  - [/] Taskwarrior #40 (`4a1fab7c-28af-4404-af39-6f283b552e55`): WP59
+        `listing.s`/`map.s` hardening
+    - Plan:
+      `brain/plans/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`
+    - User approved the ten-increment plan 2026-08-11; each increment remains
+      separately gated by the preceding increment's review.
+    - [x] Increment 1: matrix frozen at
+      `brain/reviews/2026-08-11-casm-phase11-wp59-increment1-contract-matrix.md`
+      and user-approved 2026-08-11.
+    - [x] Increment 2 user-approved 2026-08-11:
+      added repeat-safe `faultUninstall` plus `test_casm_flist` with 15 API-
+      restore/init/re-entry/disabled/transaction/wrong-state register/flag/stack
+      cases. Build 1001: 5,782 PRG bytes, 4,294 relocatable code bytes, 740
+      relocation points; `$2200` envelope unchanged. Self-bootable listing disk
+      has 126 blocks free. Live VICE 3.10: 15 dots, `CASM FAULT LIST: PASS`,
+      normal `C64[8]:>` return through restored real API; no recovery. No
+      production CASM source, ABI, version, or output change.
+    - [x] Increment 3 user-approved 2026-08-11:
+      eight deterministic capture allocation, metadata write, mirror-stage/
+      final flush, replay read, and serializer mirror-read cases bring
+      `test_casm_flist` to 23 cases. Final build 1007: 7,799 PRG bytes, 5,785
+      relocatable code bytes, 1,003 relocations; `$2200` unchanged; no-change
+      rebuild stable; listing disk has 118 blocks free. Final VICE 3.10 run:
+      23 dots, `CASM FAULT LIST: PASS`, normal `C64[8]:>` return, overlay
+      `testing`/`pass` events relayed, no recovery. Two harness-only defects
+      were corrected transparently: invalid serializer root setup found during
+      review, and the shared SP checker counting its own two-byte JSR frame.
+      No production source, ABI, version, or valid artifact changed.
+    - [x] Increment 4 user-approved 2026-08-11:
+      retryable registered/unregistered close and registration-failure
+      close-then-delete compensation fix D1/D2 with no storage/public-ABI
+      change. Ten new lifecycle cases bring `test_casm_flist` to 33/33 live
+      VICE passes. Harness build 1009: 9,259 PRG bytes, 6,885 code bytes, 1,183
+      relocations; `$2200` unchanged; listing disk 112 blocks free and no
+      `FLI04*.LST` artifacts after runtime. Production CASM build 1261: 18,572
+      code bytes, 2,806 relocations, about 210 bytes `$5500` headroom; still
+      `0.2.0`. `test_casm_frame` required the smallest test-only envelope step
+      `$5000` -> `$5100` after an 18-byte overflow. `image_d64` and listing
+      disk build; no-change counters stable. VICE 3.10: 33 dots, PASS, normal
+      `C64[8]:>` return; overlay testing/pass; no recovery.
+    - [x] Increment 5 user-approved 2026-08-11:
+      eight serializer replay/catalog/source/write/short/final-close/abort-
+      close/abort-delete cases plus strengthened mirror-read evidence bring
+      `test_casm_flist` to 41/41 live VICE passes. Build 1014: 11,033 PRG
+      bytes, 8,169 code bytes, 1,428 relocations; measured `$2200` overflow by
+      446 bytes required the smallest `$2400` test envelope (53 bytes
+      headroom). Listing disk has 105 blocks free and no `FLI05*.LST`
+      artifacts. Overlay testing/pass, normal `C64[8]:>` return, no recovery.
+      Production CASM remains build 1261 and no-change counters are stable.
+    - Increment 6 (included-device range validation) and remaining increments
+      not yet committed; separately gated pending user approval.
+  - WP60-WP63 remain unplanned in detail, per this project's
+    per-work-package-plan-approval requirement.
 
 # Deferred Optional Work
 

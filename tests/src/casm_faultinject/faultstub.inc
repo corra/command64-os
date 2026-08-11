@@ -57,6 +57,21 @@ faultInstall:
     rts
 
 ; ---------------------------------------------------------------------------
+; faultUninstall
+; Restore the exact OS_API target captured by faultInstall and disarm the
+; descriptor. Writing the captured operand again is intentional: repeated
+; calls are harmless and leave the real entry point installed.
+; ---------------------------------------------------------------------------
+faultUninstall:
+    lda #0
+    sta FaultArmed
+    lda RealApiVector
+    sta $1001
+    lda RealApiVector+1
+    sta $1002
+    rts
+
+; ---------------------------------------------------------------------------
 ; faultStubEntry
 ; Reached in place of apiHandler for every OS_API call for the rest of the
 ; including fixture's run. Mirrors apiHandler's own first instruction (cld)
@@ -85,6 +100,28 @@ faultInstall:
 ; ---------------------------------------------------------------------------
 faultStubEntry:
     cld
+.ifdef CASM_FAULT_BOUNDARY_COUNTERS
+    cmp #DOS_OPEN_FILE
+    bne fsCountWrite
+    inc FaultOpenCalls
+fsCountWrite:
+    cmp #DOS_WRITE_FILE
+    bne fsCountClose
+    inc FaultWriteCalls
+fsCountClose:
+    cmp #DOS_CLOSE_FILE
+    bne fsCountDelete
+    inc FaultCloseCalls
+fsCountDelete:
+    cmp #DOS_DELETE_FILE
+    bne fsCountVmmRead
+    inc FaultDeleteCalls
+fsCountVmmRead:
+    cmp #DOS_VMM_READ
+    bne fsCountDone
+    inc FaultVmmReadCalls
+fsCountDone:
+.endif
     pha
     lda FaultArmed
     beq fsPassThrough
@@ -127,5 +164,12 @@ FaultSetCount:       .byte 0
 FaultReturnCountLo:  .byte 0
 FaultReturnCountHi:  .byte 0
 RealApiVector:       .word 0
+.ifdef CASM_FAULT_BOUNDARY_COUNTERS
+FaultOpenCalls:       .byte 0
+FaultWriteCalls:      .byte 0
+FaultCloseCalls:      .byte 0
+FaultDeleteCalls:     .byte 0
+FaultVmmReadCalls:    .byte 0
+.endif
 
 .segment "CODE"
