@@ -81,6 +81,10 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   only on the self-bootable `casm_listing_test.d64`. Launch it from the
   Command64 shell by its full documented name; the 16-character D64 name is
   already collision-safe and must not be substituted as a separate contract.
+- WP59 Increment 6's nine-case `test_casm_flmeta` metadata/header harness is
+  split from `test_casm_flist` to keep both Command64 load envelopes bounded.
+  It is packaged beside `test_casm_flist` on `casm_listing_test.d64`; both use
+  distinct collision-safe names and clean up all `FLI06*.LST` artifacts.
 - `casmidup1.s`/`casmiduc1.s`/`casmiduc2.s` repeat that failure with an
   unterminated final identifier, proving packed identity and traceback depth
   can be recovered after normal lexer lookahead already popped the child.

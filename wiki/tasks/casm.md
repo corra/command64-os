@@ -1545,7 +1545,7 @@ behavior changed beyond the version/build artifact itself.
 - [x] WP58 Increments 5-7: all six fixtures are wired to their disk targets,
       freshly rebuilt, consolidated live verification passes 29/29 cases, and
       the walkthrough and completion gate are user-approved.
-- [/] WP59 `4a1fab7c-28af-4404-af39-6f283b552e55`: harden every exported
+- [x] WP59 `4a1fab7c-28af-4404-af39-6f283b552e55`: harden every exported
       `listing.s`/`map.s` routine and its private transitive paths. Detailed
       plan approved 2026-08-11.
 - [x] WP59 Increment 1: frozen 19-export contract matrix user-approved.
@@ -1567,9 +1567,40 @@ behavior changed beyond the version/build artifact itself.
       bring `test_casm_flist` to 41/41
       live VICE passes. Build 1014; `$2400` test envelope; 105 disk blocks
       free; no `FLI05*.LST` artifacts. Production CASM unchanged.
-- [ ] WP59 Increment 6 and later: filename/included-device validation
-      hardening and remaining increments not yet committed; separately gated
-      pending user approval.
+- [x] WP59 Increment 6 user-approved 2026-08-11: filename and included-device
+      validation hardening complete. The
+      approved split keeps 41 Increment 2-5 cases in `test_casm_flist` and puts
+      nine device/name/header/snapshot cases in `test_casm_flmeta`; both pass
+      live (41/41 and 9/9), return to `C64[8]:>`, and leave no `FLI06*.LST`
+      artifact. Listing disk has 75 blocks free. Production CASM build 1262
+      remains `0.2.0`; no public ABI, storage, diagnostic, or valid-output
+      format changed.
+- [x] WP59 Increment 7 user-approved 2026-08-11: expanded map validation,
+      decimal-boundary, determinism, formatting, and exported-contract coverage
+      complete. `test_casm_map` build
+      1012 passes 23/23 live in VICE, returns to `C64[8]:>`, and leaves 71
+      listing-disk blocks free. No production source or valid map bytes changed.
+- [x] WP59 Increment 8 user-approved 2026-08-11: static ownership, shared-scratch, BSS initialization,
+      exported-state, local-header, and DOX audit complete, awaiting user
+      approval. No defect found: no private ZP, unsafe scratch lifetime,
+      uninitialized load-bearing BSS, or ownership disagreement. Stale pre-WP54
+      comments corrected without executable/ABI/storage/output change. CASM
+      build 1263 and map harness build 1013 retain prior code/relocation sizes;
+      no-change rebuilds stable.
+- [/] WP59 Increment 9: consolidated builds, artifacts, regressions, WP58
+      compatibility, and production `/M`/`/L` live verification complete,
+      awaiting user approval. Full and image builds plus no-change rebuild pass;
+      a shared-fixture NMOS indirect-JMP page-boundary hazard was replaced by a
+      patched absolute JMP with no production impact. Live WP58/listing/metadata
+      regressions pass 8/8, 41/41, and 9/9; the final map image remains 23/23.
+      Production `/M`, `/L`, and `/M /L` smokes validate, create expected
+      listing/map artifacts, and return to `C64[8]:>`. User-approved 2026-08-11.
+- [x] WP59 Increment 10 and completion user-approved 2026-08-11. The
+      completion walkthrough records every export/private path, fix, metric,
+      fixture result, compatibility check, and manual confirmation step.
+      CASM advanced to `0.2.1.1264`; the PRG differs from `0.2.0.1263` only at
+      the stage and build banner bytes. A second image build is stable, and the
+      live `0.2.1.1264` banner returns to `C64[8]:>`. WP59 is complete.
 - [ ] WP60-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

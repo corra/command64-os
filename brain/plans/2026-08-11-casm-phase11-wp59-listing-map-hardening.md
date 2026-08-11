@@ -692,6 +692,72 @@ deviations still require an amended plan and renewed approval.
   The 44-block harness leaves 105 listing-disk blocks free. Production CASM is
   unchanged at build 1261 (18,572 code bytes, 2,806 relocations); production
   and harness no-change counters are stable. VICE remains running.
-- Increment 6 (filename/included-device validation hardening) and later
-  increments: implemented and live-verified in the working session but not
-  yet committed, pending user approval. Not included in this record.
+- 2026-08-11: Increment 6 filename/included-device validation hardening used the
+  approved two-harness split. `test_casm_flist` passed 41/41 and
+  `test_casm_flmeta` passed 9/9 live under VICE 3.10; both returned to
+  `C64[8]:>`, and no `FLI06*.LST` artifact remained. Initial invalid runs sent
+  PETSCII `$5F` left-arrows instead of `$A4` underscores and later left VICE
+  paused; exact bytes and resumed execution proved no loader defect. The user
+  approved Increment 6 on 2026-08-11 and activated Increment 7 map coverage.
+- 2026-08-11: Increment 7 implementation and verification complete, awaiting
+  user approval. Expanded `test_casm_map` to 23 top-level cases covering
+  NameLen 32/255, DEFINED-clear and each independent reserved flag bit,
+  reserved bytes 37/63, a VMM failure after header plus one valid row, exact
+  decimal totals at 9/10, 99/100, 255/256, and 511/512, repeated exact output,
+  `$0000`/`$FFFF`, exported A/carry/SP behavior, and volatile
+  `diagPrintString` registers. Build 1012 is a 5,294-byte/21-block PRG with
+  4,036 code bytes and 625 relocations in the unchanged `$1400` envelope (1,084
+  bytes headroom). The listing disk has 71 blocks free. Live VICE 3.10 printed
+  23 dots, `CASM MAP: PASS`, and returned to `C64[8]:>`; overlay
+  `testing`/`pass` events were relayed. No production defect or source change
+  was required; valid map order/bytes remain unchanged and VICE remains healthy.
+- 2026-08-11: User approved Increment 7 and activated Increment 8 static
+  ownership, shared-scratch, BSS, exported-state, local-header, and DOX audit.
+- 2026-08-11: Increment 8 implementation and verification complete, awaiting
+  user approval. Static evidence is recorded in
+  `brain/reviews/2026-08-11-casm-phase11-wp59-increment8-static-audit.md`.
+  Neither module defines private zero page; no unsafe shared-scratch lifetime,
+  uninitialized load-bearing BSS, ownership disagreement, or production defect
+  was found. All exports have production/direct-harness consumers except the
+  unused legacy `CasmListingOpenName`, retained and documented to avoid an
+  unapproved module-ABI removal. Corrected stale pre-WP54 `/L` and `/M` comments
+  plus stale map-harness history. No instruction, storage declaration, export
+  set, diagnostic, ownership behavior, or valid output changed. Comment-driven
+  rebuilds produced CASM build 1263 and map harness build 1013 with unchanged
+  18,580/4,036 code-byte and 2,806/625 relocation metrics; no-change rebuilds
+  are stable. The listing disk remains at 71 blocks free. DOX remains accurate
+  and required no contract edit.
+- 2026-08-11: User approved Increment 8 and activated Increment 9 consolidated
+  build, artifact, compatibility, and live VICE verification.
+- 2026-08-11: Increment 9 implementation and verification complete, awaiting
+  user approval. The unrestricted build, production `image_d64`, listing test
+  image, overflow test image, and stable no-change rebuild pass. Consolidation
+  exposed a WP58 test-infrastructure placement defect: the shared
+  `JMP (RealApiVector)` pointer could land at `$xxFF` and trigger the NMOS 6502
+  indirect-JMP page-wrap hazard. `faultstub.inc` now patches an absolute JMP
+  operand instead, with no production-code or public-contract change. Live VICE
+  re-runs pass `test_casm_faultinject` (8/8), `test_casm_flist` (41/41), and
+  `test_casm_flmeta` (9/9), each with its PASS banner and normal shell return;
+  Increment 7 already proved the final 23/23 map image. Production
+  `casmemit1.s` smokes pass separately with `/M`, `/L`, and `/M /L`: maps print
+  `000 SYMBOLS`, standalone and combined listing artifacts are two-block SEQ
+  files with formatted rows, and every path reports `CASM: INPUT VALIDATED` and
+  returns to `C64[8]:>`. Representative PRG/R6 and valid listing/map formats
+  remain compatible with `0.2.0`. Overlay testing/pass events were relayed and
+  VICE remains running. Increment 10 is not active before user approval.
+- 2026-08-11: User approved Increment 9 and activated Increment 10. The WP59
+  completion walkthrough is recorded at
+  `brain/walkthroughs/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`.
+  It consolidates all 19 export dispositions, private-path evidence, D1-D3 and
+  fixture-trampoline fixes, build/artifact metrics, live results, disclosed
+  risks, and manual confirmation steps. WP59 completion and the `0.2.1`
+  version-only increment remain pending explicit user approval.
+- 2026-08-11: User approved WP59 completion. Advanced CASM from `0.2.0.1263`
+  to `0.2.1.1264` and rebuilt `image_d64`. The 24,200-byte PRG retained 18,580
+  code bytes and 2,806 relocations; comparison found exactly the expected two
+  banner-byte changes (stage `0` to `1`, build digit `3` to `4`). A second
+  no-change build retained build 1264 and SHA-256
+  `fb1889317e2c7478cb037087889d4dc1615cc257a9d88c08157a914d9a4faa65`.
+  Live VICE printed `CASM V0.2.1.1264`, the expected missing-source diagnostic,
+  and `C64[8]:>`. Overlay testing/pass events were relayed, VICE remains
+  running, and WP59 is complete.

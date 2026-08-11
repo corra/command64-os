@@ -20,6 +20,24 @@ This file serves as the shared repository for architectural decisions, technical
 
 ## Technical Findings
 
+- **[2026-08-11] Shared 6502 fixture trampolines must not depend on indirect-JMP
+  pointer placement**: `JMP (addr)` on NMOS 6502 wraps the high-byte fetch when
+  its pointer lands at `$xxFF`. A relocatable test fixture cannot assume its
+  vector avoids that boundary. The CASM fault stub stores the real destination
+  into the operand of a RAM-resident absolute `JMP $xxxx`, avoiding the hardware
+  hazard without imposing global DATA alignment.
+- **[2026-08-11] VICE command entry requires PETSCII `$A4` underscores**:
+  `vice_keyboard_type` maps ASCII `$5F` to the C64 left-arrow glyph, so shell
+  application names containing `_` must be sent with `vice_keyboard_petscii`
+  and explicit `$A4` bytes. A left-arrow spelling can pass misleadingly far
+  into filename checks and appear as a loader failure. Also remove temporary
+  stopping checkpoints and explicitly resume execution before classifying a
+  timed run.
+- **[2026-08-11] CASM listing include-device validation**: Listing filename
+  resolution validates catalog devices 8-11 before subtracting 8 and indexing
+  `includeDeviceStrLo/Hi`. Out-of-range metadata returns the existing listing
+  replay-mismatch diagnostic and leaves resolved output non-consumable; valid
+  listing bytes and public storage/ABI remain unchanged.
 - **[2026-08-11] CASM listing-private handle ownership**: A successful
   `DOS_OPEN_FILE` transfers ownership to `listing.s` before central registry
   insertion can fail. `CasmListFileSlot = CASM_INVALID_SLOT` distinguishes

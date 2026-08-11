@@ -25,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **CASM listing/map production headers (Phase 11 WP59 Increment 8)**: Updated
+  stale pre-WP54 comments that still described `/L` and `/M` as unimplemented,
+  and corrected obsolete map-harness history. The accompanying static audit
+  found no private zero page, unsafe shared scratch, uninitialized load-bearing
+  BSS, ownership disagreement, or production defect; no executable, ABI,
+  storage, diagnostic, ownership, or valid-output behavior changed.
 - **DEBUG REU examples in action**: Added annotated `XS`, `XA`, `XM`, `XD`,
   and `Q` workflows to the DEBUG manual's numbered examples, including a
   write/read round trip, flat and page-relative offsets, multi-chunk transfers,
@@ -64,6 +70,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM fault-stub NMOS indirect-JMP boundary hazard (Phase 11 WP59 Increment
+  9)**: Replaced the shared test fixture's relocatable `JMP (RealApiVector)`
+  trampoline with a RAM-patched absolute JMP. This prevents the NMOS 6502
+  `$xxFF` pointer page-wrap bug from making consolidated builds placement-
+  dependent. All affected WP58/WP59 regressions and production `/M`, `/L`, and
+  `/M /L` smoke paths pass; production CASM code and artifacts are unchanged.
+- **CASM included-listing device validation (Phase 11 WP59 Increment 6)**:
+  `listingResolveFilename` now rejects corrupted include catalog devices below
+  8 or above 11 before indexing the four-entry device-string tables, returning
+  the existing listing replay-mismatch diagnostic without publishing resolved
+  output. A split 41-case listing harness and nine-case metadata/header harness
+  live-verify valid devices 8/11, invalid 7/12, root and maximum-length names,
+  31/32-byte header continuation, and record snapshots across shared VMM-buffer
+  clobber. No public ABI, storage, diagnostic number, or valid output changed.
 - **CASM listing cleanup ownership and retry hardening (Phase 11 WP59
   Increment 4)**: `listingClose` now retries both registered and
   listing-private unregistered handles after `CLOSE_FAILED`, making exactly one
@@ -84,6 +104,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM 0.2.1 listing/map hardening (Phase 11 WP59)**: Audited all 19
+  listing/map exports and their private transitive paths; fixed retryable
+  listing-close ownership, registration-failure close/delete compensation, and
+  included-device bounds validation. Added 41 listing lifecycle/serializer,
+  nine metadata/header, and 23 map contract cases, with affected WP58
+  compatibility and production `/M`, `/L`, and `/M /L` paths passing live.
+  Final `0.2.1.1264` verification changed only the stage and build banner bytes
+  from `0.2.0.1263`; the no-change rebuild is stable.
+- **CASM map contract hardening coverage (Phase 11 WP59 Increment 7)**:
+  Expanded the map harness to verify NameLen 32/255 rejection, DEFINED-clear
+  and every reserved flag bit, both reserved-padding endpoints, VMM failure
+  after partial output, decimal totals across every requested transition,
+  repeat determinism, address endpoints, exported carry/diagnostic/stack
+  behavior, and volatile diagnostic-print registers. All 23 cases pass without
+  a production source or valid-output change.
 - **CASM Phase 10 complete: `/M` and `/L` verified and promoted to `0.2.0`**:
   WP55 independently re-verified the complete `/M`/`/L` implementation
   WP50-54 delivered — a baseline reconciliation (found and fixed a

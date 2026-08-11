@@ -2030,7 +2030,7 @@
       All 29 cases across six fixtures pass. User approved completion
       2026-08-11; WP58 changed test infrastructure only and left CASM at
       `0.2.0` build `1260`. **WP58 complete.**
-  - [/] Taskwarrior #40 (`4a1fab7c-28af-4404-af39-6f283b552e55`): WP59
+  - [x] Taskwarrior #40 (`4a1fab7c-28af-4404-af39-6f283b552e55`): WP59
         `listing.s`/`map.s` hardening
     - Plan:
       `brain/plans/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`
@@ -2079,8 +2079,62 @@
       headroom). Listing disk has 105 blocks free and no `FLI05*.LST`
       artifacts. Overlay testing/pass, normal `C64[8]:>` return, no recovery.
       Production CASM remains build 1261 and no-change counters are stable.
-    - Increment 6 (included-device range validation) and remaining increments
-      not yet committed; separately gated pending user approval.
+    - [x] Increment 6 user-approved 2026-08-11: included-device range validation, filename/
+      catalog boundaries, header continuation, and shared-buffer snapshot proof.
+      Implementation and verification are complete, awaiting user approval.
+      `listingResolveFilename` rejects included devices outside 8-11 before
+      device-table indexing. The approved load-envelope split retains 41 cases
+      in `test_casm_flist` (build 1018, 11,093 bytes, `$2400`) and adds nine in
+      `test_casm_flmeta` (build 1001, 7,369 bytes, `$1A00`). Host, D64, and
+      regenerated R6 artifacts are byte-identical; the disk has 75 blocks free.
+      Live VICE 3.10 passes 41/41 and 9/9 with both PASS banners and normal
+      `C64[8]:>` returns; no `FLI06*.LST` remains. Initial false loader failures
+      were invalid test-driver runs using PETSCII `$5F` left-arrow for `_`, then
+      paused execution; exact `$A4` underscores and resume corrected setup.
+    - [x] Increment 7 user-approved 2026-08-11: expand map validation edges, decimal transitions,
+      repeat determinism, address formatting, and exported `mapPrint` contract
+      coverage without changing valid output order or bytes.
+      Implementation and verification complete, awaiting user approval.
+      `test_casm_map` now has 23 cases covering NameLen 32/255, DEFINED-clear,
+      each reserved flag bit, padding endpoints 37/63, partial-output VMM
+      failure, totals 9/10/99/100/255/256/511/512, repeat output,
+      `$0000`/`$FFFF`, A/carry/SP, and volatile print registers. Build 1012:
+      5,294-byte PRG, 4,036 code bytes, 625 relocations, unchanged `$1400`
+      envelope with 1,084-byte headroom. Live VICE passes 23/23 with
+      `CASM MAP: PASS` and `C64[8]:>`; no production change.
+    - [x] Increment 8 user-approved 2026-08-11: complete static ownership, shared-scratch,
+      load-bearing BSS initialization, exported-state ABI, stale local-header,
+      and DOX audit for `listing.s` and `map.s`.
+      Implementation and verification complete, awaiting user approval. Review:
+      `brain/reviews/2026-08-11-casm-phase11-wp59-increment8-static-audit.md`.
+      No production defect, private ZP, unsafe scratch lifetime, uninitialized
+      load-bearing BSS, or ownership mismatch found. Stale pre-WP54 source and
+      harness comments corrected only. `CasmListingOpenName` is the sole unused
+      legacy export and remains documented/retained to avoid an ABI change.
+      Comment-driven CASM 1263/map 1013 rebuilds preserve 18,580/4,036 code
+      bytes and 2,806/625 relocations; no-change rebuilds stable; disk 71 free.
+    - [/] Increment 9 active: consolidated narrow/full builds, PRG/R6 and
+      no-change stability, listing/map regressions, affected WP58 compatibility,
+      production `/M`/`/L`/combined smoke paths, shell return, and artifact
+      comparisons.
+      Implementation and verification are complete and user-approved.
+      Unrestricted, production-image, listing-image, and overflow-image builds
+      pass with a stable no-change rebuild. A consolidated-build failure exposed
+      the shared fixture's potentially page-straddling `JMP (RealApiVector)`;
+      replacing it with a RAM-patched absolute JMP avoids the NMOS page-wrap
+      hazard without production impact. Live VICE passes WP58 compatibility
+      8/8, listing 41/41, metadata 9/9, and the previously final map 23/23.
+      Production `/M`, `/L`, and `/M /L` each validate input, return to
+      `C64[8]:>`, and create the expected map/listing outputs.
+    - [x] Increment 10 user-approved 2026-08-11: The
+      completion walkthrough at
+      `brain/walkthroughs/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`
+      records all 19 exports, private paths, fixes, metrics, regressions,
+      compatibility evidence, remaining gate, and manual confirmation steps.
+      User approved completion; CASM `0.2.1.1264` differs from `0.2.0.1263`
+      only at the stage and build banner bytes. The second image build retained
+      build 1264 and the same PRG hash; the live banner and shell return pass.
+      **WP59 complete.**
   - WP60-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

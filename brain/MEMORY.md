@@ -13,6 +13,32 @@
 
 ## Current State (2026-07-29)
 
+- **CASM Phase 11 WP59 complete at `0.2.1.1264`**:
+  `listing.s` now
+  retains and retries both registered and listing-private unregistered handles;
+  registration failure compensates by close-then-delete while preserving
+  `CASM_DIAG_LISTING_CREATE_FAILED`; filename resolution rejects included
+  devices outside 8-11 before table indexing. Split harnesses
+  `test_casm_flist` build 1018 and `test_casm_flmeta` build 1001 pass 41/41 and
+  9/9 live VICE cases and leave no `FLI04*.LST`, `FLI05*.LST`, or
+  `FLI06*.LST` artifacts. Production CASM build 1262 remains `0.2.0`, with no
+  public ABI, storage, diagnostic, or valid-output format change. Increment 7
+  map-contract coverage is user-approved. `test_casm_map` build 1012 passes
+  23/23 live VICE cases across
+  all approved validation, decimal, partial-failure, repeat, formatting, and
+  exported-contract boundaries; no production map source or output changed.
+  Increment 8's static ownership/local-header/DOX audit is approved. It found no defect, private ZP, unsafe scratch, uninitialized
+  BSS, or ownership mismatch; corrected comments only. CASM build 1263 and map
+  harness build 1013 retain prior executable metrics. Increment 9 consolidated
+  builds and live verification pass: WP58 compatibility 8/8, listing 41/41,
+  metadata 9/9, final map 23/23, and production `/M`, `/L`, and `/M /L` smokes
+  all return to the shell. A shared-fixture indirect JMP page-boundary hazard
+  was replaced by a patched absolute JMP without production impact. Increment 9
+  is user-approved and Increment 10's completion walkthrough is ready at
+  `brain/walkthroughs/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`.
+  WP59 completion was user-approved. The final 24,200-byte PRG differs from
+  `0.2.0.1263` only at the stage/build banner bytes, a second image build is
+  stable, and live VICE prints `CASM V0.2.1.1264` before returning to the shell.
 - **Standalone external-app feasibility study in user review**: The study at
   `brain/plans/2026-08-04-standalone-external-apps-feasibility.md` recommends
   shared application cores with Command64 and standalone platform adapters,

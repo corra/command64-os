@@ -580,6 +580,21 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
             set(TEST_PRG_SIZE "2400")
         endif()
+        if(TEST_NAME STREQUAL "casm_flmeta")
+            # WP59 Increment 6 split: nine metadata, resolver, serializer-header,
+            # and shared-buffer snapshot cases, isolated from the 41-case
+            # test_casm_flist load envelope. Keep the same real module boundary.
+            # $1800 overflowed BSS by 409 bytes; $1A00 is the smallest fitting
+            # round-page envelope ($1999 measured requirement).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1A00")
+        endif()
         if(TEST_NAME STREQUAL "casm_listing")
             # WP51 increment 3: listing.s plus every module listingCaptureInit
             # transitively needs. Does NOT link source.s -- this harness
@@ -1181,6 +1196,8 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_finc)
 # WP59 Increment 2's collision-safe listing contract fixture joins the
 # fixture-free listing disk; test.d64 has no directory entries available.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flist)
+# WP59 Increment 6's split metadata fixture shares the listing-only disk.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flmeta)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1533,14 +1550,14 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # its directory-entry ceiling, this fixture is self-contained (cli.s state
 # only, no sourceLoad/fixture coupling), and this image has ample room
 # (442 blocks free as of WP52).
-# WP58 Increment 4's test_casm_finc and WP59's test_casm_flist join here for
-# the same "self-contained, ample room" reason. Their first 16 D64 name
-# characters are distinct, preserving truncation collision safety.
+# WP58 Increment 4's test_casm_finc and WP59's test_casm_flist/test_casm_flmeta
+# join here for the same "self-contained, ample room" reason. Their first 16
+# D64 name characters are distinct, preserving truncation collision safety.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

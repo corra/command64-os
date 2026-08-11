@@ -151,7 +151,11 @@ fsReturnSuccess:
     rts
 fsPassThrough:
     pla
-    jmp (RealApiVector)
+    ; Self-modifying absolute JMP operand. All external-app code is writable
+    ; RAM, and this avoids NMOS 6502 JMP (abs)'s $xxFF pointer-wrap hazard.
+    .byte $4C
+RealApiVector:
+    .word 0
 
 .segment "DATA"
 
@@ -163,7 +167,6 @@ FaultReturnSuccess:  .byte 0
 FaultSetCount:       .byte 0
 FaultReturnCountLo:  .byte 0
 FaultReturnCountHi:  .byte 0
-RealApiVector:       .word 0
 .ifdef CASM_FAULT_BOUNDARY_COUNTERS
 FaultOpenCalls:       .byte 0
 FaultWriteCalls:      .byte 0
