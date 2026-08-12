@@ -2199,6 +2199,33 @@
           Command64 `0.4.1.2663`, dispatched via PETSCII `$A4` underscores,
           197/197 dots with zero `F`s, `CASM OPCODES: PASS`, normal
           `C64[8]:>` return, no recovery. Production CASM unchanged.
+    - [x] Increment 5 complete 2026-08-12: added `casmopall.s` (one legal
+          statement per the Increment 1 oracle's 151 tuples, same row order,
+          `.ORG $C000`, `$12`/`$1234` representative operands, all eight
+          branches targeting a same-numbered `TGnn` label placed immediately
+          after their own instruction so every displacement is mechanically
+          `$00`) via a new block in `GenerateCasmTestFixtures.cmake`, and its
+          independently authored `tests/fixtures/casm/casmopall.ref.hex`
+          (opcode+length transcribed mechanically from the frozen oracle,
+          NOT from `opcodes.s`; full 151-row per-statement offset manifest
+          using native `COMP`'s own 24-bit file-offset space so a mismatch
+          localizes directly; self-validated through
+          `hex_manifest_to_bin.py`, 323 bytes, sha256 recorded in the
+          manifest). Added the dedicated self-bootable `casm_opcode_test_d64`
+          (`command64`, `casm`, `comp`, `test_casm_opcodes`, `casmopall.s`,
+          `casmopall.ref`) without touching `test.d64` or
+          `casm_listing_test_d64` (`casmopall`/`casmbig1` both excluded from
+          the generic `CASM_REF_NAMES` -> `test.d64` loop). `image_d64`
+          rebuilt unchanged at 334 blocks free / build `1265`; CASM version
+          unchanged. Live VICE 3.10: attached `casm_opcode_test.d64` to unit
+          8 under an already-resident Command64 `0.4.1.2663` (no autostart),
+          ran `casm casmopall.s /s /o:opall.prg` -> `CASM: INPUT VALIDATED`,
+          then `comp opall.prg casmopall.ref` -> `FILES COMPARE OK`, both
+          returning to `C64[8]:>`; `opall.prg` and `casmopall.ref` both 2
+          blocks on disk. Proves the native assemble-then-COMP round trip
+          byte-for-byte for all 151 legal combinations end to end. Requesting
+          user review before Increment 6 (numeric/addressing/branch/PC
+          boundaries) activates.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
