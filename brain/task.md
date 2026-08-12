@@ -2154,6 +2154,18 @@
           151/151/151 one-to-one mask-bit/opcode-byte correspondence proven.
           No production defect found; no production, fixture, or build-system
           change.
+    - [/] Increment 2 implementation/verification complete 2026-08-12, awaiting
+          user approval. Inventoried existing evidence across all 8 required
+          boundary domains at
+          `brain/reviews/2026-08-12-casm-phase11-wp60-increment2-boundary-register.md`:
+          52 required rows, 13 reuse, 9 strengthen, 30 add. Several `add`/
+          `strengthen` gaps are pre-generated `.seq` fixtures with correct
+          boundary values that were never wired to an automated in-code
+          assertion (manual-VICE-only, one -- `brrng1` -- with a documented
+          historical wrong-reason pass). Flagged a plan-text correction: the
+          VMM window-transfer chunk boundary is actually 64/65 bytes
+          (`CASM_VMM_BUFFER_SIZE`), not the plan's literal 255/256. No
+          production, fixture, or build-system change.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

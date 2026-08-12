@@ -1611,6 +1611,12 @@ behavior changed beyond the version/build artifact itself.
       `opcodeRunOffset`, `opcodeBytes`, and `modeLength`, with the
       151/151/151 one-to-one mask-bit/opcode-byte correspondence proven. No
       production defect found; no production or fixture change.
+- [/] WP60 Increment 2 complete 2026-08-12, awaiting user approval: inventoried
+      existing evidence across all 8 required boundary domains (52 rows: 13
+      reuse, 9 strengthen, 30 add). Several gaps are pre-generated `.seq`
+      fixtures never wired to an automated assertion. Flagged a plan-text
+      correction: VMM window-transfer chunk boundary is 64/65 bytes, not
+      255/256. No production or fixture change.
 - [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
