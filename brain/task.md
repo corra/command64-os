@@ -2177,6 +2177,28 @@
           change; CASM remains `0.2.1`. Hardens an implicit invariant (the
           existing first `OS_API` call already clears decimal incidentally)
           rather than fixing a reproduced live bug.
+    - [x] Increment 4 complete 2026-08-12: added `test_casm_opcodes`, a
+          direct matcher harness linking only `opcodes.s` (no parser/emit/
+          VMM/file ownership); `CasmParserStmt` declared and fed directly,
+          `diagSetLocFromStmt` stubbed locally. 151 legal-tuple cases (from
+          the Increment 1 oracle) plus 46 focused cases (unsupported-mode
+          rejection; 8-bit range accept/reject at `$00`/`$FF`/`$0100`;
+          ZP/Absolute selection at `$00`/`$FF`/`$0100`/`$FFFF`; `FORCE_ABS`
+          zero-page-shrink prevention; independent ZP,X/ZP,Y promotion incl.
+          the LDX/STX/LDY/STY X<->Y role swap; all eight branches resolving
+          to Relative with unconstrained 16-bit targets; Implied/Accumulator
+          distinctness) = 197 cases. Each asserts opcode/mode/length or
+          diagnostic, A/carry, `CasmParserStmt` byte-for-byte preservation,
+          stack balance, and (legal tuples only) a 151-bit coverage bitmap
+          with duplicate/missing detection. Compile-time asserts freeze 56
+          mnemonics, 13 modes, 151 tuples, and the 10-byte case record.
+          Build 1000: 3145 code bytes, 107 relocations, 3367-byte PRG (well
+          under `$1400`); no-change rebuild stable. `test.d64`'s directory
+          track is full, so the harness joins `casm_listing_test_d64`
+          instead; both disk targets build clean. Live VICE 3.10: booted
+          Command64 `0.4.1.2663`, dispatched via PETSCII `$A4` underscores,
+          197/197 dots with zero `F`s, `CASM OPCODES: PASS`, normal
+          `C64[8]:>` return, no recovery. Production CASM unchanged.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

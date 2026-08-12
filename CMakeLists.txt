@@ -456,6 +456,17 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_opcodes")
+            # WP60 Increment 4: direct 151-tuple matcher harness. Links only
+            # opcodes.s -- no parser.s/emit.s/VMM/file ownership -- and
+            # supplies CasmParserStmt records directly (declared locally in
+            # the harness, matching casm_expr.s's/casm_symbols.s's own
+            # precedent for a symbol opcodes.s only .imports).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
         if(TEST_NAME STREQUAL "casm_faultinject")
             # WP57 fault-injection design-spike prototype (WP58: refactored
             # onto the shared tests/src/casm_faultinject/faultstub.inc
@@ -1198,6 +1209,10 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_finc)
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flist)
 # WP59 Increment 6's split metadata fixture shares the listing-only disk.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flmeta)
+# WP60 Increment 4's direct opcode matcher is self-contained (no VMM/file
+# ownership) and test.d64's directory track is full; join the listing-only
+# disk for the same "self-contained, ample room" reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_opcodes)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1553,11 +1568,13 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # WP58 Increment 4's test_casm_finc and WP59's test_casm_flist/test_casm_flmeta
 # join here for the same "self-contained, ample room" reason. Their first 16
 # D64 name characters are distinct, preserving truncation collision safety.
+# WP60 Increment 4's test_casm_opcodes joins for the same reason; its
+# truncated name "test_casm_opcode" (16 chars) is also distinct.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

@@ -1622,6 +1622,16 @@ behavior changed beyond the version/build artifact itself.
       18580 -> 18581 (exactly +1), relocations unchanged at 2806; no-change
       rebuild stable; `image_d64` builds clean at the unchanged 334-block
       baseline. No BSS/zero-page/ABI change; CASM remains `0.2.1`.
+- [x] WP60 Increment 4 complete 2026-08-12: `test_casm_opcodes` direct
+      matcher harness (opcodes.s only) with 151 legal-tuple cases plus 46
+      focused cases (unsupported modes, 8-bit range, ZP/Absolute selection,
+      FORCE_ABS, ZP,X/ZP,Y independence incl. the LDX/STX/LDY/STY role swap,
+      all eight branches, Implied/Accumulator distinctness) = 197 cases, each
+      asserting opcode/mode/length or diagnostic, A/carry, statement
+      preservation, stack balance, and (legal tuples) a 151-bit coverage
+      bitmap. Joined `casm_listing_test_d64` (test.d64 directory full); both
+      disk targets build clean. Live VICE: 197/197 pass, `CASM OPCODES:
+      PASS`, normal `C64[8]:>` return. Production CASM unchanged.
 - [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
