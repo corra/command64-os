@@ -743,6 +743,19 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_bounds")
+            # WP60 Increment 6: Relative Branch/Program Counter boundary
+            # harness. Links only emit.s -- no lexer.s/parser.s/source.s --
+            # and supplies CasmParserStmt/CasmInsn records directly, plus
+            # local no-op stand-ins for emit.s's lexer/diagnostics/reloc/
+            # listing/file imports (see the harness's own header for why
+            # each is never actually reached by any case here). Matches
+            # casm_opcodes.s's own narrow-link precedent for Increment 4.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
@@ -1213,6 +1226,10 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flmeta)
 # ownership) and test.d64's directory track is full; join the listing-only
 # disk for the same "self-contained, ample room" reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_opcodes)
+# WP60 Increment 6's Relative Branch/PC boundary harness is self-contained
+# (no VMM/file ownership; emit.s stubbed to no-ops for everything it does
+# not reach) for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_bounds)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1571,11 +1588,13 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # D64 name characters are distinct, preserving truncation collision safety.
 # WP60 Increment 4's test_casm_opcodes joins for the same reason; its
 # truncated name "test_casm_opcode" (16 chars) is also distinct.
+# WP60 Increment 6's test_casm_bounds joins for the same reason; its
+# truncated name "test_casm_bounds" (16 chars) is also distinct from both.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

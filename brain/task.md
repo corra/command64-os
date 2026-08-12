@@ -2226,6 +2226,63 @@
           byte-for-byte for all 151 legal combinations end to end. Requesting
           user review before Increment 6 (numeric/addressing/branch/PC
           boundaries) activates.
+    - [x] Increment 6 complete 2026-08-12: Numeric Literal domain (4 new
+          `casm_expr.s` cases: bare `$00FF`/`$0100` isolated from their
+          prior addend-only context, `$10000` proving
+          `exprParseNumeric`'s own digit-accumulation overflow ->
+          `CASM_DIAG_OPERAND_OUT_OF_RANGE` distinct from the existing
+          `sOver`/`sUnder` *expression*-overflow cases, and a bare
+          `CASM_NUMBER_BINARY` literal (`%11111111`) never previously
+          exercised by this harness); `CASE_COUNT` 34 -> 38, build 1038.
+          Addressing Width's other two required rows (ZP/Absolute
+          crossover, 8-bit-mode rejection) are satisfied retroactively by
+          Increment 4's `test_casm_opcodes` focused cases, committed before
+          this register row was reconciled -- re-classified `add`/`add` ->
+          `reuse`, flagged here rather than silently assumed; its third row
+          (`FORCE_ABS` stability across a genuine second measure/emit pass)
+          remains open, deferred to a follow-up (single-pass `FORCE_ABS`
+          shrink-prevention is already covered by Increment 4).
+          Relative Branch (7/7) and Program Counter (5/5) domains: new
+          `tests/src/casm_bounds/casm_bounds.s`, linking only `emit.s` (no
+          lexer/parser/source), driving `emitInstruction`/`emitDirective`
+          directly via hand-built `CasmParserStmt`/`CasmInsn` records --
+          proves displacement COMPUTATION/range-checking, a different
+          production routine than Increment 4's mode-SELECTION-only
+          matcher. Branch targets independently reconciled against
+          `nextPc=CasmPc(after opcode)+1`, matching Phase 4/6's own
+          `casmbrp1`/`brn1`/`brp2`/`brn2` literals at their two shared
+          boundaries. Caught and fixed two false-result bugs before this
+          harness could be trusted: (1) `CasmOutputStarted`/`CasmPcOverflow`
+          are private to `emit.s` (not `.export`ed) -- this harness's own
+          same-named BSS bytes were disconnected shadows, never written by
+          real code, and one (`CasmPcOverflow`) read back *accidentally
+          nonzero* uninitialized RAM, producing a false PASS on the wrap-
+          endpoint and PC-end-at-`$FFFF` cases before a temporary per-case
+          marker (later removed) proved a genuine count/labeling
+          discrepancy and traced it to this; fixed by dropping those three
+          assertions in favor of only genuinely observable shared state
+          (`CasmPc`, and `pcRejectOverflow`'s indirect proof via the next
+          write's own returned diagnostic). (2) the repeat-reset case
+          depends on `CasmCliOptions` genuinely reading 0 (not static) to
+          observe `emitInit`'s real default-origin priming -- BSS is not
+          guaranteed zeroed on load, so it is now zeroed explicitly in
+          `start:` rather than trusted to `.res`. `test_casm_expr` build
+          1038, `test_casm_bounds` build 1004 (3145 -> then settling at
+          1352 code bytes, 215 relocations). Neither disk-space-limited;
+          `test_casm_bounds` joins `casm_listing_test_d64` (test.d64's
+          directory track already full, matching Increment 4's own
+          `test_casm_opcodes` precedent); `image_d64`/full build unaffected,
+          no production change. Live VICE 3.10: `test_casm_expr` on
+          `test.d64` -> `CASM EXPR: PASS` (38/38); `test_casm_bounds` on
+          `casm_listing_test.d64` -> `CASM BOUNDS: PASS` (12/12), both
+          returning to `C64[8]:>`. Underscore program names required
+          PETSCII `$A4` via `vice_keyboard_petscii`, not literal ASCII `_`
+          via `vice_keyboard_type` (matches
+          `reference_vice_shell_underscore_petscii` memory) -- the first
+          attempt at each dispatch mistyped this and hit `BAD COMMAND OR
+          FILE NAME`/`FILE NOT FOUND`, corrected on retry. Requesting user
+          review before Increment 7 (source/symbol/VMM/relocation
+          boundaries) activates.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
