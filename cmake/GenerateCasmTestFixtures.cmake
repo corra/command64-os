@@ -17,6 +17,15 @@ file(WRITE "${OUTPUT_DIR}/casmshort.seq"
     "    JMP START_LABEL\n"
 )
 
+# WP60 Increment 7: Source domain boundary fixture. casmsrc1 is the
+# minimum non-empty source, one byte with no terminator at all before EOF.
+# A true zero-byte companion (casmsrc0) was attempted and dropped: cc1541
+# refuses to write an empty SEQ entry at all ("Unexpected filesize when
+# reading casmsrc0.seq"), so the empty-source-file boundary row remains
+# unproven through this fixture pipeline -- deferred, not silently assumed
+# equivalent to the one-byte case.
+file(WRITE "${OUTPUT_DIR}/casmsrc1.seq" "Z")
+
 string(REPEAT "A" 256 CASM_EXACT_BLOCK)
 file(WRITE "${OUTPUT_DIR}/casm256.seq" "${CASM_EXACT_BLOCK}")
 

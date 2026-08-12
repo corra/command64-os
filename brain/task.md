@@ -2283,6 +2283,79 @@
           FILE NAME`/`FILE NOT FOUND`, corrected on retry. Requesting user
           review before Increment 7 (source/symbol/VMM/relocation
           boundaries) activates.
+    - [x] Increment 7 complete 2026-08-12. **Symbol domain** (`casm_symbols.s`,
+          4 new fresh-table cases after `symfull1`): name length 1
+          (`symlenmin1`); values `$0000`/`$FFFF` (`symvalzero1`/
+          `symvalmax1`, RESOLVED-flag checked independent of the value
+          bytes); 511 symbols isolated as its own checkpoint
+          (`sym511boundary1`, asserting the 511th insert's own returned
+          record index is exactly 510). Name length 0/32 not added:
+          `symbolsInsert` trusts nameLen as an unenforced 1..31
+          precondition (confirmed by source trace) -- 0 is structurally
+          unreachable from the real lexer, and 32 is `lexer.s`'s own
+          `CASM_DIAG_TOKEN_TOO_LONG` boundary, a different module than this
+          harness links; both remain open, not silently assumed covered.
+          **Relocation domain** (`casm_reloc.s`, 3 new fixtures plus a
+          `fileWrite` stub upgrade from discard-everything to capturing
+          the most recent call's bytes): empty-table R6 footer
+          (`relocempty1`, count=0 verified byte-for-byte); offset `$FFFF`
+          via `CasmPc=CASM_DEFAULT_ORIGIN-1`'s unsigned-subtraction wrap
+          (`relocoffmax1`); full 4096-entry table with distinct per-entry
+          offsets (unlike `relocfull1`'s static-offset fill), footer
+          count=4096 verified, and a `vmmWindowRead` re-read of the table's
+          own last 6 bytes (entries 4093-4095) near its full 8192-byte
+          extent (`relocfinalize4096_1`). **VMM domain** (`casm_vmm.s`):
+          `vmmoffset1` strengthened in place with a `REC_PAGES==16`
+          assertion and a diagnostic-code compare on its existing
+          one-past-window rejection; new `vmmlastbyte1` (real byte-pattern
+          round-trip at offset 65535, not just carry-clear); new
+          `vmmpage1` (isolated literal `4095` accept / `4096` reject with
+          diagnostic compare, one granted page); new `vmmchunk1` (the real
+          single-call transfer cap is `CASM_VMM_BUFFER_SIZE`=64 bytes, not
+          the plan's literal "255/256" -- confirmed via `vwPrepareTransfer`
+          source trace, matching Increment 2's own flagged correction for
+          this same domain; 64 accepted, 65 rejected with diagnostic
+          compare). **Source domain** (`casm_spanread.s`, extended with a
+          parameterized `loadNamedFixture` alongside the untouched original
+          `loadFixture`): 5 new cases wiring previously-unwired real
+          fixtures to genuine `sourceNextByte` assertions --
+          `srcCr1`/`srcCrlf1` (CR-only and CRLF both collapse to one
+          NEWLINE, identical expected sequence proving the collapse),
+          `srcBlank1` (consecutive LFs each produce their own NEWLINE),
+          `srcFinCr1` (trailing lone CR resolves as a newline before EOF),
+          `srcSplit1` (255-byte run + CRLF straddling the real 256-byte
+          source refill-chunk boundary, proving the pending-CR latch
+          survives a refill). Two Source rows explicitly NOT closed, both
+          documented rather than silently dropped or faked:
+          - Empty source file: `cc1541` cannot write a zero-byte SEQ entry
+            at all (`ERROR: Unexpected filesize when reading
+            casmsrc0.seq`), confirmed live; no fixture-pipeline path to
+            this boundary today.
+          - One-byte source file: `srcOneByte1` (written, built, run) caught
+            a **real production defect**, independently reproducing and
+            precisely characterizing an already-suspected, never-resolved
+            issue -- WP51 Increment 9's own `fixEmpty` fixture comment in
+            `cmake/GenerateCasmTestFixtures.cmake` was deliberately widened
+            from 1 byte to 4 specifically to dodge "sourceLoad's
+            phantom-byte over-read... at an exactly-1-byte file," pending a
+            fix that never landed. Live evidence: after the fixture's real
+            `Z` byte, the next `sourceNextByte` call returns
+            `A=CASM_SOURCE_BYTE`, `CasmSourceResultByte=$00` (a spurious
+            phantom byte) instead of `CASM_SOURCE_EOF`. Per this plan's
+            stop conditions, no production fix is authorized without
+            root-cause analysis and explicit approval; the routine is left
+            in `casm_spanread.s`, deliberately not called from `start:`, as
+            a ready-to-activate regression test. **Recommend a dedicated
+            Taskwarrior item for this defect**, separate from WP60.
+          `test_casm_spanread`'s envelope grew `$2C00`->`$3000` (644
+          measured bytes). No production change. Live VICE 3.10 (all four
+          harnesses): `CASM SYMBOLS: PASS`, `CASM RELOC: PASS`,
+          `CASM VMM: PASS`, `CASM SPANREAD: PASS` (13/13, one case
+          withdrawn as above), all returning to `C64[8]:>`. Requesting
+          user review before Increment 8 (consolidated build/compatibility
+          verification) activates, and a decision on the phantom-byte
+          defect (separate task vs. folding root-cause+fix into a later
+          WP60 increment under explicit approval).
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

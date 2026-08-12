@@ -683,7 +683,12 @@ if(Ca65_FOUND)
             # WP53 increment 4: $2B00 -> $2C00 -- include.s's own diagnostics
             # dependency chain grew with listing.s's `.LST` additions;
             # $2B00 overflowed by 53 measured bytes.
-            set(TEST_PRG_SIZE "2C00")
+            # WP60 Increment 7: $2C00 -> $3000 -- the new Source-domain
+            # cases (loadNamedFixture plus seven new fixtures' worth of
+            # expectByte/expectNewline/expectEof call sites) overflowed
+            # $2C00 by 644 measured bytes; $3000 (+1024) is the smallest
+            # round-page step that fits.
+            set(TEST_PRG_SIZE "3000")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -1606,6 +1611,26 @@ foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
             -w "${CASM_TEST_FIXTURE_DIR}/${CASM_LISTCAP_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
         COMMENT "Appending WP51 Increment 6 fixture ${CASM_LISTCAP_FIXTURE} to casm_listing_test.d64"
+        VERBATIM
+    )
+endforeach()
+
+# WP60 Increment 7: casm_spanread's own real-disk-fixture precedent (its
+# existing CASMLC02 dependency, packaged the same way above) extended with
+# Source-domain boundary fixtures. casmsrc1 is new (one-byte source);
+# casmcr/casmcrlf/casmblank/casmfincr/casmsplit already exist in
+# CASM_TEST_FIXTURE_DIR for test.d64's own WP5/WP6 fixtures -- bare
+# lowercase names here package a second copy onto this disk so
+# test_casm_spanread (which lives here, not on test.d64) can sourceLoad
+# them from its own attached device. No casmsrc0 (true empty file): cc1541
+# cannot write a zero-byte SEQ entry at all, see GenerateCasmTestFixtures.cmake.
+foreach(CASM_SRCBOUND_FIXTURE casmsrc1 casmcr casmcrlf casmblank casmfincr casmsplit)
+    add_custom_command(
+        TARGET casm_listing_test_d64 POST_BUILD
+        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_SRCBOUND_FIXTURE}" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${CASM_SRCBOUND_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        COMMENT "Appending WP60 Increment 7 fixture ${CASM_SRCBOUND_FIXTURE} to casm_listing_test.d64"
         VERBATIM
     )
 endforeach()

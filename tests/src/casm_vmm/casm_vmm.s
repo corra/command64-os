@@ -77,6 +77,12 @@ start:
     jsr reportCase
     jsr vmmbounds1
     jsr reportCase
+    jsr vmmlastbyte1
+    jsr reportCase
+    jsr vmmpage1
+    jsr reportCase
+    jsr vmmchunk1
+    jsr reportCase
     jsr vmmfree1
     jsr reportCase
 
@@ -398,6 +404,20 @@ vmmoffset1:
 :
     stx SavedSlot
 
+    ; WP60 Increment 7 (strengthen): the 65535-byte request must actually
+    ; grant the full 16-page/65536-byte cap, not merely "some" size that
+    ; happens to let the two window checks below pass -- REC_PAGES==16 is
+    ; direct, positive evidence of the real granted extent, matching
+    ; vmmalloc1's own REC_PAGES==1 precedent for its much smaller request.
+    lda SavedSlot
+    asl
+    asl
+    tay
+    lda CasmVmmRegistry + CASM_VMM_REC_PAGES, y
+    cmp #16
+    beq :+
+    jmp vo1Fail
+:
     ldx SavedSlot
     lda #<65504
     sta CasmVmmOffLo
@@ -422,6 +442,12 @@ vmmoffset1:
     sta CasmIoLenHi
     jsr vmmWindowRead
     bcs :+
+    jmp vo1Fail
+:
+    ; WP60 Increment 7 (strengthen): confirm the specific diagnostic, not
+    ; merely "some" carry-set failure.
+    cmp #CASM_DIAG_VMM_TRANSFER_FAILED
+    beq :+
     jmp vo1Fail
 :
     ldx SavedSlot
@@ -471,6 +497,185 @@ vmmbounds1:
     clc
     rts
 vb1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; vmmlastbyte1
+; WP60 Increment 7 (strengthen): the true last byte of the full 65536-byte
+; cap (offset 65535) round-trips real, distinctive content -- vmmoffset1
+; only ever confirmed a window ending there succeeds (carry clear), never
+; that the byte actually written there is the byte actually read back.
+; ---------------------------------------------------------------------------
+vmmlastbyte1:
+    ldx #$FF
+    ldy #$FF
+    jsr vmmStoreAlloc
+    bcc :+
+    jmp vlb1Fail
+:
+    stx SavedSlot
+
+    lda #$A5                 ; distinctive, non-zero, non-$FF pattern byte
+    sta CasmVmmBuffer
+    ldx SavedSlot
+    lda #<65535
+    sta CasmVmmOffLo
+    lda #>65535
+    sta CasmVmmOffHi
+    lda #1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowWrite
+    bcc :+
+    jmp vlb1Fail
+:
+    lda #0
+    sta CasmVmmBuffer        ; clobber before read-back, so a no-op read can't accidentally "pass"
+    ldx SavedSlot
+    lda #<65535
+    sta CasmVmmOffLo
+    lda #>65535
+    sta CasmVmmOffHi
+    lda #1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp vlb1Fail
+:
+    lda CasmVmmBuffer
+    cmp #$A5
+    beq :+
+    jmp vlb1Fail
+:
+    ldx SavedSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp vlb1Fail
+:
+    clc
+    rts
+vlb1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; vmmpage1
+; WP60 Increment 7 (strengthen): the literal 4095/4096-byte page-edge
+; values, isolated -- vmmbounds1 above proves a within-16-bit-range but
+; beyond-granted-pages request is rejected, but its own offset/count
+; (4090+32) never touch 4095/4096 exactly. One granted page (4096 bytes,
+; offsets 0..4095): offset 4095 len 1 (the page's own last byte, sum=4096
+; exactly divisible, needs 1 page) must succeed; offset 4096 len 1 (sum=
+; 4097, needs 2 pages) must fail with the specific diagnostic.
+; ---------------------------------------------------------------------------
+vmmpage1:
+    ldx #32
+    ldy #0
+    jsr vmmStoreAlloc
+    bcc :+
+    jmp vp1Fail
+:
+    stx SavedSlot
+
+    ldx SavedSlot
+    lda #<4095
+    sta CasmVmmOffLo
+    lda #>4095
+    sta CasmVmmOffHi
+    lda #1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp vp1Fail
+:
+    ldx SavedSlot
+    lda #<4096
+    sta CasmVmmOffLo
+    lda #>4096
+    sta CasmVmmOffHi
+    lda #1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcs :+
+    jmp vp1Fail
+:
+    cmp #CASM_DIAG_VMM_TRANSFER_FAILED
+    beq :+
+    jmp vp1Fail
+:
+    ldx SavedSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp vp1Fail
+:
+    clc
+    rts
+vp1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; vmmchunk1
+; WP60 Increment 7 (add): the window-transfer single-call chunk-size cap
+; (CASM_VMM_BUFFER_SIZE, 64 bytes -- the real boundary; see the Increment 2
+; register's own correction, this is a distinct layer from source.s's own
+; 256-byte read-chunk size). 64 bytes accepted (fills CasmVmmBuffer
+; exactly); 65 bytes rejected with the specific diagnostic, before any OS
+; call (vwPrepareTransfer's own length gate).
+; ---------------------------------------------------------------------------
+vmmchunk1:
+    ldx #<128
+    ldy #>128
+    jsr vmmStoreAlloc
+    bcc :+
+    jmp vc1Fail
+:
+    stx SavedSlot
+
+    ldx SavedSlot
+    lda #0
+    sta CasmVmmOffLo
+    sta CasmVmmOffHi
+    lda #CASM_VMM_BUFFER_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp vc1Fail
+:
+    ldx SavedSlot
+    lda #0
+    sta CasmVmmOffLo
+    sta CasmVmmOffHi
+    lda #CASM_VMM_BUFFER_SIZE + 1
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcs :+
+    jmp vc1Fail
+:
+    cmp #CASM_DIAG_VMM_TRANSFER_FAILED
+    beq :+
+    jmp vc1Fail
+:
+    ldx SavedSlot
+    jsr vmmStoreFree
+    bcc :+
+    jmp vc1Fail
+:
+    clc
+    rts
+vc1Fail:
     sec
     rts
 
