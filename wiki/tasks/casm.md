@@ -1617,6 +1617,11 @@ behavior changed beyond the version/build artifact itself.
       fixtures never wired to an automated assertion. Flagged a plan-text
       correction: VMM window-transfer chunk boundary is 64/65 bytes, not
       255/256. No production or fixture change.
+- [x] WP60 Increment 3 complete 2026-08-12: added `CLD` as the literal first
+      instruction at `casm.s`'s `start:` entry point. Build 1265: code bytes
+      18580 -> 18581 (exactly +1), relocations unchanged at 2806; no-change
+      rebuild stable; `image_d64` builds clean at the unchanged 334-block
+      baseline. No BSS/zero-page/ABI change; CASM remains `0.2.1`.
 - [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

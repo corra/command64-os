@@ -2166,6 +2166,17 @@
           VMM window-transfer chunk boundary is actually 64/65 bytes
           (`CASM_VMM_BUFFER_SIZE`), not the plan's literal 255/256. No
           production, fixture, or build-system change.
+    - [x] Increment 3 complete 2026-08-12: added `CLD` as the literal first
+          instruction at `start:` in `casm.s`, before `diagClearLoc` and
+          every other init. `casm.s` is the linker entry object
+          (`CASM_ENTRY`), confirmed by source trace to be the true load-time
+          entry point. Build 1265: code bytes 18580 -> 18581 (exactly +1, the
+          `CLD` opcode byte), relocations unchanged at 2806, base unchanged
+          at `$3800`; no-change rebuild stable at 1265. `image_d64` builds
+          clean, 334 blocks free (unchanged baseline). No BSS/zero-page/ABI
+          change; CASM remains `0.2.1`. Hardens an implicit invariant (the
+          existing first `OS_API` call already clears decimal incidentally)
+          rather than fixing a reproduced live bug.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

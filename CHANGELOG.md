@@ -68,6 +68,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `G`/`T`/`P`'s optional `=` prefix. Added the missing lines (+123 code
   bytes, build 1128).
 
+### Changed
+
+- **CASM entry-point decimal-mode hardening (Phase 11 WP60 Increment 3)**:
+  `casm.s`'s `start:` now begins with `CLD`, before any other initialization.
+  CASM has no supported decimal-mode entry contract, and the first `OS_API`
+  call already clears decimal incidentally, so this closes an implicit
+  ordering invariant rather than fixing a reproduced live bug. Adds exactly
+  one code byte (build 1265: 18580 -> 18581); no BSS, zero-page, or ABI
+  change.
+
 ### Fixed
 
 - **CASM fault-stub NMOS indirect-JMP boundary hazard (Phase 11 WP59 Increment
