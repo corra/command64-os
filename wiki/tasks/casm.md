@@ -1581,15 +1581,15 @@ behavior changed beyond the version/build artifact itself.
       1012 passes 23/23 live in VICE, returns to `C64[8]:>`, and leaves 71
       listing-disk blocks free. No production source or valid map bytes changed.
 - [x] WP59 Increment 8 user-approved 2026-08-11: static ownership, shared-scratch, BSS initialization,
-      exported-state, local-header, and DOX audit complete, awaiting user
-      approval. No defect found: no private ZP, unsafe scratch lifetime,
+      exported-state, local-header, and DOX audit complete. No defect found: no
+      private ZP, unsafe scratch lifetime,
       uninitialized load-bearing BSS, or ownership disagreement. Stale pre-WP54
       comments corrected without executable/ABI/storage/output change. CASM
       build 1263 and map harness build 1013 retain prior code/relocation sizes;
       no-change rebuilds stable.
-- [/] WP59 Increment 9: consolidated builds, artifacts, regressions, WP58
-      compatibility, and production `/M`/`/L` live verification complete,
-      awaiting user approval. Full and image builds plus no-change rebuild pass;
+- [x] WP59 Increment 9 user-approved 2026-08-11: consolidated builds, artifacts,
+      regressions, WP58 compatibility, and production `/M`/`/L` live
+      verification complete. Full and image builds plus no-change rebuild pass;
       a shared-fixture NMOS indirect-JMP page-boundary hazard was replaced by a
       patched absolute JMP with no production impact. Live WP58/listing/metadata
       regressions pass 8/8, 41/41, and 9/9; the final map image remains 23/23.
@@ -1601,7 +1601,17 @@ behavior changed beyond the version/build artifact itself.
       CASM advanced to `0.2.1.1264`; the PRG differs from `0.2.0.1263` only at
       the stage and build banner bytes. A second image build is stable, and the
       live `0.2.1.1264` banner returns to `C64[8]:>`. WP59 is complete.
-- [ ] WP60-WP63: remain separately gated and require dedicated approved plans.
+- [/] WP60 `bd441121-dffa-4d69-8f3a-8572e0643322`: opcode, addressing, and
+      boundary hardening. Detailed ten-increment plan approved 2026-08-12 at
+      `brain/plans/2026-08-11-casm-phase11-wp60-opcode-addressing-boundary-hardening.md`;
+      Increment 1 (exhaustive opcode oracle) activated.
+- [/] WP60 Increment 1 complete 2026-08-12, awaiting user approval: all 151
+      legal NMOS 6502/6510 tuples independently frozen and mechanically
+      reconciled byte-for-byte against `opcodes.s`'s `opcodeMaskLo/Hi`,
+      `opcodeRunOffset`, `opcodeBytes`, and `modeLength`, with the
+      151/151/151 one-to-one mask-bit/opcode-byte correspondence proven. No
+      production defect found; no production or fixture change.
+- [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
 

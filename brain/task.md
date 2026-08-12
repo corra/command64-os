@@ -2113,7 +2113,7 @@
       legacy export and remains documented/retained to avoid an ABI change.
       Comment-driven CASM 1263/map 1013 rebuilds preserve 18,580/4,036 code
       bytes and 2,806/625 relocations; no-change rebuilds stable; disk 71 free.
-    - [/] Increment 9 active: consolidated narrow/full builds, PRG/R6 and
+    - [x] Increment 9 user-approved 2026-08-11: consolidated narrow/full builds, PRG/R6 and
       no-change stability, listing/map regressions, affected WP58 compatibility,
       production `/M`/`/L`/combined smoke paths, shell return, and artifact
       comparisons.
@@ -2135,7 +2135,26 @@
       only at the stage and build banner bytes. The second image build retained
       build 1264 and the same PRG hash; the live banner and shell return pass.
       **WP59 complete.**
-  - WP60-WP63 remain unplanned in detail, per this project's
+  - [/] Taskwarrior (`bd441121-dffa-4d69-8f3a-8572e0643322`): WP60 opcode,
+        addressing, and boundary hardening
+    - Plan:
+      `brain/plans/2026-08-11-casm-phase11-wp60-opcode-addressing-boundary-hardening.md`
+    - User approved the ten-increment plan 2026-08-12 and activated Increment 1
+      only; each later increment remains separately gated by the preceding
+      increment's review. Taskwarrior child created dependent on completed
+      WP59 (`4a1fab7c-28af-4404-af39-6f283b552e55`).
+    - [/] Increment 1 implementation/verification complete 2026-08-12, awaiting
+          user approval. Froze all 151 legal NMOS 6502/6510 tuples
+          independently at
+          `brain/reviews/2026-08-12-casm-phase11-wp60-increment1-opcode-oracle.md`,
+          mapped each to its parser `OpKind`/selection condition and a
+          representative fixture statement, and mechanically reconciled the
+          oracle against `opcodes.s`'s `opcodeMaskLo/Hi`, `opcodeRunOffset`,
+          `opcodeBytes`, and `modeLength` -- exact match on all five tables,
+          151/151/151 one-to-one mask-bit/opcode-byte correspondence proven.
+          No production defect found; no production, fixture, or build-system
+          change.
+  - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
 # Deferred Optional Work
