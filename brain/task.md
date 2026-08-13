@@ -2563,6 +2563,27 @@
           mask the separately-tracked phantom-EOF-byte defect. No
           production defect/change. Closes WP60's residual source-extent
           item.
+    - [x] Increment 7 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment7-consolidated-verification.md`.
+          First full unrestricted rebuild failed (`Dir track full` on
+          `test_image_d64`): Increment 4 added `casmfa2p` to
+          `CASM_REF_NAMES` without extending the existing
+          `casmbig1`/`casmopall` test.d64-exclusion list to cover it,
+          overflowing the already-full 144-entry directory. Fixed by
+          adding `casmfa2p` to that exclusion list (its source also lives
+          only on `casm_opcode_test_d64`) -- a build-system-only fix, no
+          production impact, found only because this increment finally ran
+          a full unrestricted build. After the fix: clean full build,
+          no-change rebuild stable at 1266/unchanged hash, `test.d64`
+          re-confirmed at exactly 144/144 content-identical to the WP60
+          baseline, `casm.prg` independently re-derived as byte-identical
+          (18581 bytes/2806 relocations) -- zero production change through
+          Increment 6. Live VICE re-ran the full changed set from the
+          clean rebuild: `test_casm_opcode` (197/197),
+          `casmopall.s`/`casmreloc1.s`/`casmfa2p.s` each vs their `.ref`
+          (`FILES COMPARE OK` all three), `test_casm_lexer` (2/2), and the
+          source-extent reject case (`SOURCE OFFSET OVERFLOW`, no partial
+          output) -- all clean shell returns.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

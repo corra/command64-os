@@ -1947,9 +1947,12 @@ add_custom_command(
 # casm_overflow_test_d64 (disk-space reasons above), so its reference PRG is
 # appended there instead, not here. WP60 Increment 5's casmopall is excluded
 # for the same reason: its matching casmopall.s source lives only on the new
-# dedicated casm_opcode_test_d64 (see that target below), not test.d64.
+# dedicated casm_opcode_test_d64 (see that target below), not test.d64. WP61
+# Increment 4's casmfa2p is excluded for the same reason: its matching
+# casmfa2p.s source also lives only on casm_opcode_test_d64, and test.d64's
+# directory track is already full (144/144) with no room for a new entry.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
-    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall")
+    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p")
         add_custom_command(
             TARGET test_image_d64 POST_BUILD
             COMMAND "${CC1541_EXECUTABLE}" -f "${REF_NAME}.ref" -T PRG
