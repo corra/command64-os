@@ -30,7 +30,9 @@
   reproduced a real, previously-suspected one-byte-source phantom-EOF-byte
   defect in `sourceLoad`/`sourceNextByte` (`tests/src/casm_spanread`'s
   `srcOneByte1`, deliberately not activated), tracked separately as
-  Taskwarrior task 42, not folded into WP60. Version bump from `0.2.1` to
+  Taskwarrior UUID `882433f0-cde1-4849-8b3c-df32613518c3`, not folded into
+  WP60 (numeric task IDs are unstable across sessions as tasks complete --
+  cite the UUID). Version bump from `0.2.1` to
   `0.2.2` changed exactly 2 banner bytes; build counter 1265 -> 1266;
   `image_d64` unchanged at 334 blocks free. Full record in
   `brain/task.md`'s WP60 entry and

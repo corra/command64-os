@@ -1681,9 +1681,14 @@ behavior changed beyond the version/build artifact itself.
       `test_casm_opcode` (197/197) all pass under `0.2.2`, clean shell
       returns. Taskwarrior task 40 marked done. The 4 residual boundary
       items from Increment 9 and the separately tracked phantom-EOF-byte
-      defect (Taskwarrior task 42) remain open by design, not blocking this
-      completion. See `brain/task.md` for full detail.
-- [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
+      defect (Taskwarrior UUID `882433f0-cde1-4849-8b3c-df32613518c3`)
+      remain open by design, not blocking this completion. See
+      `brain/task.md` for full detail.
+- [/] WP61 `f6845310-bcce-4448-b5f2-0aa19a73723b`: determinism and remaining
+      boundary spot-checks. Nine-increment plan approved 2026-08-12 at
+      `brain/plans/2026-08-12-casm-phase11-wp61-determinism-and-boundary-spot-checks.md`;
+      Increment 1 (scope/spot-check register freeze) activated.
+- [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
 

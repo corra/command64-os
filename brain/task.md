@@ -2449,9 +2449,26 @@
           two-pass re-resolution; source 65,535/65,536-byte extent boundary;
           symbol name-length-32 rejection; empty-source-file tooling gap)
           and the separately tracked phantom-EOF-byte defect (Taskwarrior
-          task 42, `882433f0-cde1-4849-8b3c-df32613518c3`) remain open,
-          explicitly deferred rather than blocking this completion.
-  - WP61-WP63 remain unplanned in detail, per this project's
+          UUID `882433f0-cde1-4849-8b3c-df32613518c3`) remain open,
+          explicitly deferred rather than blocking this completion. (Note:
+          bare Taskwarrior numeric IDs are unstable across sessions as
+          tasks complete and free their ID for reuse -- this defect's ID
+          has since shifted from 42 to 41; cite the UUID.)
+  - [/] Taskwarrior (`f6845310-bcce-4448-b5f2-0aa19a73723b`): WP61
+        determinism and remaining boundary spot-checks
+    - Plan:
+      `brain/plans/2026-08-12-casm-phase11-wp61-determinism-and-boundary-spot-checks.md`
+    - User approved the nine-increment plan 2026-08-12 and activated
+      Increment 1 only; each later increment remains separately gated by
+      the preceding increment's review. Taskwarrior task created dependent
+      on completed WP60 (`bd441121-dffa-4d69-8f3a-8572e0643322`).
+    - Scope (user-confirmed 2026-08-12): determinism proof (PRG/R6/
+      listing/map self-compare) plus the 4 boundary items WP60 Increment 9
+      deferred (`FORCE_ABS` two-pass stability; source 65,535/65,536-byte
+      extent; symbol/token name-length-32; empty-source-file explicitly
+      re-scoped as a tooling gap, not carried forward again). The
+      phantom-EOF-byte defect stays out of scope, tracked separately.
+  - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
 # Deferred Optional Work
