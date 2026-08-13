@@ -1632,6 +1632,28 @@ behavior changed beyond the version/build artifact itself.
       bitmap. Joined `casm_listing_test_d64` (test.d64 directory full); both
       disk targets build clean. Live VICE: 197/197 pass, `CASM OPCODES:
       PASS`, normal `C64[8]:>` return. Production CASM unchanged.
+- [x] WP60 Increments 5-7 complete 2026-08-12: end-to-end 151-tuple
+      `casmopall.s`/`casmopall.ref` native `COMP` proof (Increment 5);
+      numeric/addressing/branch/PC boundary hardening via `test_casm_expr`
+      and a new `test_casm_bounds` harness (Increment 6); symbol/relocation/
+      VMM/source boundary hardening across `test_casm_symbols`,
+      `test_casm_reloc`, `test_casm_vmm`, and `test_casm_spanread`
+      (Increment 7). Increment 7 independently reproduced a real,
+      previously-suspected-but-unresolved one-byte-source phantom-EOF-byte
+      defect in `sourceLoad`/`sourceNextByte` (see `brain/task.md`); left as
+      a ready-to-activate regression case, not fixed under WP60. All
+      production CASM unchanged since Increment 3; see `brain/task.md` for
+      full detail.
+- [x] WP60 Increment 8 complete 2026-08-12: consolidated build and live-VICE
+      re-verification of everything Increments 3-7 introduced, after a full
+      clean/unrestricted rebuild. `casm.prg` re-confirmed byte-identical
+      (18581 code bytes, 2806 relocations, build `1265`) since Increment 3;
+      no-change rebuild stable; no disk-capacity overflow. Live VICE re-ran
+      the complete changed/affected harness set (opcodes, opcode-all COMP,
+      bounds, spanread, symbols, reloc, vmm) plus a production `/M /L`
+      smoke assembly, all PASS with clean shell returns. Record:
+      `brain/reviews/2026-08-12-casm-phase11-wp60-increment8-consolidated-verification.md`.
+      Requesting user review before Increment 9 activates.
 - [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
@@ -1647,6 +1669,30 @@ behavior changed beyond the version/build artifact itself.
   not replace Phase 10, Symbol Map and Listing.
 - A full implementation review is mandatory after automated verification and
   before runtime acceptance or merge.
+
+## Known Non-Critical Bugs
+
+- [ ] Taskwarrior `be8ca0bf-ac7c-40f6-960e-2ca816bc7fb8`: **listing output
+      shows a blank line between each row when printed to a real C64 screen.**
+      Root cause: `listing.s` (Phase 10 / WP51-WP53) correctly emits exactly
+      one trailing PETSCII CR per row after filling all 40 content columns
+      (`CASM_LISTING_ROW_WIDTH` / `CASM_LISTING_ROW_SIZE`, see
+      `src/external/casm/common.inc:1198-1201`) -- no double-CR is emitted
+      inside `listing.s` itself. The blank line is a downstream
+      exact-width-line + CR display artifact: any consumer that prints these
+      full-40-column rows via standard KERNAL CHROUT-style output gets an
+      auto-wrap advance at column 40 from the screen editor, then a second
+      advance from the explicit trailing CR. `diagnostics.s`'s caret/source-echo
+      window already documents and avoids this exact failure mode by capping
+      at 38 columns instead of 40 (`wiki/casm-programmers-reference.md:1013-1018`).
+      Not intentional spacing -- neither the WP51 nor WP53 design docs mention
+      deliberate blank-line spacing between listing rows. Fix candidates: cap
+      the screen-print path below 40 columns, suppress/account for KERNAL
+      auto-wrap when printing listing rows, or confirm whichever routine
+      displays `.LST` output to screen should not be raw-printing full-width
+      rows at all. Non-critical: does not affect `.LST` file content on disk,
+      only on-screen presentation. A dedicated plan must be written and
+      approved before any source edits begin, per this project's convention.
 
 ## Future Feature Backlog
 

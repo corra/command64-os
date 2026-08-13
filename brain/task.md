@@ -2356,6 +2356,44 @@
           verification) activates, and a decision on the phantom-byte
           defect (separate task vs. folding root-cause+fix into a later
           WP60 increment under explicit approval).
+    - [x] Increment 8 complete 2026-08-12: consolidated build and
+          compatibility verification, recorded at
+          `brain/reviews/2026-08-12-casm-phase11-wp60-increment8-consolidated-verification.md`.
+          Reconfigured and built narrowly (`casm`, `test_casm_opcodes`,
+          `test_casm_bounds`, `test_casm_expr`, `test_casm_reloc`,
+          `test_casm_symbols`, `test_casm_vmm`, `test_casm_spanread`,
+          `casm_opcode_test_d64`, `casm_listing_test_d64`,
+          `casm_overflow_test_d64`), then `image_d64`/`test_image_d64`, then
+          a full unrestricted build -- no target failed. No-change rebuild
+          left `BUILD_CASM` at `1265` with an identical hash. Independently
+          re-ran `tools/reloc.py` against fresh base/base+1-page casm links:
+          18581 code bytes, 2806 relocations, byte-identical to
+          `build/casm.prg` -- matches Increment 3 exactly, proving
+          Increments 4-7 never touched `casm.s` again. Inspected every
+          WP60-relevant disk's directory/block capacity: no overflow;
+          `image.d64` unchanged at 334 blocks free. Live VICE 3.10 re-ran
+          the full changed/affected set from scratch: `test_casm_opcode`
+          (197/197, `CASM OPCODES: PASS`), the `casmopall.s`/`casmopall.ref`
+          native `COMP` round trip (`FILES COMPARE OK`), `test_casm_bounds`
+          (`CASM BOUNDS: PASS`), `test_casm_spanre` (`CASM SPANREAD: PASS`),
+          `test_casm_symbol` (`CASM SYMBOLS: PASS`), `test_casm_reloc`
+          (`CASM RELOC: PASS`), `test_casm_vmm` (`CASM VMM: PASS`), and a
+          production `/M /L` smoke assembly of the real 151-statement
+          `casmopall.s` (`SYMBOL MAP` printed 8 branch-target symbols,
+          `CASM: INPUT VALIDATED`, `casmoml.prg`+`casmoml.lst` both
+          committed to disk) -- all returned cleanly to `C64[8]:>`. Two
+          harness-side issues surfaced and resolved without any production
+          or fixture change: dispatch typos (untruncated name; literal
+          ASCII `_` instead of PETSCII `$A4` via `vice_keyboard_petscii`,
+          matching `reference_vice_shell_underscore_petscii`), and a
+          disk-selection mistake targeting the directory-full `test.d64`
+          for the first `/M /L` smoke attempt, which correctly produced
+          `CASM: OUTPUT WRITE FAILED` / `Drive 8 status: 72, DISK FULL` --
+          a real product diagnostic, not a defect -- resolved by retrying on
+          `casm_opcode_test.d64`. No production defect found; no production,
+          fixture, or build-system change. Requesting user review before
+          Increment 9 (audit and walkthrough, record synchronization)
+          activates.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
