@@ -2547,6 +2547,22 @@
           (`CASM_DIAG_TOKEN_TOO_LONG`, length left at 31, unmodified). No
           production defect/change. Closes WP60's residual symbol/token
           name-length-32 item.
+    - [x] Increment 6 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment6-source-extent-closure.md`.
+          New `casmsrcmax.seq` (exactly 65,535 bytes: `.ORG $C000\n` + 16381
+          `NOP\n` lines, `string(REPEAT ...)`-generated for an exact byte
+          count) and `casmsrcbit.seq` (exactly 1 byte). Added `command64`
+          to `casm_include_test_d64` (previously casm/comp only) so both
+          join it directly bootable. Live VICE: `casm casmsrcmax.s` alone
+          (65,535 combined) -> `CASM: INPUT VALIDATED`, `xmax.prg`
+          committed; `casm casmsrcmax.s casmsrcbit.s` (65,536 combined) ->
+          `CASM: SOURCE OFFSET OVERFLOW` (`$15`), no location trailer
+          (matches the `casmmfovf1/2` precedent), no partial output
+          committed. Confirmed this fires in `sourceLoad`'s raw-streaming
+          `slCheckCap` phase, before any lexing -- does not exercise or
+          mask the separately-tracked phantom-EOF-byte defect. No
+          production defect/change. Closes WP60's residual source-extent
+          item.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

@@ -1576,15 +1576,38 @@ add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
 # casm_overflow_test.d64 had ~10 free blocks left (WP34's combined-cap pair
 # alone occupies 277), leaving no room for outputs, let alone a re-run.
 #
-# Carries casm.prg and comp.prg so the whole check runs from this one disk,
-# and nothing else -- roughly 590 blocks stay free for output PRGs.
+# Carries casm.prg and comp.prg so the whole check runs from this one disk.
+# WP61 Increment 6 adds command64 (48 blocks) so this disk becomes directly
+# bootable for its own new source-extent fixtures below, rather than
+# requiring a multi-drive setup -- ~540 blocks still stay free.
 add_c64_disk_image(casm_include_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp
+    PRGS command64 casm comp
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
+
+# WP61 Increment 6: source-extent boundary fixtures (65,535-byte accepted
+# combined extent / 65,536-byte first-reject). casmsrcmax.seq alone proves
+# accept; casmsrcmax.seq + casmsrcbit.seq together (combined 65,536 bytes)
+# proves reject via slCheckCap's own combined-multi-file cap (source.s:
+# 369-373), which fires during sourceLoad's raw disk-streaming phase --
+# before any lexing/sourceNextByte-driven consumption of either file's
+# content -- so this does not exercise the separately-tracked phantom-EOF-
+# byte defect (that bug is in later per-byte consumption of an already-
+# loaded exactly-1-byte source, a different code path).
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmsrcmax.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmsrcmax.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmsrcbit.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmsrcbit.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP61 Increment 6 casmsrcmax.s/casmsrcbit.s source-extent fixtures to casm_include_test.d64"
+    VERBATIM
+)
 
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64

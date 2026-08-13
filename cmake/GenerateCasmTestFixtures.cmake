@@ -750,6 +750,24 @@ string(REPEAT "A" 30000 CASM_MF_OVF2)
 file(WRITE "${OUTPUT_DIR}/casmmfovf1.seq" "${CASM_MF_OVF1}")
 file(WRITE "${OUTPUT_DIR}/casmmfovf2.seq" "${CASM_MF_OVF2}")
 
+# CASM Phase 11 WP61 Increment 6: exact source-extent boundary fixtures.
+# casmsrcmax.seq is valid CASM source (unlike casmmfovf1/2 above, which are
+# deliberately non-syntactic since they only need to overflow before
+# lexing) totaling exactly CASM_SOURCE_VMM_MAX_BYTES (65535) bytes, so it
+# alone proves the exact accepted extent with a real successful assembly:
+# ".ORG $C000\n" is 11 bytes; 16381 "NOP\n" lines (4 bytes each) is 65524
+# bytes; 11 + 65524 = 65535 exactly. casmsrcbit.seq is a single trivial
+# byte -- paired with casmsrcmax.seq as a second source file, the combined
+# total is exactly 65536, one byte past the cap, proving the reject
+# boundary via sourceLoad's combined-file slCheckCap (source.s:369-373)
+# without needing a second ~259-block fixture.
+string(REPEAT "NOP\n" 16381 CASM_SRCMAX_BODY)
+file(WRITE "${OUTPUT_DIR}/casmsrcmax.seq"
+    ".ORG \$C000\n"
+    "${CASM_SRCMAX_BODY}"
+)
+file(WRITE "${OUTPUT_DIR}/casmsrcbit.seq" "\n")
+
 # WP38 default relocatable origin fixtures. casmorg1.seq already exists
 # (Phase 4 WP13: "LDA #$01", no .ORG) and is reused unmodified here as the
 # primary positive case -- its expected outcome flips from the historical
