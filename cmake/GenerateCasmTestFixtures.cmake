@@ -505,6 +505,24 @@ file(WRITE "${OUTPUT_DIR}/p1back1.seq"
     "LDA LOOP\n"
 )
 
+# CASM Phase 11 WP61 Increment 4: FORCE_ABS end-to-end two-pass closure, the
+# opposite direction from p1back1 above. p1back1's LOOP is already defined
+# (backward reference) by the time "LDA LOOP" is measured, in one single
+# measure-pass unit case. This fixture instead forward-references TARGET --
+# undefined at the point "LDA TARGET" is first measured -- so Pass 1 must
+# size it as 3-byte absolute purely from CASM_EXPR_FLAG_SYMBOL_DERIVED
+# (parser.s:562-570), before TARGET's value is known at all, and Pass 2
+# must independently re-derive the same FORCE_ABS classification and commit
+# the same 3-byte absolute opcode to the real output file, even though
+# TARGET's resolved value ($0013) would fit zero-page if it were a literal.
+# Verified end-to-end via native COMP against casmfa2p.ref.hex, not a
+# hand-built single-pass unit case.
+file(WRITE "${OUTPUT_DIR}/casmfa2p.seq"
+    ".ORG \$0010\n"
+    "LDA TARGET\n"
+    "TARGET: NOP\n"
+)
+
 # Genuinely undefined symbol (GHOST is never defined anywhere in this file).
 # In CASM_PASS_MODE_MEASURE this must be tolerated, not a fixture failure:
 # LDA GHOST sizes as absolute (3 bytes, FORCE_ABS forces it regardless of the

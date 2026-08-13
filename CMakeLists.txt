@@ -1377,7 +1377,8 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmordhaz1
     casmrelop1 casmrelop2
     casmreloc1
-    casmopall)
+    casmopall
+    casmfa2p)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1752,6 +1753,21 @@ add_custom_command(
         -w "${CASM_REF_DIR}/casmreloc1.ref"
         "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
     COMMENT "Appending WP61 Increment 2 casmhello.s/casmreloc1.s determinism fixtures and casmreloc1's trusted reference to casm_opcode_test.d64"
+    VERBATIM
+)
+
+# WP61 Increment 4 FORCE_ABS two-pass closure fixture, same disk/rationale
+# as the Increment 2 block above (ample free space, already command64/casm/
+# comp-bootable).
+add_custom_command(
+    TARGET casm_opcode_test_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmfa2p.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmfa2p.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmfa2p.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmfa2p.ref"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMENT "Appending WP61 Increment 4 casmfa2p.s FORCE_ABS fixture and its trusted reference to casm_opcode_test.d64"
     VERBATIM
 )
 

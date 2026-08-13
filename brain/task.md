@@ -2527,6 +2527,15 @@
           change. **WP61's full determinism charter (PRG, R6, listing, map)
           is now closed.** Requesting user review before Increment 4
           (FORCE_ABS two-pass closure) activates.
+    - [x] Increment 4 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment4-force-abs-closure.md`.
+          New `casmfa2p.s` (`.ORG $0010` / `LDA TARGET` (forward ref) /
+          `TARGET: NOP`) + hand-authored `casmfa2p.ref.hex`, joined
+          `casm_opcode_test_d64`. Live VICE: assembled twice, `comp` vs the
+          trusted reference and self-compare between the two runs both
+          `FILES COMPARE OK` -- `LDA TARGET` emitted as 3-byte absolute
+          (`AD 13 00`), never shrinking to 2-byte zero-page, closing WP60's
+          residual FORCE_ABS two-pass item. No production defect/change.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
