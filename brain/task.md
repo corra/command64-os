@@ -2512,6 +2512,21 @@
           production defect; only build-system change is the fixture
           placement above. Requesting user review before Increment 3
           (determinism proof: listing and map) activates.
+    - [/] Increment 3 implementation/verification complete 2026-08-12,
+          awaiting user approval. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment3-determinism-listing-map.md`.
+          Extended the determinism proof to `/L` and `/M` using the same
+          `casmopall.s` fixture on the same already-attached
+          `casm_opcode_test.d64`, no new fixture or disk needed. `/L`:
+          dual-assembled to `m1.lst`/`m2.lst`, `comp` -> `FILES COMPARE OK`.
+          `/M`: dual-assembled and independently decoded both runs' screen
+          RAM via `vice_memory_read` -- identical 8-row symbol map
+          (`$C033 tg22` through `$C047 tg32`, `008 SYMBOLS`) both times,
+          explicitly recorded as manual/live evidence since `/M` writes no
+          file to `comp`. No production defect; no production or fixture
+          change. **WP61's full determinism charter (PRG, R6, listing, map)
+          is now closed.** Requesting user review before Increment 4
+          (FORCE_ABS two-pass closure) activates.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

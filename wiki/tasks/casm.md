@@ -1701,6 +1701,14 @@ behavior changed beyond the version/build artifact itself.
       determinism both closed. No production defect; joined
       `casm_opcode_test_d64` with 2 pre-existing fixtures rather than
       adding a new disk. See `brain/task.md` for full detail.
+- [/] WP61 Increment 3 complete 2026-08-12, awaiting user approval:
+      determinism proof for listing and map, both using `casmopall.s` on
+      the already-attached `casm_opcode_test_d64` (no new fixture/disk).
+      `/L`: `comp m1.lst m2.lst` -> `FILES COMPARE OK`. `/M`: two live runs'
+      screen RAM independently decoded and diffed, identical 8-symbol map
+      both times (manual/live evidence, `/M` writes no file). **WP61's full
+      determinism charter (PRG, R6, listing, map) is closed.** No
+      production defect. See `brain/task.md` for full detail.
 - [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
