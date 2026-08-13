@@ -2700,7 +2700,7 @@
   - [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42
         (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`) closed. CASM remains
         `0.2.2` build `1266`, unchanged (documentation-only work package).
-  - [/] WP63 plan approved 2026-08-12, activated: Taskwarrior task 42
+  - [x] WP63 plan approved 2026-08-12, activated: Taskwarrior task 42
         (`dcdc8e94-1615-46ea-8423-717d04059bce`) created, depends on WP62
         (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`), started.
         `brain/plans/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
@@ -2945,8 +2945,20 @@
         the plan's own convention), including the full defect/root-cause/
         fix summary and a pointer to the walkthrough; section header now
         reads "WP56-61 closed 2026-08-12; WP62 closed 2026-08-12; WP63 in
-        progress". Still open before WP63/Phase 11 can close: the git
-        commit and the user's own walkthrough + sign-off.
+        progress".
+        **Committed**: `93a5365` ("fix(casm): WP63 -- restore OS_API
+        vector in 6 fault-injection harnesses"), 19 files, on
+        `feature/casm-phase11-wp60`. Two unrelated pre-existing
+        uncommitted files (`CMakeLists.txt`, `cmake/Oscar64.cmake` --
+        overlay build-event wrapper infrastructure, not this session's
+        work) deliberately left out.
+        **User approved 2026-08-13 ("Approved proceed").** Taskwarrior
+        task 42 closed. WP63 and Phase 11 close together in this single
+        approval (Scoping Decision 3 -- no separate completion-promotion
+        version bump; CASM stays `0.2.2` build `1266`, unchanged by this
+        entirely test-infrastructure work package). Walkthrough's own
+        Completion Gate section updated to reflect closure. **WP63
+        complete. Phase 11 (WP56-63) complete.**
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

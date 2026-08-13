@@ -2204,7 +2204,7 @@ runs, not one clean pass.
 - Governing: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`
   (parent, with each WP50-55's own dedicated plan linked from it).
 
-### CASM Phase 11 Base-Release Hardening Contract (WP56-61 closed 2026-08-12; WP62 closed 2026-08-12; WP63 in progress)
+### CASM Phase 11 Base-Release Hardening Contract (WP56-63, Phase 11 complete 2026-08-13)
 
 - Phase 11 adds no new language feature, directive, or output format. It is a
   hardening/certification phase over the complete `0.1`/`0.2` base release

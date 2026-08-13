@@ -1773,7 +1773,7 @@ behavior changed beyond the version/build artifact itself.
       `brain/walkthroughs/2026-08-12-casm-phase11-wp62-increment7-audit-walkthrough.md`.
 - [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42 closed.
       CASM remains `0.2.2` build `1266` (documentation-only work package).
-- [/] WP63 plan approved 2026-08-12, activated (Taskwarrior task 42):
+- [x] WP63 plan approved 2026-08-12, activated (Taskwarrior task 42):
       `brain/plans/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
       Full regression build, fresh consolidated live-VICE re-run of every
       `test_casm_*` harness, and the user's own runtime walkthrough before
@@ -1789,6 +1789,11 @@ behavior changed beyond the version/build artifact itself.
       new defects); fixed and live-reverified clean. This is test
       infrastructure only, no production CASM behavior changed. See
       `brain/task.md` for full root-cause and verification detail.
+      Committed `93a5365`. **User approved 2026-08-13. WP63 complete;
+      Phase 11 (WP56-63) complete.** CASM remains `0.2.2` build `1266`
+      (test-infrastructure-only work package, no version bump). Full
+      walkthrough:
+      `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
 
 ## Optional Feature - Progress and Processing Indication
 

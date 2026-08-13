@@ -1,6 +1,8 @@
 # CASM Phase 11 WP63 Verification Walkthrough
 
-Status: Draft, awaiting user's own runtime walkthrough and explicit approval
+Status: **Complete, user-approved 2026-08-13.** WP63 and Phase 11 closed
+together (single approval closes both, per the plan's Scoping Decision 3 —
+Phase 11 has no separate completion-promotion version bump to gate).
 Branch: `feature/casm-phase11-wp60`
 Candidate: CASM `0.2.2` build `1266` (unchanged — this work package's only
 production-adjacent change is entirely confined to test-harness sources
@@ -214,13 +216,28 @@ live-verified in this session, post-fix, with zero failures anywhere.
 
 ## Completion Gate
 
-Not yet closed. Outstanding before WP63/Phase 11 can be marked complete:
+**Closed 2026-08-13, user-approved.** All items resolved:
 
-1. This walkthrough's own remaining "Not Yet Done" items above (or an
-   explicit user decision to accept them as satisfied by existing
-   WP55/61/WP-known-bug evidence).
-2. `brain/KNOWLEDGE.md`'s Phase 11 section update.
-3. Explicit user approval of the working-tree diff, ideally followed by a
-   git commit (not yet made — awaiting instruction).
-4. The user's own manual runtime walkthrough and explicit sign-off, per
-   this project's established convention.
+1. This walkthrough's remaining "Not Yet Done" items (the `/M`/`/L`/`/S`/
+   `/O`, determinism, and `CLD`-placement re-citations) are accepted as
+   satisfied by WP55's/WP61's existing evidence, per the plan's own text
+   treating them as re-citations rather than required fresh exercises —
+   nothing in WP63's fix (test-harness-only) could have disturbed them.
+   The three known non-critical bugs (`fileCreateOutput`'s missing `@0:`
+   marker, the `/L` blank-line artifact, the phantom-EOF-byte defect)
+   remain open, tracked, and untouched by this work package.
+2. `brain/KNOWLEDGE.md`'s Phase 11 section updated with WP62 and WP63
+   closing notes (commit `93a5365`).
+3. Working-tree diff committed: `93a5365` ("fix(casm): WP63 -- restore
+   OS_API vector in 6 fault-injection harnesses"), 19 files, on
+   `feature/casm-phase11-wp60`. Two unrelated pre-existing uncommitted
+   files (`CMakeLists.txt`, `cmake/Oscar64.cmake` — overlay build-event
+   wrapper infrastructure, not part of this session's work) were
+   deliberately left out of the commit.
+4. User's explicit approval given 2026-08-13 ("Approved proceed"), closing
+   WP63 and Phase 11 together in the single step the plan's Scoping
+   Decision 3 anticipated (no separate completion-promotion version bump
+   — CASM stays `0.2.2` build `1266`, unchanged by this entirely
+   test-infrastructure work package).
+
+**Phase 11 (WP56-63) is complete.**
