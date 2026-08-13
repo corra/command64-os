@@ -2595,9 +2595,14 @@
           overflow oversight); zero production defects; `casm.prg` remains
           byte-identical to its WP60 `0.2.2` state throughout. No version
           bump due (no production change occurred, per the user-confirmed
-          bump-only-if-changed policy). Requesting approval to mark **WP61
-          complete** at CASM `0.2.2` build `1266` and close Taskwarrior
-          task `f6845310-bcce-4448-b5f2-0aa19a73723b`.
+          bump-only-if-changed policy). **User approved WP61 completion
+          2026-08-12.** Taskwarrior task
+          `f6845310-bcce-4448-b5f2-0aa19a73723b` marked done. **WP61 is
+          complete at CASM `0.2.2` build `1266`.** The empty-source-file
+          boundary row remains closed by re-scope (tooling gap) and the
+          phantom-EOF-byte defect remains separately tracked (Taskwarrior
+          UUID `882433f0-cde1-4849-8b3c-df32613518c3`), neither blocking
+          this completion.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

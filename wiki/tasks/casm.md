@@ -1684,10 +1684,11 @@ behavior changed beyond the version/build artifact itself.
       defect (Taskwarrior UUID `882433f0-cde1-4849-8b3c-df32613518c3`)
       remain open by design, not blocking this completion. See
       `brain/task.md` for full detail.
-- [/] WP61 `f6845310-bcce-4448-b5f2-0aa19a73723b`: determinism and remaining
-      boundary spot-checks. Nine-increment plan approved 2026-08-12 at
-      `brain/plans/2026-08-12-casm-phase11-wp61-determinism-and-boundary-spot-checks.md`;
-      Increment 1 (scope/spot-check register freeze) activated.
+- [x] WP61 `f6845310-bcce-4448-b5f2-0aa19a73723b`: determinism and remaining
+      boundary spot-checks. **Complete 2026-08-12 at CASM `0.2.2` build
+      `1266`** (no version bump: no production change occurred across
+      WP61). Nine-increment plan approved 2026-08-12 at
+      `brain/plans/2026-08-12-casm-phase11-wp61-determinism-and-boundary-spot-checks.md`.
 - [/] WP61 Increment 1 complete 2026-08-12, awaiting user approval: all 5
       in-scope items (determinism + the 4 boundary residuals) dispositioned
       with source-trace-confirmed mechanisms and exact expected
@@ -1726,13 +1727,13 @@ behavior changed beyond the version/build artifact itself.
       set live from the clean rebuild; all PASS. `casm.prg` remains
       byte-identical to its WP60 `0.2.2` state throughout. See
       `brain/task.md` for full detail.
-- [/] WP61 Increment 8 complete 2026-08-12, awaiting user approval: audit
-      and walkthrough. All 5 Increment-1-register items closed; one
-      build-system defect found and fixed within WP61 (Increment 7), zero
-      production defects. No version bump due (no production change).
-      Requesting approval to mark WP61 complete at CASM `0.2.2` build
-      `1266`. Walkthrough:
+- [x] WP61 Increment 8 complete 2026-08-12: audit and walkthrough. All 5
+      Increment-1-register items closed; one build-system defect found and
+      fixed within WP61 (Increment 7), zero production defects. No version
+      bump due (no production change). Walkthrough:
       `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
+      **User approved WP61 completion 2026-08-12.** Taskwarrior task
+      `f6845310-bcce-4448-b5f2-0aa19a73723b` closed.
 - [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

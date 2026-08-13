@@ -13,6 +13,31 @@
 
 ## Current State (2026-08-12)
 
+- **CASM Phase 11 WP61 complete at `0.2.2.1266`** (no version bump -- no
+  production change occurred): determinism and remaining boundary spot-
+  checks. Proved re-assembling identical source twice produces byte-
+  identical PRG/R6/listing output (native `comp` self-compare, a new
+  proof technique vs. every prior WP's compare-to-fixed-reference) across
+  `casmhello.s`/`casmreloc1.s`/`casmopall.s`, plus a manual live `/M`
+  symbol-map diff (screen-print-only, no file to `comp`). Closed all 4
+  actionable boundary residuals WP60 Increment 9 deferred: `FORCE_ABS`
+  two-pass stability (new `casmfa2p.s` forward-reference fixture); source
+  extent 65,535-accept/65,536-reject (`casmsrcmax.s`, exactly 65,535
+  bytes, `CASM_DIAG_SOURCE_OFFSET_OVERFLOW` on the combined-file reject);
+  symbol/token name-length-32 (new `tests/src/casm_lexer/casm_lexer.s`,
+  the first harness in this codebase to link `lexer.s` directly). The
+  5th residual (empty-source-file) stays closed by re-scope -- `cc1541`
+  cannot write a zero-byte SEQ fixture, a tooling gap not a code gap. One
+  build-system-only bug was found and fixed within WP61 itself (a
+  `test.d64` directory-overflow oversight from Increment 4, caught only
+  once Increment 7 finally ran a full unrestricted rebuild); zero
+  production defects found. `casm.prg` remained byte-identical to its
+  WP60 state throughout (18581 code bytes, 2806 relocations). The
+  phantom-EOF-byte defect stays separately tracked (Taskwarrior UUID
+  `882433f0-cde1-4849-8b3c-df32613518c3`), untouched by WP61 as agreed at
+  plan approval. Full record in `brain/task.md`'s WP61 entry and
+  `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
+
 - **CASM Phase 11 WP60 complete at `0.2.2.1266`**: exhaustive opcode/
   addressing/boundary certification. Independently re-derived and
   mechanically reconciled all 151 legal NMOS 6502/6510 opcode/mode/length
