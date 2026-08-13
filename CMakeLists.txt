@@ -761,6 +761,19 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1400")
         endif()
+        if(TEST_NAME STREQUAL "casm_lexer")
+            # WP61 Increment 5: symbol/token name-length-32 boundary harness.
+            # Links only lexer.s -- no parser.s/source.s/state.s -- and
+            # supplies CasmLexerState/CasmLookahead*/CasmTokenRecord/
+            # CasmTokenText/CasmIncludeFilename* as local BSS plus a stub
+            # sourceNextByte feeding a fixed-length run of identifier bytes,
+            # matching casm_bounds.s's/casm_opcodes.s's own narrow-link
+            # precedent. No harness for lexer.s existed before this.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
@@ -1235,6 +1248,9 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_opcodes)
 # (no VMM/file ownership; emit.s stubbed to no-ops for everything it does
 # not reach) for the same reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_bounds)
+# WP61 Increment 5's lexer-only length-32 harness is likewise self-contained
+# (no parser.s/source.s/state.s); test.d64's directory track is still full.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_lexer)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1596,11 +1612,13 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # truncated name "test_casm_opcode" (16 chars) is also distinct.
 # WP60 Increment 6's test_casm_bounds joins for the same reason; its
 # truncated name "test_casm_bounds" (16 chars) is also distinct from both.
+# WP61 Increment 5's test_casm_lexer joins for the same reason; its full
+# 15-char name has no truncation-collision risk.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds test_casm_lexer
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

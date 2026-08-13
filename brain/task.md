@@ -2536,6 +2536,17 @@
           `FILES COMPARE OK` -- `LDA TARGET` emitted as 3-byte absolute
           (`AD 13 00`), never shrinking to 2-byte zero-page, closing WP60's
           residual FORCE_ABS two-pass item. No production defect/change.
+    - [x] Increment 5 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment5-lexer-length32-closure.md`.
+          New `tests/src/casm_lexer/casm_lexer.s`, linking only `lexer.s`
+          (no parser/source/state.s), local BSS + stub `sourceNextByte`
+          feeding a fixed-length identifier byte run through the real
+          `lnId` scan loop via `lexerNext`. Joined `casm_listing_test_d64`.
+          Live VICE: `CASM LEXER: PASS` (2/2) -- 31 bytes accept
+          (length recorded exactly 31), 32 bytes reject
+          (`CASM_DIAG_TOKEN_TOO_LONG`, length left at 31, unmodified). No
+          production defect/change. Closes WP60's residual symbol/token
+          name-length-32 item.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
