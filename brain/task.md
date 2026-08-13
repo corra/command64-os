@@ -2603,7 +2603,44 @@
           phantom-EOF-byte defect remains separately tracked (Taskwarrior
           UUID `882433f0-cde1-4849-8b3c-df32613518c3`), neither blocking
           this completion.
-  - WP62-WP63 remain unplanned in detail, per this project's
+  - [/] Taskwarrior (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`): WP62
+        documentation sync
+    - Plan: `brain/plans/2026-08-12-casm-phase11-wp62-documentation-sync.md`
+    - User approved the seven-increment plan 2026-08-12 and activated
+      Increment 1 only; each later increment remains separately gated by
+      the preceding increment's review. Taskwarrior task created dependent
+      on completed WP61 (`f6845310-bcce-4448-b5f2-0aa19a73723b`).
+    - Scope (user-confirmed 2026-08-12): full clean-room re-sync of
+      `brain/KNOWLEDGE.md` (backfilling Phase 4, Phase 10, **and** Phase 11
+      -- a bigger gap than WP56 originally flagged, found during this
+      plan's own research), `wiki/casm-programmers-reference.md`,
+      `wiki/casm-utility.md`/`docs/casm-utility.md` (kept in sync, not
+      consolidated), `CHANGELOG.md` (add the missing WP61 entry), and
+      `src/external/casm/AGENTS.md`. No CASM version bump (documentation-
+      only, matching WP56's precedent).
+    - [/] Increment 1 implementation/verification complete 2026-08-12,
+          awaiting user approval. Register at
+          `brain/reviews/2026-08-12-casm-phase11-wp62-increment1-staleness-register.md`.
+          Clean-room re-read of all 6 in-scope items. Confirmed
+          `KNOWLEDGE.md`'s CASM sections stop at Phase 9 WP48 with no Phase
+          10/11 content and pinned exact insertion points (Phase 10 after
+          the Phase 9 WP48 section and after the interleaved DASH section,
+          Phase 11 last, both chronological by close date). Cataloged 6
+          discrepancies in `wiki/casm-programmers-reference.md` (stale
+          version/build in 3 places, a missing `CLD` in the documented
+          `start:` sequence, undocumented WP60 opcode-certification
+          strength, two undocumented known non-critical bugs) and 3 in
+          `wiki/casm-utility.md`/`docs/casm-utility.md` (same version
+          staleness and missing known-bugs disclosure). Confirmed
+          `CHANGELOG.md`'s WP61 gap. Found `src/external/casm/AGENTS.md`
+          more stale than the plan anticipated: it still describes Phase 10
+          (WP50-55) as "remain inactive," has zero Phase 11 content, and
+          carries a `0.1.9`-threshold version-migration note now moot at
+          `0.2.2` -- Increment 6 will need a real rewrite, not a light
+          touch. No documentation change made in this increment. Requesting
+          user review before Increment 2 (`KNOWLEDGE.md` backfill)
+          activates.
+  - WP63 remains unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
 # Deferred Optional Work

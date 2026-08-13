@@ -1734,7 +1734,23 @@ behavior changed beyond the version/build artifact itself.
       `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
       **User approved WP61 completion 2026-08-12.** Taskwarrior task
       `f6845310-bcce-4448-b5f2-0aa19a73723b` closed.
-- [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
+- [/] WP62 `27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`: documentation sync.
+      Seven-increment plan approved 2026-08-12 at
+      `brain/plans/2026-08-12-casm-phase11-wp62-documentation-sync.md`;
+      Increment 1 (scope/staleness register freeze) activated.
+- [/] WP62 Increment 1 complete 2026-08-12, awaiting user approval:
+      clean-room re-read of `brain/KNOWLEDGE.md`,
+      `wiki/casm-programmers-reference.md`,
+      `wiki/casm-utility.md`/`docs/casm-utility.md`, `CHANGELOG.md`, and
+      `src/external/casm/AGENTS.md`. `KNOWLEDGE.md` is missing Phase 4,
+      10, **and** 11 sections (bigger gap than WP56 originally flagged);
+      exact insertion points pinned. Cataloged version/build staleness and
+      undocumented known bugs across the two user-facing docs, a missing
+      WP61 `CHANGELOG.md` entry, and significant staleness in
+      `src/external/casm/AGENTS.md` (still describes closed Phase 10 as
+      inactive, no Phase 11 content). No documentation change made yet.
+      See `brain/task.md` for full detail.
+- [ ] WP63: remains separately gated and requires a dedicated approved plan.
 
 ## Optional Feature - Progress and Processing Indication
 
