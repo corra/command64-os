@@ -2492,6 +2492,26 @@
           disk, pending a purpose/capacity check at that increment's
           activation. No production or fixture change. Requesting user
           review before Increment 2 (determinism proof: PRG/R6) activates.
+    - [/] Increment 2 implementation/verification complete 2026-08-12,
+          awaiting user approval. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment2-determinism-prg-r6.md`.
+          Appended pre-existing fixtures `casmhello.s` (static, no
+          relocation) and `casmreloc1.s` (relocatable, real R6 footer) plus
+          `casmreloc1.ref` to `casm_opcode_test_d64` (489 -> 480 blocks
+          free), avoiding a new disk or multi-drive setup. Live VICE:
+          each of `casmhello.s`, `casmreloc1.s`, and the 151-statement
+          `casmopall.s` assembled twice to independently named outputs;
+          all 3 self-compares (`comp` between the two runs) returned
+          `FILES COMPARE OK`; `casmreloc1.s` and `casmopall.s` additionally
+          cross-checked against their independently-trusted `.ref` files,
+          also `FILES COMPARE OK` -- anchoring the self-compare proof to
+          externally-derived bytes, not just internal run-to-run
+          consistency. PRG determinism closed (3/3 fixtures spanning
+          small-static, small-relocatable, and large-exhaustive shapes);
+          R6 relocation determinism closed (1/1 relocatable fixture). No
+          production defect; only build-system change is the fixture
+          placement above. Requesting user review before Increment 3
+          (determinism proof: listing and map) activates.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

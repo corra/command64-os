@@ -1693,6 +1693,14 @@ behavior changed beyond the version/build artifact itself.
       with source-trace-confirmed mechanisms and exact expected
       diagnostics; disk free space re-surveyed on every candidate target.
       No production or fixture change. See `brain/task.md` for full detail.
+- [/] WP61 Increment 2 complete 2026-08-12, awaiting user approval:
+      determinism proof for PRG/R6. `casmhello.s`, `casmreloc1.s`, and
+      `casmopall.s` each assembled twice live to independent output names;
+      all 3 self-compares (`FILES COMPARE OK`) plus 2 independent-reference
+      cross-checks (also `FILES COMPARE OK`) passed. PRG and R6 relocation
+      determinism both closed. No production defect; joined
+      `casm_opcode_test_d64` with 2 pre-existing fixtures rather than
+      adding a new disk. See `brain/task.md` for full detail.
 - [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

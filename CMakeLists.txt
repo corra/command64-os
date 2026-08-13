@@ -1731,6 +1731,30 @@ add_custom_command(
     VERBATIM
 )
 
+# WP61 Increment 2 determinism proof needs a small static (no-relocation) and
+# a small relocatable fixture alongside casmopall.s, on a disk with both
+# command64 and headroom to write live self-compare outputs -- neither
+# test.d64 (directory track full) nor casm_overflow_test.d64 (7 blocks free)
+# qualifies. casm_opcode_test_d64 already carries command64/casm/comp and has
+# 489 blocks free, so casmhello.s/casmreloc1.s (both already-generated
+# fixtures, reused here rather than duplicated) and casmreloc1.ref (for an
+# extra cross-check leg alongside the self-compare, matching casmopall's own
+# precedent) join it instead of a new disk.
+add_custom_command(
+    TARGET casm_opcode_test_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmhello.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmhello.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmreloc1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmreloc1.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmreloc1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmreloc1.ref"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMENT "Appending WP61 Increment 2 casmhello.s/casmreloc1.s determinism fixtures and casmreloc1's trusted reference to casm_opcode_test.d64"
+    VERBATIM
+)
+
 # Real CASM assembly source, so these carry the ".s" on-disk suffix the CASM
 # source-fixture convention requires (unlike WP46's frame-harness fixtures,
 # which are consumed only by a test harness and use bare names). Lowercase
