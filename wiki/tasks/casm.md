@@ -1654,6 +1654,21 @@ behavior changed beyond the version/build artifact itself.
       smoke assembly, all PASS with clean shell returns. Record:
       `brain/reviews/2026-08-12-casm-phase11-wp60-increment8-consolidated-verification.md`.
       Requesting user review before Increment 9 activates.
+- [x] WP60 Increment 9 complete 2026-08-12: audit and walkthrough
+      reconciling the Increment 1 opcode oracle (151/151/151, re-proven live
+      three times over) and the Increment 2 boundary register (52 required
+      rows) against Increments 6-7: 48/52 closed, 4 residual items flagged
+      for an explicit accept/defer decision (`FORCE_ABS` two-pass
+      re-resolution untested; source 65,535/65,536-byte extent boundary
+      untested; symbol name-length-32 rejection uncovered, owned by
+      `lexer.s`; empty-source-file row is a `cc1541` tooling gap, not a code
+      gap). The one real production defect found (Increment 7's one-byte-
+      source phantom-EOF-byte) is now tracked separately as Taskwarrior task
+      42 (`882433f0-cde1-4849-8b3c-df32613518c3`), not folded into WP60. No
+      production, fixture, or build-system change. Walkthrough:
+      `brain/walkthroughs/2026-08-12-casm-phase11-wp60-increment9-audit-walkthrough.md`.
+      Requesting review before Increment 10 (version bump to `0.2.2`)
+      activates.
 - [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

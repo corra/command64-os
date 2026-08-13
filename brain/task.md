@@ -2394,6 +2394,31 @@
           fixture, or build-system change. Requesting user review before
           Increment 9 (audit and walkthrough, record synchronization)
           activates.
+    - [x] Increment 9 complete 2026-08-12: audit and walkthrough at
+          `brain/walkthroughs/2026-08-12-casm-phase11-wp60-increment9-audit-walkthrough.md`.
+          Reconciled the Increment 1 opcode oracle (151/151/151, re-proven
+          live twice more at Increments 4/5/8) and the Increment 2 boundary
+          register (52 required rows) against what Increments 6-7 actually
+          closed: 48/52 closed, 4 residual -- `FORCE_ABS` stability across a
+          genuine two-pass re-resolution (untested, single-pass shrink-
+          prevention is covered); the source domain's 65,535-byte accepted
+          extent and 65,536-byte first-reject boundary (never attempted);
+          symbol name-length-32 rejection (owned by `lexer.s`, zero coverage
+          anywhere in `tests/`); the empty-source-file row remains a tooling
+          gap, not a code gap (`cc1541` cannot write a zero-byte SEQ entry).
+          Recorded the one real production defect Increment 7 found and left
+          unfixed (the one-byte-source phantom-EOF-byte in
+          `sourceLoad`/`sourceNextByte`) as its own Taskwarrior item, task 42
+          / UUID `882433f0-cde1-4849-8b3c-df32613518c3`, project `casm`,
+          separate from WP60 per Increment 7's own recommendation. Recorded
+          the two test-harness-only bugs Increment 6 found and fixed (both
+          non-production). No production, fixture, or build-system change
+          in this increment; `brain/KNOWLEDGE.md`, `brain/MEMORY.md`, and
+          `CHANGELOG.md` need no edits since no owned fact in those files
+          changed at this increment (all reserved for Increment 10's
+          completion). Requesting accept/defer decisions on the 4 residual
+          boundary items and approval to activate Increment 10 (version
+          bump to `0.2.2`, final no-change proof).
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
