@@ -99,7 +99,8 @@ flowchart LR
 `casm.s: start` runs this sequence: `CLD → diagClearLoc → listingStateInit →
 listingFileInit → resourcesInit → cliInit → fileIoInit → sourceInit →
 cliParse → cliDeriveOutputName → (/L: cliDeriveListingName) → symbolsInit →
-sourceLoad → sourceOpen → lexerInit`, then two passes of the shared
+sourceLoad → includeCatalogInit → sourceOpen → lexerInit`, then two passes
+of the shared
 `casmRunPass` dispatch. `CLD` (WP60 Increment 3) is the literal first
 instruction of `start:`, hardening entry against decimal-mode leakage
 independent of `OS_API` call ordering — CASM has no supported decimal-mode

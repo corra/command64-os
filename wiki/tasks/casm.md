@@ -1773,7 +1773,22 @@ behavior changed beyond the version/build artifact itself.
       `brain/walkthroughs/2026-08-12-casm-phase11-wp62-increment7-audit-walkthrough.md`.
 - [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42 closed.
       CASM remains `0.2.2` build `1266` (documentation-only work package).
-- [ ] WP63: remains separately gated and requires a dedicated approved plan.
+- [/] WP63 plan approved 2026-08-12, activated (Taskwarrior task 42):
+      `brain/plans/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
+      Full regression build, fresh consolidated live-VICE re-run of every
+      `test_casm_*` harness, and the user's own runtime walkthrough before
+      Phase 11 is marked done. Known non-critical bugs (#36/#40/#41) stay
+      deferred. **Deviation from plan**: live regression found a real,
+      newly-discovered defect (not one of the 3 known bugs) -- 6
+      fault-injection test harnesses (`casm_faultvmm.s`,
+      `casm_faultsource.s`, `casm_freloc.s`, `casm_finc.s`,
+      `casm_fsym.s`, `casm_faultinject.s`) never called `faultUninstall`
+      before exit, leaving the shared `$1000` OS_API vector dangling for
+      whatever ran next in the same session. User explicitly directed an
+      inline fix (overriding the plan's disclose-and-defer default for
+      new defects); fixed and live-reverified clean. This is test
+      infrastructure only, no production CASM behavior changed. See
+      `brain/task.md` for full root-cause and verification detail.
 
 ## Optional Feature - Progress and Processing Indication
 

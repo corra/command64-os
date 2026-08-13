@@ -2700,10 +2700,253 @@
   - [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42
         (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`) closed. CASM remains
         `0.2.2` build `1266`, unchanged (documentation-only work package).
-  - WP63 remains unplanned in detail, per this project's
-    per-work-package-plan-approval requirement.
-
-# Deferred Optional Work
+  - [/] WP63 plan approved 2026-08-12, activated: Taskwarrior task 42
+        (`dcdc8e94-1615-46ea-8423-717d04059bce`) created, depends on WP62
+        (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`), started.
+        `brain/plans/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
+        Verification/walkthrough/completion gate for Phase 11 as a whole
+        (mirrors WP49/WP55's own closing pattern). Research (via sub-agent)
+        confirmed no consolidated cross-WP live verification of WP56-62's
+        combined changes exists yet -- that is WP63's core job. User
+        confirmed 4 scoping decisions: known bugs (tasks #36/#40/#41) stay
+        fully deferred, not fixed; regression build scope is CASM-only, not
+        whole-OS; a single approval closes both WP63 and Phase 11 (no
+        separate promotion step, since Phase 11 has no completion-bump);
+        live VICE verification is a fresh full re-run of every
+        `test_casm_*` harness (~25), not citation-only. No production
+        change expected; CASM should remain `0.2.2` build `1266` throughout
+        unless verification discloses a genuine new defect (which would
+        stop the plan for separate approval, not be fixed inline).
+        Beginning Increment 2 (baseline reconciliation) and Increment 3
+        (cross-WP interaction review) next, in parallel via sub-agents
+        (both are independent, non-interactive research/build work; the
+        live-VICE increments that follow must run sequentially in one
+        session, not delegated to parallel agents).
+        **Increment 3 complete.** Sub-agent ran all 4 Cross-WP Interaction
+        Review checks, source-grounded: (1) `CLD` confirmed the literal
+        first `start:` instruction, fault-injection hook confirmed
+        test-build-only (never linked into the production `casm` target) --
+        no ordering conflict. (2) WP59's 4 fixes (D1-D4) reviewed directly
+        against their diffs -- none introduce a nondeterminism source
+        (no uninitialized reads, no VIC-II/CIA timing dependence); WP61's
+        determinism proof ran chronologically after WP59 and genuinely
+        covers the fixed binary, though D1/D2's new failure-path branches
+        (only reachable via a real/injected OS_API failure) weren't
+        exercised by WP61's all-success runs -- a coverage note, not a
+        nondeterminism risk. (3) Fault-injection and opcode/bounds/lexer
+        test infrastructure confirmed structurally isolated -- no CMake
+        target links both, `faultstub.inc`'s only storage is a DATA segment
+        (not zero page), no collision possible. (4) WP62 doc spot-check:
+        version banner and known-bugs disclosure both confirmed accurate;
+        **found one real, pre-existing gap** -- `wiki/casm-programmers-
+        reference.md`'s documented `start:` sequence omitted
+        `includeCatalogInit` (present in source since WP47, predates Phase
+        11 entirely -- WP62 only prepended `CLD →` to this line and never
+        touched the rest, so this was missed by WP62's own resync, not
+        introduced by it). Independently re-verified against
+        `casm.s:173-186` directly (own read, not just the sub-agent's
+        claim) before acting. **Fixed in place** (added
+        `includeCatalogInit` between `sourceLoad` and `sourceOpen` in the
+        documented sequence), following the exact precedent WP55's own
+        Increment 2 set for a stale-doc gap (fix in place with a note,
+        not a full Stop-Condition pause) -- this is a documentation
+        correction with no ambiguity, not a behavioral defect.
+        **Increment 2 complete.** Sub-agent confirmed: WP56-62 all closed
+        across Taskwarrior/task logs, UUIDs match the plan's `depends-on`
+        chain exactly. Version/build confirmed directly from source:
+        `0.2.2` build `1266`, matching the plan. Authoritative harness
+        roster re-derived directly from `CMakeLists.txt` (not copied from
+        the plan's own estimate): **28** `test_casm_*` targets total (the
+        plan's own "~25" was an undercount), mapped across `test.d64` (6),
+        `casm_overflow_test.d64` (7), `casm_listing_test.d64` (15, plus
+        non-`casm_`-prefixed `test_l15release`), with `test_casm_opcodes`
+        shipping on both `casm_listing_test.d64` and `casm_opcode_test.d64`
+        (double-counted once); `casm_include_test_d64`/`casm_phase10_test_d64`
+        carry only raw production fixtures, no dedicated harness. Full
+        regression build clean: `casm` target + all 28 harnesses + all 7
+        disk images (`image_d64`, `test_image_d64`,
+        `casm_overflow_test_d64`, `casm_include_test_d64`,
+        `casm_listing_test_d64`, `casm_phase10_test_d64`,
+        `casm_opcode_test_d64`), zero failures. No-change rebuild
+        deterministic: `BUILD_CASM` (`1266`) and `casm.prg` md5
+        (`d50055869f7bc896746d64420520a1ab`) identical before/after.
+        Starting-state record: git HEAD `33267feb4da381b80debeeec61602d15e0a96075`,
+        18,581 code bytes, 2,806 relocation points, all 7 image md5sums
+        captured. `git diff --check` clean; `git status` unchanged by the
+        build (only the pre-existing WP63 plan + Increment 3 doc-fix
+        working-tree state, no build-artifact leakage). All 3 known bugs
+        re-confirmed still open/Pending, none touched. **No Stop Condition
+        triggered.** Baseline Reconciliation and Cross-WP Interaction
+        Review are both complete and clean (one doc fix applied, already
+        recorded above). Proceeding to Increment 4 (live VICE harness
+        regression) next -- this and Increment 5 run sequentially in one
+        continuous session, not delegated to sub-agents.
+        **Increment 4 in progress.** Live VICE session on `test.d64`
+        (unit 8), fresh Command64 boot confirmed (`Command 64-DOS Version
+        0.4.1.2663`). One recovery: the first dispatch
+        (`test_casm_pass1`) used `vice_keyboard_type`'s ASCII underscore,
+        which mapped to PETSCII left-arrow, producing `BAD COMMAND OR FILE
+        NAME` plus leftover stale-session keyboard-buffer input (`flush`,
+        drive-8 file-not-found) -- recovered per the workflow's one-clean-
+        restart allowance (soft reset + re-autostart `test.d64`), then
+        re-dispatched every harness via `vice_keyboard_petscii` with
+        explicit PETSCII bytes (letters `$41`+offset, underscore `$A4`)
+        for the rest of this increment. **`test.d64` complete, 6/6 PASS**,
+        each with full PASS text and clean `C64[8]:>` shell return:
+        `test_casm_pass1` (`CASM PASS1: PASS`), `test_casm_symbols`
+        (`CASM SYMBOLS: PASS`), `test_casm_reloc` (`CASM RELOC: PASS`),
+        `test_casm_vmm` (`CASM VMM: PASS`), `test_casm_expr`
+        (`CASM EXPR: PASS`), `test_casm_faultinject`
+        (`CASM FAULTINJECT: PASS`). Per user direction, overlay build/test
+        events are now being fired via `c64-overlay-api` for each harness
+        (`testing` on dispatch, `pass`/`fail` on result) plus one
+        retroactive `build`/`success` event for Increment 2's regression
+        build. Continuing to `casm_overflow_test.d64` (7 harnesses) next.
+        **Setup note**: `casm_overflow_test.d64` carries no `command64`
+        (not self-bootable). First attempt swapped it directly into unit 8
+        (overwriting the boot disk), which produced `BAD COMMAND OR FILE
+        NAME` for `test_casm_include` -- a real setup failure, not a typo.
+        Corrected per this project's established two-drive convention:
+        `test.d64` stays on unit 8 (already-booted Command64), overflow
+        disk attached separately on unit 9, shell switched to `9:`. Dispatch
+        then succeeded (file found, loaded).
+        **`test_casm_include` display anomaly, resolved by direct evidence:**
+        after loading, the harness returned to a clean `C64[9]:>` prompt
+        without ever displaying its final `CASM INCLUDE: ALL PASS` line,
+        reproduced identically on a same-session retry. Investigated rather
+        than assumed pass or fail: read `tests/src/casm_include/
+        casm_include.s:91-131` directly -- the harness prints one `.` per
+        passing case (`F` per failing case) via raw `KernalChROUT` in a
+        loop of `CASE_COUNT` (`=14`, line 70) iterations, then the final
+        message via `DOS_PRINT_STR`. Byte-counted the actual dot row from
+        screen RAM: **exactly 14 dots, 0 `F`s** -- matches `CASE_COUNT`
+        exactly with zero failures, confirmed via direct source+screen
+        evidence, not inferred from the generic shell load indicator (a
+        separate row, the literal word "loading..." with its own 3
+        trailing dots). Per user direction, counted as **PASS** (14/14
+        cases) on this decisive evidence; the missing final on-screen
+        `PASS` text is a display anomaly (worth a follow-up look, not a
+        Stop Condition) -- `DOS_PRINT_STR`'s output not rendering after an
+        all-`.` KernalChROUT loop, distinct from the already-known/
+        disclosed `/L` listing blank-line artifact but possibly related in
+        mechanism. Not fixed under WP63 (verification-only scope).
+        **Real regression found and fixed (user-directed deviation from
+        plan default).** Continuing Increment 4 (`casm_overflow_test.d64`),
+        `test_casm_faultsource` dispatched immediately after
+        `test_casm_faultvmm`: produced `.fff` (1 pass, 3 real fails) with
+        no PASS/FAIL banner -- reproduced 3x, always tied to running
+        immediately after `test_casm_faultvmm` specifically (isolated runs
+        passed clean). Root-caused via scratch ca65/ld65 diagnostic
+        instrumentation (uncommitted, built outside the tracked CMake
+        targets, deleted after use): confirmed live that `sourceLoad`'s
+        real (unfaulted) VMM allocation step was failing with
+        `CASM_DIAG_VMM_ALLOC_FAILED` despite the OS-level VMM Memory
+        Control Table (`VmmMctBase = $C000`, `src/command64/vmm.asm`)
+        showing abundant free space -- ruling out both the CASM-level
+        software registry (`CasmVmmRegistry`, confirmed fully reset by
+        `resourcesInit` every case) and REU/MCT exhaustion. A second
+        probe calling `OS_API` directly (bypassing the harness's own
+        `faultInstall`) hit a runaway stack-consuming loop, pointing at
+        the shared `$1000` OS_API dispatch vector itself. Confirmed via
+        direct grep: `casm_faultvmm.s`, `casm_faultsource.s`,
+        `casm_freloc.s`, `casm_finc.s`, `casm_fsym.s`, and
+        `casm_faultinject.s` each call `faultInstall`
+        (`tests/src/casm_faultinject/faultstub.inc`) exactly once and
+        **never call `faultUninstall`** before their own `DOS_EXIT` --
+        leaving the OS-resident `$1000` vector patched to their own
+        (about-to-be-overwritten) `faultStubEntry` after they exit, so
+        the very next OS_API call issued by *whatever runs next* in the
+        same Command64 session jumps through a dangling pointer into
+        unrelated bytes of that next program's own image. `casm_flist.s`/
+        `casm_flmeta.s` already show the correct paired
+        `faultInstall`/`faultUninstall` pattern; the 6 single-case
+        harnesses above never picked it up. User explicitly directed an
+        inline fix rather than the plan's disclose-and-defer default for
+        newly-discovered defects. **Fixed**: added `jsr faultUninstall`
+        immediately before `DOS_EXIT` in all 6 harnesses. Rebuilt via the
+        real CMake targets (not the scratch tooling): all 6
+        `BUILD_TEST_CASM_*` counters incremented (faultsource ->1003,
+        freloc ->1002, finc ->1003, fsym ->1004, faultinject ->1009;
+        faultvmm's own counter also incremented, exact prior value not
+        captured), `casm_overflow_test_d64`, `test_image_d64`, and
+        `casm_listing_test_d64` all rebuilt clean.
+        **Live re-verification in VICE, fresh boot**: the exact original
+        failing sequence (`test_casm_catalog` -> `test_casm_event` ->
+        `test_casm_faultvmm` -> `test_casm_faultsource`) now runs
+        entirely clean -- `CASM FAULT SOURCE: PASS` with its banner
+        correctly displayed (the earlier missing-banner symptom was a
+        downstream effect of the same corruption, not a separate display
+        bug). Individually re-verified live and clean post-fix:
+        `test_casm_faultsource`, `test_casm_fsym`
+        (`CASM FAULT SYMBOLS: PASS`), `test_casm_freloc`
+        (`CASM FAULT RELOC: PASS`), `test_casm_faultinject`
+        (`CASM FAULTINJECT: PASS`, on `test.d64`), `test_casm_finc`
+        (`CASM FAULT INCLUDE: PASS`, on `casm_listing_test.d64`).
+        `test_casm_faultvmm` itself unaffected (still `CASM FAULT VMM:
+        PASS` throughout, since it's the harness that leaves the *later*
+        corruption, not one that suffers from a *prior* one in this
+        specific reproduction chain). This is a genuine test-infrastructure
+        defect (never a production CASM behavior change) that predates
+        WP63 -- introduced across WP57/58 whenever each single-case fault
+        harness was written -- and was only exposed now because WP63 is
+        the first session to run these harnesses back-to-back without an
+        intervening reset. Not yet reflected in `wiki/tasks/casm.md`,
+        `CHANGELOG.md`, or `brain/KNOWLEDGE.md` -- pending before WP63
+        closes.
+        **Full regression build confirmed clean**: `cmake --build build`
+        (no target filter -- every target, every image) exits 0 with zero
+        errors. No-change rebuild of `casm` alone is stable (`BUILD_CASM`
+        still `1266`, `casm.prg` md5
+        `d50055869f7bc896746d64420520a1ab` unchanged before/after --
+        correctly, since this fix touches only test-harness sources, never
+        CASM production code). `git diff --check` clean. Every harness
+        that links `faultstub.inc` (the only surface this fix could affect)
+        has now been individually live-reverified PASS post-fix:
+        `test_casm_faultvmm`, `test_casm_faultsource`, `test_casm_fsym`,
+        `test_casm_freloc`, `test_casm_faultinject`, `test_casm_finc`. The
+        remaining `test_casm_*` harnesses do not link `faultstub.inc` and
+        are structurally unreachable by this fix, but were re-run live
+        anyway to satisfy the plan's own "every harness pass live, fresh,
+        one consolidated session" bar. **Full consolidated live regression
+        now complete**, matching Increment 2's confirmed 28-target roster:
+        `test.d64` (6, `test_casm_pass1`/`symbols`/`reloc`/`vmm`/`expr`
+        verified earlier this same Increment 4 session,
+        `test_casm_faultinject` verified post-fix), `casm_overflow_test.d64`
+        (7, all verified post-fix), `casm_listing_test.d64` (15 +
+        `test_l15release`, fresh boot, one continuous session: `listing`,
+        `listcap`, `map`, `passcheck`, `l15release` (5/5 checks OK),
+        `cliderive`, `spanread`, `spancommit`, `listwrite`, `frame`,
+        `finc` (`CASM FAULT INCLUDE`), `flist` (`CASM FAULT LIST`,
+        confirms its own already-correct `faultInstall`/`faultUninstall`
+        pairing still works), `flmeta` (`CASM FAULT META`), `opcodes`,
+        `bounds`, `lexer` -- all PASS, zero failures).
+        **`casm_opcode_test.d64` `comp` cross-checks also now complete**:
+        booted fresh, live on-device `casm casmopall.s` / `casm
+        casmreloc1.s` / `casm casmfa2p.s` (each `CASM: INPUT VALIDATED`,
+        version banner `CASM V0.2.1266` unchanged) followed by `comp
+        <name>.prg <name>.ref` for each -- all three `FILES COMPARE OK`.
+        `casmhello.s` carries no `.ref` on this disk (smoke-load fixture
+        only, not a comp target). All 28 `test_casm_*` harnesses plus these
+        3 comp cross-checks are now live-verified this session. Remaining
+        by choice/time-box: production `/M`/`/L`/`/S`/`/O` end-to-end
+        re-confirmation, determinism dual-assembly re-confirmation, and the
+        `CLD`-placement check -- the plan's own text treats these three as
+        re-citations of WP55/61's already-established evidence, not
+        required fresh exercises. Not yet git-committed -- awaiting
+        explicit instruction.
+        **Walkthrough drafted**:
+        `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`
+        records the full defect/root-cause/fix/verification narrative plus
+        the consolidated harness regression, matching WP55's own
+        completion-gate walkthrough format. Status: draft, awaiting the
+        user's own runtime walkthrough and explicit approval.
+        **`brain/KNOWLEDGE.md` updated**: added WP62 and WP63 closing
+        notes to the existing Phase 11 section (not a new section, per
+        the plan's own convention), including the full defect/root-cause/
+        fix summary and a pointer to the walkthrough; section header now
+        reads "WP56-61 closed 2026-08-12; WP62 closed 2026-08-12; WP63 in
+        progress". Still open before WP63/Phase 11 can close: the git
+        commit and the user's own walkthrough + sign-off.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

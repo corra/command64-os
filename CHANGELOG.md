@@ -110,6 +110,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM fault-injection harnesses never restored the OS_API vector (Phase 11
+  WP63)**: `faultInstall` (`tests/src/casm_faultinject/faultstub.inc`)
+  patches the shared, fixed `$1000` OS_API dispatch vector to redirect
+  through each fault-injection test's own `faultStubEntry`. Six single-case
+  harnesses (`casm_faultvmm.s`, `casm_faultsource.s`, `casm_freloc.s`,
+  `casm_finc.s`, `casm_fsym.s`, `casm_faultinject.s`) called `faultInstall`
+  but never `faultUninstall` before their own `DOS_EXIT`, leaving that
+  OS-resident vector dangling into their own (about-to-be-overwritten)
+  memory after exit -- corrupting every OS_API call made by whatever ran
+  next in the same Command64 session. Discovered live during WP63's first
+  consolidated back-to-back harness regression (never previously exercised
+  in one continuous session). Fixed by adding `jsr faultUninstall` before
+  `DOS_EXIT` in all six harnesses, matching the correct paired
+  `faultInstall`/`faultUninstall` pattern `casm_flist.s`/`casm_flmeta.s`
+  already used. Test infrastructure only; no production CASM behavior
+  changed.
 - **CASM fault-stub NMOS indirect-JMP boundary hazard (Phase 11 WP59 Increment
   9)**: Replaced the shared test fixture's relocatable `JMP (RealApiVector)`
   trampoline with a RAM-patched absolute JMP. This prevents the NMOS 6502

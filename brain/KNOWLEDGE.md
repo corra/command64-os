@@ -2204,7 +2204,7 @@ runs, not one clean pass.
 - Governing: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`
   (parent, with each WP50-55's own dedicated plan linked from it).
 
-### CASM Phase 11 Base-Release Hardening Contract (WP56-61, closed 2026-08-12)
+### CASM Phase 11 Base-Release Hardening Contract (WP56-61 closed 2026-08-12; WP62 closed 2026-08-12; WP63 in progress)
 
 - Phase 11 adds no new language feature, directive, or output format. It is a
   hardening/certification phase over the complete `0.1`/`0.2` base release
@@ -2269,9 +2269,40 @@ runs, not one clean pass.
   `882433f0-cde1-4849-8b3c-df32613518c3`) remains open and explicitly
   deferred past Phase 11, tracked as its own item rather than blocking
   either WP60 or WP61 completion.
+- WP62 (documentation sync, closed 2026-08-12) backfilled this section
+  (Phase 4, 10, and 11 had all been missing from `brain/KNOWLEDGE.md`
+  until WP62), clean-room re-synced `wiki/casm-programmers-reference.md`
+  and the `wiki/casm-utility.md`/`docs/casm-utility.md` pair, and added
+  the missing WP61 `CHANGELOG.md` entry. No production/version change.
+- WP63 (verification, walkthrough, completion gate) is Phase 11's closing
+  work package: the first-ever consolidated live-VICE re-run of every
+  `test_casm_*` harness across all six CASM disk images in one continuous
+  session (never previously exercised — WP56-61 each verified only their
+  own delta). That consolidated run **found a genuine, previously-
+  undetected defect**: six fault-injection test harnesses
+  (`casm_faultvmm.s`, `casm_faultsource.s`, `casm_freloc.s`,
+  `casm_finc.s`, `casm_fsym.s`, `casm_faultinject.s`) call `faultInstall`
+  (`tests/src/casm_faultinject/faultstub.inc`), which patches the fixed,
+  OS-resident `$1000` OS_API dispatch vector to redirect through that
+  harness's own `faultStubEntry`, but never call `faultUninstall` to
+  restore it before their own `DOS_EXIT` — leaving `$1000` dangling into
+  that harness's own (about-to-be-overwritten) memory once the next
+  program loads at the same address, corrupting every OS_API call the
+  next program makes in the same session. `casm_flist.s`/`casm_flmeta.s`
+  already showed the correct paired `faultInstall`/`faultUninstall`
+  pattern; the six single-case harnesses above never picked it up. Fixed
+  by adding `jsr faultUninstall` before `DOS_EXIT` in all six. Test
+  infrastructure only — no production CASM source, ABI, diagnostic, or
+  output byte changed; CASM's own version/build (`0.2.2` build `1266`)
+  is unaffected. Full detail, root-cause evidence, and post-fix
+  verification (all 28 harnesses + 3 `comp` cross-checks live-reverified
+  PASS) in
+  `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
+  As of this writing WP63/Phase 11 are **not yet closed** — awaiting the
+  user's own runtime walkthrough and explicit approval.
 - Governing: `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
-  (parent, with each WP56-61's own dedicated plan and review/walkthrough
-  linked from it, and `brain/task.md`'s WP56-61 entries for the full
+  (parent, with each WP56-63's own dedicated plan and review/walkthrough
+  linked from it, and `brain/task.md`'s WP56-63 entries for the full
   per-increment record).
 
 ## C64 Platform Constraints Discovered

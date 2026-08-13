@@ -70,6 +70,7 @@ printResult:
     tax
     lda #DOS_PRINT_STR
     jsr OS_API
+    jsr faultUninstall
     lda #DOS_EXIT
     jsr OS_API
 
