@@ -1688,6 +1688,11 @@ behavior changed beyond the version/build artifact itself.
       boundary spot-checks. Nine-increment plan approved 2026-08-12 at
       `brain/plans/2026-08-12-casm-phase11-wp61-determinism-and-boundary-spot-checks.md`;
       Increment 1 (scope/spot-check register freeze) activated.
+- [/] WP61 Increment 1 complete 2026-08-12, awaiting user approval: all 5
+      in-scope items (determinism + the 4 boundary residuals) dispositioned
+      with source-trace-confirmed mechanisms and exact expected
+      diagnostics; disk free space re-surveyed on every candidate target.
+      No production or fixture change. See `brain/task.md` for full detail.
 - [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

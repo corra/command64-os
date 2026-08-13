@@ -2468,6 +2468,30 @@
       extent; symbol/token name-length-32; empty-source-file explicitly
       re-scoped as a tooling gap, not carried forward again). The
       phantom-EOF-byte defect stays out of scope, tracked separately.
+    - [/] Increment 1 implementation/verification complete 2026-08-12,
+          awaiting user approval. Register at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment1-scope-register.md`:
+          all 5 in-scope items dispositioned with source-trace-confirmed
+          mechanisms -- FORCE_ABS derivation (`parser.s:526-575`) confirmed
+          pass-invariant by construction (syntactic, not value-based),
+          closing an "add" for end-to-end proof only, not a design concern;
+          source-extent overflow confirmed to return
+          `CASM_DIAG_SOURCE_OFFSET_OVERFLOW` (`$15`) via `slCheckCap`'s
+          16-bit-carry check (`source.s:631-643`); token length-32
+          rejection confirmed at `lexerTokenAppend` (`lexer.s:525-537`,
+          `CASM_TOKEN_TEXT_MAX=31`) with zero existing `lexer.s`-linked
+          harness anywhere in `tests/`. Re-surveyed disk free space on
+          every candidate: `test.d64` and `casm_overflow_test.d64` remain
+          unusable for new files (34 and 7 blocks free respectively,
+          `test.d64`'s count drifted 36->34 since WP60's own survey for
+          unexplained but harmless BAM-allocation reasons, confirmed
+          content-identical); `casm_opcode_test.d64` (489 free) and
+          `command64_casm_utils.d64` (245 free) both have ample room;
+          `casm_include_test_d64` (542 free, not previously surveyed) is
+          proposed as the Increment 6 extent-fixture disk instead of a new
+          disk, pending a purpose/capacity check at that increment's
+          activation. No production or fixture change. Requesting user
+          review before Increment 2 (determinism proof: PRG/R6) activates.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
