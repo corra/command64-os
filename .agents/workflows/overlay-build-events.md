@@ -106,9 +106,57 @@ responsibility, fired by hand via `mcp__c64-overlay-api__trigger-event-event-pst
 | Action | `type` | `state` sequence | `program` |
 |---|---|---|---|
 | Direct `ca65`/`ld65`/`KickAss.jar`/`cc1541`/`oscar64` invocation, bypassing `cmake --build` | `build` | `building` → `success`/`error` | the app/target name |
-| Running `casm.prg` itself under VICE to assemble a fixture | `test` | `testing` → `pass`/`fail` | the fixture/test name |
+| Any live action performed by `casm.prg` itself under VICE | `test` | `testing` → `pass`/`fail` | the fixture/test name |
 | Any real test execution (VICE MCP driven, per `.agents/workflows/vice-mcp-testing.md`) | `test` | `testing` → `pass`/`fail` | the test/harness name |
 
 CMake only ever *builds* test fixtures (`.prg`/`.d64` outputs); it never
 *executes* them, so `type: test` events have no CMake hook to piggyback on
 by design — there is no `enable_testing()`/`ctest` in this project.
+
+### CASM's dual role — current policy (interim, 2026-08-13)
+
+CASM appears in two distinct places, and they are **not** classified the
+same way:
+
+- **Building `casm.prg` itself** (the `add_ca65_app(casm ...)` CMake
+  target) is an ordinary compiler invocation — always `type: build`,
+  already covered automatically by the Sync Contract above. Nothing about
+  this section changes that.
+- **Any live action CASM performs once it's running under VICE** — being
+  the subject under test, or acting as a build tool by natively assembling
+  a source file on-device inside a test session — is classified `type:
+  test`, never `build`, even when that on-device action also produces a
+  build artifact (e.g. natively assembling DASH as part of proving native
+  assembly works). The action happens *inside* a VICE test session, so it
+  inherits that session's `test` classification regardless of what it
+  produces.
+
+This is a deliberate, explicit choice by the user, not a default inferred
+from the schema — the user may revisit it later for specific conditions
+where the build-event framing should take priority instead (e.g. treating
+an on-device CASM assembly as a `build` event when the point of the
+exercise is the artifact, not the test). Until that reconsideration
+happens, treat every CASM-under-VICE action uniformly as `test`.
+
+### Known limitation — pass/fail vs. 4-way result classification (deferred, 2026-08-13)
+
+The `c64-overlay-api` MCP's `EventPayload` schema only supports a binary
+`testing → pass|fail` outcome for `type: test`. But
+`.agents/workflows/vice-mcp-testing.md`'s Result classification is
+four-way: **Product failure**, **Harness failure**, **Setup failure**,
+**Inconclusive** — only "Product failure" and "assertion held" map cleanly
+onto `fail`/`pass`. Firing `fail` for a harness/setup/inconclusive result
+would broadcast a false product-failure signal, since the workflow doc is
+explicit that those three are not a verdict on the thing being tested.
+
+**Left as-is deliberately.** The user decided (2026-08-13) not to resolve
+this now, because a proper fix requires changing the MCP itself (the
+`c64-overlay-api` bridge's `EventPayload` schema needs a richer state
+model, not just an agent-side policy choice) — a separate, larger piece of
+work. Two workaround options were discussed and neither was chosen: (a)
+suppress the overlay event entirely for harness/setup/inconclusive results,
+leaving the overlay on `testing` until a real product-level result lands,
+or (b) still fire `fail` but with a `message` caveat distinguishing "the
+product failed" from "the harness never got a clean read." Do not build
+test-event automation or a testing skill on the current binary schema as if
+this were solved — treat it as blocked on the MCP-side schema update.
