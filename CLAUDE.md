@@ -35,3 +35,10 @@
 1. **Performance**: Every instruction counts. Focus on efficient 6502 cycles.
 2. **Readability**: Code must be heavily annotated to explain logic.
 3. **Documentation-Driven**: Updates to spec must precede or accompany implementation.
+4. **Phased Planning**: Every Phase and Work Package (CASM, DASH, DEBUG, or
+   any other numbered multi-WP effort) requires a detailed, user-approved
+   plan in `brain/plans/` *before* implementation begins, and a
+   completion-gate walkthrough in `brain/walkthroughs/` with explicit user
+   sign-off *before* it's marked done. See
+   `.agents/workflows/phased-implementation-planning.md` and the
+   `phased-implementation-planning` skill.
