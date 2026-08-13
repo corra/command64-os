@@ -1964,8 +1964,8 @@
       PASS`; no `image_d64`/`test_image_d64` production content changed
     - User confirmed the live demonstration 2026-08-08. **WP57 complete.**
     - WP58's dedicated plan drafted as this WP's final increment
-  - [ ] Taskwarrior #(pending id) (`d297b689-3fba-4e16-81f7-8176b39a07e2`):
-        WP58 apply fault-injection across file/VMM-touching modules
+  - [x] Taskwarrior (`d297b689-3fba-4e16-81f7-8176b39a07e2`): WP58
+        apply fault-injection across file/VMM-touching modules
     - Plan: `brain/plans/2026-08-08-casm-phase11-wp58-apply-fault-injection.md`
     - Scope: extract `faultstub.inc` from WP57's inline prototype; add
       `fileio.s`'s remaining 4 operations (`WRITE_FAILED`/`SHORT_WRITE`/
@@ -1975,13 +1975,990 @@
       fixture per remaining VMM-holding module (`source.s`/`symbols.s`/
       `reloc.s`/`include.s`) built from that module's own registry/cursor
       contract
-    - User approved the plan 2026-08-09; Increment 1 (trace `fileDelete`,
-      extract `faultstub.inc`, verify `CASM FAULTINJECT: PASS` unchanged)
-      is authorized to begin
-  - WP59-WP63 remain unplanned in detail, per this project's
-    per-work-package-plan-approval requirement
-
-# Deferred Optional Work
+    - User approved the plan 2026-08-09
+    - [x] Increment 1: traced `fileDelete` (`fileio.s:366-376`) -- identical
+          SEC-only shape as `fileCreateOutput`, no plan amendment needed
+          (Open Question 3 resolved). Extracted
+          `tests/src/casm_faultinject/faultstub.inc`, extended with
+          `FaultReturnA` (for `DOS_ALLOC_MEM`'s `VMM_ERR_INVALID` branch)
+          and `FaultSetCount`/`FaultReturnCountLo/Hi` (for `DOS_READ_FILE`'s
+          EOF-vs-error disambiguation), both defaulting to 0 so every
+          existing operation keeps WP57's original shape unchanged.
+          `fileWrite`'s carry-clear `SHORT_WRITE` shape deliberately left
+          out, deferred to whichever increment first needs it. Refactored
+          `casm_faultinject.s` onto the shared include; wired
+          `faultstub.inc` into `CMakeLists.txt`'s `TMP_CA65_SRCS` list for
+          the hash gate. Build 1002, 1,508 code bytes (+20); `test_image_d64`
+          clean. Live-verified in VICE: `CASM FAULTINJECT: PASS`, matching
+          WP57's exact result -- shared-library extraction proven
+          behavior-preserving before Increment 2 adds anything new.
+    - [x] Increment 2: extended `faultstub.inc` with opt-in
+          `FaultReturnSuccess` while preserving carry-set as the default;
+          expanded `casm_faultinject.s` from 2 to 8 cases covering
+          `WRITE_FAILED`, `SHORT_WRITE`, `CLOSE_FAILED`, `DELETE_FAILED`,
+          zero-byte read EOF normalization, and nonzero
+          `INPUT_READ_FAILED`. The first live run (`......F.`) exposed a
+          fixture setup error: the EOF case had not explicitly replaced
+          fileRead's seeded request count with zero. Corrected by enabling
+          the canned zero count; no production defect or source change.
+          Final build 1005 is 1,919 code bytes with 281 relocation points;
+          `test_image_d64` builds clean. Live VICE 3.10 verification on MCP
+          port 7000 produced `........`, `CASM FAULTINJECT: PASS`, and a
+          normal return to `C64[8]:>`. User approved Increment 2 on
+          2026-08-09.
+    - [x] Increment 3 complete and user-approved 2026-08-09: added
+          collision-safe `test_casm_faultvmm`, with five real-`vmm_store.s`
+          cases distinguishing no-REU from OOM and proving failed free/read/
+          write operations retain ownership for retry cleanup. The original
+          long name collided with Increment 2's fixture at D64's 16-character
+          limit; the distinct name then proved `test.d64`'s directory track
+          full. User approved packaging it on `casm_overflow_test.d64` instead
+          (`test_casm_faultv`, 72 blocks free), preserving all `test.d64`
+          content. Final build 1001: 1,335 code bytes, 179 relocations;
+          no-change rebuild stable; both disk targets clean. Live VICE 3.10:
+          `.....`, `CASM FAULT VMM: PASS`, normal `C64[9]:>` return.
+    - [x] Increment 4 implementation/verification: added
+          `test_casm_faultsource` with four source allocation/write/read
+          cleanup cases. Corrected one fixture-only trusted-byte expectation
+          (`casmcat1` is ASCII `1`). Final build 1001: 9,329 code bytes,
+          1,264 relocations; both disk targets clean; overflow image has 25
+          blocks free. After one soft-reset recovery from a wedged hot-attach
+          session, live VICE produced `....`, `CASM FAULT SOURCE: PASS`, and
+          a normal `C64[9]:>` return. No production source changed.
+    - Increments 4-7 completed all source/symbol/relocation/include fixtures,
+      disk wiring, full build, consolidated live verification, and walkthrough.
+      All 29 cases across six fixtures pass. User approved completion
+      2026-08-11; WP58 changed test infrastructure only and left CASM at
+      `0.2.0` build `1260`. **WP58 complete.**
+  - [x] Taskwarrior #40 (`4a1fab7c-28af-4404-af39-6f283b552e55`): WP59
+        `listing.s`/`map.s` hardening
+    - Plan:
+      `brain/plans/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`
+    - User approved the ten-increment plan 2026-08-11; each increment remains
+      separately gated by the preceding increment's review.
+    - [x] Increment 1: matrix frozen at
+      `brain/reviews/2026-08-11-casm-phase11-wp59-increment1-contract-matrix.md`
+      and user-approved 2026-08-11.
+    - [x] Increment 2 user-approved 2026-08-11:
+      added repeat-safe `faultUninstall` plus `test_casm_flist` with 15 API-
+      restore/init/re-entry/disabled/transaction/wrong-state register/flag/stack
+      cases. Build 1001: 5,782 PRG bytes, 4,294 relocatable code bytes, 740
+      relocation points; `$2200` envelope unchanged. Self-bootable listing disk
+      has 126 blocks free. Live VICE 3.10: 15 dots, `CASM FAULT LIST: PASS`,
+      normal `C64[8]:>` return through restored real API; no recovery. No
+      production CASM source, ABI, version, or output change.
+    - [x] Increment 3 user-approved 2026-08-11:
+      eight deterministic capture allocation, metadata write, mirror-stage/
+      final flush, replay read, and serializer mirror-read cases bring
+      `test_casm_flist` to 23 cases. Final build 1007: 7,799 PRG bytes, 5,785
+      relocatable code bytes, 1,003 relocations; `$2200` unchanged; no-change
+      rebuild stable; listing disk has 118 blocks free. Final VICE 3.10 run:
+      23 dots, `CASM FAULT LIST: PASS`, normal `C64[8]:>` return, overlay
+      `testing`/`pass` events relayed, no recovery. Two harness-only defects
+      were corrected transparently: invalid serializer root setup found during
+      review, and the shared SP checker counting its own two-byte JSR frame.
+      No production source, ABI, version, or valid artifact changed.
+    - [x] Increment 4 user-approved 2026-08-11:
+      retryable registered/unregistered close and registration-failure
+      close-then-delete compensation fix D1/D2 with no storage/public-ABI
+      change. Ten new lifecycle cases bring `test_casm_flist` to 33/33 live
+      VICE passes. Harness build 1009: 9,259 PRG bytes, 6,885 code bytes, 1,183
+      relocations; `$2200` unchanged; listing disk 112 blocks free and no
+      `FLI04*.LST` artifacts after runtime. Production CASM build 1261: 18,572
+      code bytes, 2,806 relocations, about 210 bytes `$5500` headroom; still
+      `0.2.0`. `test_casm_frame` required the smallest test-only envelope step
+      `$5000` -> `$5100` after an 18-byte overflow. `image_d64` and listing
+      disk build; no-change counters stable. VICE 3.10: 33 dots, PASS, normal
+      `C64[8]:>` return; overlay testing/pass; no recovery.
+    - [x] Increment 5 user-approved 2026-08-11:
+      eight serializer replay/catalog/source/write/short/final-close/abort-
+      close/abort-delete cases plus strengthened mirror-read evidence bring
+      `test_casm_flist` to 41/41 live VICE passes. Build 1014: 11,033 PRG
+      bytes, 8,169 code bytes, 1,428 relocations; measured `$2200` overflow by
+      446 bytes required the smallest `$2400` test envelope (53 bytes
+      headroom). Listing disk has 105 blocks free and no `FLI05*.LST`
+      artifacts. Overlay testing/pass, normal `C64[8]:>` return, no recovery.
+      Production CASM remains build 1261 and no-change counters are stable.
+    - [x] Increment 6 user-approved 2026-08-11: included-device range validation, filename/
+      catalog boundaries, header continuation, and shared-buffer snapshot proof.
+      Implementation and verification are complete, awaiting user approval.
+      `listingResolveFilename` rejects included devices outside 8-11 before
+      device-table indexing. The approved load-envelope split retains 41 cases
+      in `test_casm_flist` (build 1018, 11,093 bytes, `$2400`) and adds nine in
+      `test_casm_flmeta` (build 1001, 7,369 bytes, `$1A00`). Host, D64, and
+      regenerated R6 artifacts are byte-identical; the disk has 75 blocks free.
+      Live VICE 3.10 passes 41/41 and 9/9 with both PASS banners and normal
+      `C64[8]:>` returns; no `FLI06*.LST` remains. Initial false loader failures
+      were invalid test-driver runs using PETSCII `$5F` left-arrow for `_`, then
+      paused execution; exact `$A4` underscores and resume corrected setup.
+    - [x] Increment 7 user-approved 2026-08-11: expand map validation edges, decimal transitions,
+      repeat determinism, address formatting, and exported `mapPrint` contract
+      coverage without changing valid output order or bytes.
+      Implementation and verification complete, awaiting user approval.
+      `test_casm_map` now has 23 cases covering NameLen 32/255, DEFINED-clear,
+      each reserved flag bit, padding endpoints 37/63, partial-output VMM
+      failure, totals 9/10/99/100/255/256/511/512, repeat output,
+      `$0000`/`$FFFF`, A/carry/SP, and volatile print registers. Build 1012:
+      5,294-byte PRG, 4,036 code bytes, 625 relocations, unchanged `$1400`
+      envelope with 1,084-byte headroom. Live VICE passes 23/23 with
+      `CASM MAP: PASS` and `C64[8]:>`; no production change.
+    - [x] Increment 8 user-approved 2026-08-11: complete static ownership, shared-scratch,
+      load-bearing BSS initialization, exported-state ABI, stale local-header,
+      and DOX audit for `listing.s` and `map.s`.
+      Implementation and verification complete, awaiting user approval. Review:
+      `brain/reviews/2026-08-11-casm-phase11-wp59-increment8-static-audit.md`.
+      No production defect, private ZP, unsafe scratch lifetime, uninitialized
+      load-bearing BSS, or ownership mismatch found. Stale pre-WP54 source and
+      harness comments corrected only. `CasmListingOpenName` is the sole unused
+      legacy export and remains documented/retained to avoid an ABI change.
+      Comment-driven CASM 1263/map 1013 rebuilds preserve 18,580/4,036 code
+      bytes and 2,806/625 relocations; no-change rebuilds stable; disk 71 free.
+    - [x] Increment 9 user-approved 2026-08-11: consolidated narrow/full builds, PRG/R6 and
+      no-change stability, listing/map regressions, affected WP58 compatibility,
+      production `/M`/`/L`/combined smoke paths, shell return, and artifact
+      comparisons.
+      Implementation and verification are complete and user-approved.
+      Unrestricted, production-image, listing-image, and overflow-image builds
+      pass with a stable no-change rebuild. A consolidated-build failure exposed
+      the shared fixture's potentially page-straddling `JMP (RealApiVector)`;
+      replacing it with a RAM-patched absolute JMP avoids the NMOS page-wrap
+      hazard without production impact. Live VICE passes WP58 compatibility
+      8/8, listing 41/41, metadata 9/9, and the previously final map 23/23.
+      Production `/M`, `/L`, and `/M /L` each validate input, return to
+      `C64[8]:>`, and create the expected map/listing outputs.
+    - [x] Increment 10 user-approved 2026-08-11: The
+      completion walkthrough at
+      `brain/walkthroughs/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`
+      records all 19 exports, private paths, fixes, metrics, regressions,
+      compatibility evidence, remaining gate, and manual confirmation steps.
+      User approved completion; CASM `0.2.1.1264` differs from `0.2.0.1263`
+      only at the stage and build banner bytes. The second image build retained
+      build 1264 and the same PRG hash; the live banner and shell return pass.
+      **WP59 complete.**
+  - [/] Taskwarrior (`bd441121-dffa-4d69-8f3a-8572e0643322`): WP60 opcode,
+        addressing, and boundary hardening
+    - Plan:
+      `brain/plans/2026-08-11-casm-phase11-wp60-opcode-addressing-boundary-hardening.md`
+    - User approved the ten-increment plan 2026-08-12 and activated Increment 1
+      only; each later increment remains separately gated by the preceding
+      increment's review. Taskwarrior child created dependent on completed
+      WP59 (`4a1fab7c-28af-4404-af39-6f283b552e55`).
+    - [/] Increment 1 implementation/verification complete 2026-08-12, awaiting
+          user approval. Froze all 151 legal NMOS 6502/6510 tuples
+          independently at
+          `brain/reviews/2026-08-12-casm-phase11-wp60-increment1-opcode-oracle.md`,
+          mapped each to its parser `OpKind`/selection condition and a
+          representative fixture statement, and mechanically reconciled the
+          oracle against `opcodes.s`'s `opcodeMaskLo/Hi`, `opcodeRunOffset`,
+          `opcodeBytes`, and `modeLength` -- exact match on all five tables,
+          151/151/151 one-to-one mask-bit/opcode-byte correspondence proven.
+          No production defect found; no production, fixture, or build-system
+          change.
+    - [/] Increment 2 implementation/verification complete 2026-08-12, awaiting
+          user approval. Inventoried existing evidence across all 8 required
+          boundary domains at
+          `brain/reviews/2026-08-12-casm-phase11-wp60-increment2-boundary-register.md`:
+          52 required rows, 13 reuse, 9 strengthen, 30 add. Several `add`/
+          `strengthen` gaps are pre-generated `.seq` fixtures with correct
+          boundary values that were never wired to an automated in-code
+          assertion (manual-VICE-only, one -- `brrng1` -- with a documented
+          historical wrong-reason pass). Flagged a plan-text correction: the
+          VMM window-transfer chunk boundary is actually 64/65 bytes
+          (`CASM_VMM_BUFFER_SIZE`), not the plan's literal 255/256. No
+          production, fixture, or build-system change.
+    - [x] Increment 3 complete 2026-08-12: added `CLD` as the literal first
+          instruction at `start:` in `casm.s`, before `diagClearLoc` and
+          every other init. `casm.s` is the linker entry object
+          (`CASM_ENTRY`), confirmed by source trace to be the true load-time
+          entry point. Build 1265: code bytes 18580 -> 18581 (exactly +1, the
+          `CLD` opcode byte), relocations unchanged at 2806, base unchanged
+          at `$3800`; no-change rebuild stable at 1265. `image_d64` builds
+          clean, 334 blocks free (unchanged baseline). No BSS/zero-page/ABI
+          change; CASM remains `0.2.1`. Hardens an implicit invariant (the
+          existing first `OS_API` call already clears decimal incidentally)
+          rather than fixing a reproduced live bug.
+    - [x] Increment 4 complete 2026-08-12: added `test_casm_opcodes`, a
+          direct matcher harness linking only `opcodes.s` (no parser/emit/
+          VMM/file ownership); `CasmParserStmt` declared and fed directly,
+          `diagSetLocFromStmt` stubbed locally. 151 legal-tuple cases (from
+          the Increment 1 oracle) plus 46 focused cases (unsupported-mode
+          rejection; 8-bit range accept/reject at `$00`/`$FF`/`$0100`;
+          ZP/Absolute selection at `$00`/`$FF`/`$0100`/`$FFFF`; `FORCE_ABS`
+          zero-page-shrink prevention; independent ZP,X/ZP,Y promotion incl.
+          the LDX/STX/LDY/STY X<->Y role swap; all eight branches resolving
+          to Relative with unconstrained 16-bit targets; Implied/Accumulator
+          distinctness) = 197 cases. Each asserts opcode/mode/length or
+          diagnostic, A/carry, `CasmParserStmt` byte-for-byte preservation,
+          stack balance, and (legal tuples only) a 151-bit coverage bitmap
+          with duplicate/missing detection. Compile-time asserts freeze 56
+          mnemonics, 13 modes, 151 tuples, and the 10-byte case record.
+          Build 1000: 3145 code bytes, 107 relocations, 3367-byte PRG (well
+          under `$1400`); no-change rebuild stable. `test.d64`'s directory
+          track is full, so the harness joins `casm_listing_test_d64`
+          instead; both disk targets build clean. Live VICE 3.10: booted
+          Command64 `0.4.1.2663`, dispatched via PETSCII `$A4` underscores,
+          197/197 dots with zero `F`s, `CASM OPCODES: PASS`, normal
+          `C64[8]:>` return, no recovery. Production CASM unchanged.
+    - [x] Increment 5 complete 2026-08-12: added `casmopall.s` (one legal
+          statement per the Increment 1 oracle's 151 tuples, same row order,
+          `.ORG $C000`, `$12`/`$1234` representative operands, all eight
+          branches targeting a same-numbered `TGnn` label placed immediately
+          after their own instruction so every displacement is mechanically
+          `$00`) via a new block in `GenerateCasmTestFixtures.cmake`, and its
+          independently authored `tests/fixtures/casm/casmopall.ref.hex`
+          (opcode+length transcribed mechanically from the frozen oracle,
+          NOT from `opcodes.s`; full 151-row per-statement offset manifest
+          using native `COMP`'s own 24-bit file-offset space so a mismatch
+          localizes directly; self-validated through
+          `hex_manifest_to_bin.py`, 323 bytes, sha256 recorded in the
+          manifest). Added the dedicated self-bootable `casm_opcode_test_d64`
+          (`command64`, `casm`, `comp`, `test_casm_opcodes`, `casmopall.s`,
+          `casmopall.ref`) without touching `test.d64` or
+          `casm_listing_test_d64` (`casmopall`/`casmbig1` both excluded from
+          the generic `CASM_REF_NAMES` -> `test.d64` loop). `image_d64`
+          rebuilt unchanged at 334 blocks free / build `1265`; CASM version
+          unchanged. Live VICE 3.10: attached `casm_opcode_test.d64` to unit
+          8 under an already-resident Command64 `0.4.1.2663` (no autostart),
+          ran `casm casmopall.s /s /o:opall.prg` -> `CASM: INPUT VALIDATED`,
+          then `comp opall.prg casmopall.ref` -> `FILES COMPARE OK`, both
+          returning to `C64[8]:>`; `opall.prg` and `casmopall.ref` both 2
+          blocks on disk. Proves the native assemble-then-COMP round trip
+          byte-for-byte for all 151 legal combinations end to end. Requesting
+          user review before Increment 6 (numeric/addressing/branch/PC
+          boundaries) activates.
+    - [x] Increment 6 complete 2026-08-12: Numeric Literal domain (4 new
+          `casm_expr.s` cases: bare `$00FF`/`$0100` isolated from their
+          prior addend-only context, `$10000` proving
+          `exprParseNumeric`'s own digit-accumulation overflow ->
+          `CASM_DIAG_OPERAND_OUT_OF_RANGE` distinct from the existing
+          `sOver`/`sUnder` *expression*-overflow cases, and a bare
+          `CASM_NUMBER_BINARY` literal (`%11111111`) never previously
+          exercised by this harness); `CASE_COUNT` 34 -> 38, build 1038.
+          Addressing Width's other two required rows (ZP/Absolute
+          crossover, 8-bit-mode rejection) are satisfied retroactively by
+          Increment 4's `test_casm_opcodes` focused cases, committed before
+          this register row was reconciled -- re-classified `add`/`add` ->
+          `reuse`, flagged here rather than silently assumed; its third row
+          (`FORCE_ABS` stability across a genuine second measure/emit pass)
+          remains open, deferred to a follow-up (single-pass `FORCE_ABS`
+          shrink-prevention is already covered by Increment 4).
+          Relative Branch (7/7) and Program Counter (5/5) domains: new
+          `tests/src/casm_bounds/casm_bounds.s`, linking only `emit.s` (no
+          lexer/parser/source), driving `emitInstruction`/`emitDirective`
+          directly via hand-built `CasmParserStmt`/`CasmInsn` records --
+          proves displacement COMPUTATION/range-checking, a different
+          production routine than Increment 4's mode-SELECTION-only
+          matcher. Branch targets independently reconciled against
+          `nextPc=CasmPc(after opcode)+1`, matching Phase 4/6's own
+          `casmbrp1`/`brn1`/`brp2`/`brn2` literals at their two shared
+          boundaries. Caught and fixed two false-result bugs before this
+          harness could be trusted: (1) `CasmOutputStarted`/`CasmPcOverflow`
+          are private to `emit.s` (not `.export`ed) -- this harness's own
+          same-named BSS bytes were disconnected shadows, never written by
+          real code, and one (`CasmPcOverflow`) read back *accidentally
+          nonzero* uninitialized RAM, producing a false PASS on the wrap-
+          endpoint and PC-end-at-`$FFFF` cases before a temporary per-case
+          marker (later removed) proved a genuine count/labeling
+          discrepancy and traced it to this; fixed by dropping those three
+          assertions in favor of only genuinely observable shared state
+          (`CasmPc`, and `pcRejectOverflow`'s indirect proof via the next
+          write's own returned diagnostic). (2) the repeat-reset case
+          depends on `CasmCliOptions` genuinely reading 0 (not static) to
+          observe `emitInit`'s real default-origin priming -- BSS is not
+          guaranteed zeroed on load, so it is now zeroed explicitly in
+          `start:` rather than trusted to `.res`. `test_casm_expr` build
+          1038, `test_casm_bounds` build 1004 (3145 -> then settling at
+          1352 code bytes, 215 relocations). Neither disk-space-limited;
+          `test_casm_bounds` joins `casm_listing_test_d64` (test.d64's
+          directory track already full, matching Increment 4's own
+          `test_casm_opcodes` precedent); `image_d64`/full build unaffected,
+          no production change. Live VICE 3.10: `test_casm_expr` on
+          `test.d64` -> `CASM EXPR: PASS` (38/38); `test_casm_bounds` on
+          `casm_listing_test.d64` -> `CASM BOUNDS: PASS` (12/12), both
+          returning to `C64[8]:>`. Underscore program names required
+          PETSCII `$A4` via `vice_keyboard_petscii`, not literal ASCII `_`
+          via `vice_keyboard_type` (matches
+          `reference_vice_shell_underscore_petscii` memory) -- the first
+          attempt at each dispatch mistyped this and hit `BAD COMMAND OR
+          FILE NAME`/`FILE NOT FOUND`, corrected on retry. Requesting user
+          review before Increment 7 (source/symbol/VMM/relocation
+          boundaries) activates.
+    - [x] Increment 7 complete 2026-08-12. **Symbol domain** (`casm_symbols.s`,
+          4 new fresh-table cases after `symfull1`): name length 1
+          (`symlenmin1`); values `$0000`/`$FFFF` (`symvalzero1`/
+          `symvalmax1`, RESOLVED-flag checked independent of the value
+          bytes); 511 symbols isolated as its own checkpoint
+          (`sym511boundary1`, asserting the 511th insert's own returned
+          record index is exactly 510). Name length 0/32 not added:
+          `symbolsInsert` trusts nameLen as an unenforced 1..31
+          precondition (confirmed by source trace) -- 0 is structurally
+          unreachable from the real lexer, and 32 is `lexer.s`'s own
+          `CASM_DIAG_TOKEN_TOO_LONG` boundary, a different module than this
+          harness links; both remain open, not silently assumed covered.
+          **Relocation domain** (`casm_reloc.s`, 3 new fixtures plus a
+          `fileWrite` stub upgrade from discard-everything to capturing
+          the most recent call's bytes): empty-table R6 footer
+          (`relocempty1`, count=0 verified byte-for-byte); offset `$FFFF`
+          via `CasmPc=CASM_DEFAULT_ORIGIN-1`'s unsigned-subtraction wrap
+          (`relocoffmax1`); full 4096-entry table with distinct per-entry
+          offsets (unlike `relocfull1`'s static-offset fill), footer
+          count=4096 verified, and a `vmmWindowRead` re-read of the table's
+          own last 6 bytes (entries 4093-4095) near its full 8192-byte
+          extent (`relocfinalize4096_1`). **VMM domain** (`casm_vmm.s`):
+          `vmmoffset1` strengthened in place with a `REC_PAGES==16`
+          assertion and a diagnostic-code compare on its existing
+          one-past-window rejection; new `vmmlastbyte1` (real byte-pattern
+          round-trip at offset 65535, not just carry-clear); new
+          `vmmpage1` (isolated literal `4095` accept / `4096` reject with
+          diagnostic compare, one granted page); new `vmmchunk1` (the real
+          single-call transfer cap is `CASM_VMM_BUFFER_SIZE`=64 bytes, not
+          the plan's literal "255/256" -- confirmed via `vwPrepareTransfer`
+          source trace, matching Increment 2's own flagged correction for
+          this same domain; 64 accepted, 65 rejected with diagnostic
+          compare). **Source domain** (`casm_spanread.s`, extended with a
+          parameterized `loadNamedFixture` alongside the untouched original
+          `loadFixture`): 5 new cases wiring previously-unwired real
+          fixtures to genuine `sourceNextByte` assertions --
+          `srcCr1`/`srcCrlf1` (CR-only and CRLF both collapse to one
+          NEWLINE, identical expected sequence proving the collapse),
+          `srcBlank1` (consecutive LFs each produce their own NEWLINE),
+          `srcFinCr1` (trailing lone CR resolves as a newline before EOF),
+          `srcSplit1` (255-byte run + CRLF straddling the real 256-byte
+          source refill-chunk boundary, proving the pending-CR latch
+          survives a refill). Two Source rows explicitly NOT closed, both
+          documented rather than silently dropped or faked:
+          - Empty source file: `cc1541` cannot write a zero-byte SEQ entry
+            at all (`ERROR: Unexpected filesize when reading
+            casmsrc0.seq`), confirmed live; no fixture-pipeline path to
+            this boundary today.
+          - One-byte source file: `srcOneByte1` (written, built, run) caught
+            a **real production defect**, independently reproducing and
+            precisely characterizing an already-suspected, never-resolved
+            issue -- WP51 Increment 9's own `fixEmpty` fixture comment in
+            `cmake/GenerateCasmTestFixtures.cmake` was deliberately widened
+            from 1 byte to 4 specifically to dodge "sourceLoad's
+            phantom-byte over-read... at an exactly-1-byte file," pending a
+            fix that never landed. Live evidence: after the fixture's real
+            `Z` byte, the next `sourceNextByte` call returns
+            `A=CASM_SOURCE_BYTE`, `CasmSourceResultByte=$00` (a spurious
+            phantom byte) instead of `CASM_SOURCE_EOF`. Per this plan's
+            stop conditions, no production fix is authorized without
+            root-cause analysis and explicit approval; the routine is left
+            in `casm_spanread.s`, deliberately not called from `start:`, as
+            a ready-to-activate regression test. **Recommend a dedicated
+            Taskwarrior item for this defect**, separate from WP60.
+          `test_casm_spanread`'s envelope grew `$2C00`->`$3000` (644
+          measured bytes). No production change. Live VICE 3.10 (all four
+          harnesses): `CASM SYMBOLS: PASS`, `CASM RELOC: PASS`,
+          `CASM VMM: PASS`, `CASM SPANREAD: PASS` (13/13, one case
+          withdrawn as above), all returning to `C64[8]:>`. Requesting
+          user review before Increment 8 (consolidated build/compatibility
+          verification) activates, and a decision on the phantom-byte
+          defect (separate task vs. folding root-cause+fix into a later
+          WP60 increment under explicit approval).
+    - [x] Increment 8 complete 2026-08-12: consolidated build and
+          compatibility verification, recorded at
+          `brain/reviews/2026-08-12-casm-phase11-wp60-increment8-consolidated-verification.md`.
+          Reconfigured and built narrowly (`casm`, `test_casm_opcodes`,
+          `test_casm_bounds`, `test_casm_expr`, `test_casm_reloc`,
+          `test_casm_symbols`, `test_casm_vmm`, `test_casm_spanread`,
+          `casm_opcode_test_d64`, `casm_listing_test_d64`,
+          `casm_overflow_test_d64`), then `image_d64`/`test_image_d64`, then
+          a full unrestricted build -- no target failed. No-change rebuild
+          left `BUILD_CASM` at `1265` with an identical hash. Independently
+          re-ran `tools/reloc.py` against fresh base/base+1-page casm links:
+          18581 code bytes, 2806 relocations, byte-identical to
+          `build/casm.prg` -- matches Increment 3 exactly, proving
+          Increments 4-7 never touched `casm.s` again. Inspected every
+          WP60-relevant disk's directory/block capacity: no overflow;
+          `image.d64` unchanged at 334 blocks free. Live VICE 3.10 re-ran
+          the full changed/affected set from scratch: `test_casm_opcode`
+          (197/197, `CASM OPCODES: PASS`), the `casmopall.s`/`casmopall.ref`
+          native `COMP` round trip (`FILES COMPARE OK`), `test_casm_bounds`
+          (`CASM BOUNDS: PASS`), `test_casm_spanre` (`CASM SPANREAD: PASS`),
+          `test_casm_symbol` (`CASM SYMBOLS: PASS`), `test_casm_reloc`
+          (`CASM RELOC: PASS`), `test_casm_vmm` (`CASM VMM: PASS`), and a
+          production `/M /L` smoke assembly of the real 151-statement
+          `casmopall.s` (`SYMBOL MAP` printed 8 branch-target symbols,
+          `CASM: INPUT VALIDATED`, `casmoml.prg`+`casmoml.lst` both
+          committed to disk) -- all returned cleanly to `C64[8]:>`. Two
+          harness-side issues surfaced and resolved without any production
+          or fixture change: dispatch typos (untruncated name; literal
+          ASCII `_` instead of PETSCII `$A4` via `vice_keyboard_petscii`,
+          matching `reference_vice_shell_underscore_petscii`), and a
+          disk-selection mistake targeting the directory-full `test.d64`
+          for the first `/M /L` smoke attempt, which correctly produced
+          `CASM: OUTPUT WRITE FAILED` / `Drive 8 status: 72, DISK FULL` --
+          a real product diagnostic, not a defect -- resolved by retrying on
+          `casm_opcode_test.d64`. No production defect found; no production,
+          fixture, or build-system change. Requesting user review before
+          Increment 9 (audit and walkthrough, record synchronization)
+          activates.
+    - [x] Increment 9 complete 2026-08-12: audit and walkthrough at
+          `brain/walkthroughs/2026-08-12-casm-phase11-wp60-increment9-audit-walkthrough.md`.
+          Reconciled the Increment 1 opcode oracle (151/151/151, re-proven
+          live twice more at Increments 4/5/8) and the Increment 2 boundary
+          register (52 required rows) against what Increments 6-7 actually
+          closed: 48/52 closed, 4 residual -- `FORCE_ABS` stability across a
+          genuine two-pass re-resolution (untested, single-pass shrink-
+          prevention is covered); the source domain's 65,535-byte accepted
+          extent and 65,536-byte first-reject boundary (never attempted);
+          symbol name-length-32 rejection (owned by `lexer.s`, zero coverage
+          anywhere in `tests/`); the empty-source-file row remains a tooling
+          gap, not a code gap (`cc1541` cannot write a zero-byte SEQ entry).
+          Recorded the one real production defect Increment 7 found and left
+          unfixed (the one-byte-source phantom-EOF-byte in
+          `sourceLoad`/`sourceNextByte`) as its own Taskwarrior item, task 42
+          / UUID `882433f0-cde1-4849-8b3c-df32613518c3`, project `casm`,
+          separate from WP60 per Increment 7's own recommendation. Recorded
+          the two test-harness-only bugs Increment 6 found and fixed (both
+          non-production). No production, fixture, or build-system change
+          in this increment; `brain/KNOWLEDGE.md`, `brain/MEMORY.md`, and
+          `CHANGELOG.md` need no edits since no owned fact in those files
+          changed at this increment (all reserved for Increment 10's
+          completion). Requesting accept/defer decisions on the 4 residual
+          boundary items and approval to activate Increment 10 (version
+          bump to `0.2.2`, final no-change proof).
+    - [x] Increment 10 complete 2026-08-12: version-only completion
+          increment. `casm.s`'s `VERSION_STAGE "1" -> "2"` (`0.2.1` ->
+          `0.2.2`). First build (1265 -> 1266): `cmp -l` against the
+          pre-bump `casm.prg` shows exactly 2 differing bytes, both in the
+          banner string -- the version-stage digit (`1`->`2`) and the
+          build-counter's own last digit (`5`->`6`); PRG size unchanged at
+          24201 bytes; `image_d64` unchanged at 334 blocks free. Second
+          build (no source change): build counter held at 1266 with an
+          identical `BUILD_CASM` hash -- no-change stability confirmed.
+          Independently re-derived the envelope via `tools/reloc.py` against
+          fresh base/base+1-page links: 18581 code bytes, 2806 relocations,
+          byte-identical to `build/casm.prg` -- unchanged since Increment 3.
+          Live VICE 3.10: `CASM V0.2.2.1266` banner confirmed (bare `casm` ->
+          `CASM: SOURCE FILE REQUIRED`, clean shell return); re-ran the
+          `casmopall.s`/`casmopall.ref` native `COMP` round trip under
+          `0.2.2` -> `CASM: INPUT VALIDATED` / `FILES COMPARE OK`; re-ran
+          `test_casm_opcode` -> `CASM OPCODES: PASS` (197/197), clean shell
+          return. One dispatch mistake mid-increment (sent `test_casm_opcode`
+          via plain `vice_keyboard_type`, resending literal ASCII `_` instead
+          of PETSCII `$A4` -- the same class of error Increment 6 already
+          hit once) put the shell into an apparent stall; recovered with one
+          soft reset + reboot per the mandatory testing workflow's recovery
+          procedure, then redispatched correctly. No production defect;
+          WP60's only production change remains the single `CLD` byte from
+          Increment 3. Taskwarrior task 40 (`bd441121-dffa-4d69-8f3a-8572e0643322`)
+          marked done. **WP60 is complete at CASM `0.2.2` build `1266`.**
+          The 4 residual boundary items from Increment 9 (`FORCE_ABS`
+          two-pass re-resolution; source 65,535/65,536-byte extent boundary;
+          symbol name-length-32 rejection; empty-source-file tooling gap)
+          and the separately tracked phantom-EOF-byte defect (Taskwarrior
+          UUID `882433f0-cde1-4849-8b3c-df32613518c3`) remain open,
+          explicitly deferred rather than blocking this completion. (Note:
+          bare Taskwarrior numeric IDs are unstable across sessions as
+          tasks complete and free their ID for reuse -- this defect's ID
+          has since shifted from 42 to 41; cite the UUID.)
+  - [/] Taskwarrior (`f6845310-bcce-4448-b5f2-0aa19a73723b`): WP61
+        determinism and remaining boundary spot-checks
+    - Plan:
+      `brain/plans/2026-08-12-casm-phase11-wp61-determinism-and-boundary-spot-checks.md`
+    - User approved the nine-increment plan 2026-08-12 and activated
+      Increment 1 only; each later increment remains separately gated by
+      the preceding increment's review. Taskwarrior task created dependent
+      on completed WP60 (`bd441121-dffa-4d69-8f3a-8572e0643322`).
+    - Scope (user-confirmed 2026-08-12): determinism proof (PRG/R6/
+      listing/map self-compare) plus the 4 boundary items WP60 Increment 9
+      deferred (`FORCE_ABS` two-pass stability; source 65,535/65,536-byte
+      extent; symbol/token name-length-32; empty-source-file explicitly
+      re-scoped as a tooling gap, not carried forward again). The
+      phantom-EOF-byte defect stays out of scope, tracked separately.
+    - [/] Increment 1 implementation/verification complete 2026-08-12,
+          awaiting user approval. Register at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment1-scope-register.md`:
+          all 5 in-scope items dispositioned with source-trace-confirmed
+          mechanisms -- FORCE_ABS derivation (`parser.s:526-575`) confirmed
+          pass-invariant by construction (syntactic, not value-based),
+          closing an "add" for end-to-end proof only, not a design concern;
+          source-extent overflow confirmed to return
+          `CASM_DIAG_SOURCE_OFFSET_OVERFLOW` (`$15`) via `slCheckCap`'s
+          16-bit-carry check (`source.s:631-643`); token length-32
+          rejection confirmed at `lexerTokenAppend` (`lexer.s:525-537`,
+          `CASM_TOKEN_TEXT_MAX=31`) with zero existing `lexer.s`-linked
+          harness anywhere in `tests/`. Re-surveyed disk free space on
+          every candidate: `test.d64` and `casm_overflow_test.d64` remain
+          unusable for new files (34 and 7 blocks free respectively,
+          `test.d64`'s count drifted 36->34 since WP60's own survey for
+          unexplained but harmless BAM-allocation reasons, confirmed
+          content-identical); `casm_opcode_test.d64` (489 free) and
+          `command64_casm_utils.d64` (245 free) both have ample room;
+          `casm_include_test_d64` (542 free, not previously surveyed) is
+          proposed as the Increment 6 extent-fixture disk instead of a new
+          disk, pending a purpose/capacity check at that increment's
+          activation. No production or fixture change. Requesting user
+          review before Increment 2 (determinism proof: PRG/R6) activates.
+    - [/] Increment 2 implementation/verification complete 2026-08-12,
+          awaiting user approval. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment2-determinism-prg-r6.md`.
+          Appended pre-existing fixtures `casmhello.s` (static, no
+          relocation) and `casmreloc1.s` (relocatable, real R6 footer) plus
+          `casmreloc1.ref` to `casm_opcode_test_d64` (489 -> 480 blocks
+          free), avoiding a new disk or multi-drive setup. Live VICE:
+          each of `casmhello.s`, `casmreloc1.s`, and the 151-statement
+          `casmopall.s` assembled twice to independently named outputs;
+          all 3 self-compares (`comp` between the two runs) returned
+          `FILES COMPARE OK`; `casmreloc1.s` and `casmopall.s` additionally
+          cross-checked against their independently-trusted `.ref` files,
+          also `FILES COMPARE OK` -- anchoring the self-compare proof to
+          externally-derived bytes, not just internal run-to-run
+          consistency. PRG determinism closed (3/3 fixtures spanning
+          small-static, small-relocatable, and large-exhaustive shapes);
+          R6 relocation determinism closed (1/1 relocatable fixture). No
+          production defect; only build-system change is the fixture
+          placement above. Requesting user review before Increment 3
+          (determinism proof: listing and map) activates.
+    - [/] Increment 3 implementation/verification complete 2026-08-12,
+          awaiting user approval. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment3-determinism-listing-map.md`.
+          Extended the determinism proof to `/L` and `/M` using the same
+          `casmopall.s` fixture on the same already-attached
+          `casm_opcode_test.d64`, no new fixture or disk needed. `/L`:
+          dual-assembled to `m1.lst`/`m2.lst`, `comp` -> `FILES COMPARE OK`.
+          `/M`: dual-assembled and independently decoded both runs' screen
+          RAM via `vice_memory_read` -- identical 8-row symbol map
+          (`$C033 tg22` through `$C047 tg32`, `008 SYMBOLS`) both times,
+          explicitly recorded as manual/live evidence since `/M` writes no
+          file to `comp`. No production defect; no production or fixture
+          change. **WP61's full determinism charter (PRG, R6, listing, map)
+          is now closed.** Requesting user review before Increment 4
+          (FORCE_ABS two-pass closure) activates.
+    - [x] Increment 4 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment4-force-abs-closure.md`.
+          New `casmfa2p.s` (`.ORG $0010` / `LDA TARGET` (forward ref) /
+          `TARGET: NOP`) + hand-authored `casmfa2p.ref.hex`, joined
+          `casm_opcode_test_d64`. Live VICE: assembled twice, `comp` vs the
+          trusted reference and self-compare between the two runs both
+          `FILES COMPARE OK` -- `LDA TARGET` emitted as 3-byte absolute
+          (`AD 13 00`), never shrinking to 2-byte zero-page, closing WP60's
+          residual FORCE_ABS two-pass item. No production defect/change.
+    - [x] Increment 5 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment5-lexer-length32-closure.md`.
+          New `tests/src/casm_lexer/casm_lexer.s`, linking only `lexer.s`
+          (no parser/source/state.s), local BSS + stub `sourceNextByte`
+          feeding a fixed-length identifier byte run through the real
+          `lnId` scan loop via `lexerNext`. Joined `casm_listing_test_d64`.
+          Live VICE: `CASM LEXER: PASS` (2/2) -- 31 bytes accept
+          (length recorded exactly 31), 32 bytes reject
+          (`CASM_DIAG_TOKEN_TOO_LONG`, length left at 31, unmodified). No
+          production defect/change. Closes WP60's residual symbol/token
+          name-length-32 item.
+    - [x] Increment 6 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment6-source-extent-closure.md`.
+          New `casmsrcmax.seq` (exactly 65,535 bytes: `.ORG $C000\n` + 16381
+          `NOP\n` lines, `string(REPEAT ...)`-generated for an exact byte
+          count) and `casmsrcbit.seq` (exactly 1 byte). Added `command64`
+          to `casm_include_test_d64` (previously casm/comp only) so both
+          join it directly bootable. Live VICE: `casm casmsrcmax.s` alone
+          (65,535 combined) -> `CASM: INPUT VALIDATED`, `xmax.prg`
+          committed; `casm casmsrcmax.s casmsrcbit.s` (65,536 combined) ->
+          `CASM: SOURCE OFFSET OVERFLOW` (`$15`), no location trailer
+          (matches the `casmmfovf1/2` precedent), no partial output
+          committed. Confirmed this fires in `sourceLoad`'s raw-streaming
+          `slCheckCap` phase, before any lexing -- does not exercise or
+          mask the separately-tracked phantom-EOF-byte defect. No
+          production defect/change. Closes WP60's residual source-extent
+          item.
+    - [x] Increment 7 complete 2026-08-12. Record at
+          `brain/reviews/2026-08-12-casm-phase11-wp61-increment7-consolidated-verification.md`.
+          First full unrestricted rebuild failed (`Dir track full` on
+          `test_image_d64`): Increment 4 added `casmfa2p` to
+          `CASM_REF_NAMES` without extending the existing
+          `casmbig1`/`casmopall` test.d64-exclusion list to cover it,
+          overflowing the already-full 144-entry directory. Fixed by
+          adding `casmfa2p` to that exclusion list (its source also lives
+          only on `casm_opcode_test_d64`) -- a build-system-only fix, no
+          production impact, found only because this increment finally ran
+          a full unrestricted build. After the fix: clean full build,
+          no-change rebuild stable at 1266/unchanged hash, `test.d64`
+          re-confirmed at exactly 144/144 content-identical to the WP60
+          baseline, `casm.prg` independently re-derived as byte-identical
+          (18581 bytes/2806 relocations) -- zero production change through
+          Increment 6. Live VICE re-ran the full changed set from the
+          clean rebuild: `test_casm_opcode` (197/197),
+          `casmopall.s`/`casmreloc1.s`/`casmfa2p.s` each vs their `.ref`
+          (`FILES COMPARE OK` all three), `test_casm_lexer` (2/2), and the
+          source-extent reject case (`SOURCE OFFSET OVERFLOW`, no partial
+          output) -- all clean shell returns.
+    - [/] Increment 8 complete 2026-08-12, awaiting user approval: audit
+          and walkthrough at
+          `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
+          Reconciled the Increment 1 register's 5 in-scope items against
+          Increments 2-6: all 5 closed (determinism; FORCE_ABS two-pass;
+          source extent; symbol/token length-32; empty-source-file closed
+          by re-scope at Increment 1 itself). One build-system-only defect
+          found and fixed within WP61 (Increment 7's `test.d64` directory-
+          overflow oversight); zero production defects; `casm.prg` remains
+          byte-identical to its WP60 `0.2.2` state throughout. No version
+          bump due (no production change occurred, per the user-confirmed
+          bump-only-if-changed policy). **User approved WP61 completion
+          2026-08-12.** Taskwarrior task
+          `f6845310-bcce-4448-b5f2-0aa19a73723b` marked done. **WP61 is
+          complete at CASM `0.2.2` build `1266`.** The empty-source-file
+          boundary row remains closed by re-scope (tooling gap) and the
+          phantom-EOF-byte defect remains separately tracked (Taskwarrior
+          UUID `882433f0-cde1-4849-8b3c-df32613518c3`), neither blocking
+          this completion.
+  - [/] Taskwarrior (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`): WP62
+        documentation sync
+    - Plan: `brain/plans/2026-08-12-casm-phase11-wp62-documentation-sync.md`
+    - User approved the seven-increment plan 2026-08-12 and activated
+      Increment 1 only; each later increment remains separately gated by
+      the preceding increment's review. Taskwarrior task created dependent
+      on completed WP61 (`f6845310-bcce-4448-b5f2-0aa19a73723b`).
+    - Scope (user-confirmed 2026-08-12): full clean-room re-sync of
+      `brain/KNOWLEDGE.md` (backfilling Phase 4, Phase 10, **and** Phase 11
+      -- a bigger gap than WP56 originally flagged, found during this
+      plan's own research), `wiki/casm-programmers-reference.md`,
+      `wiki/casm-utility.md`/`docs/casm-utility.md` (kept in sync, not
+      consolidated), `CHANGELOG.md` (add the missing WP61 entry), and
+      `src/external/casm/AGENTS.md`. No CASM version bump (documentation-
+      only, matching WP56's precedent).
+    - [/] Increment 1 implementation/verification complete 2026-08-12,
+          awaiting user approval. Register at
+          `brain/reviews/2026-08-12-casm-phase11-wp62-increment1-staleness-register.md`.
+          Clean-room re-read of all 6 in-scope items. Confirmed
+          `KNOWLEDGE.md`'s CASM sections stop at Phase 9 WP48 with no Phase
+          10/11 content and pinned exact insertion points (Phase 10 after
+          the Phase 9 WP48 section and after the interleaved DASH section,
+          Phase 11 last, both chronological by close date). Cataloged 6
+          discrepancies in `wiki/casm-programmers-reference.md` (stale
+          version/build in 3 places, a missing `CLD` in the documented
+          `start:` sequence, undocumented WP60 opcode-certification
+          strength, two undocumented known non-critical bugs) and 3 in
+          `wiki/casm-utility.md`/`docs/casm-utility.md` (same version
+          staleness and missing known-bugs disclosure). Confirmed
+          `CHANGELOG.md`'s WP61 gap. Found `src/external/casm/AGENTS.md`
+          more stale than the plan anticipated: it still describes Phase 10
+          (WP50-55) as "remain inactive," has zero Phase 11 content, and
+          carries a `0.1.9`-threshold version-migration note now moot at
+          `0.2.2` -- Increment 6 will need a real rewrite, not a light
+          touch. No documentation change made in this increment. Requesting
+          user review before Increment 2 (`KNOWLEDGE.md` backfill)
+          activates.
+    - [x] Increments 2-6 complete 2026-08-12, implemented via two parallel
+          background agents per user direction (Agent A: Increments 2 and
+          6; Agent B: Increments 3-5), then independently verified by this
+          agent against the Increment 1 register and current source before
+          committing.
+          - **Increment 2** (`brain/KNOWLEDGE.md`): added
+            `### CASM Phase 4 Parser/Opcode/Emission Contract`,
+            `### CASM Phase 10 Symbol Map/Listing Contract`, and
+            `### CASM Phase 11 Base-Release Hardening Contract`, at the
+            exact pinned insertion points (Phase 4 between Phase 3/5;
+            Phase 10 after the interleaved DASH section; Phase 11 last,
+            before `## C64 Platform Constraints Discovered`) -- verified
+            by grepping the file's heading order post-edit. Phase 4
+            content spot-checked against
+            `brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`
+            (the `CASM_MODE_ZEROPAGE_Y` ca65-negative-shift defect, the
+            bare-`.ORG`-origin-zero defect, and the `0.1.17` completion
+            version) -- all confirmed accurate.
+          - **Increment 3** (`wiki/casm-programmers-reference.md`): fixed
+            all 6 cataloged discrepancies -- version/build in 3 places,
+            the missing `CLD` in the documented `start:` sequence
+            (verified directly against `casm.s:118-128`), WP60's
+            certification strength, and both known-bug disclosures, plus
+            a new determinism note.
+          - **Increment 4** (`wiki/casm-utility.md`/`docs/casm-utility.md`):
+            version/banner fix, known-bugs disclosure in end-user framing;
+            confirmed byte-identical after edit (`diff` clean).
+          - **Increment 5** (`CHANGELOG.md`): added the missing WP61
+            entry. Caught and fixed one inaccuracy during review -- the
+            agent's draft said "closed 4... the 5th... re-scoped" (implying
+            5 total items), corrected to the accurate "closed the 4
+            items... plus [the re-scoped one]" (4 total: 3 actioned + 1
+            re-scoped), matching WP61's own walkthrough.
+          - **Increment 6** (`src/external/casm/AGENTS.md`): rewrote the
+            stale "WP50-WP55 remain inactive" framing into historical
+            record, collapsed the 5 "approved-but-blocked" WP50-54 bullets
+            into one durable-facts block (dropping only the gating
+            language), added Phase 11 content, and resolved the `0.1.9`
+            version-migration note by restating it as reapplying at the
+            next analogous threshold (`0.2.9`) rather than marking it
+            moot -- reviewed and accepted as sound reasoning, not just
+            hedging.
+          - No production source change; no CASM version bump (matches
+            WP56's precedent for documentation-only work). Requesting user
+            review before Increment 7 (audit and walkthrough) activates.
+    - [x] Increment 7 complete 2026-08-12: row-by-row reconciliation of the
+          Increment 1 register (18 discrepancy rows across 6 files/3
+          `KNOWLEDGE.md` gaps) against the Increments 2-6 commit -- all 18
+          confirmed closed, none left unaddressed. Spot-checked
+          `brain/task.md`/`wiki/tasks/casm.md` for internal consistency
+          against this plan's own findings -- both already accurate, no fix
+          needed. Confirmed directly against `casm.s` (`VERSION_MAJOR`/
+          `MINOR`/`STAGE`) that CASM remains `0.2.2` build `1266`, unchanged.
+          Confirmed `wiki/casm-utility.md`/`docs/casm-utility.md` remain
+          byte-identical (`diff -q` clean). Walkthrough recorded at
+          `brain/walkthroughs/2026-08-12-casm-phase11-wp62-increment7-audit-walkthrough.md`.
+          Requesting user approval to close WP62.
+  - [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42
+        (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`) closed. CASM remains
+        `0.2.2` build `1266`, unchanged (documentation-only work package).
+  - [x] WP63 plan approved 2026-08-12, activated: Taskwarrior task 42
+        (`dcdc8e94-1615-46ea-8423-717d04059bce`) created, depends on WP62
+        (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`), started.
+        `brain/plans/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
+        Verification/walkthrough/completion gate for Phase 11 as a whole
+        (mirrors WP49/WP55's own closing pattern). Research (via sub-agent)
+        confirmed no consolidated cross-WP live verification of WP56-62's
+        combined changes exists yet -- that is WP63's core job. User
+        confirmed 4 scoping decisions: known bugs (tasks #36/#40/#41) stay
+        fully deferred, not fixed; regression build scope is CASM-only, not
+        whole-OS; a single approval closes both WP63 and Phase 11 (no
+        separate promotion step, since Phase 11 has no completion-bump);
+        live VICE verification is a fresh full re-run of every
+        `test_casm_*` harness (~25), not citation-only. No production
+        change expected; CASM should remain `0.2.2` build `1266` throughout
+        unless verification discloses a genuine new defect (which would
+        stop the plan for separate approval, not be fixed inline).
+        Beginning Increment 2 (baseline reconciliation) and Increment 3
+        (cross-WP interaction review) next, in parallel via sub-agents
+        (both are independent, non-interactive research/build work; the
+        live-VICE increments that follow must run sequentially in one
+        session, not delegated to parallel agents).
+        **Increment 3 complete.** Sub-agent ran all 4 Cross-WP Interaction
+        Review checks, source-grounded: (1) `CLD` confirmed the literal
+        first `start:` instruction, fault-injection hook confirmed
+        test-build-only (never linked into the production `casm` target) --
+        no ordering conflict. (2) WP59's 4 fixes (D1-D4) reviewed directly
+        against their diffs -- none introduce a nondeterminism source
+        (no uninitialized reads, no VIC-II/CIA timing dependence); WP61's
+        determinism proof ran chronologically after WP59 and genuinely
+        covers the fixed binary, though D1/D2's new failure-path branches
+        (only reachable via a real/injected OS_API failure) weren't
+        exercised by WP61's all-success runs -- a coverage note, not a
+        nondeterminism risk. (3) Fault-injection and opcode/bounds/lexer
+        test infrastructure confirmed structurally isolated -- no CMake
+        target links both, `faultstub.inc`'s only storage is a DATA segment
+        (not zero page), no collision possible. (4) WP62 doc spot-check:
+        version banner and known-bugs disclosure both confirmed accurate;
+        **found one real, pre-existing gap** -- `wiki/casm-programmers-
+        reference.md`'s documented `start:` sequence omitted
+        `includeCatalogInit` (present in source since WP47, predates Phase
+        11 entirely -- WP62 only prepended `CLD →` to this line and never
+        touched the rest, so this was missed by WP62's own resync, not
+        introduced by it). Independently re-verified against
+        `casm.s:173-186` directly (own read, not just the sub-agent's
+        claim) before acting. **Fixed in place** (added
+        `includeCatalogInit` between `sourceLoad` and `sourceOpen` in the
+        documented sequence), following the exact precedent WP55's own
+        Increment 2 set for a stale-doc gap (fix in place with a note,
+        not a full Stop-Condition pause) -- this is a documentation
+        correction with no ambiguity, not a behavioral defect.
+        **Increment 2 complete.** Sub-agent confirmed: WP56-62 all closed
+        across Taskwarrior/task logs, UUIDs match the plan's `depends-on`
+        chain exactly. Version/build confirmed directly from source:
+        `0.2.2` build `1266`, matching the plan. Authoritative harness
+        roster re-derived directly from `CMakeLists.txt` (not copied from
+        the plan's own estimate): **28** `test_casm_*` targets total (the
+        plan's own "~25" was an undercount), mapped across `test.d64` (6),
+        `casm_overflow_test.d64` (7), `casm_listing_test.d64` (15, plus
+        non-`casm_`-prefixed `test_l15release`), with `test_casm_opcodes`
+        shipping on both `casm_listing_test.d64` and `casm_opcode_test.d64`
+        (double-counted once); `casm_include_test_d64`/`casm_phase10_test_d64`
+        carry only raw production fixtures, no dedicated harness. Full
+        regression build clean: `casm` target + all 28 harnesses + all 7
+        disk images (`image_d64`, `test_image_d64`,
+        `casm_overflow_test_d64`, `casm_include_test_d64`,
+        `casm_listing_test_d64`, `casm_phase10_test_d64`,
+        `casm_opcode_test_d64`), zero failures. No-change rebuild
+        deterministic: `BUILD_CASM` (`1266`) and `casm.prg` md5
+        (`d50055869f7bc896746d64420520a1ab`) identical before/after.
+        Starting-state record: git HEAD `33267feb4da381b80debeeec61602d15e0a96075`,
+        18,581 code bytes, 2,806 relocation points, all 7 image md5sums
+        captured. `git diff --check` clean; `git status` unchanged by the
+        build (only the pre-existing WP63 plan + Increment 3 doc-fix
+        working-tree state, no build-artifact leakage). All 3 known bugs
+        re-confirmed still open/Pending, none touched. **No Stop Condition
+        triggered.** Baseline Reconciliation and Cross-WP Interaction
+        Review are both complete and clean (one doc fix applied, already
+        recorded above). Proceeding to Increment 4 (live VICE harness
+        regression) next -- this and Increment 5 run sequentially in one
+        continuous session, not delegated to sub-agents.
+        **Increment 4 in progress.** Live VICE session on `test.d64`
+        (unit 8), fresh Command64 boot confirmed (`Command 64-DOS Version
+        0.4.1.2663`). One recovery: the first dispatch
+        (`test_casm_pass1`) used `vice_keyboard_type`'s ASCII underscore,
+        which mapped to PETSCII left-arrow, producing `BAD COMMAND OR FILE
+        NAME` plus leftover stale-session keyboard-buffer input (`flush`,
+        drive-8 file-not-found) -- recovered per the workflow's one-clean-
+        restart allowance (soft reset + re-autostart `test.d64`), then
+        re-dispatched every harness via `vice_keyboard_petscii` with
+        explicit PETSCII bytes (letters `$41`+offset, underscore `$A4`)
+        for the rest of this increment. **`test.d64` complete, 6/6 PASS**,
+        each with full PASS text and clean `C64[8]:>` shell return:
+        `test_casm_pass1` (`CASM PASS1: PASS`), `test_casm_symbols`
+        (`CASM SYMBOLS: PASS`), `test_casm_reloc` (`CASM RELOC: PASS`),
+        `test_casm_vmm` (`CASM VMM: PASS`), `test_casm_expr`
+        (`CASM EXPR: PASS`), `test_casm_faultinject`
+        (`CASM FAULTINJECT: PASS`). Per user direction, overlay build/test
+        events are now being fired via `c64-overlay-api` for each harness
+        (`testing` on dispatch, `pass`/`fail` on result) plus one
+        retroactive `build`/`success` event for Increment 2's regression
+        build. Continuing to `casm_overflow_test.d64` (7 harnesses) next.
+        **Setup note**: `casm_overflow_test.d64` carries no `command64`
+        (not self-bootable). First attempt swapped it directly into unit 8
+        (overwriting the boot disk), which produced `BAD COMMAND OR FILE
+        NAME` for `test_casm_include` -- a real setup failure, not a typo.
+        Corrected per this project's established two-drive convention:
+        `test.d64` stays on unit 8 (already-booted Command64), overflow
+        disk attached separately on unit 9, shell switched to `9:`. Dispatch
+        then succeeded (file found, loaded).
+        **`test_casm_include` display anomaly, resolved by direct evidence:**
+        after loading, the harness returned to a clean `C64[9]:>` prompt
+        without ever displaying its final `CASM INCLUDE: ALL PASS` line,
+        reproduced identically on a same-session retry. Investigated rather
+        than assumed pass or fail: read `tests/src/casm_include/
+        casm_include.s:91-131` directly -- the harness prints one `.` per
+        passing case (`F` per failing case) via raw `KernalChROUT` in a
+        loop of `CASE_COUNT` (`=14`, line 70) iterations, then the final
+        message via `DOS_PRINT_STR`. Byte-counted the actual dot row from
+        screen RAM: **exactly 14 dots, 0 `F`s** -- matches `CASE_COUNT`
+        exactly with zero failures, confirmed via direct source+screen
+        evidence, not inferred from the generic shell load indicator (a
+        separate row, the literal word "loading..." with its own 3
+        trailing dots). Per user direction, counted as **PASS** (14/14
+        cases) on this decisive evidence; the missing final on-screen
+        `PASS` text is a display anomaly (worth a follow-up look, not a
+        Stop Condition) -- `DOS_PRINT_STR`'s output not rendering after an
+        all-`.` KernalChROUT loop, distinct from the already-known/
+        disclosed `/L` listing blank-line artifact but possibly related in
+        mechanism. Not fixed under WP63 (verification-only scope).
+        **Real regression found and fixed (user-directed deviation from
+        plan default).** Continuing Increment 4 (`casm_overflow_test.d64`),
+        `test_casm_faultsource` dispatched immediately after
+        `test_casm_faultvmm`: produced `.fff` (1 pass, 3 real fails) with
+        no PASS/FAIL banner -- reproduced 3x, always tied to running
+        immediately after `test_casm_faultvmm` specifically (isolated runs
+        passed clean). Root-caused via scratch ca65/ld65 diagnostic
+        instrumentation (uncommitted, built outside the tracked CMake
+        targets, deleted after use): confirmed live that `sourceLoad`'s
+        real (unfaulted) VMM allocation step was failing with
+        `CASM_DIAG_VMM_ALLOC_FAILED` despite the OS-level VMM Memory
+        Control Table (`VmmMctBase = $C000`, `src/command64/vmm.asm`)
+        showing abundant free space -- ruling out both the CASM-level
+        software registry (`CasmVmmRegistry`, confirmed fully reset by
+        `resourcesInit` every case) and REU/MCT exhaustion. A second
+        probe calling `OS_API` directly (bypassing the harness's own
+        `faultInstall`) hit a runaway stack-consuming loop, pointing at
+        the shared `$1000` OS_API dispatch vector itself. Confirmed via
+        direct grep: `casm_faultvmm.s`, `casm_faultsource.s`,
+        `casm_freloc.s`, `casm_finc.s`, `casm_fsym.s`, and
+        `casm_faultinject.s` each call `faultInstall`
+        (`tests/src/casm_faultinject/faultstub.inc`) exactly once and
+        **never call `faultUninstall`** before their own `DOS_EXIT` --
+        leaving the OS-resident `$1000` vector patched to their own
+        (about-to-be-overwritten) `faultStubEntry` after they exit, so
+        the very next OS_API call issued by *whatever runs next* in the
+        same Command64 session jumps through a dangling pointer into
+        unrelated bytes of that next program's own image. `casm_flist.s`/
+        `casm_flmeta.s` already show the correct paired
+        `faultInstall`/`faultUninstall` pattern; the 6 single-case
+        harnesses above never picked it up. User explicitly directed an
+        inline fix rather than the plan's disclose-and-defer default for
+        newly-discovered defects. **Fixed**: added `jsr faultUninstall`
+        immediately before `DOS_EXIT` in all 6 harnesses. Rebuilt via the
+        real CMake targets (not the scratch tooling): all 6
+        `BUILD_TEST_CASM_*` counters incremented (faultsource ->1003,
+        freloc ->1002, finc ->1003, fsym ->1004, faultinject ->1009;
+        faultvmm's own counter also incremented, exact prior value not
+        captured), `casm_overflow_test_d64`, `test_image_d64`, and
+        `casm_listing_test_d64` all rebuilt clean.
+        **Live re-verification in VICE, fresh boot**: the exact original
+        failing sequence (`test_casm_catalog` -> `test_casm_event` ->
+        `test_casm_faultvmm` -> `test_casm_faultsource`) now runs
+        entirely clean -- `CASM FAULT SOURCE: PASS` with its banner
+        correctly displayed (the earlier missing-banner symptom was a
+        downstream effect of the same corruption, not a separate display
+        bug). Individually re-verified live and clean post-fix:
+        `test_casm_faultsource`, `test_casm_fsym`
+        (`CASM FAULT SYMBOLS: PASS`), `test_casm_freloc`
+        (`CASM FAULT RELOC: PASS`), `test_casm_faultinject`
+        (`CASM FAULTINJECT: PASS`, on `test.d64`), `test_casm_finc`
+        (`CASM FAULT INCLUDE: PASS`, on `casm_listing_test.d64`).
+        `test_casm_faultvmm` itself unaffected (still `CASM FAULT VMM:
+        PASS` throughout, since it's the harness that leaves the *later*
+        corruption, not one that suffers from a *prior* one in this
+        specific reproduction chain). This is a genuine test-infrastructure
+        defect (never a production CASM behavior change) that predates
+        WP63 -- introduced across WP57/58 whenever each single-case fault
+        harness was written -- and was only exposed now because WP63 is
+        the first session to run these harnesses back-to-back without an
+        intervening reset. Not yet reflected in `wiki/tasks/casm.md`,
+        `CHANGELOG.md`, or `brain/KNOWLEDGE.md` -- pending before WP63
+        closes.
+        **Full regression build confirmed clean**: `cmake --build build`
+        (no target filter -- every target, every image) exits 0 with zero
+        errors. No-change rebuild of `casm` alone is stable (`BUILD_CASM`
+        still `1266`, `casm.prg` md5
+        `d50055869f7bc896746d64420520a1ab` unchanged before/after --
+        correctly, since this fix touches only test-harness sources, never
+        CASM production code). `git diff --check` clean. Every harness
+        that links `faultstub.inc` (the only surface this fix could affect)
+        has now been individually live-reverified PASS post-fix:
+        `test_casm_faultvmm`, `test_casm_faultsource`, `test_casm_fsym`,
+        `test_casm_freloc`, `test_casm_faultinject`, `test_casm_finc`. The
+        remaining `test_casm_*` harnesses do not link `faultstub.inc` and
+        are structurally unreachable by this fix, but were re-run live
+        anyway to satisfy the plan's own "every harness pass live, fresh,
+        one consolidated session" bar. **Full consolidated live regression
+        now complete**, matching Increment 2's confirmed 28-target roster:
+        `test.d64` (6, `test_casm_pass1`/`symbols`/`reloc`/`vmm`/`expr`
+        verified earlier this same Increment 4 session,
+        `test_casm_faultinject` verified post-fix), `casm_overflow_test.d64`
+        (7, all verified post-fix), `casm_listing_test.d64` (15 +
+        `test_l15release`, fresh boot, one continuous session: `listing`,
+        `listcap`, `map`, `passcheck`, `l15release` (5/5 checks OK),
+        `cliderive`, `spanread`, `spancommit`, `listwrite`, `frame`,
+        `finc` (`CASM FAULT INCLUDE`), `flist` (`CASM FAULT LIST`,
+        confirms its own already-correct `faultInstall`/`faultUninstall`
+        pairing still works), `flmeta` (`CASM FAULT META`), `opcodes`,
+        `bounds`, `lexer` -- all PASS, zero failures).
+        **`casm_opcode_test.d64` `comp` cross-checks also now complete**:
+        booted fresh, live on-device `casm casmopall.s` / `casm
+        casmreloc1.s` / `casm casmfa2p.s` (each `CASM: INPUT VALIDATED`,
+        version banner `CASM V0.2.1266` unchanged) followed by `comp
+        <name>.prg <name>.ref` for each -- all three `FILES COMPARE OK`.
+        `casmhello.s` carries no `.ref` on this disk (smoke-load fixture
+        only, not a comp target). All 28 `test_casm_*` harnesses plus these
+        3 comp cross-checks are now live-verified this session. Remaining
+        by choice/time-box: production `/M`/`/L`/`/S`/`/O` end-to-end
+        re-confirmation, determinism dual-assembly re-confirmation, and the
+        `CLD`-placement check -- the plan's own text treats these three as
+        re-citations of WP55/61's already-established evidence, not
+        required fresh exercises. Not yet git-committed -- awaiting
+        explicit instruction.
+        **Walkthrough drafted**:
+        `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`
+        records the full defect/root-cause/fix/verification narrative plus
+        the consolidated harness regression, matching WP55's own
+        completion-gate walkthrough format. Status: draft, awaiting the
+        user's own runtime walkthrough and explicit approval.
+        **`brain/KNOWLEDGE.md` updated**: added WP62 and WP63 closing
+        notes to the existing Phase 11 section (not a new section, per
+        the plan's own convention), including the full defect/root-cause/
+        fix summary and a pointer to the walkthrough; section header now
+        reads "WP56-61 closed 2026-08-12; WP62 closed 2026-08-12; WP63 in
+        progress".
+        **Committed**: `93a5365` ("fix(casm): WP63 -- restore OS_API
+        vector in 6 fault-injection harnesses"), 19 files, on
+        `feature/casm-phase11-wp60`. Two unrelated pre-existing
+        uncommitted files (`CMakeLists.txt`, `cmake/Oscar64.cmake` --
+        overlay build-event wrapper infrastructure, not this session's
+        work) deliberately left out.
+        **User approved 2026-08-13 ("Approved proceed").** Taskwarrior
+        task 42 closed. WP63 and Phase 11 close together in this single
+        approval (Scoping Decision 3 -- no separate completion-promotion
+        version bump; CASM stays `0.2.2` build `1266`, unchanged by this
+        entirely test-infrastructure work package). Walkthrough's own
+        Completion Gate section updated to reflect closure. **WP63
+        complete. Phase 11 (WP56-63) complete.**
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

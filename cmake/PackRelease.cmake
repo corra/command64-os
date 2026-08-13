@@ -61,12 +61,15 @@ if(EXISTS "${BINARY_DIR}/image.d64")
     file(COPY "${BINARY_DIR}/image.d64" DESTINATION "${RELEASE_DIR}")
     list(APPEND FILES_TO_ARCHIVE "image.d64")
 endif()
+if(EXISTS "${BINARY_DIR}/command64_casm_utils.d64")
+    file(COPY "${BINARY_DIR}/command64_casm_utils.d64" DESTINATION "${RELEASE_DIR}")
+    list(APPEND FILES_TO_ARCHIVE "command64_casm_utils.d64")
+endif()
 
-# test.d64 is a developer QA/regression disk (the full app set plus every
-# test harness and fixture) and is deliberately not packaged in the public
-# release archive; it stays in the CMake build directory for local testing.
-# Remove any stale copy left in release/ by a prior version of this script.
+# test.d64 and debug.prg are not packaged in the public release archive root.
+# Remove any stale copies left in release/ by a prior version of this script.
 file(REMOVE "${RELEASE_DIR}/test.d64")
+file(REMOVE "${RELEASE_DIR}/debug.prg")
 
 # Add docs to the archive list
 list(APPEND FILES_TO_ARCHIVE "docs")

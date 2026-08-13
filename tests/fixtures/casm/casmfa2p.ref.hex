@@ -1,0 +1,41 @@
+# CASM Phase 11 WP61 Increment 4 trusted reference: casmfa2p
+#
+# Independently hand-assembled from the casmfa2p fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves
+# CASM_PARSER_STMT_FORCE_ABS (parser.s:562-575) holds across a genuine
+# two-pass real assembly for a FORWARD symbol reference whose resolved
+# value lands in the zero-page range ($00-$FF): "LDA TARGET" must emit as
+# 3-byte absolute ($AD lo hi), never shrink to 2-byte zero-page ($A5 lo),
+# even though TARGET's actual resolved value ($0013) would fit zero-page
+# if it were a literal. Complements the existing p1back1 unit-level
+# evidence (single measure pass, backward reference,
+# brain/reviews and cmake/GenerateCasmTestFixtures.cmake's own p1back1
+# block) with an end-to-end proof in the opposite (forward) direction.
+#
+# Source (.ORG $0010):
+#   LDA TARGET
+#   TARGET NOP (label TARGET on the NOP line)
+#
+# CasmPc starts at $0010. TARGET is not yet defined when "LDA TARGET" is
+# first measured (a genuine forward reference) -- CASM_EXPR_FLAG_SYMBOL_
+# DERIVED is set the moment the resolver call succeeds with C clear,
+# regardless of whether the symbol itself resolved, and
+# CASM_PARSER_STMT_FORCE_ABS is derived from it unconditionally before the
+# resolved/unresolved branch (parser.s:562-570). So Pass 1 sizes "LDA
+# TARGET" as 3-byte absolute without yet knowing TARGET's value, and Pass 2
+# -- which re-parses the statement from scratch, not reusing Pass 1's
+# record -- must independently re-derive the identical classification and
+# commit the same 3-byte absolute opcode to the real output. TARGET is
+# defined immediately after, at $0010 + 3 = $0013.
+#
+# Hand assembly:
+#   10 00              PRG load-address header ($0010, little-endian)
+#   AD 13 00           LDA $0013                    (absolute, FORCE_ABS)
+#   EA                 TARGET: NOP
+#
+# bytes: 6
+# sha256: 9d5821446dd4e9521d402e1b0babe0ff5a2287e261355b59e65d334237f48a4f
+
+10 00
+AD 13 00
+EA

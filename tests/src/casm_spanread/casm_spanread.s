@@ -109,6 +109,33 @@ start:
     jsr reportCase
     jsr resourcesCleanup
 
+    ; WP60 Increment 7: Source domain boundaries. No empty-file case: see
+    ; GenerateCasmTestFixtures.cmake's own note (cc1541 cannot write a
+    ; zero-byte SEQ entry), deferred rather than faked. No one-byte-file
+    ; case either: srcOneByte1 below is withdrawn (not called) after
+    ; catching a real, previously-suspected, unresolved production defect
+    ; -- see its own header comment.
+
+    jsr srcCr1
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr srcCrlf1
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr srcBlank1
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr srcFinCr1
+    jsr reportCase
+    jsr resourcesCleanup
+
+    jsr srcSplit1
+    jsr reportCase
+    jsr resourcesCleanup
+
     lda #$0D
     jsr KernalChROUT
     lda FailCount
@@ -157,6 +184,30 @@ lfCopy:
     iny
     bne lfCopy
 lfCopied:
+    lda #1
+    sta CasmSourceCount
+    jsr sourceInit
+    jsr fileIoInit
+    jmp sourceLoad
+
+; ---------------------------------------------------------------------------
+; loadNamedFixture
+; WP60 Increment 7: same as loadFixture, but for an arbitrary fixture --
+; X/Y = null-terminated PETSCII filename pointer. loadFixture itself is
+; left untouched (still hardcoded to CASMLC02) so no existing case above is
+; put at risk; every new Source-domain case below calls this instead.
+; ---------------------------------------------------------------------------
+loadNamedFixture:
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #0
+lnfCopy:
+    lda (CasmPtr0Lo), y
+    sta CasmSourceNames, y
+    beq lnfCopied
+    iny
+    bne lnfCopy
+lnfCopied:
     lda #1
     sta CasmSourceCount
     jsr sourceInit
@@ -416,10 +467,458 @@ sptFail:
     sec
     rts
 
+; ---------------------------------------------------------------------------
+; expectByte / expectNewline / expectEof / expectRunOfA
+; WP60 Increment 7: shared per-byte assertions for the Source-domain cases
+; below, each driving the real sourceNextByte directly (no span reading
+; involved). expectByte: A = expected raw byte on entry.
+; ---------------------------------------------------------------------------
+expectByte:
+    sta ExpectedByte
+    jsr sourceNextByte
+    bcs ebFail
+    cmp #CASM_SOURCE_BYTE
+    bne ebFail
+    lda CasmSourceResultByte
+    cmp ExpectedByte
+    bne ebFail
+    clc
+    rts
+ebFail:
+    sec
+    rts
+
+expectNewline:
+    jsr sourceNextByte
+    bcs enFail
+    cmp #CASM_SOURCE_NEWLINE
+    bne enFail
+    clc
+    rts
+enFail:
+    sec
+    rts
+
+expectEof:
+    jsr sourceNextByte
+    bcs eeFail
+    cmp #CASM_SOURCE_EOF
+    bne eeFail
+    clc
+    rts
+eeFail:
+    sec
+    rts
+
+; X = count of unshifted PETSCII 'A' bytes expected in a row.
+expectRunOfA:
+    stx RunCount
+eraLoop:
+    lda RunCount
+    beq eraDone
+    lda #$41
+    jsr expectByte
+    bcs eraFail
+    dec RunCount
+    jmp eraLoop
+eraDone:
+    clc
+    rts
+eraFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; srcOneByte1 -- WITHDRAWN, not called from start:
+; WP60 Increment 7: this case set out to prove the minimum non-empty source
+; (one byte, no terminator before EOF) loads, delivers its one byte, then
+; EOF. Live VICE instead caught a real production defect: after the real
+; 'Z' byte, the next sourceNextByte call returns A=CASM_SOURCE_BYTE with
+; CasmSourceResultByte=$00 -- a spurious phantom byte -- instead of
+; CASM_SOURCE_EOF. This independently reproduces and precisely
+; characterizes an already-suspected, never-resolved defect: WP51
+; Increment 9's own fixEmpty fixture comment in
+; cmake/GenerateCasmTestFixtures.cmake was deliberately widened from 1 byte
+; to 4 specifically to dodge "sourceLoad's phantom-byte over-read... at an
+; exactly-1-byte file," pending a fix that never landed. Per this plan's
+; stop conditions, no production fix is authorized here without root-cause
+; analysis and explicit user approval -- reported instead of silently
+; fixed or silently asserted as passing. The routine body is left below,
+; deliberately not called from start:, as a ready-to-activate regression
+; test for whenever that defect is root-caused and fixed.
+; ---------------------------------------------------------------------------
+srcOneByte1:
+    ldx #<nameSrc1
+    ldy #>nameSrc1
+    jsr loadNamedFixture
+    bcc :+
+    jmp so1Fail
+:
+    jsr sourceOpen
+    bcc :+
+    jmp so1Fail
+:
+    lda #$5A                 ; unshifted PETSCII 'Z'
+    jsr expectByte
+    bcc :+
+    jmp so1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp so1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp so1Fail
+:
+    clc
+    rts
+so1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; srcCr1
+; WP60 Increment 7 (strengthen): "LINE1<CR>LINE2<CR>" -- CR-only line
+; endings each collapse to one NEWLINE result, never wired to a real
+; per-byte assertion before now (casmcr.seq previously only backed a
+; manual-VICE/CLI exercise per its own generator comment).
+; ---------------------------------------------------------------------------
+srcCr1:
+    ldx #<nameCr
+    ldy #>nameCr
+    jsr loadNamedFixture
+    bcc :+
+    jmp sc1Fail
+:
+    jsr sourceOpen
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$4C                 ; 'L'
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$49                 ; 'I'
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$4E                 ; 'N'
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$45                 ; 'E'
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$31                 ; '1'
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$4C
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$49
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$4E
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$45
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    lda #$32                 ; '2'
+    jsr expectByte
+    bcc :+
+    jmp sc1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sc1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp sc1Fail
+:
+    clc
+    rts
+sc1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; srcCrlf1
+; WP60 Increment 7 (strengthen): "LINE1<CR><LF>LINE2<CR><LF>" -- the
+; identical expected byte/newline sequence as srcCr1 above is the proof:
+; each CRLF pair must collapse to exactly one NEWLINE result (the pending-
+; CR latch swallowing the LF half), not two.
+; ---------------------------------------------------------------------------
+srcCrlf1:
+    ldx #<nameCrlf
+    ldy #>nameCrlf
+    jsr loadNamedFixture
+    bcc :+
+    jmp scl1Fail
+:
+    jsr sourceOpen
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$4C
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$49
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$4E
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$45
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$31
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$4C
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$49
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$4E
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$45
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    lda #$32
+    jsr expectByte
+    bcc :+
+    jmp scl1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp scl1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp scl1Fail
+:
+    clc
+    rts
+scl1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; srcBlank1
+; WP60 Increment 7 (strengthen): "A<LF><LF><LF>B<LF>" -- consecutive LF
+; newlines each produce their own consecutive NEWLINE result (empty lines),
+; not collapsed or skipped.
+; ---------------------------------------------------------------------------
+srcBlank1:
+    ldx #<nameBlank
+    ldy #>nameBlank
+    jsr loadNamedFixture
+    bcc :+
+    jmp sb1Fail
+:
+    jsr sourceOpen
+    bcc :+
+    jmp sb1Fail
+:
+    lda #$41                 ; 'A'
+    jsr expectByte
+    bcc :+
+    jmp sb1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sb1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sb1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sb1Fail
+:
+    lda #$42                 ; 'B'
+    jsr expectByte
+    bcc :+
+    jmp sb1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sb1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp sb1Fail
+:
+    clc
+    rts
+sb1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; srcFinCr1
+; WP60 Increment 7 (strengthen): "LINE<CR>" -- a trailing lone CR with no
+; following byte at all still resolves as a newline before EOF, not a
+; dropped/malformed terminator.
+; ---------------------------------------------------------------------------
+srcFinCr1:
+    ldx #<nameFinCr
+    ldy #>nameFinCr
+    jsr loadNamedFixture
+    bcc :+
+    jmp sf1Fail
+:
+    jsr sourceOpen
+    bcc :+
+    jmp sf1Fail
+:
+    lda #$4C
+    jsr expectByte
+    bcc :+
+    jmp sf1Fail
+:
+    lda #$49
+    jsr expectByte
+    bcc :+
+    jmp sf1Fail
+:
+    lda #$4E
+    jsr expectByte
+    bcc :+
+    jmp sf1Fail
+:
+    lda #$45
+    jsr expectByte
+    bcc :+
+    jmp sf1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp sf1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp sf1Fail
+:
+    clc
+    rts
+sf1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; srcSplit1
+; WP60 Increment 7 (strengthen): 255 filler bytes place a CRLF straddling
+; the 256-byte source refill-chunk boundary (CR at byte index 255, the
+; chunk's last byte; LF at index 256, the next chunk's first byte),
+; proving the pending-CR latch survives a real refill -- the collapsed
+; CRLF still reads as exactly one NEWLINE, followed by "END" and EOF.
+; ---------------------------------------------------------------------------
+srcSplit1:
+    ldx #<nameSplit
+    ldy #>nameSplit
+    jsr loadNamedFixture
+    bcc :+
+    jmp ss1Fail
+:
+    jsr sourceOpen
+    bcc :+
+    jmp ss1Fail
+:
+    ldx #255
+    jsr expectRunOfA
+    bcc :+
+    jmp ss1Fail
+:
+    jsr expectNewline
+    bcc :+
+    jmp ss1Fail
+:
+    lda #$45                 ; 'E'
+    jsr expectByte
+    bcc :+
+    jmp ss1Fail
+:
+    lda #$4E                 ; 'N'
+    jsr expectByte
+    bcc :+
+    jmp ss1Fail
+:
+    lda #$44                 ; 'D'
+    jsr expectByte
+    bcc :+
+    jmp ss1Fail
+:
+    jsr expectEof
+    bcc :+
+    jmp ss1Fail
+:
+    clc
+    rts
+ss1Fail:
+    sec
+    rts
+
 .segment "RODATA"
 
 ; UPPERCASE: disk filename, per this file's header note.
 fixtureName: .byte "CASMLC02", 0
+
+; WP60 Increment 7: Source-domain boundary fixture names, same UPPERCASE
+; convention.
+nameSrc1:   .byte "CASMSRC1", 0
+nameCr:     .byte "CASMCR", 0
+nameCrlf:   .byte "CASMCRLF", 0
+nameBlank:  .byte "CASMBLANK", 0
+nameFinCr:  .byte "CASMFINCR", 0
+nameSplit:  .byte "CASMSPLIT", 0
 
 ; lowercase: raw fixture content bytes, per this file's header note.
 expectStmt:  .byte ".byte 65"
@@ -444,6 +943,10 @@ SnapFileId:  .res 1
 SnapLineLo:  .res 1
 SnapLineHi:  .res 1
 SnapColumn:  .res 1
+
+; WP60 Increment 7: expectByte/expectRunOfA scratch.
+ExpectedByte: .res 1
+RunCount:     .res 1
 
 CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
 CasmSourceCount: .res 1

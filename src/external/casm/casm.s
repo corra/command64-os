@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "2"
-.define VERSION_STAGE "0"
+.define VERSION_STAGE "2"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -116,6 +116,11 @@
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 start:
+    ; WP60 Increment 3: structural entry invariant, independent of OS_API
+    ; ordering. CASM has no supported decimal-mode entry contract; this
+    ; hardens against a future reachable ADC/SBC ever running before the
+    ; first OS_API call (which currently -- incidentally -- clears D itself).
+    cld
     ; Invalidate the diagnostic location before anything can raise: CasmDiagLoc*
     ; lives in uninitialized BSS, so a locationless diagnostic (I/O or stream
     ; failure, NOT IMPLEMENTED, ...) would otherwise print a stale, garbage

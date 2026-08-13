@@ -8,10 +8,14 @@ An MS-DOS style operating system for the Commodore 64.
   itself plus every shipped utility and game: `DEBUG`, `LABEL`, `FORMAT`,
   `COMP`, `CASM`, `EDLIN`, `CONWAY`, and `PACMAN` — plus `BANNER.S`, a
   small CASM source file to assemble yourself.
+- **`command64_casm_utils.d64`** — development utility disk containing the
+  native CASM assembler source code files for the `DASH` dashboard (`dmain.s`,
+  `dscr.s`, `dfmt.s`, `dsys.s`, `dapp.s`, `dvmm.s`, and `ddata.s`), the
+  `casm.prg`, `edlin.prg`, and `comp.prg` utilities, and `dash.ref` to verify the build.
 - **`docs/`** — reference documentation. Start with `docs/user-manual.md`;
   see `docs/casm-utility.md` for the full CASM language reference (syntax,
-  directives, expressions, limits) if you want to write your own 6502
-  programs for command64, and `docs/api-reference.md` /
+  directives, expressions, limits), `docs/banner-utility.md` and
+  `docs/edlin-utility.md` for utility guides, and `docs/api-reference.md` /
   `docs/pet-sci-api.md` for the OS system-call interface external
   programs use.
 

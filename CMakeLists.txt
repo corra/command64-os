@@ -456,18 +456,155 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_opcodes")
+            # WP60 Increment 4: direct 151-tuple matcher harness. Links only
+            # opcodes.s -- no parser.s/emit.s/VMM/file ownership -- and
+            # supplies CasmParserStmt records directly (declared locally in
+            # the harness, matching casm_expr.s's/casm_symbols.s's own
+            # precedent for a symbol opcodes.s only .imports).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/opcodes.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
         if(TEST_NAME STREQUAL "casm_faultinject")
-            # WP57 fault-injection design-spike prototype: links fileio.s
-            # whole (matching casm_vmm's own precedent for linking a real
-            # CASM module into a standalone fixture) to exercise the real,
-            # unmodified fileCreateOutput against a runtime $1000/OS_API
-            # patch this harness installs itself. See
-            # tests/src/casm_faultinject/casm_faultinject.s header.
+            # WP57 fault-injection design-spike prototype (WP58: refactored
+            # onto the shared tests/src/casm_faultinject/faultstub.inc
+            # library): links fileio.s whole (matching casm_vmm's own
+            # precedent for linking a real CASM module into a standalone
+            # fixture) to exercise the real, unmodified fileCreateOutput
+            # against a runtime $1000/OS_API patch this harness installs
+            # itself. See tests/src/casm_faultinject/casm_faultinject.s
+            # header. faultstub.inc is listed here (not just found via -I
+            # "${SRC_DIR}") so a change to it invalidates the hash gate and
+            # triggers a rebuild, matching this loop's own DEPENDS
+            # convention for app-local .inc files.
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
-                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
             set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_faultvmm")
+            # WP58 Increment 3: links the real VMM store and resource owner
+            # against the shared runtime OS_API fault hook. Listing the
+            # shared include explicitly keeps it inside the content hash and
+            # object dependency gates.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_faultsource")
+            # WP58 Increment 4: source.s's four VMM call sites with the same
+            # real-module surface proven by casm_spanread, plus the shared
+            # runtime OS_API fault hook.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/diagnostics.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "2D00")
+        endif()
+        if(TEST_NAME STREQUAL "casm_fsym")
+            # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
+            # (one vmmStoreAlloc via symbolsInit, one vmmWindowRead shared by
+            # symbolsFindChain, one vmmWindowWrite via symbolsInsert, one
+            # vmmWindowRead via symbolsReadByIndex), plus the shared runtime
+            # OS_API fault hook. Matches casm_symbols.s's own real-module
+            # link set (symbols.s + vmm_store.s + resources.s). Basename
+            # deliberately short ("fsym" not "faultsymbols"): the obvious
+            # name collided with test_casm_faultsource at the D64 16-char
+            # truncation boundary (both reduce to "test_casm_faults"), the
+            # same defect class Increment 3 hit and fixed the same way.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_freloc")
+            # WP58 Increment 4: reloc.s's three OS_API-reachable call sites
+            # (one vmmStoreAlloc via relocInit, one vmmWindowWrite via
+            # relocRecord, one vmmWindowRead via relocFinalize's own
+            # table-copy loop), plus the shared runtime OS_API fault hook.
+            # Matches casm_reloc.s's own isolation precedent (CasmPc/
+            # CasmPassMode/CasmRelocatableMode as this harness's own
+            # exported stand-ins, fileWrite stubbed) rather than linking
+            # emit.s/fileio.s for real. Basename short ("freloc" not
+            # "faultreloc") to match casm_fsym's own truncation-safety
+            # precedent, even though "faultreloc" would not itself have
+            # collided -- keeps the naming convention uniform across every
+            # Increment 4 fixture.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_finc")
+            # WP58 Increment 4: include.s's directly-exported VMM entry
+            # points (includeCatalogInit's vmmStoreAlloc, includeCatalogRead's
+            # vmmWindowRead, includeEventRecord's vmmWindowWrite,
+            # includeEventReplay's vmmWindowRead), plus the shared runtime
+            # OS_API fault hook. Deliberately does NOT link source.s/
+            # fileio.s (unlike casm_catalog's own real-load-path harness):
+            # includeCatalogLoad/includeCatalogWrite's fault coverage is
+            # explicitly deferred (see the fixture's own file header) rather
+            # than paying for the full heavy link chain here. sourceAppendFile
+            # is this harness's own trivial, never-called stub.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_flist")
+            # WP59 Increment 3: listing.s linked whole with real VMM, resource,
+            # and file lifecycle modules plus the shared OS_API hook. The short basename
+            # remains collision-safe when D64 directory names truncate at 16
+            # characters ("test_casm_flist"). Start with the plan's measured
+            # initial $2200 envelope. WP59 Increment 5's eight serializer
+            # boundary cases overflowed it by 446 measured bytes. With the
+            # current real modules, $2300 overflows BSS by 252 bytes; $2400 is
+            # the smallest fitting round-page envelope ($23FC required).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "2400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_flmeta")
+            # WP59 Increment 6 split: nine metadata, resolver, serializer-header,
+            # and shared-buffer snapshot cases, isolated from the 41-case
+            # test_casm_flist load envelope. Keep the same real module boundary.
+            # $1800 overflowed BSS by 409 bytes; $1A00 is the smallest fitting
+            # round-page envelope ($1999 measured requirement).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/listing.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
+                "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
+            set(TEST_PRG_SIZE "1A00")
         endif()
         if(TEST_NAME STREQUAL "casm_listing")
             # WP51 increment 3: listing.s plus every module listingCaptureInit
@@ -546,7 +683,12 @@ if(Ca65_FOUND)
             # WP53 increment 4: $2B00 -> $2C00 -- include.s's own diagnostics
             # dependency chain grew with listing.s's `.LST` additions;
             # $2B00 overflowed by 53 measured bytes.
-            set(TEST_PRG_SIZE "2C00")
+            # WP60 Increment 7: $2C00 -> $3000 -- the new Source-domain
+            # cases (loadNamedFixture plus seven new fixtures' worth of
+            # expectByte/expectNewline/expectEof call sites) overflowed
+            # $2C00 by 644 measured bytes; $3000 (+1024) is the smallest
+            # round-page step that fits.
+            set(TEST_PRG_SIZE "3000")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -603,6 +745,32 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/reloc.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
+        if(TEST_NAME STREQUAL "casm_bounds")
+            # WP60 Increment 6: Relative Branch/Program Counter boundary
+            # harness. Links only emit.s -- no lexer.s/parser.s/source.s --
+            # and supplies CasmParserStmt/CasmInsn records directly, plus
+            # local no-op stand-ins for emit.s's lexer/diagnostics/reloc/
+            # listing/file imports (see the harness's own header for why
+            # each is never actually reached by any case here). Matches
+            # casm_opcodes.s's own narrow-link precedent for Increment 4.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/emit.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1400")
+        endif()
+        if(TEST_NAME STREQUAL "casm_lexer")
+            # WP61 Increment 5: symbol/token name-length-32 boundary harness.
+            # Links only lexer.s -- no parser.s/source.s/state.s -- and
+            # supplies CasmLexerState/CasmLookahead*/CasmTokenRecord/
+            # CasmTokenText/CasmIncludeFilename* as local BSS plus a stub
+            # sourceNextByte feeding a fixed-length run of identifier bytes,
+            # matching casm_bounds.s's/casm_opcodes.s's own narrow-link
+            # precedent. No harness for lexer.s existed before this.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
@@ -817,7 +985,9 @@ if(Ca65_FOUND)
             # listingWriteFile formatters/serializer (unused by this
             # harness) overflowed $4C00 by 1007 measured bytes; $5000
             # (+1024) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5000")
+            # WP59 increment 4: retryable listing close/registration cleanup
+            # overflowed $5000 by 18 measured bytes.
+            set(TEST_PRG_SIZE "5100")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1051,6 +1221,36 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_listwrite)
 # free) rather than trimming test.d64's content -- not a directory-entry
 # relocation like the others above, but the same "no room left" reason.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_passcheck)
+# WP58 Increment 3's VMM fault fixture has a distinct collision-safe disk
+# name but test.d64 has no remaining directory entries. Package it on the
+# established overflow image instead.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_faultvmm)
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_faultsource)
+# WP58 Increment 4's symbols.s fault fixture joins them for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_fsym)
+# WP58 Increment 4's reloc.s fault fixture joins them for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_freloc)
+# WP58 Increment 4's include.s fault fixture is self-contained (no
+# sourceLoad/fixture coupling, see its own file header) and lands on
+# casm_listing_test_d64 instead of the overflow disk, which has only 7
+# blocks free -- too little for its ~9-block PRG.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_finc)
+# WP59 Increment 2's collision-safe listing contract fixture joins the
+# fixture-free listing disk; test.d64 has no directory entries available.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flist)
+# WP59 Increment 6's split metadata fixture shares the listing-only disk.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_flmeta)
+# WP60 Increment 4's direct opcode matcher is self-contained (no VMM/file
+# ownership) and test.d64's directory track is full; join the listing-only
+# disk for the same "self-contained, ample room" reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_opcodes)
+# WP60 Increment 6's Relative Branch/PC boundary harness is self-contained
+# (no VMM/file ownership; emit.s stubbed to no-ops for everything it does
+# not reach) for the same reason.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_bounds)
+# WP61 Increment 5's lexer-only length-32 harness is likewise self-contained
+# (no parser.s/source.s/state.s); test.d64's directory track is still full.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_lexer)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1192,7 +1392,9 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmorg1 casmorgexpl1 casmnoorg1
     casmordhaz1
     casmrelop1 casmrelop2
-    casmreloc1)
+    casmreloc1
+    casmopall
+    casmfa2p)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1222,9 +1424,14 @@ add_c64_disk_image(image_d64
 # PRG: assembling it with CASM is meant to be part of the end-user
 # experience, not a pre-built command. See command64_casm_utils_d64 below
 # for the separate dev-utility disk that also carries the compiled PRG.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
         -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
         "${CMAKE_BINARY_DIR}/image.d64"
     COMMENT "Appending banner.s source to image.d64"
@@ -1257,11 +1464,16 @@ add_c64_disk_image(command64_casm_utils_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     DISK_LABEL "CASM UTILS"
     DISK_ID "${DISK_ID}"
-    PRGS ${BANNER_TARGET} ${CASM_TARGET} ${COMP_TARGET}
+    PRGS ${BANNER_TARGET} ${CASM_TARGET} ${COMP_TARGET} ${EDLIN_TARGET}
 )
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_casm_utils_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
         -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
         "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     COMMENT "Appending banner.s source to command64_casm_utils.d64"
@@ -1300,9 +1512,14 @@ add_custom_command(
 )
 
 foreach(DASH_SEQ IN LISTS DASH_SEQ_SOURCES)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_casm_utils_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET command64_casm_utils_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${DASH_SEQ}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${DASH_SEQ}" -T SEQ
             -w "${CMAKE_SOURCE_DIR}/src/external/dash/${DASH_SEQ}"
             "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
         COMMENT "Appending DASH source ${DASH_SEQ} to command64_casm_utils.d64"
@@ -1319,9 +1536,14 @@ endforeach()
 # diffs two links one page apart, while CASM classifies each operand as
 # relocatable during emission. A defect in one cannot reproduce itself in the
 # other. The reference is EVIDENCE for the manifest review, never its source.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_casm_utils_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "dash.ref" -T PRG
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "dash.ref" -T PRG
         -w "${CMAKE_BINARY_DIR}/dash_ref.prg"
         "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     COMMENT "Appending ca65 cross-check reference dash.ref to command64_casm_utils.d64"
@@ -1361,6 +1583,7 @@ add_c64_disk_image(casm_overflow_test_d64
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
+         test_casm_faultvmm test_casm_faultsource test_casm_fsym test_casm_freloc
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1373,15 +1596,43 @@ add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
 # casm_overflow_test.d64 had ~10 free blocks left (WP34's combined-cap pair
 # alone occupies 277), leaving no room for outputs, let alone a re-run.
 #
-# Carries casm.prg and comp.prg so the whole check runs from this one disk,
-# and nothing else -- roughly 590 blocks stay free for output PRGs.
+# Carries casm.prg and comp.prg so the whole check runs from this one disk.
+# WP61 Increment 6 adds command64 (48 blocks) so this disk becomes directly
+# bootable for its own new source-extent fixtures below, rather than
+# requiring a multi-drive setup -- ~540 blocks still stay free.
 add_c64_disk_image(casm_include_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS casm comp
+    PRGS command64 casm comp
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
+
+# WP61 Increment 6: source-extent boundary fixtures (65,535-byte accepted
+# combined extent / 65,536-byte first-reject). casmsrcmax.seq alone proves
+# accept; casmsrcmax.seq + casmsrcbit.seq together (combined 65,536 bytes)
+# proves reject via slCheckCap's own combined-multi-file cap (source.s:
+# 369-373), which fires during sourceLoad's raw disk-streaming phase --
+# before any lexing/sourceNextByte-driven consumption of either file's
+# content -- so this does not exercise the separately-tracked phantom-EOF-
+# byte defect (that bug is in later per-byte consumption of an already-
+# loaded exactly-1-byte source, a different code path).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_include_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmsrcmax.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmsrcmax.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmsrcbit.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmsrcbit.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP61 Increment 6 casmsrcmax.s/casmsrcbit.s source-extent fixtures to casm_include_test.d64"
+    VERBATIM
+)
 
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
@@ -1402,22 +1653,61 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # its directory-entry ceiling, this fixture is self-contained (cli.s state
 # only, no sourceLoad/fixture coupling), and this image has ample room
 # (442 blocks free as of WP52).
+# WP58 Increment 4's test_casm_finc and WP59's test_casm_flist/test_casm_flmeta
+# join here for the same "self-contained, ample room" reason. Their first 16
+# D64 name characters are distinct, preserving truncation collision safety.
+# WP60 Increment 4's test_casm_opcodes joins for the same reason; its
+# truncated name "test_casm_opcode" (16 chars) is also distinct.
+# WP60 Increment 6's test_casm_bounds joins for the same reason; its
+# truncated name "test_casm_bounds" (16 chars) is also distinct from both.
+# WP61 Increment 5's test_casm_lexer joins for the same reason; its full
+# 15-char name has no truncation-collision risk.
 add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds test_casm_lexer
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
                              casmlc06 casmlc07 casmlc7c casmlc7g
                              casmlc08 casmlc09 casmlc10)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_listing_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_LISTCAP_FIXTURE}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${CASM_LISTCAP_FIXTURE}" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${CASM_LISTCAP_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
         COMMENT "Appending WP51 Increment 6 fixture ${CASM_LISTCAP_FIXTURE} to casm_listing_test.d64"
+        VERBATIM
+    )
+endforeach()
+
+# WP60 Increment 7: casm_spanread's own real-disk-fixture precedent (its
+# existing CASMLC02 dependency, packaged the same way above) extended with
+# Source-domain boundary fixtures. casmsrc1 is new (one-byte source);
+# casmcr/casmcrlf/casmblank/casmfincr/casmsplit already exist in
+# CASM_TEST_FIXTURE_DIR for test.d64's own WP5/WP6 fixtures -- bare
+# lowercase names here package a second copy onto this disk so
+# test_casm_spanread (which lives here, not on test.d64) can sourceLoad
+# them from its own attached device. No casmsrc0 (true empty file): cc1541
+# cannot write a zero-byte SEQ entry at all, see GenerateCasmTestFixtures.cmake.
+foreach(CASM_SRCBOUND_FIXTURE casmsrc1 casmcr casmcrlf casmblank casmfincr casmsplit)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+    endif()
+    add_custom_command(
+        TARGET casm_listing_test_d64 POST_BUILD
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${CASM_SRCBOUND_FIXTURE}" -T SEQ
+            -w "${CASM_TEST_FIXTURE_DIR}/${CASM_SRCBOUND_FIXTURE}.seq"
+            "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        COMMENT "Appending WP60 Increment 7 fixture ${CASM_SRCBOUND_FIXTURE} to casm_listing_test.d64"
         VERBATIM
     )
 endforeach()
@@ -1463,9 +1753,14 @@ add_c64_disk_image(casm_phase10_test_d64
 )
 add_dependencies(casm_phase10_test_d64 casm_test_fixtures)
 foreach(WP54_FIXTURE casmemit1 casmreloc1 casmmfa casmmfb casmmaxid1)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase10_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_phase10_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_FIXTURE}.s" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${WP54_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP54_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
         COMMENT "Appending WP54 increment 6 fixture ${WP54_FIXTURE}.s to casm_phase10_test.d64"
@@ -1473,15 +1768,109 @@ foreach(WP54_FIXTURE casmemit1 casmreloc1 casmmfa casmmfb casmmaxid1)
     )
 endforeach()
 foreach(WP54_INC_FIXTURE casmip1 casmic1)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase10_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_phase10_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_INC_FIXTURE}.s" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${WP54_INC_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP54_INC_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
         COMMENT "Appending WP54 increment 6 include fixture ${WP54_INC_FIXTURE}.s to casm_phase10_test.d64"
         VERBATIM
     )
 endforeach()
+
+# 6f. CASM Phase 11 WP60 Increment 5 end-to-end exhaustive opcode disk. Its
+# own new image, matching the WP53/WP54 "self-bootable" precedent above
+# (command64 + casm + comp, so the whole assemble/COMP proof runs from one
+# disk on the VICE MCP's single-attachable device 8): neither
+# casm_listing_test_d64 nor casm_include_test_d64 carries command64, and
+# test.d64's directory track is already full (see test_casm_opcodes' own
+# WP60 Increment 4 placement note above).
+#
+# Carries casmopall.s (one legal statement for each of the 151 documented
+# NMOS 6502/6510 mnemonic/addressing-mode combinations, generated by
+# GenerateCasmTestFixtures.cmake from the frozen Increment 1 oracle) and its
+# independently authored casmopall.ref trusted-reference PRG
+# (tests/fixtures/casm/casmopall.ref.hex), so this disk alone proves the
+# native assemble-then-COMP round trip for every legal combination, end to
+# end, exactly as casm_overflow_test_d64 already does for casmbig1.
+add_c64_disk_image(casm_opcode_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp test_casm_opcodes
+)
+add_dependencies(casm_opcode_test_d64 casm_test_fixtures)
+add_dependencies(casm_opcode_test_d64 casm_reference_fixtures)
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_opcode_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_opcode_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmopall.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmopall.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmopall.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmopall.ref"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMENT "Appending WP60 Increment 5 casmopall.s and its trusted reference to casm_opcode_test.d64"
+    VERBATIM
+)
+
+# WP61 Increment 2 determinism proof needs a small static (no-relocation) and
+# a small relocatable fixture alongside casmopall.s, on a disk with both
+# command64 and headroom to write live self-compare outputs -- neither
+# test.d64 (directory track full) nor casm_overflow_test.d64 (7 blocks free)
+# qualifies. casm_opcode_test_d64 already carries command64/casm/comp and has
+# 489 blocks free, so casmhello.s/casmreloc1.s (both already-generated
+# fixtures, reused here rather than duplicated) and casmreloc1.ref (for an
+# extra cross-check leg alongside the self-compare, matching casmopall's own
+# precedent) join it instead of a new disk.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_opcode_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_opcode_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmhello.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmhello.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmreloc1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmreloc1.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmreloc1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmreloc1.ref"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMENT "Appending WP61 Increment 2 casmhello.s/casmreloc1.s determinism fixtures and casmreloc1's trusted reference to casm_opcode_test.d64"
+    VERBATIM
+)
+
+# WP61 Increment 4 FORCE_ABS two-pass closure fixture, same disk/rationale
+# as the Increment 2 block above (ample free space, already command64/casm/
+# comp-bootable).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_opcode_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_opcode_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfa2p.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmfa2p.seq"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmfa2p.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmfa2p.ref"
+        "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
+    COMMENT "Appending WP61 Increment 4 casmfa2p.s FORCE_ABS fixture and its trusted reference to casm_opcode_test.d64"
+    VERBATIM
+)
 
 # Real CASM assembly source, so these carry the ".s" on-disk suffix the CASM
 # source-fixture convention requires (unlike WP46's frame-harness fixtures,
@@ -1497,18 +1886,28 @@ foreach(WP47_FIXTURE casmip1 casmic1 casmif1
                      casmidp1 casmidc1 casmidc2
                      casmidup1 casmiduc1 casmiduc2
                      casmiddp1 casmiddc1 casmiddc2)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_include_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_include_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${WP47_FIXTURE}.s" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${WP47_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP47_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_include_test.d64"
         COMMENT "Appending Phase 9 include fixture ${WP47_FIXTURE}.s to casm_include_test.d64"
         VERBATIM
     )
 endforeach()
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_overflow_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_overflow_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfovf1.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmmfovf1.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmmfovf1.seq"
         "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmmfovf2.s" -T SEQ
@@ -1534,9 +1933,14 @@ add_custom_command(
 # same lowercase-disk-name/uppercase-source-literal pairing already
 # established by every "<name>.s" CASM source fixture on this project's
 # disks (see project-cc1541-filename-case).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_overflow_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_overflow_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat1" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmcat1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmcat1.seq"
         "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmcat2" -T SEQ
@@ -1565,9 +1969,14 @@ add_custom_command(
 # largest harness there, with its own fixtures, is a smaller blast radius
 # than trimming this disk's real CASM fixtures -- same reasoning WP52 used
 # when relocating test_l15release/test_casm_passcheck.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_listing_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp1" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfrp1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp1.seq"
         "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc1" -T SEQ
@@ -1616,12 +2025,22 @@ add_custom_command(
 # uppercase charset -- same convention as the SEQ fixtures above). casmbig1
 # is excluded: its matching casmbiga.s/casmbigb.s inputs live only on
 # casm_overflow_test_d64 (disk-space reasons above), so its reference PRG is
-# appended there instead, not here.
+# appended there instead, not here. WP60 Increment 5's casmopall is excluded
+# for the same reason: its matching casmopall.s source lives only on the new
+# dedicated casm_opcode_test_d64 (see that target below), not test.d64. WP61
+# Increment 4's casmfa2p is excluded for the same reason: its matching
+# casmfa2p.s source also lives only on casm_opcode_test_d64, and test.d64's
+# directory track is already full (144/144) with no room for a new entry.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
-    if(NOT REF_NAME STREQUAL "casmbig1")
+    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p")
+        set(WRAPPER_CC1541 "")
+        if(C64_THEME_DIR)
+            set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+                "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+        endif()
         add_custom_command(
             TARGET test_image_d64 POST_BUILD
-            COMMAND "${CC1541_EXECUTABLE}" -f "${REF_NAME}.ref" -T PRG
+            COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${REF_NAME}.ref" -T PRG
                 -w "${CASM_REF_DIR}/${REF_NAME}.ref" "${CMAKE_BINARY_DIR}/test.d64"
             COMMENT "Appending CASM reference ${REF_NAME}.ref (PRG) to test.d64"
             VERBATIM
@@ -1640,9 +2059,14 @@ endforeach()
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
     set(CASM_FIXTURE_DISK_NAME "${CASM_FIXTURE_NAME}.s")
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET test_image_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
             -w "${CASM_FIXTURE}" "${CMAKE_BINARY_DIR}/test.d64"
         COMMENT "Appending ${CASM_FIXTURE_DISK_NAME} SEQ fixture to test.d64"
         VERBATIM
@@ -1650,18 +2074,28 @@ foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
 endforeach()
 
 # Add test SEQ file to test.d64
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending SEQ test file to test.d64"
 )
 
 # Add EDLIN test file (30 numbered lines, exercises List/Page pagination) to
 # test.d64 — see brain/plans/2026-07-09-edlin-implementation-phases.md
 # Phase 1/2.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending EDLIN test SEQ file to test.d64"
 )
 
@@ -1673,9 +2107,14 @@ add_custom_command(
 # deliberately short ones (03/07) to exercise edit-line's shrink/grow hole
 # resize paths. See brain/plans/2026-07-09-edlin-implementation-phases.md
 # Phase 3.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "edlintst2" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test2.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "edlintst2" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test2.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending second EDLIN test SEQ file (Phase 3 buffer testing) to test.d64"
 )
 
@@ -1686,9 +2125,14 @@ add_custom_command(
 # inserts is enough to cross the ceiling and exercise bufOpenHole's
 # Carry=1 path. See brain/plans/2026-07-09-edlin-implementation-phases.md
 # Phase 3.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "edlinfull" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test_full.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "edlinfull" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test_full.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending EDLIN buffer-full test SEQ file (Phase 3) to test.d64"
 )
 
@@ -1696,7 +2140,7 @@ add_custom_command(
 # Gather built binary paths to pass to release script
 get_target_property(CMD64_PATH command64 C64_PRG_PATH)
 get_target_property(DEBUG_PATH debug C64_PRG_PATH)
-set(PRG_PATHS_LIST "${CMD64_PATH};${DEBUG_PATH}")
+set(PRG_PATHS_LIST "${CMD64_PATH}")
 
 foreach(C_TARGET ${C_TARGETS})
     get_target_property(C_PATH ${C_TARGET} C64_PRG_PATH)
@@ -1705,14 +2149,24 @@ endforeach()
 
 string(REPLACE ";" "," PRG_PATHS_STR "${PRG_PATHS_LIST}")
 
+# Overlay build-event wrapper -- see .agents/workflows/overlay-build-events.md.
+# Wraps the whole PackRelease.cmake -P invocation (a single-step script, not
+# a per-file add_custom_command), mirroring cmake/cc1541.cmake's single-step
+# building/success/error pattern.
+set(WRAPPER_RELEASE "")
+if(C64_THEME_DIR)
+    set(WRAPPER_RELEASE "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "release" "--building" "--success" "--error" "--")
+endif()
+
 add_custom_target(release
-    COMMAND "${CMAKE_COMMAND}"
+    COMMAND ${WRAPPER_RELEASE} "${CMAKE_COMMAND}"
         -DVERSION="${OS_VERSION}"
         -DSOURCE_DIR="${CMAKE_SOURCE_DIR}"
         -DBINARY_DIR="${CMAKE_BINARY_DIR}"
         -DRELEASE_DIR="${CMAKE_SOURCE_DIR}/release"
         -DPRG_PATHS="${PRG_PATHS_STR}"
         -P "${CMAKE_SOURCE_DIR}/cmake/PackRelease.cmake"
-    DEPENDS image_d64 test_image_d64
+    DEPENDS image_d64 test_image_d64 command64_casm_utils_d64
     COMMENT "Packaging command64 OS v${OS_VERSION} release archives"
 )

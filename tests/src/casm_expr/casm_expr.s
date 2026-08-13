@@ -57,7 +57,7 @@ CASE_COLUMN    = 7
 ; against 0 -- so it cannot affect any case that doesn't opt in).
 CASE_RELOC_MODE = 8
 CASE_SIZE      = 9
-CASE_COUNT     = 34
+CASE_COUNT     = 38
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -409,6 +409,32 @@ sNHI: T1 CASM_TOKEN_GREATER, 0, $3E
       TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$1234"
       T1 CASM_TOKEN_RPAREN, 0, $29
 
+; WP60 Increment 6: isolated numeric-literal boundary rows. sN0/sNMAX above
+; already cover $0000/$FFFF as bare literals; sRelAdd (below) uses $0100 only
+; as an identifier addend, not isolated -- these four give $00FF and $0100
+; their own bare-literal case, plus the two rows Increment 2's register found
+; zero coverage for anywhere in tests/: a >16-bit literal (exprParseNumeric's
+; own digit-accumulation overflow, CASM_DIAG_OPERAND_OUT_OF_RANGE -- distinct
+; from sOver/sUnder below, which are RELVAL+$FFFF/ABSVAL-$FFFF *expression*
+; overflow, not a literal token overflowing on its own) and a bare
+; CASM_NUMBER_BINARY literal (never exercised anywhere in this harness).
+sN00FF: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$00FF"
+        T0 CASM_TOKEN_NEWLINE, 0
+sN0100: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0100"
+        T0 CASM_TOKEN_NEWLINE, 0
+; exprParseNumeric's hexLoop skips index 0 ('$') and multiply16s each
+; remaining digit in; the fifth hex digit shifts $1000 left by 4 more bits to
+; $10000, setting CasmExprValueExt non-zero (sticky CasmExprOverflow) before
+; the digit loop even reaches the trailing "0" -- five hex digits is the
+; minimum literal that can trip this regardless of its low nibble.
+sNumOverflow: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$10000"
+              T0 CASM_TOKEN_NEWLINE, 0
+; Binary mirrors hex/decimal's index-0-is-prefix convention ('%', skipped by
+; exprParseNumeric's own ldy #1 before binaryLoop) -- eight 1-bits is $FF,
+; independently computed, not derived by comparing against a hex case.
+sBin255: TN CASM_TOKEN_NUMBER, CASM_NUMBER_BINARY, "%11111111"
+         T0 CASM_TOKEN_NEWLINE, 0
+
 sAbs: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
       T0 CASM_TOKEN_NEWLINE, 0
 sAbsAdd: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
@@ -507,6 +533,9 @@ EXPECT eN0, 0,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
 EXPECT eNMAX, $FF,$FF, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
 EXPECT eNLO, $34,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_LO, 0,0, 0,0,0
 EXPECT eNHI, $12,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_HI, 0,0, 0,0,0
+EXPECT eN00FF, $FF,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
+EXPECT eN0100, 0,$01, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
+EXPECT eBin255, $FF,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
 EXPECT eAbs, $34,$12, $03, 0, 1,0, 0,0,0
 EXPECT eAbsAdd, $35,$12, $03, 0, 1,0, 0,1,0
 EXPECT eAbsSub, 0,$12, $03, 0, 1,0, 1,$34,0
@@ -544,6 +573,16 @@ caseTable:
     CASE sNMAX, eNMAX, 0, CASM_TOKEN_EOF, 0, 2, 0
     CASE sNLO, eNLO, 0, CASM_TOKEN_COMMA, 0, 3, 0
     CASE sNHI, eNHI, 0, CASM_TOKEN_RPAREN, 0, 3, 0
+    ; WP60 Increment 6: isolated numeric-literal boundary cases.
+    CASE sN00FF, eN00FF, 0, CASM_TOKEN_NEWLINE, 0, 2, 0
+    CASE sN0100, eN0100, 0, CASM_TOKEN_NEWLINE, 0, 2, 0
+    ; exprParseNumeric's own overflow fires BEFORE exprEvaluate's post-primary
+    ; lexerNext call (unlike sNumAdd/sNumSub, whose EXPR_UNSUPPORTED fires
+    ; AFTER a successful primary already fetched the next token) -- only the
+    ; harness's initial lexerNext (fetching the NUMBER itself) ever runs, so
+    ; TokenOrdinal (this harness's own "column" stand-in) is 1, not 2.
+    CASE sNumOverflow, 0, CASM_DIAG_OPERAND_OUT_OF_RANGE, CASM_TOKEN_NUMBER, 0, 1, 0
+    CASE sBin255, eBin255, 0, CASM_TOKEN_NEWLINE, 0, 2, 0
     CASE sAbs, eAbs, 0, CASM_TOKEN_NEWLINE, 1, 2, 0
     CASE sAbsAdd, eAbsAdd, 0, CASM_TOKEN_EOF, 1, 4, 0
     CASE sAbsSub, eAbsSub, 0, CASM_TOKEN_EOF, 1, 4, 0

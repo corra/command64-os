@@ -5,9 +5,8 @@
 ; CASM Phase 10 WP52: deterministic /M symbol map formatting. mapPrint walks
 ; symbol records in definition (insertion) order via symbolsReadByIndex --
 ; never CasmSymbolBuckets hash order -- and prints "$HHHH LABEL" rows plus a
-; final "NNN SYMBOLS" total. Built and fixture-tested in isolation -- no
-; casm.s call site exists yet; /M remains NOT IMPLEMENTED until WP54 wires
-; this module into the CLI dispatch.
+; final "NNN SYMBOLS" total. WP54 wired mapPrint into production `/M` dispatch
+; after the PRG and optional listing are committed.
 ;
 ; This module owns no VMM/file/source resource of its own: symbolsReadByIndex
 ; is the only VMM access it performs, entirely through the symbol table's own
