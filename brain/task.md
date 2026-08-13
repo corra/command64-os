@@ -2584,6 +2584,20 @@
           (`FILES COMPARE OK` all three), `test_casm_lexer` (2/2), and the
           source-extent reject case (`SOURCE OFFSET OVERFLOW`, no partial
           output) -- all clean shell returns.
+    - [/] Increment 8 complete 2026-08-12, awaiting user approval: audit
+          and walkthrough at
+          `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
+          Reconciled the Increment 1 register's 5 in-scope items against
+          Increments 2-6: all 5 closed (determinism; FORCE_ABS two-pass;
+          source extent; symbol/token length-32; empty-source-file closed
+          by re-scope at Increment 1 itself). One build-system-only defect
+          found and fixed within WP61 (Increment 7's `test.d64` directory-
+          overflow oversight); zero production defects; `casm.prg` remains
+          byte-identical to its WP60 `0.2.2` state throughout. No version
+          bump due (no production change occurred, per the user-confirmed
+          bump-only-if-changed policy). Requesting approval to mark **WP61
+          complete** at CASM `0.2.2` build `1266` and close Taskwarrior
+          task `f6845310-bcce-4448-b5f2-0aa19a73723b`.
   - WP62-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

@@ -1709,6 +1709,30 @@ behavior changed beyond the version/build artifact itself.
       both times (manual/live evidence, `/M` writes no file). **WP61's full
       determinism charter (PRG, R6, listing, map) is closed.** No
       production defect. See `brain/task.md` for full detail.
+- [/] WP61 Increments 4-7 complete 2026-08-12, awaiting user approval:
+      closed all 3 remaining WP60-flagged boundary residuals. Increment 4
+      (FORCE_ABS two-pass): new `casmfa2p.s` forward-reference fixture,
+      self-compare and reference cross-check both `FILES COMPARE OK`.
+      Increment 5 (symbol/token length-32): new
+      `tests/src/casm_lexer/casm_lexer.s`, the first harness anywhere in
+      this codebase to link `lexer.s` directly -- `CASM LEXER: PASS`
+      (2/2). Increment 6 (source extent): new `casmsrcmax.s` (exactly
+      65,535 bytes) accepts; combined with a 1-byte second file (65,536)
+      rejects with `CASM: SOURCE OFFSET OVERFLOW`, no partial output.
+      Increment 7 (consolidated verification): a full unrestricted rebuild
+      caught and fixed a build-system-only bug (Increment 4's `casmfa2p`
+      reference wasn't excluded from `test.d64`'s already-full directory,
+      overflowing it) -- no production impact. Re-ran the complete changed
+      set live from the clean rebuild; all PASS. `casm.prg` remains
+      byte-identical to its WP60 `0.2.2` state throughout. See
+      `brain/task.md` for full detail.
+- [/] WP61 Increment 8 complete 2026-08-12, awaiting user approval: audit
+      and walkthrough. All 5 Increment-1-register items closed; one
+      build-system defect found and fixed within WP61 (Increment 7), zero
+      production defects. No version bump due (no production change).
+      Requesting approval to mark WP61 complete at CASM `0.2.2` build
+      `1266`. Walkthrough:
+      `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
 - [ ] WP62-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication
