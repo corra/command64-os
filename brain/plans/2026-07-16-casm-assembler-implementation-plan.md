@@ -660,3 +660,13 @@ diagnostics.
   `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`. WP50-WP55 remain
   pending and individually gated; approval of the parent plan does not activate
   WP50 or authorize source edits.
+- 2026-08-08: Phase 10 is complete. WP50-WP55 all individually planned,
+  approved, implemented, verified, and user-approved. CASM promoted to `0.2.0`
+  build `1260` via the completion-only version change; this completes the
+  CASM 0.2 developer-usability release the Phase 10 gate defined. `feature/
+  casm-phase10-wp53` merged onto `casm-phase10`, then onto `main`.
+  A Phase 11 (Base-Release Hardening and Documentation) governing plan is
+  drafted, not yet approved, at
+  `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
+  on a new `casm-phase11` branch — see that plan for the proposed WP56-63
+  breakdown and open scoping questions.

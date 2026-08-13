@@ -5,10 +5,9 @@
 ; Standalone CASM Phase 10 WP52 fixture harness. Exercises symbols.s's
 ; symbolsReadByIndex and map.s's mapPrint/mapValidateRecord directly against
 ; real symbols/VMM/resources, the same way casm_symbols.s (WP27) and
-; casm_listing.s (WP51) exercise their own modules before any casm.s call
-; site exists. Each case is a sequential real operation against ONE shared
-; symbol table (not an independent data-driven table), matching those
-; harnesses' own sequential-fixture precedent.
+; casm_listing.s (WP51) exercise their own modules. This isolated module-level
+; evidence complements WP54's production call path. The 23 cases use one shared table for insertion-order coverage
+; and fresh, explicitly freed tables where exact-count boundaries require it.
 ;
 ; Stubs diagPrintFatal locally for the same reason casm_symbols.s/
 ; casm_listing.s do: resources.s's exitSuccess/exitFatal reference it, and
@@ -20,7 +19,7 @@
 ; lexer.s/source.s dependency-avoidance reason casm_symbols.s gives for not
 ; importing the real diagPrintFatal). This local diagPrintString is a sink,
 ; not a no-op: each call increments MapSinkCallCount and, only when that
-; count (before incrementing) equals the fixture-set MapSinkCaptureIndex,
+; 16-bit count (before incrementing) equals MapSinkCaptureIndexLo/Hi,
 ; copies the null-terminated string into MapSinkCapture for exact
 ; comparison. mapPrint's own call sequence is deterministic -- one header
 ; call, one call per row, one total call -- so a fixture that wants to
@@ -89,6 +88,10 @@ start:
     jsr reportCase
     jsr maplen31
     jsr reportCase
+    jsr mapinvalidnamelen32
+    jsr reportCase
+    jsr mapinvalidnamelen255
+    jsr reportCase
     jsr mapboundary1
     jsr reportCase
     jsr maprepeat1
@@ -97,9 +100,19 @@ start:
     jsr reportCase
     jsr mapinvalidnamelen1
     jsr reportCase
-    jsr mapinvalidflags1
+    jsr mapdefinedclear1
     jsr reportCase
-    jsr mapinvalidpad1
+    jsr mapreservedflags1
+    jsr reportCase
+    jsr mapinvalidpad37
+    jsr reportCase
+    jsr mapinvalidpad63
+    jsr reportCase
+    jsr mappartialvmmfail1
+    jsr reportCase
+    jsr maptotaltransitions1
+    jsr reportCase
+    jsr mapcontract1
     jsr reportCase
     jsr mapvmmfail1
     jsr reportCase
@@ -157,6 +170,7 @@ rcFail:
 mapRunCapture:
     sta MapSinkCaptureIndex
     lda #0
+    sta MapSinkCaptureIndexHi
     sta MapSinkCallCount
     sta MapSinkCallCountHi
     jmp mapPrint
@@ -186,6 +200,37 @@ mccNotEqual:
     sec
     rts
 mccEqual:
+    clc
+    rts
+
+; Copy the current capture to CasmPtr1 for repeat-determinism comparison.
+mapCopyCapture:
+    ldy #0
+mcpLoop:
+    lda MapSinkCapture, y
+    sta (CasmPtr1Lo), y
+    beq mcpDone
+    iny
+    bne mcpLoop
+mcpDone:
+    rts
+
+; Compare capture against CasmPtr0 without disturbing the transition-table
+; cursor held separately in TotalTablePtrLo/Hi.
+mapCompareCapturePtr0:
+    ldy #0
+mccpLoop:
+    lda MapSinkCapture, y
+    cmp (CasmPtr0Lo), y
+    bne mccpFail
+    lda MapSinkCapture, y
+    beq mccpOk
+    iny
+    bne mccpLoop
+mccpFail:
+    sec
+    rts
+mccpOk:
     clc
     rts
 
@@ -505,6 +550,25 @@ ml31Fail:
     sec
     rts
 
+; NameLen 32 and 255 are independently rejected at the upper boundary and
+; after 8-bit wrap-prone input. mapInvalidWithRestore always restores record 0.
+mapinvalidnamelen32:
+    lda #32
+    jmp mapInvalidNameLen
+
+mapinvalidnamelen255:
+    lda #255
+mapInvalidNameLen:
+    sta CorruptValue
+    lda #<corruptNameLenValue
+    ldy #>corruptNameLenValue
+    jmp mapInvalidWithRestore
+
+corruptNameLenValue:
+    lda CorruptValue
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_NAMELEN
+    rts
+
 ; ---------------------------------------------------------------------------
 ; mapboundary1
 ; Values $0000 and $FFFF both format as exactly four uppercase hex digits.
@@ -567,17 +631,22 @@ mb1Fail:
 ; ---------------------------------------------------------------------------
 ; maprepeat1
 ; mapPrint is stateless/deterministic: calling it twice in a row produces an
-; identical total-row count both times (8 symbols inserted so far).
+; identical boundary rows, total text, and call count (8 symbols so far).
 ; ---------------------------------------------------------------------------
 maprepeat1:
-    lda #0
+    lda #7                       ; $0000 ZERO row
     jsr mapRunCapture
     bcc :+
     jmp mrp1Fail
 :
     lda MapSinkCallCount
     sta RepeatFirstCount
-    lda #0
+    lda #<RepeatFirstCapture
+    sta CasmPtr1Lo
+    lda #>RepeatFirstCapture
+    sta CasmPtr1Hi
+    jsr mapCopyCapture
+    lda #7
     jsr mapRunCapture
     bcc :+
     jmp mrp1Fail
@@ -593,6 +662,21 @@ maprepeat1:
     beq :+
     jmp mrp1Fail
 :
+    lda #<RepeatFirstCapture
+    sta CasmPtr1Lo
+    lda #>RepeatFirstCapture
+    sta CasmPtr1Hi
+    jsr mapCompareCapture
+    bcs mrp1Fail
+    lda #9                       ; exact total on the repeat pass
+    jsr mapRunCapture
+    bcs mrp1Fail
+    lda #<msgExpectTotal008
+    sta CasmPtr1Lo
+    lda #>msgExpectTotal008
+    sta CasmPtr1Hi
+    jsr mapCompareCapture
+    bcs mrp1Fail
     clc
     rts
 mrp1Fail:
@@ -663,9 +747,17 @@ mri2Fail:
 ; Clobbers: A, X, Y, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi, CasmVmmBuffer
 ; ---------------------------------------------------------------------------
 mapCorruptRecord:
-    lda #0
+    lda CorruptRecordLo
     sta CasmVmmOffLo
+    lda CorruptRecordHi
     sta CasmVmmOffHi
+    ; Convert record index to its 64-byte VMM offset.
+    ldx #6
+mcrShift:
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    dex
+    bne mcrShift
     lda #CASM_SYMBOL_REC_SIZE
     sta CasmIoLenLo
     lda #0
@@ -677,9 +769,16 @@ mapCorruptRecord:
 :
     jsr callCorruptPtr
 
-    lda #0
+    lda CorruptRecordLo
     sta CasmVmmOffLo
+    lda CorruptRecordHi
     sta CasmVmmOffHi
+    ldx #6
+mcrWriteShift:
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    dex
+    bne mcrWriteShift
     lda #CASM_SYMBOL_REC_SIZE
     sta CasmIoLenLo
     lda #0
@@ -696,6 +795,9 @@ callCorruptPtr:
 ; must report CASM_DIAG_SYMBOL_MAP_INVALID and stop (not print past it).
 ; ---------------------------------------------------------------------------
 mapinvalidnamelen1:
+    lda #0
+    sta CorruptRecordLo
+    sta CorruptRecordHi
     lda #<corruptNameLenZero
     sta CorruptPtrLo
     lda #>corruptNameLenZero
@@ -739,104 +841,320 @@ corruptRestoreOne:
     rts
 
 ; ---------------------------------------------------------------------------
-; mapinvalidflags1
-; Corrupt record 0's Flags to have a reserved bit set alongside DEFINED;
-; mapPrint must report CASM_DIAG_SYMBOL_MAP_INVALID.
+; DEFINED clear is rejected independently from every reserved flag bit. The
+; reserved-bit case walks $02 through $80 one bit at a time, always alongside
+; DEFINED, so no combination can mask an individual invalid bit.
 ; ---------------------------------------------------------------------------
-mapinvalidflags1:
-    lda #<corruptFlagsReserved
-    sta CorruptPtrLo
-    lda #>corruptFlagsReserved
-    sta CorruptPtrHi
-    jsr mapCorruptRecord
-    bcc :+
-    jmp mif1Fail
-:
-    jsr mapPrint
-    bcs :+
-    jmp mif1Fail
-:
-    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
-    beq :+
-    jmp mif1Fail
-:
-    lda #<corruptRestoreFlags
-    sta CorruptPtrLo
-    lda #>corruptRestoreFlags
-    sta CorruptPtrHi
-    jsr mapCorruptRecord
-    bcc :+
-    jmp mif1Fail
-:
+mapdefinedclear1:
+    lda #0
+    sta CorruptValue
+    lda #<corruptFlagsValue
+    ldy #>corruptFlagsValue
+    jmp mapInvalidWithRestore
+
+mapreservedflags1:
+    lda #$02
+mrfLoop:
+    sta ReservedFlagBit
+    ora #CASM_SYMBOL_FLAG_DEFINED
+    sta CorruptValue
+    lda #<corruptFlagsValue
+    ldy #>corruptFlagsValue
+    jsr mapInvalidWithRestore
+    bcs mrfFail
+    asl ReservedFlagBit
+    lda ReservedFlagBit
+    bne mrfLoop
     clc
     rts
-mif1Fail:
+mrfFail:
     sec
     rts
 
-corruptFlagsReserved:
-    lda #(CASM_SYMBOL_FLAG_DEFINED | $80)
-    sta CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
-    rts
-
-corruptRestoreFlags:
-    lda #CASM_SYMBOL_FLAG_DEFINED
+corruptFlagsValue:
+    lda CorruptValue
     sta CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
     rts
 
 ; ---------------------------------------------------------------------------
-; mapinvalidpad1
-; Corrupt record 0's reserved byte 37 to nonzero; mapPrint must report
-; CASM_DIAG_SYMBOL_MAP_INVALID.
+; Both endpoints of the reserved range, offsets 37 and 63, reject nonzero.
 ; ---------------------------------------------------------------------------
-mapinvalidpad1:
+mapinvalidpad37:
+    lda #37
+    bne mapInvalidPad
+mapinvalidpad63:
+    lda #63
+mapInvalidPad:
+    sta CorruptOffset
     lda #<corruptPadByte
-    sta CorruptPtrLo
-    lda #>corruptPadByte
-    sta CorruptPtrHi
-    jsr mapCorruptRecord
-    bcc :+
-    jmp mip1Fail
-:
-    jsr mapPrint
-    bcs :+
-    jmp mip1Fail
-:
-    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
-    beq :+
-    jmp mip1Fail
-:
-    lda #<corruptRestorePad
-    sta CorruptPtrLo
-    lda #>corruptRestorePad
-    sta CorruptPtrHi
-    jsr mapCorruptRecord
-    bcc :+
-    jmp mip1Fail
-:
-    clc
-    rts
-mip1Fail:
-    sec
-    rts
+    ldy #>corruptPadByte
+    jmp mapInvalidWithRestore
 
 corruptPadByte:
+    ldy CorruptOffset
     lda #$01
-    sta CasmVmmBuffer + 37
+    sta CasmVmmBuffer, y
     rts
 
-corruptRestorePad:
+corruptRestoreRecord:
+    lda #3
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_NAMELEN
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    ldy #37
+mirClearReserved:
     lda #0
-    sta CasmVmmBuffer + 37
+    sta CasmVmmBuffer, y
+    iny
+    cpy #CASM_SYMBOL_REC_SIZE
+    bne mirClearReserved
     rts
+
+; Apply corruption pointer A/Y to record 0, require exact invalid diagnostic,
+; then restore every field touched by this increment before returning.
+mapInvalidWithRestore:
+    sta CorruptPtrLo
+    sty CorruptPtrHi
+    lda #0
+    sta CorruptRecordLo
+    sta CorruptRecordHi
+    jsr mapCorruptRecord
+    bcs miwrFail
+    jsr mapPrint
+    bcc miwrRestoreFail
+    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
+    bne miwrRestoreFail
+    lda #<corruptRestoreRecord
+    sta CorruptPtrLo
+    lda #>corruptRestoreRecord
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    rts
+miwrRestoreFail:
+    php
+    lda #<corruptRestoreRecord
+    sta CorruptPtrLo
+    lda #>corruptRestoreRecord
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    plp
+miwrFail:
+    sec
+    rts
+
+; Corrupt record 1, allowing header and record 0 to print, then free the slot.
+; mapPrint must propagate the VMM failure with exactly two sink calls emitted.
+mappartialvmmfail1:
+    lda #0
+    sta MapSinkCallCount
+    sta MapSinkCallCountHi
+    lda #1
+    sta MapSinkFreeAfterRow
+    lda #0                       ; capture header; content is irrelevant
+    jsr mapRunCapture
+    sta SavedResult
+    php
+    lda #0
+    sta MapSinkFreeAfterRow
+    plp
+    bcc mpvfFail
+    lda SavedResult
+    cmp #CASM_DIAG_VMM_TRANSFER_FAILED
+    bne mpvfFail
+    lda MapSinkCallCount
+    cmp #2
+    bne mpvfFail
+    lda MapSinkCallCountHi
+    bne mpvfFail
+    ; The slot is already freed; rebuild the shared 8-record fixture for the
+    ; remaining corruption/failure cases rather than retaining stale state.
+    jsr mapBuildEight
+    rts
+mpvfFail:
+    sec
+    rts
+
+; Exact decimal transitions use fresh tables and capture count+1 as a 16-bit
+; call index. Each scenario frees its VMM store before the next allocation.
+maptotaltransitions1:
+    jsr mapFreeTable
+    bcc :+
+    jmp mttFail
+:
+    lda #<totalCases
+    sta TotalTablePtrLo
+    lda #>totalCases
+    sta TotalTablePtrHi
+    lda #8
+    sta TotalCasesLeft
+mttLoop:
+    lda TotalTablePtrLo
+    sta CasmPtr1Lo
+    lda TotalTablePtrHi
+    sta CasmPtr1Hi
+    ldy #0
+    lda (CasmPtr1Lo), y
+    sta FillTargetLo
+    iny
+    lda (CasmPtr1Lo), y
+    sta FillTargetHi
+    iny
+    lda (CasmPtr1Lo), y
+    sta ExpectedPtrLo
+    iny
+    lda (CasmPtr1Lo), y
+    sta ExpectedPtrHi
+    jsr mapFreshFill
+    bcs mttFail
+    lda FillTargetLo
+    clc
+    adc #1
+    sta MapSinkCaptureIndex
+    lda FillTargetHi
+    adc #0
+    sta MapSinkCaptureIndexHi
+    lda #0
+    sta MapSinkCallCount
+    sta MapSinkCallCountHi
+    jsr mapPrint
+    bcs mttFreeFail
+    lda ExpectedPtrLo
+    sta CasmPtr0Lo
+    lda ExpectedPtrHi
+    sta CasmPtr0Hi
+    jsr mapCompareCapturePtr0
+    bcs mttFreeFail
+    jsr mapFreeTable
+    bcs mttFail
+    clc
+    lda TotalTablePtrLo
+    adc #4
+    sta TotalTablePtrLo
+    bcc :+
+    inc TotalTablePtrHi
+:
+    dec TotalCasesLeft
+    bne mttLoop
+    jsr mapBuildEight
+    rts
+mttFreeFail:
+    jsr mapFreeTable
+mttFail:
+    sec
+    rts
+
+; Exported mapPrint contract: success returns A=$00/C clear and preserves SP;
+; invalid-record failure returns A=$42/C set and preserves SP. The sink
+; intentionally clobbers A/X/Y, matching diagPrintString's documented
+; volatile-register assumption rather than accidentally preserving them.
+mapcontract1:
+    tsx
+    stx SavedSp
+    jsr mapPrint
+    bcs mcxFail
+    cmp #CASM_DIAG_NONE
+    bne mcxFail
+    tsx
+    cpx SavedSp
+    bne mcxFail
+    lda #0
+    sta CorruptRecordLo
+    sta CorruptRecordHi
+    lda #<corruptNameLenZero
+    sta CorruptPtrLo
+    lda #>corruptNameLenZero
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    bcs mcxFail
+    tsx
+    stx SavedSp
+    jsr mapPrint
+    bcc mcxRestoreFail
+    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
+    bne mcxRestoreFail
+    tsx
+    cpx SavedSp
+    bne mcxRestoreFail
+    lda #<corruptRestoreRecord
+    sta CorruptPtrLo
+    lda #>corruptRestoreRecord
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    rts
+mcxRestoreFail:
+    lda #<corruptRestoreRecord
+    sta CorruptPtrLo
+    lda #>corruptRestoreRecord
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+mcxFail:
+    sec
+    rts
+
+; Build a fresh symbol table with FillTargetHi:Lo distinct four-byte names.
+; Generated names are "MT" plus the 16-bit insertion index.
+mapFreshFill:
+    jsr symbolsInit
+    bcs mffFail
+    lda #0
+    sta FullCounterLo
+    sta FullCounterHi
+mffLoop:
+    lda FullCounterHi
+    cmp FillTargetHi
+    bne :+
+    lda FullCounterLo
+    cmp FillTargetLo
+    beq mffDone
+:
+    lda #'M'
+    sta FullNameBuf
+    lda #'T'
+    sta FullNameBuf + 1
+    lda FullCounterLo
+    sta FullNameBuf + 2
+    lda FullCounterHi
+    sta FullNameBuf + 3
+    lda #<FullNameBuf
+    sta CasmPtr0Lo
+    lda #>FullNameBuf
+    sta CasmPtr0Hi
+    lda #4
+    ldx FullCounterLo
+    ldy FullCounterHi
+    jsr symbolsInsert
+    bcs mffFreeFail
+    inc FullCounterLo
+    bne mffLoop
+    inc FullCounterHi
+    jmp mffLoop
+mffDone:
+    clc
+    rts
+mffFreeFail:
+    jsr mapFreeTable
+mffFail:
+    sec
+    rts
+
+mapFreeTable:
+    ldx CasmSymbolVmmSlot
+    jmp vmmStoreFree
+
+mapBuildEight:
+    lda #8
+    sta FillTargetLo
+    lda #0
+    sta FillTargetHi
+    jmp mapFreshFill
 
 ; ---------------------------------------------------------------------------
 ; mapvmmfail1
 ; Free the symbol table's VMM slot out from under symbolsReadByIndex, the
 ; same deterministic-rejection technique casm_listing.s's listingvmmfail1
 ; uses: a real, local vmmWindowRead bounds rejection rather than depending
-; on an unreliable REU-exhaustion condition. This is this file's last use
-; of the symbol table -- no fixture after this one touches it again.
+; on an unreliable REU-exhaustion condition. This ends use of the current
+; freed table; mapfull1 subsequently initializes a fresh one.
 ; ---------------------------------------------------------------------------
 mapvmmfail1:
     ldx CasmSymbolVmmSlot
@@ -917,8 +1235,13 @@ mf1InsertGo:
     jmp mf1InsertLoop
 mf1InsertDone:
 
-    lda #250                     ; no real call index reaches 250 (514 max)
-    jsr mapRunCapture
+    lda #$FF                     ; $FFFF is outside the 0..513 call range
+    sta MapSinkCaptureIndex
+    sta MapSinkCaptureIndexHi
+    lda #0
+    sta MapSinkCallCount
+    sta MapSinkCallCountHi
+    jsr mapPrint
     bcc :+
     jmp mf1Fail
 :
@@ -945,9 +1268,8 @@ passMsg:
 failMsg:
     .byte "CASM MAP: FAIL", PetCr, 0
 
-; Link-check table only: forces ld65 to resolve symbolsReadByIndex/mapPrint
-; by exact name against symbols.s/map.s as soon as those exist, without any
-; fixture here having to call them (correctly or otherwise) yet.
+; Explicit link check retained alongside the direct fixture calls: forces ld65
+; to resolve symbolsReadByIndex/mapPrint by exact name.
 mapLinkTable:
     .word symbolsReadByIndex
     .word mapPrint
@@ -975,6 +1297,8 @@ msgExpectTotal000:
     .byte "000 SYMBOLS", PetCr, 0
 msgExpectTotal001:
     .byte "001 SYMBOLS", PetCr, 0
+msgExpectTotal008:
+    .byte "008 SYMBOLS", PetCr, 0
 msgExpectOneRow:
     .byte "$1234 ONE", PetCr, 0
 msgExpectZebraRow:
@@ -992,6 +1316,25 @@ msgExpectZeroRow:
 msgExpectMaxRow:
     .byte "$FFFF MAX", PetCr, 0
 
+msgExpectTotal009: .byte "009 SYMBOLS", PetCr, 0
+msgExpectTotal010: .byte "010 SYMBOLS", PetCr, 0
+msgExpectTotal099: .byte "099 SYMBOLS", PetCr, 0
+msgExpectTotal100: .byte "100 SYMBOLS", PetCr, 0
+msgExpectTotal255: .byte "255 SYMBOLS", PetCr, 0
+msgExpectTotal256: .byte "256 SYMBOLS", PetCr, 0
+msgExpectTotal511: .byte "511 SYMBOLS", PetCr, 0
+msgExpectTotal512: .byte "512 SYMBOLS", PetCr, 0
+
+totalCases:
+    .word 9,   msgExpectTotal009
+    .word 10,  msgExpectTotal010
+    .word 99,  msgExpectTotal099
+    .word 100, msgExpectTotal100
+    .word 255, msgExpectTotal255
+    .word 256, msgExpectTotal256
+    .word 511, msgExpectTotal511
+    .word 512, msgExpectTotal512
+
 .segment "BSS"
 
 FailCount:  .res 1
@@ -1004,9 +1347,25 @@ FailCount:  .res 1
 ; failure, not a silent pass.
 
 RepeatFirstCount: .res 1
+RepeatFirstCapture: .res 40
 
 CorruptPtrLo: .res 1
 CorruptPtrHi: .res 1
+CorruptRecordLo: .res 1
+CorruptRecordHi: .res 1
+CorruptValue:    .res 1
+CorruptOffset:   .res 1
+ReservedFlagBit: .res 1
+
+FillTargetLo:    .res 1
+FillTargetHi:    .res 1
+ExpectedPtrLo:   .res 1
+ExpectedPtrHi:   .res 1
+TotalTablePtrLo: .res 1
+TotalTablePtrHi: .res 1
+TotalCasesLeft:  .res 1
+SavedSp:         .res 1
+SavedResult:     .res 1
 
 FullCounterLo: .res 1
 FullCounterHi: .res 1
@@ -1028,6 +1387,9 @@ diagPrintString:
     lda MapSinkCallCount
     cmp MapSinkCaptureIndex
     bne dpsSkipCapture
+    lda MapSinkCallCountHi
+    cmp MapSinkCaptureIndexHi
+    bne dpsSkipCapture
 
     ldy #0
 dpsCopyLoop:
@@ -1045,6 +1407,22 @@ dpsSkipCapture:
     bne dpsNoCarry
     inc MapSinkCallCountHi
 dpsNoCarry:
+    lda MapSinkFreeAfterRow
+    beq dpsReturn
+    lda MapSinkCallCount
+    cmp #2                       ; header + first valid row emitted
+    bne dpsReturn
+    lda MapSinkCallCountHi
+    bne dpsReturn
+    ldx CasmSymbolVmmSlot
+    jsr vmmStoreFree
+dpsReturn:
+    ; Production diagPrintString's A/X/Y are documented volatile. Return
+    ; conspicuous values so mapPrint cannot accidentally depend on this stub
+    ; preserving any of them.
+    lda #$A5
+    ldx #$5A
+    ldy #$C3
     rts
 
 .segment "BSS"
@@ -1052,5 +1430,7 @@ dpsNoCarry:
 MapSinkCallCount:     .res 1
 MapSinkCallCountHi:   .res 1
 MapSinkCaptureIndex:  .res 1
+MapSinkCaptureIndexHi:.res 1
 MapSinkCapture:       .res 40
 MapSinkCaptureLen:    .res 1
+MapSinkFreeAfterRow:  .res 1

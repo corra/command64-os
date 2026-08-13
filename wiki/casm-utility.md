@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.2.0` (build 1260)
+**Version:** `0.2.2` (build 1266)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
@@ -21,7 +21,10 @@ address the OS chooses.
 > Output](#map-and-listing-output-m-l) below. Everything documented below as
 > supported is real and has been verified end-to-end, including in
 > production via [DASH](dash-utility.md), which assembles through a
-> seven-file `.INCLUDE` chain. See [Not Yet
+> seven-file `.INCLUDE` chain. A follow-on hardening pass has since
+> exhaustively verified this behavior — every opcode/addressing-mode
+> combination, boundary conditions, and re-assembly determinism — rather
+> than adding anything new for you to use. See [Not Yet
 > Supported](#not-yet-supported) for the remaining gaps.
 
 ## Command Syntax
@@ -449,6 +452,16 @@ for status and rationale:
   on disk** hangs rather than replacing or failing fast (a pre-existing
   gap, not specific to `/M`/`/L`) — use a distinct `/O:` name per run, or
   delete the stale file first.
+- **`/L` listing output shows a blank line between each row when printed to
+  a real C64 screen.** This is a display artifact only — the `.LST` file
+  written to disk is not affected. See the [Programmer's
+  Reference §18](casm-programmers-reference.md#18-coverage-what-works-today)
+  for the underlying mechanism.
+- **A one-byte source file can trigger a phantom end-of-file byte** during
+  assembly (a known, currently-unresolved defect in the source-loading
+  path). See the [Programmer's
+  Reference §18](casm-programmers-reference.md#18-coverage-what-works-today)
+  for detail.
 
 ## Source
 

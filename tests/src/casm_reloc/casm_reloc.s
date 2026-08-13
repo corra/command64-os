@@ -45,6 +45,7 @@
 .import resourcesCleanup
 .import relocInit
 .import relocRecord
+.import relocFinalize
 .import CasmRelocVmmSlot
 .import vmmWindowRead
 .import CasmVmmBuffer
@@ -54,6 +55,13 @@
 .export CasmPassMode
 .export CasmRelocatableMode
 .export fileWrite
+
+; WP60 Increment 7: fileWrite stub's source pointer, needed as a real
+; zero-page location for (zp),y indirect-indexed addressing -- nothing else
+; in this harness uses zero page (no parser/lexer linked), so this pair is
+; free.
+CasmFwSrcLo = $72
+CasmFwSrcHi = $73
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -75,6 +83,14 @@ start:
     jsr relocmeasure1
     jsr reportCase
     jsr relocfull1
+    jsr reportCase
+
+    ; WP60 Increment 7: each allocates its own fresh VMM slot via relocInit.
+    jsr relocempty1
+    jsr reportCase
+    jsr relocoffmax1
+    jsr reportCase
+    jsr relocfinalize4096_1
     jsr reportCase
 
     ; WP41 fix: relocinit1/relocfull1 each allocate their own VMM slot via
@@ -329,6 +345,235 @@ rf1Fail:
     rts
 
 ; ---------------------------------------------------------------------------
+; relocempty1
+; WP60 Increment 7: R6 footer at the empty-table extreme (0 entries).
+; Fresh allocation, no relocRecord calls at all, then relocFinalize under
+; CasmRelocatableMode=1 (the no-op EARLY OUT is for mode=0, not entry
+; count -- an empty *relocatable* table must still finalize and write a
+; real 6-byte footer with count=0, not skip output entirely). fileWrite's
+; stub below always captures its most recent call's bytes into
+; LastWriteBuf/LastWriteLen; relocFinalize's own table-copy loop is
+; skipped entirely when CasmRelocCount=0 (Remaining=0*2=0 on entry), so
+; the footer write is this call's ONLY fileWrite, making LastWriteBuf
+; unambiguously the footer here.
+; ---------------------------------------------------------------------------
+relocempty1:
+    jsr relocInit
+    bcc :+
+    jmp re1Fail
+:
+    lda #1
+    sta CasmRelocatableMode
+    jsr relocFinalize
+    bcc :+
+    jmp re1Fail
+:
+    lda LastWriteLen
+    cmp #6
+    beq :+
+    jmp re1Fail
+:
+    lda LastWriteBuf + 0
+    cmp #<CASM_DEFAULT_ORIGIN
+    beq :+
+    jmp re1Fail
+:
+    lda LastWriteBuf + 1
+    cmp #>CASM_DEFAULT_ORIGIN
+    beq :+
+    jmp re1Fail
+:
+    lda LastWriteBuf + 2         ; count lo -- must be 0
+    bne re1Fail
+    lda LastWriteBuf + 3         ; count hi -- must be 0
+    bne re1Fail
+    lda LastWriteBuf + 4
+    cmp #CASM_R6_MAGIC_0
+    beq :+
+    jmp re1Fail
+:
+    lda LastWriteBuf + 5
+    cmp #CASM_R6_MAGIC_1
+    beq :+
+    jmp re1Fail
+:
+    clc
+    rts
+re1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; relocoffmax1
+; WP60 Increment 7: offset $FFFF (relocRecord's own unsigned
+; CasmPc-CASM_DEFAULT_ORIGIN subtraction wraps to $FFFF when
+; CasmPc = CASM_DEFAULT_ORIGIN-1, the one CasmPc value below the default
+; origin that is still a valid 16-bit address). Fresh allocation.
+; ---------------------------------------------------------------------------
+relocoffmax1:
+    jsr relocInit
+    bcc :+
+    jmp rom1Fail
+:
+    lda #CASM_PASS_MODE_EMIT
+    sta CasmPassMode
+    lda #<(CASM_DEFAULT_ORIGIN - 1)
+    sta CasmPc
+    lda #>(CASM_DEFAULT_ORIGIN - 1)
+    sta CasmPc + 1
+    jsr relocRecord
+    bcc :+
+    jmp rom1Fail
+:
+    ldx CasmRelocVmmSlot
+    lda #0
+    sta CasmVmmOffLo
+    sta CasmVmmOffHi
+    lda #2
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp rom1Fail
+:
+    lda CasmVmmBuffer + 0
+    cmp #$FF
+    beq :+
+    jmp rom1Fail
+:
+    lda CasmVmmBuffer + 1
+    cmp #$FF
+    beq :+
+    jmp rom1Fail
+:
+    clc
+    rts
+rom1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; relocfinalize4096_1
+; WP60 Increment 7: R6 footer at the full-table extreme (4096 entries,
+; distinct from relocfull1's own fill -- that fixture's loop never
+; advances CasmPc, so every one of its 4096 entries records the same $0000
+; offset, which cannot prove anything about distinct per-entry content)
+; AND replay/re-read bounds near the table's real 8,192-byte extent
+; (relocrecord1/relocmeasure1 only ever re-read at VMM offsets 0/6).
+; Fresh allocation; CasmPc = CASM_DEFAULT_ORIGIN+i for i=0..4095, so
+; entry i's recorded offset is i itself. After filling, vmmWindowRead the
+; table's LAST 6 bytes (VMM offset 8186, entries 4093/4094/4095) and
+; confirm each little-endian value matches its own index -- direct
+; evidence the near-full-extent region holds real, distinct, correctly
+; addressed content, not stale/aliased bytes from an earlier iteration.
+; Then relocFinalize and confirm the footer's count field reads 4096.
+; ---------------------------------------------------------------------------
+relocfinalize4096_1:
+    jsr relocInit
+    bcc :+
+    jmp rfz1Fail
+:
+    lda #CASM_PASS_MODE_EMIT
+    sta CasmPassMode
+    lda #<CASM_DEFAULT_ORIGIN
+    sta CasmPc
+    lda #>CASM_DEFAULT_ORIGIN
+    sta CasmPc + 1
+
+    lda #<CASM_RELOC_MAX
+    sta LoopLo
+    lda #>CASM_RELOC_MAX
+    sta LoopHi
+rfz1Loop:
+    jsr relocRecord
+    bcc rfz1Continue
+    jmp rfz1Fail
+rfz1Continue:
+    inc CasmPc
+    bne :+
+    inc CasmPc + 1
+:
+    lda LoopLo
+    bne rfz1DecLo
+    dec LoopHi
+rfz1DecLo:
+    dec LoopLo
+    lda LoopLo
+    ora LoopHi
+    bne rfz1Loop
+
+    ; Read the last 6 bytes of the 8192-byte table (entries 4093/4094/4095,
+    ; VMM byte offset 4093*2 = 8186).
+    ldx CasmRelocVmmSlot
+    lda #<8186
+    sta CasmVmmOffLo
+    lda #>8186
+    sta CasmVmmOffHi
+    lda #6
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    jsr vmmWindowRead
+    bcc :+
+    jmp rfz1Fail
+:
+    lda CasmVmmBuffer + 0        ; entry 4093 lo = <4093
+    cmp #<4093
+    beq :+
+    jmp rfz1Fail
+:
+    lda CasmVmmBuffer + 1        ; entry 4093 hi = >4093
+    cmp #>4093
+    beq :+
+    jmp rfz1Fail
+:
+    lda CasmVmmBuffer + 2        ; entry 4094 lo = <4094
+    cmp #<4094
+    beq :+
+    jmp rfz1Fail
+:
+    lda CasmVmmBuffer + 3        ; entry 4094 hi = >4094
+    cmp #>4094
+    beq :+
+    jmp rfz1Fail
+:
+    lda CasmVmmBuffer + 4        ; entry 4095 lo = <4095
+    cmp #<4095
+    beq :+
+    jmp rfz1Fail
+:
+    lda CasmVmmBuffer + 5        ; entry 4095 hi = >4095
+    cmp #>4095
+    beq :+
+    jmp rfz1Fail
+:
+
+    lda #1
+    sta CasmRelocatableMode
+    jsr relocFinalize
+    bcc :+
+    jmp rfz1Fail
+:
+    lda LastWriteLen
+    cmp #6
+    beq :+
+    jmp rfz1Fail
+:
+    lda LastWriteBuf + 2         ; count lo = <4096 = 0
+    bne rfz1Fail
+    lda LastWriteBuf + 3         ; count hi = >4096 = 16 ($10)
+    cmp #>CASM_RELOC_MAX
+    beq :+
+    jmp rfz1Fail
+:
+    clc
+    rts
+rfz1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; diagPrintFatal (stub)
 ; resources.s's exitSuccess/exitFatal reference this; this harness never
 ; calls either, so a trivial stub satisfies the link without pulling in the
@@ -340,11 +585,30 @@ diagPrintFatal:
 
 ; ---------------------------------------------------------------------------
 ; fileWrite (stub)
-; reloc.s's relocFinalize references this; unreachable from this harness's
-; own fixtures (none call relocFinalize). See the file header for the full
-; rationale.
+; reloc.s's relocFinalize references this. WP60 Increment 7: now captures
+; every call's bytes into LastWriteBuf/LastWriteLen (overwriting the
+; previous call each time), rather than the old discard-everything stub --
+; relocFinalize's footer write is always its LAST fileWrite call
+; regardless of table size (0 or CASM_RELOC_MAX), so by the time
+; relocFinalize returns, LastWriteBuf unambiguously holds the 6-byte
+; footer for relocempty1/relocfinalize4096_1 to inspect. CASM_VMM_BUFFER_SIZE
+; (64) bounds every possible chunk length relocFinalize ever passes,
+; matching LastWriteBuf's own size.
 ; ---------------------------------------------------------------------------
 fileWrite:
+    stx CasmFwSrcLo
+    sty CasmFwSrcHi
+    lda CasmIoLenLo
+    sta LastWriteLen
+    ldy #0
+fwCopyLoop:
+    cpy LastWriteLen
+    beq fwCopyDone
+    lda (CasmFwSrcLo), y
+    sta LastWriteBuf, y
+    iny
+    jmp fwCopyLoop
+fwCopyDone:
     clc
     rts
 
@@ -363,3 +627,7 @@ LoopHi:    .res 1
 CasmPc:         .res 2
 CasmPassMode:   .res 1
 CasmRelocatableMode: .res 1
+
+; WP60 Increment 7: fileWrite stub's capture state (see its own header).
+LastWriteBuf: .res CASM_VMM_BUFFER_SIZE
+LastWriteLen: .res 1

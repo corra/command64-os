@@ -17,6 +17,15 @@ file(WRITE "${OUTPUT_DIR}/casmshort.seq"
     "    JMP START_LABEL\n"
 )
 
+# WP60 Increment 7: Source domain boundary fixture. casmsrc1 is the
+# minimum non-empty source, one byte with no terminator at all before EOF.
+# A true zero-byte companion (casmsrc0) was attempted and dropped: cc1541
+# refuses to write an empty SEQ entry at all ("Unexpected filesize when
+# reading casmsrc0.seq"), so the empty-source-file boundary row remains
+# unproven through this fixture pipeline -- deferred, not silently assumed
+# equivalent to the one-byte case.
+file(WRITE "${OUTPUT_DIR}/casmsrc1.seq" "Z")
+
 string(REPEAT "A" 256 CASM_EXACT_BLOCK)
 file(WRITE "${OUTPUT_DIR}/casm256.seq" "${CASM_EXACT_BLOCK}")
 
@@ -496,6 +505,24 @@ file(WRITE "${OUTPUT_DIR}/p1back1.seq"
     "LDA LOOP\n"
 )
 
+# CASM Phase 11 WP61 Increment 4: FORCE_ABS end-to-end two-pass closure, the
+# opposite direction from p1back1 above. p1back1's LOOP is already defined
+# (backward reference) by the time "LDA LOOP" is measured, in one single
+# measure-pass unit case. This fixture instead forward-references TARGET --
+# undefined at the point "LDA TARGET" is first measured -- so Pass 1 must
+# size it as 3-byte absolute purely from CASM_EXPR_FLAG_SYMBOL_DERIVED
+# (parser.s:562-570), before TARGET's value is known at all, and Pass 2
+# must independently re-derive the same FORCE_ABS classification and commit
+# the same 3-byte absolute opcode to the real output file, even though
+# TARGET's resolved value ($0013) would fit zero-page if it were a literal.
+# Verified end-to-end via native COMP against casmfa2p.ref.hex, not a
+# hand-built single-pass unit case.
+file(WRITE "${OUTPUT_DIR}/casmfa2p.seq"
+    ".ORG \$0010\n"
+    "LDA TARGET\n"
+    "TARGET: NOP\n"
+)
+
 # Genuinely undefined symbol (GHOST is never defined anywhere in this file).
 # In CASM_PASS_MODE_MEASURE this must be tolerated, not a fixture failure:
 # LDA GHOST sizes as absolute (3 bytes, FORCE_ABS forces it regardless of the
@@ -722,6 +749,24 @@ string(REPEAT "A" 40000 CASM_MF_OVF1)
 string(REPEAT "A" 30000 CASM_MF_OVF2)
 file(WRITE "${OUTPUT_DIR}/casmmfovf1.seq" "${CASM_MF_OVF1}")
 file(WRITE "${OUTPUT_DIR}/casmmfovf2.seq" "${CASM_MF_OVF2}")
+
+# CASM Phase 11 WP61 Increment 6: exact source-extent boundary fixtures.
+# casmsrcmax.seq is valid CASM source (unlike casmmfovf1/2 above, which are
+# deliberately non-syntactic since they only need to overflow before
+# lexing) totaling exactly CASM_SOURCE_VMM_MAX_BYTES (65535) bytes, so it
+# alone proves the exact accepted extent with a real successful assembly:
+# ".ORG $C000\n" is 11 bytes; 16381 "NOP\n" lines (4 bytes each) is 65524
+# bytes; 11 + 65524 = 65535 exactly. casmsrcbit.seq is a single trivial
+# byte -- paired with casmsrcmax.seq as a second source file, the combined
+# total is exactly 65536, one byte past the cap, proving the reject
+# boundary via sourceLoad's combined-file slCheckCap (source.s:369-373)
+# without needing a second ~259-block fixture.
+string(REPEAT "NOP\n" 16381 CASM_SRCMAX_BODY)
+file(WRITE "${OUTPUT_DIR}/casmsrcmax.seq"
+    ".ORG \$C000\n"
+    "${CASM_SRCMAX_BODY}"
+)
+file(WRITE "${OUTPUT_DIR}/casmsrcbit.seq" "\n")
 
 # WP38 default relocatable origin fixtures. casmorg1.seq already exists
 # (Phase 4 WP13: "LDA #$01", no .ORG) and is reused unmodified here as the
@@ -1192,3 +1237,184 @@ file(WRITE "${OUTPUT_DIR}/casmlc10.seq"
     ".ORG \$2000${CASM_CR}"
     ".BYTE 1,2,3,4,5${CASM_CR}"
 )
+
+# WP60 Increment 5: casmopall -- one legal statement for each of the 151
+# NMOS 6502/6510 mnemonic/addressing-mode combinations frozen by Increment
+# 1's independent oracle (brain/reviews/2026-08-12-casm-phase11-wp60-
+# increment1-opcode-oracle.md). Statements appear in that oracle's own
+# mnemonic-subtype/mode order (table rows 1-151), one CASM statement per
+# row, using $12 for every 8-bit operand and $1234 for every 16-bit operand
+# purely to instantiate syntax -- the same representative values the oracle
+# document itself uses. All eight branch mnemonics (BCC/BCS/BEQ/BMI/BNE/
+# BPL/BVC/BVS) target a same-numbered TGnn label placed immediately after
+# their own 2-byte instruction, so every branch's displacement is
+# mechanically 0 ($00) regardless of its position in the file -- boundary
+# displacement values are Increment 6's concern, not this exhaustive
+# per-combination sweep's.
+#
+# This source is a byte-identity fixture only: it is assembled and then
+# byte-compared (native COMP) against the independently authored
+# tests/fixtures/casm/casmopall.ref.hex reference. It contains BRK/JSR/RTS/
+# JMP among its 151 statements and per the governing plan's Frozen
+# Processor Contract is data-only and must never be executed.
+file(WRITE "${OUTPUT_DIR}/casmopall.seq"
+    ".ORG \$C000\n"
+    "    ADC #\$12\n"
+    "    ADC \$12\n"
+    "    ADC \$12,X\n"
+    "    ADC \$1234\n"
+    "    ADC \$1234,X\n"
+    "    ADC \$1234,Y\n"
+    "    ADC (\$12,X)\n"
+    "    ADC (\$12),Y\n"
+    "    AND #\$12\n"
+    "    AND \$12\n"
+    "    AND \$12,X\n"
+    "    AND \$1234\n"
+    "    AND \$1234,X\n"
+    "    AND \$1234,Y\n"
+    "    AND (\$12,X)\n"
+    "    AND (\$12),Y\n"
+    "    ASL A\n"
+    "    ASL \$12\n"
+    "    ASL \$12,X\n"
+    "    ASL \$1234\n"
+    "    ASL \$1234,X\n"
+    "    BCC TG22\n"
+    "TG22:\n"
+    "    BCS TG23\n"
+    "TG23:\n"
+    "    BEQ TG24\n"
+    "TG24:\n"
+    "    BIT \$12\n"
+    "    BIT \$1234\n"
+    "    BMI TG27\n"
+    "TG27:\n"
+    "    BNE TG28\n"
+    "TG28:\n"
+    "    BPL TG29\n"
+    "TG29:\n"
+    "    BRK\n"
+    "    BVC TG31\n"
+    "TG31:\n"
+    "    BVS TG32\n"
+    "TG32:\n"
+    "    CLC\n"
+    "    CLD\n"
+    "    CLI\n"
+    "    CLV\n"
+    "    CMP #\$12\n"
+    "    CMP \$12\n"
+    "    CMP \$12,X\n"
+    "    CMP \$1234\n"
+    "    CMP \$1234,X\n"
+    "    CMP \$1234,Y\n"
+    "    CMP (\$12,X)\n"
+    "    CMP (\$12),Y\n"
+    "    CPX #\$12\n"
+    "    CPX \$12\n"
+    "    CPX \$1234\n"
+    "    CPY #\$12\n"
+    "    CPY \$12\n"
+    "    CPY \$1234\n"
+    "    DEC \$12\n"
+    "    DEC \$12,X\n"
+    "    DEC \$1234\n"
+    "    DEC \$1234,X\n"
+    "    DEX\n"
+    "    DEY\n"
+    "    EOR #\$12\n"
+    "    EOR \$12\n"
+    "    EOR \$12,X\n"
+    "    EOR \$1234\n"
+    "    EOR \$1234,X\n"
+    "    EOR \$1234,Y\n"
+    "    EOR (\$12,X)\n"
+    "    EOR (\$12),Y\n"
+    "    INC \$12\n"
+    "    INC \$12,X\n"
+    "    INC \$1234\n"
+    "    INC \$1234,X\n"
+    "    INX\n"
+    "    INY\n"
+    "    JMP \$1234\n"
+    "    JMP (\$1234)\n"
+    "    JSR \$1234\n"
+    "    LDA #\$12\n"
+    "    LDA \$12\n"
+    "    LDA \$12,X\n"
+    "    LDA \$1234\n"
+    "    LDA \$1234,X\n"
+    "    LDA \$1234,Y\n"
+    "    LDA (\$12,X)\n"
+    "    LDA (\$12),Y\n"
+    "    LDX #\$12\n"
+    "    LDX \$12\n"
+    "    LDX \$12,Y\n"
+    "    LDX \$1234\n"
+    "    LDX \$1234,Y\n"
+    "    LDY #\$12\n"
+    "    LDY \$12\n"
+    "    LDY \$12,X\n"
+    "    LDY \$1234\n"
+    "    LDY \$1234,X\n"
+    "    LSR A\n"
+    "    LSR \$12\n"
+    "    LSR \$12,X\n"
+    "    LSR \$1234\n"
+    "    LSR \$1234,X\n"
+    "    NOP\n"
+    "    ORA #\$12\n"
+    "    ORA \$12\n"
+    "    ORA \$12,X\n"
+    "    ORA \$1234\n"
+    "    ORA \$1234,X\n"
+    "    ORA \$1234,Y\n"
+    "    ORA (\$12,X)\n"
+    "    ORA (\$12),Y\n"
+    "    PHA\n"
+    "    PHP\n"
+    "    PLA\n"
+    "    PLP\n"
+    "    ROL A\n"
+    "    ROL \$12\n"
+    "    ROL \$12,X\n"
+    "    ROL \$1234\n"
+    "    ROL \$1234,X\n"
+    "    ROR A\n"
+    "    ROR \$12\n"
+    "    ROR \$12,X\n"
+    "    ROR \$1234\n"
+    "    ROR \$1234,X\n"
+    "    RTI\n"
+    "    RTS\n"
+    "    SBC #\$12\n"
+    "    SBC \$12\n"
+    "    SBC \$12,X\n"
+    "    SBC \$1234\n"
+    "    SBC \$1234,X\n"
+    "    SBC \$1234,Y\n"
+    "    SBC (\$12,X)\n"
+    "    SBC (\$12),Y\n"
+    "    SEC\n"
+    "    SED\n"
+    "    SEI\n"
+    "    STA \$12\n"
+    "    STA \$12,X\n"
+    "    STA \$1234\n"
+    "    STA \$1234,X\n"
+    "    STA \$1234,Y\n"
+    "    STA (\$12,X)\n"
+    "    STA (\$12),Y\n"
+    "    STX \$12\n"
+    "    STX \$12,Y\n"
+    "    STX \$1234\n"
+    "    STY \$12\n"
+    "    STY \$12,X\n"
+    "    STY \$1234\n"
+    "    TAX\n"
+    "    TAY\n"
+    "    TSX\n"
+    "    TXA\n"
+    "    TXS\n"
+    "    TYA\n")

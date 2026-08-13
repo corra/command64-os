@@ -85,6 +85,24 @@ start:
     jsr symfull1
     jsr reportCase
 
+    ; WP60 Increment 7: these four each call symbolsInit themselves for a
+    ; fresh, isolated table (symfull1 above leaves the shared table at
+    ; exactly CASM_SYMBOL_MAX/full), matching casm_pass1.s's own per-fixture
+    ; isolation precedent rather than this file's usual sequential-shared-
+    ; table convention -- nothing after symfull1 depends on its full state,
+    ; so this is safe. Each fresh symbolsInit allocates its own VMM slot;
+    ; the shared resourcesCleanup below frees all of them (at most 5
+    ; concurrent slots: the original plus these four), well under
+    ; CASM_VMM_CAPACITY (8).
+    jsr symlenmin1
+    jsr reportCase
+    jsr symvalzero1
+    jsr reportCase
+    jsr symvalmax1
+    jsr reportCase
+    jsr sym511boundary1
+    jsr reportCase
+
     ; WP41 fix (same defect class found in casm_reloc.s): syminit1's
     ; symbolsInit allocates the symbol table's VMM storage and this harness
     ; never freed it before DOS_EXIT, leaking it permanently at the OS/REU
@@ -595,6 +613,255 @@ fl1Fail:
     rts
 
 ; ---------------------------------------------------------------------------
+; symlenmin1
+; WP60 Increment 7: name length 1 (the minimum symbolsInsert accepts,
+; mirroring symlen1's own maximum-length case at 31). Fresh table; insert,
+; look up, and assert round-trip with no truncation.
+; ---------------------------------------------------------------------------
+symlenmin1:
+    jsr symbolsInit
+    bcc :+
+    jmp lm1Fail
+:
+    lda #<nameLen1
+    sta CasmPtr0Lo
+    lda #>nameLen1
+    sta CasmPtr0Hi
+    lda #1
+    ldx #$34
+    ldy #$12
+    jsr symbolsInsert
+    bcc :+
+    jmp lm1Fail
+:
+    lda #<nameLen1
+    sta CasmPtr0Lo
+    lda #>nameLen1
+    sta CasmPtr0Hi
+    lda #1
+    ldx #<ResolveView
+    ldy #>ResolveView
+    jsr symbolsLookup
+    bcc :+
+    jmp lm1Fail
+:
+    lda ResolveView + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne :+
+    jmp lm1Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_LO
+    cmp #$34
+    beq :+
+    jmp lm1Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_HI
+    cmp #$12
+    beq :+
+    jmp lm1Fail
+:
+    clc
+    rts
+lm1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; symvalzero1
+; WP60 Increment 7: a symbol's value is exactly $0000. Fresh table; proves
+; $0000 is stored/round-tripped as a real resolved value, not confused with
+; an unresolved/sentinel-zero state (CASM_RESOLVE_FLAGS' RESOLVED bit is
+; checked explicitly, independent of the value bytes themselves).
+; ---------------------------------------------------------------------------
+symvalzero1:
+    jsr symbolsInit
+    bcc :+
+    jmp vz1Fail
+:
+    lda #<nameValZero
+    sta CasmPtr0Lo
+    lda #>nameValZero
+    sta CasmPtr0Hi
+    lda #6
+    ldx #$00
+    ldy #$00
+    jsr symbolsInsert
+    bcc :+
+    jmp vz1Fail
+:
+    lda #<nameValZero
+    sta CasmPtr0Lo
+    lda #>nameValZero
+    sta CasmPtr0Hi
+    lda #6
+    ldx #<ResolveView
+    ldy #>ResolveView
+    jsr symbolsLookup
+    bcc :+
+    jmp vz1Fail
+:
+    lda ResolveView + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne :+
+    jmp vz1Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_LO
+    bne vz1Fail
+    lda ResolveView + CASM_RESOLVE_VAL_HI
+    bne vz1Fail
+    clc
+    rts
+vz1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; symvalmax1
+; WP60 Increment 7: a symbol's value is exactly $FFFF. Fresh table.
+; ---------------------------------------------------------------------------
+symvalmax1:
+    jsr symbolsInit
+    bcc :+
+    jmp vm1Fail
+:
+    lda #<nameValMax
+    sta CasmPtr0Lo
+    lda #>nameValMax
+    sta CasmPtr0Hi
+    lda #5
+    ldx #$FF
+    ldy #$FF
+    jsr symbolsInsert
+    bcc :+
+    jmp vm1Fail
+:
+    lda #<nameValMax
+    sta CasmPtr0Lo
+    lda #>nameValMax
+    sta CasmPtr0Hi
+    lda #5
+    ldx #<ResolveView
+    ldy #>ResolveView
+    jsr symbolsLookup
+    bcc :+
+    jmp vm1Fail
+:
+    lda ResolveView + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne :+
+    jmp vm1Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_LO
+    cmp #$FF
+    beq :+
+    jmp vm1Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_HI
+    cmp #$FF
+    beq :+
+    jmp vm1Fail
+:
+    clc
+    rts
+vm1Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; sym511boundary1
+; WP60 Increment 7: 511 symbols (capacity-edge minus one), isolated as its
+; own checkpoint -- symfull1 above reaches exactly 512 (and rejects the
+; 513th) but never checks the 511-symbol point specifically. Fresh table;
+; insert exactly 511 distinct generated names ("GL"+16-bit counter, 0..510)
+; and assert the 511th insert's own returned record index is exactly 510
+; (0-based: symbolsInsert returns the count *before* increment, so the
+; 511th successful insert is the direct, positive proof that exactly 511
+; real inserts succeeded, not an incidental byproduct of counting loop
+; iterations) -- then look that symbol back up to confirm it round-trips.
+; ---------------------------------------------------------------------------
+sym511boundary1:
+    jsr symbolsInit
+    bcc :+
+    jmp s511Fail
+:
+    lda #$47                 ; 'G'
+    sta Sym511NameBuf
+    lda #$4C                 ; 'L'
+    sta Sym511NameBuf + 1
+
+    lda #0
+    sta Sym511CounterLo
+    sta Sym511CounterHi
+s511FillLoop:
+    lda Sym511CounterLo
+    sta Sym511NameBuf + 2
+    lda Sym511CounterHi
+    sta Sym511NameBuf + 3
+    lda #<Sym511NameBuf
+    sta CasmPtr0Lo
+    lda #>Sym511NameBuf
+    sta CasmPtr0Hi
+    lda #4
+    ldx Sym511CounterLo
+    ldy Sym511CounterHi
+    jsr symbolsInsert
+    bcc s511InsertOk
+    jmp s511Fail
+s511InsertOk:
+    inc Sym511CounterLo
+    bne :+
+    inc Sym511CounterHi
+:
+    lda Sym511CounterLo
+    cmp #<511
+    bne s511FillLoop
+    lda Sym511CounterHi
+    cmp #>511
+    bne s511FillLoop
+
+    ; The 511th insert (0-based counter value 510) just returned; X/Y still
+    ; hold its own return value (record index) from the loop's last
+    ; symbolsInsert call above -- check it directly before it's clobbered.
+    cpx #<510
+    bne s511Fail
+    cpy #>510
+    bne s511Fail
+
+    ; Look the last-inserted name (counter 510) back up to confirm it
+    ; round-trips.
+    lda #<Sym511NameBuf
+    sta CasmPtr0Lo
+    lda #>Sym511NameBuf
+    sta CasmPtr0Hi
+    lda #4
+    ldx #<ResolveView
+    ldy #>ResolveView
+    jsr symbolsLookup
+    bcc :+
+    jmp s511Fail
+:
+    lda ResolveView + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne :+
+    jmp s511Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_LO
+    cmp #<510
+    beq :+
+    jmp s511Fail
+:
+    lda ResolveView + CASM_RESOLVE_VAL_HI
+    cmp #>510
+    beq :+
+    jmp s511Fail
+:
+    clc
+    rts
+s511Fail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; diagPrintFatal (stub)
 ; resources.s's exitSuccess/exitFatal reference this; this harness never
 ; calls either, so a trivial stub satisfies the link without pulling in the
@@ -638,6 +905,14 @@ nameCaseUpper:
 nameLen31:
     .byte "XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX"    ; exactly 31 bytes
 
+; WP60 Increment 7
+nameLen1:
+    .byte "Z"                ; exactly 1 byte
+nameValZero:
+    .byte "VZERO0"
+nameValMax:
+    .byte "VMAX1"
+
 .segment "BSS"
 
 FailCount:  .res 1
@@ -661,3 +936,9 @@ ChainNameBuf:   .res 3
 FullCounterLo:  .res 1
 FullCounterHi:  .res 1
 FullNameBuf:    .res 4
+
+; sym511boundary1 scratch: 16-bit loop counter (0..510) and the 4-byte
+; generated name buffer ("GL" + counter Lo/Hi).
+Sym511CounterLo: .res 1
+Sym511CounterHi: .res 1
+Sym511NameBuf:   .res 4

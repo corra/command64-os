@@ -20,6 +20,33 @@ This file serves as the shared repository for architectural decisions, technical
 
 ## Technical Findings
 
+- **[2026-08-11] Shared 6502 fixture trampolines must not depend on indirect-JMP
+  pointer placement**: `JMP (addr)` on NMOS 6502 wraps the high-byte fetch when
+  its pointer lands at `$xxFF`. A relocatable test fixture cannot assume its
+  vector avoids that boundary. The CASM fault stub stores the real destination
+  into the operand of a RAM-resident absolute `JMP $xxxx`, avoiding the hardware
+  hazard without imposing global DATA alignment.
+- **[2026-08-11] VICE command entry requires PETSCII `$A4` underscores**:
+  `vice_keyboard_type` maps ASCII `$5F` to the C64 left-arrow glyph, so shell
+  application names containing `_` must be sent with `vice_keyboard_petscii`
+  and explicit `$A4` bytes. A left-arrow spelling can pass misleadingly far
+  into filename checks and appear as a loader failure. Also remove temporary
+  stopping checkpoints and explicitly resume execution before classifying a
+  timed run.
+- **[2026-08-11] CASM listing include-device validation**: Listing filename
+  resolution validates catalog devices 8-11 before subtracting 8 and indexing
+  `includeDeviceStrLo/Hi`. Out-of-range metadata returns the existing listing
+  replay-mismatch diagnostic and leaves resolved output non-consumable; valid
+  listing bytes and public storage/ABI remain unchanged.
+- **[2026-08-11] CASM listing-private handle ownership**: A successful
+  `DOS_OPEN_FILE` transfers ownership to `listing.s` before central registry
+  insertion can fail. `CasmListFileSlot = CASM_INVALID_SLOT` distinguishes
+  this bounded unregistered state: `listingClose` calls `DOS_CLOSE_FILE`
+  directly for it, while registered slots continue through `fileClose`.
+  `OPEN` and `CLOSE_FAILED` each permit one caller-driven close attempt;
+  failures retain ownership, and deletion occurs only after close succeeds.
+  This preserves the primary create/write diagnostic and makes later
+  `artifactsAbort` calls safe retries without an internal loop.
 - **[2026-08-04] Standalone external-app feasibility**: Current ca65 external
   apps depend on a relocatable Command64 artifact, `OS_API=$1000`, shared
   parameter zero page, shell command-buffer/exit conventions, and application-
@@ -225,6 +252,63 @@ This file serves as the shared repository for architectural decisions, technical
   advanced CASM from `0.1.3` to `0.1.4`.
 - Work Package 1 synchronized the approved contracts and task hierarchy; user
   completion approval advanced the CASM stage version from `0.1.2` to `0.1.3`.
+
+### CASM Phase 4 Parser/Opcode/Emission Contract (WP12-15, closed 2026-07-21)
+
+- Phase 4 is the first production output consumer: a bounded recursive-descent
+  statement parser (`parser.s`) drives a packed opcode/addressing-mode matcher
+  (`opcodes.s`) and a numeric static emitter (`emit.s`), with no labels,
+  symbols, expressions, VMM, two-pass assembly, or relocation in scope (all
+  deferred to Phase 5 onward).
+- `parserParseStatement` accepts an optional label, then a mnemonic or
+  directive, then a shared `parseOperandSequence` grammar covering implied,
+  accumulator, immediate, absolute (zero-page/absolute promoted by operand
+  width at `$00FF`/`$0100`), indexed (`,X`/`,Y`), and both indirect forms.
+  `.BYTE`/`.WORD` operand lists are deliberately deferred past the parser to
+  `emit.s`, so their delimiter diagnostics (empty/leading/doubled/trailing
+  comma) are raised there, not in `parser.s`.
+- `opcodes.s` freezes a packed 151-entry legal-opcode table
+  (`.assert opcodeBytesEnd - opcodeBytes = 151`) covering every official NMOS
+  6502/6510 opcode/addressing-mode combination, with `CASM_MODE_IMPLIED`
+  through `CASM_MODE_RELATIVE` as the 13 `CASM_MODE_*` values
+  (`CASM_MODE_COUNT = 13`). Per-mnemonic support is a split bitmap
+  (`ofMaskLo` for modes 0-7, `ofMaskHi` for modes 8-12); the WP14 acceptance
+  work found and fixed a real miscompilation here (`CASM_MODE_ZEROPAGE_Y` was
+  dead code because ca65 silently evaluates a negative shift to `$00` with no
+  diagnostic — see the negative-shift reference note), fixed by naming each
+  mask bit as a compile-time-asserted constant (`OF_BIT_LO_*`/`OF_BIT_HI_*`)
+  instead of re-deriving the shift inline at each use site.
+- `emit.s` performs numeric static emission only: relative branch
+  displacement is computed from the address following the branch (`-128`/
+  `+127` accepted, `-129`/`+128` rejected), PC advance is checked through
+  `$FFFF` (advancing past `$FFFF` is `ADDRESS OVERFLOW`), and `.ORG` requires
+  exactly one absolute-width numeric operand (`emitOrg` rejects
+  `CASM_OPKIND_IMPLIED` and every non-`CASM_OPKIND_ABSOLUTE` operand shape) —
+  the WP14 acceptance work found and fixed a real defect where a bare `.ORG`
+  or `.ORG A` silently set the origin to `$0000` with no diagnostic. Both
+  fixes reused Phase 4's own existing diagnostic range (`CASM_DIAG_SYNTAX_ERROR`
+  `$1C`), adding no new diagnostic code.
+- Production orchestration lives in `casm.s`'s `start` entry, not a separate
+  `compiler.s`: the WP14 audit deliberately kept the ~35-line compile loop
+  in-place (cohesive, bounded, tightly coupled to the shared
+  `startInitFatal`/`startFatal` fatal trampolines) rather than extracting a
+  module boundary that would only add dispatch glue. `casm.s` owns
+  resource/CLI/file/source/lexer init, output-name derivation, output
+  creation, the dispatch loop (MNEMONIC/DIRECTIVE/NEWLINE/EOF), routing every
+  failure through `outputAbort` (preserves the primary diagnostic, deletes a
+  created-but-incomplete PRG) before `exitFatal`, and leaving the completed
+  output registry-owned for a single checked close during
+  `resourcesCleanup` — `INPUT VALIDATED` prints only after the final buffered
+  write (`emitFinalize`) succeeds.
+- Trusted-reference verification (`casmemit1.ref`, `casmhello.ref`,
+  `casmmodes.ref`, one legal statement per `CASM_MODE_*` value) is hand-
+  assembled from the 6502 instruction set, never derived from `opcodes.s`
+  itself — the non-circularity rule that caught the `ZEROPAGE_Y` defect above;
+  see the CASM trusted-reference-rule memory note.
+- User-approved Phase 4 completion (WP15) is CASM `0.1.17`. Governing:
+  `brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`,
+  `brain/plans/2026-07-20-casm-phase4-wp15-phase-verification-closeout.md`,
+  `brain/plans/2026-07-21-casm-phase4-wp14-test-plan.md`.
 
 ### CASM Phase 5 Expression/Resolver Contract (Phase 0C.3, approved 2026-07-21)
 
@@ -2063,6 +2147,163 @@ runs, not one clean pass.
   cross-check (`--allow-host-bytes`) with a truthful `# provenance:` line,
   user-approved as sufficient for now rather than blocking on a native-CASM-
   on-hardware run.
+
+### CASM Phase 10 Symbol Map/Listing Contract (WP50-55, closed 2026-08-08)
+
+- `/M` and `/L` add deterministic developer-usability output without changing
+  assembled PRG/R6 bytes, source traversal, include replay, relocation
+  behavior, diagnostics provenance, or cleanup guarantees — both were already
+  parsed as duplicate-rejected flags since an earlier phase; Phase 10 removes
+  only their `NOT IMPLEMENTED` runtime gate.
+- `/M` prints a definition-order symbol map (`map.s`, stateless
+  `symbolsReadByIndex` iteration from index 0, never hash-bucket order): a
+  `SYMBOL MAP` header, `$HHHH LABEL` rows in original case-sensitive spelling,
+  and a decimal `NNN SYMBOLS` total supporting the full 0-512 symbol range.
+  Map printing allocates no map-specific VMM store and performs no sorting;
+  it stays uncalled in production until WP54 wires it in after listing
+  success (a listing failure suppresses the map).
+- `/L` derives a `.LST` name from the final PRG output name (device prefix
+  preserved, final dot-suffix replaced or `.LST` appended) and writes raw
+  PETSCII with CR row terminators: a `FILE HH: NAME` header on every packed
+  physical-file-identity change, and fixed 40-column detail rows —
+  `HH:LLLLL PPPP BB BB BB BB` then up to 14 exact source bytes — with
+  independent byte and source continuation rows (neither count coupled to the
+  other). Every physical source line appears in actual traversal order,
+  including `.INCLUDE` lines before their child traversal, blank/comment
+  lines, and the final unterminated line; synthetic inter-file newlines are
+  not listed rows.
+- `/L` conditionally allocates exactly two VMM stores when active: a
+  metadata store of 4,096 fixed 16-byte records (exactly 65,536 bytes,
+  frozen offsets: packed file id, physical line, source VMM offset/length,
+  starting PC, byte-stream offset/count, flags, reserved) and an
+  emitted-byte mirror of up to 65,536 Pass-2 source-generated bytes (mirrored
+  at `emitByte`, explicitly excluding the raw PRG header/R6 format bytes
+  `emitRawByte` also carries — never a valid listing-byte hook). Worst-case
+  CASM VMM registry occupancy is 6 of 8 slots with both stores active.
+  `/M` without `/L` acquires neither allocation.
+- Listing capture is a transaction around the shared statement path, not a
+  syntax tree or general instruction-event IR: capture starting PC and mirror
+  cursor before parsing, dispatch through the existing parser/emitter path
+  unchanged, and commit one metadata record after dispatch using the
+  source-owned completed-line sidecar (`sourceTakeCompletedLine`, frozen at
+  WP50) rather than inferring parse position from the bulk-refill cursor.
+- Failure ownership is split by PRG finalization state: any listing capture/
+  bound/VMM failure before PRG finalization is fatal and the existing
+  incomplete-PRG abort path applies; a listing create/write/short-write/close
+  failure *after* the PRG is valid preserves the listing failure as primary,
+  deletes only the incomplete listing, retains the valid finalized PRG,
+  suppresses `/M`, and still exits through central cleanup — listing
+  ownership state is tracked separately from PRG ownership/validity state.
+- WP50-55 froze the design/ABI, added listing stores and capture events,
+  built the map module, added `.LST` serialization/cleanup, wired production
+  integration, and closed with independent verification and a user-approved
+  runtime walkthrough — Phase 10 is the master plan's "CASM 0.2 developer-
+  usability release." Completion promoted CASM `0.1.56` to `0.2.0` build
+  `1260` as a version-only change (no assembly/listing/map behavior changed
+  beyond the version/build artifact itself).
+- Governing: `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`
+  (parent, with each WP50-55's own dedicated plan linked from it).
+
+### CASM Phase 11 Base-Release Hardening Contract (WP56-63, Phase 11 complete 2026-08-13)
+
+- Phase 11 adds no new language feature, directive, or output format. It is a
+  hardening/certification phase over the complete `0.1`/`0.2` base release
+  (every module built across Phases 1-10), not a features phase: across all
+  of WP56-61 the only production source change in the entire phase is a
+  single instruction — `CLD` added as the literal first instruction of
+  `casm.s`'s `start:` entry point (WP60 Increment 3), hardening against a
+  hypothetical stale decimal flag reaching a future `ADC`/`SBC` path, since
+  CASM has no supported decimal-mode entry contract of its own. Every other
+  work package (WP56, 57-59, 60's certification work, 61's determinism work)
+  is test/verification/infrastructure, changing no assembled behavior.
+- WP56 (contract reconciliation) triaged 3 carried-forward debt items from
+  Phase 4: `CasmOutputCreated`'s naming was retired as a stale premise (the
+  real issue is a separate `fileCreateOutput` `@0:`-replace-marker gap,
+  tracked independently); the missing entry `CLD` was confirmed a real narrow
+  hardening gap and assigned to WP60; the missing Phase 4
+  `brain/KNOWLEDGE.md` section was confirmed and assigned to WP62 (this
+  section).
+- WP57 designed and built real fault-injection test infrastructure: a
+  runtime hook that patches the fixed `OS_API = $1000` `jmp apiHandler` stub
+  to install a `faultStubEntry`, letting file-open/read/write/close/delete
+  and VMM alloc/free/transfer calls be made to fail deterministically without
+  needing a genuinely full disk or exhausted registry. WP58 applied it across
+  every file/VMM-touching module (`fileio.s`, `source.s`, `symbols.s`,
+  `reloc.s`, `include.s`, `vmm_store.s`), closing a gap Phase 10's own WP55
+  had disclosed but not resolved (`CREATE_FAILED`/`WRITE_FAILED`/
+  `CLOSE_FAILED`/`DELETE_FAILED`/`SHORT_WRITE` and the no-REU/OOM branches
+  had never been independently fault-injected anywhere in the codebase).
+  Both changed test infrastructure only.
+- WP59 hardened `listing.s`/`map.s` — the newest, least individually audited
+  modules — auditing every exported routine's carry propagation, register
+  clobbers, stack balance, and zero-page/BSS ownership against its own header
+  contract, and fixing two harness-only defects plus one retryable-close
+  compensation fix (D1/D2) with no storage/public-ABI change. No production
+  defect was found beyond the close-compensation fix; CASM advanced only its
+  version/build banner (`0.2.0` to `0.2.1` build `1264`).
+- WP60 closed the two remaining Phase 4 carried-forward items (the `CLD`
+  fix above) and exhaustively certified opcode/addressing-mode coverage:
+  an independently-derived oracle for all 151 legal NMOS 6502/6510 tuples
+  was mechanically reconciled one-to-one against `opcodes.s`'s mask/offset/
+  byte/length tables, plus a 52-row boundary register spanning numeric
+  literal, addressing width, branch, PC, source, symbol, VMM, and relocation
+  domains. One real production defect was found and left explicitly
+  deferred (a one-byte-source phantom-EOF-byte defect in
+  `sourceLoad`/`sourceNextByte`, tracked separately, not fixed under WP60).
+  CASM advanced to `0.2.2` build `1266` (version-only banner change beyond
+  the single `CLD` byte).
+- WP61 proved determinism — identical input produces byte-identical output
+  across PRG, R6 relocation, `/L` listing, and `/M` map, verified by
+  dual-assembling representative fixtures (small-static, small-relocatable,
+  and the 151-statement exhaustive `casmopall.s`) and comparing both runs —
+  and closed 4 of WP60's residual boundary items (`FORCE_ABS` stability
+  across a genuine two-pass re-resolution; the 65,535/65,536-byte source
+  extent boundary; symbol/token name-length-32 rejection; the empty-source-
+  file row re-scoped as a tooling gap, since `cc1541` cannot write a
+  zero-byte SEQ entry). WP61 found and fixed one build-system-only defect
+  (a test-disk directory-overflow oversight) and zero production defects;
+  CASM's version/build stayed at `0.2.2` build `1266` throughout (no
+  production change occurred, per the project's bump-only-if-changed
+  policy).
+- The phantom-EOF-byte defect (Taskwarrior UUID
+  `882433f0-cde1-4849-8b3c-df32613518c3`) remains open and explicitly
+  deferred past Phase 11, tracked as its own item rather than blocking
+  either WP60 or WP61 completion.
+- WP62 (documentation sync, closed 2026-08-12) backfilled this section
+  (Phase 4, 10, and 11 had all been missing from `brain/KNOWLEDGE.md`
+  until WP62), clean-room re-synced `wiki/casm-programmers-reference.md`
+  and the `wiki/casm-utility.md`/`docs/casm-utility.md` pair, and added
+  the missing WP61 `CHANGELOG.md` entry. No production/version change.
+- WP63 (verification, walkthrough, completion gate) is Phase 11's closing
+  work package: the first-ever consolidated live-VICE re-run of every
+  `test_casm_*` harness across all six CASM disk images in one continuous
+  session (never previously exercised — WP56-61 each verified only their
+  own delta). That consolidated run **found a genuine, previously-
+  undetected defect**: six fault-injection test harnesses
+  (`casm_faultvmm.s`, `casm_faultsource.s`, `casm_freloc.s`,
+  `casm_finc.s`, `casm_fsym.s`, `casm_faultinject.s`) call `faultInstall`
+  (`tests/src/casm_faultinject/faultstub.inc`), which patches the fixed,
+  OS-resident `$1000` OS_API dispatch vector to redirect through that
+  harness's own `faultStubEntry`, but never call `faultUninstall` to
+  restore it before their own `DOS_EXIT` — leaving `$1000` dangling into
+  that harness's own (about-to-be-overwritten) memory once the next
+  program loads at the same address, corrupting every OS_API call the
+  next program makes in the same session. `casm_flist.s`/`casm_flmeta.s`
+  already showed the correct paired `faultInstall`/`faultUninstall`
+  pattern; the six single-case harnesses above never picked it up. Fixed
+  by adding `jsr faultUninstall` before `DOS_EXIT` in all six. Test
+  infrastructure only — no production CASM source, ABI, diagnostic, or
+  output byte changed; CASM's own version/build (`0.2.2` build `1266`)
+  is unaffected. Full detail, root-cause evidence, and post-fix
+  verification (all 28 harnesses + 3 `comp` cross-checks live-reverified
+  PASS) in
+  `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
+  As of this writing WP63/Phase 11 are **not yet closed** — awaiting the
+  user's own runtime walkthrough and explicit approval.
+- Governing: `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
+  (parent, with each WP56-63's own dedicated plan and review/walkthrough
+  linked from it, and `brain/task.md`'s WP56-63 entries for the full
+  per-increment record).
 
 ## C64 Platform Constraints Discovered
 

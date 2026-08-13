@@ -1,0 +1,340 @@
+# CASM WP60 Increment 5 trusted reference: casmopall
+#
+# One legal statement for each of the 151 documented NMOS 6502/6510
+# mnemonic/addressing-mode combinations frozen by the Increment 1 oracle
+# (brain/reviews/2026-08-12-casm-phase11-wp60-increment1-opcode-oracle.md),
+# in that oracle's own row order. Proves parser, matcher, emitter, PC
+# advancement, and file output end to end for every legal combination in one
+# native COMP run, complementing test_casm_opcodes' direct in-memory matcher
+# coverage of the same 151 tuples (Increment 4).
+#
+# Hand-derived from the same independently authored oracle values (opcode
+# byte + instruction length per tuple), NOT from src/external/casm/opcodes.s
+# and NOT by re-deriving NMOS encoding a second time -- Increment 1's
+# reconciliation already proved oracle == production byte-for-byte, so this
+# reference transcribes the frozen oracle's own opcode/length columns
+# mechanically into operand bytes, using the same fixed operand encoding for
+# every row:
+#   Implied/Accumulator      -> opcode only (1 byte)
+#   Immediate/Zero Page(,X/Y)/(Indirect,X)/(Indirect),Y
+#                             -> opcode, $12                (2 bytes)
+#   Absolute(,X/Y)/Indirect  -> opcode, $34, $12 (little-endian $1234) (3 bytes)
+#   Relative                 -> opcode, $00 (branch targets the very next
+#                                byte -- see casmopall.seq's TGnn labels)
+#
+# Source (.ORG $C000) and full per-statement manifest, in emission order.
+# Offset columns are 24-bit file byte offsets as native COMP reports them
+# (0-based from the start of the raw file stream, which begins with the
+# 2-byte PRG load-address header at file offsets $0000-$0001) -- so the
+# first mismatching combination can be identified directly from a COMP
+# report without reverse-engineering the rest of the file.
+#
+# | # | Mnemonic | Mode | Offset lo | Offset hi | Bytes |
+# | --- | --- | --- | --- | --- | --- |
+# | 1 | ADC | Immediate | $0002 | $0003 | 69 12 |
+# | 2 | ADC | Zero Page | $0004 | $0005 | 65 12 |
+# | 3 | ADC | Zero Page,X | $0006 | $0007 | 75 12 |
+# | 4 | ADC | Absolute | $0008 | $000A | 6D 34 12 |
+# | 5 | ADC | Absolute,X | $000B | $000D | 7D 34 12 |
+# | 6 | ADC | Absolute,Y | $000E | $0010 | 79 34 12 |
+# | 7 | ADC | (Indirect,X) | $0011 | $0012 | 61 12 |
+# | 8 | ADC | (Indirect),Y | $0013 | $0014 | 71 12 |
+# | 9 | AND | Immediate | $0015 | $0016 | 29 12 |
+# | 10 | AND | Zero Page | $0017 | $0018 | 25 12 |
+# | 11 | AND | Zero Page,X | $0019 | $001A | 35 12 |
+# | 12 | AND | Absolute | $001B | $001D | 2D 34 12 |
+# | 13 | AND | Absolute,X | $001E | $0020 | 3D 34 12 |
+# | 14 | AND | Absolute,Y | $0021 | $0023 | 39 34 12 |
+# | 15 | AND | (Indirect,X) | $0024 | $0025 | 21 12 |
+# | 16 | AND | (Indirect),Y | $0026 | $0027 | 31 12 |
+# | 17 | ASL | Accumulator | $0028 | $0028 | 0A |
+# | 18 | ASL | Zero Page | $0029 | $002A | 06 12 |
+# | 19 | ASL | Zero Page,X | $002B | $002C | 16 12 |
+# | 20 | ASL | Absolute | $002D | $002F | 0E 34 12 |
+# | 21 | ASL | Absolute,X | $0030 | $0032 | 1E 34 12 |
+# | 22 | BCC | Relative | $0033 | $0034 | 90 00 |
+# | 23 | BCS | Relative | $0035 | $0036 | B0 00 |
+# | 24 | BEQ | Relative | $0037 | $0038 | F0 00 |
+# | 25 | BIT | Zero Page | $0039 | $003A | 24 12 |
+# | 26 | BIT | Absolute | $003B | $003D | 2C 34 12 |
+# | 27 | BMI | Relative | $003E | $003F | 30 00 |
+# | 28 | BNE | Relative | $0040 | $0041 | D0 00 |
+# | 29 | BPL | Relative | $0042 | $0043 | 10 00 |
+# | 30 | BRK | Implied | $0044 | $0044 | 00 |
+# | 31 | BVC | Relative | $0045 | $0046 | 50 00 |
+# | 32 | BVS | Relative | $0047 | $0048 | 70 00 |
+# | 33 | CLC | Implied | $0049 | $0049 | 18 |
+# | 34 | CLD | Implied | $004A | $004A | D8 |
+# | 35 | CLI | Implied | $004B | $004B | 58 |
+# | 36 | CLV | Implied | $004C | $004C | B8 |
+# | 37 | CMP | Immediate | $004D | $004E | C9 12 |
+# | 38 | CMP | Zero Page | $004F | $0050 | C5 12 |
+# | 39 | CMP | Zero Page,X | $0051 | $0052 | D5 12 |
+# | 40 | CMP | Absolute | $0053 | $0055 | CD 34 12 |
+# | 41 | CMP | Absolute,X | $0056 | $0058 | DD 34 12 |
+# | 42 | CMP | Absolute,Y | $0059 | $005B | D9 34 12 |
+# | 43 | CMP | (Indirect,X) | $005C | $005D | C1 12 |
+# | 44 | CMP | (Indirect),Y | $005E | $005F | D1 12 |
+# | 45 | CPX | Immediate | $0060 | $0061 | E0 12 |
+# | 46 | CPX | Zero Page | $0062 | $0063 | E4 12 |
+# | 47 | CPX | Absolute | $0064 | $0066 | EC 34 12 |
+# | 48 | CPY | Immediate | $0067 | $0068 | C0 12 |
+# | 49 | CPY | Zero Page | $0069 | $006A | C4 12 |
+# | 50 | CPY | Absolute | $006B | $006D | CC 34 12 |
+# | 51 | DEC | Zero Page | $006E | $006F | C6 12 |
+# | 52 | DEC | Zero Page,X | $0070 | $0071 | D6 12 |
+# | 53 | DEC | Absolute | $0072 | $0074 | CE 34 12 |
+# | 54 | DEC | Absolute,X | $0075 | $0077 | DE 34 12 |
+# | 55 | DEX | Implied | $0078 | $0078 | CA |
+# | 56 | DEY | Implied | $0079 | $0079 | 88 |
+# | 57 | EOR | Immediate | $007A | $007B | 49 12 |
+# | 58 | EOR | Zero Page | $007C | $007D | 45 12 |
+# | 59 | EOR | Zero Page,X | $007E | $007F | 55 12 |
+# | 60 | EOR | Absolute | $0080 | $0082 | 4D 34 12 |
+# | 61 | EOR | Absolute,X | $0083 | $0085 | 5D 34 12 |
+# | 62 | EOR | Absolute,Y | $0086 | $0088 | 59 34 12 |
+# | 63 | EOR | (Indirect,X) | $0089 | $008A | 41 12 |
+# | 64 | EOR | (Indirect),Y | $008B | $008C | 51 12 |
+# | 65 | INC | Zero Page | $008D | $008E | E6 12 |
+# | 66 | INC | Zero Page,X | $008F | $0090 | F6 12 |
+# | 67 | INC | Absolute | $0091 | $0093 | EE 34 12 |
+# | 68 | INC | Absolute,X | $0094 | $0096 | FE 34 12 |
+# | 69 | INX | Implied | $0097 | $0097 | E8 |
+# | 70 | INY | Implied | $0098 | $0098 | C8 |
+# | 71 | JMP | Absolute | $0099 | $009B | 4C 34 12 |
+# | 72 | JMP | Indirect | $009C | $009E | 6C 34 12 |
+# | 73 | JSR | Absolute | $009F | $00A1 | 20 34 12 |
+# | 74 | LDA | Immediate | $00A2 | $00A3 | A9 12 |
+# | 75 | LDA | Zero Page | $00A4 | $00A5 | A5 12 |
+# | 76 | LDA | Zero Page,X | $00A6 | $00A7 | B5 12 |
+# | 77 | LDA | Absolute | $00A8 | $00AA | AD 34 12 |
+# | 78 | LDA | Absolute,X | $00AB | $00AD | BD 34 12 |
+# | 79 | LDA | Absolute,Y | $00AE | $00B0 | B9 34 12 |
+# | 80 | LDA | (Indirect,X) | $00B1 | $00B2 | A1 12 |
+# | 81 | LDA | (Indirect),Y | $00B3 | $00B4 | B1 12 |
+# | 82 | LDX | Immediate | $00B5 | $00B6 | A2 12 |
+# | 83 | LDX | Zero Page | $00B7 | $00B8 | A6 12 |
+# | 84 | LDX | Zero Page,Y | $00B9 | $00BA | B6 12 |
+# | 85 | LDX | Absolute | $00BB | $00BD | AE 34 12 |
+# | 86 | LDX | Absolute,Y | $00BE | $00C0 | BE 34 12 |
+# | 87 | LDY | Immediate | $00C1 | $00C2 | A0 12 |
+# | 88 | LDY | Zero Page | $00C3 | $00C4 | A4 12 |
+# | 89 | LDY | Zero Page,X | $00C5 | $00C6 | B4 12 |
+# | 90 | LDY | Absolute | $00C7 | $00C9 | AC 34 12 |
+# | 91 | LDY | Absolute,X | $00CA | $00CC | BC 34 12 |
+# | 92 | LSR | Accumulator | $00CD | $00CD | 4A |
+# | 93 | LSR | Zero Page | $00CE | $00CF | 46 12 |
+# | 94 | LSR | Zero Page,X | $00D0 | $00D1 | 56 12 |
+# | 95 | LSR | Absolute | $00D2 | $00D4 | 4E 34 12 |
+# | 96 | LSR | Absolute,X | $00D5 | $00D7 | 5E 34 12 |
+# | 97 | NOP | Implied | $00D8 | $00D8 | EA |
+# | 98 | ORA | Immediate | $00D9 | $00DA | 09 12 |
+# | 99 | ORA | Zero Page | $00DB | $00DC | 05 12 |
+# | 100 | ORA | Zero Page,X | $00DD | $00DE | 15 12 |
+# | 101 | ORA | Absolute | $00DF | $00E1 | 0D 34 12 |
+# | 102 | ORA | Absolute,X | $00E2 | $00E4 | 1D 34 12 |
+# | 103 | ORA | Absolute,Y | $00E5 | $00E7 | 19 34 12 |
+# | 104 | ORA | (Indirect,X) | $00E8 | $00E9 | 01 12 |
+# | 105 | ORA | (Indirect),Y | $00EA | $00EB | 11 12 |
+# | 106 | PHA | Implied | $00EC | $00EC | 48 |
+# | 107 | PHP | Implied | $00ED | $00ED | 08 |
+# | 108 | PLA | Implied | $00EE | $00EE | 68 |
+# | 109 | PLP | Implied | $00EF | $00EF | 28 |
+# | 110 | ROL | Accumulator | $00F0 | $00F0 | 2A |
+# | 111 | ROL | Zero Page | $00F1 | $00F2 | 26 12 |
+# | 112 | ROL | Zero Page,X | $00F3 | $00F4 | 36 12 |
+# | 113 | ROL | Absolute | $00F5 | $00F7 | 2E 34 12 |
+# | 114 | ROL | Absolute,X | $00F8 | $00FA | 3E 34 12 |
+# | 115 | ROR | Accumulator | $00FB | $00FB | 6A |
+# | 116 | ROR | Zero Page | $00FC | $00FD | 66 12 |
+# | 117 | ROR | Zero Page,X | $00FE | $00FF | 76 12 |
+# | 118 | ROR | Absolute | $0100 | $0102 | 6E 34 12 |
+# | 119 | ROR | Absolute,X | $0103 | $0105 | 7E 34 12 |
+# | 120 | RTI | Implied | $0106 | $0106 | 40 |
+# | 121 | RTS | Implied | $0107 | $0107 | 60 |
+# | 122 | SBC | Immediate | $0108 | $0109 | E9 12 |
+# | 123 | SBC | Zero Page | $010A | $010B | E5 12 |
+# | 124 | SBC | Zero Page,X | $010C | $010D | F5 12 |
+# | 125 | SBC | Absolute | $010E | $0110 | ED 34 12 |
+# | 126 | SBC | Absolute,X | $0111 | $0113 | FD 34 12 |
+# | 127 | SBC | Absolute,Y | $0114 | $0116 | F9 34 12 |
+# | 128 | SBC | (Indirect,X) | $0117 | $0118 | E1 12 |
+# | 129 | SBC | (Indirect),Y | $0119 | $011A | F1 12 |
+# | 130 | SEC | Implied | $011B | $011B | 38 |
+# | 131 | SED | Implied | $011C | $011C | F8 |
+# | 132 | SEI | Implied | $011D | $011D | 78 |
+# | 133 | STA | Zero Page | $011E | $011F | 85 12 |
+# | 134 | STA | Zero Page,X | $0120 | $0121 | 95 12 |
+# | 135 | STA | Absolute | $0122 | $0124 | 8D 34 12 |
+# | 136 | STA | Absolute,X | $0125 | $0127 | 9D 34 12 |
+# | 137 | STA | Absolute,Y | $0128 | $012A | 99 34 12 |
+# | 138 | STA | (Indirect,X) | $012B | $012C | 81 12 |
+# | 139 | STA | (Indirect),Y | $012D | $012E | 91 12 |
+# | 140 | STX | Zero Page | $012F | $0130 | 86 12 |
+# | 141 | STX | Zero Page,Y | $0131 | $0132 | 96 12 |
+# | 142 | STX | Absolute | $0133 | $0135 | 8E 34 12 |
+# | 143 | STY | Zero Page | $0136 | $0137 | 84 12 |
+# | 144 | STY | Zero Page,X | $0138 | $0139 | 94 12 |
+# | 145 | STY | Absolute | $013A | $013C | 8C 34 12 |
+# | 146 | TAX | Implied | $013D | $013D | AA |
+# | 147 | TAY | Implied | $013E | $013E | A8 |
+# | 148 | TSX | Implied | $013F | $013F | BA |
+# | 149 | TXA | Implied | $0140 | $0140 | 8A |
+# | 150 | TXS | Implied | $0141 | $0141 | 9A |
+# | 151 | TYA | Implied | $0142 | $0142 | 98 |
+
+# bytes: 323
+# sha256: 0bccfbc18392bb108c26b91b9c6b289b1a4537c40b995bdde2e7409939c9f6fc
+
+00 C0
+69 12
+65 12
+75 12
+6D 34 12
+7D 34 12
+79 34 12
+61 12
+71 12
+29 12
+25 12
+35 12
+2D 34 12
+3D 34 12
+39 34 12
+21 12
+31 12
+0A
+06 12
+16 12
+0E 34 12
+1E 34 12
+90 00
+B0 00
+F0 00
+24 12
+2C 34 12
+30 00
+D0 00
+10 00
+00
+50 00
+70 00
+18
+D8
+58
+B8
+C9 12
+C5 12
+D5 12
+CD 34 12
+DD 34 12
+D9 34 12
+C1 12
+D1 12
+E0 12
+E4 12
+EC 34 12
+C0 12
+C4 12
+CC 34 12
+C6 12
+D6 12
+CE 34 12
+DE 34 12
+CA
+88
+49 12
+45 12
+55 12
+4D 34 12
+5D 34 12
+59 34 12
+41 12
+51 12
+E6 12
+F6 12
+EE 34 12
+FE 34 12
+E8
+C8
+4C 34 12
+6C 34 12
+20 34 12
+A9 12
+A5 12
+B5 12
+AD 34 12
+BD 34 12
+B9 34 12
+A1 12
+B1 12
+A2 12
+A6 12
+B6 12
+AE 34 12
+BE 34 12
+A0 12
+A4 12
+B4 12
+AC 34 12
+BC 34 12
+4A
+46 12
+56 12
+4E 34 12
+5E 34 12
+EA
+09 12
+05 12
+15 12
+0D 34 12
+1D 34 12
+19 34 12
+01 12
+11 12
+48
+08
+68
+28
+2A
+26 12
+36 12
+2E 34 12
+3E 34 12
+6A
+66 12
+76 12
+6E 34 12
+7E 34 12
+40
+60
+E9 12
+E5 12
+F5 12
+ED 34 12
+FD 34 12
+F9 34 12
+E1 12
+F1 12
+38
+F8
+78
+85 12
+95 12
+8D 34 12
+9D 34 12
+99 34 12
+81 12
+91 12
+86 12
+96 12
+8E 34 12
+84 12
+94 12
+8C 34 12
+AA
+A8
+BA
+8A
+9A
+98

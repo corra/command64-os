@@ -11,8 +11,84 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-07-29)
+## Current State (2026-08-12)
 
+- **CASM Phase 11 WP61 complete at `0.2.2.1266`** (no version bump -- no
+  production change occurred): determinism and remaining boundary spot-
+  checks. Proved re-assembling identical source twice produces byte-
+  identical PRG/R6/listing output (native `comp` self-compare, a new
+  proof technique vs. every prior WP's compare-to-fixed-reference) across
+  `casmhello.s`/`casmreloc1.s`/`casmopall.s`, plus a manual live `/M`
+  symbol-map diff (screen-print-only, no file to `comp`). Closed all 4
+  actionable boundary residuals WP60 Increment 9 deferred: `FORCE_ABS`
+  two-pass stability (new `casmfa2p.s` forward-reference fixture); source
+  extent 65,535-accept/65,536-reject (`casmsrcmax.s`, exactly 65,535
+  bytes, `CASM_DIAG_SOURCE_OFFSET_OVERFLOW` on the combined-file reject);
+  symbol/token name-length-32 (new `tests/src/casm_lexer/casm_lexer.s`,
+  the first harness in this codebase to link `lexer.s` directly). The
+  5th residual (empty-source-file) stays closed by re-scope -- `cc1541`
+  cannot write a zero-byte SEQ fixture, a tooling gap not a code gap. One
+  build-system-only bug was found and fixed within WP61 itself (a
+  `test.d64` directory-overflow oversight from Increment 4, caught only
+  once Increment 7 finally ran a full unrestricted rebuild); zero
+  production defects found. `casm.prg` remained byte-identical to its
+  WP60 state throughout (18581 code bytes, 2806 relocations). The
+  phantom-EOF-byte defect stays separately tracked (Taskwarrior UUID
+  `882433f0-cde1-4849-8b3c-df32613518c3`), untouched by WP61 as agreed at
+  plan approval. Full record in `brain/task.md`'s WP61 entry and
+  `brain/walkthroughs/2026-08-12-casm-phase11-wp61-increment8-audit-walkthrough.md`.
+
+- **CASM Phase 11 WP60 complete at `0.2.2.1266`**: exhaustive opcode/
+  addressing/boundary certification. Independently re-derived and
+  mechanically reconciled all 151 legal NMOS 6502/6510 opcode/mode/length
+  tuples against production's tables (exact match); `test_casm_opcodes`
+  (197/197: 151 legal tuples + 46 focused negative/selection cases) and an
+  end-to-end 151-statement `casmopall.s`/`casmopall.ref` native-`COMP`
+  round trip both pass live. Strengthened numeric-literal, addressing-width,
+  relative-branch, program-counter, source, symbol, relocation, and VMM
+  boundary evidence: 48 of 52 required rows closed (4 residual items --
+  `FORCE_ABS` two-pass re-resolution, the source domain's 65,535/65,536-byte
+  extent boundary, symbol name-length-32 rejection, and the empty-source-
+  file tooling gap -- explicitly deferred, not blocking). Added `CLD` as
+  `casm.s`'s literal first instruction (Increment 3), the only production
+  change; +1 code byte, relocations unchanged at 2806. Independently
+  reproduced a real, previously-suspected one-byte-source phantom-EOF-byte
+  defect in `sourceLoad`/`sourceNextByte` (`tests/src/casm_spanread`'s
+  `srcOneByte1`, deliberately not activated), tracked separately as
+  Taskwarrior UUID `882433f0-cde1-4849-8b3c-df32613518c3`, not folded into
+  WP60 (numeric task IDs are unstable across sessions as tasks complete --
+  cite the UUID). Version bump from `0.2.1` to
+  `0.2.2` changed exactly 2 banner bytes; build counter 1265 -> 1266;
+  `image_d64` unchanged at 334 blocks free. Full record in
+  `brain/task.md`'s WP60 entry and
+  `brain/walkthroughs/2026-08-12-casm-phase11-wp60-increment9-audit-walkthrough.md`.
+
+- **CASM Phase 11 WP59 complete at `0.2.1.1264`**:
+  `listing.s` now
+  retains and retries both registered and listing-private unregistered handles;
+  registration failure compensates by close-then-delete while preserving
+  `CASM_DIAG_LISTING_CREATE_FAILED`; filename resolution rejects included
+  devices outside 8-11 before table indexing. Split harnesses
+  `test_casm_flist` build 1018 and `test_casm_flmeta` build 1001 pass 41/41 and
+  9/9 live VICE cases and leave no `FLI04*.LST`, `FLI05*.LST`, or
+  `FLI06*.LST` artifacts. Production CASM build 1262 remains `0.2.0`, with no
+  public ABI, storage, diagnostic, or valid-output format change. Increment 7
+  map-contract coverage is user-approved. `test_casm_map` build 1012 passes
+  23/23 live VICE cases across
+  all approved validation, decimal, partial-failure, repeat, formatting, and
+  exported-contract boundaries; no production map source or output changed.
+  Increment 8's static ownership/local-header/DOX audit is approved. It found no defect, private ZP, unsafe scratch, uninitialized
+  BSS, or ownership mismatch; corrected comments only. CASM build 1263 and map
+  harness build 1013 retain prior executable metrics. Increment 9 consolidated
+  builds and live verification pass: WP58 compatibility 8/8, listing 41/41,
+  metadata 9/9, final map 23/23, and production `/M`, `/L`, and `/M /L` smokes
+  all return to the shell. A shared-fixture indirect JMP page-boundary hazard
+  was replaced by a patched absolute JMP without production impact. Increment 9
+  is user-approved and Increment 10's completion walkthrough is ready at
+  `brain/walkthroughs/2026-08-11-casm-phase11-wp59-listing-map-hardening.md`.
+  WP59 completion was user-approved. The final 24,200-byte PRG differs from
+  `0.2.0.1263` only at the stage/build banner bytes, a second image build is
+  stable, and live VICE prints `CASM V0.2.1.1264` before returning to the shell.
 - **Standalone external-app feasibility study in user review**: The study at
   `brain/plans/2026-08-04-standalone-external-apps-feasibility.md` recommends
   shared application cores with Command64 and standalone platform adapters,

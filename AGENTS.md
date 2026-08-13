@@ -80,6 +80,15 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
 3.
     + Do: Present a detailed plan and await explicit user approval.
     + Don't: Proceed to implementation without a confirmed and approved plan.
+    + For any numbered Phase or Work Package (CASM, DASH, DEBUG, or any
+      other multi-WP effort): the plan must be written to `brain/plans/`
+      (use `brain/plans/_TEMPLATE_PHASE_WP.md`) and explicitly approved
+      before implementation begins, and closed only via a
+      `brain/walkthroughs/` completion-gate doc with explicit user
+      sign-off. Full contract:
+      `.agents/workflows/phased-implementation-planning.md`. This applies
+      to every agent working under this AGENTS.md, not a tool-specific
+      convention.
 4.
     + Do: Execute work in small, atomic, turn-based increments.
     + Don't: Chain multiple steps or actions without awaiting the next instruction.
@@ -144,6 +153,12 @@ TODO: Pare down [Do's & Dont's]
   + USAGE GUIDE: `C64_MCP_USAGE.md`
 + `task-warrior-mcp`: Used for managing tasks
 + `sequential-thinking-mcp`: Used for sequential thinking
++ `c64-overlay-api`: Used to trigger build and test stream overlay events. Most
+  `build` events fire automatically from `cmake --build` itself — see
+  `.agents/workflows/overlay-build-events.md` for what's automatic, the sync
+  contract for new CMake files, and what still requires a manual call. This
+  applies to every agent working under this AGENTS.md, not a tool-specific
+  convention.
 
 ## Agent Roles
 
@@ -269,6 +284,14 @@ Default section order:
 ## User Preferences
 
 When the user requests a durable behavior change, record it here or in the relevant child AGENTS.md
+
+- Keep a healthy VICE emulator running after tests. It is part of the user's Twitch and
+  YouTube stream layout; stop it only for problem recovery or when the user explicitly asks.
+- Every numbered Phase/Work Package requires an approved `brain/plans/`
+  doc before implementation and a `brain/walkthroughs/` completion-gate
+  doc with explicit sign-off before it's marked done — applies to every
+  agent, not a Claude-specific convention. See "Workflow & State
+  Management" above and `.agents/workflows/phased-implementation-planning.md`.
 
 ## Child DOX Index
 

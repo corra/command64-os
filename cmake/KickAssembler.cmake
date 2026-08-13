@@ -30,9 +30,15 @@ function(add_kickass_target TARGET_NAME)
     # Get absolute path for output dir
     get_filename_component(OUTPUT_DIR_ABS "${KICKASS_OUTPUT_DIR}" ABSOLUTE)
     
+    set(WRAPPER_CMD "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CMD "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--building" "--success" "--error" "--")
+    endif()
+
     add_custom_command(
         OUTPUT "${OUTPUT_PRG}"
-        COMMAND "${Java_JAVA_EXECUTABLE}" -jar "${KICKASS_JAR}" "${ENTRY_FILE_ABS}" ${LIBDIR_ARGS} -odir "${OUTPUT_DIR_ABS}" -showmem
+        COMMAND ${WRAPPER_CMD} "${Java_JAVA_EXECUTABLE}" -jar "${KICKASS_JAR}" "${ENTRY_FILE_ABS}" ${LIBDIR_ARGS} -odir "${OUTPUT_DIR_ABS}" -showmem
         DEPENDS "${ENTRY_FILE_ABS}" ${KICKASS_SOURCES} ${KICKASS_DEPENDS}
         COMMENT "Assembling C64 binary: ${ENTRY_FILE_NAME}.prg"
         VERBATIM
@@ -127,9 +133,21 @@ function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
     set(PRG_NEXT "${OUT_DIR_NEXT}/${ENTRY_FILE_NAME}.prg")
     set(OUTPUT_PRG "${CMAKE_BINARY_DIR}/${ENTRY_FILE_NAME}.prg")
 
+    set(WRAPPER_BASE "")
+    set(WRAPPER_NEXT "")
+    set(WRAPPER_RELOC "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_BASE "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--building" "--error" "--")
+        set(WRAPPER_NEXT "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--error" "--")
+        set(WRAPPER_RELOC "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--success" "--error" "--")
+    endif()
+
     add_custom_command(
         OUTPUT "${PRG_BASE}"
-        COMMAND "${Java_JAVA_EXECUTABLE}" -jar "${KICKASS_JAR}" "${ENTRY_FILE_ABS}"
+        COMMAND ${WRAPPER_BASE} "${Java_JAVA_EXECUTABLE}" -jar "${KICKASS_JAR}" "${ENTRY_FILE_ABS}"
             -libdir "${CONFIG_DIR_BASE}" -libdir "${CMAKE_BINARY_DIR}" -odir "${OUT_DIR_BASE}"
         DEPENDS "${ENTRY_FILE_ABS}" ${${SOURCES_VAR}} "${INC_FILE}" "${CONFIG_DIR_BASE}/build_config.inc"
         COMMENT "Assembling ${TARGET_NAME_UPPER} at $2600 (relocation base build)"
@@ -138,7 +156,7 @@ function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
 
     add_custom_command(
         OUTPUT "${PRG_NEXT}"
-        COMMAND "${Java_JAVA_EXECUTABLE}" -jar "${KICKASS_JAR}" "${ENTRY_FILE_ABS}"
+        COMMAND ${WRAPPER_NEXT} "${Java_JAVA_EXECUTABLE}" -jar "${KICKASS_JAR}" "${ENTRY_FILE_ABS}"
             -libdir "${CONFIG_DIR_NEXT}" -libdir "${CMAKE_BINARY_DIR}" -odir "${OUT_DIR_NEXT}"
         DEPENDS "${ENTRY_FILE_ABS}" ${${SOURCES_VAR}} "${INC_FILE}" "${CONFIG_DIR_NEXT}/build_config.inc"
         COMMENT "Assembling ${TARGET_NAME_UPPER} at $2700 (relocation +1 page build)"
@@ -147,7 +165,7 @@ function(add_external_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION)
 
     add_custom_command(
         OUTPUT "${OUTPUT_PRG}"
-        COMMAND "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/reloc.py" "${PRG_BASE}" "${PRG_NEXT}" "${OUTPUT_PRG}"
+        COMMAND ${WRAPPER_RELOC} "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/tools/reloc.py" "${PRG_BASE}" "${PRG_NEXT}" "${OUTPUT_PRG}"
         DEPENDS "${PRG_BASE}" "${PRG_NEXT}" "${CMAKE_SOURCE_DIR}/tools/reloc.py"
         COMMENT "Building relocatable ${TARGET_NAME_UPPER}.prg"
         VERBATIM

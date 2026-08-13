@@ -46,10 +46,16 @@ function(add_c64_disk_image TARGET_NAME)
     get_filename_component(OUTPUT_FILE_ABS "${DISK_OUTPUT_FILE}" ABSOLUTE)
     list(APPEND CC1541_COMMAND_ARGS "${OUTPUT_FILE_ABS}")
     
+    set(WRAPPER_CMD "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CMD "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--building" "--success" "--error" "--")
+    endif()
+
     add_custom_command(
         OUTPUT "${OUTPUT_FILE_ABS}"
         COMMAND ${CMAKE_COMMAND} -E remove -f "${OUTPUT_FILE_ABS}"
-        COMMAND "${CC1541_EXECUTABLE}" ${CC1541_COMMAND_ARGS}
+        COMMAND ${WRAPPER_CMD} "${CC1541_EXECUTABLE}" ${CC1541_COMMAND_ARGS}
         DEPENDS ${DEPENDS_LIST}
         COMMENT "Generating D64 disk image: ${TARGET_NAME}"
         VERBATIM

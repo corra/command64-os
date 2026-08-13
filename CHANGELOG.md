@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Packaging
+
+- **Release distribution updates**: Included `command64_casm_utils.d64` (development utility disk containing native CASM assembler source code for the `DASH` dashboard, `casm.prg`, `edlin.prg`, `comp.prg`, and verification references) in the packaged release archives. Removed `debug.prg` from the root of the release archives as it is not useful standalone. Updated [RELEASE_README.md](file://packaging/RELEASE_README.md) to explicitly document `command64_casm_utils.d64`, `banner-utility.md`, and `edlin-utility.md`.
+
 ### Planning
 
 - **Standalone external-application feasibility study**: Assessed standalone
@@ -21,6 +25,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **CASM listing/map production headers (Phase 11 WP59 Increment 8)**: Updated
+  stale pre-WP54 comments that still described `/L` and `/M` as unimplemented,
+  and corrected obsolete map-harness history. The accompanying static audit
+  found no private zero page, unsafe shared scratch, uninitialized load-bearing
+  BSS, ownership disagreement, or production defect; no executable, ABI,
+  storage, diagnostic, ownership, or valid-output behavior changed.
 - **DEBUG REU examples in action**: Added annotated `XS`, `XA`, `XM`, `XD`,
   and `Q` workflows to the DEBUG manual's numbered examples, including a
   write/read round trip, flat and page-relative offsets, multi-chunk transfers,
@@ -58,8 +68,91 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `G`/`T`/`P`'s optional `=` prefix. Added the missing lines (+123 code
   bytes, build 1128).
 
+### Changed
+
+- **CASM entry-point decimal-mode hardening (Phase 11 WP60 Increment 3)**:
+  `casm.s`'s `start:` now begins with `CLD`, before any other initialization.
+  CASM has no supported decimal-mode entry contract, and the first `OS_API`
+  call already clears decimal incidentally, so this closes an implicit
+  ordering invariant rather than fixing a reproduced live bug. Adds exactly
+  one code byte (build 1265: 18580 -> 18581); no BSS, zero-page, or ABI
+  change.
+- **CASM exhaustive opcode/addressing/boundary certification, WP60 complete,
+  bumped to `0.2.2`**: independently re-derived and mechanically reconciled
+  all 151 documented legal NMOS 6502/6510 opcode/mode/length combinations
+  against production's tables (exact match), added a direct 151-tuple
+  matcher harness plus 46 focused negative/selection cases (197/197 live
+  PASS), an end-to-end 151-statement source fixture with an independently
+  authored byte-exact reference (native `COMP`-verified), and strengthened
+  numeric-literal, addressing-width, relative-branch, program-counter,
+  source, symbol, relocation, and VMM boundary evidence (48 of 52 required
+  rows closed; 4 residual items explicitly deferred, not blocking, and
+  recorded in `brain/task.md`). Independently reproduced a real,
+  previously-suspected one-byte-source phantom-EOF-byte defect in
+  `sourceLoad`/`sourceNextByte`, left unfixed and tracked separately
+  (Taskwarrior task 42) per the plan's own scope. No production change
+  beyond the Increment 3 `CLD` byte; the version bump itself changes only
+  the banner's version/build digits (2 bytes).
+- **CASM determinism proof and boundary-residual closure, WP61 complete**:
+  proved that re-assembling identical source twice produces byte-identical
+  output — the same PRG bytes, R6 relocation table, and `.LST` listing
+  content, verified via a native `comp` self-compare, with the `/M` symbol
+  map (no file to `comp`) verified identical via direct live comparison
+  instead. Also closed the 4 boundary items WP60 Increment 9 deferred:
+  `FORCE_ABS` two-pass re-resolution stability, the 65,535/65,536-byte
+  combined-source-extent boundary, and symbol/token name-length-32
+  rejection, each with a new live-VICE-verified regression case, plus
+  empty-source-file testing, explicitly re-scoped as a `cc1541` tooling
+  limitation, not a code gap, and not carried forward again. No production
+  change occurred across WP61 — `casm.prg` remains
+  byte-identical to its WP60 `0.2.2` state throughout — so no version bump
+  is included in this entry.
+
 ### Fixed
 
+- **CASM fault-injection harnesses never restored the OS_API vector (Phase 11
+  WP63)**: `faultInstall` (`tests/src/casm_faultinject/faultstub.inc`)
+  patches the shared, fixed `$1000` OS_API dispatch vector to redirect
+  through each fault-injection test's own `faultStubEntry`. Six single-case
+  harnesses (`casm_faultvmm.s`, `casm_faultsource.s`, `casm_freloc.s`,
+  `casm_finc.s`, `casm_fsym.s`, `casm_faultinject.s`) called `faultInstall`
+  but never `faultUninstall` before their own `DOS_EXIT`, leaving that
+  OS-resident vector dangling into their own (about-to-be-overwritten)
+  memory after exit -- corrupting every OS_API call made by whatever ran
+  next in the same Command64 session. Discovered live during WP63's first
+  consolidated back-to-back harness regression (never previously exercised
+  in one continuous session). Fixed by adding `jsr faultUninstall` before
+  `DOS_EXIT` in all six harnesses, matching the correct paired
+  `faultInstall`/`faultUninstall` pattern `casm_flist.s`/`casm_flmeta.s`
+  already used. Test infrastructure only; no production CASM behavior
+  changed.
+- **CASM fault-stub NMOS indirect-JMP boundary hazard (Phase 11 WP59 Increment
+  9)**: Replaced the shared test fixture's relocatable `JMP (RealApiVector)`
+  trampoline with a RAM-patched absolute JMP. This prevents the NMOS 6502
+  `$xxFF` pointer page-wrap bug from making consolidated builds placement-
+  dependent. All affected WP58/WP59 regressions and production `/M`, `/L`, and
+  `/M /L` smoke paths pass; production CASM code and artifacts are unchanged.
+- **CASM included-listing device validation (Phase 11 WP59 Increment 6)**:
+  `listingResolveFilename` now rejects corrupted include catalog devices below
+  8 or above 11 before indexing the four-entry device-string tables, returning
+  the existing listing replay-mismatch diagnostic without publishing resolved
+  output. A split 41-case listing harness and nine-case metadata/header harness
+  live-verify valid devices 8/11, invalid 7/12, root and maximum-length names,
+  31/32-byte header continuation, and record snapshots across shared VMM-buffer
+  clobber. No public ABI, storage, diagnostic number, or valid output changed.
+- **CASM listing cleanup ownership and retry hardening (Phase 11 WP59
+  Increment 4)**: `listingClose` now retries both registered and
+  listing-private unregistered handles after `CLOSE_FAILED`, making exactly one
+  close attempt per call and retaining ownership until success. If listing
+  creation succeeds but central handle registration fails, CASM now records the
+  unregistered handle before compensation, preserves `LISTING_CREATE_FAILED` as
+  primary, and closes then deletes the uncommitted `.LST` through the same
+  retryable abort path. This prevents empty listing artifacts and unregistered
+  handle leaks without changing valid PRG/R6/listing/map bytes or public ABI.
+  A 41-case fault harness live-verified create/write/short-write/close/delete,
+  registered/unregistered retry, primary-diagnostic preservation, committed
+  listing retention, and serializer replay/catalog/source/mirror/aggregate/
+  final-close/abort boundaries under VICE.
 - **DOS_GET_APP_INFO occupied-slot buffer corruption** ($5D, `src/command64/api.asm`): `ahGetAppInfo`'s occupied-slot write path used `STA (PrintPtrLo), X`, not a real 6502 addressing mode (only `(zp,X)`/`(zp),Y` exist); Kick Assembler silently assembled it as absolute,X off `PrintPtrLo`'s own zero-page address, so every field except `NameLen` was written into OS zero page instead of the caller's buffer, while `Carry` still reported success. Found via WP7 (Applications page) live testing — no automated test previously exercised an occupied slot. `PS`/`APPS` (`aptList`) is unaffected; it reads the app table directly and never used this addressing pattern. Fixed by rewriting all writes to real `(PrintPtrLo), Y` indirect-indexed addressing. See the WP3 plan's WP7 Amendment for detail.
 - **DOS_GET_APP_INFO name field always empty** ($5D, `src/command64/api.asm`): a second, independent bug in the same routine's raw-name-byte read loop stacked `X` across a `vmmReadByte` call that never touches `X`; the `PLA` afterward clobbered `A` with the just-restored loop index, discarding the fetched name byte before it was stored, so `fileScratch` always ended up `[0,1,2,...]` and the length-measuring loop always read `NameLen = 0`. Predates WP7, masked until the buffer-corruption bug above was fixed. Fixed by removing the unnecessary stack dance.
 - **DOS_GET_SYSTEM_INFO OS version literals** ($5C, `src/command64/api.asm`): `OsMajor`/`OsMinor`/`OsStage` were hardcoded immediates (`4`/`0`/`0`), disconnected from the repository `VERSION` file (Task Warrior #41). Now parsed by CMake from `VERSION` (`MAJOR.MINOR.PATCH[-dev]`) into `build_config.inc` constants. `StructVersion` bumps to `$02`; offset 22 (formerly `Reserved0`) is now `OsPatch`. Part of DASH WP6 (System page).
@@ -67,6 +160,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM 0.2.1 listing/map hardening (Phase 11 WP59)**: Audited all 19
+  listing/map exports and their private transitive paths; fixed retryable
+  listing-close ownership, registration-failure close/delete compensation, and
+  included-device bounds validation. Added 41 listing lifecycle/serializer,
+  nine metadata/header, and 23 map contract cases, with affected WP58
+  compatibility and production `/M`, `/L`, and `/M /L` paths passing live.
+  Final `0.2.1.1264` verification changed only the stage and build banner bytes
+  from `0.2.0.1263`; the no-change rebuild is stable.
+- **CASM map contract hardening coverage (Phase 11 WP59 Increment 7)**:
+  Expanded the map harness to verify NameLen 32/255 rejection, DEFINED-clear
+  and every reserved flag bit, both reserved-padding endpoints, VMM failure
+  after partial output, decimal totals across every requested transition,
+  repeat determinism, address endpoints, exported carry/diagnostic/stack
+  behavior, and volatile diagnostic-print registers. All 23 cases pass without
+  a production source or valid-output change.
 - **CASM Phase 10 complete: `/M` and `/L` verified and promoted to `0.2.0`**:
   WP55 independently re-verified the complete `/M`/`/L` implementation
   WP50-54 delivered — a baseline reconciliation (found and fixed a

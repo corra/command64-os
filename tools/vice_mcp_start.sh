@@ -9,9 +9,9 @@
 # vice_autostart, etc.) rather than via CLI flags here.
 #
 # Usage:
-#   tools/vice_mcp_start.sh start [--machine x64sc] [--port 6510] [--host 127.0.0.1] [--token TOKEN]
-#   tools/vice_mcp_start.sh stop  [--port 6510]
-#   tools/vice_mcp_start.sh status [--port 6510]
+#   tools/vice_mcp_start.sh start [--machine x64sc] [--port 7000] [--host 127.0.0.1] [--token TOKEN]
+#   tools/vice_mcp_start.sh stop  [--port 7000]
+#   tools/vice_mcp_start.sh status [--port 7000]
 
 set -euo pipefail
 
@@ -19,7 +19,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 RUN_DIR="$REPO_ROOT/build/vice-mcp"
 
 MACHINE="x64sc"
-PORT="6510"
+PORT="7000"
 HOST="127.0.0.1"
 TOKEN=""
 CMD="${1:-start}"
@@ -138,5 +138,5 @@ case "$CMD" in
     start) cmd_start ;;
     stop) cmd_stop ;;
     status) cmd_status ;;
-    *) echo "Usage: $0 {start|stop|status} [--machine x64sc] [--port 6510] [--host 127.0.0.1] [--token TOKEN]" >&2; exit 2 ;;
+    *) echo "Usage: $0 {start|stop|status} [--machine x64sc] [--port 7000] [--host 127.0.0.1] [--token TOKEN]" >&2; exit 2 ;;
 esac
