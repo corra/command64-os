@@ -1764,6 +1764,15 @@ behavior changed beyond the version/build artifact itself.
       Phase 11 content. No production change; no version bump. See
       `brain/task.md` for full detail. Requesting review before Increment 7
       (audit and walkthrough) activates.
+- [x] WP62 Increment 7 complete 2026-08-12, awaiting user approval to close
+      WP62: reconciled all 18 Increment 1 register rows against the
+      Increments 2-6 commit, all closed; confirmed CASM remains `0.2.2`
+      build `1266` directly against `casm.s`; confirmed the two utility docs
+      stay byte-identical; task logs already accurate, no fix needed.
+      Walkthrough at
+      `brain/walkthroughs/2026-08-12-casm-phase11-wp62-increment7-audit-walkthrough.md`.
+- [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42 closed.
+      CASM remains `0.2.2` build `1266` (documentation-only work package).
 - [ ] WP63: remains separately gated and requires a dedicated approved plan.
 
 ## Optional Feature - Progress and Processing Indication

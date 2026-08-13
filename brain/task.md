@@ -2685,6 +2685,21 @@
           - No production source change; no CASM version bump (matches
             WP56's precedent for documentation-only work). Requesting user
             review before Increment 7 (audit and walkthrough) activates.
+    - [x] Increment 7 complete 2026-08-12: row-by-row reconciliation of the
+          Increment 1 register (18 discrepancy rows across 6 files/3
+          `KNOWLEDGE.md` gaps) against the Increments 2-6 commit -- all 18
+          confirmed closed, none left unaddressed. Spot-checked
+          `brain/task.md`/`wiki/tasks/casm.md` for internal consistency
+          against this plan's own findings -- both already accurate, no fix
+          needed. Confirmed directly against `casm.s` (`VERSION_MAJOR`/
+          `MINOR`/`STAGE`) that CASM remains `0.2.2` build `1266`, unchanged.
+          Confirmed `wiki/casm-utility.md`/`docs/casm-utility.md` remain
+          byte-identical (`diff -q` clean). Walkthrough recorded at
+          `brain/walkthroughs/2026-08-12-casm-phase11-wp62-increment7-audit-walkthrough.md`.
+          Requesting user approval to close WP62.
+  - [x] WP62 complete 2026-08-12, user approved. Taskwarrior task 42
+        (`27332a0c-7bb6-4c2e-b455-6f5e03b4b84e`) closed. CASM remains
+        `0.2.2` build `1266`, unchanged (documentation-only work package).
   - WP63 remains unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 
