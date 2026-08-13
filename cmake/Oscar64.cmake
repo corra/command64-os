@@ -20,10 +20,19 @@ function(add_oscar64_target TARGET_NAME)
     
     set(OUTPUT_PRG "${OSCAR64_OUTPUT_DIR}/${ENTRY_FILE_NAME}.prg")
     get_filename_component(OUTPUT_PRG_ABS "${OUTPUT_PRG}" ABSOLUTE)
-    
+
+    # Overlay build-event wrapper -- see .agents/workflows/overlay-build-events.md.
+    # Single-step compile+link, so building/success/error all fire off this
+    # one command, mirroring cmake/cc1541.cmake's single-step pattern.
+    set(WRAPPER_CMD "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CMD "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "${TARGET_NAME}" "--building" "--success" "--error" "--")
+    endif()
+
     add_custom_command(
         OUTPUT "${OUTPUT_PRG_ABS}"
-        COMMAND "${OSCAR64_EXECUTABLE}" -o "${OUTPUT_PRG_ABS}" "${ENTRY_FILE_ABS}"
+        COMMAND ${WRAPPER_CMD} "${OSCAR64_EXECUTABLE}" -o "${OUTPUT_PRG_ABS}" "${ENTRY_FILE_ABS}"
         DEPENDS "${ENTRY_FILE_ABS}" ${OSCAR64_SOURCES} ${OSCAR64_DEPENDS}
         COMMENT "Compiling C target ${ENTRY_FILE_NAME}.prg via Oscar64"
         VERBATIM

@@ -16,7 +16,7 @@
     option for searching the codebase. Do not waste tokens unnecesarily by `find`ing and
     `grep`ing or making custom tools.
 - **Task Warrior MCP**: `taskwarrior mcp` is installed and **MUST BE** used for task tracking if available.
-- **C64 Overlay API MCP**: `c64-overlay-api` is available (OpenAPI bridge at `http://127.0.0.1:8000/openapi.json`) to trigger build and test overlay events.
+- **C64 Overlay API MCP**: `c64-overlay-api` is available (OpenAPI bridge at `http://127.0.0.1:8000/openapi.json`) to trigger build and test overlay events. Note: `cmake --build` already fires build events automatically for every compile/link/pack step via the `C64_THEME_DIR` cache var (see `.agents/workflows/overlay-build-events.md`) — this MCP tool is only needed for direct/manual tool invocations that bypass `cmake --build`, and for `test` events.
 - **Missing MCPs**:
     +If a MCP is *unavailable*, **STOP** Ask the user to install or activate it.
     +**The User** may directy you to proceed until otherwise directed when a MCP is unavailable. Use alternative methods. **You are NOT ALLOWED to proceed without EXPLICIT PERMISION**

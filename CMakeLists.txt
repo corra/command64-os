@@ -1424,9 +1424,14 @@ add_c64_disk_image(image_d64
 # PRG: assembling it with CASM is meant to be part of the end-user
 # experience, not a pre-built command. See command64_casm_utils_d64 below
 # for the separate dev-utility disk that also carries the compiled PRG.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
         -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
         "${CMAKE_BINARY_DIR}/image.d64"
     COMMENT "Appending banner.s source to image.d64"
@@ -1461,9 +1466,14 @@ add_c64_disk_image(command64_casm_utils_d64
     DISK_ID "${DISK_ID}"
     PRGS ${BANNER_TARGET} ${CASM_TARGET} ${COMP_TARGET} ${EDLIN_TARGET}
 )
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_casm_utils_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
         -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
         "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     COMMENT "Appending banner.s source to command64_casm_utils.d64"
@@ -1502,9 +1512,14 @@ add_custom_command(
 )
 
 foreach(DASH_SEQ IN LISTS DASH_SEQ_SOURCES)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_casm_utils_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET command64_casm_utils_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${DASH_SEQ}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${DASH_SEQ}" -T SEQ
             -w "${CMAKE_SOURCE_DIR}/src/external/dash/${DASH_SEQ}"
             "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
         COMMENT "Appending DASH source ${DASH_SEQ} to command64_casm_utils.d64"
@@ -1521,9 +1536,14 @@ endforeach()
 # diffs two links one page apart, while CASM classifies each operand as
 # relocatable during emission. A defect in one cannot reproduce itself in the
 # other. The reference is EVIDENCE for the manifest review, never its source.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_casm_utils_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "dash.ref" -T PRG
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "dash.ref" -T PRG
         -w "${CMAKE_BINARY_DIR}/dash_ref.prg"
         "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
     COMMENT "Appending ca65 cross-check reference dash.ref to command64_casm_utils.d64"
@@ -1597,9 +1617,14 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # content -- so this does not exercise the separately-tracked phantom-EOF-
 # byte defect (that bug is in later per-byte consumption of an already-
 # loaded exactly-1-byte source, a different code path).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_include_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_include_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmsrcmax.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmsrcmax.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmsrcmax.seq"
         "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmsrcbit.s" -T SEQ
@@ -1647,9 +1672,14 @@ add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
                              casmlc06 casmlc07 casmlc7c casmlc7g
                              casmlc08 casmlc09 casmlc10)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_listing_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_LISTCAP_FIXTURE}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${CASM_LISTCAP_FIXTURE}" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${CASM_LISTCAP_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
         COMMENT "Appending WP51 Increment 6 fixture ${CASM_LISTCAP_FIXTURE} to casm_listing_test.d64"
@@ -1667,9 +1697,14 @@ endforeach()
 # them from its own attached device. No casmsrc0 (true empty file): cc1541
 # cannot write a zero-byte SEQ entry at all, see GenerateCasmTestFixtures.cmake.
 foreach(CASM_SRCBOUND_FIXTURE casmsrc1 casmcr casmcrlf casmblank casmfincr casmsplit)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_listing_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_SRCBOUND_FIXTURE}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${CASM_SRCBOUND_FIXTURE}" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${CASM_SRCBOUND_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
         COMMENT "Appending WP60 Increment 7 fixture ${CASM_SRCBOUND_FIXTURE} to casm_listing_test.d64"
@@ -1718,9 +1753,14 @@ add_c64_disk_image(casm_phase10_test_d64
 )
 add_dependencies(casm_phase10_test_d64 casm_test_fixtures)
 foreach(WP54_FIXTURE casmemit1 casmreloc1 casmmfa casmmfb casmmaxid1)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase10_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_phase10_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_FIXTURE}.s" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${WP54_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP54_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
         COMMENT "Appending WP54 increment 6 fixture ${WP54_FIXTURE}.s to casm_phase10_test.d64"
@@ -1728,9 +1768,14 @@ foreach(WP54_FIXTURE casmemit1 casmreloc1 casmmfa casmmfb casmmaxid1)
     )
 endforeach()
 foreach(WP54_INC_FIXTURE casmip1 casmic1)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase10_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_phase10_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${WP54_INC_FIXTURE}.s" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${WP54_INC_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP54_INC_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_phase10_test.d64"
         COMMENT "Appending WP54 increment 6 include fixture ${WP54_INC_FIXTURE}.s to casm_phase10_test.d64"
@@ -1761,9 +1806,14 @@ add_c64_disk_image(casm_opcode_test_d64
 )
 add_dependencies(casm_opcode_test_d64 casm_test_fixtures)
 add_dependencies(casm_opcode_test_d64 casm_reference_fixtures)
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_opcode_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_opcode_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmopall.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmopall.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmopall.seq"
         "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmopall.ref" -T PRG
@@ -1782,9 +1832,14 @@ add_custom_command(
 # fixtures, reused here rather than duplicated) and casmreloc1.ref (for an
 # extra cross-check leg alongside the self-compare, matching casmopall's own
 # precedent) join it instead of a new disk.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_opcode_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_opcode_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmhello.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmhello.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmhello.seq"
         "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmreloc1.s" -T SEQ
@@ -1800,9 +1855,14 @@ add_custom_command(
 # WP61 Increment 4 FORCE_ABS two-pass closure fixture, same disk/rationale
 # as the Increment 2 block above (ample free space, already command64/casm/
 # comp-bootable).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_opcode_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_opcode_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmfa2p.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfa2p.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfa2p.seq"
         "${CMAKE_BINARY_DIR}/casm_opcode_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfa2p.ref" -T PRG
@@ -1826,18 +1886,28 @@ foreach(WP47_FIXTURE casmip1 casmic1 casmif1
                      casmidp1 casmidc1 casmidc2
                      casmidup1 casmiduc1 casmiduc2
                      casmiddp1 casmiddc1 casmiddc2)
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_include_test_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET casm_include_test_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${WP47_FIXTURE}.s" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${WP47_FIXTURE}.s" -T SEQ
             -w "${CASM_TEST_FIXTURE_DIR}/${WP47_FIXTURE}.seq"
             "${CMAKE_BINARY_DIR}/casm_include_test.d64"
         COMMENT "Appending Phase 9 include fixture ${WP47_FIXTURE}.s to casm_include_test.d64"
         VERBATIM
     )
 endforeach()
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_overflow_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_overflow_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfovf1.s" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmmfovf1.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmmfovf1.seq"
         "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmmfovf2.s" -T SEQ
@@ -1863,9 +1933,14 @@ add_custom_command(
 # same lowercase-disk-name/uppercase-source-literal pairing already
 # established by every "<name>.s" CASM source fixture on this project's
 # disks (see project-cc1541-filename-case).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_overflow_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_overflow_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmcat1" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmcat1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmcat1.seq"
         "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmcat2" -T SEQ
@@ -1894,9 +1969,14 @@ add_custom_command(
 # largest harness there, with its own fixtures, is a smaller blast radius
 # than trimming this disk's real CASM fixtures -- same reasoning WP52 used
 # when relocating test_l15release/test_casm_passcheck.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET casm_listing_test_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp1" -T SEQ
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfrp1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp1.seq"
         "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc1" -T SEQ
@@ -1953,9 +2033,14 @@ add_custom_command(
 # directory track is already full (144/144) with no room for a new entry.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p")
+        set(WRAPPER_CC1541 "")
+        if(C64_THEME_DIR)
+            set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+                "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+        endif()
         add_custom_command(
             TARGET test_image_d64 POST_BUILD
-            COMMAND "${CC1541_EXECUTABLE}" -f "${REF_NAME}.ref" -T PRG
+            COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${REF_NAME}.ref" -T PRG
                 -w "${CASM_REF_DIR}/${REF_NAME}.ref" "${CMAKE_BINARY_DIR}/test.d64"
             COMMENT "Appending CASM reference ${REF_NAME}.ref (PRG) to test.d64"
             VERBATIM
@@ -1974,9 +2059,14 @@ endforeach()
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
     set(CASM_FIXTURE_DISK_NAME "${CASM_FIXTURE_NAME}.s")
+    set(WRAPPER_CC1541 "")
+    if(C64_THEME_DIR)
+        set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+            "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+    endif()
     add_custom_command(
         TARGET test_image_d64 POST_BUILD
-        COMMAND "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
+        COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "${CASM_FIXTURE_DISK_NAME}" -T SEQ
             -w "${CASM_FIXTURE}" "${CMAKE_BINARY_DIR}/test.d64"
         COMMENT "Appending ${CASM_FIXTURE_DISK_NAME} SEQ fixture to test.d64"
         VERBATIM
@@ -1984,18 +2074,28 @@ foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
 endforeach()
 
 # Add test SEQ file to test.d64
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "testseq" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending SEQ test file to test.d64"
 )
 
 # Add EDLIN test file (30 numbered lines, exercises List/Page pagination) to
 # test.d64 — see brain/plans/2026-07-09-edlin-implementation-phases.md
 # Phase 1/2.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "edlintest" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending EDLIN test SEQ file to test.d64"
 )
 
@@ -2007,9 +2107,14 @@ add_custom_command(
 # deliberately short ones (03/07) to exercise edit-line's shrink/grow hole
 # resize paths. See brain/plans/2026-07-09-edlin-implementation-phases.md
 # Phase 3.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "edlintst2" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test2.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "edlintst2" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test2.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending second EDLIN test SEQ file (Phase 3 buffer testing) to test.d64"
 )
 
@@ -2020,9 +2125,14 @@ add_custom_command(
 # inserts is enough to cross the ceiling and exercise bufOpenHole's
 # Carry=1 path. See brain/plans/2026-07-09-edlin-implementation-phases.md
 # Phase 3.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "test_image_d64" "--error" "--")
+endif()
 add_custom_command(
     TARGET test_image_d64 POST_BUILD
-    COMMAND "${CC1541_EXECUTABLE}" -f "edlinfull" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test_full.txt" "${CMAKE_BINARY_DIR}/test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "edlinfull" -T SEQ -w "${CMAKE_SOURCE_DIR}/tests/edlin_test_full.txt" "${CMAKE_BINARY_DIR}/test.d64"
     COMMENT "Appending EDLIN buffer-full test SEQ file (Phase 3) to test.d64"
 )
 
@@ -2039,8 +2149,18 @@ endforeach()
 
 string(REPLACE ";" "," PRG_PATHS_STR "${PRG_PATHS_LIST}")
 
+# Overlay build-event wrapper -- see .agents/workflows/overlay-build-events.md.
+# Wraps the whole PackRelease.cmake -P invocation (a single-step script, not
+# a per-file add_custom_command), mirroring cmake/cc1541.cmake's single-step
+# building/success/error pattern.
+set(WRAPPER_RELEASE "")
+if(C64_THEME_DIR)
+    set(WRAPPER_RELEASE "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "release" "--building" "--success" "--error" "--")
+endif()
+
 add_custom_target(release
-    COMMAND "${CMAKE_COMMAND}"
+    COMMAND ${WRAPPER_RELEASE} "${CMAKE_COMMAND}"
         -DVERSION="${OS_VERSION}"
         -DSOURCE_DIR="${CMAKE_SOURCE_DIR}"
         -DBINARY_DIR="${CMAKE_BINARY_DIR}"
