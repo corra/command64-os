@@ -1601,10 +1601,10 @@ behavior changed beyond the version/build artifact itself.
       CASM advanced to `0.2.1.1264`; the PRG differs from `0.2.0.1263` only at
       the stage and build banner bytes. A second image build is stable, and the
       live `0.2.1.1264` banner returns to `C64[8]:>`. WP59 is complete.
-- [/] WP60 `bd441121-dffa-4d69-8f3a-8572e0643322`: opcode, addressing, and
-      boundary hardening. Detailed ten-increment plan approved 2026-08-12 at
-      `brain/plans/2026-08-11-casm-phase11-wp60-opcode-addressing-boundary-hardening.md`;
-      Increment 1 (exhaustive opcode oracle) activated.
+- [x] WP60 `bd441121-dffa-4d69-8f3a-8572e0643322`: opcode, addressing, and
+      boundary hardening. **Complete 2026-08-12 at CASM `0.2.2` build
+      `1266`.** Detailed ten-increment plan approved 2026-08-12 at
+      `brain/plans/2026-08-11-casm-phase11-wp60-opcode-addressing-boundary-hardening.md`.
 - [/] WP60 Increment 1 complete 2026-08-12, awaiting user approval: all 151
       legal NMOS 6502/6510 tuples independently frozen and mechanically
       reconciled byte-for-byte against `opcodes.s`'s `opcodeMaskLo/Hi`,
@@ -1669,6 +1669,20 @@ behavior changed beyond the version/build artifact itself.
       `brain/walkthroughs/2026-08-12-casm-phase11-wp60-increment9-audit-walkthrough.md`.
       Requesting review before Increment 10 (version bump to `0.2.2`)
       activates.
+- [x] WP60 Increment 10 complete 2026-08-12, **WP60 complete**: version-only
+      bump, `0.2.1` -> `0.2.2` (build `1266`). First build's byte delta
+      against the pre-bump PRG is exactly 2 bytes, both in the banner
+      string (version-stage digit, build-counter last digit); size and
+      `image_d64` free-block count unchanged. Second build proved no-change
+      stability (counter and hash both held). Independently re-derived the
+      code/relocation envelope: 18581 bytes / 2806 relocations, unchanged
+      since Increment 3. Live VICE: `CASM V0.2.2.1266` banner, the
+      `casmopall.s`/`casmopall.ref` native `COMP` round trip, and
+      `test_casm_opcode` (197/197) all pass under `0.2.2`, clean shell
+      returns. Taskwarrior task 40 marked done. The 4 residual boundary
+      items from Increment 9 and the separately tracked phantom-EOF-byte
+      defect (Taskwarrior task 42) remain open by design, not blocking this
+      completion. See `brain/task.md` for full detail.
 - [ ] WP61-WP63: remain separately gated and require dedicated approved plans.
 
 ## Optional Feature - Progress and Processing Indication

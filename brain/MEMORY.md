@@ -11,7 +11,30 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
-## Current State (2026-07-29)
+## Current State (2026-08-12)
+
+- **CASM Phase 11 WP60 complete at `0.2.2.1266`**: exhaustive opcode/
+  addressing/boundary certification. Independently re-derived and
+  mechanically reconciled all 151 legal NMOS 6502/6510 opcode/mode/length
+  tuples against production's tables (exact match); `test_casm_opcodes`
+  (197/197: 151 legal tuples + 46 focused negative/selection cases) and an
+  end-to-end 151-statement `casmopall.s`/`casmopall.ref` native-`COMP`
+  round trip both pass live. Strengthened numeric-literal, addressing-width,
+  relative-branch, program-counter, source, symbol, relocation, and VMM
+  boundary evidence: 48 of 52 required rows closed (4 residual items --
+  `FORCE_ABS` two-pass re-resolution, the source domain's 65,535/65,536-byte
+  extent boundary, symbol name-length-32 rejection, and the empty-source-
+  file tooling gap -- explicitly deferred, not blocking). Added `CLD` as
+  `casm.s`'s literal first instruction (Increment 3), the only production
+  change; +1 code byte, relocations unchanged at 2806. Independently
+  reproduced a real, previously-suspected one-byte-source phantom-EOF-byte
+  defect in `sourceLoad`/`sourceNextByte` (`tests/src/casm_spanread`'s
+  `srcOneByte1`, deliberately not activated), tracked separately as
+  Taskwarrior task 42, not folded into WP60. Version bump from `0.2.1` to
+  `0.2.2` changed exactly 2 banner bytes; build counter 1265 -> 1266;
+  `image_d64` unchanged at 334 blocks free. Full record in
+  `brain/task.md`'s WP60 entry and
+  `brain/walkthroughs/2026-08-12-casm-phase11-wp60-increment9-audit-walkthrough.md`.
 
 - **CASM Phase 11 WP59 complete at `0.2.1.1264`**:
   `listing.s` now

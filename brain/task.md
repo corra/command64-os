@@ -2419,6 +2419,38 @@
           completion). Requesting accept/defer decisions on the 4 residual
           boundary items and approval to activate Increment 10 (version
           bump to `0.2.2`, final no-change proof).
+    - [x] Increment 10 complete 2026-08-12: version-only completion
+          increment. `casm.s`'s `VERSION_STAGE "1" -> "2"` (`0.2.1` ->
+          `0.2.2`). First build (1265 -> 1266): `cmp -l` against the
+          pre-bump `casm.prg` shows exactly 2 differing bytes, both in the
+          banner string -- the version-stage digit (`1`->`2`) and the
+          build-counter's own last digit (`5`->`6`); PRG size unchanged at
+          24201 bytes; `image_d64` unchanged at 334 blocks free. Second
+          build (no source change): build counter held at 1266 with an
+          identical `BUILD_CASM` hash -- no-change stability confirmed.
+          Independently re-derived the envelope via `tools/reloc.py` against
+          fresh base/base+1-page links: 18581 code bytes, 2806 relocations,
+          byte-identical to `build/casm.prg` -- unchanged since Increment 3.
+          Live VICE 3.10: `CASM V0.2.2.1266` banner confirmed (bare `casm` ->
+          `CASM: SOURCE FILE REQUIRED`, clean shell return); re-ran the
+          `casmopall.s`/`casmopall.ref` native `COMP` round trip under
+          `0.2.2` -> `CASM: INPUT VALIDATED` / `FILES COMPARE OK`; re-ran
+          `test_casm_opcode` -> `CASM OPCODES: PASS` (197/197), clean shell
+          return. One dispatch mistake mid-increment (sent `test_casm_opcode`
+          via plain `vice_keyboard_type`, resending literal ASCII `_` instead
+          of PETSCII `$A4` -- the same class of error Increment 6 already
+          hit once) put the shell into an apparent stall; recovered with one
+          soft reset + reboot per the mandatory testing workflow's recovery
+          procedure, then redispatched correctly. No production defect;
+          WP60's only production change remains the single `CLD` byte from
+          Increment 3. Taskwarrior task 40 (`bd441121-dffa-4d69-8f3a-8572e0643322`)
+          marked done. **WP60 is complete at CASM `0.2.2` build `1266`.**
+          The 4 residual boundary items from Increment 9 (`FORCE_ABS`
+          two-pass re-resolution; source 65,535/65,536-byte extent boundary;
+          symbol name-length-32 rejection; empty-source-file tooling gap)
+          and the separately tracked phantom-EOF-byte defect (Taskwarrior
+          task 42, `882433f0-cde1-4849-8b3c-df32613518c3`) remain open,
+          explicitly deferred rather than blocking this completion.
   - WP61-WP63 remain unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

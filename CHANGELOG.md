@@ -77,6 +77,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ordering invariant rather than fixing a reproduced live bug. Adds exactly
   one code byte (build 1265: 18580 -> 18581); no BSS, zero-page, or ABI
   change.
+- **CASM exhaustive opcode/addressing/boundary certification, WP60 complete,
+  bumped to `0.2.2`**: independently re-derived and mechanically reconciled
+  all 151 documented legal NMOS 6502/6510 opcode/mode/length combinations
+  against production's tables (exact match), added a direct 151-tuple
+  matcher harness plus 46 focused negative/selection cases (197/197 live
+  PASS), an end-to-end 151-statement source fixture with an independently
+  authored byte-exact reference (native `COMP`-verified), and strengthened
+  numeric-literal, addressing-width, relative-branch, program-counter,
+  source, symbol, relocation, and VMM boundary evidence (48 of 52 required
+  rows closed; 4 residual items explicitly deferred, not blocking, and
+  recorded in `brain/task.md`). Independently reproduced a real,
+  previously-suspected one-byte-source phantom-EOF-byte defect in
+  `sourceLoad`/`sourceNextByte`, left unfixed and tracked separately
+  (Taskwarrior task 42) per the plan's own scope. No production change
+  beyond the Increment 3 `CLD` byte; the version bump itself changes only
+  the banner's version/build digits (2 bytes).
 
 ### Fixed
 
