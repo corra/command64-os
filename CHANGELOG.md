@@ -93,6 +93,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (Taskwarrior task 42) per the plan's own scope. No production change
   beyond the Increment 3 `CLD` byte; the version bump itself changes only
   the banner's version/build digits (2 bytes).
+- **CASM determinism proof and boundary-residual closure, WP61 complete**:
+  proved that re-assembling identical source twice produces byte-identical
+  output — the same PRG bytes, R6 relocation table, and `.LST` listing
+  content, verified via a native `comp` self-compare, with the `/M` symbol
+  map (no file to `comp`) verified identical via direct live comparison
+  instead. Also closed the 4 boundary items WP60 Increment 9 deferred:
+  `FORCE_ABS` two-pass re-resolution stability, the 65,535/65,536-byte
+  combined-source-extent boundary, and symbol/token name-length-32
+  rejection, each with a new live-VICE-verified regression case, plus
+  empty-source-file testing, explicitly re-scoped as a `cc1541` tooling
+  limitation, not a code gap, and not carried forward again. No production
+  change occurred across WP61 — `casm.prg` remains
+  byte-identical to its WP60 `0.2.2` state throughout — so no version bump
+  is included in this entry.
 
 ### Fixed
 

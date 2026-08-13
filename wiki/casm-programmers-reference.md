@@ -8,7 +8,7 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 10 complete (build 1260, version 0.2.0).** `/M`
+> **Status: Phase 10 and Phase 11 complete (build 1266, version 0.2.2).** `/M`
 > (symbol map) and `/L` (listing file) are both fully wired into production
 > `casm.s` and produce real output on every assembly that requests them —
 > see [§17](#17-symbol-map--listing-output-phase-10-complete). WP55
@@ -16,6 +16,11 @@ written) user manual; for the OS services CASM builds on, see
 > reconciliation, full-path code review, live harness/identity/bounds/
 > failure-injection verification, a 4-session runtime walkthrough) before
 > the user approved the completion-only `0.1.56` -> `0.2.0` promotion.
+> Phase 11 (WP56-61) followed with base-release hardening and
+> certification — exhaustive opcode/addressing-mode/boundary verification
+> and a proven determinism guarantee — with no new language feature and
+> only one incidental production change (WP60's `CLD` hardening at
+> `start:`), closing at `0.2.2` build `1266`.
 > CASM performs a real two-pass assembly with labels, a bounded expression
 > evaluator, a VMM-backed symbol table, up to eight concatenated top-level
 > source files, native R6-relocatable output, a fully wired `.INCLUDE`
@@ -91,11 +96,15 @@ flowchart LR
     rel --> foot["relocFinalize → table + R6 footer"]
 ```
 
-`casm.s: start` runs this sequence: `diagClearLoc → listingStateInit →
+`casm.s: start` runs this sequence: `CLD → diagClearLoc → listingStateInit →
 listingFileInit → resourcesInit → cliInit → fileIoInit → sourceInit →
 cliParse → cliDeriveOutputName → (/L: cliDeriveListingName) → symbolsInit →
 sourceLoad → sourceOpen → lexerInit`, then two passes of the shared
-`casmRunPass` dispatch. `listingStateInit`/`listingFileInit` run before
+`casmRunPass` dispatch. `CLD` (WP60 Increment 3) is the literal first
+instruction of `start:`, hardening entry against decimal-mode leakage
+independent of `OS_API` call ordering — CASM has no supported decimal-mode
+entry contract, so this is a structural invariant, not a fix for a live
+bug. `listingStateInit`/`listingFileInit` run before
 `resourcesInit` specifically (WP54, deviating from Phase 10's original plan
 wording) — both are pure BSS clears that cannot fail, and running them first
 guarantees the unified `artifactsAbort` fatal path can safely inspect listing
@@ -144,7 +153,7 @@ touching the filesystem — see [§16](#16-include-processing-phase-9-complete).
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.2.0`).
+  `casm.s` (currently `0.2.2`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 
@@ -895,13 +904,18 @@ for the increment-by-increment implementation record.
 
 ## 18. Coverage: What Works Today
 
-As of build 1260 / v0.2.0 (Phase 9 complete; Phase 10 complete):
+As of build 1266 / v0.2.2 (Phase 9 complete; Phase 10 complete; Phase 11
+complete):
 
 **Works:**
 
 - All 56 legal, documented 6502 mnemonics across every addressing mode they
   support (implied, accumulator, immediate, zero page [,X/,Y], absolute
-  [,X/,Y], indirect, `(zp,X)`, `(zp),Y`, relative).
+  [,X/,Y], indirect, `(zp,X)`, `(zp),Y`, relative) — WP60 exhaustively
+  certified all 151 legal opcode/addressing-mode combinations, not merely
+  implemented, via an independent oracle, a direct matcher harness, and an
+  end-to-end assembled artifact compared byte-for-byte against an
+  independently-authored reference.
 - `.ORG`, `.BYTE`, `.WORD` directives.
 - **Labels and forward references** via a real two-pass assembly over a
   512-entry, VMM-backed symbol table.
@@ -941,6 +955,23 @@ rather than being silently accepted):
   in a KERNAL IEC retry loop rather than replacing or failing fast. Use a
   distinct `/O:` name per run, or delete the stale output first. Tracked as
   a follow-up, not a WP54 regression.
+- **`/L` listing output shows a blank line between each row when printed to
+  a real C64 screen.** `.LST` file content on disk is unaffected — the
+  extra blank line is a downstream KERNAL auto-wrap-plus-trailing-CR display
+  artifact at the 40-column boundary, not a defect in `listing.s` itself.
+  Non-critical, on-screen presentation only (Taskwarrior
+  `be8ca0bf-ac7c-40f6-960e-2ca816bc7fb8`).
+- **One-byte-source phantom-EOF-byte defect in `sourceLoad`/`sourceNextByte`.**
+  A previously-suspected-but-unresolved defect independently reproduced
+  during WP60 Increment 7; not fixed under WP60/WP61 and tracked separately
+  (Taskwarrior UUID `882433f0-cde1-4849-8b3c-df32613518c3`).
+
+**Determinism (WP61):** identical input is now proven to produce
+byte-identical output. Re-assembling the same source twice produces the
+same PRG bytes, the same R6 relocation table, and the same `.LST` listing
+content, verified via a native `comp` self-compare; the `/M` symbol map
+(which has no file to `comp`) was verified identical via direct live
+comparison instead.
 
 Bounded capacities worth knowing before writing large source: 512 symbols,
 4,096 relocation entries, 31-byte identifiers, 8 source files, 64KB combined

@@ -2640,6 +2640,51 @@
           touch. No documentation change made in this increment. Requesting
           user review before Increment 2 (`KNOWLEDGE.md` backfill)
           activates.
+    - [x] Increments 2-6 complete 2026-08-12, implemented via two parallel
+          background agents per user direction (Agent A: Increments 2 and
+          6; Agent B: Increments 3-5), then independently verified by this
+          agent against the Increment 1 register and current source before
+          committing.
+          - **Increment 2** (`brain/KNOWLEDGE.md`): added
+            `### CASM Phase 4 Parser/Opcode/Emission Contract`,
+            `### CASM Phase 10 Symbol Map/Listing Contract`, and
+            `### CASM Phase 11 Base-Release Hardening Contract`, at the
+            exact pinned insertion points (Phase 4 between Phase 3/5;
+            Phase 10 after the interleaved DASH section; Phase 11 last,
+            before `## C64 Platform Constraints Discovered`) -- verified
+            by grepping the file's heading order post-edit. Phase 4
+            content spot-checked against
+            `brain/plans/2026-07-20-casm-phase4-wp14-orchestration-binary-validation.md`
+            (the `CASM_MODE_ZEROPAGE_Y` ca65-negative-shift defect, the
+            bare-`.ORG`-origin-zero defect, and the `0.1.17` completion
+            version) -- all confirmed accurate.
+          - **Increment 3** (`wiki/casm-programmers-reference.md`): fixed
+            all 6 cataloged discrepancies -- version/build in 3 places,
+            the missing `CLD` in the documented `start:` sequence
+            (verified directly against `casm.s:118-128`), WP60's
+            certification strength, and both known-bug disclosures, plus
+            a new determinism note.
+          - **Increment 4** (`wiki/casm-utility.md`/`docs/casm-utility.md`):
+            version/banner fix, known-bugs disclosure in end-user framing;
+            confirmed byte-identical after edit (`diff` clean).
+          - **Increment 5** (`CHANGELOG.md`): added the missing WP61
+            entry. Caught and fixed one inaccuracy during review -- the
+            agent's draft said "closed 4... the 5th... re-scoped" (implying
+            5 total items), corrected to the accurate "closed the 4
+            items... plus [the re-scoped one]" (4 total: 3 actioned + 1
+            re-scoped), matching WP61's own walkthrough.
+          - **Increment 6** (`src/external/casm/AGENTS.md`): rewrote the
+            stale "WP50-WP55 remain inactive" framing into historical
+            record, collapsed the 5 "approved-but-blocked" WP50-54 bullets
+            into one durable-facts block (dropping only the gating
+            language), added Phase 11 content, and resolved the `0.1.9`
+            version-migration note by restating it as reapplying at the
+            next analogous threshold (`0.2.9`) rather than marking it
+            moot -- reviewed and accepted as sound reasoning, not just
+            hedging.
+          - No production source change; no CASM version bump (matches
+            WP56's precedent for documentation-only work). Requesting user
+            review before Increment 7 (audit and walkthrough) activates.
   - WP63 remains unplanned in detail, per this project's
     per-work-package-plan-approval requirement.
 

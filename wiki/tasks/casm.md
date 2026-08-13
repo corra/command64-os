@@ -1750,6 +1750,20 @@ behavior changed beyond the version/build artifact itself.
       `src/external/casm/AGENTS.md` (still describes closed Phase 10 as
       inactive, no Phase 11 content). No documentation change made yet.
       See `brain/task.md` for full detail.
+- [x] WP62 Increments 2-6 complete 2026-08-12, awaiting user approval:
+      implemented via two parallel background agents (KNOWLEDGE.md/AGENTS.md
+      vs. the three user-facing docs/CHANGELOG), then independently
+      verified against the Increment 1 register before committing. Added
+      the 3 missing `brain/KNOWLEDGE.md` phase sections at their pinned
+      insertion points; fixed all cataloged discrepancies in
+      `wiki/casm-programmers-reference.md` and
+      `wiki/casm-utility.md`/`docs/casm-utility.md` (kept byte-identical);
+      added the missing WP61 `CHANGELOG.md` entry (one count inaccuracy
+      caught and fixed during review); rewrote
+      `src/external/casm/AGENTS.md`'s stale Phase 10 framing and added
+      Phase 11 content. No production change; no version bump. See
+      `brain/task.md` for full detail. Requesting review before Increment 7
+      (audit and walkthrough) activates.
 - [ ] WP63: remains separately gated and requires a dedicated approved plan.
 
 ## Optional Feature - Progress and Processing Indication

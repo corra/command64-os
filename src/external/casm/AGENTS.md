@@ -85,10 +85,13 @@ The `src/external/casm` directory owns CASM, a native Command 64
   own dispatch. WP48 added included-source diagnostic filenames and bounded
   include-site tracebacks at `0.1.50`; WP49's consolidated verification and
   user-approved completion gate passed at build 1204. Phase 9 is complete.
-  The master-plan Phase 10 Symbol Map and Listing governing plan is approved at
-  `brain/plans/2026-07-29-casm-phase10-symbol-map-listing.md`; WP50-WP55 remain
-  inactive and each requires a dedicated approved plan. Progress indication is
-  a deferred optional feature outside the numbered phases.
+  Phase 10 (Symbol Map and Listing, WP50-WP55) followed: approved, planned,
+  implemented, and closed 2026-08-08 at CASM `0.2.0` build `1260` — `/M` and
+  `/L` are both fully implemented and production-active (see the durable
+  Phase 10 architecture notes below). Phase 11 (base-release hardening,
+  WP56-WP61) followed that: closed 2026-08-12 at CASM `0.2.2` build `1266`
+  (see the Phase 11 notes below). Progress indication is a deferred optional
+  feature outside the numbered phases.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter
@@ -128,44 +131,56 @@ The `src/external/casm` directory owns CASM, a native Command 64
   speculative one built now. See
   `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
   (Phase 0C.5 freeze) for the decision record.
-- Phase 10's approved reporting architecture conditionally allocates exactly
-  two `/L` VMM stores: 4,096 fixed 16-byte physical-line metadata records and a
-  65,536-byte source-generated-byte mirror. Capture hooks `emitByte`, not
-  `emitRawByte`, so PRG headers and R6 metadata are excluded. Listing output is
-  raw PETSCII with CR terminators and 40-byte rows; `/M` walks symbol records in
-  definition order without sorting. These contracts do not authorize edits
-  before WP50's dedicated plan is approved.
-- WP50's approved Phase 0C.20 freeze is recorded at
-  `brain/plans/2026-07-29-casm-phase10-wp50-contract-reconciliation.md`.
-  Exact listing spans come from a source-owned seven-byte completed-line
-  sidecar plus four internal block-base/line-start bytes, never from token
-  growth or `CasmSourceVmmCursor`. A listing transaction snapshots PC and byte
-  cursor before parse, commits after dispatch, and commits `.INCLUDE` before
-  frame push. WP50 authorizes planning/baseline work only; WP51 runtime edits
-  remain blocked pending its dedicated plan.
-- WP51's approved-but-blocked plan is
-  `brain/plans/2026-07-29-casm-phase10-wp51-listing-stores-capture.md`.
-  It freezes two 65,535-byte allocation requests (each granted as 64 KiB), a
-  dedicated 64-byte mirror stage, post-`emitRawByte` mirroring, and separate
-  storage/real-path harnesses. Do not activate or implement WP51 before WP50's
-  completion gate.
-- WP52's approved-but-blocked plan is
-  `brain/plans/2026-07-29-casm-phase10-wp52-deterministic-symbol-map.md`.
-  Definition-order reporting uses stateless `symbolsReadByIndex`, a map-owned
-  40-byte row buffer, and diagnostic `$42`; it owns no VMM/file resource and
-  remains uncalled by production until WP54.
-- WP53's approved-but-blocked plan is
-  `brain/plans/2026-07-29-casm-phase10-wp53-listing-serialization-cleanup.md`.
-  It freezes `.LST` derivation, bounded source-span reads, committed-PRG and
-  listing-specific ownership, resolved include `device:name` headers,
-  byte-before-source continuations, and reuse of idle `CasmIoBuffer` for
-  aggregate listing writes. Production `/L` remains gated to WP54.
-- WP54's approved-but-blocked plan is
-  `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`.
-  Production ordering is rewind, conditional capture allocation, PRG emission,
-  capture/PRG finalization, source close, PRG commit, listing commit, map, then
-  existing success output. One committed-aware artifact abort owns all fatal
-  paths; `test_casm_phase10` verifies orchestration before runtime acceptance.
+- **Phase 10 architecture (WP50-55, closed 2026-08-08 at CASM `0.2.0` build
+  `1260` — durable, production-active contracts, not forward-looking gating
+  language):**
+  - `/L` conditionally allocates exactly two VMM stores: 4,096 fixed 16-byte
+    physical-line metadata records (exactly 65,536 bytes) and a 65,536-byte
+    source-generated-byte mirror. Capture hooks `emitByte`, not
+    `emitRawByte`, so PRG headers and R6 metadata are excluded from the
+    mirror. `/M` without `/L` acquires neither allocation.
+  - Listing output is raw PETSCII with CR row terminators and fixed 40-byte
+    rows; `/M` walks symbol records via `symbolsReadByIndex` in definition
+    order without sorting or touching hash buckets.
+  - Exact listing spans come from a source-owned seven-byte completed-line
+    sidecar (`sourceTakeCompletedLine`) plus four internal block-base/
+    line-start bytes, never from token growth or `CasmSourceVmmCursor`. A
+    listing transaction snapshots PC and byte cursor before parse, commits
+    after dispatch, and commits `.INCLUDE` before frame push.
+  - Production ordering in `casm.s` is: rewind, conditional capture
+    allocation, PRG emission, capture/PRG finalization, source close, PRG
+    commit, listing commit, map print, then the existing success output. One
+    committed-aware artifact abort owns all fatal paths — a listing failure
+    after PRG finalization retains the valid PRG, deletes only the
+    incomplete listing, and suppresses `/M`.
+  - `map.s` owns no VMM/file resource; `symbolsReadByIndex` and its 40-byte
+    row buffer/formatters are stateless.
+  - Full per-work-package design detail (offsets, register/flag contracts,
+    fixture matrices) lives in each WP50-55 dedicated plan under
+    `brain/plans/2026-07-29-casm-phase10-*` and
+    `brain/KNOWLEDGE.md`'s "CASM Phase 10 Symbol Map/Listing Contract"
+    section; this file keeps only the still-load-bearing shape.
+- **Phase 11 (WP56-61, base-release hardening, closed 2026-08-12 at CASM
+  `0.2.2` build `1266`):** a hardening/certification phase, not a features
+  phase — no new language feature, directive, or output format was added.
+  The only production source change across all six work packages is `CLD`
+  as the literal first instruction of `casm.s`'s `start:` entry, ahead of
+  every other init step, since CASM has no supported decimal-mode entry
+  contract of its own. Everything else this phase did was test/verification
+  infrastructure: fault-injection tooling for file/VMM failure paths
+  (WP57-58), a full audit of `listing.s`/`map.s` (WP59), and exhaustive
+  certification that CASM's opcode/addressing-mode support and boundary
+  behavior (numeric literals, addressing width, branches, PC, and the
+  source/symbol/VMM/relocation boundaries) matches the documented 6502/6510
+  instruction set across all 151 legal opcode/mode combinations (WP60), plus
+  a determinism proof that identical input produces byte-identical PRG/R6/
+  listing/map output (WP61). Treat this certification as load-bearing
+  confidence, not merely "implemented": these behaviors were independently
+  re-derived and mechanically reconciled against the shipped tables, not
+  just exercised by the existing happy-path test suites. See
+  `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
+  (governing plan) and `brain/KNOWLEDGE.md`'s "CASM Phase 11 Base-Release
+  Hardening Contract" section for the full per-work-package record.
 - Do not implement a phase until the user approves that phase's prerequisite
   contract gate. Phase 0A governs the scaffold; Phase 0B governs Phase 2 CLI
   and file services; later language/storage contracts remain Phase 0C work.
@@ -194,6 +209,18 @@ The `src/external/casm` directory owns CASM, a native Command 64
   separately planned and approved multi-digit representation must be completed
   before any work package at version `0.1.9` may be completed. That migration
   must preserve the independent build-number component.
+  **Status (2026-08-12): this threshold never activated.** The project moved
+  to a `0.2.x` minor-version series (Phase 10's completion promotion,
+  `0.1.56` -> `0.2.0`) before `VERSION_STAGE` ever reached `9` under `0.1.x` —
+  the stage component reset to a fresh single-digit count under the new
+  minor version, and CASM is now at `0.2.2` with the one-byte representation
+  still sufficient. The underlying constraint is not retired, only
+  unreached: it re-applies verbatim to the next analogous threshold, i.e.
+  before any work package may be completed that would advance
+  `VERSION_STAGE` to `9` under the current `0.2.x` series (a stage value of
+  `0.2.9`). Watch for it again as Phase 12 and later work packages accumulate
+  stage increments within `0.2.x` (or whatever minor series is current at
+  the time).
 - CASM assembly-source SEQ fixtures (`tests/fixtures/casm/*`,
   `cmake/GenerateCasmTestFixtures.cmake` output) carry an explicit `.s` suffix
   in their on-disk PETSCII name when written to a D64 image (e.g.
