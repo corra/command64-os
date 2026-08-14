@@ -1453,24 +1453,32 @@ file(WRITE "${OUTPUT_DIR}/casmconst1.seq"
     "JMP ENTRY\n"
 )
 
-# casmconst2: genuine transitive circular constant definition (A -> B -> A),
-# not just a direct self-reference -- proves crcResolveChain's cycle-
-# detection bitmap catches a real multi-hop cycle, not only the trivial
-# `X = X` case. Expects CASM_DIAG_EXPR_CIRCULAR ($43) and no output PRG.
+# casmconst2: genuine transitive circular constant definition (FOO -> BAR
+# -> FOO), not just a direct self-reference -- proves crcResolveChain's
+# cycle-detection bitmap catches a real multi-hop cycle, not only the
+# trivial `SELF = SELF` case. Expects CASM_DIAG_EXPR_CIRCULAR ($43) and no
+# output PRG. Deliberately not named A/B/X/Y: those single letters lex as
+# CASM_TOKEN_REGISTER (the accumulator/index-register operand form, e.g.
+# `ROL A`), not CASM_TOKEN_IDENTIFIER -- confirmed live (a genuine `A = B`
+# fixture attempt produced SYNTAX ERROR, not CIRCULAR, since parserParse-
+# Statement's dispatch never reaches ppsLabel/ppsConstant for a REGISTER-
+# typed leading token at all).
 file(WRITE "${OUTPUT_DIR}/casmconst2.seq"
     ".ORG \$C000\n"
-    "A = B\n"
-    "B = A\n"
+    "FOO = BAR\n"
+    "BAR = FOO\n"
     "NOP\n"
 )
 
-# casmconst3: direct self-reference (`X = X`), the degenerate single-node
-# cycle -- distinct code path from casmconst2's two-node walk (the very
-# first bitmap check on X's own record already catches it, before any
-# symbolsLookup call even runs). Expects CASM_DIAG_EXPR_CIRCULAR ($43).
+# casmconst3: direct self-reference (`SELF = SELF`), the degenerate
+# single-node cycle -- distinct code path from casmconst2's two-node walk
+# (the very first bitmap check on SELF's own record already catches it,
+# before any symbolsLookup call even runs). Expects CASM_DIAG_EXPR_CIRCULAR
+# ($43). Not named X (or Y): same CASM_TOKEN_REGISTER collision as
+# casmconst2's own A/B avoidance above.
 file(WRITE "${OUTPUT_DIR}/casmconst3.seq"
     ".ORG \$C000\n"
-    "X = X\n"
+    "SELF = SELF\n"
     "NOP\n"
 )
 
