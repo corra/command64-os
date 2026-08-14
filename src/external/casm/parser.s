@@ -61,6 +61,7 @@
 .export CasmConstantRefAddendLo
 .export CasmConstantRefAddendHi
 .export CasmConstantRefExtract
+.export CasmConstantIsCurAddr
 
 .segment "BSS"
 
@@ -99,6 +100,19 @@ CasmConstantRefAddendSign: .res 1
 CasmConstantRefAddendLo:   .res 1
 CasmConstantRefAddendHi:   .res 1
 CasmConstantRefExtract:    .res 1
+; WP66: set only by ppsConstant's '*'-RHS arm (never by the numeric or
+; identifier arms). '*' RHS reuses the identifier arm's own deferred-
+; addend/extraction staging shape (CasmConstantRef{AddendSign,AddendLo,
+; AddendHi,Extract}; CasmConstantRefVmmLo/Hi/Len stay zero -- there is no
+; name to look up), but unlike an identifier's forward reference, its base
+; value (CasmPc) is already known the instant crpConstant (casm.s) runs --
+; no Pass1->Pass2 resolution-sweep involvement needed. crpConstant computes
+; CasmPc [+/- addend][extraction] itself when this flag is set, then ORs
+; CASM_SYMBOL_FLAG_LABEL_DERIVED into the inserted symbol's flags alongside
+; RESOLVED: '*' resolves immediately (like a numeric RHS, never label-
+; derived) but is relocatable-by-construction (like a label), so it needs
+; both bits together -- a combination no other RHS kind produces.
+CasmConstantIsCurAddr:     .res 1
 
 ; WP44: .INCLUDE filenames exceed the frozen 31-byte token payload. Keep the
 ; original PETSCII bytes in parser-owned bounded state for the later semantic
@@ -346,6 +360,7 @@ ppsConstant:
     sta CasmConstantRefAddendSign
     sta CasmConstantRefAddendLo
     sta CasmConstantRefAddendHi
+    sta CasmConstantIsCurAddr
     jsr lexerNext               ; consume '=', fetch the RHS's first token
     bcc @haveFirst
     rts
@@ -374,6 +389,10 @@ ppsConstant:
     beq @numeric
     cmp #CASM_TOKEN_IDENTIFIER
     beq @identifier
+    cmp #CASM_TOKEN_STAR
+    bne @notCurAddr
+    jmp @curAddr
+@notCurAddr:
     jsr diagSetLocFromToken
     lda #CASM_DIAG_EXPR_MALFORMED
     sec
@@ -492,6 +511,52 @@ ppsConstant:
     lda #0
     sta CasmConstantResolved
     ; fall through to @requireTerminator
+
+; WP66: '*' RHS. Reuses @identifierAddend's own addend-capture tail
+; verbatim (same exprParseAddend/exprGetResult sequence, staging into the
+; same CasmConstantRefAddendSign/Lo/Hi fields) -- the only difference from
+; @identifier is that there is no name to capture (CasmConstantRefVmmLo/
+; Hi/Len stay at their top-of-routine zero) and CasmConstantIsCurAddr is
+; set instead of leaving CasmConstantResolved clear, telling crpConstant
+; (casm.s) to compute CasmPc [+/- addend][extraction] itself rather than
+; deferring to the Pass1->Pass2 resolution sweep.
+@curAddr:
+    jsr lexerNext                 ; consume '*'
+    bcc @curAddrAddend
+    rts
+@curAddrAddend:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq @curAddrAddendSign
+    cmp #CASM_TOKEN_MINUS
+    beq @curAddrAddendSign
+    jsr exprParseAddend
+    bcc @curAddrStore
+    rts
+@curAddrAddendSign:
+    jsr exprParseAddend
+    bcc @curAddrAddendConsume
+    rts
+@curAddrAddendConsume:
+    jsr lexerNext                 ; advance past the addend NUMBER
+    bcc @curAddrStore
+    rts
+@curAddrStore:
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_ADDEND_SIGN
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendSign
+    ldy #CASM_EXPR_ADDEND_MAG_LO
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendLo
+    ldy #CASM_EXPR_ADDEND_MAG_HI
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendHi
+    lda #1
+    sta CasmConstantIsCurAddr
+    jmp @requireTerminator
 
 @requireTerminator:
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE

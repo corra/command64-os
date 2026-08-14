@@ -3129,6 +3129,73 @@
         Taskwarrior task 45 marked done. WP66 (current-address symbol)
         is next and requires its own detailed plan and separate
         approval before any source edit.
+  - [x] Taskwarrior #43 under this session's own numbering
+        (`074c9d56-f6d9-4d65-8de4-96421d4c21b1`): WP66, current-address
+        symbol. Depends on WP64 (task 44). Plan: `brain/plans/2026-08-14-
+        casm-phase12-wp66-current-address-symbol.md`. Sub-agent research
+        (source-grounded, file:line citations) against `expr.s`,
+        `lexer.s`, `common.inc`, `emit.s`, `parser.s` established the
+        implementation surface before drafting: confirmed no `*` token
+        exists anywhere in the lexer today, `CasmPc` (`emit.s`) is the
+        exact "current address" value `crpLabel` itself already reads,
+        and `ppsConstant` is a separate hand-rolled RHS parser from
+        `exprEvaluate` -- surfacing a real scoping fork (does `name = *`
+        ship in this WP?) that neither WP64's contract nor WP65's plan
+        settled. User confirmed: include it, not defer. **Plan approved
+        by user 2026-08-14, no changes.** Task started. All 7 Atomic
+        Increments complete: token/lexer plumbing
+        (`CASM_PETSCII_ASTERISK`, `CASM_TOKEN_STAR`); `exprEvaluate`'s
+        new `curAddr` primary-dispatch arm (reads `CasmPc`, sets
+        `RESOLVED`+`SYMBOL_DERIVED` unconditionally, `RELOCATABLE`
+        conditionally, falls through into the identifier arm's own
+        shared addend/extraction tail); operand-level fixtures added to
+        `tests/src/casm_expr/casm_expr.s` (7 new cases, `CASE_COUNT`
+        38->45, live-verified `CASM EXPR: PASS`); a live trace of
+        `crpConstant` (Increment 4) caught a real design gap before any
+        code was written -- naively mirroring the numeric-RHS path for
+        `name = *` would never have set `CASM_SYMBOL_FLAG_LABEL_DERIVED`,
+        silently misclassifying a `*`-defined constant as static; solved
+        with a new `CasmConstantIsCurAddr` staging flag
+        (`parser.s`) driving both inline `CasmPc`-based resolution and
+        the correct flags in `crpConstant` (`casm.s`); `ppsConstant`'s
+        new `*`-RHS arm (Increment 5); full disk-image tree rebuild
+        (Increment 6) surfaced three envelope overflows from the shared
+        `expr.s`/`parser.s`/`lexer.s` growth -- `test_casm_pass1` and
+        `test_casm_frame` (`$5300`->`$5400` each), `test_casm_include`
+        (`$1200`->`$1300`, which in turn grew that PRG enough to leave
+        `casm_overflow_test_d64` one block short, resolved by relocating
+        `test_casm_freloc` to `casm_include_test_d64`'s ~540 free blocks,
+        mirroring WP52/WP65's own prior identical moves); two new live
+        end-to-end fixtures (`casmcuraddr1.s`: `bufstart = *` referenced
+        via `<`/`>` later; `casmcuraddr2.s`: bare `*` with extraction and
+        an addend in one operand, `lda #<*+3`) added to
+        `cmake/GenerateCasmTestFixtures.cmake` and packed onto
+        `casm_include_test_d64` alongside WP65's own `casmconst1-4.s`.
+        Increment 7: both new fixtures live-verified against the real
+        `casm.prg` binary under VICE -- `CASM: INPUT VALIDATED` and PRG
+        bytes extracted from the disk image matching hand-computed
+        expectations exactly (`A9 00 8D 20 D0 A9 C0 8D 21 D0 4C 00 C0`
+        and `EA A9 04 8D 20 D0` respectively) -- plus regression
+        re-verification of `test_casm_expr` (45/45), `test_casm_symbols`,
+        `test_casm_pass1`, `test_casm_include`, and `test_casm_frame`
+        (all PASS). One harness-level hazard hit and resolved along the
+        way: hot-swapping a disk image on an already-attached unit mid-
+        Command64-session left the shell reporting `DEVICE NOT PRESENT`
+        even though VICE itself had the correct media attached -- fixed
+        per the workflow's own Recovery table (`vice_machine_reset
+        {mode: soft}` then re-boot Command64 with every needed unit
+        attached from the start, not hot-swapped mid-session). Also
+        confirmed shell dispatch of an underscore-bearing app/argument
+        name needs `vice_keyboard_petscii` byte 164, not literal ASCII
+        `_` via `vice_keyboard_type` (matches memory
+        `reference-vice-shell-underscore-petscii`) -- a plain `LDA (zp)`
+        typed name silently mismatched and printed `BAD COMMAND OR FILE
+        NAME` instead. Full disk-image tree rebuilds clean. Walkthrough:
+        `brain/walkthroughs/2026-08-14-casm-phase12-wp66-current-
+        address-symbol.md`. **WP66 complete, user-approved 2026-08-14.**
+        Taskwarrior task marked done. WP67 (parentheses and explicit
+        precedence) is next and requires its own detailed plan and
+        separate approval before any source edit.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

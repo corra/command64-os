@@ -535,10 +535,25 @@ derives the two statement flags:
 
 A bounded, non-recursive evaluator — not a general expression compiler. One
 expression is: an optional `<`/`>` extraction prefix, one primary (a numeric
-literal or one identifier resolved through a caller-supplied callback), and
-an optional `± NUMBER` addend. Anything else is
-`CASM_DIAG_EXPR_MALFORMED`/`CASM_DIAG_EXPR_UNSUPPORTED`; arithmetic that
-leaves 16 bits is `CASM_DIAG_EXPR_OVERFLOW`.
+literal, one identifier resolved through a caller-supplied callback, or —
+WP66 — the current-address symbol `*`), and an optional `± NUMBER` addend.
+Anything else is `CASM_DIAG_EXPR_MALFORMED`/`CASM_DIAG_EXPR_UNSUPPORTED`;
+arithmetic that leaves 16 bits is `CASM_DIAG_EXPR_OVERFLOW`.
+
+`*` (`CASM_TOKEN_STAR`, lexed from `CASM_PETSCII_ASTERISK`) is resolved
+inline in `exprEvaluate`'s own `curAddr` primary-dispatch arm — it never
+reaches the resolver callback, unlike an identifier. It reads `CasmPc`
+(imported from `emit.s`, the only new cross-module dependency this added
+to `expr.s`), sets `RESOLVED`+`SYMBOL_DERIVED` unconditionally (so
+`parserParseExpressionValue`'s `FORCE_ABS` derivation ([§10](#10-parser-parsers))
+protects it exactly as it would a label), and sets `RELOCATABLE` iff the
+caller's relocatable-mode input is nonzero, then falls through into the
+identifier arm's own shared `consumeIdentifier` tail (addend/extraction/
+continuation) rather than duplicating it. Because WP67/68 (parenthesized
+expressions, multiplication) haven't landed, `*`'s token is unambiguous —
+there is no multiply operator yet to collide with in binary-operator
+position; a future precedence-climbing rewrite must preserve `*`'s
+leaf-position reading as its own primary case.
 
 `exprEvaluate` takes the resolver's address in `X`/`Y` and the whole-assembly
 relocatable-mode flag in `A`, and leaves the following token current on
@@ -576,13 +591,30 @@ bytes) and keeps that slot for the process lifetime.
 | `symbolsLookup` | The `exprEvaluate` resolver: fills the 5-byte resolver view, reporting `RESOLVED` only for a `DEFINED` record |
 
 **Record layout** (64 bytes, `CASM_SYMBOL_REC_*`): `NameLen` (1),
-`Name` (31-byte fixed slot), `Val` (2), `Flags` (1, bit 0 = `DEFINED`),
-`Next` (2, collision-chain record index, `$FFFF` = end), then 27 reserved
-padding bytes zero-filled on every write. The record is padded from its
-meaningful 37 bytes to 64 for two concrete reasons: it then fits
-`CASM_VMM_BUFFER_SIZE` exactly (one record = one transfer), and
-record-index → VMM-offset becomes a 16-bit shift-left-by-6 instead of a
-multiply by 37.
+`Name` (31-byte fixed slot), `Val` (2), `Flags` (1: bit 0 `DEFINED`, bit 1
+`CONSTANT` — WP65, bit 2 `RESOLVED` — WP65, bit 3 `LABEL_DERIVED` — WP65),
+`Next` (2, collision-chain record index, `$FFFF` = end), then (WP65) up to
+7 of the remaining padding bytes repurposed as a deferred-reference
+bookmark (`REF_VMM_LO/HI`, `REF_LEN`, `REF_ADDEND_LO/HI/SIGN`,
+`REF_EXTRACT`) for a not-yet-resolved constant's identifier RHS, zero-
+filled once `RESOLVED` is set. The record is padded from its meaningful 37
+bytes to 64 for two concrete reasons: it then fits `CASM_VMM_BUFFER_SIZE`
+exactly (one record = one transfer), and record-index → VMM-offset becomes
+a 16-bit shift-left-by-6 instead of a multiply by 37.
+
+A label has only `DEFINED`. A named constant (`identifier = expression`,
+WP65) additionally has `CONSTANT`, plus `RESOLVED` once its value is known
+— immediately for a numeric or `*` RHS, or after `casmResolveConstants`'
+Pass1→Pass2 sweep for a forward-referencing identifier RHS — and
+`LABEL_DERIVED` iff its value is load-address-sensitive (its reference
+chain bottoms out at a label, or — WP66 — its RHS was `*` itself).
+`expr.s`'s relocatable classification for a resolved constant operand
+checks exactly this bit, mirroring a label's own unconditional
+eligibility. `crpConstant` (`casm.s`) computes a `*` RHS's value inline
+from `CasmPc` at Pass 1 (no resolution-sweep involvement needed, unlike an
+identifier forward reference — `CasmPc` is already final the instant that
+statement runs), signaled by `ppsConstant`'s (`parser.s`) own
+`CasmConstantIsCurAddr` staging flag.
 
 Capacity is 512 records over 128 buckets; the bucket index is masked with
 `$7F`, so no division is needed. Chains are walked with cheap early-outs

@@ -79,6 +79,7 @@
 .import CasmConstantRefAddendLo
 .import CasmConstantRefAddendHi
 .import CasmConstantRefExtract
+.import CasmConstantIsCurAddr
 
 ; WP65: casmResolveConstants' own dependencies -- symbolsReadByIndex/
 ; symbolsUpdateByIndex to walk and patch the symbol table directly by
@@ -505,18 +506,89 @@ crpLabel:
 crpConstant:
     lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
-    bne crpConstantCommit         ; EMIT: nothing else to do -- the symbol
+    beq crpConstantMeasure
+    jmp crpConstantCommit         ; EMIT: nothing else to do -- the symbol
                                    ; and its final value already exist from
                                    ; Pass 1 plus the resolution sweep
+crpConstantMeasure:
     ldx #<CasmLabelName
     ldy #>CasmLabelName
     stx CasmPtr0Lo
     sty CasmPtr0Hi
 
+    ; WP66: '*' RHS. Unlike an identifier's forward reference, CasmPc is
+    ; already final the instant this Pass 1 statement runs (the same fact
+    ; crpLabel itself relies on, immediately below in this file) -- so this
+    ; resolves inline here rather than waiting for casmResolveConstants'
+    ; Pass1->Pass2 sweep. Computes CasmPc [+/- addend][extraction] into
+    ; CasmConstantValueLo/Hi, marks Resolved, and clears the addend/
+    ; extraction staging fields back to the zero state symbolsInsert's
+    ; Ref* copy below expects for any already-resolved record (map.s's
+    ; mapValidateRecord requires that whole span zero-filled once
+    ; resolved -- same invariant ppsConstant's own numeric-RHS path
+    ; already keeps at definition time).
+    ldx CasmConstantIsCurAddr
+    beq crpConstantFlags
+    lda CasmPc
+    sta CasmConstantValueLo
+    lda CasmPc + 1
+    sta CasmConstantValueHi
+    lda CasmConstantRefAddendLo
+    ora CasmConstantRefAddendHi
+    beq crpConstantCurAddrExtract      ; zero addend: value is just CasmPc
+    lda CasmConstantRefAddendSign
+    cmp #CASM_ADDEND_SIGN_POSITIVE
+    beq crpConstantCurAddrAdd
+    lda CasmConstantValueLo
+    sec
+    sbc CasmConstantRefAddendLo
+    sta CasmConstantValueLo
+    lda CasmConstantValueHi
+    sbc CasmConstantRefAddendHi
+    sta CasmConstantValueHi
+    bcs crpConstantCurAddrExtract
+    jmp crpConstantCurAddrOverflow
+crpConstantCurAddrAdd:
+    lda CasmConstantValueLo
+    clc
+    adc CasmConstantRefAddendLo
+    sta CasmConstantValueLo
+    lda CasmConstantValueHi
+    adc CasmConstantRefAddendHi
+    sta CasmConstantValueHi
+    bcc crpConstantCurAddrExtract
+crpConstantCurAddrOverflow:
+    lda #CASM_DIAG_EXPR_OVERFLOW
+    sec
+    jmp crpFail
+crpConstantCurAddrExtract:
+    lda CasmConstantRefExtract
+    beq crpConstantCurAddrResolved      ; FULL: nothing to apply
+    cmp #CASM_EXTRACTION_LO
+    beq crpConstantCurAddrClearHigh
+    lda CasmConstantValueHi             ; HI: move high byte down
+    sta CasmConstantValueLo
+crpConstantCurAddrClearHigh:
+    lda #0
+    sta CasmConstantValueHi
+crpConstantCurAddrResolved:
+    lda #1
+    sta CasmConstantResolved
+    lda #0
+    sta CasmConstantRefAddendSign
+    sta CasmConstantRefAddendLo
+    sta CasmConstantRefAddendHi
+    sta CasmConstantRefExtract
+
+crpConstantFlags:
     lda #CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_CONSTANT
     ldx CasmConstantResolved
-    beq crpConstantStoreFlags
+    beq crpConstantCheckCurAddr
     ora #CASM_SYMBOL_FLAG_RESOLVED
+crpConstantCheckCurAddr:
+    ldx CasmConstantIsCurAddr
+    beq crpConstantStoreFlags
+    ora #CASM_SYMBOL_FLAG_LABEL_DERIVED
 crpConstantStoreFlags:
     sta CasmSymbolInsertFlags
 

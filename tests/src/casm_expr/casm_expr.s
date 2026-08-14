@@ -19,6 +19,7 @@
 .export diagSetLocFromToken
 .export CasmTokenRecord
 .export CasmTokenText
+.export CasmPc
 
 ; WP28: moved off $70/$71 (CasmPtr0Lo/CasmPtr0Hi). expr.s's exprEvaluate
 ; identifier branch now stages the resolver's name pointer through
@@ -57,7 +58,7 @@ CASE_COLUMN    = 7
 ; against 0 -- so it cannot affect any case that doesn't opt in).
 CASE_RELOC_MODE = 8
 CASE_SIZE      = 9
-CASE_COUNT     = 38
+CASE_COUNT     = 45
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -68,6 +69,12 @@ start:
     cld
     lda #$0E
     jsr KernalChROUT
+    ; WP66: fixed for the whole harness run -- every '*' EXPECT record
+    ; (eStar*) below is computed against this exact value ($4050).
+    lda #$50
+    sta CasmPc
+    lda #$40
+    sta CasmPc + 1
     lda #<caseTable
     sta TableLo
     lda #>caseTable
@@ -376,6 +383,7 @@ ActualDiag:     .res 1
 ExpectedColumn: .res 1
 TokenOrdinal:   .res 1
 CaseRelocModeIn: .res 1
+CasmPc:         .res 2
 
 .segment "RODATA"
 passMsg: .byte "CASM EXPR: PASS", $0D, 0
@@ -526,6 +534,27 @@ sAbsLo: T1 CASM_TOKEN_LESS, 0, $3C
         TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
         T0 CASM_TOKEN_EOF, 0
 
+; WP66: current-address symbol ('*'). Column/final-token shapes mirror the
+; structurally identical ABSVAL/RELVAL identifier cases above exactly
+; (same token sequence, same lexerNext count) -- the only difference is
+; ResolverCalls staying 0, since '*' never reaches the resolver callback.
+sStar: T0 CASM_TOKEN_STAR, 0
+       T0 CASM_TOKEN_NEWLINE, 0
+sStarAdd: T0 CASM_TOKEN_STAR, 0
+          T1 CASM_TOKEN_PLUS, 0, $2B
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+          T0 CASM_TOKEN_EOF, 0
+sStarSub: T0 CASM_TOKEN_STAR, 0
+          T1 CASM_TOKEN_MINUS, 0, $2D
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+          T0 CASM_TOKEN_EOF, 0
+sStarLo: T1 CASM_TOKEN_LESS, 0, $3C
+         T0 CASM_TOKEN_STAR, 0
+         T0 CASM_TOKEN_EOF, 0
+sStarHi: T1 CASM_TOKEN_GREATER, 0, $3E
+         T0 CASM_TOKEN_STAR, 0
+         T0 CASM_TOKEN_EOF, 0
+
 .macro EXPECT name, vlo, vhi, flags, extract, idlo, idhi, sign, maglo, maghi
 name: .byte vlo, vhi, flags, extract, idlo, idhi, sign, maglo, maghi
 .endmacro
@@ -558,6 +587,18 @@ EXPECT eAbsReloc, $34,$12, $07, 0, 1,0, 0,0,0
 EXPECT eAbsAddReloc, $35,$12, $07, 0, 1,0, 0,1,0
 EXPECT eAbsRelocLo, $34,0, $03, 1, 1,0, 0,0,0
 EXPECT eUnaReloc, 0,0, $0E, 0, 4,0, 0,5,0
+
+; WP66: current-address symbol, evaluated against CasmPc = $4050 (fixed for
+; this whole harness run -- StarPc below). $03 = RESOLVED|SYMBOL_DERIVED
+; (no resolver ever ran, so no symbol id/RELOCATABLE beyond what relocMode
+; itself contributes); $07 adds RELOCATABLE for the relocMode=1 cases.
+EXPECT eStar, $50,$40, $03, 0, 0,0, 0,0,0
+EXPECT eStarAdd, $53,$40, $03, 0, 0,0, 0,3,0
+EXPECT eStarSub, $4F,$40, $03, 0, 0,0, 1,1,0
+EXPECT eStarLo, $50,0, $03, 1, 0,0, 0,0,0
+EXPECT eStarHi, $40,0, $03, 2, 0,0, 0,0,0
+EXPECT eStarReloc, $50,$40, $07, 0, 0,0, 0,0,0
+EXPECT eStarLoReloc, $50,0, $03, 1, 0,0, 0,0,0
 
 .macro CASE script, expect, diag, final, calls, column, relocmode
     .word script, expect
@@ -618,3 +659,15 @@ caseTable:
     CASE sAbsAdd, eAbsAddReloc, 0, CASM_TOKEN_EOF, 1, 4, 1
     CASE sAbsLo, eAbsRelocLo, 0, CASM_TOKEN_EOF, 1, 3, 1
     CASE sUna, eUnaReloc, 0, CASM_TOKEN_EOF, 1, 4, 1
+
+    ; WP66: current-address symbol. Column/final/calls mirror the
+    ; structurally identical ABSVAL/RELVAL cases above (sAbs/sAbsAdd/
+    ; sAbsSub/sRelLo/sRelHi), calls=0 throughout since '*' never reaches
+    ; fixtureResolver.
+    CASE sStar, eStar, 0, CASM_TOKEN_NEWLINE, 0, 2, 0
+    CASE sStarAdd, eStarAdd, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sStarSub, eStarSub, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sStarLo, eStarLo, 0, CASM_TOKEN_EOF, 0, 3, 0
+    CASE sStarHi, eStarHi, 0, CASM_TOKEN_EOF, 0, 3, 0
+    CASE sStar, eStarReloc, 0, CASM_TOKEN_NEWLINE, 0, 2, 1
+    CASE sStarLo, eStarLoReloc, 0, CASM_TOKEN_EOF, 0, 3, 1

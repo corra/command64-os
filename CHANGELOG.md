@@ -160,6 +160,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 12 WP66: current-address symbol (`*`)**: `*` is now a valid
+  expression primitive, evaluating to the address the next emitted byte
+  would occupy — the same value a label defined at that exact point would
+  get — relocatable by construction. Works as a plain operand (`lda #<*`),
+  with an addend and/or extraction in one expression (`lda #<*+3`), and as
+  a named constant's own value (`bufstart = *`, WP65's `identifier = expr`
+  syntax). Live-verified against the real `casm.prg` binary under VICE:
+  both a `name = *` fixture and a bare-`*`-with-addend fixture produce
+  byte-exact correct output; the full pre-existing test suite (expression
+  evaluator, symbol table, Pass 1, `.INCLUDE`, frame traversal) still
+  passes unchanged.
+- **CASM Phase 12 WP65: named constant definitions**: `identifier = expr`
+  defines a named constant, usable anywhere an expression is expected
+  without occupying any address of its own. Supports full forward
+  reference — including to labels not yet defined and to other constants,
+  with genuine transitive-cycle detection (`CASM: CIRCULAR CONSTANT
+  DEFINITION`). Live-verified against the real `casm.prg` binary under
+  VICE across four fixtures (a resolution smoke test, mutual and
+  self-reference cycles, and a constant/label name collision), plus
+  regression re-verification of the expression evaluator, symbol table,
+  and Pass 1 harnesses.
 - **CASM 0.2.1 listing/map hardening (Phase 11 WP59)**: Audited all 19
   listing/map exports and their private transitive paths; fixed retryable
   listing-close ownership, registration-failure close/delete compensation, and

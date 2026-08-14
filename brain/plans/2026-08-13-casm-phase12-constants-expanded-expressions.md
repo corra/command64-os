@@ -76,9 +76,27 @@ this plan** — nothing below is final until approved, matching the Phase
 11 governing plan's own framing.
 
 Dependency spine (load-bearing order): **WP64 → WP67 → WP68 → WP70 →
-WP71**. WP65, WP66, and WP69 are proposed in this position but are
+WP71 → WP72**. WP65, WP66, and WP69 are proposed in this position but are
 largely independent of each other and of the spine — flag if you'd rather
 reorder or interleave them.
+
+**Amended 2026-08-14** (user-directed): inserted **WP71 — DASH adoption
+of Phase 12 syntax**, after WP69 (once every new syntax form exists) and
+before the closing verification WP, which is renumbered **WP71 → WP72**
+to make room. `src/external/dash/` is CASM's own real-world dogfooding
+target — genuine CASM source, currently shipped from the interim
+`dash_ref` ca65 cross-check pending a native-CASM-on-hardware regen
+(WP9's `--allow-host-bytes` provenance note, explicitly deferred not
+resolved — see `brain/KNOWLEDGE.md`'s DASH section). No prior Phase 12
+WP (including the already-closed WP65 and the just-approved WP66)
+mentioned DASH at all — confirmed by direct grep, not assumed. Rather
+than scatter DASH edits into each syntax-delivering WP (reviewed
+separately five times, and impossible for the already-closed WP65
+without reopening it), one dedicated WP adopts the new syntax into
+DASH's real source once it all exists, and uses that as the trigger to
+finally close the interim-provenance gap with a real native-CASM regen —
+feeding the same final consolidated live-VICE proof WP72 already does
+for the synthetic fixtures.
 
 - **WP64 — Contract freeze: expression evaluator architecture and
   relocation algebra.** No production behavior change. Designs, before
@@ -144,14 +162,26 @@ reorder or interleave them.
   diagnostic rather than silently wrong output. This is where the master
   plan's risk gate gets its direct proof, not assumed from WP64's design
   alone.
-- **WP71 — Verification, walkthrough, completion gate.** Mirrors WP49
+- **WP71 — DASH adoption of Phase 12 syntax.** (Inserted 2026-08-14,
+  user-directed.) Update `src/external/dash/`'s real CASM source to use
+  named constants, the current-address symbol, and whichever
+  parenthesized/operator/character-literal forms WP67-69 shipped, where
+  they genuinely improve on what's there today (magic numbers, hand-
+  computed offsets). Uses this as the trigger to close DASH's own
+  interim-provenance gap: a real native-CASM regen of `dash.ref.hex`
+  replacing the `dash_ref` ca65 cross-check's `--allow-host-bytes`
+  placeholder (WP9's own note that this was deferred, not resolved).
+  Own detailed plan and approval required, same as every other WP.
+- **WP72 — Verification, walkthrough, completion gate.** (Renumbered
+  from WP71.) Mirrors WP49
   (Phase 9), WP55 (Phase 10), and WP63 (Phase 11)'s own closing pattern:
   full regression build, a *consolidated* fresh live-VICE re-run of every
-  `test_casm_*` harness plus every new Phase 12 harness in one continuous
-  session (not just citing each WP's own individual pass — WP63 found a
-  real defect specifically because it was the first session to do this),
-  byte-identity proof that every Phase 1-11 fixture's output is
-  unchanged, the user's own manual runtime walkthrough, and explicit
+  `test_casm_*` harness plus every new Phase 12 harness (including WP71's
+  DASH regen) in one continuous session (not just citing each WP's own
+  individual pass — WP63 found a real defect specifically because it was
+  the first session to do this), byte-identity proof that every Phase
+  1-11 fixture's output is unchanged, the user's own manual runtime
+  walkthrough, and explicit
   approval before Phase 12 is marked done.
 
 ## Completion Gate
@@ -228,3 +258,17 @@ own precedent for this section:
   changes. This authorizes WP64's own detailed plan; source edits remain
   gated on WP64's own plan and separate approval, per this project's
   per-WP convention. Next: draft WP64 (contract freeze).
+- 2026-08-14: While drafting/approving WP66 (current-address symbol),
+  user directed that DASH (`src/external/dash/`, CASM's own real-world
+  dogfooding target) adopt Phase 12's new syntax as part of this phase,
+  if not already covered by an existing WP. Confirmed by direct grep
+  that no prior WP (including the already-closed WP65 and the
+  just-approved WP66) mentioned DASH. Determination presented and
+  approved: inserted new **WP71 — DASH adoption of Phase 12 syntax**
+  after WP69 (once every new syntax form exists) and before the closing
+  verification WP, which is renumbered **WP71 → WP72** to make room.
+  WP71 also closes DASH's own long-deferred interim-provenance gap (a
+  real native-CASM regen of `dash.ref.hex`, replacing the `dash_ref`
+  ca65 cross-check's `--allow-host-bytes` placeholder from WP9). WP71
+  requires its own detailed plan and approval before implementation,
+  same as every other WP; not yet drafted.

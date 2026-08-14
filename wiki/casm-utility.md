@@ -128,8 +128,9 @@ Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
 that's never defined is `CASM: UNDEFINED SYMBOL`; exceeding 512 distinct
 labels is `CASM: SYMBOL TABLE FULL`.
 
-An expression is one symbol or literal number, with an optional `<` (low
-byte) or `>` (high byte) prefix, and an optional `+`/`-` numeric addend:
+An expression is one symbol, literal number, or the current-address symbol
+`*` (see below), with an optional `<` (low byte) or `>` (high byte) prefix,
+and an optional `+`/`-` numeric addend:
 
 ```asm
 LDA #<MESSAGE      ; low byte of MESSAGE's address
@@ -139,6 +140,53 @@ LDA MESSAGE+3      ; the 4th byte of MESSAGE
 
 Parenthesized or multiplicative arithmetic (`(A+B)*2`) is not supported —
 `CASM: EXPRESSION UNSUPPORTED`.
+
+### Named Constants
+
+`identifier = expression` defines a named constant — a value you can refer
+to by name anywhere an expression is expected, without it occupying any
+address of its own:
+
+```asm
+screenw = 40
+border = screenw + 10
+```
+
+Constants share the same 512-entry symbol table as labels (a name can be
+one or the other, never both — redefining a label as a constant, or vice
+versa, is `CASM: DUPLICATE SYMBOL`) and can forward-reference other
+constants or labels defined later in the source, exactly like an operand
+can. A constant whose own definition is directly or transitively
+self-referential (`a = b` / `b = a`, or the degenerate `a = a`) is `CASM:
+CIRCULAR CONSTANT DEFINITION`.
+
+A constant's own defining expression follows the same grammar as any other
+expression (a single symbol, number, or `*`, with an optional
+extraction/addend) — it does not itself support parenthesized or
+multiplicative arithmetic, matching every other expression in this
+version.
+
+> Prefer **lowercase** constant names, per the identifier convention above
+> — `screenw`, not `SCREENW`.
+
+### The Current-Address Symbol (`*`)
+
+`*` evaluates to the address the *next* byte would be emitted at — the
+same address a label defined at that exact point in the source would get.
+It can appear anywhere an expression can, including as a named constant's
+own value:
+
+```asm
+bufstart = *        ; bufstart == the address right here
+        lda #<bufstart
+        sta $fb
+```
+
+Like a label, `*` is relocation-aware: it participates in the same
+relocatable/static output rules as any other address-valued expression
+(see [Relocation](#relocation) below), and forces the absolute form of an
+instruction operand, same as a label would. `*+N`/`*-N` and `<*`/`>*` all
+work the same way they would for a label or numeric constant.
 
 ### Numeric Literals
 

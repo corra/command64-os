@@ -189,6 +189,7 @@ CASM_PETSCII_HASH  = $23
 CASM_PETSCII_PERCENT = $25
 CASM_PETSCII_LPAREN = $28
 CASM_PETSCII_RPAREN = $29
+CASM_PETSCII_ASTERISK = $2A  ; WP66: current-address symbol
 CASM_PETSCII_PLUS  = $2B
 CASM_PETSCII_COMMA = $2C
 CASM_PETSCII_MINUS = $2D
@@ -491,7 +492,8 @@ CASM_TOKEN_MINUS      = $0D
 CASM_TOKEN_LESS       = $0E
 CASM_TOKEN_GREATER    = $0F
 CASM_TOKEN_EQUALS     = $10  ; WP65: '=' -- named-constant definition (identifier = expr)
-CASM_TOKEN_COUNT      = $11
+CASM_TOKEN_STAR       = $11  ; WP66: '*' -- current-address symbol (leaf/primary position only)
+CASM_TOKEN_COUNT      = $12
 
 ; Subtypes are interpreted only together with their token type.
 CASM_SUBTYPE_NONE = $00
@@ -569,7 +571,8 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_LEXER_STATE_COUNT = CASM_LEXER_STATE_ERROR + 1, error, "CASM lexer state range changed"
 .assert CASM_TOKEN_TEXT_BUFFER_SIZE = 32, error, "CASM token text buffer changed"
 .assert CASM_TOKEN_EQUALS = CASM_TOKEN_GREATER + 1, error, "CASM token type range changed"
-.assert CASM_TOKEN_COUNT = CASM_TOKEN_EQUALS + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_STAR = CASM_TOKEN_EQUALS + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_COUNT = CASM_TOKEN_STAR + 1, error, "CASM token type range changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
 .assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_RELOC + 1, error, "CASM directive subtype range changed"

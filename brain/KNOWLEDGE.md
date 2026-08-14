@@ -2514,6 +2514,80 @@ constant path). `test_casm_faultvmm` relocated from
 `casm_overflow_test_d64` (reached 0 free blocks) to `casm_listing_test_d64`,
 mirroring `test_l15release`'s own prior identical move.
 
+### CASM Phase 12 WP66 Current-Address Symbol — As-Built (complete 2026-08-14)
+
+`*` as a new expression primitive, evaluating to `CasmPc` (the address the
+next emitted byte will occupy — the same value a label defined at that
+exact point would get), relocatable by construction, implementing WP64's
+own frozen contract. Plan: `brain/plans/2026-08-14-casm-phase12-wp66-
+current-address-symbol.md`. Walkthrough (live VICE evidence):
+`brain/walkthroughs/2026-08-14-casm-phase12-wp66-current-address-symbol.md`.
+
+**Token** (`common.inc`): `CASM_PETSCII_ASTERISK = $2A`, `CASM_TOKEN_STAR =
+$11` (bumping `CASM_TOKEN_COUNT` to `$12`), a new `lexerPunctBytes`/
+`lexerPunctTypes` row (`lexer.s`). No new diagnostic — a `*` in leaf/
+primary position is never a syntax error, per WP64's own framing, and
+every downstream failure mode (bad addend, unsupported continuation) is
+already covered by the identifier path's existing diagnostics.
+
+**`exprEvaluate` (`expr.s`)**: a new `curAddr` primary-dispatch arm
+(alongside `NUMBER`/`IDENTIFIER`), reached without ever calling the
+resolver callback — `*`'s value is always immediately known, unlike an
+identifier's possible forward reference. New `.import CasmPc` from
+`emit.s` (a plain exported BSS word; no ABI change to either module).
+Sets `RESOLVED`+`SYMBOL_DERIVED` unconditionally (so
+`parserParseExpressionValue`'s `FORCE_ABS` derivation, keyed off
+`SYMBOL_DERIVED` alone, protects `*` exactly as it would a label — even
+though `*` never goes through the resolver path that normally sets this
+bit) and `RELOCATABLE` iff the caller's relocatable-mode input is
+nonzero — the identical unconditional check the identifier path applies,
+without WP65's `CONSTANT`/`LABEL_DERIVED` gating (irrelevant here, since
+`*` is not symbol-table-derived at all). Falls through into the
+identifier arm's own shared `consumeIdentifier` tail (addend, extraction,
+continuation) rather than duplicating it — `*+N`/`*-N` and `<*`/`>*` work
+for free from this reuse.
+
+**`ppsConstant`/`crpConstant` (`parser.s`/`casm.s`)**: `name = *` ships in
+this WP (a scoping fork not settled by WP64 or WP65 — user-confirmed
+2026-08-14 to include it rather than defer). `ppsConstant` gained a third
+`@primary` arm reusing the identifier arm's own addend-capture code
+verbatim (same `exprParseAddend`/`exprGetResult` sequence into
+`CasmConstantRefAddendSign/Lo/Hi`), but sets a new `CasmConstantIsCurAddr`
+flag instead of leaving `CasmConstantResolved` clear — there is no name to
+look up (`CasmConstantRefVmmLo/Hi/Len` stay zero) and no forward-reference
+problem to defer, so resolution doesn't wait for `casmResolveConstants`'
+Pass1→Pass2 sweep. `crpConstant` computes `CasmPc [+/- addend][extraction]`
+inline the instant this Pass 1 statement runs (the same fact `crpLabel`
+itself already relies on), then re-zeros the addend/extraction staging
+fields so the record's reserved-padding invariant (`map.s`) holds for this
+now-resolved record exactly as it does for a numeric RHS. Flags
+computation extended: `CASM_SYMBOL_FLAG_LABEL_DERIVED` is now OR'd in
+whenever `CasmConstantIsCurAddr` is set, alongside `RESOLVED` — a
+combination no other RHS kind produces (a numeric RHS is resolved but
+never label-derived; an unresolved identifier RHS is neither yet). Without
+this, `crpConstant`'s existing RESOLVED-only flag logic (correct for a
+numeric RHS) would have silently classified `name = *` as static.
+
+**Live-verified fixtures** (`casmcuraddr1.s`/`casmcuraddr2.s`,
+`cmake/GenerateCasmTestFixtures.cmake`, packed onto `casm_include_test_d64`
+alongside WP65's own `casmconst1-4.s`): `bufstart = *` referenced via
+`<bufstart`/`>bufstart` in later operands, and bare `*` combined with
+extraction and an addend in one operand (`lda #<*+3`) — both produced
+`CASM: INPUT VALIDATED` and PRG bytes matching hand-computed expectations
+exactly, extracted directly from the disk image.
+
+**Envelope**: no change to production `casm`'s own `$6000` cap (fit
+inside WP65's existing headroom, matching WP64's own +50-100 byte
+estimate for this sub-feature). Three test-harness envelopes bumped by
+one round-page step each to absorb `expr.s`/`parser.s`/`lexer.s`'s shared
+growth: `test_casm_pass1` (`$5300`→`$5400`), `test_casm_frame`
+(`$5300`→`$5400`), `test_casm_include` (`$1200`→`$1300`). The
+`test_casm_include` bump grew that PRG by a block, leaving
+`casm_overflow_test_d64` one block short — `test_casm_freloc` (smallest,
+most self-contained PRG on that disk) relocated to `casm_include_test_d64`
+(~540 free blocks), mirroring WP52/WP65's own prior same-shaped disk-
+capacity relocations.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

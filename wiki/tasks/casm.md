@@ -1849,6 +1849,35 @@ behavior changed beyond the version/build artifact itself.
       (new source-position infrastructure needed; an addend-consumption
       bug caught live). WP66 (current-address symbol) is next and needs
       its own detailed plan and separate approval before any source edit.
+- [x] WP66 **complete, user-approved 2026-08-14** (Taskwarrior task 43
+      under this session's numbering, `074c9d56-f6d9-4d65-8de4-96421d4c21b1`,
+      done):
+      `brain/plans/2026-08-14-casm-phase12-wp66-current-address-symbol.md`.
+      `*` as a new expression primitive (`CASM_TOKEN_STAR`), evaluating to
+      `CasmPc`, relocatable by construction — resolved inline in
+      `exprEvaluate`'s own new `curAddr` arm (never through the resolver
+      callback) and falling through into the identifier arm's shared
+      addend/extraction tail, so `*+N`/`*-N`/`<*`/`>*` all work for free.
+      `name = *` also ships (user-confirmed in-scope, not deferred):
+      `ppsConstant` gained a third RHS arm and `crpConstant` computes the
+      value inline from `CasmPc` at Pass 1 (no resolution-sweep needed,
+      unlike a label forward-reference), with a new `CasmConstantIsCurAddr`
+      flag driving `CASM_SYMBOL_FLAG_LABEL_DERIVED` alongside `RESOLVED` —
+      a combination no other RHS kind produces, and one Increment 4's own
+      live trace of `crpConstant` caught before it shipped silently wrong
+      (a naive numeric-RHS-shaped implementation would have classified
+      `name = *` as static). Live-verified against the real `casm.prg`
+      binary under VICE: `bufstart = *` and bare `*` combined with
+      extraction+addend (`lda #<*+3`) both produce byte-exact correct
+      output (`CASM: INPUT VALIDATED`, PRG bytes extracted and hand-
+      checked); `test_casm_expr` (45 cases, 7 new), `test_casm_symbols`,
+      `test_casm_pass1`, `test_casm_include`, and `test_casm_frame` all
+      still PASS. Full disk-image tree rebuilds clean (three test-harness
+      envelope bumps, one disk-capacity relocation). Walkthrough:
+      `brain/walkthroughs/2026-08-14-casm-phase12-wp66-current-address-
+      symbol.md`. WP67 (parentheses and explicit precedence) is next and
+      needs its own detailed plan and separate approval before any source
+      edit.
 
 ## Optional Feature - Progress and Processing Indication
 

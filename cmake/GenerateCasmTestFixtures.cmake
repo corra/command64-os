@@ -1493,3 +1493,41 @@ file(WRITE "${OUTPUT_DIR}/casmconst4.seq"
     "NOP\n"
     "START = 5\n"
 )
+
+# casmcuraddr1 (WP66): 'name = *' -- a named constant whose RHS is the
+# current-address symbol. BUFSTART = * is the first statement after .ORG,
+# before any byte is emitted, so it captures $C000 itself (constant
+# definitions never advance CasmPc, same fact casmconst1 above already
+# relies on for START). Referenced afterward via <BUFSTART/>BUFSTART like
+# any other relocatable constant -- proves crpConstant's new
+# CASM_SYMBOL_FLAG_LABEL_DERIVED handling classifies it correctly through
+# the ordinary extraction path, not just crpConstant's own insertion.
+# Expected bytes: A9 00 (LDA #$00, <BUFSTART) 8D 20 D0 (STA $D020) A9 C0
+# (LDA #$C0, >BUFSTART) 8D 21 D0 (STA $D021) 4C 00 C0 (JMP BUFSTART) -- 13
+# bytes, BUFSTART = $C000.
+file(WRITE "${OUTPUT_DIR}/casmcuraddr1.seq"
+    ".ORG \$C000\n"
+    "BUFSTART = *\n"
+    "LDA #<BUFSTART\n"
+    "STA \$D020\n"
+    "LDA #>BUFSTART\n"
+    "STA \$D021\n"
+    "JMP BUFSTART\n"
+)
+
+# casmcuraddr2 (WP66): bare '*' as an ordinary operand (not through a named
+# constant), combined with both extraction and an addend in one expression
+# (<*+3) -- the one-token grammar's own '[<|>] primary [+|- NUMBER]' shape,
+# exercised directly against exprEvaluate's new curAddr primary-dispatch
+# arm. NOP occupies $C000, so the following LDA instruction's own opcode
+# byte sits at $C001 -- CasmPc's value the instant this operand's '*'
+# evaluates, before LDA itself emits (same "current statement's own
+# address" fact casmcuraddr1 above relies on for BUFSTART). $C001+3 =
+# $C004; low byte extraction yields $04. Expected bytes: EA (NOP) A9 04
+# (LDA #$04) 8D 20 D0 (STA $D020) -- 6 bytes.
+file(WRITE "${OUTPUT_DIR}/casmcuraddr2.seq"
+    ".ORG \$C000\n"
+    "NOP\n"
+    "LDA #<*+3\n"
+    "STA \$D020\n"
+)

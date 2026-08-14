@@ -12,6 +12,7 @@
 .import CasmTokenRecord
 .import CasmTokenText
 .import diagSetLocFromToken
+.import CasmPc
 
 .export exprInit
 .export exprGetResult
@@ -64,6 +65,10 @@
 ; Clobbers:  A, X, Y, N, Z, C, lexer state, expression and private scratch BSS
 ; Resolver:  current token is IDENTIFIER; X/Y point to five-byte output view;
 ;            C clear accepts output, C set is reported as resolver failure
+; WP66:      grammar is now ['<'|'>'] (NUMBER|IDENTIFIER|'*') [('+'|'-')
+;            NUMBER] -- '*' (current address, CasmPc) never reaches the
+;            resolver; it is resolved on the spot and follows the
+;            identifier path's own addend/extraction handling.
 ; ---------------------------------------------------------------------------
 .proc exprEvaluate
     sta CasmExprRelocatableModeIn
@@ -91,12 +96,41 @@ primary:
     beq number
     cmp #CASM_TOKEN_IDENTIFIER
     beq identifier
+    cmp #CASM_TOKEN_STAR
+    beq curAddr
 malformed:
     jsr diagSetLocFromToken
     lda #CASM_DIAG_EXPR_MALFORMED
     sec
 return:
     rts
+
+; WP66: current-address symbol ('*'). Always known immediately (no
+; forward-reference case exists for it, unlike an identifier), so it is
+; resolved on the spot from CasmPc and then folds into the identifier
+; path's own consumeIdentifier tail (addend/extraction/continuation) --
+; by the time control reaches consumeIdentifier, '*' and a resolved,
+; symbol-derived identifier look identical in the result record.
+;
+; SYMBOL_DERIVED is set unconditionally (not just RESOLVED) even though
+; '*' never goes through the resolver callback: parserParseExpressionValue
+; derives CASM_PARSER_STMT_FORCE_ABS strictly from SYMBOL_DERIVED, and
+; '*'s value is exactly as load-address-sensitive as a label's, so it
+; needs the same Pass 1/Pass 2 width-agreement protection.
+curAddr:
+    lda CasmPc
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmPc + 1
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    lda #(CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_SYMBOL_DERIVED)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+    ldy CasmExprRelocatableModeIn
+    beq curAddrDone
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    ora #CASM_EXPR_FLAG_RELOCATABLE
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+curAddrDone:
+    jmp consumeIdentifier
 
 number:
     jsr exprParseNumeric

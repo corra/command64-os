@@ -841,7 +841,11 @@ if(Ca65_FOUND)
             # parser.s's new ppsConstant routine and CasmConstant* staging
             # fields (unused by this harness, which never defines a named
             # constant) overflowed $5200 by 66 measured bytes.
-            set(TEST_PRG_SIZE "5300")
+            # WP66: $5300 -> $5400 -- expr.s's new curAddr primary-dispatch
+            # arm and the lexer's new '*' punctuation-table row (this
+            # harness never evaluates '*') overflowed $5300 by 12 measured
+            # bytes; $5400 (+256) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5400")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -909,7 +913,12 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1200")
+            # WP66: $1200 -> $1300 -- parser.s's new '*'-RHS constant
+            # dispatch (CasmConstantIsCurAddr, the @curAddr arm) and
+            # lexer.s's new punctuation-table row (unused by this harness)
+            # overflowed $1200 by 63 measured bytes; $1300 (+256) is the
+            # smallest round-page step that fits.
+            set(TEST_PRG_SIZE "1300")
         endif()
         if(TEST_NAME STREQUAL "casm_catalog")
             # WP45: include.s plus every module sourceAppendFile transitively
@@ -1020,7 +1029,11 @@ if(Ca65_FOUND)
             # $5100 by 358 measured bytes; $5200 (+256) would still
             # overflow, so $5300 (+512) is the smallest round-page step
             # that fits.
-            set(TEST_PRG_SIZE "5300")
+            # WP66: $5300 -> $5400 -- expr.s's new curAddr primary-dispatch
+            # arm and parser.s's new '*'-RHS constant handling (unused by
+            # this harness) overflowed $5300 by 13 measured bytes; $5400
+            # (+256) is the smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5400")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1638,7 +1651,14 @@ add_c64_disk_image(casm_overflow_test_d64
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
-         test_casm_faultsource test_casm_fsym test_casm_freloc
+         test_casm_faultsource test_casm_fsym
+    # WP66: test_casm_freloc relocated to casm_include_test_d64 (below,
+    # ~540 free blocks) -- test_casm_include's own WP66 envelope bump
+    # ($1200 -> $1300, parser.s's new '*'-RHS constant handling) grew its
+    # PRG by a block, leaving this disk 1 block short for casmcat5.seq.
+    # Same precedent as WP52's test_l15release move and WP65's own
+    # test_casm_faultvmm move off a full disk -- relocate the smallest,
+    # most self-contained PRG rather than trim fixture content.
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1659,7 +1679,7 @@ add_c64_disk_image(casm_include_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 casm comp
+    PRGS command64 casm comp test_casm_freloc
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
 
@@ -1710,6 +1730,21 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmconst4.seq"
         "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     COMMENT "Appending WP65 Increment 10 casmconst1-4.s named-constant fixtures to casm_include_test.d64"
+    VERBATIM
+)
+
+# WP66: current-address symbol end-to-end fixtures. Same disk as
+# casmconst1-4 above, same rationale (ample free space, needs the real
+# production binary).
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmcuraddr1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcuraddr1.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcuraddr2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcuraddr2.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP66 casmcuraddr1-2.s current-address-symbol fixtures to casm_include_test.d64"
     VERBATIM
 )
 
