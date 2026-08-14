@@ -2960,6 +2960,147 @@
         Completion Gate section updated to reflect closure. **WP63
         complete. Phase 11 (WP56-63) complete.**
 
+# CASM Phase 12 - Constants and Expanded Expressions (CASM 0.3)
+
+- [/] Taskwarrior #43 (`c547c74f-5080-4f2e-b086-e4e2273b5336`): CASM Phase
+      12, governing plan **approved 2026-08-13**, task started.
+  - Plan: `brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`
+  - Milestone task: `wiki/tasks/casm.md` (Phase 12 section)
+  - User asked to begin Phase 12. Per
+    `.agents/workflows/phased-implementation-planning.md`, "beginning"
+    means drafting and getting approval for a detailed plan first, not
+    writing code. Found Phase 12 already scoped in the master plan
+    (`brain/plans/2026-07-16-casm-assembler-implementation-plan.md:406-418`):
+    named constants, current-address symbol, parens/precedence,
+    multiply/divide/shifts/bitwise/unary ops, character literals,
+    circular-definition/division-by-zero diagnostics, and a relocation-
+    algebra risk gate (expanded expressions must preserve the base
+    relocation classifier and not change any existing program's bytes).
+    No prior detailed plan existed.
+  - Asked three scoping questions before drafting: Work-Package structure
+    vs. single-phase increment list, a dedicated contract-freeze WP first
+    for the relocation risk gate vs. handling it per-WP, and who proposes
+    WP ordering. User confirmed all three recommended defaults (Work
+    Packages; dedicated contract-freeze first; agent proposes the order
+    for approval).
+  - Drafted proposed **WP64-71** breakdown: WP64 (contract freeze --
+    relocation-classifier extension, evaluator architecture for
+    precedence, named-constant/current-address-symbol ABI, diagnostic
+    numbering; no production change), WP65 (named constants + circular-
+    definition diagnostic), WP66 (current-address symbol), WP67 (parens/
+    explicit precedence -- proposed before WP68 so operators are
+    correct-by-construction against a stable precedence contract rather
+    than changing already-shipped results later), WP68 (arithmetic/
+    bitwise/unary operators + division-by-zero diagnostic), WP69
+    (character literals/string encoding), WP70 (relocation-algebra
+    closure -- consolidated proof every WP65-69 combination matches
+    WP64's representability contract), WP71 (verification/walkthrough/
+    completion gate, mirroring WP49/WP55/WP63's consolidated-
+    fresh-re-verification pattern). WP65/66/69 flagged as independent/
+    reorderable; WP64->67->68->70->71 is the load-bearing dependency
+    spine.
+  - Three Open Questions recorded in the plan: (1) does the WP64-71
+    breakdown/order match intent; (2) exact named-constant syntax and
+    current-address-symbol token (`*` collides with multiplication once
+    WP68 lands, needs its own resolution) deferred to WP64's own design
+    rather than fixed at the governing-plan level; (3) version-bump timing
+    (default: each WP stays within `0.2.x`, a final completion-promotion
+    WP bumps to `0.3.0`, mirroring Phase 10's own two-step promotion).
+  - User separately flagged a documentation gap (not previously noted
+    anywhere): real C64 platforms run single-case PETSCII, so symbols are
+    conventionally lowercase-only, never mixed case -- Command64's
+    mixed-case charset (and CASM's resulting true case-sensitivity) is an
+    anomaly. Added to `docs/casm-utility.md`/`wiki/casm-utility.md` (kept
+    byte-identical) and `wiki/casm-programmers-reference.md`; recorded as
+    memory `reference-c64-lowercase-petscii-convention`; folded into
+    WP64/65/69's own scope below. No source/behavior change.
+  - Taskwarrior task 43 created as the Phase 12 parent.
+    **User approved this governing plan as drafted 2026-08-13** -- all
+    three Open Questions confirmed with no changes. Task 43 started.
+    Taskwarrior task 44 (`c307441c-74ab-47a8-bb4c-e997d38bcf99`) created
+    for WP64, depends on task 43.
+  - [/] WP64 plan drafted 2026-08-13, **not yet approved**:
+    `brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md`.
+    Researched (sub-agent, source-grounded, file:line citations) the
+    actual current `expr.s`/`symbols.s`/`reloc.s`/`common.inc`
+    implementation before drafting. Found 3 load-bearing facts requiring
+    scoping decisions: the relocation table is purely a location marker
+    (`relocRecord` records only a code offset, `reloc.s:83-143` -- the
+    real value is baked into emitted bytes beforehand), so a relocatable
+    value can only ever be one symbol plus a static addend -- two symbols
+    or a scaled/shifted relocatable value are structurally
+    unrepresentable, not just unimplemented; a leading `(` already
+    exclusively means indirect addressing
+    (`parserParseOperandSpec`, `parser.s:276-414`) before the expression
+    evaluator ever runs; and only 114 bytes of envelope headroom remain
+    (measured directly via `ld65 -m` re-link: 21,646 of 21,760 bytes
+    used). Asked 3 scoping questions; user confirmed all 3 recommended
+    defaults: new operators (`*`,`/`,`<<`,`>>`,`&`,`|`,`^`, unary
+    `-`/`~`) apply to static operands only, relocatable operands
+    reaching them get a new diagnostic rather than silently-wrong output
+    (`CASM_DIAG_EXPR_RELOC_UNSUPPORTED = $45`); `(expr)` is only valid
+    after a binary operator, never as a whole operand (preserves
+    indirect-addressing's exclusive claim on that position, no lookahead
+    disambiguation attempted); WP64 estimates a rough envelope budget
+    now (+1,550-2,600 bytes total, recommending a `$5500`->`$6000` bump)
+    rather than leaving it to each implementing WP.
+    Designed: precedence-climbing evaluator architecture (7 tentative
+    tiers, unary `-`/`~` tightest, `+`/`-` loosest, generalizing today's
+    single-addend special case); `CASM_SYMBOL_FLAG_CONSTANT =
+    %00000010` for named constants sharing the existing 512-entry table
+    (requires a `map.s:130-131` flag-check update); current-address
+    symbol (`*`, position-disambiguated from multiplication -- leaf
+    position is always current-address, binary-operator position is
+    always multiplication); diagnostic numbering `$43`-`$45`
+    (`CASM_DIAG_EXPR_CIRCULAR`, `CASM_DIAG_EXPR_DIV_ZERO`,
+    `CASM_DIAG_EXPR_RELOC_UNSUPPORTED`). No production source change --
+    WP64 is design-only; its own completion gate requires hand-tracing 3
+    representative expressions against the new rule and recording the
+    frozen contract in `brain/KNOWLEDGE.md`. **User approved this plan.**
+    Completed Increments 1-8: hand-verified the parenthesization rule
+    directly against `parser.s:276-415` (a leading `(` is unconditionally
+    consumed by `posIndirect`, confirming Scoping Decision 2 is the only
+    workable rule); confirmed `parserParseExpressionValue`
+    (`parser.s:492-587`) as the shared integration boundary across all
+    three operand modes and that its independent `FORCE_ABS` derivation
+    doesn't interact with the new static-only-operator rule; finalized
+    the diagnostic table (`$43`-`$45`) matching `common.inc:721-769`'s
+    exact `.assert`-contiguity style. Recorded the full frozen contract
+    as a new Phase 12 section in `brain/KNOWLEDGE.md` (also fixed a stale
+    "not yet closed" sentence left in Phase 11's own section).
+    **WP64 complete, user-approved 2026-08-13.** No production source
+    changed. Walkthrough:
+    `brain/walkthroughs/2026-08-13-casm-phase12-wp64-contract-freeze.md`.
+    Taskwarrior task 44 marked done. WP65 (named constants) is next and
+    requires its own detailed plan and separate approval before any
+    source edit.
+  - [/] Taskwarrior #45 (`e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`): WP65,
+        named constant definitions. Depends on task 44 (WP64). Plan:
+        `brain/plans/2026-08-13-casm-phase12-wp65-named-constants.md`.
+        Sub-agent research (source-grounded, file:line citations)
+        against `parser.s`, `casm.s`, `symbols.s`, `common.inc`, `map.s`
+        established the implementation surface before drafting. Two
+        scoping questions asked and confirmed: constant syntax
+        (`identifier = expr`, ca65-style, not a dot-directive) and
+        forward-reference scope (full forward-reference support with
+        lazy resolution and genuine cycle detection, not restricted to
+        define-before-use -- materially larger than WP64's contract text
+        alone specified). Design discovery: WP64's own representability
+        rule already requires a constant to be definable as `= label`
+        (relocatable), which in turn requires constants to resolve
+        against labels, not just other constants -- solved by deferring
+        constant value resolution to the existing Pass1->Pass2 seam
+        (every label's address is already final by then) rather than
+        resolving inline during Pass 1, using a compact VMM
+        source-position bookmark instead of copying referenced names to
+        avoid a full source re-scan. **Plan approved by user 2026-08-13,
+        no changes.** Task 45 started. Implementation of the plan's 10
+        Atomic Increments (symbol-record/flags extension, lexer `=`
+        token, parser grammar, `crpConstant` driver, resolution sweep +
+        cycle detection, `map.s` flags update, `expr.s` relocatable
+        classification, envelope bump `$5500`->`$6000`, new
+        `casm_const` test harness) has not yet started.
+
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature
   - Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`

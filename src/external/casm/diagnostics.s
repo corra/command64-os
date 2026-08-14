@@ -135,6 +135,8 @@ diagPrintFatal:
     bcc dpfListingRange
     cmp #CASM_DIAG_SYMBOL_MAP_INVALID
     beq dpfSymbolMapInvalid
+    cmp #CASM_DIAG_EXPR_CIRCULAR
+    beq dpfExprCircular
     jmp dpfUnknown
 dpfListingRange:
     sec
@@ -168,6 +170,17 @@ dpfMainRange:
 dpfSymbolMapInvalid:
     ldx #<msgSymbolMapInvalid
     ldy #>msgSymbolMapInvalid
+    jmp diagPrintString
+; WP65: locationless like dpfSymbolMapInvalid -- raised by the Pass1->Pass2
+; resolution sweep (casm.s), which runs after the live lexer/parser state
+; that diagSetLocFromToken depends on has already moved past the constant's
+; own definition statement; the record's VMM bookmark is a raw byte offset,
+; not a line/column, so there is no cheap way to recover a source position
+; here without a dedicated offset-to-line reverse lookup this project does
+; not have.
+dpfExprCircular:
+    ldx #<msgExprCircular
+    ldy #>msgExprCircular
     jmp diagPrintString
 dpfUnknown:
     ldx #<msgUnknown
@@ -1417,6 +1430,11 @@ msgListingReplayMismatch:
     .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
 msgSymbolMapInvalid:
     .byte "CASM: SYMBOL MAP INVALID", PetCr, 0
+; WP65: locationless, same as msgSymbolMapInvalid above -- the resolution
+; sweep runs after the live lexer/parser have moved on, with no line/column
+; to attach (see dpfExprCircular's own comment).
+msgExprCircular:
+    .byte "CASM: CIRCULAR CONSTANT DEFINITION", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.
@@ -1441,11 +1459,13 @@ tokNamesLo:
     .byte <tokNameDir, <tokNameReg, <tokNameNum, <tokNameComma
     .byte <tokNameColon, <tokNameHash, <tokNameLparen, <tokNameRparen
     .byte <tokNamePlus, <tokNameMinus, <tokNameLess, <tokNameGreater
+    .byte <tokNameEquals
 tokNamesHi:
     .byte >tokNameEof, >tokNameNewline, >tokNameId, >tokNameMnem
     .byte >tokNameDir, >tokNameReg, >tokNameNum, >tokNameComma
     .byte >tokNameColon, >tokNameHash, >tokNameLparen, >tokNameRparen
     .byte >tokNamePlus, >tokNameMinus, >tokNameLess, >tokNameGreater
+    .byte >tokNameEquals
 
 dirSubtypeNamesLo:
     .byte <dirNameUnknown, <dirNameOrg, <dirNameByte, <dirNameWord
@@ -1480,6 +1500,7 @@ tokNamePlus:      .byte "PLUS", 0
 tokNameMinus:     .byte "MINUS", 0
 tokNameLess:      .byte "LESS", 0
 tokNameGreater:   .byte "GREATER", 0
+tokNameEquals:    .byte "EQUALS", 0
 msgUnknownTok:    .byte "UNKNOWN", 0
 
 dirNameUnknown:   .byte " (UNKNOWN)", 0

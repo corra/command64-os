@@ -2298,12 +2298,126 @@ runs, not one clean pass.
   verification (all 28 harnesses + 3 `comp` cross-checks live-reverified
   PASS) in
   `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
-  As of this writing WP63/Phase 11 are **not yet closed** — awaiting the
-  user's own runtime walkthrough and explicit approval.
+  **WP63 and Phase 11 (WP56-63) closed 2026-08-13, user-approved.**
 - Governing: `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
   (parent, with each WP56-63's own dedicated plan and review/walkthrough
   linked from it, and `brain/task.md`'s WP56-63 entries for the full
   per-increment record).
+
+### CASM Phase 12 WP64 Contract Freeze — Expression Evaluator Architecture and Relocation Algebra (frozen 2026-08-13)
+
+Phase 12 ("Constants and Expanded Expressions", target CASM `0.3`) is
+CASM's first *feature* phase since Phase 10 — Phase 11 was hardening-only.
+WP64 is a design-only contract-freeze work package, mirroring Phase 6A's
+own precedent: no production code change, but every later Phase 12 WP
+(WP65-70) implements against the contract recorded here. Governing plan:
+`brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`;
+WP64's own plan:
+`brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md`. Both
+approved 2026-08-13.
+
+**Current-state findings this contract is built on** (traced directly
+against source, not assumed):
+
+- `expr.s`'s `exprEvaluate` (expr.s:68-230) is a single flat `.proc`
+  implementing exactly `['<'|'>'] primary [('+'|'-') NUMBER]` — no
+  operator stack, no precedence, no parentheses. `CASM_EXPR_FLAG_
+  RELOCATABLE` is set (expr.s:143-154) whenever the primary is an
+  identifier *and* the whole assembly is running in relocatable mode —
+  never for a bare number, and stripped again by a `<` (low-byte)
+  extraction (expr.s:214-220).
+- `reloc.s`'s relocation table is **purely a location marker**:
+  `relocRecord` (reloc.s:83-143) records only a code offset. The actual
+  value (symbol + addend) is baked into the emitted bytes *before* that
+  entry is recorded (`emit.s:549-594`). There is no formula stored
+  anywhere. Consequence: a relocatable value can only ever be one symbol
+  plus a compile-time addend — already supported today, for free. Two
+  symbols together, or a relocatable symbol scaled/shifted by a new
+  operator, are not representable as a single relocation entry and are
+  not semantically valid under a linear +delta patch regardless.
+- `symbols.s`'s symbol record (`common.inc:1006-1023`) has only one flag
+  bit defined (`CASM_SYMBOL_FLAG_DEFINED`); bits 1-7 are free. Every
+  symbol today is a label (only `casm.s:416`'s `crpLabel` calls
+  `symbolsInsert`) — there is no existing "constant" kind.
+- A leading `(` at the start of an operand is unconditionally consumed by
+  `posOperandDispatch`/`posIndirect` (`parser.s:276-287, 374-415`) for
+  6502 indirect addressing, before the expression evaluator ever runs —
+  hand-verified directly, no fallback path exists for treating a leading
+  `(` as a generic sub-expression opener.
+- `parserParseExpressionValue` (`parser.s:492-587`) is the single shared
+  choke point all three operand-parsing modes (immediate, absolute,
+  indirect — `parser.s:309, 318, 389`) call into `exprEvaluate` through —
+  the exact integration boundary the new evaluator replaces. It also
+  derives `CASM_PARSER_STMT_FORCE_ABS` independently from `CASM_EXPR_
+  FLAG_SYMBOL_DERIVED` (any resolver success, resolved or not),
+  separately from `RELOCATABLE` — confirmed this doesn't interact with
+  the new static-only-operator rule, since a rejected relocatable operand
+  never reaches a successful result in the first place.
+- Envelope headroom measured directly via `ld65 -m` re-link (not
+  assumed): CODE+RODATA+BSS = 21,646 of 21,760 (`$5500`) bytes used —
+  **114 bytes free**.
+
+**Contract, frozen** (user-confirmed scoping decisions, 2026-08-13):
+
+1. **Relocation representability rule**: a value is relocatable only if
+   it is a single symbol reference (label, relocatable named constant, or
+   the current-address symbol) optionally combined with exactly one
+   static `+`/`-` addend. Any new operator (`*`, `/`, `<<`, `>>`, `&`,
+   `|`, `^`, unary `-`/`~`) applied to a relocatable operand is rejected
+   with `CASM_DIAG_EXPR_RELOC_UNSUPPORTED` — never silently computed.
+   This is the actual representability ceiling, not a conservative
+   choice.
+2. **Parenthesization rule**: `(expr)` is valid only as a sub-expression
+   following a binary operator, never as an operand's entire content —
+   preserves indirect-addressing's existing exclusive claim on a leading
+   `(` with zero lookahead disambiguation needed.
+3. **Evaluator architecture**: precedence-climbing (not full recursive-
+   descent), replacing `exprEvaluate`'s core while reusing its existing
+   `exprParseNumeric` leaf-token helpers (expr.s:296-491) unchanged.
+   Tentative precedence tiers, tightest to loosest: unary `-`/`~` →
+   `*`/`/` → `<<`/`>>` → `&` → `^` → `|` → `+`/`-` (C-family/ca65
+   convention). Final tier ordering is WP67's own implementation
+   deliverable, not fixed here.
+4. **Named constants**: new `CASM_SYMBOL_FLAG_CONSTANT = %00000010`,
+   sharing the existing 512-entry table/128-bucket hash — no new table,
+   no capacity change. Requires updating `map.s:130-131`'s exact-flags
+   corruption check to accept the new bit. Redefinition (constant↔label
+   or same-kind) reuses the existing `CASM_DIAG_DUPLICATE_SYMBOL`; a new
+   `CASM_DIAG_EXPR_CIRCULAR` covers self-referential definitions
+   specifically. Exact directive syntax is WP65's own deliverable.
+5. **Current-address symbol**: tentatively `*`, disambiguated from
+   multiplication purely by parser position (leaf/primary position is
+   always current-address; binary-operator position is always
+   multiplication) — no new lexer-level distinction needed. Relocatable
+   by construction, via the same classification path as a label.
+6. **New diagnostics** (next free slot after `CASM_DIAG_PHASE10_WP52_LAST
+   = $42`):
+
+   | Code | Name | Meaning |
+   | --- | --- | --- |
+   | `$43` | `CASM_DIAG_EXPR_CIRCULAR` | Named constant's definition is directly or transitively self-referential |
+   | `$44` | `CASM_DIAG_EXPR_DIV_ZERO` | Division by a static zero |
+   | `$45` | `CASM_DIAG_EXPR_RELOC_UNSUPPORTED` | A relocatable operand reached a static-only operator |
+
+   `CASM_DIAG_PHASE12_WP64_LAST = $45`. Later WP65-70 increments may add
+   further diagnostics sequentially from `$46`, following the same
+   `.assert`-contiguity style as every prior phase
+   (`common.inc:721-769`) — not reserved speculatively here.
+7. **Envelope budget**: rough estimate +1,550–2,600 bytes total across
+   all of Phase 12 against only 114 free bytes today. Recommends
+   requesting a `$5500` → `$6000` `PRG_SIZE_HEX` bump (a round-page step,
+   matching this project's existing bump convention) as part of WP65's
+   own plan, once WP65 gives a firmer number for its own slice.
+8. **Lowercase-PETSCII convention** applies to every new token spelling
+   and design-doc/implementation example this phase introduces (see
+   memory `reference-c64-lowercase-petscii-convention` — real C64
+   platforms are single-case, Command64's mixed-case charset is an
+   anomaly).
+
+No production source changed by WP64. WP65 (named constants) is next,
+each subsequent WP still requiring its own detailed plan and separate
+approval before any source edit, per
+`.agents/workflows/phased-implementation-planning.md`.
 
 ## C64 Platform Constraints Discovered
 

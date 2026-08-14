@@ -101,6 +101,7 @@
 .import CasmPassMode
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
 .import symbolsLookup
 
 .export CasmSourceNames  ; this harness's own copy -- NOT linking cli.s, see header
@@ -257,10 +258,13 @@ rmpParseOk:
     jmp rmpLoop               ; NEWLINE: nothing to do
 
 rmpLabel:
-    ; symbolsInsert wants: CasmPtr0Lo/Hi = namePtr, A = nameLen, X/Y = value.
-    ; Stage the pointer first, then reload A/X/Y with the actual arguments
-    ; (A is loaded before X/Y so the subsequent stx/sty/ldx/ldy sequence
-    ; never clobbers it before the call).
+    ; symbolsInsert wants: CasmPtr0Lo/Hi = namePtr, A = nameLen, X/Y = value,
+    ; CasmSymbolInsertFlags = record flags (WP65 -- no longer hardcoded
+    ; inside symbolsInsert). Stage the pointer first, then reload A/X/Y with
+    ; the actual arguments (A is loaded before X/Y so the subsequent
+    ; stx/sty/ldx/ldy sequence never clobbers it before the call).
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
@@ -628,6 +632,8 @@ p1dpLabel:
     beq p1dpSecondLabel
 
     ; First label: expect a clean insert.
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
@@ -642,6 +648,8 @@ p1dpLabel:
 
 p1dpSecondLabel:
     ; Second label: expect CASM_DIAG_DUPLICATE_SYMBOL specifically.
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName

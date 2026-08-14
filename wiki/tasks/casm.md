@@ -1795,6 +1795,49 @@ behavior changed beyond the version/build artifact itself.
       walkthrough:
       `brain/walkthroughs/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
 
+## Phase 12 - Constants and Expanded Expressions (CASM 0.3)
+
+- [/] Governing plan **approved 2026-08-13** (Taskwarrior task 43,
+      `c547c74f-5080-4f2e-b086-e4e2273b5336`, started):
+      `brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`.
+      Approves WP64-71 (contract freeze; named constants; current-address
+      symbol; parens/precedence; arithmetic/bitwise operators; character
+      literals; relocation-algebra closure; verification/walkthrough/
+      completion gate) as drafted, no changes. Also folds in a lowercase-
+      PETSCII symbol convention note (real C64 platforms are single-case;
+      Command64's mixed-case charset is an anomaly) — see
+      `docs/casm-utility.md`/`wiki/casm-programmers-reference.md` and
+      memory `reference-c64-lowercase-petscii-convention`. Taskwarrior
+      task 44 (`c307441c-74ab-47a8-bb4c-e997d38bcf99`) created for WP64.
+- [x] WP64 **complete, user-approved 2026-08-13**:
+      `brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md`.
+      Design-only (no production source change): precedence-climbing
+      evaluator architecture, a formal relocation representability rule
+      (new operators are static-operand-only; a relocatable operand
+      reaching one is `CASM_DIAG_EXPR_RELOC_UNSUPPORTED`, since the
+      relocation table can only ever represent one symbol plus a static
+      addend), a paren-vs-indirect-addressing rule (`(expr)` only after
+      a binary operator, never as a whole operand), the named-constant
+      symbol-table ABI (`CASM_SYMBOL_FLAG_CONSTANT`), the current-address
+      symbol's design, diagnostic numbers `$43`-`$45`, and a rough
+      envelope-size budget (114 bytes of headroom remain; recommends a
+      `$5500`→`$6000` bump). Hand-verified against real
+      `parser.s`/`common.inc` source and recorded as a new Phase 12
+      section in `brain/KNOWLEDGE.md`. Walkthrough:
+      `brain/walkthroughs/2026-08-13-casm-phase12-wp64-contract-freeze.md`.
+      Taskwarrior task 44 done. WP65 (named constants) is next and needs
+      its own detailed plan and separate approval before any source edit.
+- [/] WP65 plan **approved 2026-08-13** (Taskwarrior task 45,
+      `e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`, started):
+      `brain/plans/2026-08-13-casm-phase12-wp65-named-constants.md`.
+      `identifier = expr` named constants with full forward-reference
+      support (including genuine transitive-cycle detection via
+      `CASM_DIAG_EXPR_CIRCULAR`), resolved by deferring constant value
+      resolution to the existing Pass1→Pass2 seam so constants can
+      reference labels (not just other constants) per WP64's own
+      representability rule. 10 Atomic Increments planned; see
+      `brain/task.md` for full detail. Implementation not yet started.
+
 ## Optional Feature - Progress and Processing Indication
 
 - [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,

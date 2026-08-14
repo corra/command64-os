@@ -20,6 +20,10 @@
 ; Lexer/lookahead/token subrecord (storage-only state.s).
 .import CasmLexerState
 .import CasmLookaheadValid
+.import CasmLookaheadOffsetLo
+.import CasmLookaheadOffsetHi
+.import CasmSourceResultOffsetLo
+.import CasmSourceResultOffsetHi
 .import CasmLookaheadResult
 .import CasmLookaheadByte
 .import CasmLookaheadFileId
@@ -53,6 +57,19 @@
 .export lexerNext
 .export lexerGetToken
 .export lexerScanIncludeOperand
+.export CasmTokenStartOffsetLo
+.export CasmTokenStartOffsetHi
+
+.segment "BSS"
+
+; WP65: the current token's own absolute source position (see
+; CasmSourceResultOffsetLo/Hi's field comment, state.s), stamped by
+; lexerTokenReset from the lookahead exactly like FileId/Line/Column
+; already are into CasmTokenRecord -- kept as a separate module-owned pair
+; instead of growing the frozen 39-byte CASM_TOKEN_REC_SIZE record, same
+; precedent as parser.s's own CasmLabelName/CasmLabelNameLen.
+CasmTokenStartOffsetLo: .res 1
+CasmTokenStartOffsetHi: .res 1
 
 .segment "CODE"
 
@@ -472,6 +489,10 @@ lexerFill:
     sta CasmLookaheadLineHi
     lda CasmSourceResultColumn
     sta CasmLookaheadColumn
+    lda CasmSourceResultOffsetLo
+    sta CasmLookaheadOffsetLo
+    lda CasmSourceResultOffsetHi
+    sta CasmLookaheadOffsetHi
     lda CasmSourceResultByte
     sta CasmLookaheadByte
     lda #1
@@ -509,6 +530,10 @@ lexerTokenReset:
     sta CasmTokenRecord + CASM_TOKEN_REC_LINE_HI
     lda CasmLookaheadColumn
     sta CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    lda CasmLookaheadOffsetLo
+    sta CasmTokenStartOffsetLo
+    lda CasmLookaheadOffsetHi
+    sta CasmTokenStartOffsetHi
     lda #0
     sta CasmTokenRecord + CASM_TOKEN_REC_LENGTH
     rts
@@ -1081,11 +1106,13 @@ lexerPunctBytes:
     .byte CASM_PETSCII_COMMA, CASM_PETSCII_COLON, CASM_PETSCII_HASH
     .byte CASM_PETSCII_LPAREN, CASM_PETSCII_RPAREN, CASM_PETSCII_PLUS
     .byte CASM_PETSCII_MINUS, CASM_PETSCII_LESS, CASM_PETSCII_GREATER
+    .byte CASM_PETSCII_EQUALS
     .byte $FF
 lexerPunctTypes:
     .byte CASM_TOKEN_COMMA, CASM_TOKEN_COLON, CASM_TOKEN_HASH
     .byte CASM_TOKEN_LPAREN, CASM_TOKEN_RPAREN, CASM_TOKEN_PLUS
     .byte CASM_TOKEN_MINUS, CASM_TOKEN_LESS, CASM_TOKEN_GREATER
+    .byte CASM_TOKEN_EQUALS
 
 dirOrgStr:      .byte ".ORG", 0
 dirByteStr:     .byte ".BYTE", 0

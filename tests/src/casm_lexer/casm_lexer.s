@@ -55,6 +55,14 @@
 .export CasmSourceResultLineLo
 .export CasmSourceResultLineHi
 .export CasmSourceResultColumn
+; WP65: absolute-token-offset provenance, mirrored here since this harness
+; supplies its own source-layer stand-in rather than linking source.s.
+; Unused by this harness's own coverage (no `=` statements), but lexer.s
+; now unconditionally references them (lexerFill/lexerTokenReset).
+.export CasmSourceResultOffsetLo
+.export CasmSourceResultOffsetHi
+.export CasmLookaheadOffsetLo
+.export CasmLookaheadOffsetHi
 .export sourceNextByte
 .export diagSetLocFromLookahead
 .export diagSetLocFromLookaheadPos
@@ -82,6 +90,10 @@ CasmSourceResultFileId:  .res 1
 CasmSourceResultLineLo:  .res 1
 CasmSourceResultLineHi:  .res 1
 CasmSourceResultColumn:  .res 1
+CasmSourceResultOffsetLo: .res 1
+CasmSourceResultOffsetHi: .res 1
+CasmLookaheadOffsetLo:    .res 1
+CasmLookaheadOffsetHi:    .res 1
 BytesRemaining:       .res 1
 FailCount:            .res 1
 

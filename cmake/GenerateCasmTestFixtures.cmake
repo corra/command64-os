@@ -1418,3 +1418,70 @@ file(WRITE "${OUTPUT_DIR}/casmopall.seq"
     "    TXA\n"
     "    TXS\n"
     "    TYA\n")
+
+# CASM Phase 12 WP65 Increment 10: named-constant end-to-end fixtures.
+# Uppercase identifiers, matching every existing fixture's own convention in
+# this file -- the lowercase-PETSCII convention (WP64's contract item 8,
+# memory reference-c64-lowercase-petscii-convention) governs new shipped
+# documentation/examples; a raw .seq fixture's lowercase bytes would need
+# explicit PETSCII-shifted-range construction (CASM_PETSCII_SHIFTED_A =
+# $C1, not ASCII 'a' = $61 -- see memory reference-casm-petscii-identifier-
+# case), a real correctness risk unrelated to WP65's own feature under
+# test, so this harness stays uppercase like its neighbors.
+#
+# casmconst1: a real end-to-end smoke test covering every WP65 resolution
+# path in one assembly -- ENTRY = START forward-references a label not yet
+# defined (deferred until the Pass1->Pass2 resolution sweep, since START's
+# address isn't final until Pass 1 completes); SCREENW is an immediately-
+# resolved numeric constant; BORDER = SCREENW + 10 is a constant
+# referencing another constant, with an addend, itself immediately
+# resolvable since SCREENW is already defined at that point. Expected
+# emitted bytes (START lands at $C000, the first byte after .ORG, since no
+# constant definition emits anything or advances CasmPc): A9 28 (LDA
+# #$28) 8D 20 D0 (STA $D020) A9 32 (LDA #$32) 8D 21 D0 (STA $D021) 4C 00
+# C0 (JMP $C000) -- 13 bytes.
+file(WRITE "${OUTPUT_DIR}/casmconst1.seq"
+    ".ORG \$C000\n"
+    "ENTRY = START\n"
+    "SCREENW = 40\n"
+    "BORDER = SCREENW + 10\n"
+    "START:\n"
+    "LDA #SCREENW\n"
+    "STA \$D020\n"
+    "LDA #BORDER\n"
+    "STA \$D021\n"
+    "JMP ENTRY\n"
+)
+
+# casmconst2: genuine transitive circular constant definition (A -> B -> A),
+# not just a direct self-reference -- proves crcResolveChain's cycle-
+# detection bitmap catches a real multi-hop cycle, not only the trivial
+# `X = X` case. Expects CASM_DIAG_EXPR_CIRCULAR ($43) and no output PRG.
+file(WRITE "${OUTPUT_DIR}/casmconst2.seq"
+    ".ORG \$C000\n"
+    "A = B\n"
+    "B = A\n"
+    "NOP\n"
+)
+
+# casmconst3: direct self-reference (`X = X`), the degenerate single-node
+# cycle -- distinct code path from casmconst2's two-node walk (the very
+# first bitmap check on X's own record already catches it, before any
+# symbolsLookup call even runs). Expects CASM_DIAG_EXPR_CIRCULAR ($43).
+file(WRITE "${OUTPUT_DIR}/casmconst3.seq"
+    ".ORG \$C000\n"
+    "X = X\n"
+    "NOP\n"
+)
+
+# casmconst4: a constant redefining an already-defined label's name.
+# Expects CASM_DIAG_DUPLICATE_SYMBOL ($2C) -- symbolsFindChain's exact-name
+# match is kind-agnostic (WP65 Increment 2 confirmed this, not assumed),
+# so this needs no new code path of its own, only proof the existing one
+# still fires correctly across the label/constant boundary.
+file(WRITE "${OUTPUT_DIR}/casmconst4.seq"
+    ".ORG \$C000\n"
+    "START:\n"
+    "NOP\n"
+    "START = 5\n"
+)

@@ -317,7 +317,13 @@ if(Ca65_FOUND)
     # routines) overflowed $5000 by 1052 measured bytes; $5400 (+1024)
     # would still overflow, so $5500 (+1280) is the smallest round-page
     # step that fits.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "5500")
+    # WP65 (Increment 3): $5500 -> $6000, per WP64's own recommendation
+    # (brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md) --
+    # $5500 overflowed by 8 measured bytes once the new CASM_TOKEN_EQUALS
+    # lexer/diagnostics plumbing and symbols.s's WP65 ABI extension were
+    # both in place; $6000 (+2816) is the WP64-approved envelope for the
+    # whole of Phase 12, not resized incrementally per WP.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6000")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -826,7 +832,16 @@ if(Ca65_FOUND)
             # harness) overflowed $4C00 by 1072 measured bytes; $5000
             # (+1024) would still overflow, so $5100 (+1280) is the
             # smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5100")
+            # WP65 Increment 4: $5100 -> $5200 -- source.s/lexer.s/state.s's
+            # new WP65 absolute-token-offset provenance fields (unused by
+            # this harness's own label-only two-pass drive) overflowed
+            # $5100 by 43 measured bytes; $5200 (+256) is the smallest
+            # round-page step that fits.
+            # WP65 Increment 4 (parser grammar): $5200 -> $5300 --
+            # parser.s's new ppsConstant routine and CasmConstant* staging
+            # fields (unused by this harness, which never defines a named
+            # constant) overflowed $5200 by 66 measured bytes.
+            set(TEST_PRG_SIZE "5300")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -875,7 +890,18 @@ if(Ca65_FOUND)
             # listingWriteFile formatters/serializer (unused by this
             # harness) overflowed $4900 by 901 measured bytes; $4D00
             # (+1024) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "4D00")
+            # WP65: same whole-object surface as casm_pass1 -- source.s/
+            # lexer.s/state.s's absolute-token-offset provenance fields,
+            # symbols.s's ABI extension, parser.s's ppsConstant, and
+            # expr.s's constant-aware relocatable classification (all
+            # unused by this harness's own width/agreement-only coverage)
+            # overflowed $4D00 by 508 measured bytes; $4E00 (+256) would
+            # still overflow, so $4F00 (+512) is the smallest round-page
+            # step that fits.
+            # WP65 (addend-consumption fix): $4F00 -> $5000 -- ppsConstant's
+            # corrected addend handling overflowed $4F00 by 42 measured
+            # bytes.
+            set(TEST_PRG_SIZE "5000")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -987,7 +1013,14 @@ if(Ca65_FOUND)
             # (+1024) is the smallest round-page step that fits.
             # WP59 increment 4: retryable listing close/registration cleanup
             # overflowed $5000 by 18 measured bytes.
-            set(TEST_PRG_SIZE "5100")
+            # WP65: symbols.s's ABI extension, source.s/lexer.s/state.s's
+            # absolute-token-offset provenance fields, and expr.s's
+            # constant-aware relocatable classification (all unused by this
+            # harness's own label-only frame-traversal coverage) overflowed
+            # $5100 by 358 measured bytes; $5200 (+256) would still
+            # overflow, so $5300 (+512) is the smallest round-page step
+            # that fits.
+            set(TEST_PRG_SIZE "5300")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1046,7 +1079,19 @@ if(Ca65_FOUND)
             # listingWriteFile formatters/serializer (unused by this
             # harness) overflowed $5100 by 923 measured bytes; $5500
             # (+1024) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5500")
+            # WP65 Increment 2: $5500 -> $5600 -- symbols.s's new
+            # CasmSymbolInsertFlags/CasmSymbolInsertRef* scratch bytes
+            # (unused by this harness's own label-only real-path capture)
+            # overflowed $5500 by 53 measured bytes; $5600 (+256) is the
+            # smallest round-page step that fits.
+            # WP65 (Increments 4-8): $5600 -> $5800 -- source.s/lexer.s/
+            # state.s's absolute-token-offset provenance fields,
+            # parser.s's ppsConstant, and expr.s's constant-aware
+            # relocatable classification (all unused by this harness's own
+            # label-only coverage) overflowed $5600 by 282 measured bytes;
+            # $5700 (+256) would still overflow, so $5800 (+512) is the
+            # smallest round-page step that fits.
+            set(TEST_PRG_SIZE "5800")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1578,12 +1623,22 @@ add_dependencies(command64_casm_utils_d64 dash_ref)
 # free block before WP52. Moved to casm_listing_test_d64 (523 blocks free)
 # instead: a 4-block, fixture-free PRG relocates with zero coupling risk,
 # smaller blast radius than trimming any of this disk's real CASM fixtures.
+#
+# WP65: same problem, same fix. parser.s/lexer.s/state.s's growth (the new
+# named-constant grammar, symbol-table ABI extension, and absolute-token-
+# offset provenance fields, all linked whole into every harness here
+# regardless of whether it exercises the constant path) overflowed this
+# disk to 0 free blocks. test_casm_faultvmm (7 blocks) is this disk's
+# smallest PRG and, like test_l15release before it, carries no dedicated
+# fixture-append step of its own (no add_custom_command targets it
+# specifically) -- moved to casm_listing_test_d64 for the same
+# zero-coupling reason.
 add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
-         test_casm_faultvmm test_casm_faultsource test_casm_fsym test_casm_freloc
+         test_casm_faultsource test_casm_fsym test_casm_freloc
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1634,6 +1689,30 @@ add_custom_command(
     VERBATIM
 )
 
+# WP65 Increment 10: named-constant end-to-end fixtures. This disk already
+# carries casm.prg + comp.prg + command64 and has ample free space (unlike
+# test.d64/casm_overflow_test.d64, both packed to their own ceilings by
+# this point) -- real end-to-end verification (`casm casmconstN`, live
+# under VICE) needs the real production binary present, not a synthetic
+# unit-test harness reimplementing casm.s's own driver.
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmconst1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst1.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmconst2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst2.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmconst3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst3.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmconst4.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst4.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP65 Increment 10 casmconst1-4.s named-constant fixtures to casm_include_test.d64"
+    VERBATIM
+)
+
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source
@@ -1666,7 +1745,7 @@ add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds test_casm_lexer
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds test_casm_lexer test_casm_faultvmm
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

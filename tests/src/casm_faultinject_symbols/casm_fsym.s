@@ -55,6 +55,7 @@
 .import resourcesCleanup
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
 .import symbolsLookup
 .import symbolsReadByIndex
 .import CasmVmmCount
@@ -185,6 +186,8 @@ insertFindFailureLeavesCountUnchanged:
     sta CasmPtr0Lo
     lda #>nameFirst
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #5
     ldx #$11
     ldy #$00
@@ -200,6 +203,8 @@ insertFindFailureLeavesCountUnchanged:
     sta CasmPtr0Lo
     lda #>nameFirst
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #5
     ldx #$22
     ldy #$00
@@ -213,6 +218,8 @@ insertFindFailureLeavesCountUnchanged:
     sta CasmPtr0Lo
     lda #>nameFirst
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #5
     ldx #$33
     ldy #$00
@@ -246,6 +253,8 @@ insertWriteFailureLeavesCountUnchanged:
     sta CasmPtr0Lo
     lda #>nameSecond
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #6
     ldx #$44
     ldy #$00
@@ -259,6 +268,8 @@ insertWriteFailureLeavesCountUnchanged:
     sta CasmPtr0Lo
     lda #>nameSecond
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #6
     ldx #$55
     ldy #$00

@@ -142,16 +142,43 @@ resolverValid:
     sty CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_HI
     lda CasmExprResolverOutput + CASM_RESOLVE_FLAGS
     ora #CASM_EXPR_FLAG_SYMBOL_DERIVED
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+
     ; WP39: apply the caller's whole-assembly relocatable-mode input
     ; unconditionally alongside SYMBOL_DERIVED, not gated on RESOLVED below
     ; -- an unresolved Pass 1 forward reference and its resolved Pass 2
     ; counterpart must classify identically, mirroring FORCE_ABS's own
     ; SYMBOL_DERIVED-not-RESOLVED precedent (parser.s).
+    ;
+    ; WP65: unlike a label (CASM_RESOLVE_SYM_FLAGS' CONSTANT bit clear),
+    ; unconditionally eligible exactly as before, a *resolved* named
+    ; constant is relocatable only when its own reference chain bottoms
+    ; out at a label (CASM_SYMBOL_FLAG_LABEL_DERIVED) -- a pure numeric
+    ; constant's value never depends on load address regardless of mode.
+    ; An *unresolved* constant is only reachable during Pass 1, before
+    ; casmResolveConstants (casm.s) has run -- Pass 2 never sees one, since
+    ; every constant is fully resolved before Pass 2 begins -- and takes
+    ; the unconditional label-shaped path below unchanged: harmless, since
+    ; Pass 1 never acts on RELOCATABLE (only on FORCE_ABS, already
+    ; unconditional above).
+    lda CasmExprResolverOutput + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_CONSTANT
+    beq evApplyMode
+    lda CasmExprResolverOutput + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_RESOLVED
+    beq evApplyMode
+    lda CasmExprResolverOutput + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_LABEL_DERIVED
+    bne evApplyMode
+    jmp evNotRelocatable             ; resolved, non-label-derived constant
+evApplyMode:
     ldy CasmExprRelocatableModeIn
     beq evNotRelocatable
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
     ora #CASM_EXPR_FLAG_RELOCATABLE
-evNotRelocatable:
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
+evNotRelocatable:
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
     and #CASM_EXPR_FLAG_RESOLVED
     beq unresolved
     lda CasmExprResolverOutput + CASM_RESOLVE_VAL_LO
@@ -165,7 +192,9 @@ unresolved:
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
 consumeIdentifier:
     jsr lexerNext
-    bcs return
+    bcc consumeIdentifierOk
+    jmp return
+consumeIdentifierOk:
 
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_PLUS

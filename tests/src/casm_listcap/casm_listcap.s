@@ -110,6 +110,7 @@
 .import opcodesFindOpcode
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
 .import includeCatalogInit
 .import includeCatalogLoad
 .import includeCatalogLookup
@@ -366,7 +367,9 @@ rcaNoFinalize:
 ; ---------------------------------------------------------------------------
 lcRunPass:
     jsr lcListingBegin
-    bcs lcrpFail
+    bcc lcrpBeginOk
+    jmp lcrpFail
+lcrpBeginOk:
     jsr parserParseStatement
     bcs lcrpFail
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE
@@ -388,6 +391,8 @@ lcrpLabel:
     lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
     bne lcrpLabelCommit
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName

@@ -112,7 +112,19 @@ code, so it doesn't matter whether `LOOP` appears above or below where it's
 used. Identifiers are up to 31 characters, **case-sensitive** (in PETSCII
 terms, unshifted and shifted spellings of the same letter are different
 symbols), and stored in a 512-entry symbol table shared across the whole
-assembly. Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
+assembly.
+
+> **Convention:** most C64 platforms run in a single-case PETSCII mode and
+> have no lowercase letters at all, so real-world C64 symbols are
+> conventionally single-case, never a mix of shifted and unshifted
+> spellings within one name. Command64's mixed-case charset (and CASM's
+> resulting true case-sensitivity, distinct from ASCII-style case-folding)
+> is an anomaly relative to that convention. Prefer **lowercase PETSCII
+> identifiers** to match how real C64 software is written — CASM
+> supporting case-sensitivity doesn't make mixed-case identifiers
+> idiomatic.
+
+Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
 that's never defined is `CASM: UNDEFINED SYMBOL`; exceeding 512 distinct
 labels is `CASM: SYMBOL TABLE FULL`.
 

@@ -202,9 +202,36 @@ CasmDiagStateEnd:
 .export CasmSourceResultLineHi
 .export CasmSourceResultColumn
 
+; WP65: the absolute offset (within the single shared VMM allocation
+; sourceLoad/sourceAppendFile write every file -- top-level and included --
+; into, permanently, never reused) of the byte just delivered. Unlike
+; CasmSourceOffsetLo/Hi (a per-span byte-delivered overflow guard, reset at
+; every file/include boundary -- see sourceResetBoundaryEcho), this value is
+; stable and globally addressable for the entire assembly run, letting a
+; deferred named-constant reference re-fetch its own defining RHS
+; identifier's bytes later via a direct vmmWindowRead against
+; CasmSourceVmmSlot, the same way symbols.s already re-fetches its own
+; records by index. Written by source.s's sourceFetchPhysical, mirroring
+; the existing FileId/LineLo/Hi/Column provenance fields exactly (same
+; write site, same per-byte semantics).
+.export CasmSourceResultOffsetLo
+.export CasmSourceResultOffsetHi
+
+; WP65: lexerFill's own copy of CasmSourceResultOffsetLo/Hi into the
+; one-result lookahead, mirroring CasmLookaheadFileId/LineLo/Hi/Column's
+; existing copy exactly -- kept out of the frozen CasmLexerState span
+; (CasmLookaheadValid's own group) for the same reason the Result fields
+; above are kept out of CasmPhase3State's.
+.export CasmLookaheadOffsetLo
+.export CasmLookaheadOffsetHi
+
 .segment "BSS"
 
 CasmSourceResultFileId: .res 1
 CasmSourceResultLineLo: .res 1
 CasmSourceResultLineHi: .res 1
 CasmSourceResultColumn: .res 1
+CasmSourceResultOffsetLo: .res 1
+CasmSourceResultOffsetHi: .res 1
+CasmLookaheadOffsetLo:    .res 1
+CasmLookaheadOffsetHi:    .res 1

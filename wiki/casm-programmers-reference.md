@@ -591,7 +591,13 @@ never in `CasmValue0Lo/Hi`, which the VMM transfer path clobbers.
 
 Symbol identifiers are **case-sensitive**: in PETSCII terms, unshifted and
 shifted spellings of the same letter are different bytes and therefore
-different symbols.
+different symbols. Convention: real C64 platforms run a single-case
+PETSCII mode, so idiomatic symbols are single-case (lowercase) by
+convention, never a mix of shifted/unshifted spellings within one name —
+Command64's mixed-case charset (and this resulting true case-sensitivity)
+is an anomaly, not a license to mix cases. See
+`docs/casm-utility.md`'s "Labels and Symbols" section for the user-facing
+version of this note.
 
 ## 13. Opcode Table & Addressing-Mode Matcher (`opcodes.s`)
 
