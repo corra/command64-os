@@ -136,6 +136,14 @@ glyph identity, color, or layout (not just character content) is what's being ve
    explicit byte values — verify every non-alphanumeric byte against a PETSCII table first;
    ASCII `$5F` is left-arrow in PETSCII, not underscore, and a hand-rolled mistake here fails
    silently and looks exactly like a missing file.
+   If the shell responds `BAD COMMAND OR FILE NAME` (a mistyped/garbled dispatch attempt,
+   not a real missing-file condition), send `flush\n` (optionally `flush <device>\n` for a
+   non-default unit) before retyping the command. `FLUSH` manually reads and clears the
+   drive's command/error channel (LFN 15) — most commands drain it themselves right after
+   their own error, but a shell-level parse-miss does not, and a stale channel status left
+   behind by one has been observed to make the *next* unrelated command fail too (e.g.
+   `DEVICE NOT PRESENT`), which looks like drive/session corruption but is really just an
+   unflushed error channel from the previous miss.
 8. Wait for application-start evidence using, in preference order, a temporary checkpoint,
    memory sentinel, stable decoded screen text, or combined PC and memory evidence.
 9. Perform assertions. Use `vice_display_screenshot` as supporting evidence, not the sole
@@ -171,6 +179,8 @@ image, detach and re-attach that unit with `vice_disk_detach` / `vice_disk_attac
 
 | Fault | Correct action |
 | --- | --- |
+| Shell replied `BAD COMMAND OR FILE NAME` | `flush\n` (clears the drive's command/error channel), then retype the command |
+| A later, unrelated command fails (e.g. `DEVICE NOT PRESENT`) right after a `BAD COMMAND OR FILE NAME` | Same fix — `flush\n` — before assuming drive/session corruption |
 | Machine/OS state is wrong | `vice_machine_reset {mode: "soft"}`, then re-boot Command64 |
 | A drive is wedged, or a `.d64` was rebuilt on the host | `vice_disk_detach` then `vice_disk_attach` on that unit |
 | Nothing else works | `vice_machine_reset {mode: "hard"}`, then autostart again |
