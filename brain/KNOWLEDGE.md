@@ -2588,6 +2588,116 @@ most self-contained PRG on that disk) relocated to `casm_include_test_d64`
 (~540 free blocks), mirroring WP52/WP65's own prior same-shaped disk-
 capacity relocations.
 
+### CASM Phase 12 WP67 Parentheses and Explicit Precedence — As-Built (complete 2026-08-14)
+
+Precedence-climbing evaluator architecture (WP64's own design, built for
+the first time here) plus parenthesized sub-expressions, implementing
+WP64's frozen contract. Plan: `brain/plans/2026-08-14-casm-phase12-wp67-
+parens-precedence.md`. Walkthrough (live VICE evidence): `brain/
+walkthroughs/2026-08-14-casm-phase12-wp67-parens-precedence.md`.
+
+**Architecture** (`expr.s`): `exprEvaluate`'s previously-flat body split
+into three cooperating procs — `exprEvaluate` (extraction prefix, then
+hands off), `parsePrimary` (`NUMBER`/`IDENTIFIER`/`*`/`(group)`), and
+`parseOperatorTail` (the `+`/`-` loop, recursing into `parsePrimary` for
+each RHS). A parenthesized group recurses into the same `parsePrimary`+
+`parseOperatorTail` pair for its own content, bounded by a new
+`CASM_EXPR_PAREN_MAX_DEPTH = 8` counter (`CasmExprParenDepth`) since each
+nesting level costs a `JSR` against the 6502's small hardware stack.
+Since `parsePrimary` reuses the same `CasmExprResultRecord` for whatever
+it's currently parsing, `parseOperatorTail` saves the running
+accumulator's `VAL_LO/HI`/`FLAGS`/`SYMBOL_ID_LO/HI` (5 bytes) on the
+hardware stack via `PHA`/`PLA` around each recursive RHS parse — net-zero
+growth per loop iteration (a long `+`/`-` chain doesn't accumulate stack,
+only genuine `(` nesting does).
+
+**A real scoping fork user-confirmed 2026-08-14, not assumed**: WP67
+lifts the pre-existing restriction that only `IDENTIFIER`/`*` primaries
+could take a trailing addend — `NUMBER` now reaches the same shared
+operator loop, so `1+1` and `2+3` (bare or inside parens) succeed instead
+of `CASM_DIAG_EXPR_UNSUPPORTED`. This changed two existing fixtures'
+(`sNumAdd`/`sNumSub`) expected outcome from a diagnostic to a computed
+value — a deliberate, disclosed change matching WP67's own stated purpose
+(generalizing `+`/`-` into a real operator tier usable by any primary),
+not a silent regression.
+
+**Relocation representability, enforced per operator application** (WP64's
+frozen rule, first implemented here even though `+`/`-` remain the only
+operators): each combine checks both operands' `RELOCATABLE` bit;
+combining two relocatable components (`label1+label2`,
+`label+(label2)`, `(label1)+(label2)`) is `CASM_DIAG_EXPR_RELOC_
+UNSUPPORTED` — the relocation table can only ever represent one symbol +
+a static addend. A static value plus one relocatable value, in either
+order and however deeply parenthesized, always succeeds. Both new
+diagnostics (`CASM_DIAG_EXPR_RELOC_UNSUPPORTED = $45`,
+`CASM_DIAG_EXPR_PAREN_TOO_DEEP = $46`, both WP64-reserved/newly-assigned)
+needed message-table entries added to `diagnostics.s`
+(`msgExprRelocUnsupported`/`msgExprParenTooDeep`, both printed *with*
+source-location context via `diagPrintSourceContext`, unlike the
+locationless `CASM_DIAG_EXPR_CIRCULAR`/`CASM_DIAG_SYMBOL_MAP_INVALID`
+special cases) — otherwise both would have silently fallen through to
+the generic "unknown diagnostic" message, discovered live before
+shipping, not assumed correct from the code alone.
+
+**`posImmediate`'s own token whitelist** (`parser.s`, gates what can
+follow `#` before `parserParseExpressionValue` ever runs) needed
+`CASM_TOKEN_LPAREN` added — without it, `lda #(1+2)` tripped
+`CASM_DIAG_SYNTAX_ERROR` at the statement-dispatch level before
+`exprEvaluate`'s own (already-correct) primary dispatch was ever reached.
+A real integration gap caught live (the first `casmparen1.s` fixture run
+produced `SYNTAX ERROR`), not found by static reading alone. `posAbsolute`
+needed no equivalent fix — it has no such pre-check, and a leading `(`
+at the very start of an operand (no `#`) is claimed exclusively by
+indirect-addressing dispatch before either `posAbsolute` or `posImmediate`
+ever run, per WP64's frozen Parenthesization Rule.
+
+**`ppsConstant`'s own RHS grammar stays untouched** (user-confirmed
+scoping decision 2026-08-14, matching WP65/66's own precedent): named
+constants continue using their separate hand-rolled parser, unaffected by
+WP67's evaluator rewrite.
+
+**A live regression that turned out not to be a regression**: after
+implementation, `test_casm_listcap` started failing 5 of 7 fixtures live
+under VICE. Bisection (rebuilding the harness against the pre-WP67
+`expr.s`/`parser.s` in isolation, then against every source/binary
+combination in between) proved the *code* was correct throughout — the
+actual cause was `casm_listing_test_d64` reaching **0 free blocks**
+after WP67's own envelope bumps to `test_casm_pass1`/`frame`/`listcap`/
+`passcheck`, leaving no runtime headroom for `test_casm_listcap`'s own
+10 output-file writes (`CASMLO01`-`10`) during live execution — a
+capacity crunch, not a source defect. Resolved by relocating
+`test_casm_bounds`/`test_casm_cliderive`/`test_casm_lexer` (26 blocks,
+genuinely self-contained — unlike `test_casm_spanread`/`spancommit`,
+which need their own companion `.seq` fixtures packaged on whichever disk
+they live on) to `casm_include_test_d64` (208 free blocks), restoring 30
+free blocks of headroom. Same precedent as WP52/WP66's own prior
+same-shaped disk-capacity relocations — this one just needed live
+bisection to distinguish from a genuine code regression first.
+
+**Live-verified fixtures** (`casmparen1.s`/`casmparen2.s`,
+`cmake/GenerateCasmTestFixtures.cmake`, packed onto `casm_include_test_d64`
+alongside WP65/66's own fixtures): `#<(SCREENW+2)` and `#(1+2)` (a named
+constant inside a group, and pure numeric operators inside a group) both
+produced `CASM: INPUT VALIDATED` with PRG bytes matching hand-computed
+expectations exactly; `LBL1+(LBL2)` (two relocatable labels, default
+relocatable output, no `.ORG`) correctly produced `CASM: EXPRESSION
+RELOCATION UNSUPPORTED AT LINE 5, COL 17` with the source-context caret
+pointing at the second label reference.
+
+**Test coverage**: 10 new cases added to `tests/src/casm_expr/casm_expr.s`
+(`CASE_COUNT` 45→55): nested parens, two-separate-groups, left-
+associativity (`1+2-3`), the depth bound's own boundary (8 accepted, 9th
+rejected), extraction combined with a group, `*` inside a group, and both
+new relocation-representability cases (accept one relocatable component,
+reject two) — all live-verified `CASM EXPR: PASS`.
+
+**Envelope**: production `casm`'s own `$6000` cap held without a bump.
+Two additional test-harness envelope bumps beyond the disk-capacity fix
+above: `test_casm_pass1`/`test_casm_frame` (`$5400`→`$5500`/`$5800`→
+`$5A00`), `test_casm_listcap` (`$5800`→`$5A00`), `test_casm_passcheck`
+(`$5000`→`$5100`) — all one round-page step, absorbing the shared
+`expr.s`/`parser.s` growth.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

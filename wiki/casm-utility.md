@@ -128,18 +128,29 @@ Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
 that's never defined is `CASM: UNDEFINED SYMBOL`; exceeding 512 distinct
 labels is `CASM: SYMBOL TABLE FULL`.
 
-An expression is one symbol, literal number, or the current-address symbol
-`*` (see below), with an optional `<` (low byte) or `>` (high byte) prefix,
-and an optional `+`/`-` numeric addend:
+An expression is one or more terms — a symbol, literal number, the
+current-address symbol `*` (see below), or a parenthesized sub-expression
+— combined with `+`/`-`, with an optional `<` (low byte) or `>` (high
+byte) prefix applying to the expression as a whole:
 
 ```asm
-LDA #<MESSAGE      ; low byte of MESSAGE's address
-LDA #>MESSAGE      ; high byte of MESSAGE's address
-LDA MESSAGE+3      ; the 4th byte of MESSAGE
+LDA #<MESSAGE        ; low byte of MESSAGE's address
+LDA #>MESSAGE        ; high byte of MESSAGE's address
+LDA MESSAGE+3        ; the 4th byte of MESSAGE
+LDA #1+2+3           ; 6 -- chained operators, left to right
+LDA #<(SCREENW+2)    ; a parenthesized sub-expression
+LDA #((1+2)+3)       ; parentheses can nest, up to 8 levels deep
 ```
 
-Parenthesized or multiplicative arithmetic (`(A+B)*2`) is not supported —
-`CASM: EXPRESSION UNSUPPORTED`.
+`+`/`-` are left-associative (`1-2-3` is `(1-2)-3`, not `1-(2-3)`) and a
+relocatable value (a label, `*`, or a relocatable named constant) may only
+appear once per expression — combining two of them (`label1+label2`, or
+`label+(label2)`) is `CASM: EXPRESSION RELOCATION UNSUPPORTED`, since the
+relocation table can only patch one such reference per location. A static
+value plus one relocatable value, in either order and however deeply
+parenthesized, is always fine. Nesting parentheses more than 8 levels deep
+is `CASM: EXPRESSION TOO DEEPLY NESTED`. Multiplicative arithmetic (`*` as
+an operator, `/`) is not yet supported — `CASM: EXPRESSION UNSUPPORTED`.
 
 ### Named Constants
 
@@ -160,11 +171,12 @@ can. A constant whose own definition is directly or transitively
 self-referential (`a = b` / `b = a`, or the degenerate `a = a`) is `CASM:
 CIRCULAR CONSTANT DEFINITION`.
 
-A constant's own defining expression follows the same grammar as any other
-expression (a single symbol, number, or `*`, with an optional
-extraction/addend) — it does not itself support parenthesized or
-multiplicative arithmetic, matching every other expression in this
-version.
+A constant's own defining expression is narrower than an ordinary operand:
+a single symbol, number, or `*`, with at most one `+`/`-` addend — it does
+not support parenthesized sub-expressions or a second chained operator,
+even though both are otherwise valid everywhere else. `screenw = (10+30)`
+is `CASM: MALFORMED EXPRESSION`; `total = 1+2+3` is `CASM: EXPRESSION
+UNSUPPORTED` at the second `+`.
 
 > Prefer **lowercase** constant names, per the identifier convention above
 > — `screenw`, not `SCREENW`.

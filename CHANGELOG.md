@@ -160,6 +160,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 12 WP67: parentheses and explicit precedence**: expressions
+  now support parenthesized sub-expressions (`lda #<(screenw+2)`) nested up
+  to 8 levels deep, and chained `+`/`-` operators applied left-to-right
+  (`lda #1+2+3`) — including for plain numeric literals, which previously
+  couldn't take a trailing operator at all. Combining two relocatable
+  values (two labels, or a label with a relocatable named constant) is
+  now caught with a dedicated diagnostic (`CASM: EXPRESSION RELOCATION
+  UNSUPPORTED`) instead of silently misassembling, since only one such
+  reference is representable per relocation entry. Live-verified against
+  the real `casm.prg` binary under VICE: parenthesized expressions
+  (including one wrapping a named constant) produce byte-exact correct
+  output, and the new relocation diagnostic prints with the correct
+  message and source-location caret. The full expression-evaluator test
+  suite (55 cases) and every other CASM regression harness pass.
 - **CASM Phase 12 WP66: current-address symbol (`*`)**: `*` is now a valid
   expression primitive, evaluating to the address the next emitted byte
   would occupy — the same value a label defined at that exact point would

@@ -58,7 +58,7 @@ CASE_COLUMN    = 7
 ; against 0 -- so it cannot affect any case that doesn't opt in).
 CASE_RELOC_MODE = 8
 CASE_SIZE      = 9
-CASE_COUNT     = 45
+CASE_COUNT     = 55
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -490,12 +490,115 @@ sUna: TN CASM_TOKEN_IDENTIFIER, 0, "UNABS"
       TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "5"
       T0 CASM_TOKEN_EOF, 0
 
+; WP67: NUMBER now reaches the same shared +/- operator loop as IDENTIFIER/
+; '*' (the pre-WP67 restriction that only they could take a trailing
+; addend is lifted, user-confirmed 2026-08-14) -- '1+1'/'1-1' succeed
+; instead of CASM_DIAG_EXPR_UNSUPPORTED. Explicit NEWLINE terminators
+; (absent pre-WP67, when NUMBER's own tail errored out immediately after
+; the '+'/'-' without ever reading further) are now load-bearing, not
+; cosmetic.
 sNumAdd: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
          T1 CASM_TOKEN_PLUS, 0, $2B
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+         T0 CASM_TOKEN_NEWLINE, 0
 sNumSub: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
          T1 CASM_TOKEN_MINUS, 0, $2D
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+         T0 CASM_TOKEN_NEWLINE, 0
+; WP67: left-associative triple chain (1+2-3 = 0, not 1+(2-3) = 2) --
+; proves the loop applies operators strictly left-to-right, not with any
+; unintended right-associativity or grouping.
+sNumChain: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+           T1 CASM_TOKEN_PLUS, 0, $2B
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+           T1 CASM_TOKEN_MINUS, 0, $2D
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+           T0 CASM_TOKEN_NEWLINE, 0
+; WP67: parenthesized sub-expression, the simplest case -- (5).
+sParenSimple: T1 CASM_TOKEN_LPAREN, 0, $28
+              TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "5"
+              T1 CASM_TOKEN_RPAREN, 0, $29
+              T0 CASM_TOKEN_NEWLINE, 0
+; WP67: '1+(2+3)' -- grouping combined with the outer chain.
+sParenAdd: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+           T1 CASM_TOKEN_PLUS, 0, $2B
+           T1 CASM_TOKEN_LPAREN, 0, $28
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+           T1 CASM_TOKEN_PLUS, 0, $2B
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+           T1 CASM_TOKEN_RPAREN, 0, $29
+           T0 CASM_TOKEN_NEWLINE, 0
+; WP67: '(1+2)+(3+4)' -- two separate groups combined by the outer chain.
+sParenTwoGroups: T1 CASM_TOKEN_LPAREN, 0, $28
+                 TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+                 T1 CASM_TOKEN_PLUS, 0, $2B
+                 TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+                 T1 CASM_TOKEN_RPAREN, 0, $29
+                 T1 CASM_TOKEN_PLUS, 0, $2B
+                 T1 CASM_TOKEN_LPAREN, 0, $28
+                 TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+                 T1 CASM_TOKEN_PLUS, 0, $2B
+                 TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "4"
+                 T1 CASM_TOKEN_RPAREN, 0, $29
+                 T0 CASM_TOKEN_NEWLINE, 0
+; WP67: unclosed paren -- CASM_DIAG_EXPR_MALFORMED.
+sParenUnclosed: T1 CASM_TOKEN_LPAREN, 0, $28
+                TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "5"
+                T0 CASM_TOKEN_NEWLINE, 0
+; WP67: extraction (a whole-expression, top-level-only concept, applied
+; once after the full primary+operator-tail chain returns) combined with
+; a parenthesized RHS -- proves applyExtraction's own unchanged logic
+; correctly sees whatever the group computed, not just a bare primary.
+sParenExtractLo: T1 CASM_TOKEN_LESS, 0, $3C
+                 T1 CASM_TOKEN_LPAREN, 0, $28
+                 TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
+                 T1 CASM_TOKEN_PLUS, 0, $2B
+                 TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+                 T1 CASM_TOKEN_RPAREN, 0, $29
+                 T0 CASM_TOKEN_EOF, 0
+; WP67: '*' (WP66's current-address symbol) as a group's own inner
+; primary -- '(*+3)' should produce exactly the same result as WP66's own
+; bare '*+3' (sStarAdd/eStarAdd), just reached through parsePrimary's
+; recursive group arm instead of directly.
+sParenStar: T1 CASM_TOKEN_LPAREN, 0, $28
+            T0 CASM_TOKEN_STAR, 0
+            T1 CASM_TOKEN_PLUS, 0, $2B
+            TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+            T1 CASM_TOKEN_RPAREN, 0, $29
+            T0 CASM_TOKEN_EOF, 0
+; WP67: ABSVAL+(RELVAL) -- one relocatable component, wrapped in a group,
+; combined with a static primary. Representable (WP64's rule): at most
+; one relocatable component total, regardless of which side it's on or
+; whether it's parenthesized.
+sParenReloc: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
+             T1 CASM_TOKEN_PLUS, 0, $2B
+             T1 CASM_TOKEN_LPAREN, 0, $28
+             TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+             T1 CASM_TOKEN_RPAREN, 0, $29
+             T0 CASM_TOKEN_EOF, 0
+; WP67: RELVAL+(RELVAL) -- two relocatable components. Not representable
+; as one symbol + static addend -- CASM_DIAG_EXPR_RELOC_UNSUPPORTED.
+sParenRelocReject: TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+                   T1 CASM_TOKEN_PLUS, 0, $2B
+                   T1 CASM_TOKEN_LPAREN, 0, $28
+                   TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+                   T1 CASM_TOKEN_RPAREN, 0, $29
+                   T0 CASM_TOKEN_EOF, 0
+; WP67: 9 levels of nesting -- one past CASM_EXPR_PAREN_MAX_DEPTH (8) --
+; CASM_DIAG_EXPR_PAREN_TOO_DEEP. Fails at the 9th '(' itself before ever
+; reading the (absent) content/closing parens, so nothing after the 9th
+; open is needed.
+sParenTooDeep:
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T1 CASM_TOKEN_LPAREN, 0, $28
+    T0 CASM_TOKEN_NEWLINE, 0
 sNoPrimary: T1 CASM_TOKEN_LESS, 0, $3C
             T0 CASM_TOKEN_NEWLINE, 0
 sRepeatExtract: T1 CASM_TOKEN_LESS, 0, $3C
@@ -504,23 +607,48 @@ sRepeatExtract: T1 CASM_TOKEN_LESS, 0, $3C
 sBadAdd: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
          T1 CASM_TOKEN_PLUS, 0, $2B
          T0 CASM_TOKEN_NEWLINE, 0
+; WP67: RHS is now a full recursive primary parse (parsePrimary), not
+; exprParseAddend's own NUMBER-only, resolver-never-touching parse -- an
+; IDENTIFIER RHS now reaches the resolver and the relocation-
+; representability check instead of failing immediately at "expected
+; NUMBER". ABSVAL+RELVAL is exactly one relocatable component (RELVAL;
+; ABSVAL is static at relocMode=0) -- representable, now succeeds.
+; Explicit EOF terminator added (WP67; previously relied on erroring out
+; before ever reading past RELVAL's own token).
 sSymAdd: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
          T1 CASM_TOKEN_PLUS, 0, $2B
          TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+         T0 CASM_TOKEN_EOF, 0
+; WP67: a second '+' with nothing after it -- still MALFORMED (parsePrimary
+; sees NEWLINE where a primary was expected), same diagnostic as before,
+; but the loop now actually applies the *first* '+' (ABSVAL+1) before
+; discovering the second one has no RHS, so final/column shift. Explicit
+; NEWLINE terminator added (WP67).
 sChain: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
         T1 CASM_TOKEN_PLUS, 0, $2B
         TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
         T1 CASM_TOKEN_PLUS, 0, $2B
+        T0 CASM_TOKEN_NEWLINE, 0
 sAdjNum: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
 sAdjId: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
         TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+; WP67: parsePrimary's own NUMBER arm now always advances past its own
+; token before returning (matching every other primary kind), unlike the
+; pre-WP67 exprParseAddend/exprParseNumeric convention of leaving the
+; addend's NUMBER current for the caller to advance past -- so the
+; overflow (detected in parseOperatorTail's own arithmetic, independent
+; of lexer position) is now discovered with the *following* token
+; current, not the NUMBER itself. Explicit NEWLINE terminators added
+; (WP67) so that following token is deterministic.
 sOver: TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
        T1 CASM_TOKEN_PLUS, 0, $2B
        TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+       T0 CASM_TOKEN_NEWLINE, 0
 sUnder: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
         T1 CASM_TOKEN_MINUS, 0, $2D
         TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+        T0 CASM_TOKEN_NEWLINE, 0
 sUnknown: TN CASM_TOKEN_IDENTIFIER, 0, "absval"
 sBadFlag: TN CASM_TOKEN_IDENTIFIER, 0, "BADFLAG"
 
@@ -600,6 +728,29 @@ EXPECT eStarHi, $40,0, $03, 2, 0,0, 0,0,0
 EXPECT eStarReloc, $50,$40, $07, 0, 0,0, 0,0,0
 EXPECT eStarLoReloc, $50,0, $03, 1, 0,0, 0,0,0
 
+; WP67: NUMBER now reaches the shared +/- operator loop; ADDEND_SIGN/MAG
+; hold the *last* applied operator's own sign/RHS-value (parseOperatorTail's
+; own convention, matching the pre-WP67 single-addend record exactly when
+; there's exactly one operator with a NUMBER RHS).
+EXPECT eNumAdd, 2,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,1,0
+EXPECT eNumSub, 0,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 1,1,0
+EXPECT eNumChain, 0,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 1,3,0
+; ABSVAL+RELVAL: one relocatable component (RELVAL) -- representable.
+EXPECT eSymAdd, $34,$32, $07, 0, 1,0, 0,$00,$20
+; Parenthesized sub-expressions. A group with no operator around it at
+; all (eParenSimple) never touches ADDEND (no operator loop iteration
+; ever ran, inner or outer) -- stays at exprInit's zero default.
+EXPECT eParenSimple, 5,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eParenAdd, 6,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,5,0
+EXPECT eParenTwoGroups, 10,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,7,0
+; ABSVAL+(RELVAL): one relocatable component, wrapped in a group --
+; representable regardless of which side it's on or whether it's
+; parenthesized (WP64's rule).
+EXPECT eParenReloc, $34,$32, $07, 0, 1,0, 0,$00,$20
+; <(ABSVAL+1): extraction applies to the group's own final value, same as
+; any other primary's.
+EXPECT eParenExtractLo, $35,0, $03, CASM_EXTRACTION_LO, 1,0, 0,1,0
+
 .macro CASE script, expect, diag, final, calls, column, relocmode
     .word script, expect
     .byte diag, final, calls, column, relocmode
@@ -637,19 +788,44 @@ caseTable:
     CASE sUnrLo, eUnrLo, 0, CASM_TOKEN_EOF, 1, 3, 0
     CASE sUnrHi, eUnrHi, 0, CASM_TOKEN_EOF, 1, 3, 0
     CASE sUna, eUna, 0, CASM_TOKEN_EOF, 1, 4, 0
-    CASE sNumAdd, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 0, 2, 0
-    CASE sNumSub, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_MINUS, 0, 2, 0
+    ; WP67: NUMBER now succeeds through the shared +/- loop instead of
+    ; CASM_DIAG_EXPR_UNSUPPORTED (restriction lifted, user-confirmed
+    ; 2026-08-14).
+    CASE sNumAdd, eNumAdd, 0, CASM_TOKEN_NEWLINE, 0, 4, 0
+    CASE sNumSub, eNumSub, 0, CASM_TOKEN_NEWLINE, 0, 4, 0
+    CASE sNumChain, eNumChain, 0, CASM_TOKEN_NEWLINE, 0, 6, 0
     CASE sNoPrimary, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 0, 2, 0
     CASE sRepeatExtract, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_LESS, 0, 2, 0
     CASE sBadAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 1, 3, 0
-    CASE sSymAdd, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_IDENTIFIER, 1, 3, 0
-    CASE sChain, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_PLUS, 1, 4, 0
+    ; WP67: IDENTIFIER is now a valid RHS via the recursive primary parse
+    ; (previously CASM_DIAG_EXPR_MALFORMED, since exprParseAddend required
+    ; NUMBER) -- ABSVAL+RELVAL is exactly one relocatable component,
+    ; representable, now succeeds.
+    CASE sSymAdd, eSymAdd, 0, CASM_TOKEN_EOF, 2, 4, 0
+    ; WP67: the loop now actually applies ABSVAL+1 before discovering the
+    ; second '+' has no RHS (previously stopped at the first symbolDone/
+    ; rejectContinuation check without ever trying).
+    CASE sChain, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 1, 5, 0
     CASE sAdjNum, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_NUMBER, 1, 2, 0
     CASE sAdjId, 0, CASM_DIAG_EXPR_UNSUPPORTED, CASM_TOKEN_IDENTIFIER, 1, 2, 0
-    CASE sOver, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3, 0
-    CASE sUnder, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NUMBER, 1, 3, 0
+    ; WP67: parsePrimary's NUMBER arm now always advances past its own
+    ; token before returning (unlike the pre-WP67 exprParseAddend/
+    ; exprParseNumeric convention of leaving it current) -- the overflow
+    ; is discovered with the *following* token current, not the NUMBER.
+    CASE sOver, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NEWLINE, 1, 4, 0
+    CASE sUnder, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_NEWLINE, 1, 4, 0
     CASE sUnknown, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1, 0
     CASE sBadFlag, 0, CASM_DIAG_RESOLVER_FAILED, CASM_TOKEN_IDENTIFIER, 1, 1, 0
+    ; WP67: parenthesized sub-expressions.
+    CASE sParenSimple, eParenSimple, 0, CASM_TOKEN_NEWLINE, 0, 4, 0
+    CASE sParenAdd, eParenAdd, 0, CASM_TOKEN_NEWLINE, 0, 8, 0
+    CASE sParenTwoGroups, eParenTwoGroups, 0, CASM_TOKEN_NEWLINE, 0, 12, 0
+    CASE sParenUnclosed, 0, CASM_DIAG_EXPR_MALFORMED, CASM_TOKEN_NEWLINE, 0, 3, 0
+    CASE sParenReloc, eParenReloc, 0, CASM_TOKEN_EOF, 2, 6, 0
+    CASE sParenRelocReject, 0, CASM_DIAG_EXPR_RELOC_UNSUPPORTED, CASM_TOKEN_EOF, 2, 6, 0
+    CASE sParenTooDeep, 0, CASM_DIAG_EXPR_PAREN_TOO_DEEP, CASM_TOKEN_LPAREN, 0, 9, 0
+    CASE sParenExtractLo, eParenExtractLo, 0, CASM_TOKEN_EOF, 1, 7, 0
+    CASE sParenStar, eStarAdd, 0, CASM_TOKEN_EOF, 0, 6, 0
 
     ; WP39: relocMode=1 cases, proving exprEvaluate's new input classifies a
     ; symbol reference as relocatable even when the resolver itself does not

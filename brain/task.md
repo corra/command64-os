@@ -3196,6 +3196,82 @@
         Taskwarrior task marked done. WP67 (parentheses and explicit
         precedence) is next and requires its own detailed plan and
         separate approval before any source edit.
+  - [x] Taskwarrior #43 under this session's own numbering
+        (`8d988ac6-730a-440a-bc6e-a12e0c36888d`): WP67, parentheses and
+        explicit precedence. Depends on WP64 (task 44). Plan:
+        `brain/plans/2026-08-14-casm-phase12-wp67-parens-precedence.md`.
+        Sub-agent research (source-grounded) plus direct tracing against
+        `expr.s`, `parser.s`, and WP64's own frozen contract established
+        the implementation surface before drafting. Three scoping
+        decisions asked and confirmed: adopt WP64's tentative precedence-
+        tier ordering as-is; `ppsConstant` stays hand-rolled/unsupported
+        for parens (matching WP65/66's own precedent); a parenthesization
+        nesting-depth bound of 8 levels. **Plan approved 2026-08-14, no
+        changes.** Task started. All 7 Atomic Increments complete:
+        Increment 1 (regression baseline, already captured by WP66's own
+        committed test suite); Increment 2 (precedence-climbing loop with
+        only the `+`/`-` tier, no parens yet -- verified byte-for-byte
+        identical to the pre-WP67 baseline before touching anything else,
+        proving the architecture change itself introduced no drift);
+        Increment 3 (parenthesized sub-expressions) surfaced a real,
+        previously-unflagged fork mid-implementation -- whether NUMBER
+        should finally support a trailing operator (the plan's own
+        example `1+(2+3)` implied it did, but the existing restriction
+        predated WP67 and two fixtures asserted the opposite) -- asked
+        and user confirmed: lift the restriction, updating `sNumAdd`/
+        `sNumSub`'s expected outcome deliberately rather than silently;
+        Increment 4 (relocation enforcement) turned out to already be
+        implemented as part of Increment 3's own correctness requirements
+        (parens made a relocatable RHS reachable for the first time,
+        needing the check immediately, not deferrable), so this increment
+        became verification/audit rather than new code -- a disclosed,
+        reasonable adjustment as implementation unfolded; Increment 5
+        added coverage for extraction and `*` interacting with the new
+        group primary; Increment 6 (full disk-image rebuild) surfaced two
+        more envelope overflows (`test_casm_listcap`, `test_casm_
+        passcheck`) beyond WP66's own already-bumped set; Increment 7's
+        own live VICE run of `casmparen1.s` immediately caught a real
+        integration gap neither increment's own design work had surfaced:
+        `parser.s`'s `posImmediate` gate (checked before
+        `parserParseExpressionValue` ever runs) whitelisted only NUMBER/
+        IDENTIFIER/LESS/GREATER after `#`, rejecting `(` with `SYNTAX
+        ERROR` before `exprEvaluate`'s own already-correct primary
+        dispatch was ever reached -- fixed with one new whitelist entry.
+        Separately, live use of the two new diagnostics
+        (`CASM_DIAG_EXPR_RELOC_UNSUPPORTED`, `CASM_DIAG_EXPR_PAREN_TOO_
+        DEEP`) revealed neither had a message-table entry in
+        `diagnostics.s`, so both would have silently printed the generic
+        "unknown diagnostic" fallback -- fixed with two new entries,
+        confirmed live (`CASM: EXPRESSION RELOCATION UNSUPPORTED` with a
+        correctly-positioned source-context caret). A live "regression"
+        found immediately after (`test_casm_listcap` failing 5 of 7
+        fixtures) triggered a full bisection against the pre-WP67 source
+        (built and tested in complete isolation from the working tree, in
+        `/tmp`) before concluding anything -- every source/binary
+        combination tested CORRECT, proving the code itself was never at
+        fault; the actual cause was `casm_listing_test_d64` reaching 0
+        free blocks from WP67's own cumulative envelope growth, leaving
+        no runtime headroom for the harness's own 10 output-file writes
+        during live execution -- resolved by relocating
+        `test_casm_bounds`/`test_casm_cliderive`/`test_casm_lexer` (the
+        three genuinely self-contained candidates -- `test_casm_
+        spanread`/`spancommit` need their own companion fixtures on
+        whichever disk they live on, so were ruled out) to `casm_
+        include_test_d64`. Two new live end-to-end fixtures
+        (`casmparen1.s`: named constant and pure numbers inside a group;
+        `casmparen2.s`: two relocatable labels combined, proving the new
+        rejection diagnostic) both verified byte-exact/message-exact
+        against the real `casm.prg` binary under VICE. 10 new
+        `test_casm_expr` cases (`CASE_COUNT` 45->55, all live-verified
+        PASS) plus full regression re-verification of every other
+        affected harness (`symbols`, `pass1`, `include`, `frame`,
+        `listcap`, `passcheck`, `bounds`, `cliderive`, `lexer` -- all
+        PASS). Full disk-image tree rebuilds clean. Walkthrough:
+        `brain/walkthroughs/2026-08-14-casm-phase12-wp67-parens-
+        precedence.md`. **WP67 complete, user-approved 2026-08-14.**
+        Taskwarrior task marked done. WP68 (arithmetic/bitwise operators)
+        is next and requires its own detailed plan and separate approval
+        before any source edit.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

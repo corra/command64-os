@@ -845,7 +845,10 @@ if(Ca65_FOUND)
             # arm and the lexer's new '*' punctuation-table row (this
             # harness never evaluates '*') overflowed $5300 by 12 measured
             # bytes; $5400 (+256) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5400")
+            # WP67: $5400 -> $5500 -- expr.s's precedence-climbing rewrite
+            # (parsePrimary/parseOperatorTail, parenthesized-group support)
+            # overflowed $5400 by 70 measured bytes.
+            set(TEST_PRG_SIZE "5500")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -905,7 +908,10 @@ if(Ca65_FOUND)
             # WP65 (addend-consumption fix): $4F00 -> $5000 -- ppsConstant's
             # corrected addend handling overflowed $4F00 by 42 measured
             # bytes.
-            set(TEST_PRG_SIZE "5000")
+            # WP67: $5000 -> $5100 -- expr.s's precedence-climbing rewrite
+            # (parsePrimary/parseOperatorTail, parenthesized-group support)
+            # overflowed $5000 by 139 measured bytes.
+            set(TEST_PRG_SIZE "5100")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1033,7 +1039,10 @@ if(Ca65_FOUND)
             # arm and parser.s's new '*'-RHS constant handling (unused by
             # this harness) overflowed $5300 by 13 measured bytes; $5400
             # (+256) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5400")
+            # WP67: $5400 -> $5500 -- diagnostics.s's two new message-table
+            # entries (msgExprRelocUnsupported/msgExprParenTooDeep, unused
+            # by this harness) overflowed $5400 by 98 measured bytes.
+            set(TEST_PRG_SIZE "5500")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1104,7 +1113,12 @@ if(Ca65_FOUND)
             # label-only coverage) overflowed $5600 by 282 measured bytes;
             # $5700 (+256) would still overflow, so $5800 (+512) is the
             # smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5800")
+            # WP67: $5800 -> $5A00 -- expr.s's precedence-climbing rewrite
+            # (parsePrimary/parseOperatorTail, parenthesized-group support)
+            # overflowed $5800 by 169 measured bytes; $5900 (+256) would
+            # still overflow, so $5A00 (+512) is the smallest round-page
+            # step that fits.
+            set(TEST_PRG_SIZE "5A00")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1679,7 +1693,11 @@ add_c64_disk_image(casm_include_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 casm comp test_casm_freloc
+    # WP67: test_casm_bounds/test_casm_cliderive/test_casm_lexer relocated
+    # here from casm_listing_test_d64 (0 free blocks after WP67's own
+    # envelope growth left no runtime headroom for test_casm_listcap's own
+    # output writes) -- 208 free blocks here comfortably absorb all three.
+    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
 
@@ -1748,6 +1766,20 @@ add_custom_command(
     VERBATIM
 )
 
+# WP67: parenthesized-expression end-to-end fixtures. Same disk, same
+# rationale.
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmparen1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmparen1.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmparen2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmparen2.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP67 casmparen1-2.s parenthesized-expression fixtures to casm_include_test.d64"
+    VERBATIM
+)
+
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source
@@ -1780,7 +1812,21 @@ add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds test_casm_lexer test_casm_faultvmm
+    # WP67: test_casm_bounds/test_casm_cliderive/test_casm_lexer (26 blocks
+    # combined) relocated to casm_include_test_d64 (208 free blocks there
+    # vs. this disk sitting at 0 free blocks after WP67's own envelope
+    # growth on test_casm_pass1/frame/listcap/passcheck). This wasn't just
+    # a build-time packing problem: test_casm_listcap's own live run
+    # WRITES 10 runtime output files (CASMLO01-10, 1 block each) to this
+    # same disk, and a 0-free-block disk starts failing those writes
+    # partway through the fixture sequence -- discovered live (2 of 7
+    # fixtures passed before the disk ran out of room), not assumed.
+    # These three (not test_casm_spanread/spancommit, which need their own
+    # companion SEQ fixtures packaged on whichever disk they live on) are
+    # genuinely self-contained -- no other custom_command references them
+    # by name. Same precedent as WP52's test_l15release move and WP66's
+    # own test_casm_freloc move.
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_faultvmm
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05

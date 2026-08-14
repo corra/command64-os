@@ -46,6 +46,11 @@
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_SIGN
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_LO
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_HI
+    ; WP67: defensive reset -- every parsePrimary `group` exit path already
+    ; balances its own inc/dec, so this is redundant insurance, not a
+    ; correctness dependency, matching this project's own determinism
+    ; convention (e.g. ppsConstant's top-of-routine zeroing).
+    sta CasmExprParenDepth
     rts
 .endproc
 
@@ -80,7 +85,7 @@
     cmp #CASM_TOKEN_LESS
     beq lowPrefix
     cmp #CASM_TOKEN_GREATER
-    bne primary
+    bne noExtraction
     lda #CASM_EXTRACTION_HI
     bne storeExtraction
 lowPrefix:
@@ -89,8 +94,83 @@ storeExtraction:
     sta CasmExprResultRecord + CASM_EXPR_EXTRACTION
     jsr lexerNext
     bcs return
+noExtraction:
 
-primary:
+    ; WP67: primary dispatch and the +/- operator loop are now standalone
+    ; procs (parsePrimary/parseOperatorTail below) so a parenthesized
+    ; sub-expression can recurse into them -- see parsePrimary's own
+    ; `group` arm. Extraction stays a whole-expression, top-level-only
+    ; concept, applied once here after the full operator loop returns,
+    ; exactly as before; nested calls never see or touch it.
+    jsr parsePrimary
+    bcs return
+    jsr parseOperatorTail
+    bcs return
+    jsr rejectContinuation
+    bcs return
+
+applyExtraction:
+    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    beq success
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq classifyExtraction
+    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    cmp #CASM_EXTRACTION_LO
+    beq clearHigh
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+clearHigh:
+    lda #0
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+classifyExtraction:
+    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
+    cmp #CASM_EXTRACTION_LO
+    bne success
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #($FF - CASM_EXPR_FLAG_RELOCATABLE)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+success:
+    clc
+return:
+    rts
+.endproc
+
+; ---------------------------------------------------------------------------
+; parsePrimary (WP67, private)
+; Parse one primary: NUMBER, IDENTIFIER, '*' (current address), or a
+; parenthesized sub-expression -- '(' recurses into parsePrimary +
+; parseOperatorTail for the group's own content, then requires ')'.
+; Reused three ways: exprEvaluate's own top-level primary, a parenthesized
+; group's inner content, and (indirectly, via parseOperatorTail) the RHS
+; of every '+'/'-' application -- WP67 lifts the pre-WP67 restriction that
+; only IDENTIFIER/'*' primaries could take a trailing addend (user-
+; confirmed 2026-08-14): NUMBER now reaches the same shared operator loop
+; as everything else, so `1+1`/`2+3` (bare or inside parens) succeed
+; instead of CASM_DIAG_EXPR_UNSUPPORTED.
+;
+; A leading '(' can only reach this proc from a RECURSIVE call (via
+; parseOperatorTail's RHS parse, or nested inside another group) -- when
+; called as exprEvaluate's own outermost primary, parser.s's own operand
+; dispatch has already exclusively claimed a leading '(' for 6502 indirect
+; addressing before exprEvaluate ever runs (WP64's frozen Parenthesization
+; Rule), so this arm is structurally unreachable at that position in
+; today's only call chain; it stays here as the single source of truth
+; for '(' handling wherever it IS reachable, rather than being duplicated.
+;
+; Inputs:    current token begins a primary; CasmExprResolverAddrLo/Hi and
+;            CasmExprRelocatableModeIn already staged (exprEvaluate's own
+;            entry); D clear
+; Outputs:   success: CasmExprResultRecord's VAL_LO/HI, FLAGS, SYMBOL_ID_LO/HI
+;            populated (EXTRACTION/ADDEND untouched -- exclusively owned by
+;            exprEvaluate and parseOperatorTail respectively); following
+;            token current; C clear
+;            failure: A = stable diagnostic, C set
+; Preserves: V, D, I, zero page (except CasmPtr0, transient), balanced stack
+; Clobbers:  A, X, Y, N, Z, C, lexer state, CasmExprResultRecord's VAL/
+;            FLAGS/SYMBOL_ID fields, CasmExprParenDepth (net zero on return)
+; ---------------------------------------------------------------------------
+.proc parsePrimary
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_NUMBER
     beq number
@@ -98,7 +178,10 @@ primary:
     beq identifier
     cmp #CASM_TOKEN_STAR
     beq curAddr
-malformed:
+    cmp #CASM_TOKEN_LPAREN
+    bne notGroup
+    jmp group
+notGroup:
     jsr diagSetLocFromToken
     lda #CASM_DIAG_EXPR_MALFORMED
     sec
@@ -107,10 +190,7 @@ return:
 
 ; WP66: current-address symbol ('*'). Always known immediately (no
 ; forward-reference case exists for it, unlike an identifier), so it is
-; resolved on the spot from CasmPc and then folds into the identifier
-; path's own consumeIdentifier tail (addend/extraction/continuation) --
-; by the time control reaches consumeIdentifier, '*' and a resolved,
-; symbol-derived identifier look identical in the result record.
+; resolved on the spot from CasmPc.
 ;
 ; SYMBOL_DERIVED is set unconditionally (not just RESOLVED) even though
 ; '*' never goes through the resolver callback: parserParseExpressionValue
@@ -125,12 +205,12 @@ curAddr:
     lda #(CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_SYMBOL_DERIVED)
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
     ldy CasmExprRelocatableModeIn
-    beq curAddrDone
+    beq curAddrNotReloc
     lda CasmExprResultRecord + CASM_EXPR_FLAGS
     ora #CASM_EXPR_FLAG_RELOCATABLE
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
-curAddrDone:
-    jmp consumeIdentifier
+curAddrNotReloc:
+    jmp lexerNextTail
 
 number:
     jsr exprParseNumeric
@@ -139,20 +219,13 @@ number:
     sty CasmExprResultRecord + CASM_EXPR_VAL_HI
     lda #CASM_EXPR_FLAG_RESOLVED
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
-    jsr lexerNext
-    bcs return
-    jsr rejectContinuation
-    bcs return
-    jmp applyExtraction
+    bne lexerNextTail
 
 identifier:
     ; WP28: stage the resolver's name-pointer/length arguments. This is the
-    ; only point in exprEvaluate's control flow that reliably has them: the
-    ; current token is still IDENTIFIER here (consumeIdentifier's lexerNext,
-    ; which would overwrite CasmTokenText, has not run yet), and A cannot be
-    ; pre-staged by any caller further out since exprEvaluate's own entry
-    ; dispatch (the </>/NUMBER/IDENTIFIER checks above) already clobbers A
-    ; for its own purposes before this branch is even reached.
+    ; only point with reliable access to them: the current token is still
+    ; IDENTIFIER here (the tail's own lexerNext, which would overwrite
+    ; CasmTokenText, has not run yet).
     lda #<CasmTokenText
     sta CasmPtr0Lo
     lda #>CasmTokenText
@@ -214,81 +287,231 @@ evApplyMode:
 evNotRelocatable:
     lda CasmExprResultRecord + CASM_EXPR_FLAGS
     and #CASM_EXPR_FLAG_RESOLVED
-    beq unresolved
+    beq idUnresolved
     lda CasmExprResolverOutput + CASM_RESOLVE_VAL_LO
     sta CasmExprResultRecord + CASM_EXPR_VAL_LO
     lda CasmExprResolverOutput + CASM_RESOLVE_VAL_HI
     sta CasmExprResultRecord + CASM_EXPR_VAL_HI
-    jmp consumeIdentifier
-unresolved:
+    bne lexerNextTail
+idUnresolved:
     lda CasmExprResultRecord + CASM_EXPR_FLAGS
     ora #CASM_EXPR_FLAG_FORCE_ABS
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
-consumeIdentifier:
-    jsr lexerNext
-    bcc consumeIdentifierOk
-    jmp return
-consumeIdentifierOk:
 
-    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
-    cmp #CASM_TOKEN_PLUS
-    beq addend
-    cmp #CASM_TOKEN_MINUS
-    bne symbolDone
-addend:
-    jsr exprParseAddend
-    bcc :+
-    jmp return
-:
-    lda CasmExprResultRecord + CASM_EXPR_FLAGS
-    and #CASM_EXPR_FLAG_RESOLVED
-    beq consumeAddend
-    ldx CasmExprResultRecord + CASM_EXPR_VAL_LO
-    ldy CasmExprResultRecord + CASM_EXPR_VAL_HI
-    jsr exprApplyAddend
-    bcc addendApplied
-    jmp return
-addendApplied:
-    stx CasmExprResultRecord + CASM_EXPR_VAL_LO
-    sty CasmExprResultRecord + CASM_EXPR_VAL_HI
-consumeAddend:
+lexerNextTail:
     jsr lexerNext
-    bcc symbolDone
-    jmp return
-symbolDone:
-    jsr rejectContinuation
-    bcc applyExtraction
-    jmp return
-
-applyExtraction:
-    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
-    beq success
-    lda CasmExprResultRecord + CASM_EXPR_FLAGS
-    and #CASM_EXPR_FLAG_RESOLVED
-    beq classifyExtraction
-    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
-    cmp #CASM_EXTRACTION_LO
-    beq clearHigh
-    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
-    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
-clearHigh:
-    lda #0
-    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
-classifyExtraction:
-    lda CasmExprResultRecord + CASM_EXPR_EXTRACTION
-    cmp #CASM_EXTRACTION_LO
-    bne success
-    lda CasmExprResultRecord + CASM_EXPR_FLAGS
-    and #($FF - CASM_EXPR_FLAG_RELOCATABLE)
-    sta CasmExprResultRecord + CASM_EXPR_FLAGS
-success:
-    clc
     rts
 
 resolverFailed:
     jsr diagSetLocFromToken
     lda #CASM_DIAG_RESOLVER_FAILED
     sec
+    rts
+
+; WP67: parenthesized sub-expression. Depth-bounded (CASM_EXPR_PAREN_MAX_
+; DEPTH) since every level costs at least one JSR against the 6502's small
+; hardware stack, shared with every other nested call in the assembler.
+group:
+    inc CasmExprParenDepth
+    lda CasmExprParenDepth
+    cmp #CASM_EXPR_PAREN_MAX_DEPTH + 1
+    bcc groupDepthOk
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_PAREN_TOO_DEEP
+    sec
+    dec CasmExprParenDepth
+    rts
+groupDepthOk:
+    jsr lexerNext                 ; consume '(', fetch the group's own first token
+    bcc groupOpened
+    dec CasmExprParenDepth
+    rts
+groupOpened:
+    jsr parsePrimary              ; recurse: the group's own leading primary
+    bcc groupPrimaryOk
+    dec CasmExprParenDepth
+    rts
+groupPrimaryOk:
+    jsr parseOperatorTail         ; recurse: the group's own +/- chain
+    bcc groupTailOk
+    dec CasmExprParenDepth
+    rts
+groupTailOk:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_RPAREN
+    beq groupClose
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_MALFORMED
+    sec
+    dec CasmExprParenDepth
+    rts
+groupClose:
+    dec CasmExprParenDepth
+    jsr lexerNext                 ; consume ')'; C/A already correct either way
+    rts
+.endproc
+
+; ---------------------------------------------------------------------------
+; parseOperatorTail (WP67, private)
+; Left-associative '+'/'-' loop: repeatedly consumes an operator and a
+; recursively-parsed RHS primary (NUMBER, IDENTIFIER, '*', or a
+; parenthesized group -- via parsePrimary, so `label+(1+2)` and
+; `1+2+3` are both just this one loop applied uniformly), combining each
+; into the running accumulator in CasmExprResultRecord, until no operator
+; follows. Reused for exprEvaluate's own top-level chain and for a
+; parenthesized group's own inner chain (parsePrimary's `group` arm).
+;
+; Since parsePrimary shares the same CasmExprResultRecord for whatever it
+; is currently parsing, this proc saves the accumulator's VAL_LO/HI,
+; FLAGS, and SYMBOL_ID_LO/HI (5 bytes -- EXTRACTION/ADDEND are exclusively
+; top-level/this-proc's-own-output and never read back in, so they need
+; no save) on the 6502 hardware stack before each recursive parsePrimary
+; call for the RHS, and restores them after -- net zero stack growth per
+; loop iteration (chained operators at the same level don't accumulate
+; stack; only parsePrimary's own paren recursion does, separately bounded
+; by CASM_EXPR_PAREN_MAX_DEPTH).
+;
+; Per WP64's frozen relocation representability rule, formalized here: an
+; RHS whose own RELOCATABLE flag is set is rejected with
+; CASM_DIAG_EXPR_RELOC_UNSUPPORTED if the accumulator is already
+; RELOCATABLE too (two relocatable components can never collapse to one
+; symbol + static addend); otherwise the RHS's RELOCATABLE/SYMBOL_DERIVED
+; bits simply propagate into the accumulator.
+;
+; Inputs:    current token follows a just-parsed primary; CasmExprResultRecord
+;            holds that primary's value; D clear
+; Outputs:   success: CasmExprResultRecord's VAL_LO/HI/FLAGS updated for
+;            every '+'/'-' applied (zero or more); ADDEND_SIGN/MAG_LO/HI
+;            hold the *last* applied operator's own sign and RHS value
+;            (matches the pre-WP67 single-addend record exactly when
+;            exactly one operator with a NUMBER RHS was applied); first
+;            non-operator token current; C clear
+;            failure: A = stable diagnostic, C set
+; Preserves: V, D, I, zero page, balanced stack
+; Clobbers:  A, X, Y, N, Z, C, lexer state, CasmExprResultRecord's VAL/
+;            FLAGS/ADDEND fields, CasmExprOpSign/RhsValLo/RhsValHi/RhsFlags
+; ---------------------------------------------------------------------------
+.proc parseOperatorTail
+loop:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq applyOp
+    cmp #CASM_TOKEN_MINUS
+    beq applyOp
+    jmp done
+applyOp:
+    cmp #CASM_TOKEN_MINUS
+    beq opNegative
+    lda #CASM_ADDEND_SIGN_POSITIVE
+    jmp opStoreSign
+opNegative:
+    lda #CASM_ADDEND_SIGN_NEGATIVE
+opStoreSign:
+    pha                            ; stash the operator's own sign
+    jsr lexerNext                  ; consume '+'/'-', fetch the RHS's first token
+    bcc opTokenOk
+    tax
+    pla
+    txa
+    rts
+opTokenOk:
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    pha
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    pha
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    pha
+    lda CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_LO
+    pha
+    lda CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_HI
+    pha
+    jsr parsePrimary                ; RHS -- overwrites CasmExprResultRecord
+    bcc opRhsOk
+    tax
+    pla
+    pla
+    pla
+    pla
+    pla
+    pla                              ; drop the accumulator's 5 saved bytes + sign
+    txa
+    rts
+opRhsOk:
+    ; capture the RHS's own value/flags before the accumulator's saved
+    ; bytes (about to be restored) overwrite the shared record.
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    sta CasmExprRhsValLo
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    sta CasmExprRhsValHi
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    sta CasmExprRhsFlags
+    pla
+    sta CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_HI
+    pla
+    sta CasmExprResultRecord + CASM_EXPR_SYMBOL_ID_LO
+    pla
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+    pla
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    pla
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    pla
+    sta CasmExprOpSign
+
+    ; WP64's representability rule: at most one relocatable component.
+    lda CasmExprRhsFlags
+    and #CASM_EXPR_FLAG_RELOCATABLE
+    beq combineAddend
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RELOCATABLE
+    beq combineAddend
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+    sec
+    rts
+
+combineAddend:
+    lda CasmExprOpSign
+    sta CasmExprResultRecord + CASM_EXPR_ADDEND_SIGN
+    lda CasmExprRhsValLo
+    sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_LO
+    lda CasmExprRhsValHi
+    sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_HI
+
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq notBothResolved
+    lda CasmExprRhsFlags
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq notBothResolved
+    ldx CasmExprResultRecord + CASM_EXPR_VAL_LO
+    ldy CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jsr exprApplyAddend
+    bcc applied
+    rts
+applied:
+    stx CasmExprResultRecord + CASM_EXPR_VAL_LO
+    sty CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jmp combineFlags
+notBothResolved:
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #(255 - CASM_EXPR_FLAG_RESOLVED)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+combineFlags:
+    lda CasmExprRhsFlags
+    and #(CASM_EXPR_FLAG_SYMBOL_DERIVED | CASM_EXPR_FLAG_RELOCATABLE)
+    ora CasmExprResultRecord + CASM_EXPR_FLAGS
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+
+    ; No lexerNext here: parsePrimary (the RHS parse above) already
+    ; advanced past its own token internally (its own lexerNextTail) --
+    ; unlike exprParseAddend/exprParseNumeric's older "leaves the token
+    ; current" contract this loop's own predecessor relied on. The
+    ; current token is already correctly positioned for the next
+    ; iteration's own check.
+    jmp loop
+done:
+    clc
     rts
 .endproc
 
@@ -705,6 +928,18 @@ CasmExprResolverOutput: .res CASM_RESOLVE_SIZE
 ; clobbers A. Private -- expr.s stays fully decoupled from emit.s; the
 ; caller (parser.s) reads CasmRelocatableMode itself and passes it in here.
 CasmExprRelocatableModeIn: .res 1
+
+; WP67: parsePrimary's own parenthesized-group nesting counter (0 at the
+; top; bounded by CASM_EXPR_PAREN_MAX_DEPTH). parseOperatorTail's own
+; scratch for combining one RHS primary into the running accumulator --
+; transient per operator application, never needs saving across a nested
+; call (parsePrimary's own save/restore of the accumulator's 5 bytes uses
+; the hardware stack directly, not these).
+CasmExprParenDepth: .res 1
+CasmExprOpSign:     .res 1
+CasmExprRhsValLo:   .res 1
+CasmExprRhsValHi:   .res 1
+CasmExprRhsFlags:   .res 1
 
 .assert CasmExprResultRecordEnd - CasmExprResultRecord = CASM_EXPR_REC_SIZE, error, "CASM expression result record size changed"
 .assert <CasmExprResolverAddrLo <> $FF, lderror, "CASM resolver callback pointer crosses an NMOS 6502 indirect-jump page"

@@ -1531,3 +1531,45 @@ file(WRITE "${OUTPUT_DIR}/casmcuraddr2.seq"
     "LDA #<*+3\n"
     "STA \$D020\n"
 )
+
+# casmparen1 (WP67): parenthesized sub-expressions as a real operand,
+# exercised through exprEvaluate's new precedence-climbing loop end to
+# end. START lands at $C000 (first byte after .ORG). SCREENW = 40 is a
+# WP65 named constant referenced inside a group. `#<(SCREENW+2)` proves
+# a '(' immediately after '#' (immediate mode) is NOT the operand's own
+# leading token from parser.s's own indirect-addressing dispatch's point
+# of view (that only claims a bare leading '(', no '#' prefix) -- so
+# exprEvaluate's top-level parsePrimary is free to treat it as a group,
+# same as any nested one. `#(1+2)` (pure numeric, no symbol at all)
+# proves WP67's own lifted NUMBER-can-take-an-operator restriction
+# reaches inside a group too. `JMP START` closes the loop with an
+# ordinary label reference (unrelated to parens, confirming the
+# surrounding statements still assemble normally).
+# Expected bytes: A9 2A (LDA #$2A, <(42)) 8D 20 D0 (STA $D020) A9 03
+# (LDA #$03, (1+2)) 8D 21 D0 (STA $D021) 4C 00 C0 (JMP START) -- 13 bytes.
+file(WRITE "${OUTPUT_DIR}/casmparen1.seq"
+    ".ORG \$C000\n"
+    "SCREENW = 40\n"
+    "START:\n"
+    "LDA #<(SCREENW+2)\n"
+    "STA \$D020\n"
+    "LDA #(1+2)\n"
+    "STA \$D021\n"
+    "JMP START\n"
+)
+
+# casmparen2 (WP67): two relocatable labels combined via a parenthesized
+# group -- LBL1+(LBL2). No .ORG (default relocatable output, unlike
+# casmparen1's static fixture above), so both labels are genuinely
+# relocatable and this combination is not representable as one symbol +
+# a static addend (WP64's rule) -- expects CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+# ($45), live-proving both the diagnostic itself and its new message text
+# (diagnostics.s) actually print, not just that the unit-test harness's
+# own diagnostic *code* comparison passes.
+file(WRITE "${OUTPUT_DIR}/casmparen2.seq"
+    "LBL1:\n"
+    "NOP\n"
+    "LBL2:\n"
+    "NOP\n"
+    "LDA #<(LBL1+LBL2)\n"
+)

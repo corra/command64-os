@@ -533,27 +533,63 @@ derives the two statement flags:
 
 ## 11. Expression Evaluator (`expr.s`)
 
-A bounded, non-recursive evaluator — not a general expression compiler. One
-expression is: an optional `<`/`>` extraction prefix, one primary (a numeric
-literal, one identifier resolved through a caller-supplied callback, or —
-WP66 — the current-address symbol `*`), and an optional `± NUMBER` addend.
-Anything else is `CASM_DIAG_EXPR_MALFORMED`/`CASM_DIAG_EXPR_UNSUPPORTED`;
-arithmetic that leaves 16 bits is `CASM_DIAG_EXPR_OVERFLOW`.
+WP67 rewrote this from a flat single-addend parser into a small
+precedence-climbing evaluator, three cooperating procs: `exprEvaluate`
+(the public entry point — extraction prefix, then hands off), `parsePrimary`
+(NUMBER, IDENTIFIER, `*`, or a parenthesized group), and `parseOperatorTail`
+(the `+`/`-` loop). One expression is: an optional `<`/`>` extraction
+prefix (whole-expression, top-level only — applied once, at the very end,
+never touched by a nested call), then one or more primaries combined
+left-associatively by `+`/`-`, where a primary can itself be a
+parenthesized sub-expression (`(expr)`) recursing back into the same
+primary+operator-tail pair. `CASM_DIAG_EXPR_MALFORMED`/`_UNSUPPORTED`
+cover a missing/unexpected primary or trailing token;
+`CASM_DIAG_EXPR_OVERFLOW` covers 16-bit arithmetic overflow;
+`CASM_DIAG_EXPR_RELOC_UNSUPPORTED` covers two relocatable components
+combining (below); `CASM_DIAG_EXPR_PAREN_TOO_DEEP` covers exceeding
+`CASM_EXPR_PAREN_MAX_DEPTH` (8) levels of nesting.
 
-`*` (`CASM_TOKEN_STAR`, lexed from `CASM_PETSCII_ASTERISK`) is resolved
-inline in `exprEvaluate`'s own `curAddr` primary-dispatch arm — it never
-reaches the resolver callback, unlike an identifier. It reads `CasmPc`
-(imported from `emit.s`, the only new cross-module dependency this added
-to `expr.s`), sets `RESOLVED`+`SYMBOL_DERIVED` unconditionally (so
-`parserParseExpressionValue`'s `FORCE_ABS` derivation ([§10](#10-parser-parsers))
-protects it exactly as it would a label), and sets `RELOCATABLE` iff the
-caller's relocatable-mode input is nonzero, then falls through into the
-identifier arm's own shared `consumeIdentifier` tail (addend/extraction/
-continuation) rather than duplicating it. Because WP67/68 (parenthesized
-expressions, multiplication) haven't landed, `*`'s token is unambiguous —
-there is no multiply operator yet to collide with in binary-operator
-position; a future precedence-climbing rewrite must preserve `*`'s
-leaf-position reading as its own primary case.
+**Primary dispatch** (`parsePrimary`): `NUMBER` and `*`
+(`CASM_TOKEN_STAR`, WP66 — reads `CasmPc` directly, never reaches the
+resolver) are resolved inline; `IDENTIFIER` reaches the resolver callback
+exactly as before. WP67 lifted the pre-existing restriction that only
+`IDENTIFIER`/`*` primaries could take a trailing addend — `NUMBER` now
+goes through the same shared operator loop, so `1+1` and `(2+3)` both
+succeed where they previously raised `CASM_DIAG_EXPR_UNSUPPORTED`. A `(`
+reaching `parsePrimary` (only possible from a recursive call — a leading
+`(` at `exprEvaluate`'s own top-level entry is unreachable in the current
+call chain, since `parser.s`'s own operand dispatch already claims it
+exclusively for 6502 indirect addressing before `exprEvaluate` ever runs,
+per WP64's frozen Parenthesization Rule) increments
+`CasmExprParenDepth`, recurses into `parsePrimary`+`parseOperatorTail` for
+the group's own content, and requires a matching `)`.
+
+**Operator loop** (`parseOperatorTail`): since `parsePrimary` shares the
+same `CasmExprResultRecord` for whatever it's currently parsing, each
+`+`/`-` application saves the running accumulator's `VAL_LO/HI`, `FLAGS`,
+and `SYMBOL_ID_LO/HI` (5 bytes — `EXTRACTION`/`ADDEND` are exclusively
+top-level/this-proc's-own-output, never read back in) on the **hardware
+stack** via `PHA`/`PLA` before the recursive `parsePrimary` call for the
+RHS, and restores them after. This is net-zero stack growth per loop
+iteration — a long `+`/`-` chain at the same syntactic level doesn't
+accumulate stack, only genuine `(` nesting does (separately bounded by
+`CASM_EXPR_PAREN_MAX_DEPTH`). `ADDEND_SIGN`/`ADDEND_MAG_LO/HI` end up
+holding the *last* applied operator's own sign and RHS value — matches
+the pre-WP67 single-addend record exactly when exactly one operator with
+a `NUMBER` RHS was applied (nothing else reads these fields from an
+`exprEvaluate` result; confirmed by trace).
+
+**Relocation representability, enforced per operator application**
+(WP64's frozen rule, first implemented here): an RHS whose own
+`RELOCATABLE` flag is set is rejected with `CASM_DIAG_EXPR_RELOC_
+UNSUPPORTED` if the accumulator is already `RELOCATABLE` too — two
+relocatable components can never collapse to one symbol + a static
+addend, the only shape the relocation table (`reloc.s`) can represent.
+Otherwise the RHS's `RELOCATABLE`/`SYMBOL_DERIVED` bits simply propagate
+into the accumulator via `OR`. This applies uniformly regardless of
+primary kind or nesting — `label1+label2`, `label+(label2)`, and
+`(label1)+(label2)` are all rejected the same way; a static value plus
+one relocatable value, however deeply parenthesized, always succeeds.
 
 `exprEvaluate` takes the resolver's address in `X`/`Y` and the whole-assembly
 relocatable-mode flag in `A`, and leaves the following token current on
@@ -562,21 +598,32 @@ return. The resolver ABI is a 5-byte output view
 `IDENTIFIER`; `symbolsLookup`'s calling convention was designed to match it
 exactly, so no adapter exists.
 
-**`CasmExprResult` layout** (9 bytes):
+**`CasmExprResult` layout** (9 bytes, unchanged by WP67):
 
 | Offset | Field | Meaning |
 |---|---|---|
 | 0-1 | ValLo/ValHi | Evaluated 16-bit value (meaningful when `RESOLVED`) |
 | 2 | Flags | `RESOLVED` \| `SYMBOL_DERIVED` \| `RELOCATABLE` \| `FORCE_ABS` |
 | 3 | Extraction | `FULL` / `LO` (`<`) / `HI` (`>`) |
-| 4-5 | SymbolId | Resolver-reported identity |
-| 6-8 | AddendSign, AddendMagLo/Hi | The parsed `±` addend, before application |
+| 4-5 | SymbolId | Resolver-reported identity (the *leftmost* primary's own — never overwritten by a later RHS) |
+| 6-8 | AddendSign, AddendMagLo/Hi | The *last* applied operator's own sign and RHS value |
 
 Numeric conversion (`exprParseNumeric`) uses a **24-bit accumulator with a
 sticky overflow flag** — decimal ×10+digit, hex ×16+digit, binary ×2+digit.
 The extra byte plus the sticky flag catch a value exceeding 65,535
 *regardless of how many further digits follow*, rather than only checking the
 final result. Overflow reports `CASM_DIAG_OPERAND_OUT_OF_RANGE`.
+
+**`ppsConstant`'s own RHS grammar is unchanged by WP67** (a deliberate
+scoping decision, user-confirmed 2026-08-14): named-constant definitions
+(`identifier = expr`, WP65) still use their own separate, hand-rolled
+parser in `parser.s` — a single symbol, number, or `*`, with at most one
+addend, no parentheses, no chained operators. `ppsConstant` never calls
+`exprEvaluate` at all (a different resolution model: a constant's RHS may
+be a *deferred* reference the Pass1→Pass2 sweep resolves later, which
+`exprEvaluate`'s resolve-now contract doesn't support), so WP67's
+architecture change doesn't reach it automatically — unifying the two is
+a fair question for a future WP, not assumed here.
 
 ## 12. Symbol Table (`symbols.s`)
 

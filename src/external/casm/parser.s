@@ -660,6 +660,16 @@ posImmediate:
     beq posImmediateNumber
     cmp #CASM_TOKEN_GREATER
     beq posImmediateNumber
+    ; WP67: '(' after '#' is a parenthesized sub-expression (e.g.
+    ; `lda #(1+2)`), not indirect addressing -- that ambiguity is already
+    ; resolved one token earlier, since no 6502 indirect-addressing form
+    ; begins with '#'. Without this, exprEvaluate's own parsePrimary
+    ; (which does correctly accept '(' here) is never reached at all --
+    ; this whitelist gate runs first and would otherwise reject it as
+    ; CASM_DIAG_SYNTAX_ERROR before parserParseExpressionValue is even
+    ; called.
+    cmp #CASM_TOKEN_LPAREN
+    beq posImmediateNumber
     jmp posSyntaxError
 posImmediateNumber:
     jsr parserParseExpressionValue

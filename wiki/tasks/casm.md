@@ -1878,6 +1878,46 @@ behavior changed beyond the version/build artifact itself.
       symbol.md`. WP67 (parentheses and explicit precedence) is next and
       needs its own detailed plan and separate approval before any source
       edit.
+- [x] WP67 **complete, user-approved 2026-08-14** (Taskwarrior task 43
+      under this session's numbering, `8d988ac6-730a-440a-bc6e-a12e0c36888d`,
+      done):
+      `brain/plans/2026-08-14-casm-phase12-wp67-parens-precedence.md`.
+      Precedence-climbing evaluator architecture (WP64's own design, built
+      here for the first time) plus parenthesized sub-expressions:
+      `exprEvaluate` split into `parsePrimary`/`parseOperatorTail`, a
+      parenthesized group recursing into the same pair, bounded to 8
+      levels (`CASM_EXPR_PAREN_MAX_DEPTH`) via the hardware stack.
+      User-confirmed scoping fork: WP67 lifts the pre-existing restriction
+      that only `IDENTIFIER`/`*` could take a trailing addend, so `1+1`
+      now succeeds instead of `CASM_DIAG_EXPR_UNSUPPORTED` — a deliberate,
+      disclosed change to two existing fixtures, not a silent regression.
+      WP64's relocation-representability rule enforced per operator
+      application for the first time (`CASM_DIAG_EXPR_RELOC_UNSUPPORTED`);
+      `ppsConstant`'s own RHS grammar stays untouched (separate
+      user-confirmed scoping decision, matching WP65/66's precedent). Two
+      real integration gaps caught live, not by static reading: both new
+      diagnostics needed message-table entries in `diagnostics.s` (would
+      otherwise have silently fallen through to a generic "unknown
+      diagnostic" message), and `posImmediate`'s own token whitelist
+      needed `CASM_TOKEN_LPAREN` added (without it, `lda #(1+2)` tripped
+      `SYNTAX ERROR` before `exprEvaluate` was ever reached). A live
+      "regression" (`test_casm_listcap` failing 5 of 7 fixtures) turned
+      out, after bisection against the pre-WP67 source, to be a disk-
+      capacity crunch (`casm_listing_test_d64` hit 0 free blocks, leaving
+      no runtime headroom for the harness's own 10 output-file writes),
+      not a code defect — resolved by relocating three self-contained
+      harnesses to `casm_include_test_d64`. Live-verified: `#<(SCREENW+2)`
+      and `#(1+2)` (a named constant and pure numbers inside a group) both
+      produce byte-exact correct output; `LBL1+(LBL2)` (two relocatable
+      labels) correctly produces `CASM: EXPRESSION RELOCATION UNSUPPORTED`
+      with the source-context caret pointing at the right token; 10 new
+      `test_casm_expr` cases (`CASE_COUNT` 45→55) plus every other
+      regression harness (`symbols`, `pass1`, `include`, `frame`,
+      `listcap`, `passcheck`, `bounds`, `cliderive`, `lexer`) all PASS.
+      Full disk-image tree rebuilds clean. Walkthrough: `brain/
+      walkthroughs/2026-08-14-casm-phase12-wp67-parens-precedence.md`.
+      WP68 (arithmetic/bitwise operators) is next and needs its own
+      detailed plan and separate approval before any source edit.
 
 ## Optional Feature - Progress and Processing Indication
 

@@ -724,11 +724,18 @@ CASM_DIAG_SYMBOL_MAP_INVALID = $42  ; mapPrint: corrupt symbol record (locationl
 CASM_DIAG_PHASE10_WP52_LAST = CASM_DIAG_SYMBOL_MAP_INVALID
 ; WP64 reserved $43-$45 across Phase 12 for EXPR_CIRCULAR/EXPR_DIV_ZERO/
 ; EXPR_RELOC_UNSUPPORTED (brain/KNOWLEDGE.md, Phase 12 WP64 section); WP65
-; is the only WP that actually raises one of the three ($43). $44/$45 stay
-; declared-but-unraised until WP68 implements division and the new
-; static-only operators.
+; was the only WP that raised one of the three ($43) at the time. $44
+; stays declared-but-unraised until WP68 implements division; WP67
+; activates $45 (a relocatable value reaching a paren-combine that can't
+; collapse to one symbol + static addend, WP64's own representability
+; rule -- see expr.s's evalExpr).
 CASM_DIAG_EXPR_CIRCULAR = $43  ; resolutionSweep: named constant's definition is directly or transitively self-referential
 CASM_DIAG_PHASE12_WP65_LAST = CASM_DIAG_EXPR_CIRCULAR
+CASM_DIAG_EXPR_DIV_ZERO = $44  ; WP68: division by a static zero (not yet raised anywhere)
+CASM_DIAG_EXPR_RELOC_UNSUPPORTED = $45  ; WP67: a relocatable operand reached a combine that isn't representable as one symbol + static addend
+; WP67: parenthesized sub-expression nesting exceeded CASM_EXPR_PAREN_MAX_DEPTH.
+CASM_DIAG_EXPR_PAREN_TOO_DEEP = $46
+CASM_DIAG_PHASE12_WP67_LAST = CASM_DIAG_EXPR_PAREN_TOO_DEEP
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -782,6 +789,10 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_PHASE10_WP52_LAST = $42, error, "CASM WP52 diagnostic range changed"
 .assert CASM_DIAG_EXPR_CIRCULAR = CASM_DIAG_PHASE10_WP52_LAST + 1, error, "CASM Phase 12 diagnostics must follow Phase 10"
 .assert CASM_DIAG_PHASE12_WP65_LAST = $43, error, "CASM WP65 diagnostic range changed"
+.assert CASM_DIAG_EXPR_DIV_ZERO = CASM_DIAG_PHASE12_WP65_LAST + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_EXPR_RELOC_UNSUPPORTED = CASM_DIAG_EXPR_DIV_ZERO + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_EXPR_PAREN_TOO_DEEP = CASM_DIAG_EXPR_RELOC_UNSUPPORTED + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE12_WP67_LAST = $46, error, "CASM WP67 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
@@ -1088,6 +1099,16 @@ CASM_SYMBOL_CHAIN_END    = $FFFF
 ; builds (to unwind addends from the resolved base back out to the start)
 ; needs a fixed capacity.
 CASM_CONST_CHAIN_MAX = 32
+
+; WP67: deepest parenthesized-sub-expression nesting exprEvaluate's
+; evalExpr will recurse before treating it as CASM_DIAG_EXPR_PAREN_TOO_DEEP.
+; Each nesting level costs one JSR plus a save/restore of the full 9-byte
+; CasmExprResultRecord (CasmExprParenSaveStack, expr.s) against the 6502's
+; small hardware stack, shared with every other nested call in the whole
+; assembler (parser/lexer/source/VMM) -- bounded explicitly rather than
+; trusting caller-supplied nesting to stay small, same precedent as
+; CASM_CONST_CHAIN_MAX/CASM_INCLUDE_MAX_DEPTH.
+CASM_EXPR_PAREN_MAX_DEPTH = 8
 
 .assert CASM_SYMBOL_REC_NAME = CASM_SYMBOL_REC_NAMELEN + 1, error, "CASM symbol record name offset changed"
 .assert CASM_SYMBOL_REC_VAL_LO = CASM_SYMBOL_REC_NAME + 31, error, "CASM symbol record value offset changed"

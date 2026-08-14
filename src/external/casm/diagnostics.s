@@ -137,6 +137,10 @@ diagPrintFatal:
     beq dpfSymbolMapInvalid
     cmp #CASM_DIAG_EXPR_CIRCULAR
     beq dpfExprCircular
+    cmp #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+    beq dpfExprRelocUnsupported
+    cmp #CASM_DIAG_EXPR_PAREN_TOO_DEEP
+    beq dpfExprParenTooDeep
     jmp dpfUnknown
 dpfListingRange:
     sec
@@ -182,6 +186,22 @@ dpfExprCircular:
     ldx #<msgExprCircular
     ldy #>msgExprCircular
     jmp diagPrintString
+; WP67: unlike dpfSymbolMapInvalid/dpfExprCircular above, both of these are
+; raised with a valid source location already set (diagSetLocFromToken, at
+; the raise site -- parseOperatorTail/parsePrimary in expr.s, both still
+; mid-parse when they fire, unlike the Pass1->Pass2 resolution sweep) --
+; same shape as dpfMainRange's own two-step print, not the locationless
+; single-step pattern.
+dpfExprRelocUnsupported:
+    ldx #<msgExprRelocUnsupported
+    ldy #>msgExprRelocUnsupported
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfExprParenTooDeep:
+    ldx #<msgExprParenTooDeep
+    ldy #>msgExprParenTooDeep
+    jsr diagPrintString
+    jmp diagPrintSourceContext
 dpfUnknown:
     ldx #<msgUnknown
     ldy #>msgUnknown
@@ -1435,6 +1455,14 @@ msgSymbolMapInvalid:
 ; to attach (see dpfExprCircular's own comment).
 msgExprCircular:
     .byte "CASM: CIRCULAR CONSTANT DEFINITION", PetCr, 0
+; WP67: a relocatable value reached a combine that already had one --
+; representable only as one symbol + a static addend (WP64's rule).
+msgExprRelocUnsupported:
+    .byte "CASM: EXPRESSION RELOCATION UNSUPPORTED", PetCr, 0
+; WP67: parenthesized sub-expression nesting exceeded CASM_EXPR_PAREN_MAX_
+; DEPTH (8).
+msgExprParenTooDeep:
+    .byte "CASM: EXPRESSION TOO DEEPLY NESTED", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.
