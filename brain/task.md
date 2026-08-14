@@ -3094,12 +3094,40 @@
         resolving inline during Pass 1, using a compact VMM
         source-position bookmark instead of copying referenced names to
         avoid a full source re-scan. **Plan approved by user 2026-08-13,
-        no changes.** Task 45 started. Implementation of the plan's 10
-        Atomic Increments (symbol-record/flags extension, lexer `=`
-        token, parser grammar, `crpConstant` driver, resolution sweep +
-        cycle detection, `map.s` flags update, `expr.s` relocatable
-        classification, envelope bump `$5500`->`$6000`, new
-        `casm_const` test harness) has not yet started.
+        no changes.** Task 45 started. All 10 Atomic Increments
+        (symbol-record/flags extension, lexer `=` token, parser grammar,
+        `crpConstant` driver, resolution sweep + cycle detection,
+        `map.s` flags update, `expr.s` relocatable classification,
+        envelope bump `$5500`->`$6000`, new `casm_const` test harness)
+        are now **complete**. Two real findings during implementation,
+        both disclosed and fixed in the moment: (1) the plan's own
+        "VMM source-position bookmark" needed genuinely new
+        infrastructure (`CasmSourceResultOffsetLo/Hi` in `state.s`,
+        computed in `source.s`'s `sourceFetchPhysical`, propagated
+        through `lexer.s`), not an existing convention as the plan
+        assumed -- flagged to the user, who chose to build it rather
+        than downgrade to define-before-use; (2) live VICE testing of
+        `casmconst1.s` caught a real bug (`ppsConstant`'s addend
+        handling never advanced past the addend's own NUMBER token on
+        the sign-present path), fixed in both the numeric and
+        identifier RHS paths. `casm_overflow_test_d64` reached 0 free
+        blocks from the shared-module growth; `test_casm_faultvmm`
+        relocated to `casm_listing_test_d64`, mirroring
+        `test_l15release`'s own prior identical move (user confirmed
+        this approach first). All four `casmconst1-4` fixtures
+        live-verified against the real `casm.prg` binary under VICE
+        (byte-exact output for the resolution smoke test; correct
+        `CIRCULAR CONSTANT DEFINITION` and `DUPLICATE SYMBOL`
+        diagnostics for the three failure cases), plus regression
+        re-verification of `test_casm_expr`/`test_casm_symbols`/
+        `test_casm_pass1` (all PASS) after the highest-risk change
+        (`expr.s`'s relocatable classification). Full disk-image tree
+        rebuilds clean. Two commits on `feature/casm-phase12-wp65`
+        (`baa7045`, `07bdecf`). Walkthrough:
+        `brain/walkthroughs/2026-08-13-casm-phase12-wp65-named-
+        constants.md`. **Not yet marked complete -- awaiting explicit
+        user approval to close WP65**, per this project's convention
+        against self-declared completion.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

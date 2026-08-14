@@ -1827,16 +1827,27 @@ behavior changed beyond the version/build artifact itself.
       `brain/walkthroughs/2026-08-13-casm-phase12-wp64-contract-freeze.md`.
       Taskwarrior task 44 done. WP65 (named constants) is next and needs
       its own detailed plan and separate approval before any source edit.
-- [/] WP65 plan **approved 2026-08-13** (Taskwarrior task 45,
-      `e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`, started):
+- [/] WP65 **all 10 Atomic Increments complete** (Taskwarrior task 45,
+      `e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`):
       `brain/plans/2026-08-13-casm-phase12-wp65-named-constants.md`.
       `identifier = expr` named constants with full forward-reference
       support (including genuine transitive-cycle detection via
       `CASM_DIAG_EXPR_CIRCULAR`), resolved by deferring constant value
       resolution to the existing Pass1→Pass2 seam so constants can
       reference labels (not just other constants) per WP64's own
-      representability rule. 10 Atomic Increments planned; see
-      `brain/task.md` for full detail. Implementation not yet started.
+      representability rule. Live-verified against the real `casm.prg`
+      binary under VICE: a numeric constant, a constant referencing
+      another constant with an addend, and a constant forward-referencing
+      a not-yet-defined label all produce byte-exact correct output;
+      mutual and self-reference cycles correctly raise `CIRCULAR CONSTANT
+      DEFINITION`; a constant redefining a label's name correctly raises
+      `DUPLICATE SYMBOL`. Full disk-image tree rebuilds clean. Two commits
+      on `feature/casm-phase12-wp65` (`baa7045`, `07bdecf`). Walkthrough:
+      `brain/walkthroughs/2026-08-13-casm-phase12-wp65-named-constants.md`.
+      See `brain/task.md` for full detail including two real findings
+      (new source-position infrastructure needed; an addend-consumption
+      bug caught live). **Not yet marked complete — awaiting explicit user
+      approval to close WP65.**
 
 ## Optional Feature - Progress and Processing Indication
 

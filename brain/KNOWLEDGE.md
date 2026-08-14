@@ -2419,6 +2419,101 @@ each subsequent WP still requiring its own detailed plan and separate
 approval before any source edit, per
 `.agents/workflows/phased-implementation-planning.md`.
 
+### CASM Phase 12 WP65 Named Constants — As-Built (complete 2026-08-13)
+
+`identifier = expr` named-constant definitions, implementing WP64's own
+frozen contract. Plan:
+`brain/plans/2026-08-13-casm-phase12-wp65-named-constants.md`. Walkthrough
+(live VICE evidence): `brain/walkthroughs/2026-08-13-casm-phase12-wp65-
+named-constants.md`. Branch `feature/casm-phase12-wp65`.
+
+**Symbol record** (`common.inc`, 64-byte record unchanged): Flags byte
+gained `CASM_SYMBOL_FLAG_CONSTANT` (`%00000010`), `_RESOLVED`
+(`%00000100`), `_LABEL_DERIVED` (`%00001000`) alongside the existing
+`_DEFINED`. Offsets 37-43 of the previously-reserved padding now hold a
+deferred-reference bookmark: `REF_VMM_LO/HI` (absolute source position),
+`REF_LEN`, `REF_ADDEND_LO/HI`, `REF_SIGN`, `REF_EXTRACT` — meaningful only
+while `CONSTANT` is set and `RESOLVED` is clear; zeroed once resolved
+(both by `ppsConstant`'s own numeric-immediate path and by the resolution
+sweep's write-back), keeping `map.s`'s "reserved padding must be
+zero-filled" invariant intact for every valid record shape.
+
+**Absolute source-position bookmark** (new, `state.s`/`source.s`/
+`lexer.s`): `CasmSourceResultOffsetLo/Hi` — the absolute offset, within the
+single shared VMM allocation `sourceLoad`/`sourceAppendFile` write every
+file (top-level and included) into permanently, of the byte just
+delivered. Computed in `sourceFetchPhysical` as `CasmSourceVmmCursor -
+CasmSourceBlockLen + CasmSourceBlockIndex` (block start plus in-block
+position), *not* `CasmSourceOffsetLo/Hi` (a per-span counter reset at
+every file/include boundary — confirmed unusable for this purpose by
+tracing, not assumed). Propagated through `CasmLookaheadOffsetLo/Hi`
+(`lexerFill`) into `CasmTokenStartOffsetLo/Hi` (`lexerTokenReset`),
+mirroring the existing FileId/Line/Column provenance-stamping pattern
+exactly — populated for every token, not just identifiers. This is what
+lets a deferred constant reference be re-fetched later (a single
+`vmmWindowRead` against `CasmSourceVmmSlot`, now exported) without storing
+a copy of the name or re-scanning source text.
+
+**Resolution sweep** (`casmResolveConstants`/`crcResolveChain`, `casm.s`):
+runs once at the existing Pass1→Pass2 boundary (after `CasmPass1FinalPc`
+is snapshotted, before `sourceRewind`) — by then every label's address and
+every constant's name (though not necessarily its value) are already in
+the symbol table. For each still-unresolved constant: an iterative
+(non-recursive, to bound 6502 stack usage) walk follows the deferred
+reference chain, marking a 512-bit "visited this walk" bitmap
+(`CrcBitmap`) for cycle detection and recording the path (`CrcChainLo/Hi`,
+bounded by `CASM_CONST_CHAIN_MAX = 32`) to unwind addends from the
+resolved base back to the start once found. A label, or an
+already-resolved constant, terminates the walk (base value); revisiting a
+bitmap-marked index is `CASM_DIAG_EXPR_CIRCULAR`; a name that resolves to
+nothing at all is `CASM_DIAG_UNDEFINED_SYMBOL`; exceeding the chain bound
+is treated as circular too. `CASM_SYMBOL_FLAG_LABEL_DERIVED` propagates
+transitively through the whole unwound chain, not just the node adjacent
+to the label — needed so `expr.s`'s relocatable classification (below) is
+correct for `x = y`, `y = someLabel` as well as `x = someLabel` directly.
+New `symbolsUpdateByIndex` (`symbols.s`) persists each resolved node via a
+read-modify-write against its own record index.
+
+**`symbolsInsert`/`symbolsLookup` ABI** (`symbols.s`): `symbolsInsert` no
+longer hardcodes `CASM_SYMBOL_FLAG_DEFINED` — every caller (production and
+test) now sets `CasmSymbolInsertFlags` explicitly first, formalizing what
+was previously implicit. `symbolsLookup`'s `CASM_RESOLVE_*` view grew a
+6th field, `CASM_RESOLVE_SYM_FLAGS` (the matched record's own Flags byte),
+letting a caller distinguish a label from a constant — and a resolved
+constant from an unresolved one — without a second lookup.
+
+**`expr.s` relocatable classification**: previously, `CasmExprRelocatableModeIn`
+applied unconditionally to any resolved identifier (correct when every
+symbol was a label). Now: a label keeps that unconditional behavior
+unchanged (zero regression risk on the best-tested path); a *resolved*
+named constant is relocatable only when `CASM_SYMBOL_FLAG_LABEL_DERIVED`
+is also set — a pure numeric constant is never relocatable regardless of
+mode. An *unresolved* constant (only reachable during Pass 1, before the
+sweep runs — Pass 2 never sees one) takes the unconditional path, which is
+provably inert since Pass 1 never consumes `RELOCATABLE`.
+
+**Diagnostics**: `CASM_DIAG_EXPR_CIRCULAR` ($43, WP64-reserved) is the only
+one of WP64's three reserved Phase 12 codes WP65 actually raises;
+`$44`/`$45` stay declared-but-unraised until WP68. Locationless (like
+`CASM_DIAG_SYMBOL_MAP_INVALID`): the resolution sweep runs after the live
+lexer/parser state a source-position diagnostic depends on has already
+moved on, and the record's bookmark is a raw byte offset, not a
+line/column, with no cheap reverse-lookup available.
+
+**Known pre-existing limitation surfaced, not introduced**: rerunning
+`casm` against a source whose output name already exists on disk fails
+`OUTPUT WRITE FAILED` (`fileCreateOutput` has no `@0:`-style replace
+marker — matches memory `project-casm-filecreateoutput-no-replace`,
+recorded before WP65, not a regression).
+
+**Envelope**: `PRG_SIZE_HEX` `$5500`→`$6000` (WP64's own recommendation).
+Several test-harness envelopes bumped to absorb the shared-module growth
+(`parser.s`/`lexer.s`/`state.s`/`source.s`/`symbols.s`/`expr.s` are linked
+whole into many harnesses regardless of whether each one exercises the
+constant path). `test_casm_faultvmm` relocated from
+`casm_overflow_test_d64` (reached 0 free blocks) to `casm_listing_test_d64`,
+mirroring `test_l15release`'s own prior identical move.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
