@@ -1,6 +1,6 @@
 # CASM Phase 12 WP65 Named Constants Walkthrough
 
-Status: Complete; user approval pending (this document)
+Status: Complete; user-approved 2026-08-14
 Branch: `feature/casm-phase12-wp65`
 Candidate: CASM `0.2.2` build `1285`, envelope `$3800`-`$9800` (`PRG_SIZE_HEX`
 `6000`, bumped from `$5500` per WP64's own recommendation)
@@ -157,9 +157,7 @@ problem. User confirmed this approach before it was carried out.
 - `brain/KNOWLEDGE.md`: new WP65 section recorded (below), documenting the
   as-built symbol-record layout, ABI, and resolution-sweep design.
 - `brain/task.md`, `wiki/tasks/casm.md`: completion entries recorded.
-- Taskwarrior task 45 stays started, not yet marked done — closing it is
-  part of what this walkthrough's own approval authorizes, not a
-  self-declared side effect.
+- Taskwarrior task 45 marked done, 2026-08-14, after user approval.
 - No user-facing doc update in this pass: `docs/casm-utility.md` etc.
   updates for the newly-shipped `identifier = expr` syntax are deferred to
   a documentation-sync step, consistent with this project's convention of
@@ -169,11 +167,11 @@ problem. User confirmed this approach before it was carried out.
 
 ## Outcome
 
-**WP65 complete pending user approval.** All 10 increments implemented,
-build-verified across the full disk-image tree, and live-verified against
-the real production binary under VICE — including regression coverage of
-the three most exposed pre-existing harnesses. Two commits on
-`feature/casm-phase12-wp65` (`baa7045`, `07bdecf`). WP66 (current-address
-symbol) is next and requires its own detailed plan and separate approval
-before any source edit, per
+**WP65 complete, user-approved 2026-08-14.** All 10 increments
+implemented, build-verified across the full disk-image tree, and
+live-verified against the real production binary under VICE — including
+regression coverage of the three most exposed pre-existing harnesses.
+Three commits on `feature/casm-phase12-wp65` (`baa7045`, `07bdecf`,
+`dd4bb9b`). WP66 (current-address symbol) is next and requires its own
+detailed plan and separate approval before any source edit, per
 `.agents/workflows/phased-implementation-planning.md`.

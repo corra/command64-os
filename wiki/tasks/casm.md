@@ -1827,8 +1827,8 @@ behavior changed beyond the version/build artifact itself.
       `brain/walkthroughs/2026-08-13-casm-phase12-wp64-contract-freeze.md`.
       Taskwarrior task 44 done. WP65 (named constants) is next and needs
       its own detailed plan and separate approval before any source edit.
-- [/] WP65 **all 10 Atomic Increments complete** (Taskwarrior task 45,
-      `e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`):
+- [x] WP65 **complete, user-approved 2026-08-14** (Taskwarrior task 45,
+      `e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`, done):
       `brain/plans/2026-08-13-casm-phase12-wp65-named-constants.md`.
       `identifier = expr` named constants with full forward-reference
       support (including genuine transitive-cycle detection via
@@ -1841,13 +1841,14 @@ behavior changed beyond the version/build artifact itself.
       a not-yet-defined label all produce byte-exact correct output;
       mutual and self-reference cycles correctly raise `CIRCULAR CONSTANT
       DEFINITION`; a constant redefining a label's name correctly raises
-      `DUPLICATE SYMBOL`. Full disk-image tree rebuilds clean. Two commits
-      on `feature/casm-phase12-wp65` (`baa7045`, `07bdecf`). Walkthrough:
+      `DUPLICATE SYMBOL`. Full disk-image tree rebuilds clean. Three
+      commits on `feature/casm-phase12-wp65` (`baa7045`, `07bdecf`,
+      `dd4bb9b`). Walkthrough:
       `brain/walkthroughs/2026-08-13-casm-phase12-wp65-named-constants.md`.
       See `brain/task.md` for full detail including two real findings
       (new source-position infrastructure needed; an addend-consumption
-      bug caught live). **Not yet marked complete — awaiting explicit user
-      approval to close WP65.**
+      bug caught live). WP66 (current-address symbol) is next and needs
+      its own detailed plan and separate approval before any source edit.
 
 ## Optional Feature - Progress and Processing Indication
 

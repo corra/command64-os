@@ -3074,7 +3074,7 @@
     Taskwarrior task 44 marked done. WP65 (named constants) is next and
     requires its own detailed plan and separate approval before any
     source edit.
-  - [/] Taskwarrior #45 (`e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`): WP65,
+  - [x] Taskwarrior #45 (`e32c08c8-1435-43b2-a075-a2bb2f6e0c8f`): WP65,
         named constant definitions. Depends on task 44 (WP64). Plan:
         `brain/plans/2026-08-13-casm-phase12-wp65-named-constants.md`.
         Sub-agent research (source-grounded, file:line citations)
@@ -3122,12 +3122,13 @@
         re-verification of `test_casm_expr`/`test_casm_symbols`/
         `test_casm_pass1` (all PASS) after the highest-risk change
         (`expr.s`'s relocatable classification). Full disk-image tree
-        rebuilds clean. Two commits on `feature/casm-phase12-wp65`
-        (`baa7045`, `07bdecf`). Walkthrough:
+        rebuilds clean. Three commits on `feature/casm-phase12-wp65`
+        (`baa7045`, `07bdecf`, `dd4bb9b`). Walkthrough:
         `brain/walkthroughs/2026-08-13-casm-phase12-wp65-named-
-        constants.md`. **Not yet marked complete -- awaiting explicit
-        user approval to close WP65**, per this project's convention
-        against self-declared completion.
+        constants.md`. **WP65 complete, user-approved 2026-08-14.**
+        Taskwarrior task 45 marked done. WP66 (current-address symbol)
+        is next and requires its own detailed plan and separate
+        approval before any source edit.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature
