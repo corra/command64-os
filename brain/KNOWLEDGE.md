@@ -2895,6 +2895,79 @@ its `.s` suffix — the identical class of mistake WP68 Increment 7 already
 found once for `casmarithreloc1`/`2`. Caught before any live testing;
 renamed to `casmcharinval.s` (15 characters).
 
+### CASM Phase 12 WP70 Relocation Algebra Closure — As-Built (complete 2026-08-15)
+
+Consolidated, no-new-behavior verification that every operator/operand
+combination WP65-69 shipped matches WP64's frozen representability
+contract — the master plan's own risk gate, proven directly rather than
+assumed from WP64's design alone. Plan: `brain/plans/2026-08-15-casm-
+phase12-wp70-relocation-algebra-closure.md`. Walkthrough: `brain/
+walkthroughs/2026-08-15-casm-phase12-wp70-relocation-algebra-closure.md`.
+
+**Two distinct relocation rules, confirmed by reading `expr.s`'s
+`parseOperatorTail` dispatch directly, not assumed**: `+`/`-`
+(`checkAddReloc`, pre-existing) reject only when **both** operands are
+relocatable — one relocatable component plus any static components
+always succeeds. Every WP68 operator and both unary operators
+(`checkStaticReloc`/the unary path's equivalent check) reject if
+**either** operand is relocatable at all — static-only, per WP64's own
+frozen rule. Both are single shared routines with no per-operator
+branching before the check runs, confirmed by reading, not inferred from
+behavior.
+
+**A genuine, previously-unproven gap found by reading every Phase 12
+fixture's own source, not by running anything**: no fixture anywhere —
+in Phase 12 or before it — combines a relocatable label with a static
+addend AND verifies the resulting R6 relocation table. Every pre-Phase-12
+fixture that does full R6 verification (`casmrelop1`/`2`, `casmreloc1`)
+uses the old flat single-addend grammar with a bare identifier, no
+addend. Every Phase 12 fixture that reaches a real relocatable label
+(`casmparen2`, `casmareloc1`/`2`) is itself a *rejection* case — none of
+them assemble successfully and check the resulting table. Closed by
+`casmrelacc.seq` (`JMP MID` / `LDA TARGET+(1+0)` / `NOP`, no `.ORG`):
+`TARGET+(1+0)` combines relocatable `TARGET` with a static parenthesized
+group via `+`, reaching WP67's recursive `parsePrimary`/
+`parseOperatorTail` architecture with a genuinely relocatable operand for
+the first time under full R6 verification.
+
+**A real hand-derivation mistake, caught by the fixture's own COMP
+check, not silently trusted**: the first `casmrelacc.ref.hex` draft
+predicted only one R6 entry (the `LDA` line's own relocatable reference),
+missing that `JMP MID` is *also* a relocatable reference in the same
+assembly — `MID` is a label too, and every label in non-`.ORG` mode is
+relocatable, exactly the same "absolute JMP, high-byte relocatable"
+pattern `casmrelop1.ref.hex` already established at its own offset 2.
+`COMP` reported two byte mismatches plus a file-size difference (17 vs
+19 bytes) against the real assembled output; corrected by re-deriving
+from the spec/`casmrelop1` precedent (the mismatch located the error, the
+correction did not copy CASM's own bytes — non-circularity preserved).
+
+**A second live rejection proof, closing the gap between "proven
+algebraically" and "proven live for more than one operator"**:
+`casmarelocb.seq` (`LOOP: NOP` / `LDA #LOOP&$FF`) applies `&` — a
+distinct WP68 operator from Increment 7's `*` — to a real relocatable
+label, live-confirming `checkStaticReloc`'s shared mechanism a second
+time rather than resting on the "one shared routine" argument alone.
+
+**Coverage audit** (recorded here as the direct, checkable evidence the
+master plan's risk gate calls for):
+
+| Combination | Proven where |
+| --- | --- |
+| `+`/`-`, one relocatable + static, flat grammar | `casmrelop1`/`2`.ref.hex (pre-Phase-12), R6-verified, still re-run every regression |
+| `+`/`-`, one relocatable + static, through WP67's recursive architecture | `casmrelacc.seq` (WP70, this WP), R6-verified |
+| `+`/`-`, two relocatable components (rejected) | `casmparen2.seq` (WP67), live |
+| `*` applied to a real relocatable label/constant (rejected) | `casmareloc1`/`2.seq` (WP68 Increment 7), live |
+| `&` applied to a real relocatable label (rejected) | `casmarelocb.seq` (WP70, this WP), live |
+| `/`, `^`, `\|`, `<<`, `>>`, unary `-`/`~` applied to a relocatable operand (rejected) | `test_casm_expr`'s own `sMulReloc`/`sDivReloc`/`sShiftReloc`/`sUnaryReloc` cases (synthetic, algebraic) — shared-mechanism argument (above), not separately live-verified per operator |
+| `*` (current-address symbol) as a relocatable primary | `casmcuraddr1.seq` (WP66), live |
+| A relocatable named constant (`= *`) reaching a static-only operator (rejected) | `casmareloc2.seq` (WP68 Increment 7), live |
+
+No production source change was needed — this WP's own research (its
+plan's Research Findings) found no defect, only an unproven-but-correct
+gap and one hand-derivation mistake in the new fixture itself, both
+resolved without touching `src/external/casm/*.s`.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

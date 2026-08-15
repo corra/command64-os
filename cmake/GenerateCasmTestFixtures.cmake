@@ -1737,3 +1737,35 @@ file(WRITE "${OUTPUT_DIR}/casmcharunterm.seq"
 file(WRITE "${OUTPUT_DIR}/casmcharinval.seq"
     "LDA #'${CASM_CTRL_A}'\n"
 )
+
+# WP70: the "accepted" side of WP64's representability contract -- a
+# relocatable label combined with a static addend via '+', with the
+# static side wrapped in a parenthesized group, in genuinely relocatable
+# (no .ORG) mode. Proves a real R6 relocation table entry is still
+# correct when reached through WP67's recursive parsePrimary/
+# parseOperatorTail architecture -- no prior fixture combines a
+# relocatable label with an addend and verifies the resulting R6 table
+# (WP70 plan's own Research Findings). COMP-verified against a
+# hand-derived casmrelacc.ref.hex (including the R6 table/footer),
+# registered in CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmrelacc.seq"
+    "START:\n"
+    "    JMP MID\n"
+    "MID:\n"
+    "    LDA TARGET+(1+0)\n"
+    "TARGET:\n"
+    "    NOP\n"
+)
+
+# WP70: a second, distinct WP68 static-only operator (& -- bitwise AND,
+# not * already proven in WP68 Increment 7) applied to a real
+# relocatable label, live-proving checkStaticReloc's shared mechanism a
+# second time rather than resting on the algebraic "one shared routine"
+# argument alone. No .ORG (implicit relocatable default). Expects
+# CASM_DIAG_EXPR_RELOC_UNSUPPORTED; no .ref (failure case),
+# live-verified for the exact message and source location.
+file(WRITE "${OUTPUT_DIR}/casmarelocb.seq"
+    "LOOP:\n"
+    "NOP\n"
+    "LDA #LOOP&\$FF\n"
+)

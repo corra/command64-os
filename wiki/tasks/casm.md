@@ -2015,6 +2015,26 @@ behavior changed beyond the version/build artifact itself.
       `casm_listing_test_d64` is down to 7 free blocks from this WP's
       shared-module growth, the same capacity crunch WP67 already
       resolved once for this disk.
+- [/] WP70 **relocation algebra closure implemented, pending final
+      approval** (Taskwarrior task 45,
+      `99886bbd-782b-412e-9bd4-efff9c6bfd47`, depends on WP68/69):
+      `brain/plans/2026-08-15-casm-phase12-wp70-relocation-algebra-
+      closure.md`. Consolidated verification, no new production
+      behavior. Traced the two governing relocation rules directly in
+      `expr.s`: `+`/`-` reject only when both operands are relocatable;
+      every WP68 operator and both unary operators reject if either
+      operand is relocatable at all. Found a genuine, previously-unproven
+      gap by reading every Phase 12 fixture's own source: no fixture
+      anywhere combines a relocatable label with a static addend and
+      verifies the resulting R6 relocation table. Closed with
+      `casmrelacc.seq` (R6-verified through the new recursive
+      architecture for the first time) and `casmarelocb.seq` (a second
+      distinct operator, `&`, live-rejecting a real relocatable label).
+      A hand-derivation mistake in the first reference draft was caught
+      by the fixture's own COMP mismatch and corrected from spec. CASM
+      promoted `0.2.4` -> `0.2.5`, live-verified as `V0.2.5.1312`.
+      Walkthrough: `brain/walkthroughs/2026-08-15-casm-phase12-wp70-
+      relocation-algebra-closure.md`.
 
 ## Optional Feature - Progress and Processing Indication
 

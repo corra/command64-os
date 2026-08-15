@@ -160,6 +160,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 12 WP70: relocation algebra closure**: consolidated
+  verification (no new syntax or semantics) that every operator/operand
+  combination WP65-69 shipped matches the relocation-representability
+  contract exactly. Traced the two governing rules directly in `expr.s`:
+  `+`/`-` reject only when both operands are relocatable (one relocatable
+  plus any static components always succeeds); every arithmetic/bitwise
+  operator and both unary operators reject if either operand is
+  relocatable at all. Found and closed a genuine, previously-unproven gap:
+  no fixture anywhere — in Phase 12 or before it — had ever combined a
+  relocatable label with a static addend and verified the resulting R6
+  relocation table; every pre-Phase-12 fixture that does full R6
+  verification uses the old flat grammar with no addend, and every Phase
+  12 fixture that reaches a real relocatable label is itself a rejection
+  case. Closed with a new production fixture reaching a relocatable label
+  combined with a static addend through the new parenthesized/precedence-
+  climbing architecture for the first time, live-verified byte-exact
+  against a hand-derived reference (including the R6 table and footer) —
+  a hand-derivation mistake in that same reference (missing that a second
+  label in the fixture was also a relocatable reference) was caught by
+  the live COMP mismatch and corrected from the specification, not copied
+  from CASM's own output. A second live fixture applies a different
+  arithmetic operator than previously tested to a real relocatable label,
+  confirming the shared rejection mechanism a second time. Every
+  regression harness passes; CASM promoted to `0.2.5`.
 - **CASM Phase 12 WP69: character literals**: `'x'` — a single quote, one
   literal PETSCII byte, a closing quote — evaluates to that byte's value,
   usable as an immediate operand (`lda #'a'`) or a `.BYTE` list entry

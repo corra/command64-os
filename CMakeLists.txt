@@ -1558,7 +1558,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmreloc1
     casmopall
     casmfa2p
-    casmarith2 casmarithfwd casmarith3 casmchar1)
+    casmarith2 casmarithfwd casmarith3 casmchar1 casmrelacc)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1886,6 +1886,24 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmcharinval.seq"
         "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     COMMENT "Appending WP69 character-literal fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP70: relocation algebra closure fixtures -- one "accepted" case
+# (COMP-verified including R6 table/footer) plus one "rejected" case
+# (a second static-only operator applied to a real relocatable label).
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmrelacc.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmrelacc.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmrelacc.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmrelacc.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarelocb.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarelocb.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP70 relocation algebra closure fixtures and their trusted reference to casm_phase12_test.d64"
     VERBATIM
 )
 
@@ -2386,10 +2404,12 @@ add_custom_command(
 # matching casmarith3.s source also lives only on casm_phase12_test_d64.
 # WP69's casmchar1 is excluded for the same reason: its matching
 # casmchar1.s source also lives only on casm_phase12_test_d64.
+# WP70's casmrelacc is excluded for the same reason: its matching
+# casmrelacc.s source also lives only on casm_phase12_test_d64.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
        AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
-       AND NOT REF_NAME STREQUAL "casmchar1")
+       AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmrelacc")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
