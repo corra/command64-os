@@ -144,7 +144,7 @@ from WP69's 441 for the two new fixtures). `image_d64`/`test_image_d64`/
 
 ## Outcome
 
-**WP70 complete, pending final user approval.** Both new fixtures behave
+**WP70 complete, user-approved 2026-08-15.** Both new fixtures behave
 exactly as designed after one genuine hand-derivation mistake was found
 and corrected via the fixture's own COMP check (not silently trusted).
 No production source change was needed. The relocation-representability

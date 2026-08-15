@@ -272,5 +272,5 @@ tracker sync is complete; and the user explicitly approves closing WP70.
   This WP's Completion Gate is satisfied: coverage audit recorded; both
   fixtures behave exactly as designed; full build/envelope inspection
   and no-change rebuild pass; live VICE evidence recorded; documentation/
-  version/tracker sync complete. Awaiting the user's explicit approval
-  to close WP70.
+  version/tracker sync complete. **WP70 complete, user-approved
+  2026-08-15.** Taskwarrior task 45 marked done.

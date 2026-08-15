@@ -3424,8 +3424,7 @@
       literals.md`. Watch item for WP70: `casm_listing_test_d64` is down
       to 7 free blocks from this WP's shared-module growth, the same
       capacity crunch WP67 already resolved once for this disk.
-    - [/] WP70 relocation algebra closure implemented, pending approval
-      (Taskwarrior task 45,
+    - [x] WP70 relocation algebra closure complete (Taskwarrior task 45,
       `99886bbd-782b-412e-9bd4-efff9c6bfd47`, depends on WP68/69):
       `brain/plans/2026-08-15-casm-phase12-wp70-relocation-algebra-
       closure.md`. Consolidated verification, no new production
@@ -3445,10 +3444,11 @@
       in the same fixture) was caught by the fixture's own COMP mismatch
       and corrected from spec, not from CASM's own output. CASM promoted
       `0.2.4` -> `0.2.5`, live-verified as `V0.2.5.1312`. **WP70
-      implementation complete, pending final user approval to close.**
-      Walkthrough: `brain/walkthroughs/2026-08-15-casm-phase12-wp70-
-      relocation-algebra-closure.md`. WP71 (DASH adoption) and WP72
-      (Phase 12 completion gate) remain after WP70 closes.
+      complete, user-approved 2026-08-15.** Taskwarrior task 45 marked
+      done. Walkthrough: `brain/walkthroughs/2026-08-15-casm-phase12-
+      wp70-relocation-algebra-closure.md`. WP65-70 (the full
+      dependency-spine-adjacent set) are now all complete; WP71 (DASH
+      adoption) and WP72 (Phase 12 completion gate) remain.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

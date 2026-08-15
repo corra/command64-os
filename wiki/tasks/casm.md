@@ -2015,8 +2015,8 @@ behavior changed beyond the version/build artifact itself.
       `casm_listing_test_d64` is down to 7 free blocks from this WP's
       shared-module growth, the same capacity crunch WP67 already
       resolved once for this disk.
-- [/] WP70 **relocation algebra closure implemented, pending final
-      approval** (Taskwarrior task 45,
+- [x] WP70 **relocation algebra closure complete, user-approved
+      2026-08-15** (Taskwarrior task 45,
       `99886bbd-782b-412e-9bd4-efff9c6bfd47`, depends on WP68/69):
       `brain/plans/2026-08-15-casm-phase12-wp70-relocation-algebra-
       closure.md`. Consolidated verification, no new production
