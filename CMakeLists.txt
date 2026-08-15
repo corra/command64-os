@@ -1544,7 +1544,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmreloc1
     casmopall
     casmfa2p
-    casmarith2 casmarithfwd)
+    casmarith2 casmarithfwd casmarith3)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1831,6 +1831,25 @@ add_custom_command(
     VERBATIM
 )
 add_dependencies(casm_phase12_test_d64 casm_test_fixtures casm_reference_fixtures)
+
+# WP68 Increment 9: live end-to-end fixtures for the operators not yet
+# proven through the real production pipeline by Increment 7's
+# representative sample (/, ^, |, >>) plus the WP68-new
+# CASM_DIAG_EXPR_DIV_ZERO diagnostic's first real end-to-end proof.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmarith3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarith3.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarith3.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmarith3.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmdivzero.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmdivzero.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP68 Increment 9 live end-to-end fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
 
 # WP61 Increment 6: source-extent boundary fixtures (65,535-byte accepted
 # combined extent / 65,536-byte first-reject). casmsrcmax.seq alone proves
@@ -2325,9 +2344,11 @@ add_custom_command(
 # WP68 Increment 7's casmarith2/casmarithfwd are excluded for the same
 # reason: their matching .s sources live only on casm_phase12_test_d64
 # (this WP's own Scoping Decision 2), and test.d64 has only 21 free blocks.
+# WP68 Increment 9's casmarith3 is excluded for the same reason: its
+# matching casmarith3.s source also lives only on casm_phase12_test_d64.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
-       AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd")
+       AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

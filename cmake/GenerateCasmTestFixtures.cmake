@@ -1668,3 +1668,32 @@ file(WRITE "${OUTPUT_DIR}/casmareloc2.seq"
     "NOP\n"
     "LDA #BUFSTART*2\n"
 )
+
+# WP68 Increment 9: the remaining WP68 operators not yet exercised through
+# the real production pipeline by Increment 7's representative sample (*,
+# &, <<, unary -): / (division), ^ (XOR), | (OR), >> (right shift), across
+# immediate/.BYTE/.WORD contexts. .ORG $C000 keeps this fixed-address (no
+# relocatable symbols involved). $8001>>1 = $4000 proves the shift is
+# logical/zero-filling, not arithmetic, through the real pipeline.
+# COMP-verified against a hand-derived casmarith3.ref.hex, registered in
+# CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmarith3.seq"
+    ".ORG \$C000\n"
+    "LDA #10/2\n"
+    "LDA #\$0F^\$03\n"
+    "LDA #\$0F|\$03\n"
+    ".BYTE 10/2, \$0F^\$03\n"
+    ".WORD \$0F|\$03, \$8001>>1\n"
+)
+
+# WP68 Increment 9: forbidden form, division by a static zero. Proves
+# CASM_DIAG_EXPR_DIV_ZERO (expr.s:676-682, unconditional zero-divisor
+# check before any division arithmetic) through the real production
+# pipeline for the first time -- common.inc:770's own comment still says
+# "not yet raised anywhere," stale as of Increment 6's synthetic-harness
+# wiring; this is the first live end-to-end proof. No .ORG needed (a
+# static-constant division, not a relocation case). No .ref (failure
+# case), live-verified for the exact message and source location.
+file(WRITE "${OUTPUT_DIR}/casmdivzero.seq"
+    "LDA #5/0\n"
+)

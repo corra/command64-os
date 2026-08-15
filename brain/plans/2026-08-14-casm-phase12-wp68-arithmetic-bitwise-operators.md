@@ -639,3 +639,55 @@ synchronized; and the user explicitly approves closing WP68.
   bytes of headroom. Detailed evidence recorded in the subordinate plan.
   Awaiting explicit user approval to close Increment 8 and proceed to
   Atomic Increment 9 (live end-to-end verification).
+- 2026-08-15: **Atomic Increment 9 complete -- WP68's own Atomic Steps are
+  now all closed.** Drafted a detailed subordinate plan
+  (`brain/plans/2026-08-15-casm-phase12-wp68-increment9-live-end-to-end.md`),
+  user-approved, scoped around the one real gap left in live-verification
+  coverage: `/`, `^`, `|`, `>>`, and `CASM_DIAG_EXPR_DIV_ZERO` had only
+  ever been proven against the synthetic `test_casm_expr` harness, never
+  through the real `casm.prg` production pipeline (unlike `*`, `&`, `<<`,
+  unary `-`, and relocation rejection, already proven live in Increment 7).
+
+  Added two fixtures to `casm_phase12_test_d64`: `casmarith3.seq`
+  (division/XOR/OR/right-shift across immediate/`.BYTE`/`.WORD` contexts,
+  including `$8001>>1 = $4000` proving the shift is logical/zero-filling
+  through the real pipeline) and `casmdivzero.seq` (`LDA #5/0`, forbidden
+  form). Full affected-target/disk-image rebuild and a no-change rebuild
+  proof (SHA-256 identical) both passed before any live testing; disk
+  landed at 449 free blocks (still comfortably above the `>=40` gate).
+
+  Live VICE 3.10 verification: `casmarith3.s` -> `CASM: INPUT VALIDATED`,
+  `comp carith3.prg casmarith3.ref` -> `FILES COMPARE OK`; `casmdivzero.s`
+  -> `CASM: EXPRESSION DIVISION BY ZERO AT LINE 1, COL 9 (OFFSET 8)`,
+  exactly as designed -- the first real end-to-end proof of
+  `CASM_DIAG_EXPR_DIV_ZERO`, correcting `common.inc:770`'s own stale "not
+  yet raised anywhere" comment. Both re-run harnesses confirmed no
+  regression: `test_casm_expr` (`CASM EXPR: PASS`) and `test_casm_lexer`
+  (`CASM LEXER: PASS`).
+
+  One harness-only finding, disclosed here per this project's standard
+  practice rather than silently worked around: several shell-dispatch
+  attempts for `test_casm_expr`/`test_casm_lexer` returned spurious `BAD
+  COMMAND OR FILE NAME` with a visibly garbled command echo (e.g.
+  `test•casm•lexer`), even after `flush\n` and even when typed as a
+  single `vice_keyboard_type` call with the verified underscore handling
+  from `.agents/workflows/vice-mcp-testing.md`. Both harnesses ultimately
+  ran cleanly (`CASM EXPR: PASS`, `CASM LEXER: PASS`) once retried with a
+  fresh `flush\n` immediately before the command, with no production or
+  fixture-source involvement -- classified as a VICE MCP
+  keyboard-queue/timing harness issue, not a product defect, and not
+  investigated further since it lies outside this increment's scope; the
+  existing `flush`-based recovery in the mandatory workflow doc remains
+  the correct and sufficient mitigation.
+
+  Every WP64-frozen operator has now been proven at least once through
+  the real production pipeline. No `src/external/casm/*.s` production
+  source change was needed. VICE left healthy and running.
+
+  All nine Atomic Increments of WP68 are now complete. WP68 itself is not
+  yet closed: its own final close-out (`brain/KNOWLEDGE.md`,
+  `wiki/casm-utility.md`/`docs/casm-utility.md`,
+  `wiki/casm-programmers-reference.md`, `CHANGELOG.md`, stage-version
+  bump, and a `brain/walkthroughs/` completion-gate doc) remains, per the
+  phased-planning skill's closing checklist, before WP68 can be marked
+  done.
