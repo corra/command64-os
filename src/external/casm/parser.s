@@ -627,6 +627,18 @@ parseOperandSequence:
     beq posAbsoluteJmp
     cmp #CASM_TOKEN_GREATER
     beq posAbsoluteJmp
+    ; WP68 Increment 7: current-address (WP66, pre-existing gap) and unary
+    ; '-'/'~' (this WP) can all start a non-immediate operand expression
+    ; ("LDA *", "LDA -1", "LDA ~1") -- without these, exprEvaluate's own
+    ; parsePrimary (which already handles all three) is never reached at
+    ; all, rejected here first as CASM_DIAG_SYNTAX_ERROR. Same class of gap
+    ; WP67 fixed for a leading '(' in posImmediate's own whitelist below.
+    cmp #CASM_TOKEN_STAR
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_MINUS
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_TILDE
+    beq posAbsoluteJmp
     cmp #CASM_TOKEN_REGISTER
     beq posAccumulatorJmp
     cmp #CASM_TOKEN_LPAREN
@@ -669,6 +681,15 @@ posImmediate:
     ; CASM_DIAG_SYNTAX_ERROR before parserParseExpressionValue is even
     ; called.
     cmp #CASM_TOKEN_LPAREN
+    beq posImmediateNumber
+    ; WP68 Increment 7: same class of gap as '(' immediately above, for
+    ; current-address (WP66, pre-existing gap) and unary '-'/'~' (this WP)
+    ; as the first token after '#' (e.g. `lda #*`, `lda #-1`, `lda #~1`).
+    cmp #CASM_TOKEN_STAR
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_MINUS
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_TILDE
     beq posImmediateNumber
     jmp posSyntaxError
 posImmediateNumber:

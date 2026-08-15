@@ -1543,7 +1543,8 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmrelop1 casmrelop2
     casmreloc1
     casmopall
-    casmfa2p)
+    casmfa2p
+    casmarith2 casmarithfwd)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1785,12 +1786,51 @@ add_dependencies(casm_include_test_d64 casm_test_fixtures)
 # test.d64 (see the TEST_IMAGE_PRG_TARGETS REMOVE_ITEM above) onto this disk.
 # add_c64_disk_image already wraps cc1541 with the required C64_THEME_DIR
 # build-event contract, so no direct external-tool command is introduced here.
+#
+# WP68 Increment 7: adds comp.prg, needed for the two COMP-verified
+# production integration fixtures (casmarith2/casmarithfwd) appended below,
+# per this increment's own Scoping Decision 2 (keep this WP's growth off
+# the already-tight test.d64).
 add_c64_disk_image(casm_phase12_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 casm test_casm_expr test_casm_lexer
+    PRGS command64 casm comp test_casm_expr test_casm_lexer
 )
+
+# WP68 Increment 7: production parser/emitter integration fixtures. Two
+# success fixtures (COMP-verified against their hand-derived .ref, matching
+# casmfa2p's own precedent) plus two forbidden-form fixtures (no .ref --
+# live-verified for CASM_DIAG_EXPR_RELOC_UNSUPPORTED instead).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase12_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmarith2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarith2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarith2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmarith2.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarithfwd.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarithfwd.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarithfwd.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmarithfwd.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmareloc1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmareloc1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmareloc2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmareloc2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP68 Increment 7 parser-integration fixtures and their trusted references to casm_phase12_test.d64"
+    VERBATIM
+)
+add_dependencies(casm_phase12_test_d64 casm_test_fixtures casm_reference_fixtures)
 
 # WP61 Increment 6: source-extent boundary fixtures (65,535-byte accepted
 # combined extent / 65,536-byte first-reject). casmsrcmax.seq alone proves
@@ -2282,8 +2322,12 @@ add_custom_command(
 # Increment 4's casmfa2p is excluded for the same reason: its matching
 # casmfa2p.s source also lives only on casm_opcode_test_d64, and test.d64's
 # directory track is already full (144/144) with no room for a new entry.
+# WP68 Increment 7's casmarith2/casmarithfwd are excluded for the same
+# reason: their matching .s sources live only on casm_phase12_test_d64
+# (this WP's own Scoping Decision 2), and test.d64 has only 21 free blocks.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
-    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p")
+    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
+       AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

@@ -555,6 +555,14 @@ synchronized; and the user explicitly approves closing WP68.
   before/after a full rebuild of every one of them, showed zero changed
   bytes -- comprehensive no-change rebuild stability confirmed. Detailed
   evidence remains in the subordinate plan.
+- 2026-08-15: Increment 6 (WP68 Atomic Increments 4-6) committed
+  (`a24a42c`). Drafted a detailed subordinate plan for Atomic Increment 7
+  (relocation, unresolved, and parser integration):
+  `brain/plans/2026-08-15-casm-phase12-wp68-increment7-parser-integration.md`.
+  User confirmed all three Scoping Decisions (representative operators per
+  family; fixtures packaged on `casm_phase12_test_d64`; end-to-end-only
+  width-agreement proof) and approved the plan as a whole. Implementation
+  begins with Atomic Step 1 (resolver-flag audit).
 - 2026-08-15: Atomic Step 9 complete -- **Increment 6 (WP68 Atomic
   Increments 4-6: multiply, division-by-zero, division) fully closed**, all
   nine of its own Atomic Steps done and its Completion Gate satisfied. Final
@@ -564,3 +572,29 @@ synchronized; and the user explicitly approves closing WP68.
   `c64[8]:>`. VICE left healthy and running. Detailed evidence remains in
   the subordinate plan. Awaiting explicit user approval to proceed to
   Atomic Increment 7 (relocation, unresolved, and parser integration).
+- 2026-08-15: **Atomic Increment 7 complete.** Added four production
+  parser-integration fixtures on `casm_phase12_test_d64`
+  (`casmarith2`/`casmarithfwd`, COMP-verified against hand-derived
+  references; `casmareloc1`/`casmareloc2`, forbidden-form diagnostic
+  fixtures). Live VICE confirmed all four behave exactly as designed,
+  including a genuine two-pass Pass 1/Pass 2 FORCE_ABS width-agreement
+  proof for a forward-referenced named constant combined with a WP68
+  operator -- the same property `casmfa2p.ref.hex` established for a bare
+  label (WP61 Increment 4), now proven for the new operators.
+
+  Live testing surfaced and fixed a real, in-scope WP68 gap, disclosed and
+  user-approved before touching source: `parser.s`'s instruction-operand
+  dispatch (two token-type whitelists) never added `CASM_TOKEN_MINUS`/
+  `CASM_TOKEN_TILDE`, so `LDA #-1`-shaped operand forms failed
+  `CASM: SYNTAX ERROR` -- the identical bug class WP67 already fixed once
+  for a leading `(`. Also fixed, by user approval, a related pre-existing
+  WP66-era gap in the same whitelists (`CASM_TOKEN_STAR`/current-address).
+  A second live finding (`LDA #-1` then failing `OPERAND OUT OF RANGE`) was
+  correctly diagnosed as expected behavior, not a defect -- unary `-`
+  always yields a full 16-bit result, which cannot fit an 8-bit immediate
+  by design -- and resolved by correcting the fixture, not the source.
+
+  Full affected-target build/envelope inspection and no-change rebuild both
+  passed. Detailed evidence, including the exact diagnostics/locations and
+  hand-derived reference bytes, is recorded in the subordinate plan:
+  `brain/plans/2026-08-15-casm-phase12-wp68-increment7-parser-integration.md`.

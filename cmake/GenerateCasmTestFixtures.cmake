@@ -1581,3 +1581,90 @@ file(WRITE "${OUTPUT_DIR}/casmparen2.seq"
     "NOP\n"
     "LDA #<(LBL1+LBL2)\n"
 )
+
+# WP68 Increment 7: production parser/emitter integration for the new
+# arithmetic/bitwise operators, one representative operator per family
+# (*, &, <<, unary -) per the increment plan's own Scoping Decision 1.
+# Pure numeric constants across every operand context this WP68 grammar
+# reaches (immediate, absolute, .BYTE, .WORD), plus one parenthesized RHS
+# combining WP67 grouping with a WP68 operator -- the same "every parser
+# and directive delimiter context" precedent casmexprn.seq (WP20)
+# established for extraction. .ORG $C000 keeps this fixed-address (no
+# relocatable symbols involved at all, so mode is irrelevant here).
+#
+# Unary '-'/'~' both produce a full 16-bit two's-complement/complement
+# result (Scoping Decision 1 of the WP68 parent plan); any nonzero '-'
+# result and most '~' results carry a nonzero high byte, which
+# ofRequire8Bit (opcodes.s) correctly rejects as CASM_DIAG_OPERAND_OUT_OF_
+# RANGE for an immediate or .BYTE operand -- not a bug, the same rule any
+# other >255 literal already hits. "LDA -1" (absolute, no '#') exercises
+# unary '-' as an instruction operand instead, deliberately proving the
+# WP68 Increment 7 parser-dispatch fix (parser.s's outer
+# parseOperandSequence whitelist, not just posImmediate's inner one).
+# "LDA #~$FF00" keeps unary '~' in immediate context with an input chosen
+# so the complement's high byte is zero ($FF00 -> $00FF).
+# COMP-verified against a hand-derived casmarith2.ref.hex, registered in
+# CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmarith2.seq"
+    ".ORG \$C000\n"
+    "LDA #2*3\n"
+    "LDA #\$0F&\$03\n"
+    "LDA #1<<3\n"
+    "LDA #~\$FF00\n"
+    "LDA -1\n"
+    ".BYTE 2*3, 1<<3\n"
+    ".WORD \$0F&\$03, (2+3)*2\n"
+)
+
+# WP68 Increment 7: forward-referenced, non-relocatable named constant
+# combined with a new operator, proving genuine two-pass Pass 1/Pass 2
+# width agreement -- the same proof shape WP61 Increment 4's casmfa2p.seq/
+# .ref.hex established for a bare forward-referenced label, now through a
+# WP68 operator. FWDCONST is not yet in the symbol table when "LDA
+# FWDCONST*2" is first measured (Pass 1): CASM_EXPR_FLAG_SYMBOL_DERIVED is
+# still set unconditionally (expr.s:318-320) and CASM_PARSER_STMT_FORCE_ABS
+# derived from it (parser.s:928-940) forces 3-byte absolute addressing
+# before FWDCONST's value ($5) or the multiply result ($000A) is known at
+# all -- even though $000A would fit zero page as a literal. Pass 2
+# independently re-derives the identical FORCE_ABS classification once
+# FWDCONST is fully resolved (casmResolveConstants has run by then), and
+# commits the same 3-byte absolute opcode to the real output. Explicit
+# .ORG $0010 is load-bearing here (see the WP68 Increment 7 plan's Atomic
+# Step 1 audit): it keeps CasmRelocatableMode static/0 for the whole
+# assembly, so the forward reference's stale/unspecified resolver
+# CASM_RESOLVE_SYM_FLAGS byte cannot accidentally set RELOCATABLE and
+# trigger CASM_DIAG_EXPR_RELOC_UNSUPPORTED instead of succeeding
+# statically. COMP-verified against a hand-derived casmarithfwd.ref.hex,
+# registered in CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmarithfwd.seq"
+    ".ORG \$0010\n"
+    "LDA FWDCONST*2\n"
+    "FWDCONST = 5\n"
+)
+
+# WP68 Increment 7: forbidden form, a real (relocatable) label combined
+# with a new operator, through the real parser -- not the synthetic RELVAL
+# resolver tests/src/casm_expr/casm_expr.s uses. Deliberately no .ORG
+# (implicit relocatable default, emit.s:536, matching casmparen2.seq's own
+# precedent immediately above): under a fixed-address build every symbol
+# is static regardless of kind (WP68 Increment 7 plan's Atomic Step 1
+# audit), so this rejection is only reachable in a genuinely relocatable
+# assembly. Expects CASM_DIAG_EXPR_RELOC_UNSUPPORTED; no .ref (failure
+# case), live-verified for the exact message and source location.
+file(WRITE "${OUTPUT_DIR}/casmareloc1.seq"
+    "LOOP:\n"
+    "NOP\n"
+    "LDA #LOOP*2\n"
+)
+
+# WP68 Increment 7: forbidden form, a label-derived named constant
+# (BUFSTART = *, WP66's CASM_SYMBOL_FLAG_LABEL_DERIVED) combined with a new
+# operator. Proves relocation rejection generalizes beyond bare labels to
+# any relocatable-flagged symbol, including constant-derived ones. Same
+# no-.ORG reasoning as casmareloc1.seq above. Expects
+# CASM_DIAG_EXPR_RELOC_UNSUPPORTED; no .ref, live-verified.
+file(WRITE "${OUTPUT_DIR}/casmareloc2.seq"
+    "BUFSTART = *\n"
+    "NOP\n"
+    "LDA #BUFSTART*2\n"
+)

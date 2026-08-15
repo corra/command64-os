@@ -1,0 +1,46 @@
+# CASM Phase 12 WP68 Increment 7 trusted reference: casmarithfwd
+#
+# Independently hand-assembled from the casmarithfwd fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves
+# CASM_PARSER_STMT_FORCE_ABS (parser.s:928-940) holds across a genuine
+# two-pass real assembly for a forward-referenced NAMED CONSTANT combined
+# with a WP68 operator -- the same property casmfa2p.ref.hex proved for a
+# bare forward-referenced label (WP61 Increment 4), now one level removed
+# through a new arithmetic operator. "LDA FWDCONST*2" must emit as 3-byte
+# absolute ($AD lo hi), never shrink to 2-byte zero-page ($A5 lo), even
+# though the computed value ($000A) would fit zero page if it were a
+# literal.
+#
+# Source (.ORG $0010, load-bearing -- keeps CasmRelocatableMode static/0
+# for the whole assembly; see the WP68 Increment 7 plan's Atomic Step 1
+# audit for why this matters for a forward-referenced identifier):
+#   LDA FWDCONST*2
+#   FWDCONST = 5
+#
+# CasmPc starts at $0010. FWDCONST is not yet in the symbol table when
+# "LDA FWDCONST*2" is first measured (Pass 1) -- a genuine forward
+# reference. CASM_EXPR_FLAG_SYMBOL_DERIVED is set unconditionally the
+# moment the resolver call returns (expr.s:318-320), regardless of whether
+# the symbol itself resolved, and combineStatic's staticUnresolved path
+# (expr.s) propagates it through the '*' application without evaluating
+# the multiply (RESOLVED clear, no placeholder arithmetic). Pass 1 thus
+# sizes "LDA FWDCONST*2" as 3-byte absolute without yet knowing FWDCONST's
+# value or the product. Pass 2 -- which re-parses the statement from
+# scratch, by which point FWDCONST is fully resolved to 5 via
+# casmResolveConstants -- independently re-derives the identical FORCE_ABS
+# classification (SYMBOL_DERIVED still set, now on a RESOLVED result) and
+# commits the same 3-byte absolute opcode, now with the real computed
+# value FWDCONST*2 = 5*2 = 10 = $000A.
+#
+# Hand assembly:
+#   10 00              PRG load-address header ($0010, little-endian)
+#   AD 0A 00           LDA $000A                    (absolute, FORCE_ABS)
+#
+# FWDCONST = 5 emits no bytes (a named-constant definition is a pure
+# symbol-table entry, matching casmconst1.seq's own precedent).
+#
+# bytes: 5
+# sha256: ed747101efeeb1af567f2b55a092f62cbd2d8e62c82ed0e70171701cc69a5373
+
+10 00
+AD 0A 00
