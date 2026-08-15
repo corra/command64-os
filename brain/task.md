@@ -3272,7 +3272,7 @@
         Taskwarrior task marked done. WP68 (arithmetic/bitwise operators)
         is next and requires its own detailed plan and separate approval
         before any source edit.
-    - [/] WP68 arithmetic/bitwise operators active, plan approved
+    - [x] WP68 arithmetic/bitwise operators active, plan approved
       2026-08-14 (Taskwarrior task 43,
       `c1b8e145-0a9c-4e15-aaab-4e82fc253363`, depends on WP67):
       `brain/plans/2026-08-14-casm-phase12-wp68-arithmetic-bitwise-
@@ -3377,6 +3377,24 @@
         `test_casm_expr`, and `test_casm_lexer`, with 470 free blocks.
         Immediate no-change rebuild stable; Step 2 will independently move
         expression-harness packaging off `test.d64`.
+      - Increments 6-9 complete (each behind its own detailed,
+        user-approved subordinate plan: Increment 6 multiply/division,
+        Increment 7 relocation/unresolved/parser integration, Increment 8
+        harness/envelope verification, Increment 9 live end-to-end).
+        Every WP64-frozen operator now proven both algebraically (97-case
+        `test_casm_expr`) and live through the real `casm.prg` production
+        pipeline. Two real defects found and fixed, both disclosed and
+        user-approved before the fix: `parser.s`'s operand-entry token
+        whitelists never accepted `CASM_TOKEN_MINUS`/`TILDE` (and,
+        pre-existing since WP66, `STAR`), so `LDA #-1`-shaped operand
+        forms failed `SYNTAX ERROR`. Production `casm` cap raised
+        `$6000` -> `$6100`. CASM promoted `0.2.2` -> `0.2.3`. Docs
+        (`wiki`/`docs` `casm-utility.md`, `wiki/casm-programmers-
+        reference.md`), `brain/KNOWLEDGE.md`, and `CHANGELOG.md` updated.
+        **WP68 complete, pending final user approval.** Walkthrough:
+        `brain/walkthroughs/2026-08-15-casm-phase12-wp68-arithmetic-
+        bitwise-operators.md`. Phase 12 itself remains open (WP69,
+        character literals, still pending).
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

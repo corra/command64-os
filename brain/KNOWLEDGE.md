@@ -2698,6 +2698,104 @@ above: `test_casm_pass1`/`test_casm_frame` (`$5400`→`$5500`/`$5800`→
 (`$5000`→`$5100`) — all one round-page step, absorbing the shared
 `expr.s`/`parser.s` growth.
 
+### CASM Phase 12 WP68 Arithmetic and Bitwise Operators — As-Built (complete 2026-08-15)
+
+Adds the last operator group WP64's frozen contract reserved: `*`, `/`,
+`<<`, `>>`, `&`, `^`, `|`, unary `~`, unary `-` — completing Phase 12's
+expression evaluator. Plan: `brain/plans/2026-08-14-casm-phase12-wp68-
+arithmetic-bitwise-operators.md` (nine Atomic Increments, three with
+their own detailed subordinate plans: Increment 6 — multiply/division;
+Increment 7 — relocation/unresolved/parser integration; Increment 8 —
+harness/envelope verification; Increment 9 — live end-to-end). Walkthrough:
+`brain/walkthroughs/2026-08-15-casm-phase12-wp68-arithmetic-bitwise-
+operators.md`.
+
+**Token/lexer** (`common.inc`/`lexer.s`): nine new single/two-byte
+punctuation tokens, `CASM_TOKEN_SLASH`/`AMPERSAND`/`CARET`/`PIPE`/`TILDE`
+(single-byte) and `CASM_TOKEN_SHL`/`SHR` (two-byte lookahead on `<<`/`>>`,
+alongside the pre-existing single-`<`/`>` extraction tokens),
+`CASM_TOKEN_COUNT` now `$19`.
+
+**Precedence dispatcher** (`expr.s`): WP67's `parseOperatorTail` (a flat
+`+`/`-` loop) generalized to real precedence climbing across 7 tiers
+(tightest to loosest: unary `-`/`~`; `*`/`/`; `<<`/`>>`; `&`; `^`; `|`;
+`+`/`-` — C-family convention, per WP64's own design). Reproduced every
+pre-WP68 expression result byte/message/location-identical before any new
+operator was enabled (Increment 3's own gate).
+
+**Arithmetic/bitwise implementations** (`expr.s:640-731`): `&`/`^`/`|` are
+plain `AND`/`EOR`/`ORA`. `*`/`/` are bounded unsigned 16-bit software
+routines (`mulUnsigned16`/`divUnsigned16` — the 6502 has no hardware
+multiply/divide); multiply overflow and shift-count/shift-overflow all
+share the pre-existing `CASM_DIAG_EXPR_OVERFLOW`; division checks its
+divisor for zero unconditionally *before* any division arithmetic and
+raises the new `CASM_DIAG_EXPR_DIV_ZERO` (`$44`) — WP64's third and last
+reserved Phase 12 diagnostic code, after `$43` (WP65's
+`EXPR_CIRCULAR`) and `$45`/`$46` (WP67's `EXPR_RELOC_UNSUPPORTED`/
+`EXPR_PAREN_TOO_DEEP`). `<<`/`>>` accept only a 0-15 count; `>>` is
+logical (`LSR`/`ROR`), not arithmetic — proven end-to-end with
+`$8001>>1 = $4000` (Increment 9), not just algebraically. Unary `-`/`~`
+always produce a full 16-bit result — a nonzero `-x` (and most `~x`)
+therefore correctly fails `ofRequire8Bit`'s existing `CASM_DIAG_OPERAND_
+OUT_OF_RANGE` for an 8-bit immediate/`.BYTE` operand, the same rule any
+other `>255` literal already hits, discovered live rewriting Increment
+7's own fixture rather than the source.
+
+**A real production-pipeline gap, found and fixed live (Increment 7)**:
+`parser.s`'s two operand-entry token whitelists (the outer
+`parseOperandSequence` dispatcher and `posImmediate`'s own inner one —
+gating which token may *start* a non-implied operand, before
+`parserParseExpressionValue` ever runs) never gained
+`CASM_TOKEN_MINUS`/`TILDE`, so `LDA #-1`-shaped operand forms failed
+`CASM_DIAG_SYNTAX_ERROR` before `exprEvaluate`'s own already-correct
+primary handling was ever reached — the identical bug class WP67 already
+fixed once for a leading `(`. The same audit found `CASM_TOKEN_STAR`
+(WP66's current-address symbol) had the identical pre-existing gap since
+WP66, not introduced by WP68; fixed in the same pass, disclosed and
+user-approved before either fix landed.
+
+**Live end-to-end coverage** (Increments 7 and 9, real `casm.prg`, not
+just the synthetic `test_casm_expr` harness): one representative operator
+per family (`*`, `&`, `<<`, unary `-`) plus relocation rejection for both
+a real label and a label-derived named constant (Increment 7), and the
+remaining `/`, `^`, `|`, `>>` plus the first real proof of
+`CASM_DIAG_EXPR_DIV_ZERO` (Increment 9) — every WP64-frozen operator now
+proven at least once through the real production pipeline, not only
+algebraically. Increment 7 also proved genuine Pass 1/Pass 2 `FORCE_ABS`
+width agreement for a forward-referenced named constant combined with a
+new operator, the same property `casmfa2p.ref.hex` established for a bare
+label (WP61 Increment 4).
+
+**Test coverage**: `tests/src/casm_expr/casm_expr.s` grew from 55 to 97
+cases (`CASE_COUNT`) across Increments 4-7, covering every operator,
+chained-unary order, all 16-bit boundary patterns, shift counts 0/1/15/16,
+multiply/divide identities and overflow/truncation, division by zero, and
+relocation/unresolved interaction. Six new production `.seq`/`.ref.hex`
+fixture pairs on `casm_phase12_test_d64` (`casmarith2`/`casmarithfwd`/
+`casmareloc1`/`casmareloc2`, Increment 7; `casmarith3`/`casmdivzero`,
+Increment 9) exercise the real parser/emitter pipeline the synthetic
+harness cannot reach.
+
+**Envelope**: production `casm` grew `$6000` → `$6100` (Increment 6,
+activating `CASM_DIAG_EXPR_DIV_ZERO`'s message/dispatch plus the
+divisor-zero check) — the only production cap change; `$6100` held with
+3,351 bytes of headroom through Increment 8's consolidated final
+measurement. `test_casm_expr` grew `$1600` → `$1700` (Increment 6,
+tightest surviving headroom at 158 bytes); `test_casm_pass1`/`frame`
+→ `$5900`, `test_casm_passcheck` → `$5B00`, `test_casm_listcap` →
+`$5D00` (all absorbing the shared `expr.s`/`parser.s` growth).
+`casm_phase12_test_d64` (dedicated to Phase 12 expression/operator
+harnesses, created in Increment 6 when `test.d64`'s final free blocks ran
+out) ended WP68 at 449 free blocks.
+
+**A VICE MCP harness-only quirk, not a product defect** (Increment 9):
+several shell-dispatch attempts for `test_casm_expr`/`test_casm_lexer`
+returned spurious `BAD COMMAND OR FILE NAME` with a visibly garbled
+command echo, resolved every time by a fresh `flush\n` immediately before
+retyping the command — the existing recovery procedure in
+`.agents/workflows/vice-mcp-testing.md` remains sufficient; not
+investigated further as out of this WP's scope.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

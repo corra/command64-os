@@ -160,6 +160,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 12 WP68: arithmetic and bitwise operators**: expressions now
+  support multiplication, division, left/right shift, bitwise AND/XOR/OR,
+  and unary negate/complement (`*`, `/`, `<<`, `>>`, `&`, `^`, `|`, unary
+  `-`/`~`), completing Phase 12's full precedence-climbing evaluator (7
+  tiers, C-family convention) alongside WP67's parentheses. All arithmetic
+  is checked unsigned 16-bit: shift counts are bounded to 0-15, division by
+  a static zero is a dedicated diagnostic (`CASM: EXPRESSION DIVISION BY
+  ZERO`) rather than a crash, and every operator enforces the same
+  relocation-representability rule WP67 established — combining two
+  relocatable components is rejected, not silently misassembled. Fixed a
+  real parser gap found live: unary `-`/`~` (and, pre-existing since WP66,
+  `*` as current-address) could not start an instruction operand
+  (`lda #-1` failed `SYNTAX ERROR`) because two operand-entry token
+  whitelists in `parser.s` had never been extended for them — the same bug
+  class WP67 already fixed once for a leading `(`. Live-verified against
+  the real `casm.prg` binary under VICE across six new production
+  fixtures: representative multiply/AND/shift/unary-negate cases plus
+  relocation rejection for both a real label and a label-derived named
+  constant, a genuine two-pass Pass 1/Pass 2 width-agreement proof for a
+  forward-referenced constant combined with a new operator, and the
+  remaining division/XOR/OR/right-shift operators plus the first real
+  end-to-end proof of the division-by-zero diagnostic. The full
+  expression-evaluator test suite (97 cases) and every other CASM
+  regression harness pass; CASM promoted to `0.2.3`.
 - **CASM Phase 12 WP67: parentheses and explicit precedence**: expressions
   now support parenthesized sub-expressions (`lda #<(screenw+2)`) nested up
   to 8 levels deep, and chained `+`/`-` operators applied left-to-right

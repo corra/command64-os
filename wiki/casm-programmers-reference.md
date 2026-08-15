@@ -394,15 +394,19 @@ whitespace and `;`-comments (but still emits the newline that terminates a
 comment) and classifies the next significant token into the persistent
 `CasmTokenRecord` (`state.s`).
 
-**Token types** (`CASM_TOKEN_*`, $00-$0F):
+**Token types** (`CASM_TOKEN_*`, $00-$18, `CASM_TOKEN_COUNT` = $19):
 `EOF, NEWLINE, IDENTIFIER, MNEMONIC, DIRECTIVE, REGISTER, NUMBER, COMMA,
-COLON, HASH, LPAREN, RPAREN, PLUS, MINUS, LESS, GREATER`.
+COLON, HASH, LPAREN, RPAREN, PLUS, MINUS, LESS, GREATER, EQUALS` (WP65,
+`=`), `STAR` (WP66, `*`), `SLASH, AMPERSAND, CARET, PIPE, TILDE, SHL, SHR`
+(WP68, `/ & ^ | ~ << >>`).
 
 Scanning rules:
 
 | Lead byte | Result |
 |---|---|
-| `,` `:` `#` `(` `)` `+` `-` `<` `>` | Single-byte punctuation token, direct table lookup (`lexerPunctBytes`/`lexerPunctTypes`) |
+| `,` `:` `#` `(` `)` `+` `-` `<` `>` `=` `*` `/` `&` `^` `\|` `~` | Single-byte punctuation token, direct table lookup (`lexerPunctBytes`/`lexerPunctTypes`) |
+| `<` immediately followed by another `<` | `SHL` (two-byte lookahead, WP68) |
+| `>` immediately followed by another `>` | `SHR` (two-byte lookahead, WP68); a lone `<`/`>` not followed by its own repeat still scans as the pre-existing extraction-prefix `LESS`/`GREATER` token |
 | `.` | `DIRECTIVE`; text matched case-insensitively against `.ORG .BYTE .WORD .INCLUDE .STATIC .RELOC`, else subtype `CASM_DIRECTIVE_UNKNOWN` (still a valid token — rejected later by the parser/emitter) |
 | `$` | `NUMBER`, subtype `HEX`; at least one hex digit required |
 | `%` | `NUMBER`, subtype `BINARY`; at least one `0`/`1` required |
@@ -471,7 +475,7 @@ operandSeq     := terminator                              ; implied
                  | 'A' terminator                            ; accumulator
                  | '(' expr ')' [',' 'Y'] terminator          ; indirect / (zp),Y
                  | '(' expr ',' 'X' ')' terminator             ; (zp,X)
-expr           := ['<' | '>'] (NUMBER | IDENTIFIER) [('+'|'-') NUMBER]
+expr           := ['<' | '>'] exprBody                     ; WP68: full precedence-climbing grammar, see §11
 terminator     := NEWLINE | EOF
 ```
 
@@ -484,6 +488,18 @@ driver's job (`casm.s`'s `crpLabel`, Pass 1 only), keeping the semantic
 action out of the grammar module. Any other unexpected token is
 `CASM_DIAG_SYNTAX_ERROR`; a well-formed operand sequence missing its
 terminator is `CASM_DIAG_EXPECTED_NEWLINE`.
+
+**Operand-entry token whitelists** (two of them, both gating which token
+may *start* a non-implied operand before `parserParseExpressionValue`
+ever runs): the outer `parseOperandSequence` dispatcher and
+`posImmediate`'s own inner whitelist. WP67 added `CASM_TOKEN_LPAREN` to
+both for grouped sub-expressions; WP68 Increment 7 found live (not by
+static reading) that neither whitelist had been extended for unary `-`/`~`
+or WP66's `*` in leaf/leading position — `LDA #-1`-shaped operands failed
+`CASM_DIAG_SYNTAX_ERROR` at this dispatch gate, before `exprEvaluate`'s
+own (already-correct) primary handling was ever reached. Fixed by adding
+`CASM_TOKEN_MINUS`/`TILDE`/`STAR` to both whitelists, the same shape as
+WP67's own `LPAREN` fix.
 
 **`.INCLUDE`** is classified like any other directive, then routed to
 `lexerScanIncludeOperand` instead of the operand grammar above. The scanned
@@ -536,18 +552,55 @@ derives the two statement flags:
 WP67 rewrote this from a flat single-addend parser into a small
 precedence-climbing evaluator, three cooperating procs: `exprEvaluate`
 (the public entry point — extraction prefix, then hands off), `parsePrimary`
-(NUMBER, IDENTIFIER, `*`, or a parenthesized group), and `parseOperatorTail`
-(the `+`/`-` loop). One expression is: an optional `<`/`>` extraction
-prefix (whole-expression, top-level only — applied once, at the very end,
-never touched by a nested call), then one or more primaries combined
-left-associatively by `+`/`-`, where a primary can itself be a
-parenthesized sub-expression (`(expr)`) recursing back into the same
-primary+operator-tail pair. `CASM_DIAG_EXPR_MALFORMED`/`_UNSUPPORTED`
-cover a missing/unexpected primary or trailing token;
-`CASM_DIAG_EXPR_OVERFLOW` covers 16-bit arithmetic overflow;
+(NUMBER, IDENTIFIER, `*`, unary `-`/`~`, or a parenthesized group), and
+`parseOperatorTail` (the binary-operator loop, generalized by WP68 from a
+`+`/`-`-only loop into full precedence climbing). One expression is: an
+optional `<`/`>` extraction prefix (whole-expression, top-level only —
+applied once, at the very end, never touched by a nested call), then one
+or more primaries combined by the operators below, where a primary can
+itself be a parenthesized sub-expression (`(expr)`) recursing back into
+the same primary+operator-tail pair. `CASM_DIAG_EXPR_MALFORMED`/
+`_UNSUPPORTED` cover a missing/unexpected primary or trailing token;
+`CASM_DIAG_EXPR_OVERFLOW` covers 16-bit arithmetic overflow (also raised
+by shift-count-out-of-range and checked-multiply overflow, WP68);
+`CASM_DIAG_EXPR_DIV_ZERO` covers a static divisor of zero (WP68);
 `CASM_DIAG_EXPR_RELOC_UNSUPPORTED` covers two relocatable components
 combining (below); `CASM_DIAG_EXPR_PAREN_TOO_DEEP` covers exceeding
 `CASM_EXPR_PAREN_MAX_DEPTH` (8) levels of nesting.
+
+**Operator precedence** (WP68, highest to lowest binding; matches C-family
+convention, per WP64's frozen design):
+
+| Tier | Operators | Notes |
+|---|---|---|
+| 1 (tightest) | unary `-`, `~` | Prefix; chain freely (`~-1`); always produce a full 16-bit result |
+| 2 | `*`, `/` | Checked unsigned 16-bit multiply/divide |
+| 3 | `<<`, `>>` | Checked shift, count must be 0-15 |
+| 4 | `&` | Bitwise AND |
+| 5 | `^` | Bitwise XOR |
+| 6 | `\|` | Bitwise OR |
+| 7 (loosest) | `+`, `-` | Binary addition/subtraction (pre-WP68 addend, generalized) |
+
+**Unary `-`/`~`** (`parsePrimary`): two's-complement negation and
+bitwise complement, both always producing a full 16-bit result — any
+nonzero `-x` and most `~x` results carry a nonzero high byte, which
+correctly fails `CASM_DIAG_OPERAND_OUT_OF_RANGE` for an 8-bit immediate
+or `.BYTE` operand, the same rule any other `>255` literal already hits.
+Chain freely; static-only, same as every other WP68 operator.
+
+**Binary operators** (`parseOperatorTail`'s `staticCombine`-family
+dispatch, `expr.s:640-731`): `&`/`^`/`|` are plain `AND`/`EOR`/`ORA` on
+both bytes. `*` (`mulUnsigned16`) and `/` (`divUnsigned16`) are bounded
+software routines (the 6502 has no hardware multiply/divide) — multiply
+overflow is `CASM_DIAG_EXPR_OVERFLOW`; division checks the divisor for
+zero *before* any division arithmetic and raises the permanent
+`CASM_DIAG_EXPR_DIV_ZERO` (`common.inc` `$44`) if so, otherwise always
+succeeds (quotient truncates toward zero, matching integer-division
+convention). `<<`/`>>` (`staticShift`) accept only a 0-15 count (16+ or a
+nonzero high byte on the count is `CASM_DIAG_EXPR_OVERFLOW`); left shift
+detects overflow out of the top bit the same way; right shift is
+**logical** (`LSR`/`ROR` on the high/low bytes, zero-filling) — not
+arithmetic/sign-extending.
 
 **Primary dispatch** (`parsePrimary`): `NUMBER` and `*`
 (`CASM_TOKEN_STAR`, WP66 — reads `CasmPc` directly, never reaches the
@@ -1023,7 +1076,7 @@ complete):
   [§17](#17-symbol-map--listing-output-phase-10-complete). Both may be
   combined; either, both, or neither may be requested per assembly.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (66 distinct `CASM_DIAG_*` codes —
+  diagnostic per failure (70 distinct `CASM_DIAG_*` codes —
   [§19](#19-diagnostic-reference)).
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
@@ -1205,6 +1258,10 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$40` | `LISTING_DELETE_FAILED` | LISTING DELETE FAILED |  | `listing.s` (`listingDelete`/`listingAbort`) |
 | `$41` | `LISTING_SHORT_WRITE` | LISTING SHORT WRITE |  | `listing.s` (`listingWrite`: actual byte count ≠ requested) *(Phase 10/WP53 range ends here)* |
 | `$42` | `SYMBOL_MAP_INVALID` | SYMBOL MAP INVALID |  | `map.s` (`mapPrint`: corrupt symbol record — bad `NameLen`, `DEFINED` clear, reserved flag bits set, or nonzero reserved padding) *(Phase 10/WP52 range ends here)* |
+| `$43` | `EXPR_CIRCULAR` | CIRCULAR CONSTANT DEFINITION |  | `symbols.s` (`resolutionSweep`: a named constant's definition is directly or transitively self-referential) *(Phase 12/WP65)* |
+| `$44` | `EXPR_DIV_ZERO` | EXPRESSION DIVISION BY ZERO | ✓ | `expr.s` (`staticDiv`: a static divisor of zero, checked before any division arithmetic) *(Phase 12/WP68)* |
+| `$45` | `EXPR_RELOC_UNSUPPORTED` | EXPRESSION RELOCATION UNSUPPORTED | ✓ | `expr.s` (`parseOperatorTail`'s relocation-representability check: two relocatable components combining, which the relocation table cannot represent) *(Phase 12/WP67)* |
+| `$46` | `EXPR_PAREN_TOO_DEEP` | EXPRESSION TOO DEEPLY NESTED | ✓ | `expr.s` (`parsePrimary`: exceeded `CASM_EXPR_PAREN_MAX_DEPTH` = 8 levels of `(` nesting) *(Phase 12/WP67 range ends here)* |
 | `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
 See [§17](#17-symbol-map--listing-output-phase-10-complete) for the map/

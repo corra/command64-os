@@ -1918,7 +1918,7 @@ behavior changed beyond the version/build artifact itself.
       walkthroughs/2026-08-14-casm-phase12-wp67-parens-precedence.md`.
       WP68 (arithmetic/bitwise operators) is next and needs its own
       detailed plan and separate approval before any source edit.
-- [/] WP68 **active, plan approved 2026-08-14** (Taskwarrior task 43,
+- [x] WP68 **active, plan approved 2026-08-14** (Taskwarrior task 43,
       `c1b8e145-0a9c-4e15-aaab-4e82fc253363`, depends on WP67):
       `brain/plans/2026-08-14-casm-phase12-wp68-arithmetic-bitwise-
       operators.md`. Implements static-only `*`, `/`, `<<`, `>>`, `&`,
@@ -1968,6 +1968,25 @@ behavior changed beyond the version/build artifact itself.
       self-bootable `casm_phase12_test.d64` carries Command64, CASM,
       expression/lexer harnesses and has 470 free blocks. Existing harness
       packaging is unchanged until Step 2.
+      Increments 6-9 complete, each behind its own detailed, user-approved
+      subordinate plan (Increment 6 multiply/division, Increment 7
+      relocation/unresolved/parser integration, Increment 8 harness/
+      envelope verification, Increment 9 live end-to-end). Every
+      WP64-frozen operator now proven both algebraically (97-case
+      `test_casm_expr`) and live through the real `casm.prg` production
+      pipeline, including the first live proof of `CASM_DIAG_EXPR_
+      DIV_ZERO`. Two real defects found and fixed, both disclosed and
+      user-approved before the fix: `parser.s`'s operand-entry token
+      whitelists never accepted `CASM_TOKEN_MINUS`/`TILDE` (and,
+      pre-existing since WP66, `STAR`), so `LDA #-1`-shaped operand forms
+      failed `SYNTAX ERROR`. Production `casm` cap raised `$6000` ->
+      `$6100`; CASM promoted `0.2.2` -> `0.2.3`. Docs
+      (`wiki`/`docs casm-utility.md`, `wiki/casm-programmers-
+      reference.md`), `brain/KNOWLEDGE.md`, and `CHANGELOG.md` updated.
+      **WP68 complete, pending final user approval.** Walkthrough:
+      `brain/walkthroughs/2026-08-15-casm-phase12-wp68-arithmetic-
+      bitwise-operators.md`. Phase 12 itself remains open (WP69,
+      character literals, still pending).
 
 ## Optional Feature - Progress and Processing Indication
 

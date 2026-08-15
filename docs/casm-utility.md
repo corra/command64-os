@@ -213,6 +213,53 @@ All three accept up to a 16-bit value (0-65535); anything larger is
 back in range (e.g. `$1FFFF` is rejected the moment it exceeds 65535, not
 after the whole token is read).
 
+### Expressions and Operators
+
+Any operand position (instruction operand, `.BYTE`/`.WORD` list, or a
+named constant's own RHS) accepts a full expression, not just a bare
+number or label. Operators combine any mix of numbers, labels, named
+constants, and `*`, and may be grouped with parentheses:
+
+```asm
+LDA #(BASE+2)*3          ; grouping plus multiplication
+LDA #~$FF00              ; bitwise complement, immediate
+LDA TABLE+OFFSET*2         ; a label combined with arithmetic
+.WORD $0F&$03, $8001>>1     ; bitwise AND and a logical right shift, in a directive
+```
+
+Operators, from tightest to loosest binding:
+
+| Operator | Meaning |
+| --- | --- |
+| unary `-`, `~` | Negate / bitwise complement (prefix; chain freely, e.g. `~-1`) |
+| `*`, `/` | Multiply, divide (unsigned 16-bit; division truncates toward zero) |
+| `<<`, `>>` | Shift left/right (count must be 0-15; `>>` is logical — zero-filling, not sign-extending) |
+| `&` | Bitwise AND |
+| `^` | Bitwise XOR |
+| `\|` | Bitwise OR |
+| `+`, `-` | Add, subtract |
+
+All arithmetic is unsigned 16-bit; a result or intermediate value outside
+0-65535, a shift count outside 0-15, or a divisor of zero is `CASM:
+EXPRESSION OVERFLOW` (or, for a zero divisor, `CASM: EXPRESSION DIVISION
+BY ZERO`) rather than silently wrapping or crashing the assembler.
+Parenthesized groups may nest up to 8 levels deep; a 9th level is `CASM:
+EXPRESSION TOO DEEPLY NESTED`.
+
+**Relocation**: an operator may combine at most one relocatable component
+(a label, or a `*`-derived value) with any number of static (plain
+number/constant) components. Combining two relocatable components —
+`LABEL1+LABEL2`, or a label multiplied by anything — is `CASM: EXPRESSION
+RELOCATION UNSUPPORTED`, because the output format can only represent one
+symbol plus a static addend (see [Relocation](#relocation) below). This
+applies uniformly regardless of which operator or how deeply parenthesized
+the combination is.
+
+Named constants' own definitions (`NAME = expr`, see [Named
+Constants](#named-constants) above) use a narrower grammar and do not
+accept these operators — only a single symbol/literal/`*` with an
+optional `±NUMBER` addend.
+
 ### Addressing Modes
 
 Every documented 6502 addressing mode that the target mnemonic supports is
@@ -514,9 +561,9 @@ thing — see the [Programmer's Reference §18](casm-programmers-reference.md#18
 for status and rationale:
 
 - **`.STATIC` / `.RELOC` directives** — use `/S` plus `.ORG` instead.
-- **Multiplicative or parenthesized expression arithmetic** — `(A+B)*2` and
-  similar are not supported; only one symbol/literal plus an optional
-  `±NUMBER` addend.
+- **A named constant's own definition** (`NAME = expr`) does not accept the
+  full expression grammar above — only a single symbol/literal/`*` with an
+  optional `±NUMBER` addend.
 - **More than 8 top-level source files, 32 distinct included files, 16
   include-nesting levels, 512 distinct labels, 4096 relocation entries,
   4096 listing records (`/L`), or 65,535 bytes of combined source.**
