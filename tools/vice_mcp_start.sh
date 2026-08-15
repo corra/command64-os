@@ -9,9 +9,15 @@
 # vice_autostart, etc.) rather than via CLI flags here.
 #
 # Usage:
-#   tools/vice_mcp_start.sh start [--machine x64sc] [--port 7000] [--host 127.0.0.1] [--token TOKEN]
+#   tools/vice_mcp_start.sh start [--machine x64sc] [--port 7000] [--host 127.0.0.1] [--token TOKEN] [--reu-size 16384] [--no-reu]
 #   tools/vice_mcp_start.sh stop  [--port 7000]
 #   tools/vice_mcp_start.sh status [--port 7000]
+#
+# A 16MB REU (16384 KiB) is attached by default -- native CASM assembly
+# requires a real REU (see src/external/dash/AGENTS.md's "Native Assembly
+# Workflow"), and the emulator otherwise starts with standard (no REU)
+# expansion. Pass --no-reu to start without one, or --reu-size to change
+# the size.
 
 set -euo pipefail
 
@@ -22,6 +28,8 @@ MACHINE="x64sc"
 PORT="7000"
 HOST="127.0.0.1"
 TOKEN=""
+REU_SIZE="16384"
+NO_REU=0
 CMD="${1:-start}"
 shift || true
 
@@ -31,6 +39,8 @@ while [[ $# -gt 0 ]]; do
         --port) PORT="$2"; shift 2 ;;
         --host) HOST="$2"; shift 2 ;;
         --token) TOKEN="$2"; shift 2 ;;
+        --reu-size) REU_SIZE="$2"; shift 2 ;;
+        --no-reu) NO_REU=1; shift ;;
         *) echo "Unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -100,6 +110,9 @@ cmd_start() {
 
     local args=(-mcpserver -mcpserverhost "$HOST" -mcpserverport "$PORT")
     [[ -n "$TOKEN" ]] && args+=(-mcpservertoken "$TOKEN")
+    if [[ "$NO_REU" -eq 0 ]]; then
+        args+=(-reu -reusize "$REU_SIZE")
+    fi
 
     : > "$LOG_FILE"
     setsid nohup "$bin" "${args[@]}" >"$LOG_FILE" 2>&1 </dev/null &
@@ -130,6 +143,11 @@ cmd_start() {
 
     echo "$owner" > "$PID_FILE"
     echo "VICE MCP server up: PID $owner, $URL"
+    if [[ "$NO_REU" -eq 0 ]]; then
+        echo "REU attached: ${REU_SIZE} KiB"
+    else
+        echo "REU: not attached (--no-reu)"
+    fi
     echo "Log: $LOG_FILE"
     echo "Attach disks over MCP now, e.g. vice_disk_attach {unit:8, path:...}."
 }
