@@ -598,3 +598,44 @@ synchronized; and the user explicitly approves closing WP68.
   passed. Detailed evidence, including the exact diagnostics/locations and
   hand-derived reference bytes, is recorded in the subordinate plan:
   `brain/plans/2026-08-15-casm-phase12-wp68-increment7-parser-integration.md`.
+- 2026-08-15: **Atomic Increment 8 complete.** Drafted a detailed
+  subordinate plan
+  (`brain/plans/2026-08-15-casm-phase12-wp68-increment8-harness-envelope-verification.md`)
+  scoping Increment 8 as consolidation-only, per Increment 7's own
+  forward-reference to it; user approved. Atomic Step 1's audit (WP64's
+  frozen 9-operator inventory against the current `casm_lexer`/`casm_expr`/
+  `casm_pass1`/`casm_passcheck` case tables) found every operator,
+  precedence tier, boundary/overflow case, relocation-rejection case, and
+  unresolved-reference case already covered by a prior increment's own
+  harness additions -- no new test case needed.
+
+  Consolidated build/envelope measurement, full clean rebuild
+  (`build/` removed and reconfigured) of every affected target and disk
+  image:
+
+  | Target | Code bytes | Cap | Headroom |
+  | --- | --- | --- | --- |
+  | `casm` | 21,481 | `$6100` (24,832) | 3,351 |
+  | `test_casm_lexer` | 2,357 | `$1000` (4,096) | 1,739 |
+  | `test_casm_expr` | 5,730 | `$1700` (5,888) | 158 |
+  | `test_casm_pass1` | 20,027 | `$5900` (22,784) | 2,757 |
+  | `test_casm_passcheck` | 19,079 | `$5B00` (23,296) | 4,217 |
+  | `test_casm_frame` | 19,868 | `$5900` (22,784) | 2,916 |
+  | `test_casm_listcap` | 20,947 | `$5D00` (23,808) | 2,861 |
+
+  | Disk image | Free blocks | Gate |
+  | --- | --- | --- |
+  | `image_d64` | 318 | unaffected (general OS release image) |
+  | `test_image_d64` | 21 | unchanged from Increment 7 |
+  | `casm_listing_test_d64` | 11 | unchanged from Increment 7 |
+  | `casm_phase12_test_d64` | 452 | >=40 |
+
+  No production source, harness, or build-system file required any change.
+  No-change rebuild proof: SHA-256 of all seven PRGs and four disk images,
+  before and after an immediate second full rebuild of every one of them,
+  identical byte-for-byte. Note: the parent plan's own Increment 8 charter
+  text cites a stale `$6000` production cap; the real, current, WP68
+  Increment-6-approved cap is `$6100`, confirmed held above with 3,351
+  bytes of headroom. Detailed evidence recorded in the subordinate plan.
+  Awaiting explicit user approval to close Increment 8 and proceed to
+  Atomic Increment 9 (live end-to-end verification).
