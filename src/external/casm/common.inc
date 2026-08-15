@@ -187,6 +187,7 @@ CASM_PETSCII_CR    = $0D
 CASM_PETSCII_QUOTE = $22
 CASM_PETSCII_HASH  = $23
 CASM_PETSCII_PERCENT = $25
+CASM_PETSCII_AMPERSAND = $26
 CASM_PETSCII_LPAREN = $28
 CASM_PETSCII_RPAREN = $29
 CASM_PETSCII_ASTERISK = $2A  ; WP66: current-address symbol
@@ -202,6 +203,9 @@ CASM_PETSCII_SEMICOLON = $3B
 CASM_PETSCII_LESS  = $3C
 CASM_PETSCII_EQUALS = $3D  ; WP65: named-constant definition (identifier = expr)
 CASM_PETSCII_GREATER = $3E
+CASM_PETSCII_CARET = $5E
+CASM_PETSCII_PIPE = $7C
+CASM_PETSCII_TILDE = $7E
 CASM_PETSCII_AT    = $40  ; WP53: CBM DOS's native open-for-write replace marker
 CASM_PETSCII_UPPER_A = $41
 CASM_PETSCII_UPPER_Z = $5A
@@ -493,7 +497,32 @@ CASM_TOKEN_LESS       = $0E
 CASM_TOKEN_GREATER    = $0F
 CASM_TOKEN_EQUALS     = $10  ; WP65: '=' -- named-constant definition (identifier = expr)
 CASM_TOKEN_STAR       = $11  ; WP66: '*' -- current-address symbol (leaf/primary position only)
-CASM_TOKEN_COUNT      = $12
+CASM_TOKEN_SLASH      = $12  ; WP68: '/'
+CASM_TOKEN_AMPERSAND  = $13  ; WP68: '&'
+CASM_TOKEN_CARET      = $14  ; WP68: '^'
+CASM_TOKEN_PIPE       = $15  ; WP68: '|'
+CASM_TOKEN_TILDE      = $16  ; WP68: '~'
+CASM_TOKEN_SHL        = $17  ; WP68: '<<'
+CASM_TOKEN_SHR        = $18  ; WP68: '>>'
+CASM_TOKEN_COUNT      = $19
+
+; WP68 expression precedence values, lowest to highest. Binary operators are
+; left-associative, so an RHS recurses at its operator's precedence + 1.
+CASM_EXPR_PREC_ADD     = 1
+CASM_EXPR_PREC_OR      = 2
+CASM_EXPR_PREC_XOR     = 3
+CASM_EXPR_PREC_AND     = 4
+CASM_EXPR_PREC_SHIFT   = 5
+CASM_EXPR_PREC_MULDIV  = 6
+CASM_EXPR_PREC_UNARY   = 7
+CASM_EXPR_PREC_LOWEST  = CASM_EXPR_PREC_ADD
+
+.assert CASM_EXPR_PREC_OR = CASM_EXPR_PREC_ADD + 1, error, "CASM expression precedence changed"
+.assert CASM_EXPR_PREC_XOR = CASM_EXPR_PREC_OR + 1, error, "CASM expression precedence changed"
+.assert CASM_EXPR_PREC_AND = CASM_EXPR_PREC_XOR + 1, error, "CASM expression precedence changed"
+.assert CASM_EXPR_PREC_SHIFT = CASM_EXPR_PREC_AND + 1, error, "CASM expression precedence changed"
+.assert CASM_EXPR_PREC_MULDIV = CASM_EXPR_PREC_SHIFT + 1, error, "CASM expression precedence changed"
+.assert CASM_EXPR_PREC_UNARY = CASM_EXPR_PREC_MULDIV + 1, error, "CASM expression precedence changed"
 
 ; Subtypes are interpreted only together with their token type.
 CASM_SUBTYPE_NONE = $00
@@ -572,7 +601,14 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_TOKEN_TEXT_BUFFER_SIZE = 32, error, "CASM token text buffer changed"
 .assert CASM_TOKEN_EQUALS = CASM_TOKEN_GREATER + 1, error, "CASM token type range changed"
 .assert CASM_TOKEN_STAR = CASM_TOKEN_EQUALS + 1, error, "CASM token type range changed"
-.assert CASM_TOKEN_COUNT = CASM_TOKEN_STAR + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_SLASH = CASM_TOKEN_STAR + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_AMPERSAND = CASM_TOKEN_SLASH + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_CARET = CASM_TOKEN_AMPERSAND + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_PIPE = CASM_TOKEN_CARET + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_TILDE = CASM_TOKEN_PIPE + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_SHL = CASM_TOKEN_TILDE + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_SHR = CASM_TOKEN_SHL + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_COUNT = CASM_TOKEN_SHR + 1, error, "CASM token type range changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
 .assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_RELOC + 1, error, "CASM directive subtype range changed"

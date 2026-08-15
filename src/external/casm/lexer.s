@@ -155,6 +155,10 @@ lnSkip:
     beq lnSkipByte
     cmp #CASM_PETSCII_SEMICOLON
     beq lnComment
+    cmp #CASM_PETSCII_LESS
+    beq lnAngle
+    cmp #CASM_PETSCII_GREATER
+    beq lnAngle
     jsr lexerClassifyPunct
     bcc lnPunct
 
@@ -210,9 +214,13 @@ lnCommentBody:
 @okComment:
     lda CasmLookaheadResult
     cmp #CASM_SOURCE_NEWLINE
-    beq lnSkip                  ; preserve the newline; re-dispatch emits it
+    bne @commentNotNewline
+    jmp lnSkip                  ; preserve the newline; re-dispatch emits it
+@commentNotNewline:
     cmp #CASM_SOURCE_EOF
-    beq lnSkip                  ; preserve EOF; re-dispatch emits it
+    bne @commentByte
+    jmp lnSkip                  ; preserve EOF; re-dispatch emits it
+@commentByte:
     jsr lexerConsume            ; consume a comment-body byte
     jmp lnCommentBody
 
@@ -228,6 +236,49 @@ lnPunct:
     jmp lexerEmit               ; returns C clear, A = token type
 lnPunctAppendFail:
     pla                         ; discard the saved type
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_TOKEN_TOO_LONG
+    jmp lnFailWithA
+
+; WP68: distinguish the two-byte shift operators from the existing
+; single-byte extraction tokens. The token location is stamped before the
+; first byte is consumed. A differing second byte remains buffered as the
+; next token; EOF/newline likewise terminates a single '<' or '>'.
+lnAngle:
+    jsr lexerTokenReset
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcs lnAngleAppendFail
+    jsr lexerConsume
+    jsr lexerFill
+    bcs lnFail
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    bne lnAngleSingle
+    lda CasmLookaheadByte
+    cmp CasmTokenText
+    bne lnAngleSingle
+    jsr lexerTokenAppend
+    bcs lnAngleAppendFail
+    jsr lexerConsume
+    lda CasmTokenText
+    cmp #CASM_PETSCII_LESS
+    beq lnAngleShl
+    lda #CASM_TOKEN_SHR
+    jmp lexerEmit
+lnAngleShl:
+    lda #CASM_TOKEN_SHL
+    jmp lexerEmit
+lnAngleSingle:
+    lda CasmTokenText
+    cmp #CASM_PETSCII_LESS
+    beq lnAngleLess
+    lda #CASM_TOKEN_GREATER
+    jmp lexerEmit
+lnAngleLess:
+    lda #CASM_TOKEN_LESS
+    jmp lexerEmit
+lnAngleAppendFail:
     jsr diagSetLocFromLookahead
     lda #CASM_DIAG_TOKEN_TOO_LONG
     jmp lnFailWithA
@@ -1106,13 +1157,17 @@ lexerPunctBytes:
     .byte CASM_PETSCII_COMMA, CASM_PETSCII_COLON, CASM_PETSCII_HASH
     .byte CASM_PETSCII_LPAREN, CASM_PETSCII_RPAREN, CASM_PETSCII_PLUS
     .byte CASM_PETSCII_MINUS, CASM_PETSCII_LESS, CASM_PETSCII_GREATER
-    .byte CASM_PETSCII_EQUALS, CASM_PETSCII_ASTERISK
+    .byte CASM_PETSCII_EQUALS, CASM_PETSCII_ASTERISK, CASM_PETSCII_SLASH
+    .byte CASM_PETSCII_AMPERSAND, CASM_PETSCII_CARET, CASM_PETSCII_PIPE
+    .byte CASM_PETSCII_TILDE
     .byte $FF
 lexerPunctTypes:
     .byte CASM_TOKEN_COMMA, CASM_TOKEN_COLON, CASM_TOKEN_HASH
     .byte CASM_TOKEN_LPAREN, CASM_TOKEN_RPAREN, CASM_TOKEN_PLUS
     .byte CASM_TOKEN_MINUS, CASM_TOKEN_LESS, CASM_TOKEN_GREATER
-    .byte CASM_TOKEN_EQUALS, CASM_TOKEN_STAR
+    .byte CASM_TOKEN_EQUALS, CASM_TOKEN_STAR, CASM_TOKEN_SLASH
+    .byte CASM_TOKEN_AMPERSAND, CASM_TOKEN_CARET, CASM_TOKEN_PIPE
+    .byte CASM_TOKEN_TILDE
 
 dirOrgStr:      .byte ".ORG", 0
 dirByteStr:     .byte ".BYTE", 0

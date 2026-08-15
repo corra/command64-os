@@ -3272,6 +3272,111 @@
         Taskwarrior task marked done. WP68 (arithmetic/bitwise operators)
         is next and requires its own detailed plan and separate approval
         before any source edit.
+    - [/] WP68 arithmetic/bitwise operators active, plan approved
+      2026-08-14 (Taskwarrior task 43,
+      `c1b8e145-0a9c-4e15-aaab-4e82fc253363`, depends on WP67):
+      `brain/plans/2026-08-14-casm-phase12-wp68-arithmetic-bitwise-
+      operators.md`.
+      - User-confirmed scope: unsigned 16-bit `*`/`/` (checked multiply,
+        truncating divide), checked `<<` and logical `>>` with counts 0-15,
+        bytewise `&`/`^`/`|`/`~`, and two's-complement unary `-`; no modulo
+        and no named-constant RHS grammar expansion.
+      - Atomic Increment 1 is active: capture current regression/envelope
+        baseline and audit unresolved operands, private scratch, and
+        worst-case stack use before any production-source edit.
+      - Atomic Increment 1 complete 2026-08-14: `casm`,
+        `test_casm_expr`, and `test_casm_lexer` narrow builds pass; immediate
+        no-change rebuild preserved SHA-256 hashes and counters (1296/1047/
+        1005). Generated configs confirm `$6000` production and `$1000`
+        expression-harness caps. Audit confirms expression ZP `$84-$87` is
+        already fully allocated/aliased, WP67's recursive operator path
+        saves five accumulator bytes plus return addresses, and unresolved
+        operands (`RESOLVED` clear) must be rejected before new arithmetic
+        reads placeholder values. Increment 2 is next; production source is
+        still unchanged.
+      - Atomic Increment 2 complete 2026-08-14: stable token IDs and lexer
+        recognition added for `/`, `&`, `^`, `|`, `~`, `<<`, `>>`; existing
+        `*`/`-` token IDs remain contextual. Two-byte shifts retain the first
+        byte's source location and preserve lone extraction tokens. Expanded
+        `test_casm_lexer` validates 11 operator spellings, text, columns,
+        adjacency, and EOF. Initial build found `lnCommentBody`'s EOF branch
+        displaced to -129 by code growth; RCA complete, fixed with a local
+        conditional + absolute JMP. Final/no-change builds pass: CASM 1298
+        (20,648 base bytes, 3,236 relocations), lexer 1008 (2,357 base bytes,
+        377 relocations); rebuilt include disk has 179 free blocks. VICE 3.10
+        proved Command64 boot and harness dispatch but both bounded
+        observations remained `LOADING...`; result correctly classified
+        inconclusive, with fresh live PASS retained for Increment 9.
+      - Atomic Increment 3 stopped at the approved envelope gate
+        2026-08-14: minimum-precedence architecture compiles in narrow
+        `test_casm_expr` 1049 and CASM 1299 builds, with only existing
+        `+`/`-` enabled. Two relative-branch range failures were corrected
+        after RCA with absolute-JMP exits. `test_image_d64` packaging then
+        measured `test_casm_pass1` 130 bytes beyond its `$5500` whole-link
+        cap. No cap changed; `$5600` is the smallest round-page fit (+256,
+        126 bytes projected headroom). Awaiting explicit user approval to
+        make that CMake envelope edit and resume Increment 3.
+      - User approved `$5500` -> `$5600`; CMake records the measured
+        130-byte overflow and smallest round-page fit. Atomic Increment 3
+        complete: `test_image_d64` builds with 12 blocks free; narrow
+        no-change rebuild is stable. VICE 3.10 booted Command64 and ran
+        `test_casm_expr` build 1049 with exact PETSCII `$A4` underscores:
+        55/55 dots, `CASM EXPR: PASS`, normal `c64[8]:>` return. An initial
+        ASCII-underscore attempt was correctly classified as setup failure
+        (`BAD COMMAND OR FILE NAME`) and cleared with `flush`, not attributed
+        to the product.
+      - Atomic Increment 4 stopped at the approved envelope gate
+        2026-08-14: static-only `&`/`^`/`|`, unary `~`/`-`, right-to-left
+        unary chaining, unresolved propagation, and relocation rejection are
+        implemented; production CASM build 1300 links. Nine focused fixtures
+        raise `CASE_COUNT` 55->64 but overflow `test_casm_expr`'s `$1000`
+        MAIN cap by 161 bytes. No cap changed; `$1100` is the smallest
+        round-page fit (+256, 95 bytes projected headroom). Awaiting explicit
+        user approval to make the CMake envelope edit and resume Increment 4.
+      - User approved `test_casm_expr` `$1000`->$1100`; its 64-case build now
+        links. `test_image_d64` then measured whole-linking
+        `test_casm_pass1` 175 bytes beyond `$5600`. No second cap changed;
+        `$5700` is the smallest round-page fit (+256, 81 bytes projected
+        headroom). Increment 4 remains stopped pending explicit approval.
+      - User approved `test_casm_pass1` `$5600` -> `$5700`. Atomic Increment 4
+        complete: full `test_image_d64` builds with 6 blocks free; VICE 3.10
+        ran all 64 expression cases to `CASM EXPR: PASS` with normal
+        `c64[8]:>` return. No-change narrow rebuild stable. CASM 1300 uses
+        21,046 base code bytes/3,307 relocations; expression harness 1052
+        uses 4,257 base bytes/505 relocations. Durable bitwise/unary and
+        unresolved-propagation rules recorded in CASM DOX.
+      - Atomic Increment 5 stopped at the approved envelope gate
+        2026-08-14: checked `<<`/logical `>>`, 0-15 count bound, precedence,
+        unresolved propagation, and relocation rejection implemented; seven
+        focused cases raise `CASE_COUNT` 64->71. Two branch-distance failures
+        were corrected after RCA with inverse-branch/absolute-JMP exits. The
+        harness then measured 225 bytes beyond `$1100`; no cap changed.
+        `$1200` is the smallest fit (+256, 31 bytes projected headroom),
+        pending explicit approval before Increment 5 resumes.
+      - User approved `$1100` -> `$1200`, but ld65's staged reporting then
+        exposed BSS 55 bytes beyond `$1200` after RODATA began fitting. No
+        source changed between measurements; the prior warning covered only
+        the first overflowing segment. Total use is `$1237`; `$1300` is the
+        true smallest round-page fit (201 bytes projected headroom). No
+        further cap change made; Increment 5 remains stopped.
+      - User approved the corrected `test_casm_expr` `$1200` -> `$1300`;
+        71-case harness and CASM 1301 link. `test_image_d64` then measured
+        `test_casm_pass1` exactly 2 bytes beyond `$5700`. No cap changed;
+        `$5800` is the smallest round-page fit (254 bytes projected
+        headroom). Increment 5 remains stopped pending explicit approval.
+      - User approved `test_casm_pass1` `$5700` -> `$5800`. Atomic Increment
+        5 complete: full test image builds with 3 blocks free; VICE 3.10 ran
+        all 71 expression cases to `CASM EXPR: PASS` with normal `c64[8]:>`
+        return. No-change narrow rebuild stable. CASM 1301 uses 21,129 base
+        code bytes/3,320 relocations; expression harness 1054 uses 4,577 base
+        bytes/529 relocations. Durable shift semantics recorded in CASM DOX.
+      - Increment 6 detailed plan approved 2026-08-14:
+        `brain/plans/2026-08-14-casm-phase12-wp68-increment6-multiply-
+        divide.md`. Atomic Step 1 complete: new self-bootable
+        `casm_phase12_test.d64` contains Command64, CASM,
+        `test_casm_expr`, and `test_casm_lexer`, with 470 free blocks.
+        Immediate no-change rebuild stable; Step 2 will independently move
+        expression-harness packaging off `test.d64`.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

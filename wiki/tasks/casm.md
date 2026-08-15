@@ -1918,6 +1918,56 @@ behavior changed beyond the version/build artifact itself.
       walkthroughs/2026-08-14-casm-phase12-wp67-parens-precedence.md`.
       WP68 (arithmetic/bitwise operators) is next and needs its own
       detailed plan and separate approval before any source edit.
+- [/] WP68 **active, plan approved 2026-08-14** (Taskwarrior task 43,
+      `c1b8e145-0a9c-4e15-aaab-4e82fc253363`, depends on WP67):
+      `brain/plans/2026-08-14-casm-phase12-wp68-arithmetic-bitwise-
+      operators.md`. Implements static-only `*`, `/`, `<<`, `>>`, `&`,
+      `^`, `|`, unary `-`, and unary `~` against WP67's precedence parser.
+      Approved semantics are unsigned 16-bit multiply/divide, checked
+      multiply and left-shift overflow, logical right shift, 0-15 shift
+      counts, and two's-complement unary negation. Modulo and expanded
+      named-constant RHS grammar remain excluded. Atomic Increment 1
+      (baseline and contract audit) complete: narrow builds pass; an
+      immediate no-change rebuild preserved all three artifact hashes and
+      build counters (`casm` 1296, expression 1047, lexer 1005); `$6000`
+      production/`$1000` expression caps confirmed; no new zero-page is
+      available or planned; unresolved operands must be rejected before
+      value access. Atomic Increment 2 complete: stable `/`, `&`, `^`, `|`,
+      `~`, `<<`, `>>` tokens added; `*`/`-` remain contextual; shift tokens
+      retain first-byte provenance and lone `<`/`>` remain extraction.
+      Expanded real-lexer harness builds clean at build 1008; CASM build
+      1298 links within `$6000`. One branch-range build failure was fully
+      diagnosed and corrected with an absolute-JMP trampoline. Bounded VICE
+      run proved boot/dispatch but remained at `LOADING...` for both allowed
+      observations, so live result is inconclusive and deferred to Increment
+      9 rather than called a product failure. Atomic Increment 3 (precedence
+      dispatcher, existing `+`/`-` behavior first) reached its envelope stop
+      gate: narrow expression/CASM builds link, but `test_casm_pass1`
+      overflows its `$5500` whole-link cap by 130 bytes during
+      `test_image_d64`. No cap changed. Smallest round-page fit is `$5600`,
+      user-approved and applied. Atomic Increment 3 complete: full test image
+      builds with 12 blocks free; exact-PETSCII VICE launch ran all 55
+      expression fixtures to `CASM EXPR: PASS` and returned to `c64[8]:>`.
+      Increment 4 implemented bitwise/unary semantics and nine focused cases,
+      then stopped at its envelope gate: `test_casm_expr` exceeds `$1000` by
+      161 bytes. User approved `$1100`, which now links all 64 cases.
+      Packaging then found `test_casm_pass1` 175 bytes beyond `$5600`; no
+      second cap changed. User approved `$5700`. Atomic Increment 4 complete:
+      full test image builds with 6 blocks free; all 64 expression cases pass
+      live under VICE and return normally. Increment 5 (checked shifts) is
+      implemented with seven focused cases, then stopped at its envelope
+      gate: `test_casm_expr` exceeds `$1100` by 225 bytes. No cap changed;
+      user approved `$1200`, but once RODATA fit ld65 exposed BSS 55 bytes
+      beyond that cap. This is staged segment reporting, not new growth.
+      User approved the true `$1300` fit; 71-case harness and CASM 1301 now
+      link. Packaging then found `test_casm_pass1` 2 bytes beyond `$5700`.
+      User approved `$5800`. Atomic Increment 5 complete: full test image
+      builds with 3 blocks free; all 71 expression cases pass live under
+      VICE and return normally. Increment 6 (software multiplication and
+      division) detailed plan approved. Atomic Step 1 complete: new
+      self-bootable `casm_phase12_test.d64` carries Command64, CASM,
+      expression/lexer harnesses and has 470 free blocks. Existing harness
+      packaging is unchanged until Step 2.
 
 ## Optional Feature - Progress and Processing Indication
 

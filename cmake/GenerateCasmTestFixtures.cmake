@@ -446,6 +446,14 @@ file(WRITE "${OUTPUT_DIR}/casmnumerrd.seq" ".ORG \$C000\n.WORD 65536\n")
 file(WRITE "${OUTPUT_DIR}/casmnumerrh.seq" ".ORG \$C000\n.WORD \$10000\n")
 file(WRITE "${OUTPUT_DIR}/casmnumerrb.seq" ".ORG \$C000\n.WORD %11111111111111111\n")
 
+# WP68 Increment 6 Atomic Step 5: minimal production fixture solely to prove
+# CASM_DIAG_EXPR_DIV_ZERO's message routes correctly through the real
+# casm.prg binary (not just the harness's coded diagnostic-number
+# assertion). Not part of CASM_REF_NAMES -- like casmnumerrd/h/b above, it is
+# meant to fail, not assemble to a comparable reference PRG. Deliberately
+# not the full multiply/divide production matrix, which Increment 9 owns.
+file(WRITE "${OUTPUT_DIR}/casmdivzero.seq" ".ORG \$C000\n.WORD 2/0\n")
+
 # Phase 5 WP20 production adapter fixtures. casmexprn exercises every parser and
 # directive delimiter context with numeric extraction; casmexpru proves an
 # identifier is routed to the production resolver and rejected before emission.

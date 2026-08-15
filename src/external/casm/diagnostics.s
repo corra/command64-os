@@ -137,6 +137,8 @@ diagPrintFatal:
     beq dpfSymbolMapInvalid
     cmp #CASM_DIAG_EXPR_CIRCULAR
     beq dpfExprCircular
+    cmp #CASM_DIAG_EXPR_DIV_ZERO
+    beq dpfExprDivZero
     cmp #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
     beq dpfExprRelocUnsupported
     cmp #CASM_DIAG_EXPR_PAREN_TOO_DEEP
@@ -186,6 +188,16 @@ dpfExprCircular:
     ldx #<msgExprCircular
     ldy #>msgExprCircular
     jmp diagPrintString
+; WP68 Increment 6 Atomic Step 5: division by a static zero, raised by
+; combineStatic's own divide dispatch (Atomic Step 6) with
+; diagSetLocFromToken already called at the raise site -- same shape as
+; dpfExprRelocUnsupported/dpfExprParenTooDeep immediately below, not the
+; locationless single-step pattern.
+dpfExprDivZero:
+    ldx #<msgExprDivZero
+    ldy #>msgExprDivZero
+    jsr diagPrintString
+    jmp diagPrintSourceContext
 ; WP67: unlike dpfSymbolMapInvalid/dpfExprCircular above, both of these are
 ; raised with a valid source location already set (diagSetLocFromToken, at
 ; the raise site -- parseOperatorTail/parsePrimary in expr.s, both still
@@ -1455,6 +1467,9 @@ msgSymbolMapInvalid:
 ; to attach (see dpfExprCircular's own comment).
 msgExprCircular:
     .byte "CASM: CIRCULAR CONSTANT DEFINITION", PetCr, 0
+; WP68 Increment 6 Atomic Step 5: static division by zero.
+msgExprDivZero:
+    .byte "CASM: EXPRESSION DIVISION BY ZERO", PetCr, 0
 ; WP67: a relocatable value reached a combine that already had one --
 ; representable only as one symbol + a static addend (WP64's rule).
 msgExprRelocUnsupported:

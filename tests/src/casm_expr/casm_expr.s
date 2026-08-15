@@ -58,7 +58,7 @@ CASE_COLUMN    = 7
 ; against 0 -- so it cannot affect any case that doesn't opt in).
 CASE_RELOC_MODE = 8
 CASE_SIZE      = 9
-CASE_COUNT     = 55
+CASE_COUNT     = 97
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -683,6 +683,243 @@ sStarHi: T1 CASM_TOKEN_GREATER, 0, $3E
          T0 CASM_TOKEN_STAR, 0
          T0 CASM_TOKEN_EOF, 0
 
+; WP68 Increment 4: cheap bitwise and unary operators.
+sBitOr: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+        T1 CASM_TOKEN_PIPE, 0, $7C
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+        T0 CASM_TOKEN_EOF, 0
+sBitXor: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FF00"
+         T1 CASM_TOKEN_CARET, 0, $5E
+         TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0FF0"
+         T0 CASM_TOKEN_EOF, 0
+sBitAnd: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$1234"
+         T1 CASM_TOKEN_AMPERSAND, 0, $26
+         TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$00FF"
+         T0 CASM_TOKEN_EOF, 0
+sBitPrec: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+          T1 CASM_TOKEN_PIPE, 0, $7C
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+          T1 CASM_TOKEN_AMPERSAND, 0, $26
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "4"
+          T0 CASM_TOKEN_EOF, 0
+sUnaryNot: T1 CASM_TOKEN_TILDE, 0, $7E
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$1234"
+           T0 CASM_TOKEN_EOF, 0
+sUnaryNeg: T1 CASM_TOKEN_MINUS, 0, $2D
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0001"
+           T0 CASM_TOKEN_EOF, 0
+sUnaryChain: T1 CASM_TOKEN_TILDE, 0, $7E
+             T1 CASM_TOKEN_MINUS, 0, $2D
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+             T0 CASM_TOKEN_EOF, 0
+sUnaryReloc: T1 CASM_TOKEN_TILDE, 0, $7E
+             TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+             T0 CASM_TOKEN_EOF, 0
+sBitUnresolved: TN CASM_TOKEN_IDENTIFIER, 0, "UNABS"
+                T1 CASM_TOKEN_AMPERSAND, 0, $26
+                TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+                T0 CASM_TOKEN_EOF, 0
+
+; WP68 Increment 5: checked shifts.
+sShl: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+      TN CASM_TOKEN_SHL, 0, "<<"
+      TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "4"
+      T0 CASM_TOKEN_EOF, 0
+sShr: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$8001"
+      TN CASM_TOKEN_SHR, 0, ">>"
+      TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+      T0 CASM_TOKEN_EOF, 0
+sShiftZero: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$1234"
+            TN CASM_TOKEN_SHL, 0, "<<"
+            TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+            T0 CASM_TOKEN_EOF, 0
+sShiftCount16: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+               TN CASM_TOKEN_SHL, 0, "<<"
+               TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "16"
+               T0 CASM_TOKEN_EOF, 0
+sShiftOverflow: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$8000"
+                TN CASM_TOKEN_SHL, 0, "<<"
+                TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+                T0 CASM_TOKEN_EOF, 0
+sShiftPrec: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+            T1 CASM_TOKEN_PLUS, 0, $2B
+            TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+            TN CASM_TOKEN_SHL, 0, "<<"
+            TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+            T0 CASM_TOKEN_EOF, 0
+sShiftReloc: TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+             TN CASM_TOKEN_SHR, 0, ">>"
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+             T0 CASM_TOKEN_EOF, 0
+
+; WP68 Increment 6 Atomic Step 3: '*'/'/' now reach parseOperatorTail's
+; CASM_EXPR_PREC_MULDIV classifier row (an infix '*' here, not the
+; current-address primary above). Atomic Step 4 implemented checked
+; multiplication, so sMul2x3 (renamed from sMulTemp) now asserts its real
+; product below. Atomic Step 5 implemented the divisor-zero check ahead of
+; the division loop, so a zero divisor (sDivZero) raises the real, permanent
+; CASM_DIAG_EXPR_DIV_ZERO. Atomic Step 6 implemented the division loop
+; itself, so a nonzero divisor (sDivTemp, renamed in spirit from its old
+; placeholder role) now asserts its real truncated quotient below too.
+sMul2x3: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+         T0 CASM_TOKEN_STAR, 0
+         TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+         T0 CASM_TOKEN_EOF, 0
+sDivTemp: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+          T1 CASM_TOKEN_SLASH, 0, $2F
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+          T0 CASM_TOKEN_EOF, 0
+sDivZero: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+          T1 CASM_TOKEN_SLASH, 0, $2F
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+          T0 CASM_TOKEN_EOF, 0
+
+; WP68 Increment 6 Atomic Step 6: bounded division boundary cases.
+sDivL0: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+        T1 CASM_TOKEN_SLASH, 0, $2F
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+        T0 CASM_TOKEN_EOF, 0
+sDivR1: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+        T1 CASM_TOKEN_SLASH, 0, $2F
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+        T0 CASM_TOKEN_EOF, 0
+sDivSelf: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+          T1 CASM_TOKEN_SLASH, 0, $2F
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+          T0 CASM_TOKEN_EOF, 0
+; Truncation toward zero: 7/2 = 3 (not 3.5), 1/2 = 0 (not a fraction).
+sDivTrunc7: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "7"
+            T1 CASM_TOKEN_SLASH, 0, $2F
+            TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+            T0 CASM_TOKEN_EOF, 0
+sDivTrunc1: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+            T1 CASM_TOKEN_SLASH, 0, $2F
+            TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+            T0 CASM_TOKEN_EOF, 0
+sDivWide: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+          T1 CASM_TOKEN_SLASH, 0, $2F
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0100"
+          T0 CASM_TOKEN_EOF, 0
+
+; WP68 Increment 6 Atomic Step 4: checked multiplication boundary cases.
+sMulL0: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+        T0 CASM_TOKEN_STAR, 0
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+        T0 CASM_TOKEN_EOF, 0
+sMulR0: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+        T0 CASM_TOKEN_STAR, 0
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+        T0 CASM_TOKEN_EOF, 0
+sMulR1: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+        T0 CASM_TOKEN_STAR, 0
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+        T0 CASM_TOKEN_EOF, 0
+sMulL1: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+        T0 CASM_TOKEN_STAR, 0
+        TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+        T0 CASM_TOKEN_EOF, 0
+; Exact boundary: 255*257 = 65535 ($FFFF), the largest representable
+; product -- must not trip the overflow path.
+sMulExact: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$00FF"
+           T0 CASM_TOKEN_STAR, 0
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0101"
+           T0 CASM_TOKEN_EOF, 0
+; One past representable: 256*256 = 65536 ($10000).
+sMulOvfSame: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0100"
+             T0 CASM_TOKEN_STAR, 0
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$0100"
+             T0 CASM_TOKEN_EOF, 0
+sMulOvf2: TN CASM_TOKEN_NUMBER, CASM_NUMBER_HEX, "$FFFF"
+          T0 CASM_TOKEN_STAR, 0
+          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+          T0 CASM_TOKEN_EOF, 0
+
+; WP68 Increment 6 Atomic Step 7: full precedence, associativity, unary,
+; current-address-context, relocation, and unresolved cases across every
+; new operator.
+;
+; Left-associativity: 24/3/2 must be (24/3)/2 = 4, not 24/(3/2) = 16.
+sDivAssoc: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "24"
+           T1 CASM_TOKEN_SLASH, 0, $2F
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+           T1 CASM_TOKEN_SLASH, 0, $2F
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+           T0 CASM_TOKEN_EOF, 0
+; Same-tier left-to-right ordering: 2*3/4 = 6/4 = 1 (truncated).
+sMulDivOrder: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+              T0 CASM_TOKEN_STAR, 0
+              TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+              T1 CASM_TOKEN_SLASH, 0, $2F
+              TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "4"
+              T0 CASM_TOKEN_EOF, 0
+; Cross-tier precedence: '*' binds tighter than '+': 1+2*3 = 1+6 = 7.
+sAddMulPrec: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+             T1 CASM_TOKEN_PLUS, 0, $2B
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+             T0 CASM_TOKEN_STAR, 0
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "3"
+             T0 CASM_TOKEN_EOF, 0
+; Cross-tier precedence: '*' binds tighter than '>>': 8>>1*2 = 8>>2 = 2.
+sShiftMulPrec: TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "8"
+               TN CASM_TOKEN_SHR, 0, ">>"
+               TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+               T0 CASM_TOKEN_STAR, 0
+               TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+               T0 CASM_TOKEN_EOF, 0
+; Current-address context, both roles in one expression: the first '*' is
+; the primary-position current-address read (CasmPc = $4050, same fixed
+; value as sStar/eStar); the second '*' is unambiguously infix multiply,
+; since parseOperatorTail's classifier only ever runs after a primary has
+; already been parsed. $4050*2 = $80A0.
+sCurAddrMul: T0 CASM_TOKEN_STAR, 0
+             T0 CASM_TOKEN_STAR, 0
+             TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+             T0 CASM_TOKEN_EOF, 0
+; Unary interaction. NOTE: the plan's own illustrative "-2*3 = $FFFA" is
+; arithmetically unreachable under the frozen unsigned checked-multiply
+; semantics -- unary '-' recurses through parsePrimary alone (not the full
+; operator chain), so "-2*3" evaluates as ($FFFE)*3 = 196602, genuinely
+; over $FFFF, and correctly raises CASM_DIAG_EXPR_OVERFLOW rather than
+; producing $FFFA (which only a signed multiply could produce, and
+; Scoping Decision 1 explicitly keeps arithmetic other than unary '-'
+; itself unsigned). User-approved substitute: -1*1 = $FFFF*1 = $FFFF, a
+; real non-overflowing unary+multiply interaction using the same $FFFF
+; boundary as sMulR1/eMulFFFF above.
+sUnaryMul: T1 CASM_TOKEN_MINUS, 0, $2D
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+           T0 CASM_TOKEN_STAR, 0
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
+           T0 CASM_TOKEN_EOF, 0
+; ~0 = $FFFF; $FFFF/2 = $7FFF (truncated).
+sUnaryDiv: T1 CASM_TOKEN_TILDE, 0, $7E
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "0"
+           T1 CASM_TOKEN_SLASH, 0, $2F
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+           T0 CASM_TOKEN_EOF, 0
+; Relocation rejection: checkStaticReloc rejects any relocatable operand
+; reaching a non-+/- operator, shared by every WP68 operator alike -- same
+; shape as sShiftReloc above, just with '*'/'/' instead of '>>'.
+sMulReloc: TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+           T0 CASM_TOKEN_STAR, 0
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+           T0 CASM_TOKEN_EOF, 0
+sDivReloc: TN CASM_TOKEN_IDENTIFIER, 0, "RELVAL"
+           T1 CASM_TOKEN_SLASH, 0, $2F
+           TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+           T0 CASM_TOKEN_EOF, 0
+; Unresolved propagation: combineStatic's staticUnresolved path runs before
+; any per-operator dispatch (staticBothResolved), so an unresolved static
+; operand (UNABS) never reaches staticMul/staticDiv's actual arithmetic --
+; same shape as sBitUnresolved above.
+sMulUnresolved: TN CASM_TOKEN_IDENTIFIER, 0, "UNABS"
+                T0 CASM_TOKEN_STAR, 0
+                TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+                T0 CASM_TOKEN_EOF, 0
+sDivUnresolved: TN CASM_TOKEN_IDENTIFIER, 0, "UNABS"
+                T1 CASM_TOKEN_SLASH, 0, $2F
+                TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "2"
+                T0 CASM_TOKEN_EOF, 0
+
 .macro EXPECT name, vlo, vhi, flags, extract, idlo, idhi, sign, maglo, maghi
 name: .byte vlo, vhi, flags, extract, idlo, idhi, sign, maglo, maghi
 .endmacro
@@ -750,6 +987,47 @@ EXPECT eParenReloc, $34,$32, $07, 0, 1,0, 0,$00,$20
 ; <(ABSVAL+1): extraction applies to the group's own final value, same as
 ; any other primary's.
 EXPECT eParenExtractLo, $35,0, $03, CASM_EXTRACTION_LO, 1,0, 0,1,0
+EXPECT eBitOr, 3,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eBitXor, $F0,$F0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eBitAnd, $34,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eBitPrec, 1,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eUnaryNot, $CB,$ED, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eUnaryNeg, $FF,$FF, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eUnaryChain, 0,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eBitUnresolved, 0,0, (CASM_EXPR_FLAG_SYMBOL_DERIVED | CASM_EXPR_FLAG_FORCE_ABS), 0, 4,0, 0,0,0
+EXPECT eShl, $10,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eShr, 0,$40, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eShiftZero, $34,$12, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eShiftPrec, 3,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,2,0
+
+; WP68 Increment 6 Atomic Step 4: checked multiplication. ADDEND_SIGN/MAG
+; stay untouched (0,0,0), matching the bitwise/shift convention -- multiply
+; is not addend combination.
+EXPECT eMul2x3, 6,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eMulZero, 0,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eMulFFFF, $FF,$FF, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+
+; WP68 Increment 6 Atomic Step 6: bounded unsigned division (truncated
+; quotient only). ADDEND_SIGN/MAG stay untouched (0,0,0), same convention
+; as multiply/bitwise/shift. eDivZero is shared across every zero-quotient
+; case (2/3, 0/1, 1/2), matching eMulZero's own reuse above.
+EXPECT eDivZero, 0,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eDivFFFF, $FF,$FF, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eDivOne, 1,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eDivTrunc3, 3,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eDivWide, $FF,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+
+; WP68 Increment 6 Atomic Step 7: precedence/associativity/unary/current-
+; address cases. sAddMulPrec is the only one that touches ADDEND: its '+'
+; combine's RHS value is 6 (the already-multiplied 2*3), per
+; parseOperatorTail's "last applied operator's own sign/RHS-value" ADDEND
+; convention.
+EXPECT eDivAssoc, 4,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eMulDivOrder, 1,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eAddMulPrec, 7,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,6,0
+EXPECT eShiftMulPrec, 2,0, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
+EXPECT eCurAddrMul, $A0,$80, $03, 0, 0,0, 0,0,0
+EXPECT eUnaryDiv, $FF,$7F, CASM_EXPR_FLAG_RESOLVED, 0, 0,0, 0,0,0
 
 .macro CASE script, expect, diag, final, calls, column, relocmode
     .word script, expect
@@ -847,3 +1125,55 @@ caseTable:
     CASE sStarHi, eStarHi, 0, CASM_TOKEN_EOF, 0, 3, 0
     CASE sStar, eStarReloc, 0, CASM_TOKEN_NEWLINE, 0, 2, 1
     CASE sStarLo, eStarLoReloc, 0, CASM_TOKEN_EOF, 0, 3, 1
+
+    ; WP68 Increment 4: static bitwise/unary semantics and precedence.
+    CASE sBitOr, eBitOr, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sBitXor, eBitXor, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sBitAnd, eBitAnd, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sBitPrec, eBitPrec, 0, CASM_TOKEN_EOF, 0, 6, 0
+    CASE sUnaryNot, eUnaryNot, 0, CASM_TOKEN_EOF, 0, 3, 0
+    CASE sUnaryNeg, eUnaryNeg, 0, CASM_TOKEN_EOF, 0, 3, 0
+    CASE sUnaryChain, eUnaryChain, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sUnaryReloc, 0, CASM_DIAG_EXPR_RELOC_UNSUPPORTED, CASM_TOKEN_EOF, 1, 3, 0
+    CASE sBitUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sShl, eShl, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sShr, eShr, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sShiftZero, eShiftZero, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sShiftCount16, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sShiftOverflow, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sShiftPrec, eShiftPrec, 0, CASM_TOKEN_EOF, 0, 6, 0
+    CASE sShiftReloc, 0, CASM_DIAG_EXPR_RELOC_UNSUPPORTED, CASM_TOKEN_EOF, 1, 4, 0
+    ; WP68 Increment 6 Atomic Step 4: checked multiplication now real;
+    ; sMul2x3 (renamed from sMulTemp) asserts its actual product.
+    CASE sMul2x3, eMul2x3, 0, CASM_TOKEN_EOF, 0, 4, 0
+    ; WP68 Increment 6 Atomic Step 6: bounded division now real; sDivTemp
+    ; asserts its actual truncated quotient (2/3 = 0).
+    CASE sDivTemp, eDivZero, 0, CASM_TOKEN_EOF, 0, 4, 0
+    ; WP68 Increment 6 Atomic Step 5: divisor-zero check is real and
+    ; permanent, independent of the division loop's own Atomic Step 6 growth.
+    CASE sDivZero, 0, CASM_DIAG_EXPR_DIV_ZERO, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulL0, eMulZero, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulR0, eMulZero, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulR1, eMulFFFF, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulL1, eMulFFFF, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulExact, eMulFFFF, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulOvfSame, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sMulOvf2, 0, CASM_DIAG_EXPR_OVERFLOW, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sDivL0, eDivZero, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sDivR1, eDivFFFF, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sDivSelf, eDivOne, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sDivTrunc7, eDivTrunc3, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sDivTrunc1, eDivZero, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sDivWide, eDivWide, 0, CASM_TOKEN_EOF, 0, 4, 0
+    ; WP68 Increment 6 Atomic Step 7.
+    CASE sDivAssoc, eDivAssoc, 0, CASM_TOKEN_EOF, 0, 6, 0
+    CASE sMulDivOrder, eMulDivOrder, 0, CASM_TOKEN_EOF, 0, 6, 0
+    CASE sAddMulPrec, eAddMulPrec, 0, CASM_TOKEN_EOF, 0, 6, 0
+    CASE sShiftMulPrec, eShiftMulPrec, 0, CASM_TOKEN_EOF, 0, 6, 0
+    CASE sCurAddrMul, eCurAddrMul, 0, CASM_TOKEN_EOF, 0, 4, 0
+    CASE sUnaryMul, eMulFFFF, 0, CASM_TOKEN_EOF, 0, 5, 0
+    CASE sUnaryDiv, eUnaryDiv, 0, CASM_TOKEN_EOF, 0, 5, 0
+    CASE sMulReloc, 0, CASM_DIAG_EXPR_RELOC_UNSUPPORTED, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sDivReloc, 0, CASM_DIAG_EXPR_RELOC_UNSUPPORTED, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sMulUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sDivUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0

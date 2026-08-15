@@ -323,7 +323,12 @@ if(Ca65_FOUND)
     # lexer/diagnostics plumbing and symbols.s's WP65 ABI extension were
     # both in place; $6000 (+2816) is the WP64-approved envelope for the
     # whole of Phase 12, not resized incrementally per WP.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6000")
+    # WP68 Increment 6 Atomic Step 5: $6000 -> $6100 -- activating
+    # CASM_DIAG_EXPR_DIV_ZERO's message text and dispatch (diagnostics.s)
+    # plus the divisor-zero check in expr.s's staticDiv overflowed $6000 by
+    # 41 measured BSS-placement bytes; $6100 (+256) is the smallest
+    # round-page fit. User-approved 2026-08-15.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6100")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -453,7 +458,33 @@ if(Ca65_FOUND)
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1000")
+            # WP68 Increment 4: $1000 -> $1100 -- nine bitwise/unary
+            # fixtures plus evaluator growth overflowed $1000 by 161
+            # measured bytes; $1100 is the smallest round-page fit.
+            # WP68 Increment 5: $1100 -> $1200 -- seven checked-shift
+            # fixtures plus evaluator growth overflowed $1100 by 225
+            # measured RODATA bytes. At $1200, ld65 could place RODATA and
+            # then exposed BSS 55 bytes beyond MAIN; total use is $1237, so
+            # $1300 is the true smallest round-page fit.
+            # WP68 Increment 6 Atomic Step 4: $1300 -> $1400 -- checked
+            # multiplication (mulUnsigned16) plus its eight boundary
+            # fixtures overflowed $1300 by 119 measured RODATA bytes; $1400
+            # (+256) is the smallest round-page fit. User-approved 2026-08-15.
+            # WP68 Increment 6 Atomic Step 6: $1400 -> $1500 -- bounded
+            # division (divUnsigned16) plus its six boundary fixtures
+            # overflowed $1400 by 240 measured RODATA bytes; $1500 (+256) is
+            # the smallest round-page fit. User-approved 2026-08-15. Same
+            # staged-segment-reporting behavior as Increment 5: at $1500,
+            # RODATA fit but ld65 then reported BSS extending 83 bytes
+            # beyond MAIN; true total use is $1583, so $1600 (+256 from
+            # $1500) is the corrected smallest round-page fit.
+            # User-approved 2026-08-15.
+            # WP68 Increment 6 Atomic Step 7: $1600 -> $1700 -- 11
+            # precedence/associativity/unary/current-address/relocation/
+            # unresolved fixtures overflowed $1600 by 98 measured RODATA
+            # bytes; $1700 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "1700")
         endif()
         if(TEST_NAME STREQUAL "casm_vmm")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -848,7 +879,20 @@ if(Ca65_FOUND)
             # WP67: $5400 -> $5500 -- expr.s's precedence-climbing rewrite
             # (parsePrimary/parseOperatorTail, parenthesized-group support)
             # overflowed $5400 by 70 measured bytes.
-            set(TEST_PRG_SIZE "5500")
+            # WP68 Increment 3: $5500 -> $5600 -- the generalized minimum-
+            # precedence recursion contract overflowed $5500 by 130 measured
+            # bytes; $5600 (+256) is the smallest round-page step that fits.
+            # WP68 Increment 4: $5600 -> $5700 -- bitwise/unary evaluator
+            # growth overflowed $5600 by 175 measured bytes; $5700 (+256)
+            # is the smallest round-page step that fits.
+            # WP68 Increment 5: $5700 -> $5800 -- checked-shift evaluator
+            # growth overflowed $5700 by 2 measured bytes; $5800 (+256) is
+            # the smallest round-page step that fits.
+            # WP68 Increment 6 Atomic Step 6: $5800 -> $5900 -- bounded
+            # division (divUnsigned16) overflowed $5800 by 87 measured BSS
+            # bytes; $5900 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5900")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -911,7 +955,19 @@ if(Ca65_FOUND)
             # WP67: $5000 -> $5100 -- expr.s's precedence-climbing rewrite
             # (parsePrimary/parseOperatorTail, parenthesized-group support)
             # overflowed $5000 by 139 measured bytes.
-            set(TEST_PRG_SIZE "5100")
+            # WP68 Increment 6 Atomic Step 6: $5100 -> $5B00 -- this cap was
+            # never bumped alongside casm_pass1's own three WP68 increment
+            # bumps (Increments 3/4/5, +130/+175/+2 bytes respectively) even
+            # though both harnesses whole-link the same expr.s/diagnostics.s
+            # growth; discovered only now because no narrow WP68 build had
+            # rebuilt this specific target since WP67. A pre-existing latent
+            # defect outside Atomic Step 6's own scope, not something this
+            # step's own division code caused by itself -- user-approved
+            # fixing inline rather than deferring, since the fix is the same
+            # mechanical cap bump used everywhere else in this plan.
+            # Measured overflow at $5100 was 924 bytes; $5B00 (+2560) is the
+            # smallest round-page fit. User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5B00")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1042,7 +1098,13 @@ if(Ca65_FOUND)
             # WP67: $5400 -> $5500 -- diagnostics.s's two new message-table
             # entries (msgExprRelocUnsupported/msgExprParenTooDeep, unused
             # by this harness) overflowed $5400 by 98 measured bytes.
-            set(TEST_PRG_SIZE "5500")
+            # WP68 Increment 6 Atomic Step 6: $5500 -> $5900 -- same
+            # pre-existing latent gap as casm_pass1/casm_passcheck above:
+            # this cap was never bumped alongside WP68 Increments 3/4/5's
+            # own expr.s/diagnostics.s growth, discovered only now. Measured
+            # overflow at $5500 was 774 bytes; $5900 (+1024) is the smallest
+            # round-page fit. User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5900")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1118,7 +1180,13 @@ if(Ca65_FOUND)
             # overflowed $5800 by 169 measured bytes; $5900 (+256) would
             # still overflow, so $5A00 (+512) is the smallest round-page
             # step that fits.
-            set(TEST_PRG_SIZE "5A00")
+            # WP68 Increment 6 Atomic Step 6: $5A00 -> $5D00 -- same
+            # pre-existing latent gap as casm_pass1/casm_passcheck/
+            # casm_frame above: never bumped alongside WP68 Increments
+            # 3/4/5's own expr.s/diagnostics.s growth, discovered only now.
+            # Measured overflow at $5A00 was 698 bytes; $5D00 (+768) is the
+            # smallest round-page fit. User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5D00")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1323,6 +1391,11 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_bounds)
 # WP61 Increment 5's lexer-only length-32 harness is likewise self-contained
 # (no parser.s/source.s/state.s); test.d64's directory track is still full.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_lexer)
+# WP68 Increment 6 Atomic Step 2: test.d64 was down to its final 3 free
+# blocks after Increment 5's expression-evaluator growth. test_casm_expr
+# moves to the new self-bootable casm_phase12_test_d64 (see below), which
+# becomes its canonical home for Phase 12's continuing operator growth.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_expr)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1387,6 +1460,10 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrd.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrh.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrb.seq"
+    # WP68 Increment 6 Atomic Step 5: minimal production proof of
+    # CASM_DIAG_EXPR_DIV_ZERO's message routing through the real casm.prg
+    # binary.
+    "${CASM_TEST_FIXTURE_DIR}/casmdivzero.seq"
     # WP20 production expression-adapter fixtures
     "${CASM_TEST_FIXTURE_DIR}/casmexprn.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmexpru.seq"
@@ -1700,6 +1777,20 @@ add_c64_disk_image(casm_include_test_d64
     PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
+
+# WP68 Increment 6: durable, self-bootable Phase 12 expression-test image.
+# test.d64 has only 3 free blocks after Increment 5; this image becomes the
+# canonical home for growing expression/operator harnesses and may be reused
+# by later Phase 12 increments. Atomic Step 2 moved test_casm_expr off
+# test.d64 (see the TEST_IMAGE_PRG_TARGETS REMOVE_ITEM above) onto this disk.
+# add_c64_disk_image already wraps cc1541 with the required C64_THEME_DIR
+# build-event contract, so no direct external-tool command is introduced here.
+add_c64_disk_image(casm_phase12_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm test_casm_expr test_casm_lexer
+)
 
 # WP61 Increment 6: source-extent boundary fixtures (65,535-byte accepted
 # combined extent / 65,536-byte first-reject). casmsrcmax.seq alone proves

@@ -51,6 +51,7 @@
     ; correctness dependency, matching this project's own determinism
     ; convention (e.g. ppsConstant's top-of-routine zeroing).
     sta CasmExprParenDepth
+    sta CasmExprMinPrec
     rts
 .endproc
 
@@ -104,6 +105,7 @@ noExtraction:
     ; exactly as before; nested calls never see or touch it.
     jsr parsePrimary
     bcs return
+    lda #CASM_EXPR_PREC_LOWEST
     jsr parseOperatorTail
     bcs return
     jsr rejectContinuation
@@ -172,10 +174,18 @@ return:
 ; ---------------------------------------------------------------------------
 .proc parsePrimary
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_MINUS
+    beq unary
+    cmp #CASM_TOKEN_TILDE
+    beq unary
     cmp #CASM_TOKEN_NUMBER
-    beq number
+    bne primaryNotNumber
+    jmp number
+primaryNotNumber:
     cmp #CASM_TOKEN_IDENTIFIER
-    beq identifier
+    bne primaryNotIdentifier
+    jmp identifier
+primaryNotIdentifier:
     cmp #CASM_TOKEN_STAR
     beq curAddr
     cmp #CASM_TOKEN_LPAREN
@@ -186,6 +196,62 @@ notGroup:
     lda #CASM_DIAG_EXPR_MALFORMED
     sec
 return:
+    rts
+
+; WP68: unary '-'/'~' recurse through parsePrimary so chains bind
+; right-to-left and tighter than every binary tier. The operator token is
+; kept on the hardware stack across lexer/RHS parsing; every exit balances it.
+unary:
+    pha
+    jsr lexerNext
+    bcc unaryTokenOk
+    tax
+    pla
+    txa
+    rts
+unaryTokenOk:
+    jsr parsePrimary
+    bcc unaryPrimaryOk
+    tax
+    pla
+    txa
+    rts
+unaryPrimaryOk:
+    pla
+    sta CasmExprOpToken
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RELOCATABLE
+    beq unaryNotReloc
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+    sec
+    rts
+unaryNotReloc:
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq unarySuccess
+    lda CasmExprOpToken
+    cmp #CASM_TOKEN_TILDE
+    beq unaryComplement
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    eor #$FF
+    clc
+    adc #1
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    eor #$FF
+    adc #0
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jmp unarySuccess
+unaryComplement:
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    eor #$FF
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    eor #$FF
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+unarySuccess:
+    clc
     rts
 
 ; WP66: current-address symbol ('*'). Always known immediately (no
@@ -214,7 +280,9 @@ curAddrNotReloc:
 
 number:
     jsr exprParseNumeric
-    bcs return
+    bcc numberOk
+    rts
+numberOk:
     stx CasmExprResultRecord + CASM_EXPR_VAL_LO
     sty CasmExprResultRecord + CASM_EXPR_VAL_HI
     lda #CASM_EXPR_FLAG_RESOLVED
@@ -332,6 +400,7 @@ groupOpened:
     dec CasmExprParenDepth
     rts
 groupPrimaryOk:
+    lda #CASM_EXPR_PREC_LOWEST
     jsr parseOperatorTail         ; recurse: the group's own +/- chain
     bcc groupTailOk
     dec CasmExprParenDepth
@@ -352,14 +421,13 @@ groupClose:
 .endproc
 
 ; ---------------------------------------------------------------------------
-; parseOperatorTail (WP67, private)
-; Left-associative '+'/'-' loop: repeatedly consumes an operator and a
-; recursively-parsed RHS primary (NUMBER, IDENTIFIER, '*', or a
-; parenthesized group -- via parsePrimary, so `label+(1+2)` and
-; `1+2+3` are both just this one loop applied uniformly), combining each
-; into the running accumulator in CasmExprResultRecord, until no operator
-; follows. Reused for exprEvaluate's own top-level chain and for a
-; parenthesized group's own inner chain (parsePrimary's `group` arm).
+; parseOperatorTail (WP67/WP68, private)
+; Minimum-precedence, left-associative operator loop. WP68 Increment 3
+; establishes the complete recursion contract while deliberately classifying
+; only the already-shipped '+'/'-' tier: consume an operator whose precedence
+; is at least A, parse one RHS primary, recursively consume only tighter RHS
+; operators (current precedence + 1), then combine. Later increments populate
+; the other frozen tiers without changing this control-flow shape.
 ;
 ; Since parsePrimary shares the same CasmExprResultRecord for whatever it
 ; is currently parsing, this proc saves the accumulator's VAL_LO/HI,
@@ -378,8 +446,9 @@ groupClose:
 ; symbol + static addend); otherwise the RHS's RELOCATABLE/SYMBOL_DERIVED
 ; bits simply propagate into the accumulator.
 ;
-; Inputs:    current token follows a just-parsed primary; CasmExprResultRecord
-;            holds that primary's value; D clear
+; Inputs:    A = minimum accepted precedence; current token follows a
+;            just-parsed primary; CasmExprResultRecord holds that primary's
+;            value; D clear
 ; Outputs:   success: CasmExprResultRecord's VAL_LO/HI/FLAGS updated for
 ;            every '+'/'-' applied (zero or more); ADDEND_SIGN/MAG_LO/HI
 ;            hold the *last* applied operator's own sign and RHS value
@@ -389,31 +458,73 @@ groupClose:
 ;            failure: A = stable diagnostic, C set
 ; Preserves: V, D, I, zero page, balanced stack
 ; Clobbers:  A, X, Y, N, Z, C, lexer state, CasmExprResultRecord's VAL/
-;            FLAGS/ADDEND fields, CasmExprOpSign/RhsValLo/RhsValHi/RhsFlags
+;            FLAGS/ADDEND fields, CasmExprMinPrec/OpToken/OpPrec/RhsValLo/RhsValHi/
+;            RhsFlags
 ; ---------------------------------------------------------------------------
 .proc parseOperatorTail
+    tax
+    lda CasmExprMinPrec
+    pha
+    stx CasmExprMinPrec
 loop:
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_PLUS
-    beq applyOp
+    beq classifyAdd
     cmp #CASM_TOKEN_MINUS
-    beq applyOp
+    beq classifyAdd
+    cmp #CASM_TOKEN_PIPE
+    beq classifyOr
+    cmp #CASM_TOKEN_CARET
+    beq classifyXor
+    cmp #CASM_TOKEN_AMPERSAND
+    beq classifyAnd
+    cmp #CASM_TOKEN_SHL
+    beq classifyShift
+    cmp #CASM_TOKEN_SHR
+    beq classifyShift
+    cmp #CASM_TOKEN_STAR
+    beq classifyMulDiv
+    cmp #CASM_TOKEN_SLASH
+    beq classifyMulDiv
+    jmp done
+classifyAdd:
+    lda #CASM_EXPR_PREC_ADD
+    bne classified
+classifyOr:
+    lda #CASM_EXPR_PREC_OR
+    bne classified
+classifyXor:
+    lda #CASM_EXPR_PREC_XOR
+    bne classified
+classifyAnd:
+    lda #CASM_EXPR_PREC_AND
+    bne classified
+classifyShift:
+    lda #CASM_EXPR_PREC_SHIFT
+    bne classified
+classifyMulDiv:
+    ; WP68 Increment 6 Atomic Step 3: '*' here is unambiguously infix --
+    ; this loop only runs after a primary has already been parsed, so the
+    ; primary-position current-address reading of CASM_TOKEN_STAR (see
+    ; parsePrimary) never reaches this classifier.
+    lda #CASM_EXPR_PREC_MULDIV
+classified:
+    sta CasmExprOpPrec
+    cmp CasmExprMinPrec
+    bcs applyOp
     jmp done
 applyOp:
-    cmp #CASM_TOKEN_MINUS
-    beq opNegative
-    lda #CASM_ADDEND_SIGN_POSITIVE
-    jmp opStoreSign
-opNegative:
-    lda #CASM_ADDEND_SIGN_NEGATIVE
-opStoreSign:
-    pha                            ; stash the operator's own sign
-    jsr lexerNext                  ; consume '+'/'-', fetch the RHS's first token
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    pha                            ; stash operator token
+    lda CasmExprOpPrec
+    pha                            ; stash precedence across recursive RHS
+    jsr lexerNext                  ; consume operator, fetch RHS first token
     bcc opTokenOk
     tax
     pla
+    pla
     txa
-    rts
+    jmp failReturn
 opTokenOk:
     lda CasmExprResultRecord + CASM_EXPR_VAL_LO
     pha
@@ -433,10 +544,28 @@ opTokenOk:
     pla
     pla
     pla
-    pla                              ; drop the accumulator's 5 saved bytes + sign
+    pla
+    pla                              ; drop accumulator, precedence, and token
     txa
-    rts
+    jmp failReturn
 opRhsOk:
+    tsx
+    lda $0106, x                    ; precedence below 5 saved accumulator bytes
+    clc
+    adc #1
+    jsr parseOperatorTail
+    bcc opRhsTailOk
+    tax
+    pla
+    pla
+    pla
+    pla
+    pla
+    pla
+    pla                              ; drop accumulator, precedence, and token
+    txa
+    jmp failReturn
+opRhsTailOk:
     ; capture the RHS's own value/flags before the accumulator's saved
     ; bytes (about to be restored) overwrite the shared record.
     lda CasmExprResultRecord + CASM_EXPR_VAL_LO
@@ -456,22 +585,174 @@ opRhsOk:
     pla
     sta CasmExprResultRecord + CASM_EXPR_VAL_LO
     pla
-    sta CasmExprOpSign
+    sta CasmExprOpPrec              ; discard saved precedence into scratch
+    pla
+    sta CasmExprOpToken
 
-    ; WP64's representability rule: at most one relocatable component.
+    lda CasmExprOpToken
+    cmp #CASM_TOKEN_PLUS
+    beq checkAddReloc
+    cmp #CASM_TOKEN_MINUS
+    bne checkStaticReloc
+checkAddReloc:
+    ; Existing +/- representability rule: at most one relocatable component.
     lda CasmExprRhsFlags
     and #CASM_EXPR_FLAG_RELOCATABLE
-    beq combineAddend
+    bne checkAddLeftReloc
+    jmp combineAddend
+checkAddLeftReloc:
     lda CasmExprResultRecord + CASM_EXPR_FLAGS
     and #CASM_EXPR_FLAG_RELOCATABLE
-    beq combineAddend
+    bne addRelocFail
+    jmp combineAddend
+addRelocFail:
     jsr diagSetLocFromToken
     lda #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
     sec
-    rts
+    jmp failReturn
+
+checkStaticReloc:
+    ; Every new WP68 operator is static-only: either relocatable operand is
+    ; rejected, even when the other operand is static.
+    lda CasmExprRhsFlags
+    and #CASM_EXPR_FLAG_RELOCATABLE
+    bne staticRelocFail
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RELOCATABLE
+    beq combineStatic
+staticRelocFail:
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+    sec
+    jmp failReturn
+
+combineStatic:
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne staticLeftResolved
+    jmp staticUnresolved
+staticLeftResolved:
+    lda CasmExprRhsFlags
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne staticBothResolved
+    jmp staticUnresolved
+staticBothResolved:
+    lda CasmExprOpToken
+    cmp #CASM_TOKEN_AMPERSAND
+    beq staticAnd
+    cmp #CASM_TOKEN_CARET
+    beq staticXor
+    cmp #CASM_TOKEN_SHL
+    beq staticShift
+    cmp #CASM_TOKEN_SHR
+    beq staticShift
+    cmp #CASM_TOKEN_STAR
+    beq staticMul
+    cmp #CASM_TOKEN_SLASH
+    beq staticDiv
+    ; CASM_TOKEN_PIPE
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    ora CasmExprRhsValLo
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    ora CasmExprRhsValHi
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jmp staticFlags
+staticMul:
+    ; WP68 Increment 6 Atomic Step 4: checked unsigned 16-bit multiply.
+    ; Atomic Step 5's growth pushed staticFlags out of bcc's short-branch
+    ; range; local bcs + absolute JMP trampolines keep both outcomes correct
+    ; without relying on branch distance.
+    jsr mulUnsigned16
+    bcs staticMulOverflow
+    jmp staticFlags
+staticMulOverflow:
+    jmp staticOverflow
+staticDiv:
+    ; WP68 Increment 6 Atomic Step 5: the divisor-zero check is
+    ; unconditional and runs before any division arithmetic, matching the
+    ; plan's algorithm ("check the divisor for zero before entering the
+    ; loop"). A zero divisor raises the real, permanent
+    ; CASM_DIAG_EXPR_DIV_ZERO diagnostic regardless of whether the bounded
+    ; division loop exists yet.
+    lda CasmExprRhsValLo
+    ora CasmExprRhsValHi
+    bne staticDivNonzero
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_DIV_ZERO
+    sec
+    jmp failReturn
+staticDivNonzero:
+    ; WP68 Increment 6 Atomic Step 6: bounded unsigned division. Always
+    ; succeeds once reached -- the caller (staticDiv, above) already
+    ; rejected a zero divisor, and divUnsigned16 has no other failure mode.
+    jsr divUnsigned16
+    jmp staticFlags
+staticAnd:
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    and CasmExprRhsValLo
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    and CasmExprRhsValHi
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jmp staticFlags
+staticXor:
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    eor CasmExprRhsValLo
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    eor CasmExprRhsValHi
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    jmp staticFlags
+staticShift:
+    ; Counts are unsigned 16-bit values but only 0..15 are valid.
+    lda CasmExprRhsValHi
+    bne staticOverflow
+    lda CasmExprRhsValLo
+    cmp #16
+    bcs staticOverflow
+    tax
+    beq staticFlags
+    lda CasmExprOpToken
+    cmp #CASM_TOKEN_SHR
+    beq staticShiftRight
+staticShiftLeftLoop:
+    asl CasmExprResultRecord + CASM_EXPR_VAL_LO
+    rol CasmExprResultRecord + CASM_EXPR_VAL_HI
+    bcs staticOverflow
+    dex
+    bne staticShiftLeftLoop
+    jmp staticFlags
+staticShiftRight:
+    lsr CasmExprResultRecord + CASM_EXPR_VAL_HI
+    ror CasmExprResultRecord + CASM_EXPR_VAL_LO
+    dex
+    bne staticShiftRight
+    jmp staticFlags
+staticOverflow:
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_OVERFLOW
+    sec
+    jmp failReturn
+staticUnresolved:
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #(255 - CASM_EXPR_FLAG_RESOLVED)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+staticFlags:
+    lda CasmExprRhsFlags
+    and #CASM_EXPR_FLAG_SYMBOL_DERIVED
+    ora CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #(255 - CASM_EXPR_FLAG_RELOCATABLE)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
+    jmp loop
 
 combineAddend:
-    lda CasmExprOpSign
+    lda #CASM_ADDEND_SIGN_POSITIVE
+    ldx CasmExprOpToken
+    cpx #CASM_TOKEN_MINUS
+    bne storeAddendSign
+    lda #CASM_ADDEND_SIGN_NEGATIVE
+storeAddendSign:
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_SIGN
     lda CasmExprRhsValLo
     sta CasmExprResultRecord + CASM_EXPR_ADDEND_MAG_LO
@@ -488,7 +769,7 @@ combineAddend:
     ldy CasmExprResultRecord + CASM_EXPR_VAL_HI
     jsr exprApplyAddend
     bcc applied
-    rts
+    jmp failReturn
 applied:
     stx CasmExprResultRecord + CASM_EXPR_VAL_LO
     sty CasmExprResultRecord + CASM_EXPR_VAL_HI
@@ -511,7 +792,16 @@ combineFlags:
     ; iteration's own check.
     jmp loop
 done:
+    pla
+    sta CasmExprMinPrec
     clc
+    rts
+failReturn:
+    tax
+    pla
+    sta CasmExprMinPrec
+    txa
+    sec
     rts
 .endproc
 
@@ -530,6 +820,22 @@ done:
     cmp #CASM_TOKEN_NUMBER
     beq unsupported
     cmp #CASM_TOKEN_IDENTIFIER
+    beq unsupported
+    cmp #CASM_TOKEN_STAR
+    beq unsupported
+    cmp #CASM_TOKEN_SLASH
+    beq unsupported
+    cmp #CASM_TOKEN_AMPERSAND
+    beq unsupported
+    cmp #CASM_TOKEN_CARET
+    beq unsupported
+    cmp #CASM_TOKEN_PIPE
+    beq unsupported
+    cmp #CASM_TOKEN_TILDE
+    beq unsupported
+    cmp #CASM_TOKEN_SHL
+    beq unsupported
+    cmp #CASM_TOKEN_SHR
     beq unsupported
     clc
     rts
@@ -895,6 +1201,152 @@ success:
     rts
 .endproc
 
+; ---------------------------------------------------------------------------
+; mulUnsigned16 (WP68 Increment 6 Atomic Step 4, private)
+; Bounded unsigned 16x16->16 shift/add multiply with overflow detection.
+; Standard right-shift-multiplier/left-shift-multiplicand algorithm, capped
+; at 16 iterations with an early exit once the multiplier reaches zero.
+; Checking multiplier-zero before shifting the multiplicand is load-bearing:
+; it avoids a false overflow on the multiplicand's own final left shift for
+; valid products such as $8000*1, where that shift is never needed and its
+; leading bit is irrelevant to the (already complete) result.
+;
+; Inputs:    CasmExprResultRecord VAL_LO/HI = left operand (multiplicand);
+;            CasmExprRhsValLo/Hi = right operand (multiplier); D clear
+; Outputs:   success: CasmExprResultRecord VAL_LO/HI = 16-bit product; C clear
+;            failure: C set (product would exceed $FFFF); ResultRecord
+;            VAL_LO/HI unchanged (caller must not commit a partial product)
+; Preserves: V, D, I, zero page, balanced stack, CasmExprResultRecord on
+;            failure
+; Clobbers:  A, X, N, Z, C, CasmExprMulcandLo/Hi, CasmExprMulplierLo/Hi,
+;            CasmExprProductLo/Hi
+; ---------------------------------------------------------------------------
+.proc mulUnsigned16
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    sta CasmExprMulcandLo
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    sta CasmExprMulcandHi
+    lda CasmExprRhsValLo
+    sta CasmExprMulplierLo
+    lda CasmExprRhsValHi
+    sta CasmExprMulplierHi
+    lda #0
+    sta CasmExprProductLo
+    sta CasmExprProductHi
+
+    ldx #16
+loop:
+    lsr CasmExprMulplierHi
+    ror CasmExprMulplierLo         ; carry out = multiplier's own bit 0
+    bcc noAdd
+    clc
+    lda CasmExprProductLo
+    adc CasmExprMulcandLo
+    sta CasmExprProductLo
+    lda CasmExprProductHi
+    adc CasmExprMulcandHi
+    sta CasmExprProductHi
+    bcs overflow
+noAdd:
+    lda CasmExprMulplierLo
+    ora CasmExprMulplierHi
+    beq done                       ; no remaining multiplier bits -- early out
+    asl CasmExprMulcandLo
+    rol CasmExprMulcandHi
+    bcs overflow
+    dex
+    bne loop
+done:
+    lda CasmExprProductLo
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprProductHi
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    clc
+    rts
+overflow:
+    sec
+    rts
+.endproc
+
+; ---------------------------------------------------------------------------
+; divUnsigned16 (WP68 Increment 6 Atomic Step 6, private)
+; Bounded unsigned 16/16->16 restoring binary long division. Returns the
+; truncated quotient only; the remainder is private scratch and is discarded.
+; Always succeeds when reached -- the caller (staticDiv) already rejected a
+; zero divisor before calling this, so there is no failure path here.
+;
+; Standard technique: each of the 16 iterations shifts the dividend/quotient
+; pair and the (17-bit-capable) remainder left together as one wide rotate
+; (quotient low -> quotient high -> remainder low -> remainder high ->
+; remainder extension bit), most significant dividend bit first. The 17-bit
+; remainder (extension:high:low) is then compared against the 16-bit
+; divisor; if it is not smaller, the divisor is subtracted and the vacated
+; quotient bit 0 (just shifted in as 0) is set to 1.
+;
+; Inputs:    CasmExprResultRecord VAL_LO/HI = dividend; CasmExprRhsValLo/Hi =
+;            nonzero divisor; D clear
+; Outputs:   CasmExprResultRecord VAL_LO/HI = truncated unsigned quotient
+; Preserves: V, D, I, zero page, balanced stack
+; Clobbers:  A, X, N, Z, C, CasmExprDivisorLo/Hi, CasmExprQuotientLo/Hi,
+;            CasmExprRemainderLo/Hi, CasmExprRemainderExt
+; ---------------------------------------------------------------------------
+.proc divUnsigned16
+    lda CasmExprResultRecord + CASM_EXPR_VAL_LO
+    sta CasmExprQuotientLo         ; initially the dividend
+    lda CasmExprResultRecord + CASM_EXPR_VAL_HI
+    sta CasmExprQuotientHi
+    lda CasmExprRhsValLo
+    sta CasmExprDivisorLo
+    lda CasmExprRhsValHi
+    sta CasmExprDivisorHi
+    lda #0
+    sta CasmExprRemainderLo
+    sta CasmExprRemainderHi
+    sta CasmExprRemainderExt
+
+    ldx #16
+loop:
+    asl CasmExprQuotientLo
+    rol CasmExprQuotientHi
+    rol CasmExprRemainderLo
+    rol CasmExprRemainderHi
+    rol CasmExprRemainderExt
+
+    lda CasmExprRemainderExt
+    bne doSub                      ; 17th bit set -- remainder > any 16-bit divisor
+    lda CasmExprRemainderHi
+    cmp CasmExprDivisorHi
+    bcc noSub
+    bne doSub
+    lda CasmExprRemainderLo
+    cmp CasmExprDivisorLo
+    bcc noSub
+doSub:
+    sec
+    lda CasmExprRemainderLo
+    sbc CasmExprDivisorLo
+    sta CasmExprRemainderLo
+    lda CasmExprRemainderHi
+    sbc CasmExprDivisorHi
+    sta CasmExprRemainderHi
+    lda CasmExprRemainderExt
+    sbc #0
+    sta CasmExprRemainderExt
+    lda CasmExprQuotientLo
+    ora #1                         ; set the freshly shifted-in quotient bit 0
+    sta CasmExprQuotientLo
+noSub:
+    dex
+    bne loop
+
+    lda CasmExprQuotientLo
+    sta CasmExprResultRecord + CASM_EXPR_VAL_LO
+    lda CasmExprQuotientHi
+    sta CasmExprResultRecord + CASM_EXPR_VAL_HI
+    clc
+    rts
+.endproc
+
 .segment "BSS"
 
 CasmExprResultRecord:
@@ -936,10 +1388,33 @@ CasmExprRelocatableModeIn: .res 1
 ; call (parsePrimary's own save/restore of the accumulator's 5 bytes uses
 ; the hardware stack directly, not these).
 CasmExprParenDepth: .res 1
-CasmExprOpSign:     .res 1
+CasmExprMinPrec:    .res 1
+CasmExprOpToken:    .res 1
+CasmExprOpPrec:     .res 1
 CasmExprRhsValLo:   .res 1
 CasmExprRhsValHi:   .res 1
 CasmExprRhsFlags:   .res 1
+
+; WP68 Increment 6 Atomic Step 4: mulUnsigned16's own private scratch --
+; transient per multiply application, same lifetime shape as the RHS scratch
+; above.
+CasmExprMulcandLo:  .res 1
+CasmExprMulcandHi:  .res 1
+CasmExprMulplierLo: .res 1
+CasmExprMulplierHi: .res 1
+CasmExprProductLo:  .res 1
+CasmExprProductHi:  .res 1
+
+; WP68 Increment 6 Atomic Step 6: divUnsigned16's own private scratch --
+; same lifetime shape as the multiply scratch above. 13 bytes total between
+; the two, at the plan's approved ceiling.
+CasmExprDivisorLo:    .res 1
+CasmExprDivisorHi:    .res 1
+CasmExprQuotientLo:   .res 1
+CasmExprQuotientHi:   .res 1
+CasmExprRemainderLo:  .res 1
+CasmExprRemainderHi:  .res 1
+CasmExprRemainderExt: .res 1
 
 .assert CasmExprResultRecordEnd - CasmExprResultRecord = CASM_EXPR_REC_SIZE, error, "CASM expression result record size changed"
 .assert <CasmExprResolverAddrLo <> $FF, lderror, "CASM resolver callback pointer crosses an NMOS 6502 indirect-jump page"

@@ -245,6 +245,22 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Treat resource cleanup, source provenance, expression relocation class, and
   instruction-size stability as foundational interfaces rather than late
   error handling.
+- Phase 12 WP68 extends the stable token inventory with `/`, `&`, `^`, `|`,
+  `~`, `<<`, and `>>`. `*` and `-` retain their existing token IDs and are
+  interpreted contextually as primary/infix and unary/infix respectively.
+  Shift tokens consume two matching bytes but retain the first byte's source
+  location; lone `<`/`>` remain extraction tokens.
+- Phase 12 expression precedence is lowest-to-highest: binary `+`/`-`, `|`,
+  `^`, `&`, `<<`/`>>`, `*`/`/`, unary `-`/`~`. Binary operators are
+  left-associative; the evaluator parses an RHS at its operator precedence
+  plus one.
+- Phase 12 bitwise operators `&`, `^`, `|`, and unary `~` are static-only
+  16-bit operations. Unary `-` computes 16-bit two's-complement and chains
+  right-to-left. Relocatable operands are rejected; unresolved static Pass 1
+  values propagate unresolved without reading placeholder value bytes.
+- Phase 12 shifts are static-only: counts are limited to 0-15, left shift
+  raises expression overflow when any high bit is discarded, and right shift
+  is logical and zero-filling.
 - `CasmSourceVmmCursorLo/Hi` is the **bulk-refill read head, not the logical
   parse position**. `sourceRefill` installs up to 256 bytes per call, so for
   a source file smaller than the buffer the cursor already sits at that

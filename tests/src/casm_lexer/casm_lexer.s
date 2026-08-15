@@ -96,6 +96,9 @@ CasmLookaheadOffsetLo:    .res 1
 CasmLookaheadOffsetHi:    .res 1
 BytesRemaining:       .res 1
 FailCount:            .res 1
+SourceMode:           .res 1
+SourceIndex:          .res 1
+ExpectedIndex:        .res 1
 
 .segment "CODE"
 
@@ -105,10 +108,13 @@ start:
     jsr KernalChROUT
     lda #0
     sta FailCount
+    sta SourceMode
 
     jsr caseAccept31
     jsr reportCase
     jsr caseReject32
+    jsr reportCase
+    jsr caseOperators
     jsr reportCase
 
     lda #$0D
@@ -188,6 +194,68 @@ cr32Fail:
     rts
 
 ; ---------------------------------------------------------------------------
+; caseOperators
+; Feed every WP68 operator spelling through the real lexer. Single '<'/'>'
+; must remain extraction tokens, doubled forms must consume two bytes into
+; one shift token, and each token location must stay at its first byte.
+; ---------------------------------------------------------------------------
+caseOperators:
+    lda #1
+    sta SourceMode
+    lda #0
+    sta SourceIndex
+    sta ExpectedIndex
+    jsr lexerInit
+coLoop:
+    jsr lexerNext
+    bcs coFail
+    ldx ExpectedIndex
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp operatorExpected, x
+    bne coFail
+    inx
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp operatorExpected, x
+    bne coFail
+    inx
+    lda CasmTokenText
+    cmp operatorExpected, x
+    bne coFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #2
+    bne coColumn
+    lda CasmTokenText + 1
+    cmp CasmTokenText
+    bne coFail
+    lda CasmTokenText + 2
+    bne coFail
+coColumn:
+    inx
+    lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    cmp operatorExpected, x
+    bne coFail
+    inx
+    stx ExpectedIndex
+    cpx #OPERATOR_EXPECTED_SIZE
+    bcc coLoop
+    jsr lexerNext
+    bcs coFail
+    cmp #CASM_TOKEN_EOF
+    bne coFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    cmp #OPERATOR_SOURCE_SIZE
+    bne coFail
+    lda #0
+    sta SourceMode
+    clc
+    rts
+coFail:
+    lda #0
+    sta SourceMode
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; sourceNextByte (stub)
 ; Returns CASM_PETSCII_UPPER_A once per remaining byte in BytesRemaining,
 ; then CASM_SOURCE_EOF. Matches source.s's real CASM_SOURCE_BYTE/EOF
@@ -195,14 +263,47 @@ cr32Fail:
 ; the only part of it lexer.s's lnId loop and lexerFill observe.
 ; ---------------------------------------------------------------------------
 sourceNextByte:
+    lda SourceMode
+    beq snbRepeatA
+    ldx SourceIndex
+    cpx #OPERATOR_SOURCE_SIZE
+    bcs snbEof
+    lda operatorSource, x
+    sta CasmSourceResultByte
+    lda #0
+    sta CasmSourceResultFileId
+    sta CasmSourceResultLineHi
+    txa
+    sta CasmSourceResultColumn
+    sta CasmSourceResultOffsetLo
+    lda #0
+    sta CasmSourceResultOffsetHi
+    lda #1
+    sta CasmSourceResultLineLo
+    inc SourceIndex
+    lda #CASM_SOURCE_BYTE
+    clc
+    rts
+snbRepeatA:
     lda BytesRemaining
     bne snbHaveByte
+snbEof:
     lda #0
     sta CasmSourceResultByte
     sta CasmSourceResultFileId
     sta CasmSourceResultLineLo
     sta CasmSourceResultLineHi
     sta CasmSourceResultColumn
+    sta CasmSourceResultOffsetLo
+    sta CasmSourceResultOffsetHi
+    lda SourceMode
+    beq snbEofReady
+    lda #1
+    sta CasmSourceResultLineLo
+    lda SourceIndex
+    sta CasmSourceResultColumn
+    sta CasmSourceResultOffsetLo
+snbEofReady:
     lda #CASM_SOURCE_EOF
     clc
     rts
@@ -232,6 +333,35 @@ diagSetLocFromToken:
     rts
 
 .segment "RODATA"
+
+operatorSource:
+    .byte CASM_PETSCII_LESS, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_LESS, CASM_PETSCII_LESS, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_GREATER, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_GREATER, CASM_PETSCII_GREATER, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_SLASH, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_AMPERSAND, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_CARET, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_PIPE, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_TILDE, CASM_PETSCII_SPACE
+    .byte CASM_PETSCII_ASTERISK, CASM_PETSCII_SPACE, CASM_PETSCII_MINUS
+OPERATOR_SOURCE_SIZE = * - operatorSource
+
+; token type, text length, first text byte, source column
+operatorExpected:
+    .byte CASM_TOKEN_LESS,      1, CASM_PETSCII_LESS,       0
+    .byte CASM_TOKEN_SHL,       2, CASM_PETSCII_LESS,       2
+    .byte CASM_TOKEN_GREATER,   1, CASM_PETSCII_GREATER,    5
+    .byte CASM_TOKEN_SHR,       2, CASM_PETSCII_GREATER,    7
+    .byte CASM_TOKEN_SLASH,     1, CASM_PETSCII_SLASH,     10
+    .byte CASM_TOKEN_AMPERSAND, 1, CASM_PETSCII_AMPERSAND, 12
+    .byte CASM_TOKEN_CARET,     1, CASM_PETSCII_CARET,     14
+    .byte CASM_TOKEN_PIPE,      1, CASM_PETSCII_PIPE,      16
+    .byte CASM_TOKEN_TILDE,     1, CASM_PETSCII_TILDE,     18
+    .byte CASM_TOKEN_STAR,      1, CASM_PETSCII_ASTERISK,  20
+    .byte CASM_TOKEN_MINUS,     1, CASM_PETSCII_MINUS,     22
+OPERATOR_EXPECTED_SIZE = * - operatorExpected
+.assert OPERATOR_EXPECTED_SIZE = 11 * 4, error, "WP68 lexer operator fixture count changed"
 
 passMsg:
     .byte "CASM LEXER: PASS", PetCr, 0

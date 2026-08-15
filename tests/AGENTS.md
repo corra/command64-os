@@ -85,6 +85,13 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   split from `test_casm_flist` to keep both Command64 load envelopes bounded.
   It is packaged beside `test_casm_flist` on `casm_listing_test.d64`; both use
   distinct collision-safe names and clean up all `FLI06*.LST` artifacts.
+- Phase 12 WP68 Increment 6 adds the self-bootable
+  `casm_phase12_test.d64` as the canonical growth image for Phase 12
+  expression/operator harnesses. It carries `command64`, `casm`,
+  `test_casm_expr`, and `test_casm_lexer`; preserve at least 40 free blocks
+  for later Phase 12 fixtures and runtime outputs. `test_casm_expr` is
+  packaged only here, not on `test.d64` (moved off in Atomic Step 2 to
+  recover `test.d64`'s directory/byte-space headroom).
 - `casmidup1.s`/`casmiduc1.s`/`casmiduc2.s` repeat that failure with an
   unterminated final identifier, proving packed identity and traceback depth
   can be recovered after normal lexer lookahead already popped the child.
