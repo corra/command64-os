@@ -143,6 +143,10 @@ diagPrintFatal:
     beq dpfExprRelocUnsupported
     cmp #CASM_DIAG_EXPR_PAREN_TOO_DEEP
     beq dpfExprParenTooDeep
+    cmp #CASM_DIAG_CHAR_UNTERMINATED
+    beq dpfCharUnterminated
+    cmp #CASM_DIAG_CHAR_INVALID_BYTE
+    beq dpfCharInvalidByte
     jmp dpfUnknown
 dpfListingRange:
     sec
@@ -212,6 +216,20 @@ dpfExprRelocUnsupported:
 dpfExprParenTooDeep:
     ldx #<msgExprParenTooDeep
     ldy #>msgExprParenTooDeep
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+; WP69: both raised by lexer.s's lnChar with diagSetLocFromLookahead
+; already called at the raise site -- same two-step shape as
+; dpfExprRelocUnsupported/dpfExprParenTooDeep above, not the locationless
+; single-step pattern.
+dpfCharUnterminated:
+    ldx #<msgCharUnterminated
+    ldy #>msgCharUnterminated
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfCharInvalidByte:
+    ldx #<msgCharInvalidByte
+    ldy #>msgCharInvalidByte
     jsr diagPrintString
     jmp diagPrintSourceContext
 dpfUnknown:
@@ -1478,6 +1496,11 @@ msgExprRelocUnsupported:
 ; DEPTH (8).
 msgExprParenTooDeep:
     .byte "CASM: EXPRESSION TOO DEEPLY NESTED", PetCr, 0
+; WP69: character literal ('x') diagnostics.
+msgCharUnterminated:
+    .byte "CASM: CHARACTER LITERAL UNTERMINATED", PetCr, 0
+msgCharInvalidByte:
+    .byte "CASM: CHARACTER LITERAL INVALID BYTE", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.

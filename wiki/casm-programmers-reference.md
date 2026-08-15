@@ -394,11 +394,11 @@ whitespace and `;`-comments (but still emits the newline that terminates a
 comment) and classifies the next significant token into the persistent
 `CasmTokenRecord` (`state.s`).
 
-**Token types** (`CASM_TOKEN_*`, $00-$18, `CASM_TOKEN_COUNT` = $19):
+**Token types** (`CASM_TOKEN_*`, $00-$19, `CASM_TOKEN_COUNT` = $1A):
 `EOF, NEWLINE, IDENTIFIER, MNEMONIC, DIRECTIVE, REGISTER, NUMBER, COMMA,
 COLON, HASH, LPAREN, RPAREN, PLUS, MINUS, LESS, GREATER, EQUALS` (WP65,
 `=`), `STAR` (WP66, `*`), `SLASH, AMPERSAND, CARET, PIPE, TILDE, SHL, SHR`
-(WP68, `/ & ^ | ~ << >>`).
+(WP68, `/ & ^ | ~ << >>`), `CHAR` (WP69, `'x'`).
 
 Scanning rules:
 
@@ -407,6 +407,7 @@ Scanning rules:
 | `,` `:` `#` `(` `)` `+` `-` `<` `>` `=` `*` `/` `&` `^` `\|` `~` | Single-byte punctuation token, direct table lookup (`lexerPunctBytes`/`lexerPunctTypes`) |
 | `<` immediately followed by another `<` | `SHL` (two-byte lookahead, WP68) |
 | `>` immediately followed by another `>` | `SHR` (two-byte lookahead, WP68); a lone `<`/`>` not followed by its own repeat still scans as the pre-existing extraction-prefix `LESS`/`GREATER` token |
+| `'` | `CHAR` (WP69, `lnChar` — multi-byte scan like `$`/`%` below, not a single-byte punctuation table entry): consumes exactly one content byte verbatim (no escapes, no case folding) then requires an immediate closing `'`. Content outside the existing printable-PETSCII range (`$20`-`$7E`/`$A0`-`$FE`, the same bounds `.INCLUDE` filenames enforce) is `CASM_DIAG_CHAR_INVALID_BYTE`; anything else where the closing `'` should be is `CASM_DIAG_CHAR_UNTERMINATED` (also covers an empty `''` literal, not special-cased). A literal quote as content (`'''`) needs no special-casing — it falls out of the same one-byte-then-close mechanism. |
 | `.` | `DIRECTIVE`; text matched case-insensitively against `.ORG .BYTE .WORD .INCLUDE .STATIC .RELOC`, else subtype `CASM_DIRECTIVE_UNKNOWN` (still a valid token — rejected later by the parser/emitter) |
 | `$` | `NUMBER`, subtype `HEX`; at least one hex digit required |
 | `%` | `NUMBER`, subtype `BINARY`; at least one `0`/`1` required |
@@ -500,6 +501,25 @@ or WP66's `*` in leaf/leading position — `LDA #-1`-shaped operands failed
 own (already-correct) primary handling was ever reached. Fixed by adding
 `CASM_TOKEN_MINUS`/`TILDE`/`STAR` to both whitelists, the same shape as
 WP67's own `LPAREN` fix.
+
+**WP69's `CASM_TOKEN_CHAR`** (a character literal) is added **only** to
+`posImmediate`'s own inner whitelist, deliberately **not** the outer
+`parseOperandSequence` dispatcher — a character literal is not a general
+expression primary (this WP's own scoping decision) and is never valid as
+a bare/absolute instruction operand (`LDA 'A'` stays `CASM_DIAG_
+SYNTAX_ERROR` at the outer dispatcher, never reaching `posImmediate` at
+all). Where it is accepted, `posImmediateChar` short-circuits straight to
+`CasmTokenText[0]` as the resolved 8-bit value — `exprEvaluate` is never
+called for this case, so `expr.s` needed no change. `emit.s`'s `.BYTE`
+list parsing (`emitByteList`) has the identical short-circuit per list
+item; `.WORD` list parsing (`emitWordList`) does not, so `.WORD 'A'`
+falls through to the ordinary expression path and fails at `exprEvaluate`'s
+own primary dispatch (`CASM_DIAG_EXPR_MALFORMED` — `CASM_TOKEN_CHAR` is
+not one of `parsePrimary`'s recognized leaf tokens). `ppsConstant`
+(named-constant RHS, [§11](#11-expression-evaluator-exprs)) is untouched
+for the same reason — its own narrow hand-rolled grammar simply does not
+recognize `CASM_TOKEN_CHAR` either, so `NAME = 'A'` falls through to the
+same `CASM_DIAG_EXPR_MALFORMED` path with no code change required.
 
 **`.INCLUDE`** is classified like any other directive, then routed to
 `lexerScanIncludeOperand` instead of the operand grammar above. The scanned
@@ -1076,7 +1096,7 @@ complete):
   [§17](#17-symbol-map--listing-output-phase-10-complete). Both may be
   combined; either, both, or neither may be requested per assembly.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (70 distinct `CASM_DIAG_*` codes —
+  diagnostic per failure (72 distinct `CASM_DIAG_*` codes —
   [§19](#19-diagnostic-reference)).
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
@@ -1143,8 +1163,11 @@ AT LINE 2, COL 9 (OFFSET 8) BYTE $40
 ```
 
 `LINE`/`COL` are 1-based and **per file**; `OFFSET` is the 0-based byte index
-(`COL - 1`). `BYTE` is emitted only for `INVALID_SOURCE_BYTE`. How this is
-produced:
+(`COL - 1`). `BYTE` is emitted for any diagnostic raised via
+`diagSetLocFromLookahead` (below) — not only `INVALID_SOURCE_BYTE`, which
+was this contract's only example until WP69's `CASM_DIAG_CHAR_
+UNTERMINATED`/`CHAR_INVALID_BYTE` (`lnChar`, both also lookahead-raised)
+confirmed the same `BYTE` suffix live. How this is produced:
 
 - **Location.** `diagnostics.s` holds a `CasmDiagLoc*` record. A raise site
   stamps it immediately before returning its diagnostic, via one of three
@@ -1262,6 +1285,8 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$44` | `EXPR_DIV_ZERO` | EXPRESSION DIVISION BY ZERO | ✓ | `expr.s` (`staticDiv`: a static divisor of zero, checked before any division arithmetic) *(Phase 12/WP68)* |
 | `$45` | `EXPR_RELOC_UNSUPPORTED` | EXPRESSION RELOCATION UNSUPPORTED | ✓ | `expr.s` (`parseOperatorTail`'s relocation-representability check: two relocatable components combining, which the relocation table cannot represent) *(Phase 12/WP67)* |
 | `$46` | `EXPR_PAREN_TOO_DEEP` | EXPRESSION TOO DEEPLY NESTED | ✓ | `expr.s` (`parsePrimary`: exceeded `CASM_EXPR_PAREN_MAX_DEPTH` = 8 levels of `(` nesting) *(Phase 12/WP67 range ends here)* |
+| `$47` | `CHAR_UNTERMINATED` | CHARACTER LITERAL UNTERMINATED | ✓ | `lexer.s` (`lnChar`: no closing `'` immediately after the one content byte; also covers an empty `''` literal) |
+| `$48` | `CHAR_INVALID_BYTE` | CHARACTER LITERAL INVALID BYTE | ✓ | `lexer.s` (`lnChar`: content byte outside the printable-PETSCII range) *(Phase 12/WP69 range ends here)* |
 | `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
 See [§17](#17-symbol-map--listing-output-phase-10-complete) for the map/

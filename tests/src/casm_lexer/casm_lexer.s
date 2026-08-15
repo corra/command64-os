@@ -116,6 +116,14 @@ start:
     jsr reportCase
     jsr caseOperators
     jsr reportCase
+    jsr caseCharValid
+    jsr reportCase
+    jsr caseCharQuoteContent
+    jsr reportCase
+    jsr caseCharUnterminated
+    jsr reportCase
+    jsr caseCharInvalidByte
+    jsr reportCase
 
     lda #$0D
     jsr KernalChROUT
@@ -256,6 +264,108 @@ coFail:
     rts
 
 ; ---------------------------------------------------------------------------
+; caseCharValid
+; 'A' -- CASM_TOKEN_CHAR, length 1, text[0] = 'A' (unshifted PETSCII, no
+; case folding), then EOF.
+; ---------------------------------------------------------------------------
+caseCharValid:
+    lda #2
+    sta SourceMode
+    lda #0
+    sta SourceIndex
+    jsr lexerInit
+    jsr lexerNext
+    bcs ccvFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_CHAR
+    bne ccvFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #1
+    bne ccvFail
+    lda CasmTokenText
+    cmp #CASM_PETSCII_UPPER_A
+    bne ccvFail
+    jsr lexerNext
+    bcs ccvFail
+    cmp #CASM_TOKEN_EOF
+    bne ccvFail
+    clc
+    rts
+ccvFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; caseCharQuoteContent
+; ''' (three apostrophes) -- mechanically lexes as the quote byte itself as
+; content, no special-casing needed (this WP's own minimalism scoping
+; decision): opener, content byte (itself '), closer.
+; ---------------------------------------------------------------------------
+caseCharQuoteContent:
+    lda #3
+    sta SourceMode
+    lda #0
+    sta SourceIndex
+    jsr lexerInit
+    jsr lexerNext
+    bcs ccqFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_CHAR
+    bne ccqFail
+    lda CasmTokenText
+    cmp #CASM_PETSCII_APOSTROPHE
+    bne ccqFail
+    clc
+    rts
+ccqFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; caseCharUnterminated
+; '' (two apostrophes) then EOF -- the second ' is consumed as the one
+; content byte, no third ' follows: CASM_DIAG_CHAR_UNTERMINATED, not a
+; separate "empty literal" diagnostic (not special-cased, per this WP's own
+; minimalism scoping decision).
+; ---------------------------------------------------------------------------
+caseCharUnterminated:
+    lda #4
+    sta SourceMode
+    lda #0
+    sta SourceIndex
+    jsr lexerInit
+    jsr lexerNext
+    bcc cuFail
+    cmp #CASM_DIAG_CHAR_UNTERMINATED
+    bne cuFail
+    clc
+    rts
+cuFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; caseCharInvalidByte
+; A control byte ($01) as content -- CASM_DIAG_CHAR_INVALID_BYTE (outside
+; the existing printable-PETSCII range .INCLUDE filenames already enforce).
+; ---------------------------------------------------------------------------
+caseCharInvalidByte:
+    lda #5
+    sta SourceMode
+    lda #0
+    sta SourceIndex
+    jsr lexerInit
+    jsr lexerNext
+    bcc cibFail
+    cmp #CASM_DIAG_CHAR_INVALID_BYTE
+    bne cibFail
+    clc
+    rts
+cibFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; sourceNextByte (stub)
 ; Returns CASM_PETSCII_UPPER_A once per remaining byte in BytesRemaining,
 ; then CASM_SOURCE_EOF. Matches source.s's real CASM_SOURCE_BYTE/EOF
@@ -265,10 +375,46 @@ coFail:
 sourceNextByte:
     lda SourceMode
     beq snbRepeatA
+    cmp #1
+    beq snbOperatorMode
+    cmp #2
+    beq snbCharValidMode
+    cmp #3
+    beq snbCharQuoteMode
+    cmp #4
+    beq snbCharUntermMode
+    jmp snbCharInvalidMode      ; mode 5, the only remaining case
+
+snbOperatorMode:
     ldx SourceIndex
     cpx #OPERATOR_SOURCE_SIZE
     bcs snbEof
     lda operatorSource, x
+    jmp snbEmitTableByte
+snbCharValidMode:
+    ldx SourceIndex
+    cpx #CHAR_VALID_SOURCE_SIZE
+    bcs snbEof
+    lda charValidSource, x
+    jmp snbEmitTableByte
+snbCharQuoteMode:
+    ldx SourceIndex
+    cpx #CHAR_QUOTE_SOURCE_SIZE
+    bcs snbEof
+    lda charQuoteSource, x
+    jmp snbEmitTableByte
+snbCharUntermMode:
+    ldx SourceIndex
+    cpx #CHAR_UNTERM_SOURCE_SIZE
+    bcs snbEof
+    lda charUntermSource, x
+    jmp snbEmitTableByte
+snbCharInvalidMode:
+    ldx SourceIndex
+    cpx #CHAR_INVALID_SOURCE_SIZE
+    bcs snbEof
+    lda charInvalidSource, x
+snbEmitTableByte:
     sta CasmSourceResultByte
     lda #0
     sta CasmSourceResultFileId
@@ -362,6 +508,25 @@ operatorExpected:
     .byte CASM_TOKEN_MINUS,     1, CASM_PETSCII_MINUS,     22
 OPERATOR_EXPECTED_SIZE = * - operatorExpected
 .assert OPERATOR_EXPECTED_SIZE = 11 * 4, error, "WP68 lexer operator fixture count changed"
+
+; WP69 character-literal sources.
+charValidSource:
+    .byte CASM_PETSCII_APOSTROPHE, CASM_PETSCII_UPPER_A, CASM_PETSCII_APOSTROPHE
+CHAR_VALID_SOURCE_SIZE = * - charValidSource
+charQuoteSource:
+    ; ''' -- opener, content (the quote byte itself), closer.
+    .byte CASM_PETSCII_APOSTROPHE, CASM_PETSCII_APOSTROPHE, CASM_PETSCII_APOSTROPHE
+CHAR_QUOTE_SOURCE_SIZE = * - charQuoteSource
+charUntermSource:
+    ; '' -- opener, then the second ' consumed as the one content byte;
+    ; table exhausted (EOF) before a third ' can close it.
+    .byte CASM_PETSCII_APOSTROPHE, CASM_PETSCII_APOSTROPHE
+CHAR_UNTERM_SOURCE_SIZE = * - charUntermSource
+charInvalidSource:
+    ; opener, a control byte ($01, outside the printable range), closer
+    ; (never reached -- rejected at the content byte itself).
+    .byte CASM_PETSCII_APOSTROPHE, $01, CASM_PETSCII_APOSTROPHE
+CHAR_INVALID_SOURCE_SIZE = * - charInvalidSource
 
 passMsg:
     .byte "CASM LEXER: PASS", PetCr, 0

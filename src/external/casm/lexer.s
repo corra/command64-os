@@ -156,9 +156,9 @@ lnSkip:
     cmp #CASM_PETSCII_SEMICOLON
     beq lnComment
     cmp #CASM_PETSCII_LESS
-    beq lnAngle
+    beq lnAngleJmp
     cmp #CASM_PETSCII_GREATER
-    beq lnAngle
+    beq lnAngleJmp
     jsr lexerClassifyPunct
     bcc lnPunct
 
@@ -174,6 +174,11 @@ lnSkip:
     ; Check if it's a binary number (%)
     cmp #CASM_PETSCII_PERCENT
     beq lnBinJmp
+
+    ; WP69: character literal ('x') -- multi-byte scan like $/% above, not a
+    ; single-byte punctuation table entry.
+    cmp #CASM_PETSCII_APOSTROPHE
+    beq lnCharJmp
 
     ; Check if it's a decimal number (0-9)
     jsr isDecDigit
@@ -196,6 +201,10 @@ lnHexJmp:
     jmp lnHex
 lnBinJmp:
     jmp lnBin
+lnCharJmp:
+    jmp lnChar
+lnAngleJmp:
+    jmp lnAngle
 lnDecJmp:
     jmp lnDec
 lnIdJmp:
@@ -838,6 +847,79 @@ lnBin:
 
 lnMalformedBin:
     jmp lnMalformedNum
+
+; ---------------------------------------------------------------------------
+; lnChar (private, WP69)
+; Scan a character literal: '<one printable byte>'. No escape sequences --
+; the content byte is taken raw, no case folding/charmap reinterpretation
+; (matches CASM's existing verbatim treatment of identifier bytes). Exactly
+; one content byte is always consumed regardless of its value, so a literal
+; quote as content ('''  -- three apostrophes) needs no special-casing: the
+; opening ', the quote-as-content byte, and the closing ' each fall out of
+; the same mechanical read. An empty literal ('') is reported the same way
+; as a genuinely unterminated one -- not special-cased separately, per this
+; WP's own minimalism scoping decision.
+; ---------------------------------------------------------------------------
+lnChar:
+    jsr lexerTokenReset
+    jsr lexerConsume            ; consume opening '
+    jsr lexerFill
+    bcc @haveByte1
+    jmp lnFail
+@haveByte1:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnCharUnterminated
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnCharUnterminated
+
+    ; Printable raw PETSCII is $20-$7E or $A0-$FE, same bounds
+    ; .INCLUDE filenames already enforce (lexerScanIncludeOperand above).
+    lda CasmLookaheadByte
+    cmp #CASM_INCLUDE_PRINT_LO_MIN
+    bcs @lowCheck
+    jmp lnCharInvalidByte
+@lowCheck:
+    cmp #CASM_INCLUDE_PRINT_LO_MAX + 1
+    bcc @content
+    cmp #CASM_INCLUDE_PRINT_HI_MIN
+    bcs @hiCheck
+    jmp lnCharInvalidByte
+@hiCheck:
+    cmp #CASM_INCLUDE_PRINT_HI_MAX + 1
+    bcc @content
+    jmp lnCharInvalidByte
+@content:
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume            ; consume the content byte
+    jsr lexerFill
+    bcc @haveByte2
+    jmp lnFail
+@haveByte2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnCharUnterminated
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnCharUnterminated
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_APOSTROPHE
+    bne lnCharUnterminated
+    jsr lexerConsume            ; consume closing '
+    lda #CASM_TOKEN_CHAR
+    jmp lexerEmit
+
+lnCharUnterminated:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_CHAR_UNTERMINATED
+    jmp lnFailWithA
+
+lnCharInvalidByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_CHAR_INVALID_BYTE
+    jmp lnFailWithA
 
 lnDec:
     jsr lexerTokenReset

@@ -260,6 +260,37 @@ Constants](#named-constants) above) use a narrower grammar and do not
 accept these operators — only a single symbol/literal/`*` with an
 optional `±NUMBER` addend.
 
+### Character Literals
+
+`'x'` — a single quote, exactly one byte, a closing quote — evaluates to
+that byte's PETSCII value, exactly as if you had written its numeric
+value directly:
+
+```asm
+lda #'a'            ; same as lda #$41
+.byte 'h', 'i'       ; same as .byte $48, $49
+```
+
+The byte is taken **verbatim**: no escape sequences (`\n`, `\'`, and
+similar are not supported — there is no backslash convention anywhere in
+CASM), and no case folding. A literal quote character as content works
+without any special syntax: `'''` reads as the quote character's own
+value, since the rule is always "one byte, then the closing quote,"
+regardless of what that one byte is.
+
+Unlike a number, label, or the operators above, a character literal is
+**not** a general expression primary — it's valid only as a whole
+immediate operand or a whole `.BYTE` list entry:
+
+```asm
+lda #'a'             ; OK -- immediate operand
+.byte 'h', 'i'        ; OK -- .BYTE list entries
+lda 'a'              ; error -- not valid as a bare (non-immediate) operand
+.word 'a'            ; error -- not valid in a .WORD list
+lda #'a'+1            ; error -- can't combine with an operator
+name = 'a'           ; error -- not valid on a named constant's own RHS
+```
+
 ### Addressing Modes
 
 Every documented 6502 addressing mode that the target mnemonic supports is

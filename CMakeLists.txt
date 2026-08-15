@@ -328,7 +328,11 @@ if(Ca65_FOUND)
     # plus the divisor-zero check in expr.s's staticDiv overflowed $6000 by
     # 41 measured BSS-placement bytes; $6100 (+256) is the smallest
     # round-page fit. User-approved 2026-08-15.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6100")
+    # WP69: $6100 -> $6200 -- the character-literal lexer scan (lnChar),
+    # two new diagnostics, and the posImmediate/.BYTE short-circuit
+    # integration overflowed $6100 by 235 measured bytes; $6200 (+256) is
+    # the smallest round-page fit. User-approved 2026-08-15.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6200")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -892,7 +896,10 @@ if(Ca65_FOUND)
             # division (divUnsigned16) overflowed $5800 by 87 measured BSS
             # bytes; $5900 (+256) is the smallest round-page fit.
             # User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "5900")
+            # WP69: $5900 -> $5A00 -- the character-literal lexer/parser
+            # integration overflowed $5900 by 150 measured bytes; $5A00
+            # (+256) is the smallest round-page fit. User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5A00")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -1104,7 +1111,10 @@ if(Ca65_FOUND)
             # own expr.s/diagnostics.s growth, discovered only now. Measured
             # overflow at $5500 was 774 bytes; $5900 (+1024) is the smallest
             # round-page fit. User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "5900")
+            # WP69: $5900 -> $5A00 -- the character-literal lexer/parser
+            # integration overflowed $5900 by 69 measured bytes; $5A00
+            # (+256) is the smallest round-page fit. User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5A00")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1186,7 +1196,11 @@ if(Ca65_FOUND)
             # 3/4/5's own expr.s/diagnostics.s growth, discovered only now.
             # Measured overflow at $5A00 was 698 bytes; $5D00 (+768) is the
             # smallest round-page fit. User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "5D00")
+            # WP69: $5D00 -> $5E00 -- the character-literal lexer/parser
+            # integration overflowed $5D00 by 249 measured bytes; $5E00
+            # (+256) is the smallest round-page fit. User-approved
+            # 2026-08-15.
+            set(TEST_PRG_SIZE "5E00")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1544,7 +1558,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmreloc1
     casmopall
     casmfa2p
-    casmarith2 casmarithfwd casmarith3)
+    casmarith2 casmarithfwd casmarith3 casmchar1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1848,6 +1862,30 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmdivzero.seq"
         "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     COMMENT "Appending WP68 Increment 9 live end-to-end fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP69: character-literal fixtures -- one success case (COMP-verified) plus
+# three forbidden-form cases (bare-operand excluded context, unterminated,
+# invalid content byte).
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmchar1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmchar1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmchar1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmchar1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcharbare.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcharbare.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcharunterm.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcharunterm.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcharinval.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcharinval.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP69 character-literal fixtures and their trusted reference to casm_phase12_test.d64"
     VERBATIM
 )
 
@@ -2346,9 +2384,12 @@ add_custom_command(
 # (this WP's own Scoping Decision 2), and test.d64 has only 21 free blocks.
 # WP68 Increment 9's casmarith3 is excluded for the same reason: its
 # matching casmarith3.s source also lives only on casm_phase12_test_d64.
+# WP69's casmchar1 is excluded for the same reason: its matching
+# casmchar1.s source also lives only on casm_phase12_test_d64.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
-       AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3")
+       AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
+       AND NOT REF_NAME STREQUAL "casmchar1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

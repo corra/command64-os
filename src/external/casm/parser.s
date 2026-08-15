@@ -691,12 +691,35 @@ posImmediate:
     beq posImmediateNumber
     cmp #CASM_TOKEN_TILDE
     beq posImmediateNumber
+    ; WP69: a character literal is a direct 8-bit value, never a general
+    ; expression primary (this WP's own scoping decision) -- short-circuits
+    ; straight to CasmTokenText[0], bypassing parserParseExpressionValue/
+    ; exprEvaluate entirely, so expr.s needs no change for this feature.
+    cmp #CASM_TOKEN_CHAR
+    beq posImmediateChar
     jmp posSyntaxError
 posImmediateNumber:
     jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
+    lda #CASM_OPKIND_IMMEDIATE
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    jmp posValidateTerminator
+posImmediateChar:
+    jsr emitMarkStarted
+    bcc @ok1
+    rts
+@ok1:
+    lda CasmTokenText
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    lda #0
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    sta CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    jsr lexerNext                ; advance past CHAR, leave delimiter current
+    bcc @ok2
+    rts
+@ok2:
     lda #CASM_OPKIND_IMMEDIATE
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
     jmp posValidateTerminator

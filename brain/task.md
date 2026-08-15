@@ -3396,6 +3396,34 @@
         `brain/walkthroughs/2026-08-15-casm-phase12-wp68-arithmetic-
         bitwise-operators.md`. Phase 12 itself remains open (WP69,
         character literals, still pending).
+    - [x] WP69 character literals complete (Taskwarrior task 44,
+      `fe24c370-a520-450d-b281-f56eab2fd7ce`, depends on WP64):
+      `brain/plans/2026-08-15-casm-phase12-wp69-character-literals.md`.
+      Two user-confirmed scoping decisions, deliberately narrower than
+      every other Phase 12 primitive: no backslash escapes (one literal
+      byte between quotes, verbatim); restricted to immediate/`.BYTE`
+      contexts only, never a general expression primary -- combining
+      with an operator, `.WORD`, a bare instruction operand, or a named
+      constant's own RHS all correctly fail. Because of that
+      restriction, `expr.s` needed zero changes -- `CASM_TOKEN_CHAR`
+      never reaches `exprEvaluate`; `posImmediate`/`emitByteList` each
+      gained a direct short-circuit instead. Two new diagnostics ($47/
+      $48), the last of WP64's reserved Phase 12 range. Found and fixed
+      a real 6502 branch-range overflow (lnAngle's beq sites, fixed with
+      a trampoline matching lnHexJmp/lnBinJmp) and a stale doc claim
+      (BYTE-suffix printing, corrected by live evidence). Production
+      `casm` cap $6100->$6200; three test-harness caps bumped the same
+      round-page step, all user-approved 2026-08-15. Live-verified
+      against the real `casm.prg`: success fixture COMP byte-exact,
+      three forbidden-form fixtures each raised the exact diagnostic and
+      location, `test_casm_lexer` (4 new cases) and `test_casm_expr`
+      (unaffected) both re-ran clean. CASM promoted `0.2.3` -> `0.2.4`,
+      live-verified as `V0.2.4.1311`. **WP69 complete, user-approved
+      2026-08-15.** Taskwarrior task 44 marked done. Walkthrough:
+      `brain/walkthroughs/2026-08-15-casm-phase12-wp69-character-
+      literals.md`. Watch item for WP70: `casm_listing_test_d64` is down
+      to 7 free blocks from this WP's shared-module growth, the same
+      capacity crunch WP67 already resolved once for this disk.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

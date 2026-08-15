@@ -185,6 +185,7 @@ CASM_PETSCII_TAB   = $09
 CASM_PETSCII_LF    = $0A
 CASM_PETSCII_CR    = $0D
 CASM_PETSCII_QUOTE = $22
+CASM_PETSCII_APOSTROPHE = $27  ; WP69: character-literal delimiter
 CASM_PETSCII_HASH  = $23
 CASM_PETSCII_PERCENT = $25
 CASM_PETSCII_AMPERSAND = $26
@@ -504,7 +505,8 @@ CASM_TOKEN_PIPE       = $15  ; WP68: '|'
 CASM_TOKEN_TILDE      = $16  ; WP68: '~'
 CASM_TOKEN_SHL        = $17  ; WP68: '<<'
 CASM_TOKEN_SHR        = $18  ; WP68: '>>'
-CASM_TOKEN_COUNT      = $19
+CASM_TOKEN_CHAR       = $19  ; WP69: 'x' -- character literal (immediate/.BYTE only)
+CASM_TOKEN_COUNT      = $1A
 
 ; WP68 expression precedence values, lowest to highest. Binary operators are
 ; left-associative, so an RHS recurses at its operator's precedence + 1.
@@ -608,7 +610,8 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_TOKEN_TILDE = CASM_TOKEN_PIPE + 1, error, "CASM token type range changed"
 .assert CASM_TOKEN_SHL = CASM_TOKEN_TILDE + 1, error, "CASM token type range changed"
 .assert CASM_TOKEN_SHR = CASM_TOKEN_SHL + 1, error, "CASM token type range changed"
-.assert CASM_TOKEN_COUNT = CASM_TOKEN_SHR + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_CHAR = CASM_TOKEN_SHR + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_COUNT = CASM_TOKEN_CHAR + 1, error, "CASM token type range changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
 .assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_RELOC + 1, error, "CASM directive subtype range changed"
@@ -772,6 +775,14 @@ CASM_DIAG_EXPR_RELOC_UNSUPPORTED = $45  ; WP67: a relocatable operand reached a 
 ; WP67: parenthesized sub-expression nesting exceeded CASM_EXPR_PAREN_MAX_DEPTH.
 CASM_DIAG_EXPR_PAREN_TOO_DEEP = $46
 CASM_DIAG_PHASE12_WP67_LAST = CASM_DIAG_EXPR_PAREN_TOO_DEEP
+; WP69: character literal ('x') -- no closing quote found immediately after
+; the one content byte (also covers an empty '' literal, not special-cased).
+CASM_DIAG_CHAR_UNTERMINATED = $47
+; WP69: character literal's content byte outside the existing printable-
+; PETSCII range (CASM_INCLUDE_PRINT_LO/HI_MIN/MAX, same bounds .INCLUDE
+; filenames already enforce).
+CASM_DIAG_CHAR_INVALID_BYTE = $48
+CASM_DIAG_PHASE12_WP69_LAST = CASM_DIAG_CHAR_INVALID_BYTE
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -829,6 +840,9 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_EXPR_RELOC_UNSUPPORTED = CASM_DIAG_EXPR_DIV_ZERO + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
 .assert CASM_DIAG_EXPR_PAREN_TOO_DEEP = CASM_DIAG_EXPR_RELOC_UNSUPPORTED + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE12_WP67_LAST = $46, error, "CASM WP67 diagnostic range changed"
+.assert CASM_DIAG_CHAR_UNTERMINATED = CASM_DIAG_PHASE12_WP67_LAST + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_CHAR_INVALID_BYTE = CASM_DIAG_CHAR_UNTERMINATED + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE12_WP69_LAST = $48, error, "CASM WP69 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

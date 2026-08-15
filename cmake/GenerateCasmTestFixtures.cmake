@@ -59,6 +59,9 @@ file(WRITE "${OUTPUT_DIR}/casmvmm128.seq" "${CASM_VMM_CHUNK_128}")
 string(ASCII 13 CASM_CR)
 string(ASCII 10 CASM_LF)
 set(CASM_CRLF "${CASM_CR}${CASM_LF}")
+# WP69: a control byte ($01), outside the printable-PETSCII range a
+# character literal's content byte must fall in.
+string(ASCII 1 CASM_CTRL_A)
 
 # CR-only line endings (classic-Mac style).
 file(WRITE "${OUTPUT_DIR}/casmcr.seq" "LINE1${CASM_CR}LINE2${CASM_CR}")
@@ -1696,4 +1699,41 @@ file(WRITE "${OUTPUT_DIR}/casmarith3.seq"
 # case), live-verified for the exact message and source location.
 file(WRITE "${OUTPUT_DIR}/casmdivzero.seq"
     "LDA #5/0\n"
+)
+
+# WP69: character literals. casmchar1 is the success case -- an immediate
+# operand and a .BYTE list entry, both using a character literal directly
+# (no case folding/charmap reinterpretation: source 'A'/'H'/'I' are already
+# plain ASCII uppercase, numerically identical to unshifted PETSCII).
+# COMP-verified against a hand-derived casmchar1.ref.hex, registered in
+# CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmchar1.seq"
+    ".ORG \$C000\n"
+    "LDA #'A'\n"
+    ".BYTE 'H', 'I'\n"
+)
+
+# WP69: forbidden form, a character literal used as a bare (non-immediate)
+# instruction operand -- excluded by this WP's own scoping decision
+# (character literals are not a general expression primary). Expects
+# CASM_DIAG_SYNTAX_ERROR from parseOperandSequence's own whitelist, which
+# never gained CASM_TOKEN_CHAR (deliberately, unlike the outer whitelist's
+# WP66/68 entries). No .ref, live-verified for the exact message/location.
+file(WRITE "${OUTPUT_DIR}/casmcharbare.seq"
+    "LDA 'A'\n"
+)
+
+# WP69: forbidden form, an unterminated character literal -- the content
+# byte is followed by something other than a closing '. No .ORG needed. No
+# .ref, live-verified for the exact CASM_DIAG_CHAR_UNTERMINATED
+# message/location.
+file(WRITE "${OUTPUT_DIR}/casmcharunterm.seq"
+    "LDA #'A\n"
+)
+
+# WP69: forbidden form, a character literal's content byte outside the
+# printable-PETSCII range (a raw control byte, $01). No .ref, live-verified
+# for the exact CASM_DIAG_CHAR_INVALID_BYTE message/location.
+file(WRITE "${OUTPUT_DIR}/casmcharinval.seq"
+    "LDA #'${CASM_CTRL_A}'\n"
 )

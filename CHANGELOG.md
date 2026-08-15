@@ -160,6 +160,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 12 WP69: character literals**: `'x'` — a single quote, one
+  literal PETSCII byte, a closing quote — evaluates to that byte's value,
+  usable as an immediate operand (`lda #'a'`) or a `.BYTE` list entry
+  (`.byte 'h', 'i'`). No backslash escape sequences (a literal quote as
+  content, `'''`, works anyway — one content byte then a closing quote,
+  regardless of what that byte is) and no case folding. Deliberately
+  narrower than every other Phase 12 primitive: a character literal is
+  not a general expression primary — combining it with an operator,
+  using it in a `.WORD` list, as a bare (non-immediate) instruction
+  operand, or on a named constant's own right-hand side all correctly
+  fail rather than silently succeed, live-verified against the real
+  `casm.prg` binary under VICE. Because of that restriction, the shared
+  expression evaluator needed no change at all. Two new diagnostics for
+  malformed literals (`CASM: CHARACTER LITERAL UNTERMINATED`/`INVALID
+  BYTE`). Live-verified across four new production fixtures (a success
+  case COMP-verified byte-exact, plus the three forbidden forms), the
+  expanded lexer test suite, and every other CASM regression harness;
+  CASM promoted to `0.2.4`.
 - **CASM Phase 12 WP68: arithmetic and bitwise operators**: expressions now
   support multiplication, division, left/right shift, bitwise AND/XOR/OR,
   and unary negate/complement (`*`, `/`, `<<`, `>>`, `&`, `^`, `|`, unary

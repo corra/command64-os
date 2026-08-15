@@ -2796,6 +2796,105 @@ retyping the command — the existing recovery procedure in
 `.agents/workflows/vice-mcp-testing.md` remains sufficient; not
 investigated further as out of this WP's scope.
 
+### CASM Phase 12 WP69 Character Literals — As-Built (complete 2026-08-15)
+
+Adds `'x'`-style character literals, the last WP64-reserved token
+(`brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md` line 91)
+never implemented until now. Plan: `brain/plans/2026-08-15-casm-phase12-
+wp69-character-literals.md`. Walkthrough: `brain/walkthroughs/2026-08-15-
+casm-phase12-wp69-character-literals.md`.
+
+**Two real scoping decisions, user-confirmed 2026-08-15, deliberately
+narrower than every other Phase 12 primitive**: no backslash escape
+sequences (one literal byte between quotes, verbatim — no case folding,
+matching CASM's existing identifier-byte treatment), and restricted to
+immediate/`.BYTE` contexts only, never a general expression primary.
+Combining with an operator, `.WORD`, a bare/absolute instruction operand,
+or a named-constant RHS all correctly fail rather than silently succeed.
+
+**Because of the second decision, `expr.s` needed no change at all** —
+`CASM_TOKEN_CHAR` never reaches `exprEvaluate`/`parsePrimary`. Instead,
+`posImmediate` (`parser.s`) gained a new whitelist entry routing to
+`posImmediateChar`, and `emitByteList` (`emit.s`) gained an equivalent
+per-item short-circuit — both read `CasmTokenText[0]` directly as the
+resolved 8-bit value, unconditionally non-relocatable/non-force-abs. The
+outer `parseOperandSequence` dispatcher deliberately does **not** gain
+`CASM_TOKEN_CHAR` (unlike WP66/68's `*`/`-`/`~`), and `emitWordList`/
+`ppsConstant` are both untouched — confirmed by reading, not assumed,
+that `CASM_TOKEN_CHAR` simply isn't one of their recognized tokens, so
+`.WORD 'A'` and `NAME = 'A'` both naturally fall through to
+`CASM_DIAG_EXPR_MALFORMED` with zero code change required.
+
+**Lexer** (`lnChar`, matching `lnHex`/`lnBin`'s own multi-byte-scan shape,
+not a single-byte punctuation-table entry): consumes exactly one content
+byte verbatim, validated against the same printable-PETSCII bounds
+`.INCLUDE` filenames already enforce (`CASM_INCLUDE_PRINT_LO/HI_MIN/MAX`,
+reused rather than duplicated), then requires an immediate closing `'`.
+Two new diagnostics, `$47`/`$48` (`CASM_DIAG_CHAR_UNTERMINATED`/
+`CHAR_INVALID_BYTE`), both source-location-context printed via
+`diagSetLocFromLookahead`. The one-byte-then-close rule needs no special
+case for a literal quote as content: `'''` mechanically lexes as the
+quote byte itself (opener, content = the second `'`, closer = the third).
+An empty `''` literal is reported as `CASM_DIAG_CHAR_UNTERMINATED` (the
+second `'` is consumed as content, no third `'` follows), not a separate
+"empty literal" diagnostic — deliberately not special-cased, per the
+no-escapes minimalism decision. Live-verified this correction to an
+existing doc claim: `diagPrintSourceContext`'s `BYTE $xx` suffix is
+emitted for **any** `diagSetLocFromLookahead`-raised diagnostic, not only
+`CASM_DIAG_INVALID_SOURCE_BYTE` as `wiki/casm-programmers-reference.md`
+previously (incompletely) stated — both new WP69 diagnostics print it too,
+confirmed live (`AT LINE 1, COL 8 (OFFSET 7) BYTE $00`).
+
+**A branch-range overflow, found and fixed during Atomic Step 2** (not a
+design defect, a direct consequence of inserting a large new scan routine
+into an already-tight dispatch region): `lnAngle`'s two `beq` sites
+(`lexer.s`'s main dispatch) fell out of 6502 short-branch range once
+`lnChar`'s dispatch check/trampoline were added nearby. Fixed with a
+`lnAngleJmp` trampoline, the same indirection `lnHexJmp`/`lnBinJmp`
+already used for the same reason.
+
+**Envelope**: production `casm` grew `$6100` → `$6200` (235 measured
+bytes over $6100 once the full lexer/parser/emitter integration was
+complete); `test_casm_pass1`/`test_casm_frame` `$5900` → `$5A00` (150/69
+bytes respectively); `test_casm_listcap` `$5D00` → `$5E00` (249 bytes).
+`test_casm_passcheck` ($5B00) absorbed the shared growth without needing
+a bump. All four bumps are the smallest round-page (+256) step that fits,
+user-approved 2026-08-15. `casm_phase12_test_d64` ended WP69 at 441 free
+blocks (still comfortably above its `>=40` gate); `image_d64`/
+`test_image_d64`/`casm_listing_test_d64` all shrank slightly from the
+larger `casm.prg`/`test_casm_lexer.prg` PRG sizes consuming more disk
+blocks when packaged (317/18/7 free respectively, down from 318/21/11) —
+none hit zero, all builds succeeded, but `casm_listing_test_d64` in
+particular is now tight enough to be worth relocating a harness off it
+before the next WP that touches these shared modules, the same kind of
+capacity crunch WP67 already resolved once for the same disk.
+
+**Live-verified fixtures** (`casmchar1.s`/`casmcharbare.s`/
+`casmcharunterm.s`/`casmcharinval.s`, `cmake/GenerateCasmTestFixtures.cmake`,
+packed onto `casm_phase12_test_d64` alongside WP68's own fixtures):
+`casmchar1.s` (`LDA #'A'`, `.BYTE 'H','I'`) produced `CASM: INPUT
+VALIDATED` and `FILES COMPARE OK` against a hand-derived reference;
+`casmcharbare.s` (`LDA 'A'`) produced `CASM: SYNTAX ERROR` at the bare-
+operand position, confirming the excluded-context restriction holds
+through the real parser, not just by design; `casmcharunterm.s`/
+`casmcharinval.s` produced the exact `CASM_DIAG_CHAR_UNTERMINATED`/
+`CHAR_INVALID_BYTE` messages and locations. `test_casm_lexer` (4 new
+cases) and `test_casm_expr` (unaffected, confirming `expr.s` truly
+untouched) both re-ran clean.
+
+**Test coverage**: `tests/src/casm_lexer/casm_lexer.s` gained four new
+cases (`caseCharValid`/`caseCharQuoteContent`/`caseCharUnterminated`/
+`caseCharInvalidByte`), each a fresh `lexerInit`/`lexerNext` pair (matching
+`caseAccept31`/`caseReject32`'s own minimal single-shot style) rather than
+the multi-token streaming style `caseOperators` uses, since each
+scenario ends in a different lexer state.
+
+**`casmchar1.s` on cc1541's 16-character limit**: `casmcharinvalid.s` (17
+characters) silently truncated to `casmcharinval.` on first build, losing
+its `.s` suffix — the identical class of mistake WP68 Increment 7 already
+found once for `casmarithreloc1`/`2`. Caught before any live testing;
+renamed to `casmcharinval.s` (15 characters).
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
