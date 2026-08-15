@@ -3391,7 +3391,8 @@
         `$6000` -> `$6100`. CASM promoted `0.2.2` -> `0.2.3`. Docs
         (`wiki`/`docs` `casm-utility.md`, `wiki/casm-programmers-
         reference.md`), `brain/KNOWLEDGE.md`, and `CHANGELOG.md` updated.
-        **WP68 complete, pending final user approval.** Walkthrough:
+        **WP68 complete, user-approved 2026-08-15.** Taskwarrior task 43
+        marked done. Walkthrough:
         `brain/walkthroughs/2026-08-15-casm-phase12-wp68-arithmetic-
         bitwise-operators.md`. Phase 12 itself remains open (WP69,
         character literals, still pending).

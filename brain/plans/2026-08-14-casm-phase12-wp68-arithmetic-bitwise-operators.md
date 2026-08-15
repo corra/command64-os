@@ -691,3 +691,24 @@ synchronized; and the user explicitly approves closing WP68.
   bump, and a `brain/walkthroughs/` completion-gate doc) remains, per the
   phased-planning skill's closing checklist, before WP68 can be marked
   done.
+- 2026-08-15: **WP68 final close-out complete (commit `50ac398`).** Added
+  a `brain/KNOWLEDGE.md` as-built section; a new "Expressions and
+  Operators" section in `wiki/casm-utility.md`/`docs/casm-utility.md`
+  (kept byte-identical) documenting the full operator table, precedence,
+  and semantics, removing the now-stale "multiplicative/parenthesized
+  arithmetic not supported" bullet; extended
+  `wiki/casm-programmers-reference.md`'s lexer/parser/evaluator sections
+  for the new tokens and operators, plus a diagnostic-reference table
+  extension for `$43`-`$46` (previously entirely missing from that table
+  since WP65); a `CHANGELOG.md` entry; and promoted CASM `0.2.2` →
+  `0.2.3` (`VERSION_STAGE` in `casm.s`), live-verified on the real banner
+  (`CASM V0.2.3.1308`) with `casm.prg` unchanged in size and every other
+  artifact byte-identical in a no-change rebuild. Walkthrough with
+  consolidated live evidence:
+  `brain/walkthroughs/2026-08-15-casm-phase12-wp68-arithmetic-bitwise-
+  operators.md`.
+
+  **WP68 complete, user-approved 2026-08-15.** Taskwarrior task 43
+  (`c1b8e145-0a9c-4e15-aaab-4e82fc253363`) marked done; `brain/task.md`
+  and `wiki/tasks/casm.md` finalized. Phase 12 itself remains open (WP69,
+  character literals, still pending — see WP64's own contract freeze).

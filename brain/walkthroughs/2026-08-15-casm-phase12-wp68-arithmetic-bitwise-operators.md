@@ -166,7 +166,7 @@ confirmed unaffected across every increment's rebuild.
 
 ## Outcome
 
-**WP68 complete, pending final user approval.** All nine Atomic
+**WP68 complete, user-approved 2026-08-15.** All nine Atomic
 Increments implemented and verified, four of them (6, 7, 8, 9) behind
 their own detailed, user-approved subordinate plans. Every WP64-frozen
 operator is now proven correct both algebraically (97-case synthetic
