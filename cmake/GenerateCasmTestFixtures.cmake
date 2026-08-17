@@ -1769,3 +1769,21 @@ file(WRITE "${OUTPUT_DIR}/casmarelocb.seq"
     "NOP\n"
     "LDA #LOOP&\$FF\n"
 )
+
+# WP72: end-to-end proof of the named-constant zero-page width-selection
+# fix (expr.s::identifier). DISPATCHVECTOR = $70 mirrors DASH's own real
+# equate (dmain.s) -- the exact source shape WP71 found miscompiling.
+# Before the fix, both STA lines below assembled as 3-byte absolute (8D 70
+# 00 / 8D 71 00); the fix makes them 2-byte zero-page (85 70 / 85 71),
+# matching what a bare literal operand (STA $70) already produced. The
+# second line (DISPATCHVECTOR+1) exercises the addend-combination path
+# (expr.s combineAddend/combineFlags), proving the fix's flag-clearing
+# at the primary identifier propagates through '+' unchanged, not just
+# the bare-symbol case. COMP-verified against a hand-derived
+# casmzpconst1.ref.hex.
+file(WRITE "${OUTPUT_DIR}/casmzpconst1.seq"
+    ".ORG \$C000\n"
+    "DISPATCHVECTOR = \$70\n"
+    "STA DISPATCHVECTOR\n"
+    "STA DISPATCHVECTOR+1\n"
+)

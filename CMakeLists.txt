@@ -488,7 +488,12 @@ if(Ca65_FOUND)
             # unresolved fixtures overflowed $1600 by 98 measured RODATA
             # bytes; $1700 (+256) is the smallest round-page fit.
             # User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "1700")
+            # WP72: $1700 -> $1800 -- one new resolved-non-label-derived-
+            # constant fixture (proving expr.s::identifier no longer forces
+            # SYMBOL_DERIVED for a plain equate) overflowed $1700 by 23
+            # measured BSS bytes; $1800 (+256) is the smallest round-page
+            # fit. User-approved 2026-08-17.
+            set(TEST_PRG_SIZE "1800")
         endif()
         if(TEST_NAME STREQUAL "casm_vmm")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1558,7 +1563,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmreloc1
     casmopall
     casmfa2p
-    casmarith2 casmarithfwd casmarith3 casmchar1 casmrelacc)
+    casmarith2 casmarithfwd casmarith3 casmchar1 casmrelacc casmzpconst1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1904,6 +1909,19 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmarelocb.seq"
         "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     COMMENT "Appending WP70 relocation algebra closure fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP72: named-constant zero-page width-selection fix, end-to-end proof.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmzpconst1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmzpconst1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmzpconst1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmzpconst1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP72 named-constant zero-page-width fixture and its trusted reference to casm_phase12_test.d64"
     VERBATIM
 )
 
@@ -2406,10 +2424,12 @@ add_custom_command(
 # casmchar1.s source also lives only on casm_phase12_test_d64.
 # WP70's casmrelacc is excluded for the same reason: its matching
 # casmrelacc.s source also lives only on casm_phase12_test_d64.
+# WP72's casmzpconst1 is excluded for the same reason: its matching
+# casmzpconst1.s source also lives only on casm_phase12_test_d64.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
        AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
-       AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmrelacc")
+       AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

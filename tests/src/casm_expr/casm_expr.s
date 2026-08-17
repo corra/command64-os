@@ -58,7 +58,14 @@ CASE_COLUMN    = 7
 ; against 0 -- so it cannot affect any case that doesn't opt in).
 CASE_RELOC_MODE = 8
 CASE_SIZE      = 9
-CASE_COUNT     = 97
+; WP72: was 97, but the table already held 98 entries before this WP added
+; a 99th -- a pre-existing harness defect (predating and unrelated to this
+; WP) that silently skipped the table's true last entry every run since
+; whenever it was introduced. Corrected here to the real total (99: 98
+; pre-existing + this WP's own new eConst case), since the stale count is
+; exactly what let this WP's own new case go unexecuted and falsely
+; "pass" on the first two attempts to add one.
+CASE_COUNT     = 99
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -277,6 +284,10 @@ fixtureResolver:
     ldy #>nameBad
     jsr tokenEquals
     bcc resolveBad
+    ldx #<nameConst
+    ldy #>nameConst
+    jsr tokenEquals
+    bcc resolveConst
     lda #CASM_DIAG_RESOLVER_FAILED
     sec
     rts
@@ -313,6 +324,35 @@ resolveUnabs:
 resolveBad:
     ldy #CASM_RESOLVE_FLAGS
     lda #$80
+    sta (OutputLo), y
+    clc
+    rts
+; WP72: reports itself as a resolved named constant (CASM_RESOLVE_SYM_
+; FLAGS' CONSTANT and RESOLVED bits set, LABEL_DERIVED clear), value $0070
+; -- same shape and value as DASH's own DISPATCHVECTOR equate, the real
+; source that exposed the width-selection defect this case guards against.
+; storeResolveHead only writes CASM_RESOLVE_FLAGS/ID_LO/ID_HI (offsets
+; 0-2); CASM_RESOLVE_SYM_FLAGS (offset 5) is poked directly here since no
+; existing fixtureResolver entry has ever needed to set it.
+; Value is $1270 (nonzero high byte), not DASH's real $0070 -- identifier's
+; own VAL_HI-load-then-bne fallthrough at the end of this proc (unrelated
+; to WP72, unreachable by every pre-existing case, and confirmed to set
+; only the inert, never-consumed CASM_EXPR_FLAG_FORCE_ABS bit, not
+; anything parser.s or opcodes.s reads) is taken only when VAL_HI is $00;
+; a nonzero high byte keeps this case isolated to the one thing WP72
+; actually changed. The real $0070 zero-page value is exercised by the
+; end-to-end fixture instead, which asserts final instruction bytes, not
+; this raw flags comparison.
+resolveConst:
+    lda #CASM_EXPR_FLAG_RESOLVED
+    ldx #5
+    ldy #0
+    jsr storeResolveHead
+    lda #$70
+    ldx #$12
+    jsr storeResolveValue
+    ldy #CASM_RESOLVE_SYM_FLAGS
+    lda #(CASM_SYMBOL_FLAG_CONSTANT | CASM_SYMBOL_FLAG_RESOLVED)
     sta (OutputLo), y
     clc
     rts
@@ -393,6 +433,13 @@ nameRel:   .byte 6, "RELVAL"
 nameUnres: .byte 5, "UNRES"
 nameUnabs: .byte 5, "UNABS"
 nameBad:   .byte 7, "BADFLAG"
+; WP72: a resolved, non-label-derived named constant (CASM_SYMBOL_FLAG_
+; CONSTANT set, LABEL_DERIVED clear) whose value is in zero-page range --
+; the exact shape a real equate declaration produces. Distinct from ABSVAL
+; above, whose fixtureResolver entry never sets CASM_RESOLVE_SYM_FLAGS at
+; all (leaving CONSTANT clear), so ABSVAL is deliberately treated as
+; label-shaped and must keep SYMBOL_DERIVED set -- see eConst's own comment.
+nameConst: .byte 8, "CONSTVAL"
 
 ; Token macros keep scripts readable while preserving exact PETSCII bytes.
 .macro T0 type, subtype
@@ -445,6 +492,14 @@ sBin255: TN CASM_TOKEN_NUMBER, CASM_NUMBER_BINARY, "%11111111"
 
 sAbs: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
       T0 CASM_TOKEN_NEWLINE, 0
+; WP72: a bare reference to a resolved, non-label-derived named constant
+; (resolveConst above) must NOT set CASM_EXPR_FLAG_SYMBOL_DERIVED -- unlike
+; sAbs's own ABSVAL, which is deliberately label-shaped (fixtureResolver
+; never sets CASM_RESOLVE_SYM_FLAGS for it) and must keep it set. See
+; eConst's own comment for what this proves and why it would fail without
+; the WP72 fix in expr.s::identifier.
+sConst: TN CASM_TOKEN_IDENTIFIER, 0, "CONSTVAL"
+        T0 CASM_TOKEN_NEWLINE, 0
 sAbsAdd: TN CASM_TOKEN_IDENTIFIER, 0, "ABSVAL"
          T1 CASM_TOKEN_PLUS, 0, $2B
          TN CASM_TOKEN_NUMBER, CASM_NUMBER_DECIMAL, "1"
@@ -931,6 +986,14 @@ EXPECT eN00FF, $FF,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
 EXPECT eN0100, 0,$01, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
 EXPECT eBin255, $FF,0, CASM_EXPR_FLAG_RESOLVED, CASM_EXTRACTION_FULL, 0,0, 0,0,0
 EXPECT eAbs, $34,$12, $03, 0, 1,0, 0,0,0
+; WP72: CONSTVAL resolves to $0070 (zero-page range, matching DASH's real
+; DISPATCHVECTOR = $70 equate) with flags = RESOLVED only ($01) -- NOT
+; RESOLVED|SYMBOL_DERIVED ($03) the way eAbs's label-shaped ABSVAL above
+; requires. Before the WP72 fix (expr.s::identifier unconditionally OR'd
+; in SYMBOL_DERIVED for every resolved symbol, constant or not), this case
+; would have observed $03 here and failed -- proving the fix, not just
+; exercising the already-passing label path eAbs covers.
+EXPECT eConst, $70,$12, CASM_EXPR_FLAG_RESOLVED, 0, 5,0, 0,0,0
 EXPECT eAbsAdd, $35,$12, $03, 0, 1,0, 0,1,0
 EXPECT eAbsSub, 0,$12, $03, 0, 1,0, 1,$34,0
 EXPECT eAbsNegZero, $34,$12, $03, 0, 1,0, 1,0,0
@@ -1177,3 +1240,4 @@ caseTable:
     CASE sDivReloc, 0, CASM_DIAG_EXPR_RELOC_UNSUPPORTED, CASM_TOKEN_EOF, 1, 4, 0
     CASE sMulUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0
     CASE sDivUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0
+    CASE sConst, eConst, 0, CASM_TOKEN_NEWLINE, 1, 2, 0

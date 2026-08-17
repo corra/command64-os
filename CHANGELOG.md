@@ -110,6 +110,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM named-constant operands wrongly forced absolute addressing (Phase 12
+  WP72)**: a resolved named constant (equate, e.g. `DISPATCHVECTOR = $70`)
+  referenced as an instruction operand always assembled with absolute
+  (3-byte) addressing, never zero-page (2-byte), even when its value was in
+  range — unlike the identical numeric literal (`STA $70`), which correctly
+  selected zero-page. `expr.s`'s `identifier` proc set the internal
+  `SYMBOL_DERIVED` flag unconditionally for every resolved symbol, label or
+  constant alike; `parser.s` derives its own `FORCE_ABS` from that flag, and
+  `opcodes.s` takes the absolute branch whenever it's set, before checking
+  the value. Discovered during Phase 12 WP71 (DASH adoption) via a real
+  native/ca65 cross-check mismatch. Fixed by clearing the flag specifically
+  for a resolved, non-label-derived constant (the same classification
+  already used correctly for `RELOCATABLE`); labels and the `*`
+  current-address symbol are unaffected and correctly still force absolute
+  width. See `brain/walkthroughs/2026-08-17-casm-phase12-wp72-constant-
+  zeropage-width.md`.
 - **CASM fault-injection harnesses never restored the OS_API vector (Phase 11
   WP63)**: `faultInstall` (`tests/src/casm_faultinject/faultstub.inc`)
   patches the shared, fixed `$1000` OS_API dispatch vector to redirect

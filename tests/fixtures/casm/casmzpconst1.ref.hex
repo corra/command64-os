@@ -1,0 +1,26 @@
+# CASM Phase 12 WP72 trusted reference: casmzpconst1
+#
+# Independently hand-assembled from the casmzpconst1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves the
+# WP72 fix directly: a named constant (equate) whose resolved value is in
+# zero-page range ($00-$FF) must select zero-page (2-byte) addressing for
+# STA, exactly like a bare numeric literal operand already does -- not
+# absolute (3-byte) addressing, which is what CASM produced before this
+# fix. Mirrors WP71's own real-world discovery site verbatim (DASH's
+# dmain.s: STA DISPATCHVECTOR / STA DISPATCHVECTOR+1, DISPATCHVECTOR = $70).
+#
+# Source (.ORG $C000):
+#   DISPATCHVECTOR = $70
+#   STA DISPATCHVECTOR
+#   STA DISPATCHVECTOR+1
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   85 70        STA $70   (zero-page, 2 bytes -- NOT 8D 70 00 absolute)
+#   85 71        STA $71   (zero-page, 2 bytes -- NOT 8D 71 00 absolute)
+#
+# bytes: 6
+
+00 C0
+85 70
+85 71

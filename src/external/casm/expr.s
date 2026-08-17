@@ -345,6 +345,24 @@ resolverValid:
     lda CasmExprResolverOutput + CASM_RESOLVE_SYM_FLAGS
     and #CASM_SYMBOL_FLAG_LABEL_DERIVED
     bne evApplyMode
+    ; WP72: a resolved, non-label-derived constant's value can never differ
+    ; between Pass 1 and Pass 2 (casmResolveConstants, casm.s, fully resolves
+    ; every such constant before either pass ever evaluates an instruction
+    ; operand naming it -- see this proc's own WP65 comment above), unlike a
+    ; label or the current-address symbol, whose SYMBOL_DERIVED must stay set
+    ; unconditionally so parserParseExpressionValue's FORCE_ABS derivation
+    ; (parser.s) can never disagree in width between passes. Clearing
+    ; SYMBOL_DERIVED here lets such a constant fall through to the same
+    ; value-based zero-page/absolute selection in opcodes.s that a bare
+    ; numeric literal already gets -- fixing STA SYMBOL (SYMBOL = $70)
+    ; wrongly assembling as 3-byte absolute instead of 2-byte zero-page.
+    ; The binary-operator RHS-propagation sites below (combineFlags/
+    ; staticFlags) need no matching change: they only OR in whatever
+    ; SYMBOL_DERIVED state an operand already carries, so a compound
+    ; expression like SYMBOL+1 correctly inherits this same clear bit.
+    lda CasmExprResultRecord + CASM_EXPR_FLAGS
+    and #($FF - CASM_EXPR_FLAG_SYMBOL_DERIVED)
+    sta CasmExprResultRecord + CASM_EXPR_FLAGS
     jmp evNotRelocatable             ; resolved, non-label-derived constant
 evApplyMode:
     ldy CasmExprRelocatableModeIn

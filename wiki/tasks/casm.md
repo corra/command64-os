@@ -2035,6 +2035,29 @@ behavior changed beyond the version/build artifact itself.
       promoted `0.2.4` -> `0.2.5`, live-verified as `V0.2.5.1312`.
       Walkthrough: `brain/walkthroughs/2026-08-15-casm-phase12-wp70-
       relocation-algebra-closure.md`.
+- [x] WP72 **named-constant zero-page width selection fix complete,
+      user-approved 2026-08-17** (Taskwarrior task 44,
+      `d439019e-5487-4f76-bf08-3fc792d43813`): `brain/plans/2026-08-17-
+      casm-phase12-wp72-constant-zeropage-width.md`. Inserted ad hoc,
+      discovered mid-WP71 (DASH adoption): a resolved named constant
+      (equate) referenced as an instruction operand always forced
+      absolute (3-byte) addressing, never zero-page (2-byte), even when
+      in range -- unlike an identical literal operand. Root cause:
+      `expr.s`'s `identifier` proc set its internal `SYMBOL_DERIVED` flag
+      unconditionally for every resolved symbol, label or constant alike;
+      `parser.s` derives `FORCE_ABS` from that flag, and `opcodes.s`
+      takes the absolute branch before ever checking the value. Fixed
+      with a single-site gate in the same branch already used to
+      classify `RELOCATABLE` correctly; labels and `*` are unaffected.
+      Found and fixed an unrelated pre-existing off-by-one in
+      `casm_expr`'s own harness (`CASE_COUNT`, silently skipping the
+      table's true last case) and a second, separate, confirmed-harmless
+      dormant quirk left deliberately unfixed. Fail-before/pass-after
+      unit proof, full regression clean, `dash_ref` ca65 cross-check
+      byte-identical, new end-to-end native-CASM fixture (`casmzpconst1`,
+      mirroring DASH's real source) COMP-verified byte-exact. Walkthrough:
+      `brain/walkthroughs/2026-08-17-casm-phase12-wp72-constant-
+      zeropage-width.md`. WP71 resumes its own blocked Atomic Step 5.
 
 ## Optional Feature - Progress and Processing Indication
 

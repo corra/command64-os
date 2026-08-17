@@ -2968,6 +2968,67 @@ plan's Research Findings) found no defect, only an unproven-but-correct
 gap and one hand-derivation mistake in the new fixture itself, both
 resolved without touching `src/external/casm/*.s`.
 
+### CASM Phase 12 WP72 Named-Constant Zero-Page Width Selection Fix — As-Built (complete 2026-08-17)
+
+A real, confirmed defect discovered mid-WP71 (DASH adoption): a resolved
+named constant (equate, e.g. `DISPATCHVECTOR = $70`) referenced as an
+instruction operand always assembled with absolute (3-byte) addressing,
+never zero-page (2-byte), even when its value was in range — unlike the
+identical numeric literal (`STA $70`), which correctly selected
+zero-page. Plan: `brain/plans/2026-08-17-casm-phase12-wp72-constant-
+zeropage-width.md`. Walkthrough: `brain/walkthroughs/2026-08-17-casm-
+phase12-wp72-constant-zeropage-width.md`.
+
+**Root cause, confirmed by reading `expr.s`/`parser.s`/`opcodes.s`
+directly**: `expr.s`'s `identifier` proc set `CASM_EXPR_FLAG_
+SYMBOL_DERIVED` unconditionally for *every* resolved symbol, label or
+constant alike — `parser.s` then derives `CASM_PARSER_STMT_FORCE_ABS`
+straight from that bit, and `opcodes.s` takes the absolute branch
+whenever it's set, before ever checking the actual value. The code
+already drew the correct label-vs-constant distinction four lines later,
+for `RELOCATABLE` classification — it simply never applied that same
+distinction to width selection. A label's address genuinely can differ
+between Pass 1 and Pass 2 (hence must force absolute, unconditionally,
+correctly); a named constant is always fully resolved, identically,
+before either pass evaluates an instruction operand naming it (via
+`casmResolveConstants`, WP65), so it never needed the same protection.
+
+**Fix**: a single site in `identifier`'s existing "resolved,
+non-label-derived constant" branch (the same branch already gating
+`RELOCATABLE`) now also clears `SYMBOL_DERIVED`, letting such a constant
+fall through to the same value-based zero-page/absolute check a literal
+already receives. No change to label or `*` (current-address) handling.
+
+**Two pre-existing, unrelated things found and handled, not silently
+folded in**:
+1. `tests/src/casm_expr/casm_expr.s`'s own `CASE_COUNT` constant was
+   already wrong before this WP touched it — 97 against a true 98
+   pre-existing table entries — silently skipping the table's real last
+   case for an unknown prior span. Found because it caused this WP's own
+   new regression case to falsely pass against deliberately-broken code
+   (twice, for two different reasons — see the walkthrough). Corrected
+   to 99 (98 pre-existing + this WP's own new case).
+2. A second, separate, genuinely dormant control-flow quirk in the same
+   `identifier` proc (a `bne` relying on a resolved value's high byte
+   being nonzero, taken only when it's zero, spuriously setting the
+   never-consumed `CASM_EXPR_FLAG_FORCE_ABS` bit) — confirmed harmless
+   (grep: nothing reads that bit; `parser.s` derives its own `FORCE_ABS`
+   from `SYMBOL_DERIVED` only) and deliberately left unfixed, out of this
+   WP's scope.
+
+**Verification**: unit-level case (`casm_expr`'s new `sConst`/`eConst`)
+demonstrated fail-before/pass-after live under VICE against the actual
+pre-fix and post-fix binaries. Full regression suite (`pass1`, `reloc`,
+`symbol`, `opcodes`, `expr`) clean post-fix. `dash_ref` (ca65 cross-check)
+confirmed byte-identical (sha256
+`3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b`,
+4766 bytes) — unaffected, as expected for a native-CASM-only change. New
+end-to-end fixture `casmzpconst1` (mirroring DASH's real `dmain.s`
+source verbatim: `DISPATCHVECTOR = $70` / `STA DISPATCHVECTOR` / `STA
+DISPATCHVECTOR+1`) assembled by real native CASM and `COMP`-verified
+byte-exact against a hand-derived reference (`85 70` / `85 71`, not
+`8D 70 00` / `8D 71 00`).
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

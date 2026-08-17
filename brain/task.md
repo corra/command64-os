@@ -3449,6 +3449,30 @@
       wp70-relocation-algebra-closure.md`. WP65-70 (the full
       dependency-spine-adjacent set) are now all complete; WP71 (DASH
       adoption) and WP72 (Phase 12 completion gate) remain.
+    - [x] WP72 named-constant zero-page width selection fix complete
+      (Taskwarrior task 44, `d439019e-5487-4f76-bf08-3fc792d43813`).
+      Inserted ad hoc, not the previously-anticipated "Phase 12
+      completion gate" WP72 -- discovered mid-WP71 (DASH adoption) as a
+      real, confirmed CASM defect: a resolved named constant (equate)
+      referenced as an instruction operand always forced absolute
+      (3-byte) addressing, never zero-page (2-byte), even in range --
+      unlike an identical literal operand. Root-caused in `expr.s`'s
+      `identifier` proc (unconditional `SYMBOL_DERIVED` for every
+      resolved symbol, label or constant) and fixed with a single-site
+      gate mirroring the existing, already-correct `RELOCATABLE`
+      classification. Found and fixed a genuine unrelated pre-existing
+      off-by-one in `casm_expr`'s own test harness (`CASE_COUNT`) along
+      the way, plus a second dormant, confirmed-harmless quirk left
+      deliberately unfixed (out of scope). Fail-before/pass-after unit
+      proof, full regression suite clean, `dash_ref` ca65 cross-check
+      confirmed byte-identical, and a new end-to-end native-CASM fixture
+      (`casmzpconst1`, mirroring DASH's real source) COMP-verified
+      byte-exact. **WP72 complete, user-approved 2026-08-17.** Walkthrough:
+      `brain/walkthroughs/2026-08-17-casm-phase12-wp72-constant-
+      zeropage-width.md`. The true Phase 12 completion-gate WP is
+      renumbered WP73 when it starts. WP71 (DASH adoption) resumes its
+      own blocked Atomic Step 5 (native `dash.prg` regen) now that this
+      fix has landed.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature
