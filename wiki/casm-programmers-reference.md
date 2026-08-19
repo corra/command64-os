@@ -394,11 +394,12 @@ whitespace and `;`-comments (but still emits the newline that terminates a
 comment) and classifies the next significant token into the persistent
 `CasmTokenRecord` (`state.s`).
 
-**Token types** (`CASM_TOKEN_*`, $00-$19, `CASM_TOKEN_COUNT` = $1A):
+**Token types** (`CASM_TOKEN_*`, $00-$1A, `CASM_TOKEN_COUNT` = $1B):
 `EOF, NEWLINE, IDENTIFIER, MNEMONIC, DIRECTIVE, REGISTER, NUMBER, COMMA,
 COLON, HASH, LPAREN, RPAREN, PLUS, MINUS, LESS, GREATER, EQUALS` (WP65,
 `=`), `STAR` (WP66, `*`), `SLASH, AMPERSAND, CARET, PIPE, TILDE, SHL, SHR`
-(WP68, `/ & ^ | ~ << >>`), `CHAR` (WP69, `'x'`).
+(WP68, `/ & ^ | ~ << >>`), `CHAR` (WP69, `'x'`), `STRING` (WP74,
+`"..."`, `.BYTE` only).
 
 Scanning rules:
 
@@ -408,6 +409,7 @@ Scanning rules:
 | `<` immediately followed by another `<` | `SHL` (two-byte lookahead, WP68) |
 | `>` immediately followed by another `>` | `SHR` (two-byte lookahead, WP68); a lone `<`/`>` not followed by its own repeat still scans as the pre-existing extraction-prefix `LESS`/`GREATER` token |
 | `'` | `CHAR` (WP69, `lnChar` — multi-byte scan like `$`/`%` below, not a single-byte punctuation table entry): consumes exactly one content byte verbatim (no escapes, no case folding) then requires an immediate closing `'`. Content outside the existing printable-PETSCII range (`$20`-`$7E`/`$A0`-`$FE`, the same bounds `.INCLUDE` filenames enforce) is `CASM_DIAG_CHAR_INVALID_BYTE`; anything else where the closing `'` should be is `CASM_DIAG_CHAR_UNTERMINATED` (also covers an empty `''` literal, not special-cased). A literal quote as content (`'''`) needs no special-casing — it falls out of the same one-byte-then-close mechanism. |
+| `"` | `STRING` (WP74, `lnString`): scans zero or more printable PETSCII bytes verbatim into lexer-owned `CasmStringBuffer[255]`, records the 8-bit length in `CasmStringLength` and the token LENGTH field, and consumes the closing quote. Newline/EOF before close is `CASM_DIAG_STRING_UNTERMINATED`; a non-printable byte is `CASM_DIAG_STRING_INVALID_BYTE`. `CasmTokenText` is not the STRING payload source. |
 | `.` | `DIRECTIVE`; text matched case-insensitively against `.ORG .BYTE .WORD .INCLUDE .STATIC .RELOC`, else subtype `CASM_DIRECTIVE_UNKNOWN` (still a valid token — rejected later by the parser/emitter) |
 | `$` | `NUMBER`, subtype `HEX`; at least one hex digit required |
 | `%` | `NUMBER`, subtype `BINARY`; at least one `0`/`1` required |
@@ -436,6 +438,11 @@ run and reports `CASM_DIAG_MALFORMED_NUMBER`.
 An identifier's 31-byte bound is also the symbol table's name bound
 ([§12](#12-symbol-table-symbolss)) — the two are the same limit, not two
 limits that happen to agree.
+
+STRING deliberately does not enlarge the frozen token record. Its 255-byte
+buffer and one-byte length live in `lexer.s` BSS; consumers may read only
+`CasmStringBuffer[0..CasmStringLength-1]`. The physical 255-byte source-line
+payload is the outer bound, and the scanner also checks its buffer explicitly.
 
 **`lexerScanIncludeOperand`** is a second, deliberately separate entry point
 used only for a `.INCLUDE` operand, because an include filename (up to 63
@@ -520,6 +527,14 @@ not one of `parsePrimary`'s recognized leaf tokens). `ppsConstant`
 for the same reason — its own narrow hand-rolled grammar simply does not
 recognize `CASM_TOKEN_CHAR` either, so `NAME = 'A'` falls through to the
 same `CASM_DIAG_EXPR_MALFORMED` path with no code change required.
+
+**WP74's `CASM_TOKEN_STRING`** is not accepted by parser operand or expression
+grammar. `emitByteList` alone recognizes it before expression parsing, emits
+each buffered byte through `emitByte`, advances once to the delimiter, and
+rejoins the existing comma/newline/EOF checks. An empty STRING performs no
+`emitByte` call but remains a syntactically present list item. `.WORD`,
+instructions, and named constants therefore fail through their existing
+syntax/expression paths without STRING-specific parser integration.
 
 **`.INCLUDE`** is classified like any other directive, then routed to
 `lexerScanIncludeOperand` instead of the operand grammar above. The scanned
@@ -826,10 +841,13 @@ pass gate, and the output staging buffer.
   (record the low byte). Length-2 modes record only `IMMEDIATE`; zero-page
   and the indirect pointer forms are deliberately excluded.
 - **`emitByteList`/`emitWordList`** implement `.BYTE`/`.WORD` by reading a
-  comma-separated expression list directly off the lexer (the parser
+  comma-separated operand list directly off the lexer (the parser
   deliberately stopped after classifying the directive — see
   [§10](#10-parser-parsers)); at least one value is required, and `.BYTE`
   values must fit 8 bits (`CASM_DIAG_OPERAND_OUT_OF_RANGE` otherwise).
+  `.BYTE` additionally short-circuits CHAR and STRING tokens before expression
+  parsing; STRING bytes all pass through `emitByte`, preserving PC overflow,
+  listing capture, pass-mode, and output-failure behavior.
 - **Output staging**: bytes accumulate in a 64-byte `CasmEmitBuffer`
   (`CASM_EMIT_BUFFER_SIZE`), separate from the 256-byte `CasmIoBuffer`
   input buffer because both are live simultaneously during a pass.
@@ -1287,6 +1305,8 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$46` | `EXPR_PAREN_TOO_DEEP` | EXPRESSION TOO DEEPLY NESTED | ✓ | `expr.s` (`parsePrimary`: exceeded `CASM_EXPR_PAREN_MAX_DEPTH` = 8 levels of `(` nesting) *(Phase 12/WP67 range ends here)* |
 | `$47` | `CHAR_UNTERMINATED` | CHARACTER LITERAL UNTERMINATED | ✓ | `lexer.s` (`lnChar`: no closing `'` immediately after the one content byte; also covers an empty `''` literal) |
 | `$48` | `CHAR_INVALID_BYTE` | CHARACTER LITERAL INVALID BYTE | ✓ | `lexer.s` (`lnChar`: content byte outside the printable-PETSCII range) *(Phase 12/WP69 range ends here)* |
+| `$49` | `STRING_UNTERMINATED` | STRING UNTERMINATED | ✓ | `lexer.s` (`lnString`: newline or EOF before closing `"`) |
+| `$4A` | `STRING_INVALID_BYTE` | STRING INVALID BYTE | ✓ | `lexer.s` (`lnString`: content byte outside printable PETSCII) *(Phase 12/WP74 range ends here)* |
 | `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
 See [§17](#17-symbol-map--listing-output-phase-10-complete) for the map/

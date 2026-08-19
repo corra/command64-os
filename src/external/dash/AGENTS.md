@@ -38,13 +38,18 @@ DASH is a CASM-assembled, relocatable, three-page system dashboard utility for C
 - **UPPERCASE ONLY (load-bearing)**: Every byte of these files — mnemonics, labels, hex digits, **and comment text** — must be uppercase ASCII. `cc1541 -w` writes host bytes to the SEQ verbatim with no translation, and ASCII lowercase `a`-`z` (`$61`-`$7A`) are *not* letters in PETSCII; CASM rejects them with `CASM_DIAG_INVALID_SOURCE_BYTE`. ASCII uppercase `A`-`Z` (`$41`-`$5A`) coincides exactly with the PETSCII letter range, so an all-uppercase host file needs no conversion step. `banner.s` follows the same rule and is the proven precedent. This is safe for identifiers only because no two differ solely by case — check that before renaming anything.
 - **Dual-Assembler Subset (load-bearing)**: The seven sources are written in the strict syntactic subset that **both** ca65 and native CASM accept, so the identical bytes on disk can be assembled either way and the outputs compared. Anything outside that subset breaks the cross-check, not just one build. Concretely:
   - **No segment directives.** CASM has no segment concept — it emits one linear stream in command-line file order. The single `.segment` ca65 needs lives in `dash_wrapper.s`, the ca65-only wrapper.
-  - **No string literals.** CASM lacks `"string"` syntax, and `"` is `CASM_DIAG_INVALID_SOURCE_BYTE` outside a `.INCLUDE` operand. All text is raw screen-code bytes.
-  - **No equates.** Constants are raw literals or ZP address targets.
+  - **Audited string literals only.** CASM WP74 supports raw-PETSCII strings in
+    `.BYTE` lists. Use them only for runs proven byte-identical under ca65's
+    active C64 charmap; digits and punctuation in `DASHVERSTR` are the initial
+    safe adoption. Screen-code letters remain explicit bytes because ca65
+    remaps source letters and would break native/host identity.
+  - **Equates must precede every use.** Both assemblers accept named constants, but ca65 cannot select zero-page addressing for a forward-referenced equate. Declare shared equates at the top of `dmain.s`, before executable code.
+  - **No character literals.** ca65's character mapping does not preserve the raw keyboard-byte values native CASM assigns to uppercase literals (`'T'` becomes `$D4`, not `$54`). Keep keyboard and screen-code operands as explicit hex bytes.
   - **Accumulator shifts must be written `asl a`.** CASM maps a no-operand shift to `MODE_IMPLIED` and has *no* implied-to-accumulator fallback (`opcodesFindOpcode`), so a bare `asl` is a hard `CASM_DIAG_INVALID_ADDR_MODE`. ca65 accepts both spellings; only `asl a` works in both.
-  - **Expressions are bounded**: one symbol or literal, an optional `<`/`>` prefix, and an optional `± NUMBER`. No parenthesised or multiplicative arithmetic.
+  - **Expressions are bounded**: parenthesised arithmetic and the Phase 12 operators are available, but use them only where both assemblers produce identical values. ZP pointer high bytes use `SYMBOL+1`.
 - **Source Order Is Authoritative, Specified Once**: `dmain.s` pulls in the other six sources itself via `.INCLUDE "DSCR.S"` / `.INCLUDE "DFMT.S"` / ... / `.INCLUDE "DDATA.S"` (native CASM's include facility, operational since CASM WP47), and `dash_wrapper.s` (the ca65-only wrapper) does nothing but `.include "dmain.s"` — its own `.INCLUDE` chain then does the rest for both toolchains. `ddata.s` stays last so data follows all code. Because both toolchains now read the order from the same six lines instead of it being hand-duplicated between a CASM command line and `dash_wrapper.s`'s own include list, the two can no longer silently drift out of sync.
   - **Case mismatch is expected and handled by the build, not the source**: the `.INCLUDE` operands are uppercase (`"DSCR.S"`), matching the uppercase PETSCII directory entries `cc1541 -f` writes on the packaged disk (same byte-matching mechanism the old multi-file CLI already relied on). ca65 resolves `.include` operands as literal filesystem paths on this case-sensitive host, where the real files are lowercase (`dscr.s`). `CMakeLists.txt` generates uppercase symlinks into `${CMAKE_BINARY_DIR}/dash_ref_includes/` at configure time and passes that directory to the `dash_ref` ca65 build via `add_ca65_app`'s `EXTRA_INCLUDE_DIRS`, so the identical operand spelling resolves for both toolchains without renaming any checked-in file.
-- **Dispatch Trampoline**: High/low bytes of the target page routine are stashed into ZP `$70/$71`. The return address is set by pushing `dispatchReturnMinusOne` onto the stack before executing `JMP ($0070)`.
+- **Dispatch Trampoline**: High/low bytes of the target page routine are stashed through `DISPATCHVECTOR` (`$70/$71`). The return address is set by pushing `dispatchReturnMinusOne` onto the stack before executing `JMP (DISPATCHVECTOR)`.
 
 # Artifact Provenance
 
@@ -54,7 +59,13 @@ DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a P
 - The ca65 `dash_ref` target is an **independent cross-check only** and must never be the source of manifest bytes. `build_dash_manifest.py` refuses its output unless `--allow-host-bytes` is passed explicitly.
 - The cross-check is non-circular: ca65 and CASM share no code and derive relocation entries by completely different means — `tools/reloc.py` diffs two links one page apart, while CASM classifies each operand as relocatable during emission. A defect in one cannot reproduce itself in the other.
 - **Stale-artifact protection (WP9)**: `dash.ref.hex` embeds one `# source_sha256: <name>=<hash>` line per source file, written by `build_dash_manifest.py`. The `dash` CMake target always passes `--source-dir` to `hex_manifest_to_bin.py`, which recomputes each file's hash and hard-fails the build on any mismatch, missing file, or a manifest with no recorded hashes at all — editing a source without regenerating the manifest is a build failure, not a silent stale ship.
-- **Current provenance**: `dash.ref.hex`'s shipping bytes come from the `dash_ref` ca65 cross-check (`--allow-host-bytes`), an explicit, user-approved interim measure recorded truthfully in the manifest's own `# provenance:` line — not a native-CASM-on-hardware run. `dash` ships on `image_d64` (production only, never `test.d64`) from these bytes today.
+- **Current provenance**: `dash.ref.hex`'s shipping bytes come from native CASM
+  `0.2.7` build `1321` running under VICE 3.10 with a 16MB REU on
+  `command64_casm_utils.d64` (2026-08-18). Native `COMP DASH.PRG DASH.REF`
+  and host `--cross-check build/dash_ref.prg` both confirmed all 4,766 bytes
+  match the independent ca65 reference. No `--allow-host-bytes` override was
+  used. `dash` ships on `image_d64` (production only, never `test.d64`) from
+  these reviewed native bytes.
 
 # Native Assembly Workflow
 

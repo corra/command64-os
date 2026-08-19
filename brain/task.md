@@ -2962,6 +2962,15 @@
 
 # CASM Phase 12 - Constants and Expanded Expressions (CASM 0.3)
 
+- **Current map (reconciled 2026-08-18):** WP64 contract freeze; WP65 named
+  constants; WP66 current address; WP67 precedence; WP68 operators; WP69
+  character literals; WP70 relocation closure; WP71 DASH adoption; WP72
+  constant zero-page correction; WP73 resolver-state correction; WP74 `.BYTE`
+  strings (active); WP75 consolidated completion gate. Earlier numbering notes
+  below are historical and superseded by this map.
+- Current implementation: CASM `0.2.7` build `1319`; `0.3.0` remains the WP75
+  completion-promotion target.
+
 - [/] Taskwarrior #43 (`c547c74f-5080-4f2e-b086-e4e2273b5336`): CASM Phase
       12, governing plan **approved 2026-08-13**, task started.
   - Plan: `brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`
@@ -3448,7 +3457,15 @@
       done. Walkthrough: `brain/walkthroughs/2026-08-15-casm-phase12-
       wp70-relocation-algebra-closure.md`. WP65-70 (the full
       dependency-spine-adjacent set) are now all complete; WP71 (DASH
-      adoption) and WP72 (Phase 12 completion gate) remain.
+      adoption) and the then-numbered WP72 completion gate remained. Historical
+      note: corrective WP72/WP73 and WP74 later moved the final gate to WP75.
+    - [x] WP71 DASH Phase 12 adoption complete, user-approved 2026-08-18
+      (Taskwarrior task 43,
+      `e126dbb8-fc8e-4b94-a93a-ec6121a19fb8`). Native CASM/ca65 match all
+      4,766 bytes; `dash.ref.hex` has genuine native provenance; production and
+      no-change builds are stable; live `$3800`/`$5000`/`$9000` relocation
+      checks pass. Walkthrough: `brain/walkthroughs/2026-08-18-casm-phase12-
+      wp71-dash-adoption.md`. CASM promoted `0.2.6` -> `0.2.7`; WP74 unblocked.
     - [x] WP72 named-constant zero-page width selection fix complete
       (Taskwarrior task 44, `d439019e-5487-4f76-bf08-3fc792d43813`).
       Inserted ad hoc, not the previously-anticipated "Phase 12
@@ -3472,7 +3489,29 @@
       zeropage-width.md`. The true Phase 12 completion-gate WP is
       renumbered WP73 when it starts. WP71 (DASH adoption) resumes its
       own blocked Atomic Step 5 (native `dash.prg` regen) now that this
-      fix has landed.
+       fix has landed.
+    - [x] WP73 forward-label resolver-state/pass-agreement fix complete,
+      user-approved 2026-08-18 (Taskwarrior task
+      44, `34c11d87-811e-4aa2-b705-1cd59e91a23a`). Root cause: unresolved
+      `symbolsLookup` results leave `CASM_RESOLVE_SYM_FLAGS` unspecified, but
+      WP72's `expr.s::identifier` path read that stale byte before checking
+      RESOLVED. Added a resolution guard, case 100 in `casm_expr`, and the
+      `casmfwdstale1` native/COMP fixture. Live VICE: `CASM EXPR: PASS`,
+      `FILES COMPARE OK`, and normal `c64[8]:>` returns. Walkthrough:
+      `brain/walkthroughs/2026-08-18-casm-phase12-wp73-forward-label-
+      resolver-state.md`. CASM promoted `0.2.5` -> `0.2.6`; WP71 may resume.
+    - [x] WP74 ca65-compatible `.BYTE` string literals complete
+      (Taskwarrior task 44,
+      `a61634af-b482-476b-a20b-5442334d1315`). Verbatim PETSCII, empty strings,
+      mixed byte lists, no escapes/implicit terminator; mandatory DASH adoption
+       and native/ca65 proof. Phase 13 must decide whether `.TEXT` is removed,
+       replaced, or separately justified. Plan: `brain/plans/2026-08-18-casm-
+       phase12-wp74-string-literals.md`.
+      Implementation and full affected-image regression pass. Live VICE 3.10
+      reports `CASM FAULT SYMBOLS: PASS` from the relocated include image with
+      normal `c64[8]:>` return. Walkthrough: `brain/walkthroughs/2026-08-19-
+      casm-phase12-wp74-string-literals.md`. User approved completion on
+      2026-08-19; CASM advanced `0.2.7` -> `0.2.8`.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

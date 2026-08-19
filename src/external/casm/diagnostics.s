@@ -147,6 +147,10 @@ diagPrintFatal:
     beq dpfCharUnterminated
     cmp #CASM_DIAG_CHAR_INVALID_BYTE
     beq dpfCharInvalidByte
+    cmp #CASM_DIAG_STRING_UNTERMINATED
+    beq dpfStringUnterminated
+    cmp #CASM_DIAG_STRING_INVALID_BYTE
+    beq dpfStringInvalidByte
     jmp dpfUnknown
 dpfListingRange:
     sec
@@ -230,6 +234,16 @@ dpfCharUnterminated:
 dpfCharInvalidByte:
     ldx #<msgCharInvalidByte
     ldy #>msgCharInvalidByte
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfStringUnterminated:
+    ldx #<msgStringUnterminated
+    ldy #>msgStringUnterminated
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfStringInvalidByte:
+    ldx #<msgStringInvalidByte
+    ldy #>msgStringInvalidByte
     jsr diagPrintString
     jmp diagPrintSourceContext
 dpfUnknown:
@@ -1501,6 +1515,10 @@ msgCharUnterminated:
     .byte "CASM: CHARACTER LITERAL UNTERMINATED", PetCr, 0
 msgCharInvalidByte:
     .byte "CASM: CHARACTER LITERAL INVALID BYTE", PetCr, 0
+msgStringUnterminated:
+    .byte "CASM: STRING UNTERMINATED", PetCr, 0
+msgStringInvalidByte:
+    .byte "CASM: STRING INVALID BYTE", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.
@@ -1525,13 +1543,17 @@ tokNamesLo:
     .byte <tokNameDir, <tokNameReg, <tokNameNum, <tokNameComma
     .byte <tokNameColon, <tokNameHash, <tokNameLparen, <tokNameRparen
     .byte <tokNamePlus, <tokNameMinus, <tokNameLess, <tokNameGreater
-    .byte <tokNameEquals
+    .byte <tokNameEquals, <tokNameStar, <tokNameSlash, <tokNameAmpersand
+    .byte <tokNameCaret, <tokNamePipe, <tokNameTilde, <tokNameShl
+    .byte <tokNameShr, <tokNameChar, <tokNameString
 tokNamesHi:
     .byte >tokNameEof, >tokNameNewline, >tokNameId, >tokNameMnem
     .byte >tokNameDir, >tokNameReg, >tokNameNum, >tokNameComma
     .byte >tokNameColon, >tokNameHash, >tokNameLparen, >tokNameRparen
     .byte >tokNamePlus, >tokNameMinus, >tokNameLess, >tokNameGreater
-    .byte >tokNameEquals
+    .byte >tokNameEquals, >tokNameStar, >tokNameSlash, >tokNameAmpersand
+    .byte >tokNameCaret, >tokNamePipe, >tokNameTilde, >tokNameShl
+    .byte >tokNameShr, >tokNameChar, >tokNameString
 
 dirSubtypeNamesLo:
     .byte <dirNameUnknown, <dirNameOrg, <dirNameByte, <dirNameWord
@@ -1567,6 +1589,16 @@ tokNameMinus:     .byte "MINUS", 0
 tokNameLess:      .byte "LESS", 0
 tokNameGreater:   .byte "GREATER", 0
 tokNameEquals:    .byte "EQUALS", 0
+tokNameStar:      .byte "STAR", 0
+tokNameSlash:     .byte "SLASH", 0
+tokNameAmpersand: .byte "AMPERSAND", 0
+tokNameCaret:     .byte "CARET", 0
+tokNamePipe:      .byte "PIPE", 0
+tokNameTilde:     .byte "TILDE", 0
+tokNameShl:       .byte "SHL", 0
+tokNameShr:       .byte "SHR", 0
+tokNameChar:      .byte "CHAR", 0
+tokNameString:    .byte "STRING", 0
 msgUnknownTok:    .byte "UNKNOWN", 0
 
 dirNameUnknown:   .byte " (UNKNOWN)", 0

@@ -291,6 +291,32 @@ lda #'a'+1            ; error -- can't combine with an operator
 name = 'a'           ; error -- not valid on a named constant's own RHS
 ```
 
+### String Literals
+
+Double-quoted strings are valid as whole `.BYTE` list entries:
+
+```asm
+.byte "hello", 0
+.byte $01, "", 'a', "ok", 1+1
+```
+
+Each content byte is emitted **verbatim** as PETSCII. CASM performs no case
+folding, ASCII conversion, screen-code conversion, or ca65 charmap remapping.
+An empty string is valid and emits zero bytes. No terminator or length byte is
+added automatically; write an explicit `0` when the consumer needs a
+null-terminated string.
+
+Strings support no escapes, embedded quote spelling, interpolation, or implicit
+concatenation. Content is limited to printable PETSCII (`$20-$7E` and
+`$A0-$FE`, with `"` closing the string) and to the current 255-byte source-line
+payload. A newline or EOF before the closing quote reports `CASM: STRING
+UNTERMINATED`; a non-printable content byte reports `CASM: STRING INVALID
+BYTE`.
+
+Strings are not expression values. They are invalid in instruction operands,
+`.WORD`, `.ORG`, and named-constant definitions, and adjacent strings require
+the ordinary comma separator.
+
 ### Addressing Modes
 
 Every documented 6502 addressing mode that the target mnemonic supports is
@@ -331,7 +357,7 @@ bytes ahead of the next instruction.
 | Directive | Syntax | Effect |
 | --- | --- | --- |
 | `.ORG` | `.ORG $C000` | Sets the assembly's fixed address and switches it to static output (see [Relocation](#relocation) below). Optional — omit it entirely for the default relocatable behavior. A second `.ORG`, or one after output has already started, is an error. |
-| `.BYTE` | `.BYTE $01, $02, $FF` | Emits one or more comma-separated byte values (each must fit 8 bits) at the current address. |
+| `.BYTE` | `.BYTE $01, "OK", 0` | Emits one or more comma-separated byte expressions, character literals, or verbatim PETSCII strings at the current address. Numeric values must fit 8 bits; strings may be empty and add no implicit terminator. |
 | `.WORD` | `.WORD $1234, $ABCD` | Emits one or more comma-separated 16-bit values, little-endian, at the current address. |
 | `.INCLUDE` | `.INCLUDE "SUBS.S"` | Splices another source file in at this point, as if its text appeared here. See [Splitting Source Across Files](#splitting-source-across-files). |
 

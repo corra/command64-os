@@ -1,0 +1,27 @@
+# CASM Phase 12 WP74 trusted reference: casmstring1
+#
+# Independently hand-assembled from the generated fixed-origin source. This
+# file is not produced by CASM. STRING bytes are verbatim source PETSCII, the
+# empty string emits no byte, and no terminator is implicit.
+#
+# Source
+#   .ORG $C000
+#   .BYTE "HELLO", 0, $11, "", 'A', "Z", 1+1
+#
+# Hand assembly
+#   00 C0                 PRG load-address header
+#   48 45 4C 4C 4F       "HELLO"
+#   00 11                 explicit numeric bytes
+#   (nothing)             empty string
+#   41                    character literal 'A'
+#   5A                    "Z"
+#   02                    1+1
+#
+# bytes: 12
+
+00 C0
+48 45 4C 4C 4F
+00 11
+41
+5A
+02

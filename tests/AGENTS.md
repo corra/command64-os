@@ -77,6 +77,9 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   packaged only on `casm_overflow_test_d64`, under `test_casm_faults`. Launch
   it by the full documented name after switching the Command64 shell to unit
   9; allow up to 90 seconds under true-drive emulation.
+- WP74 moves fixture-free `test_casm_fsym` from `casm_overflow_test.d64` to
+  `casm_include_test.d64` to preserve overflow-image capacity after shared
+  diagnostics growth; launch it from the include image by its full name.
 - WP59 Increment 2's `test_casm_flist` listing contract harness is packaged
   only on the self-bootable `casm_listing_test.d64`. Launch it from the
   Command64 shell by its full documented name; the 16-character D64 name is
@@ -88,7 +91,10 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - Phase 12 WP68 Increment 6 adds the self-bootable
   `casm_phase12_test.d64` as the canonical growth image for Phase 12
   expression/operator harnesses. It carries `command64`, `casm`,
-  `test_casm_expr`, and `test_casm_lexer`; preserve at least 40 free blocks
+  `test_casm_expr`, `test_casm_lexer`, and (WP74) `test_casm_pass1` with its
+  complete eight-file fixture set (`p1label1.s` through `p1string1.s`);
+  WP74 also adds `casmstring1.s`/`.ref` plus six rejected STRING fixtures;
+  preserve at least 40 free blocks
   for later Phase 12 fixtures and runtime outputs. `test_casm_expr` is
   packaged only here, not on `test.d64` (moved off in Atomic Step 2 to
   recover `test.d64`'s directory/byte-space headroom).

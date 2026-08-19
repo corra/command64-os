@@ -4,19 +4,19 @@
 # back to a binary at build time by scripts/hex_manifest_to_bin.py,
 # which contains no 6502 knowledge and no assembler of any kind.
 #
-# provenance:  ca65 dash_ref cross-check build, --allow-host-bytes interim (user-approved 2026-07-30, DASH V0.1.4 version bump)
+# provenance:  native CASM 0.2.7 build 1321 under VICE 3.10 with 16MB REU on command64_casm_utils.d64, 2026-08-18
 # cross-check: MATCHES dash_ref.prg (4766 bytes) byte-for-byte
 # load addr:   $3400
 #
 # bytes: 4766
 # sha256: 3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b
-# source_sha256: dmain.s=591a0a396926e65ef4e79db6faab3e4c396042a19dd8cb96591f64f78c9b0cea
-# source_sha256: dscr.s=2107dd045d1b3b253989c5d0da684323bbd357cf0c331d2de48b18c1143d9d4f
-# source_sha256: dfmt.s=0ba99dddda4cbeea8144d8b22787e17362bae3899af6d1754a7bbc7f49176743
-# source_sha256: dsys.s=5fc7202e6a545bb247a3548d41d635184919aac23cab6d157aac6d21f2b5cea6
+# source_sha256: dmain.s=53d4b2771a27e93dbb01b5d6a95fe665938ea3bfa48f5e1e13cbc714099c5d4a
+# source_sha256: dscr.s=ac1c9d5fd37a23dbee447c5d5a55fc386b9c97bdac42d72df52862df307161fc
+# source_sha256: dfmt.s=c8e57a30ee82e59ce559c9574b92cafb1f5eb73a2a5926da772c39bade69f5d3
+# source_sha256: dsys.s=cfe96813168064f55a5d5bea05095d667988e05b3b401c2808b073f32599df2f
 # source_sha256: dapp.s=f8c8b5f53357a5175fc64173b08bf6f82d2ffbe132c7029320aa0c86c6c656b8
 # source_sha256: dvmm.s=64141df29ebea3362104ad9215403521195da865866118bb40348eb569fb6659
-# source_sha256: ddata.s=7e62064a9ccca922988e85ab8e7c9052dc0874741f08f740efdd93b3897436cb
+# source_sha256: ddata.s=845141c93ba8a8ee9d0e407559ea0dc2da18552a45c3c337c20b53651cc09996
 
 00 34 D8 A9 00 8D 91 3E A9 01 8D 92 3E AD 92 3E
 F0 08 A9 00 8D 92 3E 20 8F 34 20 E4 FF AA F0 ED

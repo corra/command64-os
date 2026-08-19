@@ -1,7 +1,7 @@
 ---
 feature: casm-phase12-wp71-dash-adoption
 created: 2026-08-15
-status: approved
+status: completed
 taskwarrior: e126dbb8-fc8e-4b94-a93a-ec6121a19fb8
 depends-on: WP65-70, all complete
 ---
@@ -240,6 +240,95 @@ approves closing WP71.
 
 ## Progress
 
+- 2026-08-18: **User approved the completion gate. WP71 complete.** CASM
+  promoted `0.2.6` -> `0.2.7`; Taskwarrior task 43 and repository task records
+  closed. Approved WP74 is now unblocked.
+- 2026-08-18: **Atomic Step 6 implementation and verification complete;
+  awaiting user completion approval.** Production `image_d64` builds with DASH
+  at 19 blocks and 317 free blocks. An immediate no-change rebuild preserved
+  identical SHA-256 values for `image.d64`, `dash.prg`, `BUILD_DASH_REF`, and
+  `BUILD_CASM`; `dash.prg` remains the reviewed 4,766-byte native artifact with
+  SHA-256 `3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b`.
+
+  Fresh VICE 3.10 production-image runs proved DASH at all documented bases.
+  Default `LOAD DASH` registered `$3800` and rendered the System page. Explicit
+  `LOAD DASH 5000` / `RUN 5000` rendered correctly; F3 reported DASH range
+  `5000-5ef3`. A fresh session with `LOAD DASH 9000` / `RUN 9000` rendered
+  correctly; F3 reported `9000-9ef3`. The emulator was restored to a healthy
+  `c64[8]:>` production shell afterward.
+
+  Verification exposed stale documentation, not a DASH defect: `GO 5000` is
+  not a recognized shell command and returns `BAD COMMAND OR FILE NAME`.
+  Corrected mirrored `wiki/docs/dash-utility.md` to the implemented explicit
+  loader workflow above. Completion walkthrough created; trackers and durable
+  docs synchronized. No CASM/DASH version or task completion change until user
+  approval.
+- 2026-08-18: **Atomic Step 5 complete after WP73 closure.** Rebuilt a fresh
+  `command64_casm_utils.d64` with CASM `0.2.6.1318`, attached it to unit 9,
+  switched Command64 to `c64[9]:>`, and entered exact PETSCII
+  `CASM DMAIN.S /O:@:DASH.PRG`. Native CASM completed normally and produced a
+  19-block `dash.prg`. Exact PETSCII `COMP DASH.PRG DASH.REF` reported
+  `FILES COMPARE OK` and returned to the shell, proving WP73 removed the final
+  pass-agreement blocker.
+
+  Extracted the native PRG from the utility disk (4,766 bytes, load `$3400`,
+  SHA-256 `3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b`)
+  and ran `scripts/build_dash_manifest.py` with native provenance and
+  `--cross-check build/dash_ref.prg`, without `--allow-host-bytes`. The host
+  cross-check also matched all 4,766 bytes. `dash.ref.hex` now records native
+  CASM `0.2.6` build `1318`, VICE 3.10, 16MB REU, the utility disk, date, and
+  current hashes for all seven source files. Proceeding to Atomic Step 6.
+- 2026-08-17: **Atomic Step 5 re-attempted after WP72's fix landed — a
+  second, different, new CASM defect found, native regen still blocked.**
+  Rebuilt `command64_casm_utils.d64` fresh (a clean 222-free-block disk,
+  no leftover files from the prior VICE session) and re-ran native
+  `CASM DMAIN.S /O:DASH.PRG` on device 9 (`test.d64` on device 8 for
+  Command64 itself, `drive 9` to switch — `device 9` is not a real
+  command, confirmed live with `BAD COMMAND OR FILE NAME`).
+
+  This time CASM did not produce a mismatched PRG — it refused to
+  assemble at all: `CASM: BRANCH OUT OF RANGE` at `dvmm.s` line 411
+  (`BCC DVMMRT_PATTERNLOOP`, included from `dmain.s` line 158).
+
+  **Confirmed via the ca65 cross-check (a live, independent assembly,
+  not assumed) that this branch is genuinely in valid 6502 range,
+  proving CASM's own diagnostic is a false positive, not a real
+  hardware limit or a DASH source defect**: assembled `dash_wrapper.s`
+  directly with `ca65 ... -l` and read the resulting listing —
+  `DVMMRT_PATTERNLOOP` resolves to `$0962`; the `BCC` instruction itself
+  is at `$09D9` with operand byte `$87` (`-121` signed), giving
+  `nextPc ($09DB) + (-121) = $0962` — exactly matching the label, 7
+  bytes inside the valid `-128..+127` window. ca65 assembled the exact
+  same source with zero complaint.
+
+  Read `emit.s`'s own relative-branch range-check code (`eiRelative`):
+  the `disp = target - nextPc` formula and range test are textbook-
+  correct in isolation, ruling out a simple arithmetic-formula bug.
+  Confirmed by reading (not assumed) that `dvmm.s` itself references
+  none of WP71/WP72's zero-page-equate names directly — any byte-count
+  change reaching this branch must come from upstream files
+  (`dscr.s`/`dfmt.s`, which do use the equates, `.INCLUDE`d before
+  `dvmm.s`). A pure uniform shift in address from upstream code
+  shrinking cannot, on its own, change this branch's own relative
+  displacement (both the branch and its target shift by the same
+  amount) — the leading working hypothesis, not yet confirmed live, is a
+  genuine Pass 1/Pass 2 label-address disagreement for some symbol
+  reached before this branch, now newly exposed because WP72 makes
+  Pass 1 and Pass 2 byte counts capable of diverging in a case they
+  previously couldn't (when every symbol-derived operand was
+  unconditionally forced absolute in both passes alike, Pass 1 and
+  Pass 2 could never disagree in width for that reason; WP72
+  legitimately relies on constants resolving identically in both
+  passes, which holds for DASH's own top-of-`dmain.s` equates — the
+  actual divergence mechanism for *this* symbol is not yet identified).
+
+  This is a second, distinct, genuinely new CASM defect — not a DASH
+  source problem (ca65 proves the source is fine) and not WP72's own
+  fix being wrong for the case it targeted (full regression + the
+  targeted end-to-end fixture both still pass). Per this plan's own
+  Stop Conditions, halting here rather than guessing at a fix.
+  Requires its own investigation and a new approved plan (WP73), not an
+  inline patch under WP71 or WP72.
 - 2026-08-17: **WP72 (named-constant zero-page width selection fix)
   complete and user-approved.** See `brain/plans/2026-08-17-casm-
   phase12-wp72-constant-zeropage-width.md` and its walkthrough for full

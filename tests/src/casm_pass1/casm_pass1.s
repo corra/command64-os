@@ -151,6 +151,9 @@ start:
     jsr resourcesCleanup
     jsr p1size1
     jsr reportCase
+    jsr resourcesCleanup
+    jsr p1string1
+    jsr reportCase
 
     lda #$0D
     jsr KernalChROUT
@@ -805,6 +808,27 @@ p1szFail:
     sec
     rts
 
+; WP74 Increment 3: an empty STRING plus numeric, character, non-empty STRING,
+; and expression items emit four bytes total in measure mode.
+p1string1:
+    jsr symbolsInit
+    bcs p1strFail
+    ldx #<p1string1Name
+    ldy #>p1string1Name
+    jsr runMeasurePass
+    bcs p1strFail
+    lda CasmPc
+    cmp #$04
+    bne p1strFail
+    lda CasmPc + 1
+    cmp #$C0
+    bne p1strFail
+    clc
+    rts
+p1strFail:
+    sec
+    rts
+
 .segment "RODATA"
 
 passMsg:
@@ -826,6 +850,7 @@ p1back1Name:        .byte "P1BACK1.S", 0
 p1undef1Name:       .byte "P1UNDEF1.S", 0
 p1dup1Name:         .byte "P1DUP1.S", 0
 p1size1Name:        .byte "P1SIZE1.S", 0
+p1string1Name:      .byte "P1STRING1.S", 0
 
 ; Label-name literals for symbolsLookup: bare bytes, no terminator (length
 ; is passed separately in A), matching tests/src/casm_symbols/casm_symbols.s's

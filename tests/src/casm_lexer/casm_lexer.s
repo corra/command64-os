@@ -36,6 +36,8 @@
 .import __MAIN_START__
 .import lexerInit
 .import lexerNext
+.import CasmStringLength
+.import CasmStringBuffer
 
 .export CasmLexerState
 .export CasmLookaheadValid
@@ -123,6 +125,18 @@ start:
     jsr caseCharUnterminated
     jsr reportCase
     jsr caseCharInvalidByte
+    jsr reportCase
+    jsr caseStringEmpty
+    jsr reportCase
+    jsr caseStringRaw
+    jsr reportCase
+    jsr caseStringUnterminated
+    jsr reportCase
+    jsr caseStringNewline
+    jsr reportCase
+    jsr caseStringInvalid7f
+    jsr reportCase
+    jsr caseStringInvalidff
     jsr reportCase
 
     lda #$0D
@@ -365,6 +379,77 @@ cibFail:
     sec
     rts
 
+caseStringEmpty:
+    lda #6
+    jsr stringCaseInit
+    jsr lexerNext
+    bcs stringCaseFail
+    cmp #CASM_TOKEN_STRING
+    bne stringCaseFail
+    lda CasmStringLength
+    bne stringCaseFail
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    bne stringCaseFail
+    clc
+    rts
+
+caseStringRaw:
+    lda #7
+    jsr stringCaseInit
+    jsr lexerNext
+    bcs stringCaseFail
+    cmp #CASM_TOKEN_STRING
+    bne stringCaseFail
+    lda CasmStringLength
+    cmp #5
+    bne stringCaseFail
+    ldx #4
+@loop:
+    lda CasmStringBuffer, x
+    cmp stringRawExpected, x
+    bne stringCaseFail
+    dex
+    bpl @loop
+    clc
+    rts
+
+caseStringUnterminated:
+    lda #8
+    ldx #CASM_DIAG_STRING_UNTERMINATED
+    jmp stringCaseDiagnostic
+
+caseStringNewline:
+    lda #9
+    ldx #CASM_DIAG_STRING_UNTERMINATED
+    jmp stringCaseDiagnostic
+
+caseStringInvalid7f:
+    lda #10
+    ldx #CASM_DIAG_STRING_INVALID_BYTE
+    jmp stringCaseDiagnostic
+
+caseStringInvalidff:
+    lda #11
+    ldx #CASM_DIAG_STRING_INVALID_BYTE
+stringCaseDiagnostic:
+    stx ExpectedIndex
+    jsr stringCaseInit
+    jsr lexerNext
+    bcc stringCaseFail
+    cmp ExpectedIndex
+    bne stringCaseFail
+    clc
+    rts
+
+stringCaseInit:
+    sta SourceMode
+    lda #0
+    sta SourceIndex
+    jmp lexerInit
+stringCaseFail:
+    sec
+    rts
+
 ; ---------------------------------------------------------------------------
 ; sourceNextByte (stub)
 ; Returns CASM_PETSCII_UPPER_A once per remaining byte in BytesRemaining,
@@ -374,7 +459,9 @@ cibFail:
 ; ---------------------------------------------------------------------------
 sourceNextByte:
     lda SourceMode
-    beq snbRepeatA
+    bne :+
+    jmp snbRepeatA
+:
     cmp #1
     beq snbOperatorMode
     cmp #2
@@ -383,37 +470,75 @@ sourceNextByte:
     beq snbCharQuoteMode
     cmp #4
     beq snbCharUntermMode
-    jmp snbCharInvalidMode      ; mode 5, the only remaining case
+    cmp #5
+    beq snbCharInvalidMode
+    jmp snbStringMode
 
 snbOperatorMode:
     ldx SourceIndex
     cpx #OPERATOR_SOURCE_SIZE
-    bcs snbEof
+    bcc :+
+    jmp snbEof
+:
     lda operatorSource, x
     jmp snbEmitTableByte
 snbCharValidMode:
     ldx SourceIndex
     cpx #CHAR_VALID_SOURCE_SIZE
-    bcs snbEof
+    bcc :+
+    jmp snbEof
+:
     lda charValidSource, x
     jmp snbEmitTableByte
 snbCharQuoteMode:
     ldx SourceIndex
     cpx #CHAR_QUOTE_SOURCE_SIZE
-    bcs snbEof
+    bcc :+
+    jmp snbEof
+:
     lda charQuoteSource, x
     jmp snbEmitTableByte
 snbCharUntermMode:
     ldx SourceIndex
     cpx #CHAR_UNTERM_SOURCE_SIZE
-    bcs snbEof
+    bcc :+
+    jmp snbEof
+:
     lda charUntermSource, x
     jmp snbEmitTableByte
 snbCharInvalidMode:
     ldx SourceIndex
     cpx #CHAR_INVALID_SOURCE_SIZE
-    bcs snbEof
+    bcc :+
+    jmp snbEof
+:
     lda charInvalidSource, x
+    jmp snbEmitTableByte
+snbStringMode:
+    sec
+    sbc #6
+    tax
+    lda stringSourceLo, x
+    sta CasmPtr0Lo
+    lda stringSourceHi, x
+    sta CasmPtr0Hi
+    lda stringSourceSize, x
+    cmp SourceIndex
+    beq snbStringEnd
+    bcc snbStringEnd
+    ldy SourceIndex
+    lda (CasmPtr0Lo), y
+    cmp #$0D
+    beq snbStringNewline
+    ldx SourceIndex
+    jmp snbEmitTableByte
+snbStringNewline:
+    inc SourceIndex
+    lda #CASM_SOURCE_NEWLINE
+    clc
+    rts
+snbStringEnd:
+    jmp snbEof
 snbEmitTableByte:
     sta CasmSourceResultByte
     lda #0
@@ -527,6 +652,23 @@ charInvalidSource:
     ; (never reached -- rejected at the content byte itself).
     .byte CASM_PETSCII_APOSTROPHE, $01, CASM_PETSCII_APOSTROPHE
 CHAR_INVALID_SOURCE_SIZE = * - charInvalidSource
+
+stringEmptySource: .byte CASM_PETSCII_QUOTE, CASM_PETSCII_QUOTE
+stringRawSource:
+    .byte CASM_PETSCII_QUOTE, $41, $7E, $A0, $FE, $20, CASM_PETSCII_QUOTE
+stringRawExpected: .byte $41, $7E, $A0, $FE, $20
+stringUntermSource: .byte CASM_PETSCII_QUOTE, $41
+stringNewlineSource: .byte CASM_PETSCII_QUOTE, $41, $0D
+stringInvalid7fSource: .byte CASM_PETSCII_QUOTE, $7F, CASM_PETSCII_QUOTE
+stringInvalidffSource: .byte CASM_PETSCII_QUOTE, $FF, CASM_PETSCII_QUOTE
+stringSourceLo:
+    .byte <stringEmptySource, <stringRawSource, <stringUntermSource
+    .byte <stringNewlineSource, <stringInvalid7fSource, <stringInvalidffSource
+stringSourceHi:
+    .byte >stringEmptySource, >stringRawSource, >stringUntermSource
+    .byte >stringNewlineSource, >stringInvalid7fSource, >stringInvalidffSource
+stringSourceSize:
+    .byte 2, 7, 2, 3, 3, 3
 
 passMsg:
     .byte "CASM LEXER: PASS", PetCr, 0

@@ -567,6 +567,14 @@ file(WRITE "${OUTPUT_DIR}/p1size1.seq"
     "VALS: .WORD \$ABCD, \$1234\n"
 )
 
+# WP74 Increment 3: empty and non-empty STRING items mixed with numeric,
+# character-literal, and expression entries. Four emitted bytes advance the
+# measure-pass PC from $C000 to $C004; the empty string advances it by zero.
+file(WRITE "${OUTPUT_DIR}/p1string1.seq"
+    ".ORG \$C000\n"
+    ".BYTE \"\", \$11, 'A', \"B\", 1+1\n"
+)
+
 # WP30 relative-branch fixtures. No prior fixture (Phase 4's casmbrp1/brp2/
 # brn1/brn2 included) has ever used a label as a branch target -- all four
 # use raw literal addresses. brfwd1/brback1 prove real Pass 2 emission of a
@@ -1738,6 +1746,31 @@ file(WRITE "${OUTPUT_DIR}/casmcharinval.seq"
     "LDA #'${CASM_CTRL_A}'\n"
 )
 
+# WP74: production STRING fixtures. The accepted fixed-origin case has a
+# hand-derived reference; the others prove excluded contexts and diagnostics.
+file(WRITE "${OUTPUT_DIR}/casmstring1.seq"
+    ".ORG \$C000\n"
+    ".BYTE \"HELLO\", 0, \$11, \"\", 'A', \"Z\", 1+1\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrimm.seq"
+    "LDA #\"X\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrword.seq"
+    ".WORD \"X\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrequat.seq"
+    "NAME = \"X\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstradj.seq"
+    ".BYTE \"A\" \"B\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrunterm.seq"
+    ".BYTE \"ABC\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrinval.seq"
+    ".BYTE \"${CASM_CTRL_A}\"\n"
+)
+
 # WP70: the "accepted" side of WP64's representability contract -- a
 # relocatable label combined with a static addend via '+', with the
 # static side wrapped in a parenthesized group, in genuinely relocatable
@@ -1786,4 +1819,51 @@ file(WRITE "${OUTPUT_DIR}/casmzpconst1.seq"
     "DISPATCHVECTOR = \$70\n"
     "STA DISPATCHVECTOR\n"
     "STA DISPATCHVECTOR+1\n"
+)
+
+# WP73: minimal production reproduction of stale resolver symbol-kind state.
+# The resolved CHARSTASH constant lookup immediately precedes an unresolved
+# forward label lookup in Pass 1. Before the fix, FWDLABEL inherited stale
+# CONSTANT|RESOLVED flags, lost SYMBOL_DERIVED, and selected zero-page in
+# Pass 1 but absolute in Pass 2. COMP against casmfwdstale1.ref proves stable
+# width and the complete loop/control-flow shape that exposed the defect.
+file(WRITE "${OUTPUT_DIR}/casmfwdstale1.seq"
+    ".ORG \$C000\n"
+    "COLORPTR = \$7B\n"
+    "CHARSTASH = \$7D\n"
+    "MAXLEN = \$7E\n"
+    "START:\n"
+    "LDX #0\n"
+    "OUTERLOOP:\n"
+    "CPX #3\n"
+    "BEQ OUTERDONE\n"
+    "LDA #\$0E\n"
+    "CPX #0\n"
+    "BNE COLORSET\n"
+    "LDA #\$01\n"
+    "COLORSET:\n"
+    "STA CHARSTASH\n"
+    "LDA FWDLABEL\n"
+    "CLC\n"
+    "ADC #\$50\n"
+    "STA COLORPTR\n"
+    "LDA #\$D8\n"
+    "STA COLORPTR+1\n"
+    "LDA #5\n"
+    "STA MAXLEN\n"
+    "LDY #0\n"
+    "FILLLOOP:\n"
+    "CPY MAXLEN\n"
+    "BCS NEXTTAB\n"
+    "LDA CHARSTASH\n"
+    "STA (COLORPTR), Y\n"
+    "INY\n"
+    "JMP FILLLOOP\n"
+    "NEXTTAB:\n"
+    "INX\n"
+    "JMP OUTERLOOP\n"
+    "OUTERDONE:\n"
+    "RTS\n"
+    "FWDLABEL:\n"
+    ".BYTE 0\n"
 )

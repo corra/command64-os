@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **CASM `.BYTE` string literals (Phase 12 WP74)**: Added bounded, verbatim
+  printable-PETSCII double-quoted strings to `.BYTE`, including empty and mixed
+  lists, focused diagnostics, production fixtures, and DASH adoption with
+  native CASM/ca65/shipping byte identity. Completion was approved on
+  2026-08-19 and CASM advanced from `0.2.7` to `0.2.8`.
+
+### Fixed
+
+- **DASH Phase 12 syntax adoption and native provenance (WP71)**: Replaced
+  private zero-page magic addresses with named constants across DASH's seven
+  dual-assembler sources. Native CASM `0.2.6.1318` now produces the reviewed
+  4,766-byte shipping artifact byte-identically to ca65; `dash.ref.hex` records
+  the real VICE/REU run without `--allow-host-bytes`. Corrected the DASH manual's
+  stale explicit-relocation commands to `LOAD DASH <address>` / `RUN <address>`.
+  Completion was approved on 2026-08-18 and CASM advanced from `0.2.6` to
+  `0.2.7`.
+- **CASM forward-label pass agreement (Phase 12 WP73)**: Unresolved identifier
+  evaluation now ignores the resolver view's unspecified symbol-kind byte,
+  preventing stale named-constant flags from making Pass 1 select zero-page
+  while Pass 2 selects absolute. Added focused expression-harness coverage and
+  the `casmfwdstale1` native assembly/COMP regression fixture. Completion was
+  approved on 2026-08-18 and CASM advanced from `0.2.5` to `0.2.6`.
+
 ### Packaging
 
 - **Release distribution updates**: Included `command64_casm_utils.d64` (development utility disk containing native CASM assembler source code for the `DASH` dashboard, `casm.prg`, `edlin.prg`, `comp.prg`, and verification references) in the packaged release archives. Removed `debug.prg` from the root of the release archives as it is not useful standalone. Updated [RELEASE_README.md](file://packaging/RELEASE_README.md) to explicitly document `command64_casm_utils.d64`, `banner-utility.md`, and `edlin-utility.md`.
@@ -25,6 +50,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **CASM master-plan reconciliation**: Updated the native-assembler master plan
+  from its stale Phase 11 proposal state to current CASM `0.2.7.1319` truth,
+  recorded the authoritative Phase 12 WP64-WP75 map, corrected the as-built
+  Phase 7 source-cache and Phase 10 listing architectures, current VICE MCP
+  workflow, canonical `.BYTE` string/Phase 13 policy, module ownership, and the
+  mandatory per-feature DASH adoption rule. Synchronized CASM task and local
+  contract records while preserving superseded numbering as historical context.
 - **CASM listing/map production headers (Phase 11 WP59 Increment 8)**: Updated
   stale pre-WP54 comments that still described `/L` and `/M` as unimplemented,
   and corrected obsolete map-harness history. The accompanying static audit

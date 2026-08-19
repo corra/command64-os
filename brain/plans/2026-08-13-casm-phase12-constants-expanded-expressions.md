@@ -10,9 +10,10 @@ depends-on: none (Phase 11 closed 2026-08-13)
 
 ## Status and Authorization
 
-**Approved 2026-08-13.** The WP64-71 breakdown, sequencing, and version
-target below are confirmed as drafted (all three Open Questions resolved
-as-is — see Progress). This approval creates the task hierarchy and
+**Approved 2026-08-13.** The original WP64-71 breakdown, sequencing, and
+version target were confirmed as drafted (all three Open Questions resolved
+as-is — see Progress), then amended for WP71, corrective WP72/WP73, and the
+proposed WP74/WP75 sequence recorded below. This approval creates the task hierarchy and
 authorizes WP64's own detailed plan, but does not itself authorize source
 edits. WP64 (and every WP after it) still requires its own detailed plan
 and explicit user approval before implementation, per
@@ -76,7 +77,7 @@ this plan** — nothing below is final until approved, matching the Phase
 11 governing plan's own framing.
 
 Dependency spine (load-bearing order): **WP64 → WP67 → WP68 → WP70 →
-WP71 → WP72**. WP65, WP66, and WP69 are proposed in this position but are
+WP71 → WP74 → WP75**. WP65, WP66, and WP69 are proposed in this position but are
 largely independent of each other and of the spine — flag if you'd rather
 reorder or interleave them.
 
@@ -95,7 +96,7 @@ separately five times, and impossible for the already-closed WP65
 without reopening it), one dedicated WP adopts the new syntax into
 DASH's real source once it all exists, and uses that as the trigger to
 finally close the interim-provenance gap with a real native-CASM regen —
-feeding the same final consolidated live-VICE proof WP72 already does
+  feeding the same final consolidated live-VICE proof now assigned to WP75
 for the synthetic fixtures.
 
 - **WP64 — Contract freeze: expression evaluator architecture and
@@ -172,8 +173,15 @@ for the synthetic fixtures.
   replacing the `dash_ref` ca65 cross-check's `--allow-host-bytes`
   placeholder (WP9's own note that this was deferred, not resolved).
   Own detailed plan and approval required, same as every other WP.
-- **WP72 — Verification, walkthrough, completion gate.** (Renumbered
-  from WP71.) Mirrors WP49
+- **WP74 — String literals.** (Proposed 2026-08-18, user-directed after
+  confirming WP69 delivered character literals but not strings.) Adds bounded
+  double-quoted, verbatim-PETSCII literals as `.BYTE` list entries, including
+  empty strings, with no escapes or implicit terminator. WP72/WP73 numbering is
+  already consumed by corrective work discovered during WP71, so this feature
+  takes the next available number. Own detailed plan:
+  `brain/plans/2026-08-18-casm-phase12-wp74-string-literals.md`.
+- **WP75 — Verification, walkthrough, completion gate.** (Renumbered from
+  the originally planned WP72 after corrective WP72/WP73 and feature WP74.) Mirrors WP49
   (Phase 9), WP55 (Phase 10), and WP63 (Phase 11)'s own closing pattern:
   full regression build, a *consolidated* fresh live-VICE re-run of every
   `test_casm_*` harness plus every new Phase 12 harness (including WP71's
@@ -272,3 +280,19 @@ own precedent for this section:
   ca65 cross-check's `--allow-host-bytes` placeholder from WP9). WP71
   requires its own detailed plan and approval before implementation,
   same as every other WP; not yet drafted.
+- 2026-08-18: User directed that full string literals, omitted from WP69's
+  character-literal implementation, belong in Phase 12 and require a dedicated
+  plan. Confirmed scope: double quotes, verbatim PETSCII, `.BYTE` only, empty
+  allowed, no escapes. Proposed WP74 and renumbered the still-unstarted
+  consolidated Phase 12 completion gate to WP75. This amendment and WP74's
+  detailed plan await explicit approval; no implementation/task activation.
+- 2026-08-18: User selected ca65 convention for strings: `.BYTE "string"` is
+  canonical. WP74 now includes mandatory DASH adoption and native/ca65 proof;
+  the master Phase 13 `.TEXT` entry is no longer an assumed directive and must
+  be removed/replaced or separately justified in Phase 13's own plan. User also
+  established a durable rule that every future CASM language/feature addition
+  triggers a DASH rewrite or an explicit stop for direction when safe adoption
+  is impossible. WP74 remains proposed pending plan approval.
+- 2026-08-18: User approved WP74 as amended. Taskwarrior task 44
+  (`a61634af-b482-476b-a20b-5442334d1315`) is active but blocked on WP71;
+  implementation waits for that dependency.

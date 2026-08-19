@@ -58,14 +58,11 @@ CASE_COLUMN    = 7
 ; against 0 -- so it cannot affect any case that doesn't opt in).
 CASE_RELOC_MODE = 8
 CASE_SIZE      = 9
-; WP72: was 97, but the table already held 98 entries before this WP added
-; a 99th -- a pre-existing harness defect (predating and unrelated to this
-; WP) that silently skipped the table's true last entry every run since
-; whenever it was introduced. Corrected here to the real total (99: 98
-; pre-existing + this WP's own new eConst case), since the stale count is
-; exactly what let this WP's own new case go unexecuted and falsely
-; "pass" on the first two attempts to add one.
-CASE_COUNT     = 99
+; WP73 adds one ordering-sensitive case after WP72's eConst case: the shared
+; resolver output still contains eConst's symbol-kind byte when unresolved
+; UNABS is evaluated, proving unresolved classification ignores that stale
+; unspecified byte. 99 pre-existing cases + this case = 100.
+CASE_COUNT     = 100
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -1241,3 +1238,8 @@ caseTable:
     CASE sMulUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0
     CASE sDivUnresolved, eBitUnresolved, 0, CASM_TOKEN_EOF, 1, 4, 0
     CASE sConst, eConst, 0, CASM_TOKEN_NEWLINE, 1, 2, 0
+    ; WP73: deliberately follows sConst. resolveUnabs writes FLAGS/ID only,
+    ; leaving CASM_RESOLVE_SYM_FLAGS' prior CONSTANT|RESOLVED value in the
+    ; shared output view, exactly matching symbolsLookup's documented miss
+    ; contract and the production failure sequence.
+    CASE sUna, eUna, 0, CASM_TOKEN_EOF, 1, 4, 0

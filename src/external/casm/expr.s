@@ -287,7 +287,7 @@ numberOk:
     sty CasmExprResultRecord + CASM_EXPR_VAL_HI
     lda #CASM_EXPR_FLAG_RESOLVED
     sta CasmExprResultRecord + CASM_EXPR_FLAGS
-    bne lexerNextTail
+    jmp lexerNextTail
 
 identifier:
     ; WP28: stage the resolver's name-pointer/length arguments. This is the
@@ -336,6 +336,12 @@ resolverValid:
     ; the unconditional label-shaped path below unchanged: harmless, since
     ; Pass 1 never acts on RELOCATABLE (only on FORCE_ABS, already
     ; unconditional above).
+    ; A miss leaves CASM_RESOLVE_SYM_FLAGS unspecified by resolver contract.
+    ; Treat unresolved identifiers as label-shaped before inspecting it, or a
+    ; preceding constant lookup can leak stale kind flags into this result.
+    lda CasmExprResolverOutput + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq evApplyMode
     lda CasmExprResolverOutput + CASM_RESOLVE_SYM_FLAGS
     and #CASM_SYMBOL_FLAG_CONSTANT
     beq evApplyMode

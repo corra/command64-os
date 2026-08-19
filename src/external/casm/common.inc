@@ -506,7 +506,10 @@ CASM_TOKEN_TILDE      = $16  ; WP68: '~'
 CASM_TOKEN_SHL        = $17  ; WP68: '<<'
 CASM_TOKEN_SHR        = $18  ; WP68: '>>'
 CASM_TOKEN_CHAR       = $19  ; WP69: 'x' -- character literal (immediate/.BYTE only)
-CASM_TOKEN_COUNT      = $1A
+CASM_TOKEN_STRING     = $1A  ; WP74: "..." -- raw PETSCII (.BYTE only)
+CASM_TOKEN_COUNT      = $1B
+
+CASM_STRING_BUFFER_SIZE = CASM_SOURCE_LINE_PAYLOAD_MAX
 
 ; WP68 expression precedence values, lowest to highest. Binary operators are
 ; left-associative, so an RHS recurses at its operator's precedence + 1.
@@ -611,7 +614,9 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_TOKEN_SHL = CASM_TOKEN_TILDE + 1, error, "CASM token type range changed"
 .assert CASM_TOKEN_SHR = CASM_TOKEN_SHL + 1, error, "CASM token type range changed"
 .assert CASM_TOKEN_CHAR = CASM_TOKEN_SHR + 1, error, "CASM token type range changed"
-.assert CASM_TOKEN_COUNT = CASM_TOKEN_CHAR + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_STRING = CASM_TOKEN_CHAR + 1, error, "CASM token type range changed"
+.assert CASM_TOKEN_COUNT = CASM_TOKEN_STRING + 1, error, "CASM token type range changed"
+.assert CASM_STRING_BUFFER_SIZE = 255, error, "CASM string buffer bound changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
 .assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_RELOC + 1, error, "CASM directive subtype range changed"
@@ -783,6 +788,9 @@ CASM_DIAG_CHAR_UNTERMINATED = $47
 ; filenames already enforce).
 CASM_DIAG_CHAR_INVALID_BYTE = $48
 CASM_DIAG_PHASE12_WP69_LAST = CASM_DIAG_CHAR_INVALID_BYTE
+CASM_DIAG_STRING_UNTERMINATED = $49
+CASM_DIAG_STRING_INVALID_BYTE = $4A
+CASM_DIAG_PHASE12_WP74_LAST = CASM_DIAG_STRING_INVALID_BYTE
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -843,6 +851,9 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_CHAR_UNTERMINATED = CASM_DIAG_PHASE12_WP67_LAST + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
 .assert CASM_DIAG_CHAR_INVALID_BYTE = CASM_DIAG_CHAR_UNTERMINATED + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE12_WP69_LAST = $48, error, "CASM WP69 diagnostic range changed"
+.assert CASM_DIAG_STRING_UNTERMINATED = CASM_DIAG_PHASE12_WP69_LAST + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_STRING_INVALID_BYTE = CASM_DIAG_STRING_UNTERMINATED + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE12_WP74_LAST = $4A, error, "CASM WP74 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

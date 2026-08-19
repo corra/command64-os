@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
 Status: [/]
-Taskwarrior: 30 (`6b72d639`)
-Plan: `brain/plans/2026-07-20-casm-phase5-minimal-expression-evaluator.md`
+Taskwarrior: Phase 12 parent (`c547c74f-5080-4f2e-b086-e4e2273b5336`)
+Plan: `brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`
 
 ## Goal
 
@@ -12,14 +12,10 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 5 adds a bounded expression evaluator and resolver boundary without
-implementing symbol storage, two-pass assembly, or relocation emission.
-
-**Phase 4 is complete**, approved by the user on 2026-07-21 at CASM `0.1.17`
-build 1079. WP11-WP15 are all closed.
-
-WP16-WP18 are complete. CASM is `0.1.20` build 1085. WP19 is next but remains
-pending a reconciled detailed plan; WP20-WP21 remain blocked.
+Phase 12 is active at CASM `0.2.7` build `1319`. WP64-WP73 and WP71 DASH
+adoption are complete. WP74 (ca65-compatible `.BYTE` string literals) is the
+active approved work package; WP75 is the pending consolidated Phase 12
+completion gate and `0.3.0` promotion.
 
 ## Phase 1 Prerequisite
 
@@ -2035,6 +2031,14 @@ behavior changed beyond the version/build artifact itself.
       promoted `0.2.4` -> `0.2.5`, live-verified as `V0.2.5.1312`.
       Walkthrough: `brain/walkthroughs/2026-08-15-casm-phase12-wp70-
       relocation-algebra-closure.md`.
+- [x] WP71 **DASH Phase 12 adoption complete, user-approved 2026-08-18**
+      (Taskwarrior task 43,
+      `e126dbb8-fc8e-4b94-a93a-ec6121a19fb8`): named private-ZP constants,
+      native CASM/ca65 byte identity, genuine native `dash.ref.hex` provenance,
+      stable production/no-change builds, and live `$3800`/`$5000`/`$9000`
+      relocation checks all pass. Walkthrough: `brain/walkthroughs/2026-08-18-
+      casm-phase12-wp71-dash-adoption.md`. CASM promoted `0.2.6` -> `0.2.7`;
+      WP74 unblocked.
 - [x] WP72 **named-constant zero-page width selection fix complete,
       user-approved 2026-08-17** (Taskwarrior task 44,
       `d439019e-5487-4f76-bf08-3fc792d43813`): `brain/plans/2026-08-17-
@@ -2058,6 +2062,28 @@ behavior changed beyond the version/build artifact itself.
       mirroring DASH's real source) COMP-verified byte-exact. Walkthrough:
       `brain/walkthroughs/2026-08-17-casm-phase12-wp72-constant-
       zeropage-width.md`. WP71 resumes its own blocked Atomic Step 5.
+- [x] WP73 **forward-label resolver-state/pass-agreement fix complete,
+      user-approved 2026-08-18** (Taskwarrior task 44,
+      `34c11d87-811e-4aa2-b705-1cd59e91a23a`): an unresolved forward label
+      read stale `CONSTANT|RESOLVED` symbol-kind flags left by a preceding
+      equate lookup, causing Pass 1 zero-page and Pass 2 absolute widths.
+      `expr.s` now checks resolution before consuming symbol-kind flags.
+      Added the 100th `casm_expr` case and `casmfwdstale1` native/COMP fixture;
+      live results are `CASM EXPR: PASS` and `FILES COMPARE OK`. Host builds
+      for opcodes, pass1, reloc, symbols, and `dash_ref` pass. Walkthrough:
+      `brain/walkthroughs/2026-08-18-casm-phase12-wp73-forward-label-
+      resolver-state.md`. CASM promoted `0.2.5` -> `0.2.6`; WP71 may resume.
+- [x] WP74 **ca65-compatible `.BYTE` string literals complete**
+      (Taskwarrior task 44,
+      `a61634af-b482-476b-a20b-5442334d1315`): double-quoted verbatim-PETSCII
+      strings, empty strings, mixed byte lists, no escapes or implicit
+       terminator. Includes mandatory DASH adoption/native-ca65 proof. Phase 13
+       must remove/replace or separately justify its tentative `.TEXT` concept.
+       Plan: `brain/plans/2026-08-18-casm-phase12-wp74-string-literals.md`.
+      Implementation, disk regression, no-change rebuild, documentation, and
+      live relocated-harness verification pass. Completion walkthrough:
+      `brain/walkthroughs/2026-08-19-casm-phase12-wp74-string-literals.md`.
+      User approved completion on 2026-08-19; CASM advanced `0.2.7` -> `0.2.8`.
 
 ## Optional Feature - Progress and Processing Indication
 

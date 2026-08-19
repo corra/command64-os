@@ -2309,8 +2309,8 @@ runs, not one clean pass.
 Phase 12 ("Constants and Expanded Expressions", target CASM `0.3`) is
 CASM's first *feature* phase since Phase 10 — Phase 11 was hardening-only.
 WP64 is a design-only contract-freeze work package, mirroring Phase 6A's
-own precedent: no production code change, but every later Phase 12 WP
-(WP65-70) implements against the contract recorded here. Governing plan:
+own precedent: no production code change, but subsequent Phase 12 work applies
+this expression/relocation contract wherever relevant. Governing plan:
 `brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`;
 WP64's own plan:
 `brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md`. Both
@@ -3028,6 +3028,67 @@ source verbatim: `DISPATCHVECTOR = $70` / `STA DISPATCHVECTOR` / `STA
 DISPATCHVECTOR+1`) assembled by real native CASM and `COMP`-verified
 byte-exact against a hand-derived reference (`85 70` / `85 71`, not
 `8D 70 00` / `8D 71 00`).
+
+### CASM Phase 12 WP73 Forward-Label Resolver-State Fix — As-Built (complete 2026-08-18)
+
+`symbolsLookup` guarantees only `CASM_RESOLVE_FLAGS = 0` on a miss and leaves
+the remaining resolver view, including `CASM_RESOLVE_SYM_FLAGS`, unspecified.
+WP72 made `expr.s::identifier` consume that symbol-kind byte before checking
+whether the result was resolved. A preceding resolved equate lookup could
+therefore leave `CONSTANT|RESOLVED` in the reusable view; a following unresolved
+forward label inherited it, cleared `SYMBOL_DERIVED`, and lost parser-level
+`FORCE_ABS`. Pass 1 selected zero-page from its `$0000` placeholder while Pass 2
+selected absolute from the real label address, shifting all following labels and
+eventually producing DASH's false branch-range diagnostic.
+
+The fix checks `CASM_RESOLVE_FLAGS.RESOLVED` before inspecting symbol-kind flags;
+unresolved identifiers retain the existing label-shaped path. No resolver ABI,
+storage, opcode, branch-range, or resolved-constant behavior changed. The
+existing number-primary tail changed from an unconditional-by-construction `BNE`
+to `JMP` after the guard's code growth exceeded relative-branch range.
+
+Regression evidence: `casm_expr` now runs a stale-output `CONSTVAL` then `UNABS`
+sequence as case 100; native CASM assembled `casmfwdstale1.s` and COMP reported
+`FILES COMPARE OK` against the 54-byte hand-derived reference. The first oracle
+draft incorrectly used CPX-zero-page opcode `$E4` for `CPY MAXLEN`; COMP caught
+the error at offset `$0024`, and the reference was corrected from the 6502
+opcode specification to `$C4`. Live `CASM EXPR: PASS` and shell-return evidence
+were then observed under VICE 3.10.
+
+The user approved the completion gate on 2026-08-18. CASM advanced from
+`0.2.5` to `0.2.6`; WP71 may resume native DASH regeneration.
+
+### CASM Phase 12 WP71 DASH Adoption — As-Built (complete 2026-08-18)
+
+DASH's seven dual-assembler sources now use named constants for the documented
+private zero-page registers while retaining explicit keyboard/screen-code bytes
+where ca65 and native CASM character mapping differs. Native CASM `0.2.6.1318`
+assembled the complete include graph under VICE 3.10 with a 16MB REU; native
+COMP and the host ca65 cross-check both matched all 4,766 bytes. The reviewed
+`dash.ref.hex` now carries genuine native provenance and current hashes for all
+seven sources, with no `--allow-host-bytes` override.
+
+The production image and no-change rebuild are stable. Live relocation runs
+rendered at `$3800`, `$5000`, and `$9000`; DASH's Applications page reported
+the explicit ranges `5000-5ef3` and `9000-9ef3`. The implemented explicit
+workflow is `LOAD DASH <address>` then `RUN <address>`; the previously documented
+`GO <address>` spelling is not dispatched by the shell and was corrected in the
+mirrored DASH manuals.
+
+The user approved the completion gate on 2026-08-18. CASM advanced from
+`0.2.6` to `0.2.7`; WP74 string literals are unblocked.
+
+## CASM Phase 12 WP74 String Literal Contract
+
+- WP74 completed with user approval on 2026-08-19 at CASM `0.2.8`.
+- Double-quoted strings are valid only as `.BYTE` list items. They contain
+  zero or more verbatim printable PETSCII bytes, with no escapes or implicit
+  terminator; empty and mixed numeric/character/string lists are valid.
+- `CASM_TOKEN_STRING` is `$1A`. Payload storage is the bounded lexer-owned
+  `CasmStringBuffer[255]` plus `CasmStringLength`; the frozen token record did
+  not grow. Diagnostics `$49/$4A` cover unterminated and invalid-byte strings.
+- DASH dogfoods the feature with `.BYTE "0.1.4"`; native CASM, ca65, and the
+  shipping result are byte-identical.
 
 ## C64 Platform Constraints Discovered
 

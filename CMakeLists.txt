@@ -332,7 +332,11 @@ if(Ca65_FOUND)
     # two new diagnostics, and the posImmediate/.BYTE short-circuit
     # integration overflowed $6100 by 235 measured bytes; $6200 (+256) is
     # the smallest round-page fit. User-approved 2026-08-15.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6200")
+    # WP74 Increment 2: the 256-byte bounded string buffer, scanner, token-
+    # dump names, and two diagnostics overflowed $6200 by 529 bytes. The
+    # initially approved $6400 ceiling was 17 bytes short; user approved the
+    # measured amendment to $6500, the smallest fitting round-page envelope.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6500")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -558,7 +562,10 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
                 "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
-            set(TEST_PRG_SIZE "2D00")
+            # WP74 Increment 6: diagnostics.s's STRING messages/routing
+            # overflowed the prior $2D00 whole-link envelope by 39 bytes.
+            # User approved $2E00, the smallest fitting page.
+            set(TEST_PRG_SIZE "2E00")
         endif()
         if(TEST_NAME STREQUAL "casm_fsym")
             # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
@@ -734,7 +741,10 @@ if(Ca65_FOUND)
             # expectByte/expectNewline/expectEof call sites) overflowed
             # $2C00 by 644 measured bytes; $3000 (+1024) is the smallest
             # round-page step that fits.
-            set(TEST_PRG_SIZE "3000")
+            # WP74 Increment 6: $3000 -> $3100 -- STRING diagnostics and
+            # token names overflowed the shared diagnostics consumer by 89
+            # measured bytes; $3100 is the smallest page-aligned fit.
+            set(TEST_PRG_SIZE "3100")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -904,7 +914,12 @@ if(Ca65_FOUND)
             # WP69: $5900 -> $5A00 -- the character-literal lexer/parser
             # integration overflowed $5900 by 150 measured bytes; $5A00
             # (+256) is the smallest round-page fit. User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "5A00")
+            # WP74 Increment 3: shared STRING lexer storage/scanner and
+            # emitByteList integration overflowed $5A00 by 480 bytes before
+            # this harness's own string fixture. The mixed-list fixture then
+            # exceeded the initially approved $5C00 ceiling by 21 bytes; user
+            # approved $5D00, the revised smallest fitting page.
+            set(TEST_PRG_SIZE "5D00")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -992,7 +1007,14 @@ if(Ca65_FOUND)
             # lexer.s's new punctuation-table row (unused by this harness)
             # overflowed $1200 by 63 measured bytes; $1300 (+256) is the
             # smallest round-page step that fits.
-            set(TEST_PRG_SIZE "1300")
+            # WP74 prerequisite audit: subsequent shared lexer/parser growth
+            # had left this target's recorded envelope stale; the unchanged
+            # baseline overflowed $1300 by 105 bytes. User approved correcting
+            # the pre-existing defect inline; $1400 is the smallest page fit.
+            # WP74 Increment 6: the implemented STRING scanner/storage then
+            # overflowed $1400 by 223 bytes. $1500 is the smallest page fit,
+            # within the approved $1600 ceiling.
+            set(TEST_PRG_SIZE "1500")
         endif()
         if(TEST_NAME STREQUAL "casm_catalog")
             # WP45: include.s plus every module sourceAppendFile transitively
@@ -1119,7 +1141,10 @@ if(Ca65_FOUND)
             # WP69: $5900 -> $5A00 -- the character-literal lexer/parser
             # integration overflowed $5900 by 69 measured bytes; $5A00
             # (+256) is the smallest round-page fit. User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "5A00")
+            # WP74 Increment 6: STRING lexer/emitter/diagnostic growth
+            # overflowed $5A00 by 399 bytes; $5B00 is insufficient, so $5C00
+            # is the smallest fit and the approved WP74 ceiling.
+            set(TEST_PRG_SIZE "5C00")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1205,7 +1230,13 @@ if(Ca65_FOUND)
             # integration overflowed $5D00 by 249 measured bytes; $5E00
             # (+256) is the smallest round-page fit. User-approved
             # 2026-08-15.
-            set(TEST_PRG_SIZE "5E00")
+            # WP74 prerequisite audit: later shared-module growth left the
+            # baseline 9 bytes beyond $5E00. User approved correcting this
+            # pre-existing defect inline; $5F00 is the smallest page fit.
+            # WP74 Increment 6: STRING lexer/emitter/diagnostic growth
+            # overflowed $5F00 by 323 bytes; $6000 is insufficient, so $6100
+            # is the smallest fit and the approved WP74 ceiling.
+            set(TEST_PRG_SIZE "6100")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1494,6 +1525,7 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/p1undef1.seq"
     "${CASM_TEST_FIXTURE_DIR}/p1dup1.seq"
     "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1string1.seq"
     # WP30 relative-branch fixtures
     "${CASM_TEST_FIXTURE_DIR}/brfwd1.seq"
     "${CASM_TEST_FIXTURE_DIR}/brback1.seq"
@@ -1563,7 +1595,8 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmreloc1
     casmopall
     casmfa2p
-    casmarith2 casmarithfwd casmarith3 casmchar1 casmrelacc casmzpconst1)
+    casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
+    casmfwdstale1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1762,7 +1795,7 @@ add_c64_disk_image(casm_overflow_test_d64
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
-         test_casm_faultsource test_casm_fsym
+         test_casm_faultsource
     # WP66: test_casm_freloc relocated to casm_include_test_d64 (below,
     # ~540 free blocks) -- test_casm_include's own WP66 envelope bump
     # ($1200 -> $1300, parser.s's new '*'-RHS constant handling) grew its
@@ -1794,7 +1827,9 @@ add_c64_disk_image(casm_include_test_d64
     # here from casm_listing_test_d64 (0 free blocks after WP67's own
     # envelope growth left no runtime headroom for test_casm_listcap's own
     # output writes) -- 208 free blocks here comfortably absorb all three.
-    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer
+    # WP74 Increment 6: test_casm_fsym moved here from the overflow image;
+    # unlike the full listing image, this image retains fixture capacity.
+    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
 
@@ -1814,7 +1849,7 @@ add_c64_disk_image(casm_phase12_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 casm comp test_casm_expr test_casm_lexer
+    PRGS command64 casm comp test_casm_expr test_casm_lexer test_casm_pass1
 )
 
 # WP68 Increment 7: production parser/emitter integration fixtures. Two
@@ -1826,6 +1861,61 @@ if(C64_THEME_DIR)
     set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
         "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase12_test_d64" "--error" "--")
 endif()
+# WP74 Increment 3: keep the expanded pass harness and its STRING fixture on
+# the canonical Phase 12 growth image; test.d64's directory track is full.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1label1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1label1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1labelinsn1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1labelinsn1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1fwd1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1fwd1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1back1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1back1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1undef1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1undef1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1dup1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1dup1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1size1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1string1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1string1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending complete WP74 Increment 3 pass-harness fixture set to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP74 production STRING fixtures: one accepted byte-identity case and six
+# rejected grammar/diagnostic cases.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstring1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstring1.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstring1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmstring1.ref" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrimm.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrimm.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrword.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrword.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrequat.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrequat.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstradj.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstradj.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrunterm.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrunterm.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrinval.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrinval.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP74 production STRING fixtures to casm_phase12_test.d64"
+    VERBATIM
+)
 add_custom_command(
     TARGET casm_phase12_test_d64 POST_BUILD
     COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmarith2.s" -T SEQ
@@ -1847,6 +1937,20 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmareloc2.seq"
         "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     COMMENT "Appending WP68 Increment 7 parser-integration fixtures and their trusted references to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP73: unresolved forward labels must ignore stale symbol-kind output left by
+# a preceding resolved named-constant lookup.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfwdstale1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmfwdstale1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfwdstale1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmfwdstale1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP73 stale resolver-state fixture and its trusted reference to casm_phase12_test.d64"
     VERBATIM
 )
 add_dependencies(casm_phase12_test_d64 casm_test_fixtures casm_reference_fixtures)
@@ -2422,14 +2526,17 @@ add_custom_command(
 # matching casmarith3.s source also lives only on casm_phase12_test_d64.
 # WP69's casmchar1 is excluded for the same reason: its matching
 # casmchar1.s source also lives only on casm_phase12_test_d64.
+# WP74's casmstring1 follows the same dedicated-disk rule.
 # WP70's casmrelacc is excluded for the same reason: its matching
 # casmrelacc.s source also lives only on casm_phase12_test_d64.
 # WP72's casmzpconst1 is excluded for the same reason: its matching
-# casmzpconst1.s source also lives only on casm_phase12_test_d64.
+# casmzpconst1.s source also lives only on casm_phase12_test_d64. WP73's
+# casmfwdstale1 follows the same dedicated-disk rule.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
        AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
-       AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1")
+       AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmstring1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1"
+       AND NOT REF_NAME STREQUAL "casmfwdstale1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
@@ -2455,6 +2562,9 @@ endforeach()
 # their existing bare names.
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
+    if(CASM_FIXTURE_NAME STREQUAL "p1string1")
+        continue()
+    endif()
     set(CASM_FIXTURE_DISK_NAME "${CASM_FIXTURE_NAME}.s")
     set(WRAPPER_CC1541 "")
     if(C64_THEME_DIR)

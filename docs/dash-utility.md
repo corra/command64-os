@@ -40,12 +40,13 @@ user-program placement currently resolves to.
 ### Explicit relocated launch
 
 ```text
-LOAD DASH,9
-GO 5000
+LOAD DASH 5000
+RUN 5000
 ```
 
-`GO <address>` looks the loaded program up by address and relocates/runs it
-there. DASH has been verified to run identically at `$3800`, `$5000`, and
+`LOAD DASH <address>` relocates and registers DASH at the requested address;
+`RUN <address>` looks up and executes that registered instance. DASH has been
+verified to run identically at `$3800`, `$5000`, and
 `$9000` — every JSR/JMP high operand, `#>label` high byte, `.WORD` renderer
 pointer, and absolute local-data reference the R6 relocation table covers is
 patched for the new base, and the Applications page (F3) correctly reports

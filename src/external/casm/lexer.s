@@ -59,6 +59,8 @@
 .export lexerScanIncludeOperand
 .export CasmTokenStartOffsetLo
 .export CasmTokenStartOffsetHi
+.export CasmStringLength
+.export CasmStringBuffer
 
 .segment "BSS"
 
@@ -70,6 +72,8 @@
 ; precedent as parser.s's own CasmLabelName/CasmLabelNameLen.
 CasmTokenStartOffsetLo: .res 1
 CasmTokenStartOffsetHi: .res 1
+CasmStringLength:       .res 1
+CasmStringBuffer:       .res CASM_STRING_BUFFER_SIZE
 
 .segment "CODE"
 
@@ -180,6 +184,9 @@ lnSkip:
     cmp #CASM_PETSCII_APOSTROPHE
     beq lnCharJmp
 
+    cmp #CASM_PETSCII_QUOTE
+    beq lnStringJmp
+
     ; Check if it's a decimal number (0-9)
     jsr isDecDigit
     bcc lnDecJmp
@@ -203,6 +210,8 @@ lnBinJmp:
     jmp lnBin
 lnCharJmp:
     jmp lnChar
+lnStringJmp:
+    jmp lnString
 lnAngleJmp:
     jmp lnAngle
 lnDecJmp:
@@ -919,6 +928,65 @@ lnCharUnterminated:
 lnCharInvalidByte:
     jsr diagSetLocFromLookahead
     lda #CASM_DIAG_CHAR_INVALID_BYTE
+    jmp lnFailWithA
+
+; ---------------------------------------------------------------------------
+; lnString (private, WP74)
+; Scan a bounded double-quoted raw-PETSCII string. Content lives in the
+; lexer-owned 255-byte buffer rather than the frozen token text record.
+; ---------------------------------------------------------------------------
+lnString:
+    jsr lexerTokenReset
+    lda #0
+    sta CasmStringLength
+    jsr lexerConsume
+lnStringLoop:
+    jsr lexerFill
+    bcc @haveResult
+    jmp lnFail
+@haveResult:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnStringUnterminated
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnStringUnterminated
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_QUOTE
+    beq lnStringClose
+    cmp #CASM_INCLUDE_PRINT_LO_MIN
+    bcc lnStringInvalidByte
+    cmp #CASM_INCLUDE_PRINT_LO_MAX + 1
+    bcc lnStringAppend
+    cmp #CASM_INCLUDE_PRINT_HI_MIN
+    bcc lnStringInvalidByte
+    cmp #CASM_INCLUDE_PRINT_HI_MAX + 1
+    bcs lnStringInvalidByte
+lnStringAppend:
+    ldx CasmStringLength
+    cpx #CASM_STRING_BUFFER_SIZE
+    bcs lnStringUnterminated
+    sta CasmStringBuffer, x
+    inc CasmStringLength
+    jsr lexerConsume
+    jmp lnStringLoop
+lnStringClose:
+    jsr lexerConsume
+    lda #CASM_TOKEN_STRING
+    sta CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    lda #CASM_SUBTYPE_NONE
+    sta CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
+    lda CasmStringLength
+    sta CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    lda #CASM_TOKEN_STRING
+    clc
+    rts
+lnStringUnterminated:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_STRING_UNTERMINATED
+    jmp lnFailWithA
+lnStringInvalidByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_STRING_INVALID_BYTE
     jmp lnFailWithA
 
 lnDec:
