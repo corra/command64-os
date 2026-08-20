@@ -381,3 +381,29 @@ Phase 12 (and this WP) completes only when:
   documented application name, never the truncated disk directory name
   or a `RUN`/`LOAD` prefix, and always bracket a live test with `FLUSH`
   before and after.
+- 2026-08-20: **Increment 4's consolidated sweep is now fully complete —
+  all 30 `test_casm_*` harnesses PASS across all five disks**, each
+  bracketed by `FLUSH` and each dispatch/result pair fired as a
+  `c64-overlay-api` test event (per user direction to always fire overlay
+  events for test/status updates going forward -- see memory
+  `feedback-fire-overlay-events-for-tests`). Results: `casm_listing_test.d64`
+  12/12 (listcap, spancommit, listwrite, flist, flmeta, listing, map,
+  passcheck, l15release, spanread, frame, faultvmm); `casm_include_test.d64`
+  7/7 (freloc, bounds, cliderive, lexer, fsym, finc, opcodes); `test.d64`
+  4/4 (faultinstall, reloc, symbols, vmm -- including a live `BAD COMMAND
+  OR FILE NAME` shell-parse-miss on `test_casm_reloc` recovered exactly
+  per the workflow doc's `FLUSH`-then-retype procedure); `casm_phase12_test.d64`
+  3/3 (expr, lexer, pass1 -- `pass1` reconfirms the earlier directory-full
+  fix holds); `casm_overflow_test.d64` 4/4 (include, catalog, event,
+  faults -- via the documented two-drive setup, device 8 booting
+  `test.d64` and device 9 serving the non-bootable overflow disk, `9:`
+  switch confirmed via prompt change to `C64[9]:>`). One VICE crash
+  occurred mid-sweep (nothing listening on port 7000) and was recovered
+  per the one-clean-restart procedure: fresh instance started, state
+  discarded, re-attach + reboot + re-verify from the last confirmed
+  point. **Increment 4 is complete.** Remaining WP75 scope: Increment 5
+  (Phase 12 feature fixtures fresh run + WP70 relocation algebra closure
+  re-check), Increment 6 (DASH regen re-verify), Increment 7 (docs
+  reconciliation), Increment 8 (version promotion 0.2.8->0.3.0),
+  Increment 9 (tracker sync), Increment 10 (final walkthrough + user's
+  own manual approval).
