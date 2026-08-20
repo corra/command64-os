@@ -1446,6 +1446,20 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_lexer)
 # moves to the new self-bootable casm_phase12_test_d64 (see below), which
 # becomes its canonical home for Phase 12's continuing operator growth.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_expr)
+# WP74 added a ninth casm_pass1.s subtest (p1string1) requiring a new
+# p1string1.s fixture, but test.d64's directory track was already full
+# (see the many removals above), so p1string1.s was packaged only onto
+# casm_phase12_test.d64, never test.d64 -- while test_casm_pass1 itself
+# stayed on both disks. The shared PRG unconditionally runs all nine
+# subtests regardless of which disk it boots from, so the copy on
+# test.d64 deterministically failed its p1string1 subtest (its required
+# fixture file was simply absent there), discovered live during CASM
+# Phase 12 WP75's consolidated verification session. Fix: move
+# test_casm_pass1 off test.d64 entirely, matching test_casm_expr's own
+# precedent immediately above -- casm_phase12_test.d64 already carries
+# the complete eight-file fixture set (tests/AGENTS.md) and is its
+# canonical home.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_pass1)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
