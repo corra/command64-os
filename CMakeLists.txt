@@ -1275,6 +1275,8 @@ set(SYNC_FILES
     debug-test-plan.md
     debug-utility.md
     edlin-utility.md
+    label-utility.md
+    pacman-utility.md
     pet-sci-api.md
     programmers-reference.md
     user-manual.md
