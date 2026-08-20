@@ -132,9 +132,6 @@ set(PACMAN_ENTRY "src/external/pacman/pacman_main.s")
 set(PACMAN_AUTOTILE "${CMAKE_SOURCE_DIR}/src/external/pacman/autotile.py")
 set(PACMAN_GAME_SOURCE "${CMAKE_SOURCE_DIR}/src/external/pacman/pacman_game.s")
 
-file(GLOB_RECURSE BANNER_SRCS CONFIGURE_DEPENDS "src/external/banner/*.s" "src/external/banner/*.inc" "include/ca65/*.inc")
-set(BANNER_ENTRY "src/external/banner/banner.s")
-
 file(GLOB_RECURSE DASH_SRCS CONFIGURE_DEPENDS "src/external/dash/*.s" "src/external/dash/*.inc" "include/ca65/*.inc")
 set(DASH_ENTRY "src/external/dash/dash_wrapper.s")
 
@@ -357,13 +354,8 @@ else()
 endif()
 set(CONWAY_TARGET conway)
 
-# 4. BANNER External Command PRG Target — renders 5x6 block PETSCII text messages.
-if(Ca65_FOUND)
-    add_ca65_app(banner "${BANNER_ENTRY}" BANNER_SRCS 1000 "0800")
-else()
-    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for BANNER target")
-endif()
-set(BANNER_TARGET banner)
+# BANNER is CASM-native (no ca65 build) — see the manifest-derived `banner`
+# target below, alongside `dash`'s own manifest target, for the same reason.
 
 # DASH_REF Reference Target — host ca65/ld65 build of the very same seven
 # sources, existing only to be compared byte-for-byte against native CASM
@@ -1346,6 +1338,32 @@ add_custom_command(
 )
 add_custom_target(dash ALL DEPENDS "${DASH_BIN}")
 set_target_properties(dash PROPERTIES C64_PRG_PATH "${DASH_BIN}")
+
+# BANNER Production Target — generated from its own reviewed hex manifest,
+# same shape as DASH's above but for a single source file and with no ca65
+# cross-check step: BANNER has no ca65 build at all (see the plan at
+# brain/plans/2026-08-20-banner-casm-native-migration.md), so there is no
+# second toolchain's output to guard the manifest against. Regenerating
+# banner.ref.hex is a deliberate, reviewed act
+# (scripts/build_banner_manifest.py), never a build step.
+set(BANNER_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/banner/banner.ref.hex")
+set(BANNER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/banner")
+set(BANNER_BIN "${CMAKE_BINARY_DIR}/banner.prg")
+add_custom_command(
+    OUTPUT "${BANNER_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${BANNER_MANIFEST}" "${BANNER_BIN}"
+        "--source-dir" "${BANNER_SOURCE_DIR}"
+    DEPENDS "${BANNER_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${BANNER_SOURCE_DIR}/banner.s"
+    COMMENT "Generating BANNER production binary from manifest"
+    VERBATIM
+)
+add_custom_target(banner ALL DEPENDS "${BANNER_BIN}")
+set_target_properties(banner PROPERTIES C64_PRG_PATH "${BANNER_BIN}")
+set(BANNER_TARGET banner)
 
 # 6. Disk images
 # TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS

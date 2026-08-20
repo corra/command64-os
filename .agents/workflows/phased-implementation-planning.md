@@ -55,6 +55,11 @@ of size.
 Filename convention: `brain/plans/YYYY-MM-DD-<feature-slug>.md`, e.g.
 `brain/plans/2026-08-12-casm-phase11-wp63-verification-walkthrough-completion-gate.md`.
 
+If the Phase will add on-disk test fixtures, its first Work Package's
+plan should also call for a dedicated Phase test `.d64` image — see
+`per-phase-test-images.md` — rather than adding fixtures to `test.d64`
+or a prior Phase's image.
+
 ## Scoping decisions need to be explicit, not assumed
 
 When a plan has to make a judgment call the user hasn't already settled
