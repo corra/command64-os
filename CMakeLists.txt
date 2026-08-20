@@ -1843,7 +1843,19 @@ add_c64_disk_image(casm_include_test_d64
     # output writes) -- 208 free blocks here comfortably absorb all three.
     # WP74 Increment 6: test_casm_fsym moved here from the overflow image;
     # unlike the full listing image, this image retains fixture capacity.
-    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym
+    # WP75 Increment 4: test_casm_finc/test_casm_opcodes relocated here from
+    # casm_listing_test_d64 for the identical reason WP67 already documented
+    # above -- later WP68-74 code growth silently ate back the headroom
+    # WP67 freed, and casm_listing_test_d64 was again at 0 free blocks,
+    # confirmed live (blocks_free: 0 via vice_disk_list, and a real CBM DOS
+    # `67, ILLEGAL TRACK OR SECTOR` on the drive's error channel when
+    # test_casm_listcap/spancommit/listwrite tried to create their runtime
+    # output files). Both are self-contained (no other custom_command
+    # references them by name) and test_casm_opcodes already has its own
+    # dedicated casm_opcode_test_d64 exhaustive-coverage disk, so moving
+    # (not removing) it here only restores the consolidated-sweep duplicate.
+    # 156 free blocks here (pre-move) comfortably absorb both (25 blocks).
+    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym test_casm_finc test_casm_opcodes
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
 
@@ -2168,7 +2180,19 @@ add_c64_disk_image(casm_listing_test_d64
     # genuinely self-contained -- no other custom_command references them
     # by name. Same precedent as WP52's test_l15release move and WP66's
     # own test_casm_freloc move.
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_faultvmm
+    # WP75 Increment 4: the identical regression recurred -- WP68-74's own
+    # code growth (new Phase 12 operators/directives touching listing.s,
+    # vmm_store.s, etc.) silently ate back the headroom WP67 freed, and
+    # this disk was again confirmed live at 0 free blocks (vice_disk_list),
+    # with a real CBM DOS `67, ILLEGAL TRACK OR SECTOR, 36,16` on the
+    # drive's error channel when test_casm_listcap/spancommit/listwrite
+    # tried to create their runtime output files -- not a VMM/REU defect as
+    # first hypothesized. test_casm_finc/test_casm_opcodes (25 blocks
+    # combined) relocated to casm_include_test_d64 for the same reasons
+    # WP67 already established: self-contained, no companion fixtures, and
+    # (for test_casm_opcodes specifically) already covered independently by
+    # its own dedicated casm_opcode_test_d64 exhaustive disk.
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_flist test_casm_flmeta test_casm_faultvmm
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
