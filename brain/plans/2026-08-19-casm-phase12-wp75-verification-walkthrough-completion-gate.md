@@ -463,3 +463,43 @@ Phase 12 (and this WP) completes only when:
   docs reconciliation, deferred per user direction until this Phase's own
   close; Increment 8: version promotion; Increment 9: tracker sync;
   Increment 10: final walkthrough) resumes from here.
+- 2026-08-20: **Increments 6, 8, 7, and 9 complete** (8 done before 7 to
+  avoid writing a not-yet-real version number into the docs pass).
+  - **Increment 6**: re-assembled DASH live with the post-WP76 `casm.prg`
+    (build 1323) on a dedicated CASM-only test disk. `CASM: INPUT
+    VALIDATED`; extracted PRG confirmed byte-identical to the current
+    shipping `dash.ref.hex` (`sha256 3238b786...`) — WP76's fix changed
+    nothing for DASH, as expected (DASH doesn't combine a forward-
+    referenced constant with an operator anywhere).
+  - **Increment 8**: promoted `VERSION_MAJOR/MINOR/STAGE` to `0`/`3`/`0`
+    in `casm.s`. Full project build clean (build 1324). Live-verified:
+    `CASM V0.3.0.1324`, `casmarithfwd.s` still `CASM: INPUT VALIDATED`.
+    Full no-change rebuild byte-stable across every `.d64` in `build/`.
+  - **Increment 7**: found the earlier documentation-audit assessment
+    (an earlier session turn) that `wiki/casm-utility.md` and
+    `wiki/casm-programmers-reference.md` were "missing all of Phase 12"
+    was wrong — that assessment grepped version strings only, without
+    reading the files. Their actual *content* already comprehensively
+    documented named constants, `*`, parentheses, arithmetic/bitwise
+    operators, and character/string literals. The real gaps: both files'
+    version/status headers were stale (`0.2.2`/`1266`, "Phase 10 and
+    Phase 11 complete"), and WP76's brand-new symbol-record/resolver-view
+    changes (`DEFINED_AT_OFFSET`, resolver view grown 6->8 bytes) weren't
+    documented anywhere yet, nor was WP72's zero-page-exemption mechanism
+    described in the internals reference. Updated both files' headers to
+    `0.3.0`/`1324`/"Phase 12 complete", added WP72/WP73/WP76 detail to
+    `wiki/casm-programmers-reference.md` §11-12, and synced
+    `docs/casm-utility.md` + `release/docs/casm-utility.md` from
+    `wiki/casm-utility.md` (the source of truth). `brain/KNOWLEDGE.md`
+    gained a Phase 12 rollup section — deliberately titled "pending final
+    closure," not "complete," since Increment 10's approval hasn't
+    happened yet (caught and corrected a premature-completion framing
+    before it was committed). `CHANGELOG.md` gained the `0.3.0` promotion
+    entry, matching the `0.1.56`->`0.2.0`/`0.2.0`->`0.2.1` precedent.
+  - **Increment 9**: `wiki/tasks/casm.md`'s "Current Milestone" summary
+    and WP list updated (WP76 marked complete, WP75 marked in-progress
+    with per-increment detail). Taskwarrior tasks 42 (Phase 12 parent,
+    UUID `c547c74f`) and 43 (WP75, UUID `d3440667`) annotated with
+    current progress — **neither closed yet**, since Increment 10's
+    walkthrough and the user's own manual approval are still outstanding.
+  - Remaining: Increment 10 (final walkthrough + user approval).

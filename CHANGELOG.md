@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is evaluating. `casmarithfwd.s` now passes; all 11 WP75 Increment 5
   production fixtures re-verified together with zero regressions.
   Completion was approved on 2026-08-20.
+- **CASM `0.3.0` (Phase 12 completion promotion, WP75)**: Completion-only
+  version bump, no behavior change in the same commit -- mirrors the
+  `0.1.56` -> `0.2.0` and `0.2.0` -> `0.2.1` precedent. Closes CASM Phase
+  12 (WP64-76: named constants, the current-address symbol, parenthesized
+  precedence, arithmetic/bitwise operators, character literals, string
+  literals, and DASH's own full adoption of all of them) after a fresh
+  consolidated live-VICE re-run of all 30 `test_casm_*` harnesses and all
+  11 Phase 12 production fixtures in one continuous session, a clean
+  regression build, and a byte-identical no-change rebuild.
 - **DASH Phase 12 syntax adoption and native provenance (WP71)**: Replaced
   private zero-page magic addresses with named constants across DASH's seven
   dual-assembler sources. Native CASM `0.2.6.1318` now produces the reviewed

@@ -8,7 +8,7 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 10 and Phase 11 complete (build 1266, version 0.2.2).** `/M`
+> **Status: Phase 12 complete (build 1324, version 0.3.0).** `/M`
 > (symbol map) and `/L` (listing file) are both fully wired into production
 > `casm.s` and produce real output on every assembly that requests them —
 > see [§17](#17-symbol-map--listing-output-phase-10-complete). WP55
@@ -16,11 +16,17 @@ written) user manual; for the OS services CASM builds on, see
 > reconciliation, full-path code review, live harness/identity/bounds/
 > failure-injection verification, a 4-session runtime walkthrough) before
 > the user approved the completion-only `0.1.56` -> `0.2.0` promotion.
-> Phase 11 (WP56-61) followed with base-release hardening and
+> Phase 11 (WP56-63) followed with base-release hardening and
 > certification — exhaustive opcode/addressing-mode/boundary verification
-> and a proven determinism guarantee — with no new language feature and
-> only one incidental production change (WP60's `CLD` hardening at
-> `start:`), closing at `0.2.2` build `1266`.
+> and a proven determinism guarantee — closing at `0.2.2` build `1266`.
+> Phase 12 (WP64-76, see [§11](#11-expression-evaluator-exprs) and
+> [§12](#12-symbol-table-symbolss)) then added named constants, the
+> current-address symbol `*`, parenthesized/precedence expressions, the
+> full arithmetic/bitwise operator set, character literals, string
+> literals, and DASH's own full adoption of all of them — plus two
+> corrective fixes discovered along the way (WP72's named-constant
+> zero-page width selection, WP76's forward-reference Pass 1/2 width
+> agreement) — closing at `0.3.0` build `1324`.
 > CASM performs a real two-pass assembly with labels, a bounded expression
 > evaluator, a VMM-backed symbol table, up to eight concatenated top-level
 > source files, native R6-relocatable output, a fully wired `.INCLUDE`
@@ -681,10 +687,40 @@ one relocatable value, however deeply parenthesized, always succeeds.
 
 `exprEvaluate` takes the resolver's address in `X`/`Y` and the whole-assembly
 relocatable-mode flag in `A`, and leaves the following token current on
-return. The resolver ABI is a 5-byte output view
-(`flags, idLo, idHi, valLo, valHi`) filled while the current token is still
-`IDENTIFIER`; `symbolsLookup`'s calling convention was designed to match it
-exactly, so no adapter exists.
+return. The resolver ABI is an 8-byte output view (`CASM_RESOLVE_*`,
+`flags, idLo, idHi, valLo, valHi, symFlags, definedAtOffsetLo,
+definedAtOffsetHi` — grew from its original 5 bytes via WP65's `symFlags`
+addition and WP76's `definedAtOffset` pair, below) filled while the current
+token is still `IDENTIFIER`; `symbolsLookup`'s calling convention was
+designed to match it exactly, so no adapter exists.
+
+**WP72's zero-page/absolute selection for a resolved constant**
+(`identifier:`'s dispatch in `expr.s`, immediately after the resolver
+call): a *resolved, non-label-derived* constant (a plain equate, e.g.
+`SYMBOL = $70`) clears `CASM_EXPR_FLAG_SYMBOL_DERIVED` so it falls through
+to the same value-based zero-page/absolute selection a bare numeric
+literal already gets in `opcodes.s` — fixing `STA SYMBOL` wrongly forcing
+3-byte absolute instead of 2-byte zero-page. A label, the current-address
+symbol `*`, and any *label-derived* constant keep `SYMBOL_DERIVED` set
+unconditionally regardless of resolution state, since their value is
+inherently load-address-sensitive.
+
+**WP76's forward-reference guard on that same exemption**: a resolved,
+non-label-derived constant's *value* can't differ between Pass 1 and
+Pass 2, but a specific *reference's* resolution state at the moment Pass 1
+evaluates it can, if that reference occurs before the constant's own
+defining statement in source order — Pass 1 necessarily saw it unresolved
+there (forced absolute, the general symbol-derived rule), while Pass 2
+always sees the fully-populated symbol table and would otherwise take the
+value-based path, disagreeing on instruction width
+(`CASM_DIAG_PASS_MISMATCH`). Each constant's symbol record now carries a
+`DEFINED_AT_OFFSET` bookmark (`CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO/HI`,
+offsets 44-45, stamped from the already-global `CasmTokenStartOffsetLo/Hi`
+at the constant's own definition), surfaced through the resolver view
+above at zero extra VMM-read cost. WP72's exemption now only fires when
+the *current* reference's own `CasmTokenStartOffsetLo/Hi` is at or after
+that bookmark — both passes replay the identical source top-to-bottom, so
+this yields the same answer regardless of which pass is evaluating.
 
 **`CasmExprResult` layout** (9 bytes, unchanged by WP67):
 
@@ -723,19 +759,35 @@ bytes) and keeps that slot for the process lifetime.
 |---|---|
 | `symbolsInit` | Allocate the record store, clear all 128 bucket heads to `$FFFF` |
 | `symbolsInsert` | `A` = name length, `CasmPtr0` = name, `X`/`Y` = value → define. An exact case-sensitive duplicate is `CASM_DIAG_DUPLICATE_SYMBOL`; a full table is `CASM_DIAG_SYMBOL_TABLE_FULL` |
-| `symbolsLookup` | The `exprEvaluate` resolver: fills the 5-byte resolver view, reporting `RESOLVED` only for a `DEFINED` record |
+| `symbolsLookup` | The `exprEvaluate` resolver: fills the 8-byte resolver view (`CASM_RESOLVE_*`, WP76), reporting `RESOLVED` only for a `DEFINED` record |
 
 **Record layout** (64 bytes, `CASM_SYMBOL_REC_*`): `NameLen` (1),
 `Name` (31-byte fixed slot), `Val` (2), `Flags` (1: bit 0 `DEFINED`, bit 1
 `CONSTANT` — WP65, bit 2 `RESOLVED` — WP65, bit 3 `LABEL_DERIVED` — WP65),
-`Next` (2, collision-chain record index, `$FFFF` = end), then (WP65) up to
-7 of the remaining padding bytes repurposed as a deferred-reference
-bookmark (`REF_VMM_LO/HI`, `REF_LEN`, `REF_ADDEND_LO/HI/SIGN`,
-`REF_EXTRACT`) for a not-yet-resolved constant's identifier RHS, zero-
-filled once `RESOLVED` is set. The record is padded from its meaningful 37
-bytes to 64 for two concrete reasons: it then fits `CASM_VMM_BUFFER_SIZE`
-exactly (one record = one transfer), and record-index → VMM-offset becomes
-a 16-bit shift-left-by-6 instead of a multiply by 37.
+`Next` (2, collision-chain record index, `$FFFF` = end), then (WP65) 7
+bytes (offsets 37-43) repurposed as a deferred-reference bookmark
+(`REF_VMM_LO/HI`, `REF_LEN`, `REF_ADDEND_LO/HI/SIGN`, `REF_EXTRACT`) for a
+not-yet-resolved constant's identifier RHS, zero-filled once `RESOLVED`
+is set, then (WP76) 2 more bytes (offsets 44-45) as `DEFINED_AT_OFFSET_
+LO/HI` — a constant's own defining statement's source position, stamped
+unconditionally at insert time and meaningful for the constant's entire
+lifetime (unlike the `REF_*` bookmark, not just pre-resolution). See
+[§11](#11-expression-evaluator-exprs)'s WP76 note for what reads it. The
+record is padded from its meaningful 39 bytes to 64 for two concrete
+reasons: it then fits `CASM_VMM_BUFFER_SIZE` exactly (one record = one
+transfer), and record-index → VMM-offset becomes a 16-bit shift-left-by-6
+instead of a multiply by 39.
+
+**WP73's forward-label resolver-state fix**: an *unresolved* identifier's
+`CASM_RESOLVE_SYM_FLAGS` byte is unspecified by `symbolsLookup`'s own
+contract (there's no record to read a kind from yet). `identifier:`
+(`expr.s`) explicitly treats an unresolved result as label-shaped
+*before* inspecting `SYM_FLAGS` at all, rather than risk reading a stale
+byte left over from a *preceding* resolved constant lookup in the same
+call chain — the actual WP73 defect: a stale `CONSTANT`-shaped byte
+leaking into an unresolved forward label's own classification, making
+Pass 1 select zero-page while Pass 2 (by then resolved, correctly
+label-shaped) selected absolute.
 
 A label has only `DEFINED`. A named constant (`identifier = expression`,
 WP65) additionally has `CONSTANT`, plus `RESOLVED` once its value is known

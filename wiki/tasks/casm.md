@@ -12,10 +12,14 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-Phase 12 is active at CASM `0.2.7` build `1319`. WP64-WP73 and WP71 DASH
-adoption are complete. WP74 (ca65-compatible `.BYTE` string literals) is the
-active approved work package; WP75 is the pending consolidated Phase 12
-completion gate and `0.3.0` promotion.
+Phase 12 is at CASM `0.3.0` build `1324`. WP64-WP74 and WP71's full DASH
+adoption are complete. WP76 (a corrective forward-reference Pass 1/2
+width-agreement fix, found by WP75's own fresh consolidated fixture
+sweep) is complete and user-approved. WP75, the consolidated Phase 12
+completion gate, has completed its verification/regression/documentation
+work (Increments 1-8) and is finishing tracker sync and the final
+walkthrough (Increments 9-10) — not yet closed pending the user's own
+manual runtime walkthrough and explicit approval.
 
 ## Phase 1 Prerequisite
 
@@ -2084,6 +2088,42 @@ behavior changed beyond the version/build artifact itself.
       live relocated-harness verification pass. Completion walkthrough:
       `brain/walkthroughs/2026-08-19-casm-phase12-wp74-string-literals.md`.
       User approved completion on 2026-08-19; CASM advanced `0.2.7` -> `0.2.8`.
+- [x] WP76 **forward-reference Pass 1/2 width-agreement fix complete,
+      user-approved 2026-08-20** (Taskwarrior task 44, UUID
+      `25420ff2-5dd5-46d0-a790-4d10dda0b947` -- discovered mid-WP75
+      Increment 5, corrective WP inserted per the WP72/WP73 precedent).
+      A named constant referenced inside an arithmetic expression before
+      its own defining statement disagreed on instruction width between
+      Pass 1 (forced absolute while unresolved) and Pass 2 (always
+      resolved, took WP72's zero-page exemption) -- confirmed live via
+      direct memory read (`CasmPass1FinalPc=$0013` vs `CasmPc=$0012`).
+      Fixed with a per-constant `DEFINED_AT_OFFSET` bookmark gating WP72's
+      exemption on source-position order. `casmarithfwd.s` fixed; all 11
+      WP75 Increment 5 fixtures re-verified together, zero regressions.
+      Found and disclosed a second, unrelated defect (constant-to-constant
+      chaining breaks parsing) as its own Taskwarrior task, deferred.
+      Plan: `brain/plans/2026-08-20-casm-phase12-wp76-forward-reference-
+      pass-agreement-fix.md`. Walkthrough: `brain/walkthroughs/2026-08-20-
+      casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
+- [ ] WP75 **consolidated Phase 12 completion gate, verification complete,
+      finishing tracker sync and final walkthrough** (Taskwarrior task 43,
+      `d3440667-c9bd-49cc-9013-80d9bd96d035`). Increment 1 (DASH full
+      Phase 12 syntax adoption) complete. Increments 2-5 (clean regression
+      build, no-change rebuild, byte-identity vs. pre-Phase-12 baseline,
+      consolidated live-VICE session covering all 30 `test_casm_*`
+      harnesses and all 11 Phase 12 production fixtures) complete, zero
+      regressions. Increment 6 (DASH regen re-verify against WP76's fixed
+      `casm.prg`) complete, byte-identical. Increment 7 (documentation
+      reconciliation across `docs/casm-utility.md`,
+      `wiki/casm-programmers-reference.md`, `brain/KNOWLEDGE.md`,
+      `CHANGELOG.md`) complete. Increment 8 (version promotion `0.2.8` ->
+      `0.3.0`) complete, live-verified (`CASM V0.3.0.1324`), no-change
+      rebuild stable. Remaining: Increment 9 (this tracker sync) and
+      Increment 10 (final walkthrough + the user's own manual runtime
+      approval, per this project's completion-gate discipline -- not
+      self-declared). Plan:
+      `brain/plans/2026-08-19-casm-phase12-wp75-verification-walkthrough-
+      completion-gate.md`.
 
 ## Optional Feature - Progress and Processing Indication
 

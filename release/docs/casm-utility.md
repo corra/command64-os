@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.2.0` (build 1260)
+**Version:** `0.3.0` (build 1324)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
@@ -15,14 +15,19 @@ bounded expression evaluator, source-file inclusion via `.INCLUDE`, and
 produces relocatable output by default so the same PRG can run at any load
 address the OS chooses.
 
-> **CASM Phase 10 is complete (labels/expressions/multi-file/relocation/
-> include processing/symbol map/listing output all shipped).** `/M` and
-> `/L` are fully implemented — see [Map and Listing
-> Output](#map-and-listing-output-m-l) below. Everything documented below as
-> supported is real and has been verified end-to-end, including in
-> production via [DASH](dash-utility.md), which assembles through a
-> seven-file `.INCLUDE` chain. See [Not Yet
-> Supported](#not-yet-supported) for the remaining gaps.
+> **CASM Phase 12 is complete** (labels/expressions/multi-file/relocation/
+> include processing/symbol map/listing output/named constants/the
+> current-address symbol/parenthesized precedence/arithmetic and bitwise
+> operators/character literals/string literals all shipped). Everything
+> documented below as supported is real and has been verified end-to-end,
+> including in production via [DASH](dash-utility.md), which assembles
+> through a seven-file `.INCLUDE` chain and uses named constants, operator
+> expressions, and string literals throughout its own source. A
+> consolidated hardening pass has since exhaustively re-verified this
+> behavior — every opcode/addressing-mode combination, every Phase 12
+> syntax form together in one session, boundary conditions, and
+> re-assembly determinism — rather than adding anything new for you to
+> use. See [Not Yet Supported](#not-yet-supported) for the remaining gaps.
 
 ## Command Syntax
 
@@ -109,21 +114,93 @@ code, so it doesn't matter whether `LOOP` appears above or below where it's
 used. Identifiers are up to 31 characters, **case-sensitive** (in PETSCII
 terms, unshifted and shifted spellings of the same letter are different
 symbols), and stored in a 512-entry symbol table shared across the whole
-assembly. Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
+assembly.
+
+> **Convention:** most C64 platforms run in a single-case PETSCII mode and
+> have no lowercase letters at all, so real-world C64 symbols are
+> conventionally single-case, never a mix of shifted and unshifted
+> spellings within one name. Command64's mixed-case charset (and CASM's
+> resulting true case-sensitivity, distinct from ASCII-style case-folding)
+> is an anomaly relative to that convention. Prefer **lowercase PETSCII
+> identifiers** to match how real C64 software is written — CASM
+> supporting case-sensitivity doesn't make mixed-case identifiers
+> idiomatic.
+
+Redefining the same name is `CASM: DUPLICATE SYMBOL`; using a name
 that's never defined is `CASM: UNDEFINED SYMBOL`; exceeding 512 distinct
 labels is `CASM: SYMBOL TABLE FULL`.
 
-An expression is one symbol or literal number, with an optional `<` (low
-byte) or `>` (high byte) prefix, and an optional `+`/`-` numeric addend:
+An expression is one or more terms — a symbol, literal number, the
+current-address symbol `*` (see below), or a parenthesized sub-expression
+— combined with `+`/`-`, with an optional `<` (low byte) or `>` (high
+byte) prefix applying to the expression as a whole:
 
 ```asm
-LDA #<MESSAGE      ; low byte of MESSAGE's address
-LDA #>MESSAGE      ; high byte of MESSAGE's address
-LDA MESSAGE+3      ; the 4th byte of MESSAGE
+LDA #<MESSAGE        ; low byte of MESSAGE's address
+LDA #>MESSAGE        ; high byte of MESSAGE's address
+LDA MESSAGE+3        ; the 4th byte of MESSAGE
+LDA #1+2+3           ; 6 -- chained operators, left to right
+LDA #<(SCREENW+2)    ; a parenthesized sub-expression
+LDA #((1+2)+3)       ; parentheses can nest, up to 8 levels deep
 ```
 
-Parenthesized or multiplicative arithmetic (`(A+B)*2`) is not supported —
-`CASM: EXPRESSION UNSUPPORTED`.
+`+`/`-` are left-associative (`1-2-3` is `(1-2)-3`, not `1-(2-3)`) and a
+relocatable value (a label, `*`, or a relocatable named constant) may only
+appear once per expression — combining two of them (`label1+label2`, or
+`label+(label2)`) is `CASM: EXPRESSION RELOCATION UNSUPPORTED`, since the
+relocation table can only patch one such reference per location. A static
+value plus one relocatable value, in either order and however deeply
+parenthesized, is always fine. Nesting parentheses more than 8 levels deep
+is `CASM: EXPRESSION TOO DEEPLY NESTED`. Multiplicative arithmetic (`*` as
+an operator, `/`) is not yet supported — `CASM: EXPRESSION UNSUPPORTED`.
+
+### Named Constants
+
+`identifier = expression` defines a named constant — a value you can refer
+to by name anywhere an expression is expected, without it occupying any
+address of its own:
+
+```asm
+screenw = 40
+border = screenw + 10
+```
+
+Constants share the same 512-entry symbol table as labels (a name can be
+one or the other, never both — redefining a label as a constant, or vice
+versa, is `CASM: DUPLICATE SYMBOL`) and can forward-reference other
+constants or labels defined later in the source, exactly like an operand
+can. A constant whose own definition is directly or transitively
+self-referential (`a = b` / `b = a`, or the degenerate `a = a`) is `CASM:
+CIRCULAR CONSTANT DEFINITION`.
+
+A constant's own defining expression is narrower than an ordinary operand:
+a single symbol, number, or `*`, with at most one `+`/`-` addend — it does
+not support parenthesized sub-expressions or a second chained operator,
+even though both are otherwise valid everywhere else. `screenw = (10+30)`
+is `CASM: MALFORMED EXPRESSION`; `total = 1+2+3` is `CASM: EXPRESSION
+UNSUPPORTED` at the second `+`.
+
+> Prefer **lowercase** constant names, per the identifier convention above
+> — `screenw`, not `SCREENW`.
+
+### The Current-Address Symbol (`*`)
+
+`*` evaluates to the address the *next* byte would be emitted at — the
+same address a label defined at that exact point in the source would get.
+It can appear anywhere an expression can, including as a named constant's
+own value:
+
+```asm
+bufstart = *        ; bufstart == the address right here
+        lda #<bufstart
+        sta $fb
+```
+
+Like a label, `*` is relocation-aware: it participates in the same
+relocatable/static output rules as any other address-valued expression
+(see [Relocation](#relocation) below), and forces the absolute form of an
+instruction operand, same as a label would. `*+N`/`*-N` and `<*`/`>*` all
+work the same way they would for a label or numeric constant.
 
 ### Numeric Literals
 
@@ -137,6 +214,110 @@ All three accept up to a 16-bit value (0-65535); anything larger is
 `CASM: OPERAND OUT OF RANGE`, even if later digits would have brought it
 back in range (e.g. `$1FFFF` is rejected the moment it exceeds 65535, not
 after the whole token is read).
+
+### Expressions and Operators
+
+Any operand position (instruction operand, `.BYTE`/`.WORD` list, or a
+named constant's own RHS) accepts a full expression, not just a bare
+number or label. Operators combine any mix of numbers, labels, named
+constants, and `*`, and may be grouped with parentheses:
+
+```asm
+LDA #(BASE+2)*3          ; grouping plus multiplication
+LDA #~$FF00              ; bitwise complement, immediate
+LDA TABLE+OFFSET*2         ; a label combined with arithmetic
+.WORD $0F&$03, $8001>>1     ; bitwise AND and a logical right shift, in a directive
+```
+
+Operators, from tightest to loosest binding:
+
+| Operator | Meaning |
+| --- | --- |
+| unary `-`, `~` | Negate / bitwise complement (prefix; chain freely, e.g. `~-1`) |
+| `*`, `/` | Multiply, divide (unsigned 16-bit; division truncates toward zero) |
+| `<<`, `>>` | Shift left/right (count must be 0-15; `>>` is logical — zero-filling, not sign-extending) |
+| `&` | Bitwise AND |
+| `^` | Bitwise XOR |
+| `\|` | Bitwise OR |
+| `+`, `-` | Add, subtract |
+
+All arithmetic is unsigned 16-bit; a result or intermediate value outside
+0-65535, a shift count outside 0-15, or a divisor of zero is `CASM:
+EXPRESSION OVERFLOW` (or, for a zero divisor, `CASM: EXPRESSION DIVISION
+BY ZERO`) rather than silently wrapping or crashing the assembler.
+Parenthesized groups may nest up to 8 levels deep; a 9th level is `CASM:
+EXPRESSION TOO DEEPLY NESTED`.
+
+**Relocation**: an operator may combine at most one relocatable component
+(a label, or a `*`-derived value) with any number of static (plain
+number/constant) components. Combining two relocatable components —
+`LABEL1+LABEL2`, or a label multiplied by anything — is `CASM: EXPRESSION
+RELOCATION UNSUPPORTED`, because the output format can only represent one
+symbol plus a static addend (see [Relocation](#relocation) below). This
+applies uniformly regardless of which operator or how deeply parenthesized
+the combination is.
+
+Named constants' own definitions (`NAME = expr`, see [Named
+Constants](#named-constants) above) use a narrower grammar and do not
+accept these operators — only a single symbol/literal/`*` with an
+optional `±NUMBER` addend.
+
+### Character Literals
+
+`'x'` — a single quote, exactly one byte, a closing quote — evaluates to
+that byte's PETSCII value, exactly as if you had written its numeric
+value directly:
+
+```asm
+lda #'a'            ; same as lda #$41
+.byte 'h', 'i'       ; same as .byte $48, $49
+```
+
+The byte is taken **verbatim**: no escape sequences (`\n`, `\'`, and
+similar are not supported — there is no backslash convention anywhere in
+CASM), and no case folding. A literal quote character as content works
+without any special syntax: `'''` reads as the quote character's own
+value, since the rule is always "one byte, then the closing quote,"
+regardless of what that one byte is.
+
+Unlike a number, label, or the operators above, a character literal is
+**not** a general expression primary — it's valid only as a whole
+immediate operand or a whole `.BYTE` list entry:
+
+```asm
+lda #'a'             ; OK -- immediate operand
+.byte 'h', 'i'        ; OK -- .BYTE list entries
+lda 'a'              ; error -- not valid as a bare (non-immediate) operand
+.word 'a'            ; error -- not valid in a .WORD list
+lda #'a'+1            ; error -- can't combine with an operator
+name = 'a'           ; error -- not valid on a named constant's own RHS
+```
+
+### String Literals
+
+Double-quoted strings are valid as whole `.BYTE` list entries:
+
+```asm
+.byte "hello", 0
+.byte $01, "", 'a', "ok", 1+1
+```
+
+Each content byte is emitted **verbatim** as PETSCII. CASM performs no case
+folding, ASCII conversion, screen-code conversion, or ca65 charmap remapping.
+An empty string is valid and emits zero bytes. No terminator or length byte is
+added automatically; write an explicit `0` when the consumer needs a
+null-terminated string.
+
+Strings support no escapes, embedded quote spelling, interpolation, or implicit
+concatenation. Content is limited to printable PETSCII (`$20-$7E` and
+`$A0-$FE`, with `"` closing the string) and to the current 255-byte source-line
+payload. A newline or EOF before the closing quote reports `CASM: STRING
+UNTERMINATED`; a non-printable content byte reports `CASM: STRING INVALID
+BYTE`.
+
+Strings are not expression values. They are invalid in instruction operands,
+`.WORD`, `.ORG`, and named-constant definitions, and adjacent strings require
+the ordinary comma separator.
 
 ### Addressing Modes
 
@@ -178,7 +359,7 @@ bytes ahead of the next instruction.
 | Directive | Syntax | Effect |
 | --- | --- | --- |
 | `.ORG` | `.ORG $C000` | Sets the assembly's fixed address and switches it to static output (see [Relocation](#relocation) below). Optional — omit it entirely for the default relocatable behavior. A second `.ORG`, or one after output has already started, is an error. |
-| `.BYTE` | `.BYTE $01, $02, $FF` | Emits one or more comma-separated byte values (each must fit 8 bits) at the current address. |
+| `.BYTE` | `.BYTE $01, "OK", 0` | Emits one or more comma-separated byte expressions, character literals, or verbatim PETSCII strings at the current address. Numeric values must fit 8 bits; strings may be empty and add no implicit terminator. |
 | `.WORD` | `.WORD $1234, $ABCD` | Emits one or more comma-separated 16-bit values, little-endian, at the current address. |
 | `.INCLUDE` | `.INCLUDE "SUBS.S"` | Splices another source file in at this point, as if its text appeared here. See [Splitting Source Across Files](#splitting-source-across-files). |
 
@@ -439,9 +620,9 @@ thing — see the [Programmer's Reference §18](casm-programmers-reference.md#18
 for status and rationale:
 
 - **`.STATIC` / `.RELOC` directives** — use `/S` plus `.ORG` instead.
-- **Multiplicative or parenthesized expression arithmetic** — `(A+B)*2` and
-  similar are not supported; only one symbol/literal plus an optional
-  `±NUMBER` addend.
+- **A named constant's own definition** (`NAME = expr`) does not accept the
+  full expression grammar above — only a single symbol/literal/`*` with an
+  optional `±NUMBER` addend.
 - **More than 8 top-level source files, 32 distinct included files, 16
   include-nesting levels, 512 distinct labels, 4096 relocation entries,
   4096 listing records (`/L`), or 65,535 bytes of combined source.**
@@ -449,6 +630,16 @@ for status and rationale:
   on disk** hangs rather than replacing or failing fast (a pre-existing
   gap, not specific to `/M`/`/L`) — use a distinct `/O:` name per run, or
   delete the stale file first.
+- **`/L` listing output shows a blank line between each row when printed to
+  a real C64 screen.** This is a display artifact only — the `.LST` file
+  written to disk is not affected. See the [Programmer's
+  Reference §18](casm-programmers-reference.md#18-coverage-what-works-today)
+  for the underlying mechanism.
+- **A one-byte source file can trigger a phantom end-of-file byte** during
+  assembly (a known, currently-unresolved defect in the source-loading
+  path). See the [Programmer's
+  Reference §18](casm-programmers-reference.md#18-coverage-what-works-today)
+  for detail.
 
 ## Source
 

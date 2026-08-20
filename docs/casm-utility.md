@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.2.2` (build 1266)
+**Version:** `0.3.0` (build 1324)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
@@ -15,17 +15,19 @@ bounded expression evaluator, source-file inclusion via `.INCLUDE`, and
 produces relocatable output by default so the same PRG can run at any load
 address the OS chooses.
 
-> **CASM Phase 10 is complete (labels/expressions/multi-file/relocation/
-> include processing/symbol map/listing output all shipped).** `/M` and
-> `/L` are fully implemented — see [Map and Listing
-> Output](#map-and-listing-output-m-l) below. Everything documented below as
-> supported is real and has been verified end-to-end, including in
-> production via [DASH](dash-utility.md), which assembles through a
-> seven-file `.INCLUDE` chain. A follow-on hardening pass has since
-> exhaustively verified this behavior — every opcode/addressing-mode
-> combination, boundary conditions, and re-assembly determinism — rather
-> than adding anything new for you to use. See [Not Yet
-> Supported](#not-yet-supported) for the remaining gaps.
+> **CASM Phase 12 is complete** (labels/expressions/multi-file/relocation/
+> include processing/symbol map/listing output/named constants/the
+> current-address symbol/parenthesized precedence/arithmetic and bitwise
+> operators/character literals/string literals all shipped). Everything
+> documented below as supported is real and has been verified end-to-end,
+> including in production via [DASH](dash-utility.md), which assembles
+> through a seven-file `.INCLUDE` chain and uses named constants, operator
+> expressions, and string literals throughout its own source. A
+> consolidated hardening pass has since exhaustively re-verified this
+> behavior — every opcode/addressing-mode combination, every Phase 12
+> syntax form together in one session, boundary conditions, and
+> re-assembly determinism — rather than adding anything new for you to
+> use. See [Not Yet Supported](#not-yet-supported) for the remaining gaps.
 
 ## Command Syntax
 

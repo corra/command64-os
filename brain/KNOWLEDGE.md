@@ -3183,6 +3183,64 @@ Walkthrough:
 `brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
 WP75 resumes from Increment 6.
 
+## CASM Phase 12 (WP64-76) — Pending Final Closure at `0.3.0` build `1324`
+
+Phase 12 added named constants (WP65), the current-address symbol `*`
+(WP66), parenthesized/precedence expressions (WP67), the full
+arithmetic/bitwise operator set (WP68), character literals (WP69),
+relocation algebra closure (WP70), and string literals (WP74) — six real
+language additions to CASM's expression grammar, none of them changing
+any already-shipped Phase 1-11 program's assembled bytes. DASH (WP71,
+completed by WP75's own Increment 1) adopted every one of them that
+genuinely improved its source, staying inside its own `AGENTS.md`
+dual-assembler subset (no character literals — a divergent ca65/native
+byte-value risk for letters, not applicable to CASM itself).
+
+Two corrective fixes were found and closed along the way, each its own
+inserted WP per this project's established precedent: WP72 (a resolved,
+non-label-derived named constant wrongly forced 3-byte absolute
+addressing instead of the same value-based zero-page selection a bare
+number gets) and WP73 (an unresolved forward label could inherit a stale
+symbol-kind byte left over from a preceding resolved constant lookup,
+disagreeing with Pass 2's own correct classification). A third,
+deeper-latency defect (WP76) was found only by WP75's own fresh
+consolidated fixture sweep — a forward-referenced named constant
+combined with an arithmetic operator disagreed on instruction width
+between Pass 1 (forced absolute while unresolved) and Pass 2 (always
+resolved, took WP72's exemption) — exactly the kind of defect this
+project's "re-run everything fresh, don't cite each WP's own individual
+pass" consolidated-verification norm exists to catch (WP63 found an
+analogous cross-harness defect in Phase 11 the same way).
+
+WP75 itself (`brain/plans/2026-08-19-casm-phase12-wp75-verification-
+walkthrough-completion-gate.md`) is Phase 12's consolidated closing WP:
+all 30 `test_casm_*` harnesses plus all 11 Phase 12 production fixtures
+re-run fresh in single continuous live-VICE sessions, DASH's regen
+re-verified byte-identical after WP76's fix, a full clean regression
+build and no-change rebuild both clean, and this documentation
+reconciliation pass (this section plus `wiki/casm-utility.md`,
+`wiki/casm-programmers-reference.md`, `CHANGELOG.md`). **Not yet closed**:
+tracker sync (Taskwarrior, `brain/task.md`, `wiki/tasks/casm.md`) and the
+final walkthrough with the user's own manual runtime approval remain —
+this section records what's been verified so far, not a self-declared
+completion. Update this heading once WP75's own completion gate is
+actually met.
+
+One genuinely new, unrelated defect was found and explicitly deferred
+along the way, not fixed under Phase 12: chaining a named constant to
+another named constant (`B = A`) breaks parsing of the following source
+line (`CASM: EXPECTED NEWLINE`) — logged as its own Taskwarrior task,
+tracked separately.
+
+Full per-WP detail lives in each WP's own entry above (WP65 Named
+Constants, WP66 Current-Address Symbol, WP67 Parentheses and Explicit
+Precedence, WP68 Arithmetic and Bitwise Operators, WP69 Character
+Literals, WP70 Relocation Algebra Closure, WP71 DASH Adoption, WP72
+Named-Constant Zero-Page Width Selection Fix, WP73 Forward-Label
+Resolver-State Fix, WP74 String Literal Contract, WP76 Forward-Reference
+Pass-Agreement Fix) and in each WP's own plan/walkthrough pair under
+`brain/plans/`/`brain/walkthroughs/`.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

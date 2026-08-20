@@ -15,8 +15,8 @@
 .include "common.inc"
 
 .define VERSION_MAJOR "0"
-.define VERSION_MINOR "2"
-.define VERSION_STAGE "8"
+.define VERSION_MINOR "3"
+.define VERSION_STAGE "0"
 .include "build_casm.inc"
 
 .import __MAIN_START__
