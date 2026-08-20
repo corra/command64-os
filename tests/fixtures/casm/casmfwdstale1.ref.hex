@@ -1,0 +1,46 @@
+# CASM Phase 12 WP73 trusted reference: casmfwdstale1
+#
+# Independently hand-assembled from the fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. The forward
+# FWDLABEL operand is absolute in both passes; all numeric equates retain
+# zero-page addressing. Branch displacements and label addresses below are
+# derived from the listed instruction lengths.
+#
+# Address facts:
+#   OUTERLOOP  = $C002
+#   FILLLOOP   = $C022
+#   NEXTTAB    = $C02E
+#   OUTERDONE  = $C032
+#   FWDLABEL   = $C033
+#
+# 2-byte PRG header + 52-byte payload.
+# bytes: 54
+
+00 C0
+A2 00
+E0 03
+F0 2C
+A9 0E
+E0 00
+D0 02
+A9 01
+85 7D
+AD 33 C0
+18
+69 50
+85 7B
+A9 D8
+85 7C
+A9 05
+85 7E
+A0 00
+C4 7E
+B0 08
+A5 7D
+91 7B
+C8
+4C 22 C0
+E8
+4C 02 C0
+60
+00

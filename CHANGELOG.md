@@ -7,6 +7,64 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **CASM `.BYTE` string literals (Phase 12 WP74)**: Added bounded, verbatim
+  printable-PETSCII double-quoted strings to `.BYTE`, including empty and mixed
+  lists, focused diagnostics, production fixtures, and DASH adoption with
+  native CASM/ca65/shipping byte identity. Completion was approved on
+  2026-08-19 and CASM advanced from `0.2.7` to `0.2.8`.
+- **BANNER migrated to native CASM**: Retired BANNER's ca65 build path
+  entirely (`add_ca65_app`, `header.s` removed) and adopted CASM Phase 12
+  syntax throughout `banner.s` (named constants, WP74 string literals, WP69
+  character literals). The compiled `banner.prg` now ships from a new
+  reviewed hex manifest (`banner.ref.hex` + `scripts/build_banner_manifest.py`)
+  with no ca65 cross-check, verified byte-identical across 4 independent
+  live-VICE native-CASM assemblies.
+- **DASH further Phase 12 syntax adoption**: Beyond WP71's named-constant
+  pass, `dapp.s`/`dscr.s`/`dsys.s`/`ddata.s` adopted WP68 shift/arithmetic
+  expressions and WP74 string literals for the audited punctuation/digit
+  range. `dash.ref.hex` regenerated from a real native-CASM run on a
+  dedicated test disk, confirmed byte-identical to the prior shipping
+  manifest and the ca65 cross-check.
+
+### Fixed
+
+- **CASM forward-referenced constant Pass 1/2 width agreement (Phase 12
+  WP76)**: Fixed a genuine instruction-width disagreement between Pass 1
+  and Pass 2 for a named constant referenced (inside an arithmetic
+  expression) before its own defining statement -- Pass 1 forced absolute
+  addressing while unresolved, Pass 2 always saw it resolved and took
+  WP72's zero-page exemption, disagreeing by 1 byte
+  (`CASM: PASS 1/2 MISMATCH`). Fixed with a per-constant `DEFINED_AT_
+  OFFSET` bookmark so both passes agree on width regardless of which one
+  is evaluating. `casmarithfwd.s` now passes; all 11 WP75 Increment 5
+  production fixtures re-verified together with zero regressions.
+  Completion was approved on 2026-08-20.
+- **CASM `0.3.0` (Phase 12 completion promotion, WP75)**: Completion-only
+  version bump, no behavior change in the same commit -- mirrors the
+  `0.1.56` -> `0.2.0` and `0.2.0` -> `0.2.1` precedent. Closes CASM Phase
+  12 (WP64-76: named constants, the current-address symbol, parenthesized
+  precedence, arithmetic/bitwise operators, character literals, string
+  literals, and DASH's own full adoption of all of them) after a fresh
+  consolidated live-VICE re-run of all 30 `test_casm_*` harnesses and all
+  11 Phase 12 production fixtures in one continuous session, a clean
+  regression build, and a byte-identical no-change rebuild.
+- **DASH Phase 12 syntax adoption and native provenance (WP71)**: Replaced
+  private zero-page magic addresses with named constants across DASH's seven
+  dual-assembler sources. Native CASM `0.2.6.1318` now produces the reviewed
+  4,766-byte shipping artifact byte-identically to ca65; `dash.ref.hex` records
+  the real VICE/REU run without `--allow-host-bytes`. Corrected the DASH manual's
+  stale explicit-relocation commands to `LOAD DASH <address>` / `RUN <address>`.
+  Completion was approved on 2026-08-18 and CASM advanced from `0.2.6` to
+  `0.2.7`.
+- **CASM forward-label pass agreement (Phase 12 WP73)**: Unresolved identifier
+  evaluation now ignores the resolver view's unspecified symbol-kind byte,
+  preventing stale named-constant flags from making Pass 1 select zero-page
+  while Pass 2 selects absolute. Added focused expression-harness coverage and
+  the `casmfwdstale1` native assembly/COMP regression fixture. Completion was
+  approved on 2026-08-18 and CASM advanced from `0.2.5` to `0.2.6`.
+
 ### Packaging
 
 - **Release distribution updates**: Included `command64_casm_utils.d64` (development utility disk containing native CASM assembler source code for the `DASH` dashboard, `casm.prg`, `edlin.prg`, `comp.prg`, and verification references) in the packaged release archives. Removed `debug.prg` from the root of the release archives as it is not useful standalone. Updated [RELEASE_README.md](file://packaging/RELEASE_README.md) to explicitly document `command64_casm_utils.d64`, `banner-utility.md`, and `edlin-utility.md`.
@@ -25,6 +83,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **CASM master-plan reconciliation**: Updated the native-assembler master plan
+  from its stale Phase 11 proposal state to current CASM `0.2.7.1319` truth,
+  recorded the authoritative Phase 12 WP64-WP75 map, corrected the as-built
+  Phase 7 source-cache and Phase 10 listing architectures, current VICE MCP
+  workflow, canonical `.BYTE` string/Phase 13 policy, module ownership, and the
+  mandatory per-feature DASH adoption rule. Synchronized CASM task and local
+  contract records while preserving superseded numbering as historical context.
 - **CASM listing/map production headers (Phase 11 WP59 Increment 8)**: Updated
   stale pre-WP54 comments that still described `/L` and `/M` as unimplemented,
   and corrected obsolete map-harness history. The accompanying static audit
@@ -110,6 +175,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM named-constant operands wrongly forced absolute addressing (Phase 12
+  WP72)**: a resolved named constant (equate, e.g. `DISPATCHVECTOR = $70`)
+  referenced as an instruction operand always assembled with absolute
+  (3-byte) addressing, never zero-page (2-byte), even when its value was in
+  range — unlike the identical numeric literal (`STA $70`), which correctly
+  selected zero-page. `expr.s`'s `identifier` proc set the internal
+  `SYMBOL_DERIVED` flag unconditionally for every resolved symbol, label or
+  constant alike; `parser.s` derives its own `FORCE_ABS` from that flag, and
+  `opcodes.s` takes the absolute branch whenever it's set, before checking
+  the value. Discovered during Phase 12 WP71 (DASH adoption) via a real
+  native/ca65 cross-check mismatch. Fixed by clearing the flag specifically
+  for a resolved, non-label-derived constant (the same classification
+  already used correctly for `RELOCATABLE`); labels and the `*`
+  current-address symbol are unaffected and correctly still force absolute
+  width. See `brain/walkthroughs/2026-08-17-casm-phase12-wp72-constant-
+  zeropage-width.md`.
 - **CASM fault-injection harnesses never restored the OS_API vector (Phase 11
   WP63)**: `faultInstall` (`tests/src/casm_faultinject/faultstub.inc`)
   patches the shared, fixed `$1000` OS_API dispatch vector to redirect
@@ -160,6 +241,107 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM Phase 12 WP70: relocation algebra closure**: consolidated
+  verification (no new syntax or semantics) that every operator/operand
+  combination WP65-69 shipped matches the relocation-representability
+  contract exactly. Traced the two governing rules directly in `expr.s`:
+  `+`/`-` reject only when both operands are relocatable (one relocatable
+  plus any static components always succeeds); every arithmetic/bitwise
+  operator and both unary operators reject if either operand is
+  relocatable at all. Found and closed a genuine, previously-unproven gap:
+  no fixture anywhere — in Phase 12 or before it — had ever combined a
+  relocatable label with a static addend and verified the resulting R6
+  relocation table; every pre-Phase-12 fixture that does full R6
+  verification uses the old flat grammar with no addend, and every Phase
+  12 fixture that reaches a real relocatable label is itself a rejection
+  case. Closed with a new production fixture reaching a relocatable label
+  combined with a static addend through the new parenthesized/precedence-
+  climbing architecture for the first time, live-verified byte-exact
+  against a hand-derived reference (including the R6 table and footer) —
+  a hand-derivation mistake in that same reference (missing that a second
+  label in the fixture was also a relocatable reference) was caught by
+  the live COMP mismatch and corrected from the specification, not copied
+  from CASM's own output. A second live fixture applies a different
+  arithmetic operator than previously tested to a real relocatable label,
+  confirming the shared rejection mechanism a second time. Every
+  regression harness passes; CASM promoted to `0.2.5`.
+- **CASM Phase 12 WP69: character literals**: `'x'` — a single quote, one
+  literal PETSCII byte, a closing quote — evaluates to that byte's value,
+  usable as an immediate operand (`lda #'a'`) or a `.BYTE` list entry
+  (`.byte 'h', 'i'`). No backslash escape sequences (a literal quote as
+  content, `'''`, works anyway — one content byte then a closing quote,
+  regardless of what that byte is) and no case folding. Deliberately
+  narrower than every other Phase 12 primitive: a character literal is
+  not a general expression primary — combining it with an operator,
+  using it in a `.WORD` list, as a bare (non-immediate) instruction
+  operand, or on a named constant's own right-hand side all correctly
+  fail rather than silently succeed, live-verified against the real
+  `casm.prg` binary under VICE. Because of that restriction, the shared
+  expression evaluator needed no change at all. Two new diagnostics for
+  malformed literals (`CASM: CHARACTER LITERAL UNTERMINATED`/`INVALID
+  BYTE`). Live-verified across four new production fixtures (a success
+  case COMP-verified byte-exact, plus the three forbidden forms), the
+  expanded lexer test suite, and every other CASM regression harness;
+  CASM promoted to `0.2.4`.
+- **CASM Phase 12 WP68: arithmetic and bitwise operators**: expressions now
+  support multiplication, division, left/right shift, bitwise AND/XOR/OR,
+  and unary negate/complement (`*`, `/`, `<<`, `>>`, `&`, `^`, `|`, unary
+  `-`/`~`), completing Phase 12's full precedence-climbing evaluator (7
+  tiers, C-family convention) alongside WP67's parentheses. All arithmetic
+  is checked unsigned 16-bit: shift counts are bounded to 0-15, division by
+  a static zero is a dedicated diagnostic (`CASM: EXPRESSION DIVISION BY
+  ZERO`) rather than a crash, and every operator enforces the same
+  relocation-representability rule WP67 established — combining two
+  relocatable components is rejected, not silently misassembled. Fixed a
+  real parser gap found live: unary `-`/`~` (and, pre-existing since WP66,
+  `*` as current-address) could not start an instruction operand
+  (`lda #-1` failed `SYNTAX ERROR`) because two operand-entry token
+  whitelists in `parser.s` had never been extended for them — the same bug
+  class WP67 already fixed once for a leading `(`. Live-verified against
+  the real `casm.prg` binary under VICE across six new production
+  fixtures: representative multiply/AND/shift/unary-negate cases plus
+  relocation rejection for both a real label and a label-derived named
+  constant, a genuine two-pass Pass 1/Pass 2 width-agreement proof for a
+  forward-referenced constant combined with a new operator, and the
+  remaining division/XOR/OR/right-shift operators plus the first real
+  end-to-end proof of the division-by-zero diagnostic. The full
+  expression-evaluator test suite (97 cases) and every other CASM
+  regression harness pass; CASM promoted to `0.2.3`.
+- **CASM Phase 12 WP67: parentheses and explicit precedence**: expressions
+  now support parenthesized sub-expressions (`lda #<(screenw+2)`) nested up
+  to 8 levels deep, and chained `+`/`-` operators applied left-to-right
+  (`lda #1+2+3`) — including for plain numeric literals, which previously
+  couldn't take a trailing operator at all. Combining two relocatable
+  values (two labels, or a label with a relocatable named constant) is
+  now caught with a dedicated diagnostic (`CASM: EXPRESSION RELOCATION
+  UNSUPPORTED`) instead of silently misassembling, since only one such
+  reference is representable per relocation entry. Live-verified against
+  the real `casm.prg` binary under VICE: parenthesized expressions
+  (including one wrapping a named constant) produce byte-exact correct
+  output, and the new relocation diagnostic prints with the correct
+  message and source-location caret. The full expression-evaluator test
+  suite (55 cases) and every other CASM regression harness pass.
+- **CASM Phase 12 WP66: current-address symbol (`*`)**: `*` is now a valid
+  expression primitive, evaluating to the address the next emitted byte
+  would occupy — the same value a label defined at that exact point would
+  get — relocatable by construction. Works as a plain operand (`lda #<*`),
+  with an addend and/or extraction in one expression (`lda #<*+3`), and as
+  a named constant's own value (`bufstart = *`, WP65's `identifier = expr`
+  syntax). Live-verified against the real `casm.prg` binary under VICE:
+  both a `name = *` fixture and a bare-`*`-with-addend fixture produce
+  byte-exact correct output; the full pre-existing test suite (expression
+  evaluator, symbol table, Pass 1, `.INCLUDE`, frame traversal) still
+  passes unchanged.
+- **CASM Phase 12 WP65: named constant definitions**: `identifier = expr`
+  defines a named constant, usable anywhere an expression is expected
+  without occupying any address of its own. Supports full forward
+  reference — including to labels not yet defined and to other constants,
+  with genuine transitive-cycle detection (`CASM: CIRCULAR CONSTANT
+  DEFINITION`). Live-verified against the real `casm.prg` binary under
+  VICE across four fixtures (a resolution smoke test, mutual and
+  self-reference cycles, and a constant/label name collision), plus
+  regression re-verification of the expression evaluator, symbol table,
+  and Pass 1 harnesses.
 - **CASM 0.2.1 listing/map hardening (Phase 11 WP59)**: Audited all 19
   listing/map exports and their private transitive paths; fixed retryable
   listing-close ownership, registration-failure close/delete compensation, and

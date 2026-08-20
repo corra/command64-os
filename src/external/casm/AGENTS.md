@@ -126,9 +126,9 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Pass 1 and Pass 2 share one per-statement dispatch, driven twice and gated
   by a single `CasmPassMode` flag (measure vs. emit) checked at exactly one
   point in the emission engine's byte writer -- not a structured event
-  stream. The future listing/map consumer in master-plan Phase 10 designs its
-  own event shape against its real needs at that time rather than reusing a
-  speculative one built now. See
+  stream. Phase 6 deliberately deferred listing/map capture design rather than
+  inventing a speculative event shape. Phase 10 subsequently implemented the direct
+  `emitByte` capture and completed-line-sidecar design documented below. See
   `brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`
   (Phase 0C.5 freeze) for the decision record.
 - **Phase 10 architecture (WP50-55, closed 2026-08-08 at CASM `0.2.0` build
@@ -199,6 +199,12 @@ The `src/external/casm` directory owns CASM, a native Command 64
   register/flag/scratch contracts, atomic increments, failure and cleanup
   behavior, verification, documentation/task/DOX updates, stop conditions, and
   completion gate.
+- Every CASM language or feature addition must include a DASH adoption
+  increment: audit `src/external/dash/` for applicable uses, perform a
+  byte-equivalent DASH rewrite when the feature applies, and re-run both native
+  CASM and ca65 cross-checks. If safe adoption is impossible, stop and obtain
+  explicit user direction rather than silently declaring the feature complete
+  without real-application dogfooding.
 - Completing a CASM work package increments the stage component of the current
   `major.minor.stage` version while preserving the current major and minor
   components. The new stage is recorded only after verification and explicit
@@ -245,6 +251,27 @@ The `src/external/casm` directory owns CASM, a native Command 64
 - Treat resource cleanup, source provenance, expression relocation class, and
   instruction-size stability as foundational interfaces rather than late
   error handling.
+- Phase 12 WP68 extends the stable token inventory with `/`, `&`, `^`, `|`,
+  `~`, `<<`, and `>>`. `*` and `-` retain their existing token IDs and are
+  interpreted contextually as primary/infix and unary/infix respectively.
+  Shift tokens consume two matching bytes but retain the first byte's source
+  location; lone `<`/`>` remain extraction tokens.
+- Phase 12 expression precedence is lowest-to-highest: binary `+`/`-`, `|`,
+  `^`, `&`, `<<`/`>>`, `*`/`/`, unary `-`/`~`. Binary operators are
+  left-associative; the evaluator parses an RHS at its operator precedence
+  plus one.
+- Phase 12 bitwise operators `&`, `^`, `|`, and unary `~` are static-only
+  16-bit operations. Unary `-` computes 16-bit two's-complement and chains
+  right-to-left. Relocatable operands are rejected; unresolved static Pass 1
+  values propagate unresolved without reading placeholder value bytes.
+- Phase 12 shifts are static-only: counts are limited to 0-15, left shift
+  raises expression overflow when any high bit is discarded, and right shift
+  is logical and zero-filling.
+- Phase 12 WP74 adds `CASM_TOKEN_STRING` (`$1A`) for double-quoted `.BYTE`
+  list entries. Content is zero or more verbatim printable-PETSCII bytes with
+  no escapes or implicit terminator, stored in lexer-owned
+  `CasmStringBuffer[255]` plus `CasmStringLength`; the frozen 39-byte token
+  record does not grow. Only `emitByteList` consumes STRING tokens.
 - `CasmSourceVmmCursorLo/Hi` is the **bulk-refill read head, not the logical
   parse position**. `sourceRefill` installs up to 256 bytes per call, so for
   a source file smaller than the buffer the cursor already sits at that

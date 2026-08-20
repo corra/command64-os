@@ -334,13 +334,36 @@ specific diagnostic, deletes the partial output, and returns to the shell.
 
 - **`/O:<output>`**: explicit output filename. Without it, the output name
   is derived from `<source>` by replacing its extension with `.PRG`.
-- **`/S`**: static output (currently CASM's default behavior regardless).
-- **`/M`** and **`/L`**: symbol-map and listing output. Not yet available
-  in this build — CASM recognizes both switches but exits with `FEATURE
-  NOT IMPLEMENTED` if either is used.
+- **`/S`**: static output at a fixed address (requires an explicit `.ORG`
+  in the source). Without it, CASM's default is **relocatable** output
+  that runs correctly at whatever address the OS loads it.
+- **`/M`** and **`/L`**: print a deterministic symbol map and write a
+  `.LST` source listing alongside the PRG, respectively. Both may be
+  combined with each other or used alone.
+
+CASM's language also supports named constants, the current-address symbol
+`*`, parenthesized expressions, a full arithmetic/bitwise operator set,
+and character/string literals — see the full manual for the complete
+grammar.
 
 See the **[CASM Utility Manual](casm-utility.md)** for the full language
 reference (addressing modes, directives, expressions, and limits).
+
+### DASH
+
+**Description:** A three-page system dashboard — System information, a
+live Applications registry, and a VMM/REU hardware self-test. It ships
+as a relocatable PRG assembled by the *native* CASM assembler itself
+(not any host tool), so it runs correctly wherever the OS loads it.
+**Syntax:** `LOAD DASH` then `RUN`
+
+Once running, function keys switch pages (**F1** System, **F3**
+Applications, **F5** VMM Test); **R** redraws the current page, **T**
+runs the VMM hardware test (VMM Test page only), and **Q** exits cleanly
+back to the shell.
+
+See the **[DASH Utility Manual](dash-utility.md)** for the full page
+reference and explicit-relocation examples.
 
 ### EDLIN
 

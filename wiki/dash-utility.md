@@ -40,12 +40,13 @@ user-program placement currently resolves to.
 ### Explicit relocated launch
 
 ```text
-LOAD DASH,9
-GO 5000
+LOAD DASH 5000
+RUN 5000
 ```
 
-`GO <address>` looks the loaded program up by address and relocates/runs it
-there. DASH has been verified to run identically at `$3800`, `$5000`, and
+`LOAD DASH <address>` relocates and registers DASH at the requested address;
+`RUN <address>` looks up and executes that registered instance. DASH has been
+verified to run identically at `$3800`, `$5000`, and
 `$9000` — every JSR/JMP high operand, `#>label` high byte, `.WORD` renderer
 pointer, and absolute local-data reference the R6 relocation table covers is
 patched for the new base, and the Applications page (F3) correctly reports
@@ -99,16 +100,19 @@ separate:
   the manifest embeds a `source_sha256` line per file, and the build hard-fails
   if any of the seven sources' hashes no longer match.
 
-**Current provenance (as of this writing):** the shipping manifest's bytes
-come from the `dash_ref` ca65 cross-check build
-(`build_dash_manifest.py --allow-host-bytes`), used as an explicit,
-user-approved interim stand-in — not a native-CASM-on-hardware run. The
-manifest's own `# provenance:` line states this plainly. A native-CASM
-regeneration remains available as a future step if wanted, but is not a
-blocker on any current work. The `dash_ref` cross-check is independent by
-construction: ca65 and CASM share no code and derive relocation entries by
-completely different means, so a defect in one cannot reproduce itself in
-the other.
+**Current provenance:** the shipping manifest's bytes come from a real
+native CASM `0.2.8` build `1322` run under VICE on a dedicated CASM-only
+test disk (`dash_casm_test.d64`), 2026-08-20 — not a ca65 stand-in. This
+run also carried a further Phase 12 syntax pass beyond WP71's initial
+named-constant adoption: WP68 shift/arithmetic expressions for bitmasks
+and screen-row offsets (`AND #1<<0`, `$0400+1*40`), and WP74 string
+literals for the audited `$20`-`$3F` punctuation/digit range. The
+resulting bytes are confirmed byte-identical to both the independent
+`dash_ref` ca65 cross-check build and the prior shipping manifest,
+proving the syntax pass changed nothing observable. The `dash_ref`
+cross-check remains independent by construction: ca65 and CASM share no
+code and derive relocation entries by completely different means, so a
+defect in one cannot reproduce itself in the other.
 
 ## System Page (F1)
 

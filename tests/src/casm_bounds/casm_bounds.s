@@ -65,6 +65,9 @@
 .export CasmInsn
 .export CasmCliOptions
 .export CasmTokenRecord
+.export CasmTokenText
+.export CasmStringLength
+.export CasmStringBuffer
 .export diagSetLocFromStmt
 .export diagSetLocFromToken
 .export diagClearLoc
@@ -88,6 +91,12 @@ CasmParserStmt:    .res CASM_PARSER_STMT_SIZE
 CasmInsn:          .res CASM_INSN_SIZE
 CasmCliOptions:    .res 1
 CasmTokenRecord:   .res CASM_TOKEN_REC_SIZE
+; emit.s links whole, but this harness never enters .BYTE list parsing. These
+; one-byte stand-ins resolve its unreachable CHAR/STRING imports without
+; importing lexer.s or duplicating production-sized payload storage.
+CasmTokenText:     .res 1
+CasmStringLength:  .res 1
+CasmStringBuffer:  .res 1
 FailCount:         .res 1
 OrgLo:             .res 1
 OrgHi:             .res 1

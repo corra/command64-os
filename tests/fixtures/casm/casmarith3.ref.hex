@@ -1,0 +1,48 @@
+# CASM Phase 12 WP68 Increment 9 trusted reference: casmarith3
+#
+# Independently hand-assembled from the casmarith3 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves the
+# remaining WP68 operators not yet exercised through the real production
+# pipeline by Increment 7's representative sample (*, &, <<, unary -):
+# / (division), ^ (XOR), | (OR), >> (right shift), across immediate,
+# .BYTE, and .WORD operand contexts. Per-operator numeric correctness
+# across the full inventory is already closed by
+# tests/src/casm_expr/casm_expr.s's own 97-case harness (expr.s:640-731
+# confirms staticDiv/staticXor/'|'-branch/staticShiftRight implement plain
+# unsigned division, EOR, ORA, and a zero-filling logical right shift
+# respectively -- traced during this increment's own Atomic Step 1 audit).
+#
+# Source (.ORG $C000, fixed address -- no relocatable symbols involved):
+#   LDA #10/2            ; 10/2 = 5
+#   LDA #$0F^$03         ; $0F ^ $03 = $0C
+#   LDA #$0F|$03         ; $0F | $03 = $0F
+#   .BYTE 10/2, $0F^$03  ; 5, $0C
+#   .WORD $0F|$03, $8001>>1  ; $000F, $4000
+#
+# $8001>>1 is a logical (zero-filling) right shift, not arithmetic:
+# 1000000000000001 >> 1 = 0100000000000000 = $4000 -- proves the shift
+# does not sign-extend, through the real pipeline (the synthetic harness's
+# own sShr case already proved this arithmetically; this is its
+# production-pipeline counterpart).
+#
+# All three LDA forms are immediate addressing ($A9, always 2 bytes) --
+# immediate mode has no zero-page/absolute width choice, so FORCE_ABS
+# classification does not affect them (that proof is casmarithfwd's own
+# job, WP68 Increment 7).
+#
+# Hand assembly:
+#   00 C0              PRG load-address header ($C000, little-endian)
+#   A9 05              LDA #$05        (10/2)
+#   A9 0C              LDA #$0C        ($0F^$03)
+#   A9 0F              LDA #$0F        ($0F|$03)
+#   05 0C              .BYTE 5, 12
+#   0F 00 00 40        .WORD $000F, $4000
+#
+# bytes: 14
+
+00 C0
+A9 05
+A9 0C
+A9 0F
+05 0C
+0F 00 00 40

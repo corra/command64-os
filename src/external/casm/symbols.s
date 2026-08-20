@@ -43,6 +43,7 @@
 .export symbolsInsert
 .export symbolsLookup
 .export symbolsReadByIndex
+.export symbolsUpdateByIndex
 .export CasmSymbolVmmSlot
 
 .segment "BSS"
@@ -62,6 +63,41 @@ CasmSymScratchCursorHi: .res 1
 CasmSymScratchBucket:   .res 1   ; bucket index, 0-127
 CasmSymScratchHeadLo:   .res 1   ; the bucket's ORIGINAL head (for prepend-on-insert)
 CasmSymScratchHeadHi:   .res 1
+
+; WP65: symbolsInsert caller-set inputs, read instead of a hardcoded
+; CASM_SYMBOL_FLAG_DEFINED. Every caller (including crpLabel, formalizing
+; its previously-implicit behavior) must set CasmSymbolInsertFlags
+; explicitly before JSR symbolsInsert. The Ref* fields are copied into the
+; new record only when CasmSymbolInsertFlags has CASM_SYMBOL_FLAG_CONSTANT
+; set (a label caller may leave them unset; the zero-fill already in
+; symbolsInsert covers that case for CONSTANT callers with a resolved
+; numeric RHS too, since those simply never populate them).
+; WP76: the constant's own defining statement's source position (copied
+; from CasmLabelDefinedAtOffsetLo/Hi, parser.s, which ppsLabel stamps from
+; CasmTokenStartOffsetLo/Hi before consuming any further tokens). Copied
+; into the new record unconditionally alongside the Ref* fields, same
+; CONSTANT-flag gate -- a label caller doesn't need it (labels stay
+; unconditionally force-abs regardless, WP39).
+.export CasmSymbolInsertFlags
+.export CasmSymbolInsertRefVmmLo
+.export CasmSymbolInsertRefVmmHi
+.export CasmSymbolInsertRefLen
+.export CasmSymbolInsertRefAddendLo
+.export CasmSymbolInsertRefAddendHi
+.export CasmSymbolInsertRefSign
+.export CasmSymbolInsertRefExtract
+.export CasmSymbolInsertDefinedAtOffsetLo
+.export CasmSymbolInsertDefinedAtOffsetHi
+CasmSymbolInsertFlags:        .res 1
+CasmSymbolInsertRefVmmLo:     .res 1
+CasmSymbolInsertRefVmmHi:     .res 1
+CasmSymbolInsertRefLen:       .res 1
+CasmSymbolInsertRefAddendLo:  .res 1
+CasmSymbolInsertRefAddendHi:  .res 1
+CasmSymbolInsertRefSign:      .res 1
+CasmSymbolInsertDefinedAtOffsetLo: .res 1
+CasmSymbolInsertDefinedAtOffsetHi: .res 1
+CasmSymbolInsertRefExtract:   .res 1
 
 .assert CASM_SYMBOL_BUCKET_COUNT * 2 = 256, error, "CASM symbol bucket table size changed"
 
@@ -253,8 +289,21 @@ sfcAdvance:
 ; Never leaves partial state on failure: CasmSymbolBuckets and CasmSymbolCount
 ; are only updated after a successful vmmWindowWrite of the new record.
 ;
+; WP65: the record's Flags byte is no longer hardcoded to
+; CASM_SYMBOL_FLAG_DEFINED -- every caller must set CasmSymbolInsertFlags
+; explicitly first. When that value has CASM_SYMBOL_FLAG_CONSTANT set, the
+; six CasmSymbolInsertRef* scratch bytes are also copied into the new
+; record's REF_* fields (meaningful only until CASM_SYMBOL_FLAG_RESOLVED is
+; later set by the resolution sweep); a label caller (CONSTANT clear)
+; leaves them at whatever they last held, since the record's own zero-fill
+; already covers that case. WP76: CasmSymbolInsertDefinedAtOffsetLo/Hi is
+; copied the same way, alongside the Ref* fields -- unlike them it stays
+; meaningful for the constant's entire lifetime, not just pre-resolution.
+;
 ; Inputs:  CasmPtr0Lo/CasmPtr0Hi = namePtr; A = nameLen (1..31);
-;          X/Y = value (Lo/Hi)
+;          X/Y = value (Lo/Hi); CasmSymbolInsertFlags = record flags;
+;          CasmSymbolInsertRef* = deferred-reference bookmark, meaningful
+;              only when CasmSymbolInsertFlags has CASM_SYMBOL_FLAG_CONSTANT set
 ; Outputs: C clear, X/Y = new record index (Lo/Hi)
 ;          C set, A = CASM_DIAG_DUPLICATE_SYMBOL (exact case-sensitive name
 ;              already DEFINED), CASM_DIAG_SYMBOL_TABLE_FULL (CasmSymbolCount
@@ -316,8 +365,29 @@ siNameDone:
     sta CasmVmmBuffer + CASM_SYMBOL_REC_VAL_LO
     lda CasmSymScratchValHi
     sta CasmVmmBuffer + CASM_SYMBOL_REC_VAL_HI
-    lda #CASM_SYMBOL_FLAG_DEFINED
+    lda CasmSymbolInsertFlags
     sta CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    and #CASM_SYMBOL_FLAG_CONSTANT
+    beq siRefDone
+    lda CasmSymbolInsertRefVmmLo
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_LO
+    lda CasmSymbolInsertRefVmmHi
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_HI
+    lda CasmSymbolInsertRefLen
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_LEN
+    lda CasmSymbolInsertRefAddendLo
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_LO
+    lda CasmSymbolInsertRefAddendHi
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_HI
+    lda CasmSymbolInsertRefSign
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_SIGN
+    lda CasmSymbolInsertRefExtract
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_EXTRACT
+    lda CasmSymbolInsertDefinedAtOffsetLo
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO
+    lda CasmSymbolInsertDefinedAtOffsetHi
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI
+siRefDone:
 
     ; Prepend: Next = the bucket's ORIGINAL head (captured by
     ; symbolsFindChain before it walked anything).
@@ -389,8 +459,16 @@ siCountDone:
 ;              CASM_RESOLVE_FLAGS byte has CASM_EXPR_FLAG_RESOLVED set (only
 ;              that bit -- symbols are always absolute, never RELOCATABLE)
 ;              and CASM_RESOLVE_ID_LO/HI + CASM_RESOLVE_VAL_LO/HI populated
-;              on a match; CASM_RESOLVE_FLAGS clear (RESOLVED clear) and the
-;              remaining view bytes unspecified on no match
+;              on a match; CASM_RESOLVE_SYM_FLAGS (WP65) is also populated
+;              on a match with the matched record's own CASM_SYMBOL_REC_
+;              FLAGS byte (DEFINED/CONSTANT/RESOLVED/LABEL_DERIVED),
+;              distinct from CASM_RESOLVE_FLAGS' CASM_EXPR_FLAG_* meaning;
+;              CASM_RESOLVE_DEFINED_AT_OFFSET_LO/HI (WP76) is also
+;              populated on a match from the record's own field; CASM_
+;              RESOLVE_FLAGS clear (RESOLVED clear) and the remaining view
+;              bytes (including CASM_RESOLVE_SYM_FLAGS and
+;              CASM_RESOLVE_DEFINED_AT_OFFSET_LO/HI) unspecified on no
+;              match
 ;          C set + A = CASM_DIAG_VMM_TRANSFER_FAILED is the ONE exception:
 ;              an internal VMM failure during the chain walk, which is not a
 ;              resolution outcome at all
@@ -424,6 +502,15 @@ symbolsLookup:
     sta (CasmPtr1Lo), y
     ldy #CASM_RESOLVE_VAL_HI
     lda CasmVmmBuffer + CASM_SYMBOL_REC_VAL_HI
+    sta (CasmPtr1Lo), y
+    ldy #CASM_RESOLVE_SYM_FLAGS
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    sta (CasmPtr1Lo), y
+    ldy #CASM_RESOLVE_DEFINED_AT_OFFSET_LO
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO
+    sta (CasmPtr1Lo), y
+    ldy #CASM_RESOLVE_DEFINED_AT_OFFSET_HI
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI
     sta (CasmPtr1Lo), y
     clc
     rts
@@ -506,4 +593,57 @@ srbiEof:
 srbiFail:
     lda #CASM_DIAG_VMM_TRANSFER_FAILED
     sec
+    rts
+
+; ---------------------------------------------------------------------------
+; symbolsUpdateByIndex
+; WP65: write CasmVmmBuffer back to the symbol table at the given record
+; index. The caller is expected to have obtained CasmVmmBuffer's current
+; content from a symbolsReadByIndex call at this same index made
+; immediately before (no intervening VMM-touching call in between, since
+; any of those -- another symbolsReadByIndex/Insert/Lookup call, or a raw
+; vmmWindowRead/Write -- clobbers the shared CasmVmmBuffer staging area),
+; patched the fields that changed (typically VAL_LO/HI and FLAGS), and left
+; everything else in the record untouched. Used by the Pass1->Pass2
+; constant-resolution sweep (casm.s) to persist a deferred named constant's
+; final value and CASM_SYMBOL_FLAG_RESOLVED once resolved.
+;
+; Inputs:  X/Y = record index (Lo/Hi); CasmVmmBuffer = the full 64-byte
+;              record to write
+; Outputs: C clear on success
+;          C set, A = CASM_DIAG_VMM_TRANSFER_FAILED (rejected vmmWindowWrite)
+; Clobbers: A, X, Y, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi, and OS API-defined
+;           volatile registers
+; ---------------------------------------------------------------------------
+symbolsUpdateByIndex:
+    stx CasmVmmOffLo
+    sty CasmVmmOffHi
+
+    ; VMM offset = index * CASM_SYMBOL_REC_SIZE (64): matches
+    ; symbolsReadByIndex's own offset math exactly.
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+    asl CasmVmmOffLo
+    rol CasmVmmOffHi
+
+    lda #CASM_SYMBOL_REC_SIZE
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmSymbolVmmSlot
+    jsr vmmWindowWrite
+    bcc suiOk
+    lda #CASM_DIAG_VMM_TRANSFER_FAILED
+    sec
+    rts
+suiOk:
+    clc
     rts

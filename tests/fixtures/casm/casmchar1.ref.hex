@@ -1,0 +1,30 @@
+# CASM Phase 12 WP69 trusted reference: casmchar1
+#
+# Independently hand-assembled from the casmchar1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves a
+# character literal produces correct bytes when reached through the real
+# production parser/emitter (posImmediateChar in parser.s, emitByteList's
+# own short-circuit in emit.s) -- both call sites bypass exprEvaluate
+# entirely (this WP's own scoping decision), so this is the only live
+# proof of that wiring; expr.s itself is unchanged.
+#
+# Source (.ORG $C000, fixed address -- no relocatable symbols involved):
+#   LDA #'A'         ; immediate, character literal = $41
+#   .BYTE 'H', 'I'   ; directive operands, character literals = $48, $49
+#
+# Source 'A'/'H'/'I' are plain ASCII uppercase in the fixture text, which
+# is numerically identical to unshifted PETSCII ($41-$5A) -- no charmap
+# translation applies to a raw .seq fixture (unlike a ca65-assembled .s
+# harness), and a character literal's content byte is taken verbatim, no
+# case folding either way.
+#
+# Hand assembly:
+#   00 C0     PRG load-address header ($C000, little-endian)
+#   A9 41     LDA #$41   ('A')
+#   48 49     .BYTE $48, $49   ('H', 'I')
+#
+# bytes: 6
+
+00 C0
+A9 41
+48 49

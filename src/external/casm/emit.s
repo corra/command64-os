@@ -25,6 +25,9 @@
 .import fileWrite
 .import lexerNext
 .import CasmTokenRecord
+.import CasmTokenText
+.import CasmStringLength
+.import CasmStringBuffer
 .import parserParseExpressionValue
 .import CasmCliOptions
 .import relocRecord
@@ -414,8 +417,43 @@ emitByteList:
 eblRead:
     jsr lexerNext
     bcs eblRet
+    ; WP69: a character literal is a direct 8-bit value, never a general
+    ; expression primary -- short-circuits straight to CasmTokenText[0],
+    ; bypassing parserParseExpressionValue/exprEvaluate entirely, same as
+    ; posImmediateChar (parser.s).
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_STRING
+    beq eblString
+    cmp #CASM_TOKEN_CHAR
+    bne eblExpr
+    lda CasmTokenText
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    lda #0
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    sta CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    jsr lexerNext                ; advance past CHAR, leave delimiter current
+    bcs eblRet
+    jmp eblStore
+eblString:
+    lda #0
+    sta CasmEmitScratch0
+eblStringLoop:
+    ldx CasmEmitScratch0
+    cpx CasmStringLength
+    beq eblStringDone
+    lda CasmStringBuffer, x
+    jsr emitByte
+    bcs eblRet
+    inc CasmEmitScratch0
+    jmp eblStringLoop
+eblStringDone:
+    jsr lexerNext                ; advance past STRING, leave delimiter current
+    bcs eblRet
+    jmp eblDelimiter
+eblExpr:
     jsr parserParseExpressionValue
     bcs eblRet
+eblStore:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     bne eblRange
     ; WP40: eblRange above already guarantees ValHi == 0 here, so the only
@@ -427,6 +465,7 @@ eblRead:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     jsr emitByte
     bcs eblRet
+eblDelimiter:
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_COMMA
     beq eblRead

@@ -48,6 +48,7 @@
 .import resourcesCleanup
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
 .import symbolsReadByIndex
 .import CasmSymbolVmmSlot
 .import vmmWindowRead
@@ -324,6 +325,8 @@ mapone1:
     sta CasmPtr0Lo
     lda #>nameOne
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #3
     ldx #$34
     ldy #$12
@@ -375,6 +378,8 @@ maporder1a:
     sta CasmPtr0Lo
     lda #>nameZebra
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #5
     ldx #$00                 ; ValLo=$00, ValHi=$11 -> displays "$1100"
     ldy #$11
@@ -410,6 +415,8 @@ maporder1b:
     sta CasmPtr0Lo
     lda #>nameApple
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #5
     ldx #$00                 ; ValLo=$00, ValHi=$22 -> displays "$2200"
     ldy #$22
@@ -450,6 +457,8 @@ mapcase1a:
     sta CasmPtr0Lo
     lda #>nameCaseLower
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$00                 ; ValLo=$00, ValHi=$01 -> displays "$0100"
     ldy #$01
@@ -485,6 +494,8 @@ mapcase1b:
     sta CasmPtr0Lo
     lda #>nameCaseUpper
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$00                 ; ValLo=$00, ValHi=$02 -> displays "$0200"
     ldy #$02
@@ -524,6 +535,8 @@ maplen31:
     sta CasmPtr0Lo
     lda #>nameLen31
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #31
     ldx #$FF
     ldy #$00
@@ -578,6 +591,8 @@ mapboundary1:
     sta CasmPtr0Lo
     lda #>nameZero
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$00
     ldy #$00
@@ -589,6 +604,8 @@ mapboundary1:
     sta CasmPtr0Lo
     lda #>nameMax
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #3
     ldx #$FF
     ldy #$FF
@@ -1119,6 +1136,8 @@ mffLoop:
     sta CasmPtr0Lo
     lda #>FullNameBuf
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx FullCounterLo
     ldy FullCounterHi
@@ -1222,6 +1241,8 @@ mf1InsertGo:
     sta CasmPtr0Lo
     lda #>FullNameBuf
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx FullCounterLo
     ldy FullCounterHi

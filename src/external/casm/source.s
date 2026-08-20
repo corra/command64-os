@@ -72,6 +72,8 @@
 .import CasmSourceResultLineLo
 .import CasmSourceResultLineHi
 .import CasmSourceResultColumn
+.import CasmSourceResultOffsetLo
+.import CasmSourceResultOffsetHi
 
 ; WP15 diagnostic line echo. Written here and never read by traversal: no
 ; source decision may depend on these.
@@ -118,6 +120,14 @@
 .export sourceLoad
 .export sourceAppendFile
 .export sourceFramePush
+; WP65: the single shared VMM allocation every file's raw bytes (top-level
+; and included) permanently live in -- lets the Pass1->Pass2 constant-
+; resolution sweep (casm.s) re-fetch a deferred reference's own identifier
+; text directly, keyed by the absolute offset CasmTokenStartOffsetLo/Hi
+; already stamps on every token. See CasmSourceResultOffsetLo/Hi's own
+; field comment (state.s) for why this offset is stable across the whole
+; assembly run.
+.export CasmSourceVmmSlot
 .export CasmFrameDepth
 ; WP47: the active chain's own physical identity, read by casmRunPass's
 ; `.INCLUDE` dispatch to name the *parent* of an include event when that
@@ -1413,7 +1423,9 @@ sourceFetchPhysical:
     bne sfpCursorFailNear
 
     jsr sourceRefill
-    bcs sfpFail                 ; refill failed; source already ERROR
+    bcc sfpRefillOk
+    jmp sfpFail                 ; refill failed; source already ERROR
+sfpRefillOk:
     cmp #CASM_SOURCE_EOF
     beq sfpEof
     ; Refill installed a nonempty block with index 0; a byte is now available.
@@ -1454,6 +1466,27 @@ sfpResultColumnStore:
     cmp #$FF
     beq sfpOffsetOverflow       ; offset == $FFFF -> another byte would overflow
 sfpOffsetOk:
+    ; WP65: absolute offset (within the single permanent shared VMM
+    ; allocation) of the byte about to be fetched = CasmSourceVmmCursorLo/Hi
+    ; (the offset one-past the end of the currently-installed block) minus
+    ; CasmSourceBlockLenLo/Hi (this block's own length, giving the block's
+    ; own start) plus CasmSourceBlockIndexLo/Hi (this byte's position within
+    ; the block, still unincremented here). See state.s's field comment.
+    lda CasmSourceVmmCursorLo
+    sec
+    sbc CasmSourceBlockLenLo
+    sta CasmSourceResultOffsetLo
+    lda CasmSourceVmmCursorHi
+    sbc CasmSourceBlockLenHi
+    sta CasmSourceResultOffsetHi
+    lda CasmSourceResultOffsetLo
+    clc
+    adc CasmSourceBlockIndexLo
+    sta CasmSourceResultOffsetLo
+    lda CasmSourceResultOffsetHi
+    adc CasmSourceBlockIndexHi
+    sta CasmSourceResultOffsetHi
+
     ; index < length and length <= 256 guarantee index high is zero here.
     ldx CasmSourceBlockIndexLo
     lda CasmIoBuffer,x

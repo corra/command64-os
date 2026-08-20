@@ -135,6 +135,22 @@ diagPrintFatal:
     bcc dpfListingRange
     cmp #CASM_DIAG_SYMBOL_MAP_INVALID
     beq dpfSymbolMapInvalid
+    cmp #CASM_DIAG_EXPR_CIRCULAR
+    beq dpfExprCircular
+    cmp #CASM_DIAG_EXPR_DIV_ZERO
+    beq dpfExprDivZero
+    cmp #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+    beq dpfExprRelocUnsupported
+    cmp #CASM_DIAG_EXPR_PAREN_TOO_DEEP
+    beq dpfExprParenTooDeep
+    cmp #CASM_DIAG_CHAR_UNTERMINATED
+    beq dpfCharUnterminated
+    cmp #CASM_DIAG_CHAR_INVALID_BYTE
+    beq dpfCharInvalidByte
+    cmp #CASM_DIAG_STRING_UNTERMINATED
+    beq dpfStringUnterminated
+    cmp #CASM_DIAG_STRING_INVALID_BYTE
+    beq dpfStringInvalidByte
     jmp dpfUnknown
 dpfListingRange:
     sec
@@ -169,6 +185,67 @@ dpfSymbolMapInvalid:
     ldx #<msgSymbolMapInvalid
     ldy #>msgSymbolMapInvalid
     jmp diagPrintString
+; WP65: locationless like dpfSymbolMapInvalid -- raised by the Pass1->Pass2
+; resolution sweep (casm.s), which runs after the live lexer/parser state
+; that diagSetLocFromToken depends on has already moved past the constant's
+; own definition statement; the record's VMM bookmark is a raw byte offset,
+; not a line/column, so there is no cheap way to recover a source position
+; here without a dedicated offset-to-line reverse lookup this project does
+; not have.
+dpfExprCircular:
+    ldx #<msgExprCircular
+    ldy #>msgExprCircular
+    jmp diagPrintString
+; WP68 Increment 6 Atomic Step 5: division by a static zero, raised by
+; combineStatic's own divide dispatch (Atomic Step 6) with
+; diagSetLocFromToken already called at the raise site -- same shape as
+; dpfExprRelocUnsupported/dpfExprParenTooDeep immediately below, not the
+; locationless single-step pattern.
+dpfExprDivZero:
+    ldx #<msgExprDivZero
+    ldy #>msgExprDivZero
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+; WP67: unlike dpfSymbolMapInvalid/dpfExprCircular above, both of these are
+; raised with a valid source location already set (diagSetLocFromToken, at
+; the raise site -- parseOperatorTail/parsePrimary in expr.s, both still
+; mid-parse when they fire, unlike the Pass1->Pass2 resolution sweep) --
+; same shape as dpfMainRange's own two-step print, not the locationless
+; single-step pattern.
+dpfExprRelocUnsupported:
+    ldx #<msgExprRelocUnsupported
+    ldy #>msgExprRelocUnsupported
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfExprParenTooDeep:
+    ldx #<msgExprParenTooDeep
+    ldy #>msgExprParenTooDeep
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+; WP69: both raised by lexer.s's lnChar with diagSetLocFromLookahead
+; already called at the raise site -- same two-step shape as
+; dpfExprRelocUnsupported/dpfExprParenTooDeep above, not the locationless
+; single-step pattern.
+dpfCharUnterminated:
+    ldx #<msgCharUnterminated
+    ldy #>msgCharUnterminated
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfCharInvalidByte:
+    ldx #<msgCharInvalidByte
+    ldy #>msgCharInvalidByte
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfStringUnterminated:
+    ldx #<msgStringUnterminated
+    ldy #>msgStringUnterminated
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfStringInvalidByte:
+    ldx #<msgStringInvalidByte
+    ldy #>msgStringInvalidByte
+    jsr diagPrintString
+    jmp diagPrintSourceContext
 dpfUnknown:
     ldx #<msgUnknown
     ldy #>msgUnknown
@@ -1417,6 +1494,31 @@ msgListingReplayMismatch:
     .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
 msgSymbolMapInvalid:
     .byte "CASM: SYMBOL MAP INVALID", PetCr, 0
+; WP65: locationless, same as msgSymbolMapInvalid above -- the resolution
+; sweep runs after the live lexer/parser have moved on, with no line/column
+; to attach (see dpfExprCircular's own comment).
+msgExprCircular:
+    .byte "CASM: CIRCULAR CONSTANT DEFINITION", PetCr, 0
+; WP68 Increment 6 Atomic Step 5: static division by zero.
+msgExprDivZero:
+    .byte "CASM: EXPRESSION DIVISION BY ZERO", PetCr, 0
+; WP67: a relocatable value reached a combine that already had one --
+; representable only as one symbol + a static addend (WP64's rule).
+msgExprRelocUnsupported:
+    .byte "CASM: EXPRESSION RELOCATION UNSUPPORTED", PetCr, 0
+; WP67: parenthesized sub-expression nesting exceeded CASM_EXPR_PAREN_MAX_
+; DEPTH (8).
+msgExprParenTooDeep:
+    .byte "CASM: EXPRESSION TOO DEEPLY NESTED", PetCr, 0
+; WP69: character literal ('x') diagnostics.
+msgCharUnterminated:
+    .byte "CASM: CHARACTER LITERAL UNTERMINATED", PetCr, 0
+msgCharInvalidByte:
+    .byte "CASM: CHARACTER LITERAL INVALID BYTE", PetCr, 0
+msgStringUnterminated:
+    .byte "CASM: STRING UNTERMINATED", PetCr, 0
+msgStringInvalidByte:
+    .byte "CASM: STRING INVALID BYTE", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.
@@ -1441,11 +1543,17 @@ tokNamesLo:
     .byte <tokNameDir, <tokNameReg, <tokNameNum, <tokNameComma
     .byte <tokNameColon, <tokNameHash, <tokNameLparen, <tokNameRparen
     .byte <tokNamePlus, <tokNameMinus, <tokNameLess, <tokNameGreater
+    .byte <tokNameEquals, <tokNameStar, <tokNameSlash, <tokNameAmpersand
+    .byte <tokNameCaret, <tokNamePipe, <tokNameTilde, <tokNameShl
+    .byte <tokNameShr, <tokNameChar, <tokNameString
 tokNamesHi:
     .byte >tokNameEof, >tokNameNewline, >tokNameId, >tokNameMnem
     .byte >tokNameDir, >tokNameReg, >tokNameNum, >tokNameComma
     .byte >tokNameColon, >tokNameHash, >tokNameLparen, >tokNameRparen
     .byte >tokNamePlus, >tokNameMinus, >tokNameLess, >tokNameGreater
+    .byte >tokNameEquals, >tokNameStar, >tokNameSlash, >tokNameAmpersand
+    .byte >tokNameCaret, >tokNamePipe, >tokNameTilde, >tokNameShl
+    .byte >tokNameShr, >tokNameChar, >tokNameString
 
 dirSubtypeNamesLo:
     .byte <dirNameUnknown, <dirNameOrg, <dirNameByte, <dirNameWord
@@ -1480,6 +1588,17 @@ tokNamePlus:      .byte "PLUS", 0
 tokNameMinus:     .byte "MINUS", 0
 tokNameLess:      .byte "LESS", 0
 tokNameGreater:   .byte "GREATER", 0
+tokNameEquals:    .byte "EQUALS", 0
+tokNameStar:      .byte "STAR", 0
+tokNameSlash:     .byte "SLASH", 0
+tokNameAmpersand: .byte "AMPERSAND", 0
+tokNameCaret:     .byte "CARET", 0
+tokNamePipe:      .byte "PIPE", 0
+tokNameTilde:     .byte "TILDE", 0
+tokNameShl:       .byte "SHL", 0
+tokNameShr:       .byte "SHR", 0
+tokNameChar:      .byte "CHAR", 0
+tokNameString:    .byte "STRING", 0
 msgUnknownTok:    .byte "UNKNOWN", 0
 
 dirNameUnknown:   .byte " (UNKNOWN)", 0

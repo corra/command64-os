@@ -6,18 +6,21 @@ An MS-DOS style operating system for the Commodore 64.
 
 - **`image.d64`** — the command64 OS disk. Boot this. It carries the OS
   itself plus every shipped utility and game: `DEBUG`, `LABEL`, `FORMAT`,
-  `COMP`, `CASM`, `EDLIN`, `CONWAY`, and `PACMAN` — plus `BANNER.S`, a
-  small CASM source file to assemble yourself.
+  `COMP`, `CASM`, `EDLIN`, `DASH`, `CONWAY`, and `PACMAN` — plus `BANNER.S`,
+  a small CASM source file to assemble yourself (BANNER is CASM-native and
+  ships as source only, by design — see "Things to try" below).
 - **`command64_casm_utils.d64`** — development utility disk containing the
   native CASM assembler source code files for the `DASH` dashboard (`dmain.s`,
-  `dscr.s`, `dfmt.s`, `dsys.s`, `dapp.s`, `dvmm.s`, and `ddata.s`), the
-  `casm.prg`, `edlin.prg`, and `comp.prg` utilities, and `dash.ref` to verify the build.
+  `dscr.s`, `dfmt.s`, `dsys.s`, `dapp.s`, `dvmm.s`, and `ddata.s`), `BANNER`'s
+  own source (`banner.s`) alongside its compiled `banner.prg`, and the
+  `casm.prg`, `edlin.prg`, and `comp.prg` utilities, plus `dash.ref` to
+  verify the build.
 - **`docs/`** — reference documentation. Start with `docs/user-manual.md`;
   see `docs/casm-utility.md` for the full CASM language reference (syntax,
-  directives, expressions, limits), `docs/banner-utility.md` and
-  `docs/edlin-utility.md` for utility guides, and `docs/api-reference.md` /
-  `docs/pet-sci-api.md` for the OS system-call interface external
-  programs use.
+  directives, expressions, limits), `docs/dash-utility.md`,
+  `docs/banner-utility.md`, and `docs/edlin-utility.md` for utility guides,
+  and `docs/api-reference.md` / `docs/pet-sci-api.md` for the OS
+  system-call interface external programs use.
 
 ## Requirements
 
@@ -45,6 +48,9 @@ You'll see the command64 banner and the `C64:>` prompt.
   and the shell's LOAD/RUN path work together.
 - `EDLIN <filename>` — write or edit 6502 source (or any text file) with
   the ported MS-DOS line editor.
+- `LOAD DASH` then `RUN` — a three-page system dashboard (System info,
+  live Applications registry, VMM/REU hardware self-test), itself
+  assembled entirely by native CASM. `F1`/`F3`/`F5` switch pages.
 - `CONWAY` — a toroidal Game-of-Life with nine presets and custom rules.
 - `PACMAN` — an in-progress character-grid Pac-Man clone.
 - `DEBUG` — a machine-language monitor and memory editor with MS-DOS

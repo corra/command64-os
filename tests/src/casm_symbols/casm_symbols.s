@@ -44,6 +44,7 @@
 .import resourcesCleanup
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
 .import symbolsLookup
 .import CasmSymbolVmmSlot
 .import vmmWindowRead
@@ -194,6 +195,8 @@ symins1:
     sta CasmPtr0Lo
     lda #>nameLoop
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$34
     ldy #$12
@@ -298,6 +301,8 @@ symdup1:
     sta CasmPtr0Lo
     lda #>nameLoop
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$99
     ldy #$88
@@ -331,6 +336,8 @@ symcase1:
     sta CasmPtr0Lo
     lda #>nameCaseLower
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$01
     ldy #$00
@@ -345,6 +352,8 @@ symcase1:
     sta CasmPtr0Lo
     lda #>nameCaseUpper
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$02
     ldy #$00
@@ -391,6 +400,8 @@ ch1FillLoop:
     sta CasmPtr0Lo
     lda #>ChainNameBuf
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #3
     ldx ChainCounter
     ldy #0
@@ -454,6 +465,8 @@ symlen1:
     sta CasmPtr0Lo
     lda #>nameLen31
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #31
     ldx #$78
     ldy #$56
@@ -566,6 +579,8 @@ fl1FillLoop:
     sta CasmPtr0Lo
     lda #>FullNameBuf
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx FullCounterLo
     ldy FullCounterHi
@@ -595,6 +610,8 @@ fl1FillLoop:
     sta CasmPtr0Lo
     lda #>FullNameBuf
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx #$AA
     ldy #$BB
@@ -627,6 +644,8 @@ symlenmin1:
     sta CasmPtr0Lo
     lda #>nameLen1
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #1
     ldx #$34
     ldy #$12
@@ -682,6 +701,8 @@ symvalzero1:
     sta CasmPtr0Lo
     lda #>nameValZero
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #6
     ldx #$00
     ldy #$00
@@ -728,6 +749,8 @@ symvalmax1:
     sta CasmPtr0Lo
     lda #>nameValMax
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #5
     ldx #$FF
     ldy #$FF
@@ -801,6 +824,8 @@ s511FillLoop:
     sta CasmPtr0Lo
     lda #>Sym511NameBuf
     sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda #4
     ldx Sym511CounterLo
     ldy Sym511CounterHi

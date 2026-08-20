@@ -1,0 +1,61 @@
+# CASM Phase 12 WP70 trusted reference: casmrelacc
+#
+# Independently hand-assembled from the casmrelacc fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves the
+# "accepted" side of WP64's representability contract -- a relocatable
+# label combined with a static addend via '+', with the static side
+# wrapped in an explicit parenthesized group -- through the real R6
+# relocation table, for the first time reached via WP67's recursive
+# parsePrimary/parseOperatorTail architecture rather than the old flat
+# single-addend evaluator every pre-Phase-12 R6-verified fixture
+# (casmrelop1/casmrelop2/casmreloc1) used exclusively. No existing
+# fixture anywhere combines a relocatable label with an addend AND
+# verifies the resulting R6 table -- confirmed by reading every one of
+# them (WP70 plan's own Research Findings).
+#
+# Source (no .ORG -- default relocatable output, base $3400):
+#   - START: JMP MID
+#   - MID: LDA TARGET+(1+0)
+#   - TARGET: NOP
+#
+# START = $3400. JMP MID is 3 bytes ($3400-$3402, absolute, MID's own
+# address is not yet known at this point but resolves to $3403). MID =
+# $3403. LDA TARGET+(1+0) is 3 bytes ($3403-$3405, absolute -- TARGET is
+# symbol-derived so FORCE_ABS applies regardless of value): the '+'
+# combines relocatable TARGET with the static group (1+0)=1, accepted
+# per WP64's rule (one relocatable + one static). TARGET = $3406
+# (immediately after this instruction). TARGET+(1+0) = $3406+1 = $3407.
+# The NOP defining TARGET ($EA) is at $3406.
+#
+# MID is itself a label in this same relocatable assembly, so JMP MID is
+# ALSO a relocatable reference in its own right (easy to miss when
+# focused on TARGET as "the" test subject -- caught by the real COMP
+# mismatch below, not assumed correct from the design alone) -- the same
+# "JMP LABEL, absolute, high byte relocatable" pattern casmrelop1.ref.hex
+# already established at its own offset 2.
+#
+# Hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   4C 03 34     JMP $3403                    (MID)
+#   AD 07 34     LDA $3407                    (TARGET+(1+0) = $3406+1)
+#   EA           NOP                          (at $3406, defines TARGET)
+#   02 00        R6 table entry: offset 2 (JMP MID's high byte)
+#   05 00        R6 table entry: offset 5 (LDA's high byte) -- only the
+#                high byte of a page-relocated absolute address ever
+#                needs patching, matching casmrelop1's own established
+#                pattern
+#   00 34        R6 footer: base address ($3400, little-endian)
+#   02 00        R6 footer: relocation entry count (2)
+#   52 36        R6 footer: ASCII magic "R6"
+#
+# bytes: 19
+
+00 34
+4C 03 34
+AD 07 34
+EA
+02 00
+05 00
+00 34
+02 00
+52 36

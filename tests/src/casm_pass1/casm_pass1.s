@@ -101,6 +101,7 @@
 .import CasmPassMode
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
 .import symbolsLookup
 
 .export CasmSourceNames  ; this harness's own copy -- NOT linking cli.s, see header
@@ -149,6 +150,9 @@ start:
     jsr reportCase
     jsr resourcesCleanup
     jsr p1size1
+    jsr reportCase
+    jsr resourcesCleanup
+    jsr p1string1
     jsr reportCase
 
     lda #$0D
@@ -257,10 +261,13 @@ rmpParseOk:
     jmp rmpLoop               ; NEWLINE: nothing to do
 
 rmpLabel:
-    ; symbolsInsert wants: CasmPtr0Lo/Hi = namePtr, A = nameLen, X/Y = value.
-    ; Stage the pointer first, then reload A/X/Y with the actual arguments
-    ; (A is loaded before X/Y so the subsequent stx/sty/ldx/ldy sequence
-    ; never clobbers it before the call).
+    ; symbolsInsert wants: CasmPtr0Lo/Hi = namePtr, A = nameLen, X/Y = value,
+    ; CasmSymbolInsertFlags = record flags (WP65 -- no longer hardcoded
+    ; inside symbolsInsert). Stage the pointer first, then reload A/X/Y with
+    ; the actual arguments (A is loaded before X/Y so the subsequent
+    ; stx/sty/ldx/ldy sequence never clobbers it before the call).
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
@@ -628,6 +635,8 @@ p1dpLabel:
     beq p1dpSecondLabel
 
     ; First label: expect a clean insert.
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
@@ -642,6 +651,8 @@ p1dpLabel:
 
 p1dpSecondLabel:
     ; Second label: expect CASM_DIAG_DUPLICATE_SYMBOL specifically.
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
     lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
@@ -797,6 +808,27 @@ p1szFail:
     sec
     rts
 
+; WP74 Increment 3: an empty STRING plus numeric, character, non-empty STRING,
+; and expression items emit four bytes total in measure mode.
+p1string1:
+    jsr symbolsInit
+    bcs p1strFail
+    ldx #<p1string1Name
+    ldy #>p1string1Name
+    jsr runMeasurePass
+    bcs p1strFail
+    lda CasmPc
+    cmp #$04
+    bne p1strFail
+    lda CasmPc + 1
+    cmp #$C0
+    bne p1strFail
+    clc
+    rts
+p1strFail:
+    sec
+    rts
+
 .segment "RODATA"
 
 passMsg:
@@ -818,6 +850,7 @@ p1back1Name:        .byte "P1BACK1.S", 0
 p1undef1Name:       .byte "P1UNDEF1.S", 0
 p1dup1Name:         .byte "P1DUP1.S", 0
 p1size1Name:        .byte "P1SIZE1.S", 0
+p1string1Name:      .byte "P1STRING1.S", 0
 
 ; Label-name literals for symbolsLookup: bare bytes, no terminator (length
 ; is passed separately in A), matching tests/src/casm_symbols/casm_symbols.s's

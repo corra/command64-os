@@ -124,12 +124,26 @@ mapValidateRecord:
     cmp #32
     bcs mvrInvalid            ; >=32 exceeds the 31-byte Name slot
 
-    ; Flags must be exactly CASM_SYMBOL_FLAG_DEFINED -- DEFINED set, every
-    ; reserved bit clear. A future flag bit would need this rule revisited
-    ; deliberately, not silently accepted as "valid" data.
+    ; Flags must be exactly CASM_SYMBOL_FLAG_DEFINED (a label),
+    ; DEFINED|CONSTANT|RESOLVED (a fully-resolved named constant with no
+    ; label anywhere in its own reference chain), or
+    ; DEFINED|CONSTANT|RESOLVED|LABEL_DERIVED (a fully-resolved named
+    ; constant whose chain bottoms out at a label -- WP65's Increment 8).
+    ; By the time Pass 2/map output runs, every constant has already
+    ; passed through casmResolveConstants; an unresolved constant
+    ; surviving to here is a bug in that sweep, not a valid row, and
+    ; correctly still trips CASM_DIAG_SYMBOL_MAP_INVALID. An explicit
+    ; allowlist, not a mask -- any other combination would need this rule
+    ; revisited deliberately, not silently accepted.
     lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
     cmp #CASM_SYMBOL_FLAG_DEFINED
-    bne mvrInvalid
+    beq mvrFlagsOk
+    cmp #(CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_CONSTANT | CASM_SYMBOL_FLAG_RESOLVED)
+    beq mvrFlagsOk
+    cmp #(CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_CONSTANT | CASM_SYMBOL_FLAG_RESOLVED | CASM_SYMBOL_FLAG_LABEL_DERIVED)
+    beq mvrFlagsOk
+    jmp mvrInvalid
+mvrFlagsOk:
 
     ; Reserved padding (offsets 37-63) must be zero-filled, per symbolsInsert.
     ldy #37

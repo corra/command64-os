@@ -132,9 +132,6 @@ set(PACMAN_ENTRY "src/external/pacman/pacman_main.s")
 set(PACMAN_AUTOTILE "${CMAKE_SOURCE_DIR}/src/external/pacman/autotile.py")
 set(PACMAN_GAME_SOURCE "${CMAKE_SOURCE_DIR}/src/external/pacman/pacman_game.s")
 
-file(GLOB_RECURSE BANNER_SRCS CONFIGURE_DEPENDS "src/external/banner/*.s" "src/external/banner/*.inc" "include/ca65/*.inc")
-set(BANNER_ENTRY "src/external/banner/banner.s")
-
 file(GLOB_RECURSE DASH_SRCS CONFIGURE_DEPENDS "src/external/dash/*.s" "src/external/dash/*.inc" "include/ca65/*.inc")
 set(DASH_ENTRY "src/external/dash/dash_wrapper.s")
 
@@ -317,7 +314,26 @@ if(Ca65_FOUND)
     # routines) overflowed $5000 by 1052 measured bytes; $5400 (+1024)
     # would still overflow, so $5500 (+1280) is the smallest round-page
     # step that fits.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "5500")
+    # WP65 (Increment 3): $5500 -> $6000, per WP64's own recommendation
+    # (brain/plans/2026-08-13-casm-phase12-wp64-contract-freeze.md) --
+    # $5500 overflowed by 8 measured bytes once the new CASM_TOKEN_EQUALS
+    # lexer/diagnostics plumbing and symbols.s's WP65 ABI extension were
+    # both in place; $6000 (+2816) is the WP64-approved envelope for the
+    # whole of Phase 12, not resized incrementally per WP.
+    # WP68 Increment 6 Atomic Step 5: $6000 -> $6100 -- activating
+    # CASM_DIAG_EXPR_DIV_ZERO's message text and dispatch (diagnostics.s)
+    # plus the divisor-zero check in expr.s's staticDiv overflowed $6000 by
+    # 41 measured BSS-placement bytes; $6100 (+256) is the smallest
+    # round-page fit. User-approved 2026-08-15.
+    # WP69: $6100 -> $6200 -- the character-literal lexer scan (lnChar),
+    # two new diagnostics, and the posImmediate/.BYTE short-circuit
+    # integration overflowed $6100 by 235 measured bytes; $6200 (+256) is
+    # the smallest round-page fit. User-approved 2026-08-15.
+    # WP74 Increment 2: the 256-byte bounded string buffer, scanner, token-
+    # dump names, and two diagnostics overflowed $6200 by 529 bytes. The
+    # initially approved $6400 ceiling was 17 bytes short; user approved the
+    # measured amendment to $6500, the smallest fitting round-page envelope.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6500")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -338,13 +354,8 @@ else()
 endif()
 set(CONWAY_TARGET conway)
 
-# 4. BANNER External Command PRG Target — renders 5x6 block PETSCII text messages.
-if(Ca65_FOUND)
-    add_ca65_app(banner "${BANNER_ENTRY}" BANNER_SRCS 1000 "0800")
-else()
-    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for BANNER target")
-endif()
-set(BANNER_TARGET banner)
+# BANNER is CASM-native (no ca65 build) — see the manifest-derived `banner`
+# target below, alongside `dash`'s own manifest target, for the same reason.
 
 # DASH_REF Reference Target — host ca65/ld65 build of the very same seven
 # sources, existing only to be compared byte-for-byte against native CASM
@@ -447,7 +458,38 @@ if(Ca65_FOUND)
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/expr.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1000")
+            # WP68 Increment 4: $1000 -> $1100 -- nine bitwise/unary
+            # fixtures plus evaluator growth overflowed $1000 by 161
+            # measured bytes; $1100 is the smallest round-page fit.
+            # WP68 Increment 5: $1100 -> $1200 -- seven checked-shift
+            # fixtures plus evaluator growth overflowed $1100 by 225
+            # measured RODATA bytes. At $1200, ld65 could place RODATA and
+            # then exposed BSS 55 bytes beyond MAIN; total use is $1237, so
+            # $1300 is the true smallest round-page fit.
+            # WP68 Increment 6 Atomic Step 4: $1300 -> $1400 -- checked
+            # multiplication (mulUnsigned16) plus its eight boundary
+            # fixtures overflowed $1300 by 119 measured RODATA bytes; $1400
+            # (+256) is the smallest round-page fit. User-approved 2026-08-15.
+            # WP68 Increment 6 Atomic Step 6: $1400 -> $1500 -- bounded
+            # division (divUnsigned16) plus its six boundary fixtures
+            # overflowed $1400 by 240 measured RODATA bytes; $1500 (+256) is
+            # the smallest round-page fit. User-approved 2026-08-15. Same
+            # staged-segment-reporting behavior as Increment 5: at $1500,
+            # RODATA fit but ld65 then reported BSS extending 83 bytes
+            # beyond MAIN; true total use is $1583, so $1600 (+256 from
+            # $1500) is the corrected smallest round-page fit.
+            # User-approved 2026-08-15.
+            # WP68 Increment 6 Atomic Step 7: $1600 -> $1700 -- 11
+            # precedence/associativity/unary/current-address/relocation/
+            # unresolved fixtures overflowed $1600 by 98 measured RODATA
+            # bytes; $1700 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-15.
+            # WP72: $1700 -> $1800 -- one new resolved-non-label-derived-
+            # constant fixture (proving expr.s::identifier no longer forces
+            # SYMBOL_DERIVED for a plain equate) overflowed $1700 by 23
+            # measured BSS bytes; $1800 (+256) is the smallest round-page
+            # fit. User-approved 2026-08-17.
+            set(TEST_PRG_SIZE "1800")
         endif()
         if(TEST_NAME STREQUAL "casm_vmm")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -512,7 +554,10 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc"
                 "${CMAKE_SOURCE_DIR}/tests/src/casm_faultinject/faultstub.inc")
-            set(TEST_PRG_SIZE "2D00")
+            # WP74 Increment 6: diagnostics.s's STRING messages/routing
+            # overflowed the prior $2D00 whole-link envelope by 39 bytes.
+            # User approved $2E00, the smallest fitting page.
+            set(TEST_PRG_SIZE "2E00")
         endif()
         if(TEST_NAME STREQUAL "casm_fsym")
             # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
@@ -688,7 +733,10 @@ if(Ca65_FOUND)
             # expectByte/expectNewline/expectEof call sites) overflowed
             # $2C00 by 644 measured bytes; $3000 (+1024) is the smallest
             # round-page step that fits.
-            set(TEST_PRG_SIZE "3000")
+            # WP74 Increment 6: $3000 -> $3100 -- STRING diagnostics and
+            # token names overflowed the shared diagnostics consumer by 89
+            # measured bytes; $3100 is the smallest page-aligned fit.
+            set(TEST_PRG_SIZE "3100")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -826,7 +874,44 @@ if(Ca65_FOUND)
             # harness) overflowed $4C00 by 1072 measured bytes; $5000
             # (+1024) would still overflow, so $5100 (+1280) is the
             # smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5100")
+            # WP65 Increment 4: $5100 -> $5200 -- source.s/lexer.s/state.s's
+            # new WP65 absolute-token-offset provenance fields (unused by
+            # this harness's own label-only two-pass drive) overflowed
+            # $5100 by 43 measured bytes; $5200 (+256) is the smallest
+            # round-page step that fits.
+            # WP65 Increment 4 (parser grammar): $5200 -> $5300 --
+            # parser.s's new ppsConstant routine and CasmConstant* staging
+            # fields (unused by this harness, which never defines a named
+            # constant) overflowed $5200 by 66 measured bytes.
+            # WP66: $5300 -> $5400 -- expr.s's new curAddr primary-dispatch
+            # arm and the lexer's new '*' punctuation-table row (this
+            # harness never evaluates '*') overflowed $5300 by 12 measured
+            # bytes; $5400 (+256) is the smallest round-page step that fits.
+            # WP67: $5400 -> $5500 -- expr.s's precedence-climbing rewrite
+            # (parsePrimary/parseOperatorTail, parenthesized-group support)
+            # overflowed $5400 by 70 measured bytes.
+            # WP68 Increment 3: $5500 -> $5600 -- the generalized minimum-
+            # precedence recursion contract overflowed $5500 by 130 measured
+            # bytes; $5600 (+256) is the smallest round-page step that fits.
+            # WP68 Increment 4: $5600 -> $5700 -- bitwise/unary evaluator
+            # growth overflowed $5600 by 175 measured bytes; $5700 (+256)
+            # is the smallest round-page step that fits.
+            # WP68 Increment 5: $5700 -> $5800 -- checked-shift evaluator
+            # growth overflowed $5700 by 2 measured bytes; $5800 (+256) is
+            # the smallest round-page step that fits.
+            # WP68 Increment 6 Atomic Step 6: $5800 -> $5900 -- bounded
+            # division (divUnsigned16) overflowed $5800 by 87 measured BSS
+            # bytes; $5900 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-15.
+            # WP69: $5900 -> $5A00 -- the character-literal lexer/parser
+            # integration overflowed $5900 by 150 measured bytes; $5A00
+            # (+256) is the smallest round-page fit. User-approved 2026-08-15.
+            # WP74 Increment 3: shared STRING lexer storage/scanner and
+            # emitByteList integration overflowed $5A00 by 480 bytes before
+            # this harness's own string fixture. The mixed-list fixture then
+            # exceeded the initially approved $5C00 ceiling by 21 bytes; user
+            # approved $5D00, the revised smallest fitting page.
+            set(TEST_PRG_SIZE "5D00")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -875,7 +960,33 @@ if(Ca65_FOUND)
             # listingWriteFile formatters/serializer (unused by this
             # harness) overflowed $4900 by 901 measured bytes; $4D00
             # (+1024) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "4D00")
+            # WP65: same whole-object surface as casm_pass1 -- source.s/
+            # lexer.s/state.s's absolute-token-offset provenance fields,
+            # symbols.s's ABI extension, parser.s's ppsConstant, and
+            # expr.s's constant-aware relocatable classification (all
+            # unused by this harness's own width/agreement-only coverage)
+            # overflowed $4D00 by 508 measured bytes; $4E00 (+256) would
+            # still overflow, so $4F00 (+512) is the smallest round-page
+            # step that fits.
+            # WP65 (addend-consumption fix): $4F00 -> $5000 -- ppsConstant's
+            # corrected addend handling overflowed $4F00 by 42 measured
+            # bytes.
+            # WP67: $5000 -> $5100 -- expr.s's precedence-climbing rewrite
+            # (parsePrimary/parseOperatorTail, parenthesized-group support)
+            # overflowed $5000 by 139 measured bytes.
+            # WP68 Increment 6 Atomic Step 6: $5100 -> $5B00 -- this cap was
+            # never bumped alongside casm_pass1's own three WP68 increment
+            # bumps (Increments 3/4/5, +130/+175/+2 bytes respectively) even
+            # though both harnesses whole-link the same expr.s/diagnostics.s
+            # growth; discovered only now because no narrow WP68 build had
+            # rebuilt this specific target since WP67. A pre-existing latent
+            # defect outside Atomic Step 6's own scope, not something this
+            # step's own division code caused by itself -- user-approved
+            # fixing inline rather than deferring, since the fix is the same
+            # mechanical cap bump used everywhere else in this plan.
+            # Measured overflow at $5100 was 924 bytes; $5B00 (+2560) is the
+            # smallest round-page fit. User-approved 2026-08-15.
+            set(TEST_PRG_SIZE "5B00")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -883,7 +994,19 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1200")
+            # WP66: $1200 -> $1300 -- parser.s's new '*'-RHS constant
+            # dispatch (CasmConstantIsCurAddr, the @curAddr arm) and
+            # lexer.s's new punctuation-table row (unused by this harness)
+            # overflowed $1200 by 63 measured bytes; $1300 (+256) is the
+            # smallest round-page step that fits.
+            # WP74 prerequisite audit: subsequent shared lexer/parser growth
+            # had left this target's recorded envelope stale; the unchanged
+            # baseline overflowed $1300 by 105 bytes. User approved correcting
+            # the pre-existing defect inline; $1400 is the smallest page fit.
+            # WP74 Increment 6: the implemented STRING scanner/storage then
+            # overflowed $1400 by 223 bytes. $1500 is the smallest page fit,
+            # within the approved $1600 ceiling.
+            set(TEST_PRG_SIZE "1500")
         endif()
         if(TEST_NAME STREQUAL "casm_catalog")
             # WP45: include.s plus every module sourceAppendFile transitively
@@ -987,7 +1110,33 @@ if(Ca65_FOUND)
             # (+1024) is the smallest round-page step that fits.
             # WP59 increment 4: retryable listing close/registration cleanup
             # overflowed $5000 by 18 measured bytes.
-            set(TEST_PRG_SIZE "5100")
+            # WP65: symbols.s's ABI extension, source.s/lexer.s/state.s's
+            # absolute-token-offset provenance fields, and expr.s's
+            # constant-aware relocatable classification (all unused by this
+            # harness's own label-only frame-traversal coverage) overflowed
+            # $5100 by 358 measured bytes; $5200 (+256) would still
+            # overflow, so $5300 (+512) is the smallest round-page step
+            # that fits.
+            # WP66: $5300 -> $5400 -- expr.s's new curAddr primary-dispatch
+            # arm and parser.s's new '*'-RHS constant handling (unused by
+            # this harness) overflowed $5300 by 13 measured bytes; $5400
+            # (+256) is the smallest round-page step that fits.
+            # WP67: $5400 -> $5500 -- diagnostics.s's two new message-table
+            # entries (msgExprRelocUnsupported/msgExprParenTooDeep, unused
+            # by this harness) overflowed $5400 by 98 measured bytes.
+            # WP68 Increment 6 Atomic Step 6: $5500 -> $5900 -- same
+            # pre-existing latent gap as casm_pass1/casm_passcheck above:
+            # this cap was never bumped alongside WP68 Increments 3/4/5's
+            # own expr.s/diagnostics.s growth, discovered only now. Measured
+            # overflow at $5500 was 774 bytes; $5900 (+1024) is the smallest
+            # round-page fit. User-approved 2026-08-15.
+            # WP69: $5900 -> $5A00 -- the character-literal lexer/parser
+            # integration overflowed $5900 by 69 measured bytes; $5A00
+            # (+256) is the smallest round-page fit. User-approved 2026-08-15.
+            # WP74 Increment 6: STRING lexer/emitter/diagnostic growth
+            # overflowed $5A00 by 399 bytes; $5B00 is insufficient, so $5C00
+            # is the smallest fit and the approved WP74 ceiling.
+            set(TEST_PRG_SIZE "5C00")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1046,7 +1195,40 @@ if(Ca65_FOUND)
             # listingWriteFile formatters/serializer (unused by this
             # harness) overflowed $5100 by 923 measured bytes; $5500
             # (+1024) is the smallest round-page step that fits.
-            set(TEST_PRG_SIZE "5500")
+            # WP65 Increment 2: $5500 -> $5600 -- symbols.s's new
+            # CasmSymbolInsertFlags/CasmSymbolInsertRef* scratch bytes
+            # (unused by this harness's own label-only real-path capture)
+            # overflowed $5500 by 53 measured bytes; $5600 (+256) is the
+            # smallest round-page step that fits.
+            # WP65 (Increments 4-8): $5600 -> $5800 -- source.s/lexer.s/
+            # state.s's absolute-token-offset provenance fields,
+            # parser.s's ppsConstant, and expr.s's constant-aware
+            # relocatable classification (all unused by this harness's own
+            # label-only coverage) overflowed $5600 by 282 measured bytes;
+            # $5700 (+256) would still overflow, so $5800 (+512) is the
+            # smallest round-page step that fits.
+            # WP67: $5800 -> $5A00 -- expr.s's precedence-climbing rewrite
+            # (parsePrimary/parseOperatorTail, parenthesized-group support)
+            # overflowed $5800 by 169 measured bytes; $5900 (+256) would
+            # still overflow, so $5A00 (+512) is the smallest round-page
+            # step that fits.
+            # WP68 Increment 6 Atomic Step 6: $5A00 -> $5D00 -- same
+            # pre-existing latent gap as casm_pass1/casm_passcheck/
+            # casm_frame above: never bumped alongside WP68 Increments
+            # 3/4/5's own expr.s/diagnostics.s growth, discovered only now.
+            # Measured overflow at $5A00 was 698 bytes; $5D00 (+768) is the
+            # smallest round-page fit. User-approved 2026-08-15.
+            # WP69: $5D00 -> $5E00 -- the character-literal lexer/parser
+            # integration overflowed $5D00 by 249 measured bytes; $5E00
+            # (+256) is the smallest round-page fit. User-approved
+            # 2026-08-15.
+            # WP74 prerequisite audit: later shared-module growth left the
+            # baseline 9 bytes beyond $5E00. User approved correcting this
+            # pre-existing defect inline; $5F00 is the smallest page fit.
+            # WP74 Increment 6: STRING lexer/emitter/diagnostic growth
+            # overflowed $5F00 by 323 bytes; $6000 is insufficient, so $6100
+            # is the smallest fit and the approved WP74 ceiling.
+            set(TEST_PRG_SIZE "6100")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1086,10 +1268,15 @@ endif()
 set(SYNC_FILES
     api-reference.md
     banner-utility.md
+    casm-programmers-reference.md
     casm-utility.md
+    conway-utility.md
+    dash-utility.md
     debug-test-plan.md
     debug-utility.md
     edlin-utility.md
+    label-utility.md
+    pacman-utility.md
     pet-sci-api.md
     programmers-reference.md
     user-manual.md
@@ -1156,6 +1343,32 @@ add_custom_command(
 )
 add_custom_target(dash ALL DEPENDS "${DASH_BIN}")
 set_target_properties(dash PROPERTIES C64_PRG_PATH "${DASH_BIN}")
+
+# BANNER Production Target — generated from its own reviewed hex manifest,
+# same shape as DASH's above but for a single source file and with no ca65
+# cross-check step: BANNER has no ca65 build at all (see the plan at
+# brain/plans/2026-08-20-banner-casm-native-migration.md), so there is no
+# second toolchain's output to guard the manifest against. Regenerating
+# banner.ref.hex is a deliberate, reviewed act
+# (scripts/build_banner_manifest.py), never a build step.
+set(BANNER_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/banner/banner.ref.hex")
+set(BANNER_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/banner")
+set(BANNER_BIN "${CMAKE_BINARY_DIR}/banner.prg")
+add_custom_command(
+    OUTPUT "${BANNER_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${BANNER_MANIFEST}" "${BANNER_BIN}"
+        "--source-dir" "${BANNER_SOURCE_DIR}"
+    DEPENDS "${BANNER_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${BANNER_SOURCE_DIR}/banner.s"
+    COMMENT "Generating BANNER production binary from manifest"
+    VERBATIM
+)
+add_custom_target(banner ALL DEPENDS "${BANNER_BIN}")
+set_target_properties(banner PROPERTIES C64_PRG_PATH "${BANNER_BIN}")
+set(BANNER_TARGET banner)
 
 # 6. Disk images
 # TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS
@@ -1251,6 +1464,25 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_bounds)
 # WP61 Increment 5's lexer-only length-32 harness is likewise self-contained
 # (no parser.s/source.s/state.s); test.d64's directory track is still full.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_lexer)
+# WP68 Increment 6 Atomic Step 2: test.d64 was down to its final 3 free
+# blocks after Increment 5's expression-evaluator growth. test_casm_expr
+# moves to the new self-bootable casm_phase12_test_d64 (see below), which
+# becomes its canonical home for Phase 12's continuing operator growth.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_expr)
+# WP74 added a ninth casm_pass1.s subtest (p1string1) requiring a new
+# p1string1.s fixture, but test.d64's directory track was already full
+# (see the many removals above), so p1string1.s was packaged only onto
+# casm_phase12_test.d64, never test.d64 -- while test_casm_pass1 itself
+# stayed on both disks. The shared PRG unconditionally runs all nine
+# subtests regardless of which disk it boots from, so the copy on
+# test.d64 deterministically failed its p1string1 subtest (its required
+# fixture file was simply absent there), discovered live during CASM
+# Phase 12 WP75's consolidated verification session. Fix: move
+# test_casm_pass1 off test.d64 entirely, matching test_casm_expr's own
+# precedent immediately above -- casm_phase12_test.d64 already carries
+# the complete eight-file fixture set (tests/AGENTS.md) and is its
+# canonical home.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_pass1)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
@@ -1315,6 +1547,10 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrd.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrh.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmnumerrb.seq"
+    # WP68 Increment 6 Atomic Step 5: minimal production proof of
+    # CASM_DIAG_EXPR_DIV_ZERO's message routing through the real casm.prg
+    # binary.
+    "${CASM_TEST_FIXTURE_DIR}/casmdivzero.seq"
     # WP20 production expression-adapter fixtures
     "${CASM_TEST_FIXTURE_DIR}/casmexprn.seq"
     "${CASM_TEST_FIXTURE_DIR}/casmexpru.seq"
@@ -1326,6 +1562,7 @@ set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/p1undef1.seq"
     "${CASM_TEST_FIXTURE_DIR}/p1dup1.seq"
     "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
+    "${CASM_TEST_FIXTURE_DIR}/p1string1.seq"
     # WP30 relative-branch fixtures
     "${CASM_TEST_FIXTURE_DIR}/brfwd1.seq"
     "${CASM_TEST_FIXTURE_DIR}/brback1.seq"
@@ -1394,7 +1631,9 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmrelop1 casmrelop2
     casmreloc1
     casmopall
-    casmfa2p)
+    casmfa2p
+    casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
+    casmfwdstale1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -1578,12 +1817,29 @@ add_dependencies(command64_casm_utils_d64 dash_ref)
 # free block before WP52. Moved to casm_listing_test_d64 (523 blocks free)
 # instead: a 4-block, fixture-free PRG relocates with zero coupling risk,
 # smaller blast radius than trimming any of this disk's real CASM fixtures.
+#
+# WP65: same problem, same fix. parser.s/lexer.s/state.s's growth (the new
+# named-constant grammar, symbol-table ABI extension, and absolute-token-
+# offset provenance fields, all linked whole into every harness here
+# regardless of whether it exercises the constant path) overflowed this
+# disk to 0 free blocks. test_casm_faultvmm (7 blocks) is this disk's
+# smallest PRG and, like test_l15release before it, carries no dedicated
+# fixture-append step of its own (no add_custom_command targets it
+# specifically) -- moved to casm_listing_test_d64 for the same
+# zero-coupling reason.
 add_c64_disk_image(casm_overflow_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_overflow_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
     PRGS casm comp test_casm_include test_casm_catalog test_casm_event
-         test_casm_faultvmm test_casm_faultsource test_casm_fsym test_casm_freloc
+         test_casm_faultsource
+    # WP66: test_casm_freloc relocated to casm_include_test_d64 (below,
+    # ~540 free blocks) -- test_casm_include's own WP66 envelope bump
+    # ($1200 -> $1300, parser.s's new '*'-RHS constant handling) grew its
+    # PRG by a block, leaving this disk 1 block short for casmcat5.seq.
+    # Same precedent as WP52's test_l15release move and WP65's own
+    # test_casm_faultvmm move off a full disk -- relocate the smallest,
+    # most self-contained PRG rather than trim fixture content.
 )
 add_dependencies(casm_overflow_test_d64 casm_test_fixtures)
 add_dependencies(casm_overflow_test_d64 casm_reference_fixtures)
@@ -1604,9 +1860,223 @@ add_c64_disk_image(casm_include_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 casm comp
+    # WP67: test_casm_bounds/test_casm_cliderive/test_casm_lexer relocated
+    # here from casm_listing_test_d64 (0 free blocks after WP67's own
+    # envelope growth left no runtime headroom for test_casm_listcap's own
+    # output writes) -- 208 free blocks here comfortably absorb all three.
+    # WP74 Increment 6: test_casm_fsym moved here from the overflow image;
+    # unlike the full listing image, this image retains fixture capacity.
+    # WP75 Increment 4: test_casm_finc/test_casm_opcodes relocated here from
+    # casm_listing_test_d64 for the identical reason WP67 already documented
+    # above -- later WP68-74 code growth silently ate back the headroom
+    # WP67 freed, and casm_listing_test_d64 was again at 0 free blocks,
+    # confirmed live (blocks_free: 0 via vice_disk_list, and a real CBM DOS
+    # `67, ILLEGAL TRACK OR SECTOR` on the drive's error channel when
+    # test_casm_listcap/spancommit/listwrite tried to create their runtime
+    # output files). Both are self-contained (no other custom_command
+    # references them by name) and test_casm_opcodes already has its own
+    # dedicated casm_opcode_test_d64 exhaustive-coverage disk, so moving
+    # (not removing) it here only restores the consolidated-sweep duplicate.
+    # 156 free blocks here (pre-move) comfortably absorb both (25 blocks).
+    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym test_casm_finc test_casm_opcodes
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
+
+# WP68 Increment 6: durable, self-bootable Phase 12 expression-test image.
+# test.d64 has only 3 free blocks after Increment 5; this image becomes the
+# canonical home for growing expression/operator harnesses and may be reused
+# by later Phase 12 increments. Atomic Step 2 moved test_casm_expr off
+# test.d64 (see the TEST_IMAGE_PRG_TARGETS REMOVE_ITEM above) onto this disk.
+# add_c64_disk_image already wraps cc1541 with the required C64_THEME_DIR
+# build-event contract, so no direct external-tool command is introduced here.
+#
+# WP68 Increment 7: adds comp.prg, needed for the two COMP-verified
+# production integration fixtures (casmarith2/casmarithfwd) appended below,
+# per this increment's own Scoping Decision 2 (keep this WP's growth off
+# the already-tight test.d64).
+add_c64_disk_image(casm_phase12_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp test_casm_expr test_casm_lexer test_casm_pass1
+)
+
+# WP68 Increment 7: production parser/emitter integration fixtures. Two
+# success fixtures (COMP-verified against their hand-derived .ref, matching
+# casmfa2p's own precedent) plus two forbidden-form fixtures (no .ref --
+# live-verified for CASM_DIAG_EXPR_RELOC_UNSUPPORTED instead).
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase12_test_d64" "--error" "--")
+endif()
+# WP74 Increment 3: keep the expanded pass harness and its STRING fixture on
+# the canonical Phase 12 growth image; test.d64's directory track is full.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1label1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1label1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1labelinsn1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1labelinsn1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1fwd1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1fwd1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1back1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1back1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1undef1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1undef1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1dup1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1dup1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1size1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "p1string1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1string1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending complete WP74 Increment 3 pass-harness fixture set to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP74 production STRING fixtures: one accepted byte-identity case and six
+# rejected grammar/diagnostic cases.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstring1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstring1.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstring1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmstring1.ref" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrimm.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrimm.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrword.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrword.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrequat.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrequat.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstradj.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstradj.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrunterm.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrunterm.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmstrinval.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmstrinval.seq" "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP74 production STRING fixtures to casm_phase12_test.d64"
+    VERBATIM
+)
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmarith2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarith2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarith2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmarith2.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarithfwd.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarithfwd.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarithfwd.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmarithfwd.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmareloc1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmareloc1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmareloc2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmareloc2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP68 Increment 7 parser-integration fixtures and their trusted references to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP73: unresolved forward labels must ignore stale symbol-kind output left by
+# a preceding resolved named-constant lookup.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfwdstale1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmfwdstale1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfwdstale1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmfwdstale1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP73 stale resolver-state fixture and its trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+add_dependencies(casm_phase12_test_d64 casm_test_fixtures casm_reference_fixtures)
+
+# WP68 Increment 9: live end-to-end fixtures for the operators not yet
+# proven through the real production pipeline by Increment 7's
+# representative sample (/, ^, |, >>) plus the WP68-new
+# CASM_DIAG_EXPR_DIV_ZERO diagnostic's first real end-to-end proof.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmarith3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarith3.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarith3.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmarith3.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmdivzero.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmdivzero.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP68 Increment 9 live end-to-end fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP69: character-literal fixtures -- one success case (COMP-verified) plus
+# three forbidden-form cases (bare-operand excluded context, unterminated,
+# invalid content byte).
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmchar1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmchar1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmchar1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmchar1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcharbare.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcharbare.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcharunterm.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcharunterm.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcharinval.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcharinval.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP69 character-literal fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP70: relocation algebra closure fixtures -- one "accepted" case
+# (COMP-verified including R6 table/footer) plus one "rejected" case
+# (a second static-only operator applied to a real relocatable label).
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmrelacc.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmrelacc.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmrelacc.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmrelacc.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmarelocb.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmarelocb.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP70 relocation algebra closure fixtures and their trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP72: named-constant zero-page width-selection fix, end-to-end proof.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmzpconst1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmzpconst1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmzpconst1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmzpconst1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP72 named-constant zero-page-width fixture and its trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
 
 # WP61 Increment 6: source-extent boundary fixtures (65,535-byte accepted
 # combined extent / 65,536-byte first-reject). casmsrcmax.seq alone proves
@@ -1631,6 +2101,59 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmsrcbit.seq"
         "${CMAKE_BINARY_DIR}/casm_include_test.d64"
     COMMENT "Appending WP61 Increment 6 casmsrcmax.s/casmsrcbit.s source-extent fixtures to casm_include_test.d64"
+    VERBATIM
+)
+
+# WP65 Increment 10: named-constant end-to-end fixtures. This disk already
+# carries casm.prg + comp.prg + command64 and has ample free space (unlike
+# test.d64/casm_overflow_test.d64, both packed to their own ceilings by
+# this point) -- real end-to-end verification (`casm casmconstN`, live
+# under VICE) needs the real production binary present, not a synthetic
+# unit-test harness reimplementing casm.s's own driver.
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmconst1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst1.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmconst2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst2.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmconst3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst3.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmconst4.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmconst4.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP65 Increment 10 casmconst1-4.s named-constant fixtures to casm_include_test.d64"
+    VERBATIM
+)
+
+# WP66: current-address symbol end-to-end fixtures. Same disk as
+# casmconst1-4 above, same rationale (ample free space, needs the real
+# production binary).
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmcuraddr1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcuraddr1.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcuraddr2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcuraddr2.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP66 casmcuraddr1-2.s current-address-symbol fixtures to casm_include_test.d64"
+    VERBATIM
+)
+
+# WP67: parenthesized-expression end-to-end fixtures. Same disk, same
+# rationale.
+add_custom_command(
+    TARGET casm_include_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmparen1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmparen1.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmparen2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmparen2.seq"
+        "${CMAKE_BINARY_DIR}/casm_include_test.d64"
+    COMMENT "Appending WP67 casmparen1-2.s parenthesized-expression fixtures to casm_include_test.d64"
     VERBATIM
 )
 
@@ -1666,7 +2189,33 @@ add_c64_disk_image(casm_listing_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_cliderive test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_finc test_casm_flist test_casm_flmeta test_casm_opcodes test_casm_bounds test_casm_lexer
+    # WP67: test_casm_bounds/test_casm_cliderive/test_casm_lexer (26 blocks
+    # combined) relocated to casm_include_test_d64 (208 free blocks there
+    # vs. this disk sitting at 0 free blocks after WP67's own envelope
+    # growth on test_casm_pass1/frame/listcap/passcheck). This wasn't just
+    # a build-time packing problem: test_casm_listcap's own live run
+    # WRITES 10 runtime output files (CASMLO01-10, 1 block each) to this
+    # same disk, and a 0-free-block disk starts failing those writes
+    # partway through the fixture sequence -- discovered live (2 of 7
+    # fixtures passed before the disk ran out of room), not assumed.
+    # These three (not test_casm_spanread/spancommit, which need their own
+    # companion SEQ fixtures packaged on whichever disk they live on) are
+    # genuinely self-contained -- no other custom_command references them
+    # by name. Same precedent as WP52's test_l15release move and WP66's
+    # own test_casm_freloc move.
+    # WP75 Increment 4: the identical regression recurred -- WP68-74's own
+    # code growth (new Phase 12 operators/directives touching listing.s,
+    # vmm_store.s, etc.) silently ate back the headroom WP67 freed, and
+    # this disk was again confirmed live at 0 free blocks (vice_disk_list),
+    # with a real CBM DOS `67, ILLEGAL TRACK OR SECTOR, 36,16` on the
+    # drive's error channel when test_casm_listcap/spancommit/listwrite
+    # tried to create their runtime output files -- not a VMM/REU defect as
+    # first hypothesized. test_casm_finc/test_casm_opcodes (25 blocks
+    # combined) relocated to casm_include_test_d64 for the same reasons
+    # WP67 already established: self-contained, no companion fixtures, and
+    # (for test_casm_opcodes specifically) already covered independently by
+    # its own dedicated casm_opcode_test_d64 exhaustive disk.
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_flist test_casm_flmeta test_casm_faultvmm
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
@@ -2031,8 +2580,24 @@ add_custom_command(
 # Increment 4's casmfa2p is excluded for the same reason: its matching
 # casmfa2p.s source also lives only on casm_opcode_test_d64, and test.d64's
 # directory track is already full (144/144) with no room for a new entry.
+# WP68 Increment 7's casmarith2/casmarithfwd are excluded for the same
+# reason: their matching .s sources live only on casm_phase12_test_d64
+# (this WP's own Scoping Decision 2), and test.d64 has only 21 free blocks.
+# WP68 Increment 9's casmarith3 is excluded for the same reason: its
+# matching casmarith3.s source also lives only on casm_phase12_test_d64.
+# WP69's casmchar1 is excluded for the same reason: its matching
+# casmchar1.s source also lives only on casm_phase12_test_d64.
+# WP74's casmstring1 follows the same dedicated-disk rule.
+# WP70's casmrelacc is excluded for the same reason: its matching
+# casmrelacc.s source also lives only on casm_phase12_test_d64.
+# WP72's casmzpconst1 is excluded for the same reason: its matching
+# casmzpconst1.s source also lives only on casm_phase12_test_d64. WP73's
+# casmfwdstale1 follows the same dedicated-disk rule.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
-    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p")
+    if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
+       AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
+       AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmstring1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1"
+       AND NOT REF_NAME STREQUAL "casmfwdstale1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
@@ -2058,6 +2623,9 @@ endforeach()
 # their existing bare names.
 foreach(CASM_FIXTURE IN LISTS CASM_TEST_FIXTURES)
     get_filename_component(CASM_FIXTURE_NAME "${CASM_FIXTURE}" NAME_WE)
+    if(CASM_FIXTURE_NAME STREQUAL "p1string1")
+        continue()
+    endif()
     set(CASM_FIXTURE_DISK_NAME "${CASM_FIXTURE_NAME}.s")
     set(WRAPPER_CC1541 "")
     if(C64_THEME_DIR)

@@ -20,6 +20,10 @@
 ; Lexer/lookahead/token subrecord (storage-only state.s).
 .import CasmLexerState
 .import CasmLookaheadValid
+.import CasmLookaheadOffsetLo
+.import CasmLookaheadOffsetHi
+.import CasmSourceResultOffsetLo
+.import CasmSourceResultOffsetHi
 .import CasmLookaheadResult
 .import CasmLookaheadByte
 .import CasmLookaheadFileId
@@ -53,6 +57,23 @@
 .export lexerNext
 .export lexerGetToken
 .export lexerScanIncludeOperand
+.export CasmTokenStartOffsetLo
+.export CasmTokenStartOffsetHi
+.export CasmStringLength
+.export CasmStringBuffer
+
+.segment "BSS"
+
+; WP65: the current token's own absolute source position (see
+; CasmSourceResultOffsetLo/Hi's field comment, state.s), stamped by
+; lexerTokenReset from the lookahead exactly like FileId/Line/Column
+; already are into CasmTokenRecord -- kept as a separate module-owned pair
+; instead of growing the frozen 39-byte CASM_TOKEN_REC_SIZE record, same
+; precedent as parser.s's own CasmLabelName/CasmLabelNameLen.
+CasmTokenStartOffsetLo: .res 1
+CasmTokenStartOffsetHi: .res 1
+CasmStringLength:       .res 1
+CasmStringBuffer:       .res CASM_STRING_BUFFER_SIZE
 
 .segment "CODE"
 
@@ -138,6 +159,10 @@ lnSkip:
     beq lnSkipByte
     cmp #CASM_PETSCII_SEMICOLON
     beq lnComment
+    cmp #CASM_PETSCII_LESS
+    beq lnAngleJmp
+    cmp #CASM_PETSCII_GREATER
+    beq lnAngleJmp
     jsr lexerClassifyPunct
     bcc lnPunct
 
@@ -153,6 +178,14 @@ lnSkip:
     ; Check if it's a binary number (%)
     cmp #CASM_PETSCII_PERCENT
     beq lnBinJmp
+
+    ; WP69: character literal ('x') -- multi-byte scan like $/% above, not a
+    ; single-byte punctuation table entry.
+    cmp #CASM_PETSCII_APOSTROPHE
+    beq lnCharJmp
+
+    cmp #CASM_PETSCII_QUOTE
+    beq lnStringJmp
 
     ; Check if it's a decimal number (0-9)
     jsr isDecDigit
@@ -175,6 +208,12 @@ lnHexJmp:
     jmp lnHex
 lnBinJmp:
     jmp lnBin
+lnCharJmp:
+    jmp lnChar
+lnStringJmp:
+    jmp lnString
+lnAngleJmp:
+    jmp lnAngle
 lnDecJmp:
     jmp lnDec
 lnIdJmp:
@@ -193,9 +232,13 @@ lnCommentBody:
 @okComment:
     lda CasmLookaheadResult
     cmp #CASM_SOURCE_NEWLINE
-    beq lnSkip                  ; preserve the newline; re-dispatch emits it
+    bne @commentNotNewline
+    jmp lnSkip                  ; preserve the newline; re-dispatch emits it
+@commentNotNewline:
     cmp #CASM_SOURCE_EOF
-    beq lnSkip                  ; preserve EOF; re-dispatch emits it
+    bne @commentByte
+    jmp lnSkip                  ; preserve EOF; re-dispatch emits it
+@commentByte:
     jsr lexerConsume            ; consume a comment-body byte
     jmp lnCommentBody
 
@@ -211,6 +254,49 @@ lnPunct:
     jmp lexerEmit               ; returns C clear, A = token type
 lnPunctAppendFail:
     pla                         ; discard the saved type
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_TOKEN_TOO_LONG
+    jmp lnFailWithA
+
+; WP68: distinguish the two-byte shift operators from the existing
+; single-byte extraction tokens. The token location is stamped before the
+; first byte is consumed. A differing second byte remains buffered as the
+; next token; EOF/newline likewise terminates a single '<' or '>'.
+lnAngle:
+    jsr lexerTokenReset
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend
+    bcs lnAngleAppendFail
+    jsr lexerConsume
+    jsr lexerFill
+    bcs lnFail
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    bne lnAngleSingle
+    lda CasmLookaheadByte
+    cmp CasmTokenText
+    bne lnAngleSingle
+    jsr lexerTokenAppend
+    bcs lnAngleAppendFail
+    jsr lexerConsume
+    lda CasmTokenText
+    cmp #CASM_PETSCII_LESS
+    beq lnAngleShl
+    lda #CASM_TOKEN_SHR
+    jmp lexerEmit
+lnAngleShl:
+    lda #CASM_TOKEN_SHL
+    jmp lexerEmit
+lnAngleSingle:
+    lda CasmTokenText
+    cmp #CASM_PETSCII_LESS
+    beq lnAngleLess
+    lda #CASM_TOKEN_GREATER
+    jmp lexerEmit
+lnAngleLess:
+    lda #CASM_TOKEN_LESS
+    jmp lexerEmit
+lnAngleAppendFail:
     jsr diagSetLocFromLookahead
     lda #CASM_DIAG_TOKEN_TOO_LONG
     jmp lnFailWithA
@@ -472,6 +558,10 @@ lexerFill:
     sta CasmLookaheadLineHi
     lda CasmSourceResultColumn
     sta CasmLookaheadColumn
+    lda CasmSourceResultOffsetLo
+    sta CasmLookaheadOffsetLo
+    lda CasmSourceResultOffsetHi
+    sta CasmLookaheadOffsetHi
     lda CasmSourceResultByte
     sta CasmLookaheadByte
     lda #1
@@ -509,6 +599,10 @@ lexerTokenReset:
     sta CasmTokenRecord + CASM_TOKEN_REC_LINE_HI
     lda CasmLookaheadColumn
     sta CasmTokenRecord + CASM_TOKEN_REC_COLUMN
+    lda CasmLookaheadOffsetLo
+    sta CasmTokenStartOffsetLo
+    lda CasmLookaheadOffsetHi
+    sta CasmTokenStartOffsetHi
     lda #0
     sta CasmTokenRecord + CASM_TOKEN_REC_LENGTH
     rts
@@ -762,6 +856,138 @@ lnBin:
 
 lnMalformedBin:
     jmp lnMalformedNum
+
+; ---------------------------------------------------------------------------
+; lnChar (private, WP69)
+; Scan a character literal: '<one printable byte>'. No escape sequences --
+; the content byte is taken raw, no case folding/charmap reinterpretation
+; (matches CASM's existing verbatim treatment of identifier bytes). Exactly
+; one content byte is always consumed regardless of its value, so a literal
+; quote as content ('''  -- three apostrophes) needs no special-casing: the
+; opening ', the quote-as-content byte, and the closing ' each fall out of
+; the same mechanical read. An empty literal ('') is reported the same way
+; as a genuinely unterminated one -- not special-cased separately, per this
+; WP's own minimalism scoping decision.
+; ---------------------------------------------------------------------------
+lnChar:
+    jsr lexerTokenReset
+    jsr lexerConsume            ; consume opening '
+    jsr lexerFill
+    bcc @haveByte1
+    jmp lnFail
+@haveByte1:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnCharUnterminated
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnCharUnterminated
+
+    ; Printable raw PETSCII is $20-$7E or $A0-$FE, same bounds
+    ; .INCLUDE filenames already enforce (lexerScanIncludeOperand above).
+    lda CasmLookaheadByte
+    cmp #CASM_INCLUDE_PRINT_LO_MIN
+    bcs @lowCheck
+    jmp lnCharInvalidByte
+@lowCheck:
+    cmp #CASM_INCLUDE_PRINT_LO_MAX + 1
+    bcc @content
+    cmp #CASM_INCLUDE_PRINT_HI_MIN
+    bcs @hiCheck
+    jmp lnCharInvalidByte
+@hiCheck:
+    cmp #CASM_INCLUDE_PRINT_HI_MAX + 1
+    bcc @content
+    jmp lnCharInvalidByte
+@content:
+    jsr lexerTokenAppend
+    bcc @ok1
+    jmp lnTokenTooLong
+@ok1:
+    jsr lexerConsume            ; consume the content byte
+    jsr lexerFill
+    bcc @haveByte2
+    jmp lnFail
+@haveByte2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnCharUnterminated
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnCharUnterminated
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_APOSTROPHE
+    bne lnCharUnterminated
+    jsr lexerConsume            ; consume closing '
+    lda #CASM_TOKEN_CHAR
+    jmp lexerEmit
+
+lnCharUnterminated:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_CHAR_UNTERMINATED
+    jmp lnFailWithA
+
+lnCharInvalidByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_CHAR_INVALID_BYTE
+    jmp lnFailWithA
+
+; ---------------------------------------------------------------------------
+; lnString (private, WP74)
+; Scan a bounded double-quoted raw-PETSCII string. Content lives in the
+; lexer-owned 255-byte buffer rather than the frozen token text record.
+; ---------------------------------------------------------------------------
+lnString:
+    jsr lexerTokenReset
+    lda #0
+    sta CasmStringLength
+    jsr lexerConsume
+lnStringLoop:
+    jsr lexerFill
+    bcc @haveResult
+    jmp lnFail
+@haveResult:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq lnStringUnterminated
+    cmp #CASM_SOURCE_NEWLINE
+    beq lnStringUnterminated
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_QUOTE
+    beq lnStringClose
+    cmp #CASM_INCLUDE_PRINT_LO_MIN
+    bcc lnStringInvalidByte
+    cmp #CASM_INCLUDE_PRINT_LO_MAX + 1
+    bcc lnStringAppend
+    cmp #CASM_INCLUDE_PRINT_HI_MIN
+    bcc lnStringInvalidByte
+    cmp #CASM_INCLUDE_PRINT_HI_MAX + 1
+    bcs lnStringInvalidByte
+lnStringAppend:
+    ldx CasmStringLength
+    cpx #CASM_STRING_BUFFER_SIZE
+    bcs lnStringUnterminated
+    sta CasmStringBuffer, x
+    inc CasmStringLength
+    jsr lexerConsume
+    jmp lnStringLoop
+lnStringClose:
+    jsr lexerConsume
+    lda #CASM_TOKEN_STRING
+    sta CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    lda #CASM_SUBTYPE_NONE
+    sta CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
+    lda CasmStringLength
+    sta CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    lda #CASM_TOKEN_STRING
+    clc
+    rts
+lnStringUnterminated:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_STRING_UNTERMINATED
+    jmp lnFailWithA
+lnStringInvalidByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_STRING_INVALID_BYTE
+    jmp lnFailWithA
 
 lnDec:
     jsr lexerTokenReset
@@ -1081,11 +1307,17 @@ lexerPunctBytes:
     .byte CASM_PETSCII_COMMA, CASM_PETSCII_COLON, CASM_PETSCII_HASH
     .byte CASM_PETSCII_LPAREN, CASM_PETSCII_RPAREN, CASM_PETSCII_PLUS
     .byte CASM_PETSCII_MINUS, CASM_PETSCII_LESS, CASM_PETSCII_GREATER
+    .byte CASM_PETSCII_EQUALS, CASM_PETSCII_ASTERISK, CASM_PETSCII_SLASH
+    .byte CASM_PETSCII_AMPERSAND, CASM_PETSCII_CARET, CASM_PETSCII_PIPE
+    .byte CASM_PETSCII_TILDE
     .byte $FF
 lexerPunctTypes:
     .byte CASM_TOKEN_COMMA, CASM_TOKEN_COLON, CASM_TOKEN_HASH
     .byte CASM_TOKEN_LPAREN, CASM_TOKEN_RPAREN, CASM_TOKEN_PLUS
     .byte CASM_TOKEN_MINUS, CASM_TOKEN_LESS, CASM_TOKEN_GREATER
+    .byte CASM_TOKEN_EQUALS, CASM_TOKEN_STAR, CASM_TOKEN_SLASH
+    .byte CASM_TOKEN_AMPERSAND, CASM_TOKEN_CARET, CASM_TOKEN_PIPE
+    .byte CASM_TOKEN_TILDE
 
 dirOrgStr:      .byte ".ORG", 0
 dirByteStr:     .byte ".BYTE", 0

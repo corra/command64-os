@@ -6,6 +6,33 @@ status: in-progress
 
 # Plan: CASM Native 6502/6510 Assembler
 
+## Current Status (reconciled 2026-08-19)
+
+- Current implementation: CASM `0.2.8` build `1322`.
+- Phases 1-11 are complete and user-approved. Their sections below preserve
+  the original contracts and are explicitly marked as-built/closed.
+- Phase 12 is active. WP64-WP74 are complete; WP75 is the pending consolidated
+  Phase 12 completion gate.
+- `0.3.0` is the Phase 12 completion-promotion target, not the current version.
+- Phase 13 onward remains future roadmap.
+
+Authoritative Phase 12 work-package map:
+
+| WP | Scope | State |
+| --- | --- | --- |
+| 64 | Expression/relocation contract freeze | Complete |
+| 65 | Named constants and circular-definition handling | Complete |
+| 66 | Current-address symbol | Complete |
+| 67 | Parentheses and explicit precedence | Complete |
+| 68 | Arithmetic, shifts, bitwise, unary operators | Complete |
+| 69 | Character literals | Complete |
+| 70 | Relocation-algebra closure | Complete |
+| 71 | DASH syntax adoption and native provenance | Complete |
+| 72 | Named-constant zero-page width correction | Complete |
+| 73 | Forward-label resolver-state/pass-agreement correction | Complete |
+| 74 | `.BYTE` string literals | Complete |
+| 75 | Consolidated verification and `0.3.0` completion gate | Pending |
+
 ## Goal and Rationale
 
 Implement `casm` as a Command 64 OS native external application. CASM runs on
@@ -75,9 +102,9 @@ CASM source1.asm [source2.asm ...] [/O:output.prg] [/S] [/M] [/L]
 - `.static` and `.reloc` are preamble-only; conflicting directives are fatal.
 - Precedence is `/S`, then the source preamble directive, then the relocatable
   default.
-- Symbol operands do not automatically shrink to zero-page encoding. An
-  unresolved symbolic operand uses absolute width in both passes so instruction
-  sizes cannot oscillate.
+- Labels and unresolved symbolic operands retain absolute width so instruction
+  sizes cannot oscillate. Resolved non-label-derived named constants may select
+  zero-page by value, matching numeric literals (WP72/WP73).
 
 ### R6 Output Contract
 
@@ -113,8 +140,9 @@ These decisions must remain stable across the base phases:
   writer, rather than a structured event stream: WP26's Phase 0C.5 freeze
   (`brain/plans/2026-07-22-casm-phase6-wp26-prerequisite-reconciliation.md`)
   found no real consumer existed yet to design an event shape against, and
-  deferred any structured "emission event" concept to Phase 10, when the
-  listing writer's actual needs are known. WP29
+  deferred any structured "emission event" concept until the listing writer's
+  actual needs were known. Phase 10 subsequently implemented direct `emitByte`
+  capture plus source-owned completed-line sidecars, not an event bus. WP29
   (`brain/plans/2026-07-23-casm-phase6-wp29-pass2-resolution-emission.md`)
   implements Pass 2 against this simpler design; this bullet originally
   described the pre-Phase-6 intent and is corrected here to match.
@@ -127,7 +155,15 @@ These decisions must remain stable across the base phases:
 - The base assembler reparses a deterministic source stream in Pass 2 rather
   than storing a complete token or syntax tree in VMM.
 
-## Files Expected in the Base Implementation
+## Original Expected Files and As-Built Boundaries
+
+The table below is the original decomposition forecast, retained as historical
+planning context. The approved implementation did not create separate
+`pass1.s`, `pass2.s`, `codegen.s`, or `output.s` modules: `casm.s` owns pass
+orchestration, `emit.s` owns addressing/emission/output sequencing, and
+`fileio.s` owns native file serialization. `include.s`, `listing.s`, and
+`map.s` are now implemented production modules. Current ownership is governed
+by `src/external/casm/AGENTS.md` and the phase-specific as-built records.
 
 | File | Action | Responsibility |
 |---|---|---|
@@ -160,7 +196,7 @@ responsibilities merely to reduce file count.
 
 ## Phased Base Implementation
 
-### Phase 0: Contract Freeze and Risk Spikes
+### Phase 0: Contract Freeze and Risk Spikes — Complete
 
 Resolve the contracts that affect foundational representations:
 
@@ -189,7 +225,7 @@ Perform bounded design spikes for:
 Gate: the user approves all observable language and CLI contracts and the RAM,
 VMM, and zero-page maps.
 
-### Phase 1: Native Application Scaffold
+### Phase 1: Native Application Scaffold — Complete
 
 - Create the external-app directory, build counter, entry point, and common
   include.
@@ -210,7 +246,7 @@ Verification:
 
 Gate: CASM launches and exits without corrupting shell state.
 
-### Phase 2: CLI and Native File-Service Foundation
+### Phase 2: CLI and Native File-Service Foundation — Complete
 
 - Parse one required source, `/O`, `/S`, `/M`, and `/L` from `CommandBuffer`
   using `ParsePos`.
@@ -230,7 +266,7 @@ and cleanup of partially opened resources.
 Gate: CASM can safely consume a bounded input stream and survive every tested
 I/O error without leaked handles or incomplete output.
 
-### Phase 3: Source Stream and Minimal Lexer
+### Phase 3: Source Stream and Minimal Lexer — Complete
 
 Detailed implementation is governed by
 `brain/plans/2026-07-16-casm-phase3-source-stream-lexer.md`.
@@ -260,7 +296,7 @@ The interface must allow a VMM/multi-file backend without lexer changes.
 Gate: a temporary token-dump mode reproduces all lexical fixtures with correct
 file and line locations.
 
-### Phase 4: Statement Parser, Opcode Table, and Numeric Static Assembly
+### Phase 4: Statement Parser, Opcode Table, and Numeric Static Assembly — Complete
 
 Implement a restricted numeric-only vertical slice:
 
@@ -279,7 +315,7 @@ included in this phase.
 
 Gate: numeric-only fixture programs match trusted expected machine bytes.
 
-### Phase 5: Minimal Expression Evaluator
+### Phase 5: Minimal Expression Evaluator — Complete
 
 Implement the approved expression subset and return a structured result:
 
@@ -299,7 +335,7 @@ signed constant addend
 
 Gate: expression fixtures pass without depending on instruction emission.
 
-### Phase 6A: VMM Storage Foundation
+### Phase 6A: VMM Storage Foundation — Complete
 
 - Implement bounded VMM-backed record storage before any symbol-table user.
 - Define record capacity, allocation, access, replay, and failure contracts.
@@ -308,7 +344,7 @@ Gate: expression fixtures pass without depending on instruction emission.
 Gate: bounded VMM records can be written, read, and replayed without source or
 symbol semantics.
 
-### Phase 6B: Symbol Table and Two-Pass Assembly
+### Phase 6B: Symbol Table and Two-Pass Assembly — Complete
 
 - Allocate VMM-backed symbol storage.
 - Use a documented 6502-efficient hash with bounded RAM buckets and VMM
@@ -325,21 +361,23 @@ symbol semantics.
 Gate: static programs with forward and backward references match trusted
 reference binaries byte for byte.
 
-### Phase 7: VMM-Backed Source and Multiple Top-Level Inputs
+### Phase 7: VMM-Backed Source and Multiple Top-Level Inputs — Complete
 
-- Extend the source backend to handle sources larger than the RAM window.
-- Use block VMM transfers rather than byte-at-a-time OS calls.
-- Support multiple ordered command-line inputs in one global symbol scope.
+- Cache the complete bounded compilation unit in VMM before Pass 1 so both
+  passes traverse identical bytes and Pass 2 performs no source filesystem I/O.
+- Use bounded 256-byte native file/VMM transfers and preserve the 65,535-byte
+  combined distinct-source cap.
+- Support up to eight ordered command-line inputs in one global symbol scope.
 - Maintain file and line provenance across boundaries.
 - Insert a logical newline between files when required.
 - Validate every 16-bit offset increment and allocation ceiling.
-- Demonstrate equivalent output for small fixtures through the initial and VMM
-  paths before retiring any redundant backend.
+- Preserve deterministic replay, synthetic boundary newlines, and per-file
+  provenance across both passes.
 
 Gate: small inputs remain byte-identical, while large and multiple inputs
 assemble successfully with correct diagnostics.
 
-### Phase 8: Native R6 Relocation
+### Phase 8: Native R6 Relocation — Complete
 
 - Default to relocatable output while preserving `/S` static override.
 - Record the code offset of each emitted relocatable high byte.
@@ -356,7 +394,7 @@ addresses; static fixtures remain ordinary PRGs.
 
 This gate completes the CASM 0.1 minimum native assembler.
 
-### Phase 9: Include Processing
+### Phase 9: Include Processing — Complete
 
 - Add `.include` through a bounded VMM-span source-frame stack; input handles
   are transiently opened, loaded, and closed rather than retained by frames.
@@ -371,11 +409,14 @@ This gate completes the CASM 0.1 minimum native assembler.
 Gate: nested includes assemble identically in both passes and every diagnostic
 identifies the correct physical source location.
 
-### Phase 10: Symbol Map and Listing
+### Phase 10: Symbol Map and Listing — Complete
 
 - `/M` prints symbols in deterministic definition order; sorting is deferred.
-- `/L` consumes Pass 2 emission events and reports filename, line, address,
-  emitted bytes, and original source.
+- `/L` captures generated bytes at `emitByte` (excluding raw PRG headers and R6
+  metadata), while a source-owned completed-line sidecar provides exact file,
+  line, and source spans.
+- Statement listing transactions snapshot PC and generated-byte cursor before
+  dispatch and commit afterward; `.INCLUDE` commits before frame push.
 - Define continuation formatting for directives that emit many bytes.
 - Included files retain their own provenance in listings.
 - Track and remove incomplete listing files on failure.
@@ -385,7 +426,7 @@ Gate: enabling `/M` or `/L` never changes generated PRG bytes.
 
 This gate completes the CASM 0.2 developer-usability release.
 
-### Phase 11: Base-Release Hardening and Documentation
+### Phase 11: Base-Release Hardening and Documentation — Complete
 
 - Exercise every official opcode/addressing-mode combination.
 - Test literal, address, PC, source, symbol, VMM, and relocation boundaries.
@@ -401,21 +442,30 @@ This gate completes the CASM 0.2 developer-usability release.
 Gate: the user performs the manual runtime walkthrough and decides whether the
 base release is done. The task is not marked done without that confirmation.
 
-## Future Native Release Phases
+## Active Native Release Phase
 
-### Phase 12: Constants and Expanded Expressions (CASM 0.3)
+### Phase 12: Constants and Expanded Expressions (target CASM 0.3) — Active
 
 - Named constant definitions.
 - Current-address symbol.
 - Parentheses and explicit precedence.
 - Multiplication, division, shifts, bitwise operations, unary negation, and
   complement where practical on the 6510.
-- Character literals and documented string encoding.
+- Character literals: one verbatim printable PETSCII byte in immediate and
+  `.BYTE` contexts (WP69, complete).
+- String literals: bounded double-quoted verbatim PETSCII entries in `.BYTE`
+  lists, empty allowed, no escapes or implicit terminator (WP74, active).
 - Circular-definition and division-by-zero diagnostics.
 - Relocation algebra limited to combinations that remain representable.
 
 Risk gate: expanded expressions must preserve the base relocation classifier
 and must not change existing program bytes.
+
+Corrective WP72/WP73 were discovered by WP71's required DASH dogfooding and are
+part of the completed Phase 12 work, not optional follow-ups. The governing plan
+and authoritative WP map above supersede earlier provisional numbering.
+
+## Future Native Release Phases
 
 ### Phase 13: Data Construction Directives (CASM 0.3)
 
@@ -425,10 +475,14 @@ Potential directives:
 .res count[, value]
 .fill count, value
 .align boundary[, fill]
-.text "string"
 .incbin "file"
 .assert expression[, "message"]
 ```
+
+- Phase 12 WP74 owns canonical ca65-compatible `.BYTE "string"` syntax and the
+  shared string token/encoding. `.TEXT` is not inherited as planned Phase 13
+  syntax; adding it requires a separately approved, non-duplicate semantic
+  purpose. Migration plans use `.BYTE` by default.
 
 - Large fills and binary inclusions stream through bounded buffers.
 - `.align` produces identical Pass 1 and Pass 2 sizes.
@@ -563,7 +617,9 @@ base symbol records.
   screen-code, and raw-byte semantics; introduce them with a documented
   encoding contract.
 - Listing output adds simultaneous file-handle and partial-output paths; design
-  emission events early but implement listings after relocation.
+  byte capture and source-span ownership against real listing requirements, not
+  a speculative event stream. Phase 10's `emitByte`/line-sidecar model is the
+  as-built precedent.
 - A complete token or syntax-tree IR duplicates VMM storage and cleanup burden;
   reparse deterministic source instead.
 - `.incbin` adds large binary transfers and Pass 1/Pass 2 identity checks; it
@@ -619,9 +675,11 @@ Command 64 shell
   -> the generated program executes
 ```
 
-Project policy prohibits the broken `c64-testing` MCP and web-based emulator
-fallbacks. When no supported local testing MCP is available, the user performs
-runtime tests and confirms the result.
+Use the VICE-embedded C64 MCP only under
+`.agents/workflows/vice-mcp-testing.md`: start/verify it through
+`tools/vice_mcp_start.sh`, boot Command64 before applications, prefer exact
+PETSCII shell input, and leave a healthy emulator running. If the MCP is
+unavailable, ask the user to run the same workflow. Never use a web emulator.
 
 ## Dependency-Critical Path
 
@@ -644,8 +702,13 @@ contracts and memory budgets
 No later phase may bypass an earlier gate merely because its user-facing syntax
 appears independent. In particular, includes depend on stable provenance and
 two-pass replay; relocation depends on correct static emission; listings depend
-on emission events; and macros depend on stable includes, scoping, and
+on direct byte capture plus exact source-span ownership; and macros depend on stable includes, scoping, and
 diagnostics.
+
+Every CASM language or feature addition must audit DASH, perform a meaningful
+byte-equivalent DASH rewrite when applicable, and re-run native CASM and ca65
+cross-checks. If safe adoption is impossible, stop for explicit user direction
+rather than silently waiving real-application dogfooding.
 
 ## Progress
 
@@ -665,8 +728,11 @@ diagnostics.
   build `1260` via the completion-only version change; this completes the
   CASM 0.2 developer-usability release the Phase 10 gate defined. `feature/
   casm-phase10-wp53` merged onto `casm-phase10`, then onto `main`.
-  A Phase 11 (Base-Release Hardening and Documentation) governing plan is
-  drafted, not yet approved, at
-  `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`
-  on a new `casm-phase11` branch — see that plan for the proposed WP56-63
-  breakdown and open scoping questions.
+  Phase 11 subsequently closed user-approved at CASM `0.2.2` build `1266`;
+  see `brain/plans/2026-08-08-casm-phase11-base-release-hardening-documentation.md`.
+- 2026-08-18: Reconciled the master plan to current truth. Phase 12 is active;
+  WP64-WP73 are complete, CASM is `0.2.7` build `1319`,
+  WP74 `.BYTE` strings is approved/active, and WP75 is the pending consolidated
+  `0.3.0` completion gate. Added the mandatory per-feature DASH-adoption rule
+  and corrected stale Phase 7, listing, module-boundary, testing, and Phase 13
+  string assumptions.

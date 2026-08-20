@@ -15,8 +15,8 @@
 .include "common.inc"
 
 .define VERSION_MAJOR "0"
-.define VERSION_MINOR "2"
-.define VERSION_STAGE "2"
+.define VERSION_MINOR "3"
+.define VERSION_STAGE "0"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -52,12 +52,55 @@
 .import CasmParserStmt
 .import CasmLabelName
 .import CasmLabelNameLen
+.import CasmLabelDefinedAtOffsetLo
+.import CasmLabelDefinedAtOffsetHi
 .import opcodesFindOpcode
 .import diagPrintPhase2Ready
 
 .import sourceRewind
 .import symbolsInit
 .import symbolsInsert
+.import CasmSymbolInsertFlags
+.import CasmSymbolInsertRefVmmLo
+.import CasmSymbolInsertRefVmmHi
+.import CasmSymbolInsertRefLen
+.import CasmSymbolInsertRefAddendLo
+.import CasmSymbolInsertRefAddendHi
+.import CasmSymbolInsertRefSign
+.import CasmSymbolInsertRefExtract
+.import CasmSymbolInsertDefinedAtOffsetLo
+.import CasmSymbolInsertDefinedAtOffsetHi
+
+; WP65: ppsConstant's own staged output (parser.s) for a just-parsed
+; `identifier = expr` statement.
+.import CasmConstantResolved
+.import CasmConstantValueLo
+.import CasmConstantValueHi
+.import CasmConstantRefVmmLo
+.import CasmConstantRefVmmHi
+.import CasmConstantRefLen
+.import CasmConstantRefAddendSign
+.import CasmConstantRefAddendLo
+.import CasmConstantRefAddendHi
+.import CasmConstantRefExtract
+.import CasmConstantIsCurAddr
+
+; WP65: casmResolveConstants' own dependencies -- symbolsReadByIndex/
+; symbolsUpdateByIndex to walk and patch the symbol table directly by
+; record index, symbolsLookup to resolve a deferred reference's own name,
+; CasmSourceVmmSlot + vmmWindowRead to re-fetch that name's raw bytes from
+; the single shared source VMM allocation via the absolute offset
+; ppsConstant captured, CasmVmmBuffer as the shared VMM staging area every
+; one of those calls stages through, and diagClearLoc so a diagnostic
+; raised from the sweep (no "current token" exists at this point) never
+; shows a stale location left over from Pass 1's last parsed statement.
+.import symbolsReadByIndex
+.import symbolsUpdateByIndex
+.import symbolsLookup
+.import CasmSourceVmmSlot
+.import vmmWindowRead
+.import CasmVmmBuffer
+.import diagClearLoc
 
 ; WP47 include processing. casmRunPass is the one production bridge between
 ; include.s's catalog/event log and source.s's frame traversal: neither module
@@ -224,6 +267,15 @@ startPass1Continue:
     lda CasmPc + 1
     sta CasmPass1FinalPc + 1
 
+    ; WP65: resolve every named constant Pass 1 left deferred, now that
+    ; every label and every constant's own name is in the symbol table --
+    ; the one point in casm's own control flow both are simultaneously true
+    ; without yet having rewound into Pass 2's real emission.
+    jsr casmResolveConstants
+    bcc startPass1ConstantsOk
+    jmp startFatal
+startPass1ConstantsOk:
+
     ; Pass 2 (WP29): rewind the identical source, recreate the output PRG,
     ; and re-drive the same dispatch for real now that every label the
     ; source defines is in the symbol table.
@@ -375,22 +427,36 @@ startFatalNear:
 ; ---------------------------------------------------------------------------
 casmRunPass:
     jsr crpListingBegin
-    bcs crpFail
+    bcc crpBeginOk
+    jmp crpFail
+crpBeginOk:
     jsr parserParseStatement
-    bcs crpFail
-    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    bcc :+
+    jmp crpFail
+    :
+        lda CasmParserStmt + CASM_PARSER_STMT_TYPE
     cmp #CASM_TOKEN_IDENTIFIER
     beq crpLabel
+    cmp #CASM_TOKEN_EQUALS
+    beq crpConstant
     cmp #CASM_TOKEN_MNEMONIC
-    beq crpInsn
+    bne :+
+    jmp crpInsn
+    :
     cmp #CASM_TOKEN_DIRECTIVE
-    beq crpDir
+    bne :+
+    jmp crpDir
+    :
     cmp #CASM_TOKEN_EOF
-    beq crpDone
+    bne :+
+    jmp crpDone
+    :
     ; NEWLINE: nothing to emit, but still commit the physical line just ended.
     jsr crpListingCommit
-    bcs crpFail
-    jmp casmRunPass
+    bcc :+
+    jmp crpFail
+    :
+        jmp casmRunPass
 
 crpLabel:
     ; WP38: mark output started (and, on the very first qualifying statement
@@ -401,33 +467,182 @@ crpLabel:
     ; "nothing else to do for a label" skip just below) would let Pass 2
     ; silently disagree with Pass 1 whenever a label is the first statement.
     jsr emitMarkStarted
-    bcs crpFail
-    lda CasmPassMode
+    bcc :+
+    jmp crpFail
+    :
+        lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
     bne crpLabelCommit            ; EMIT: nothing else to do for a label
                                    ; statement besides the commit below
-    lda CasmLabelNameLen
     ldx #<CasmLabelName
     ldy #>CasmLabelName
     stx CasmPtr0Lo
     sty CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
+    lda CasmLabelNameLen
     ldx CasmPc
     ldy CasmPc + 1
     jsr symbolsInsert
-    bcs crpFail
-crpLabelCommit:
+    bcc :+
+    jmp crpFail
+    :
+    crpLabelCommit:
     jsr crpListingCommit
-    bcs crpFail
-    jmp casmRunPass
+    bcc :+
+    jmp crpFail
+    :
+        jmp casmRunPass
+
+; ---------------------------------------------------------------------------
+; crpConstant (WP65, private)
+; Insert an `identifier = expr` statement's symbol, Pass 1 (MEASURE) only --
+; mirrors crpLabel's own pass-mode gate exactly, since a constant's
+; existence in the table (like a label's) only needs establishing once.
+; Unlike a label, a constant's own VALUE may still be unresolved after this
+; call (an identifier RHS forward-referencing a not-yet-defined symbol);
+; casmRunPass's caller runs casmResolveConstants (below) at the Pass1->
+; Pass2 boundary specifically to finish what this call leaves deferred.
+; No emitMarkStarted call: a bare constant definition has no address of its
+; own and must not itself trigger the default-origin header a label or
+; instruction would (WP38's own concern doesn't apply here).
+; ---------------------------------------------------------------------------
+crpConstant:
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_MEASURE
+    beq crpConstantMeasure
+    jmp crpConstantCommit         ; EMIT: nothing else to do -- the symbol
+                                   ; and its final value already exist from
+                                   ; Pass 1 plus the resolution sweep
+crpConstantMeasure:
+    ldx #<CasmLabelName
+    ldy #>CasmLabelName
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+
+    ; WP66: '*' RHS. Unlike an identifier's forward reference, CasmPc is
+    ; already final the instant this Pass 1 statement runs (the same fact
+    ; crpLabel itself relies on, immediately below in this file) -- so this
+    ; resolves inline here rather than waiting for casmResolveConstants'
+    ; Pass1->Pass2 sweep. Computes CasmPc [+/- addend][extraction] into
+    ; CasmConstantValueLo/Hi, marks Resolved, and clears the addend/
+    ; extraction staging fields back to the zero state symbolsInsert's
+    ; Ref* copy below expects for any already-resolved record (map.s's
+    ; mapValidateRecord requires that whole span zero-filled once
+    ; resolved -- same invariant ppsConstant's own numeric-RHS path
+    ; already keeps at definition time).
+    ldx CasmConstantIsCurAddr
+    beq crpConstantFlags
+    lda CasmPc
+    sta CasmConstantValueLo
+    lda CasmPc + 1
+    sta CasmConstantValueHi
+    lda CasmConstantRefAddendLo
+    ora CasmConstantRefAddendHi
+    beq crpConstantCurAddrExtract      ; zero addend: value is just CasmPc
+    lda CasmConstantRefAddendSign
+    cmp #CASM_ADDEND_SIGN_POSITIVE
+    beq crpConstantCurAddrAdd
+    lda CasmConstantValueLo
+    sec
+    sbc CasmConstantRefAddendLo
+    sta CasmConstantValueLo
+    lda CasmConstantValueHi
+    sbc CasmConstantRefAddendHi
+    sta CasmConstantValueHi
+    bcs crpConstantCurAddrExtract
+    jmp crpConstantCurAddrOverflow
+crpConstantCurAddrAdd:
+    lda CasmConstantValueLo
+    clc
+    adc CasmConstantRefAddendLo
+    sta CasmConstantValueLo
+    lda CasmConstantValueHi
+    adc CasmConstantRefAddendHi
+    sta CasmConstantValueHi
+    bcc crpConstantCurAddrExtract
+crpConstantCurAddrOverflow:
+    lda #CASM_DIAG_EXPR_OVERFLOW
+    sec
+    jmp crpFail
+crpConstantCurAddrExtract:
+    lda CasmConstantRefExtract
+    beq crpConstantCurAddrResolved      ; FULL: nothing to apply
+    cmp #CASM_EXTRACTION_LO
+    beq crpConstantCurAddrClearHigh
+    lda CasmConstantValueHi             ; HI: move high byte down
+    sta CasmConstantValueLo
+crpConstantCurAddrClearHigh:
+    lda #0
+    sta CasmConstantValueHi
+crpConstantCurAddrResolved:
+    lda #1
+    sta CasmConstantResolved
+    lda #0
+    sta CasmConstantRefAddendSign
+    sta CasmConstantRefAddendLo
+    sta CasmConstantRefAddendHi
+    sta CasmConstantRefExtract
+
+crpConstantFlags:
+    lda #CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_CONSTANT
+    ldx CasmConstantResolved
+    beq crpConstantCheckCurAddr
+    ora #CASM_SYMBOL_FLAG_RESOLVED
+crpConstantCheckCurAddr:
+    ldx CasmConstantIsCurAddr
+    beq crpConstantStoreFlags
+    ora #CASM_SYMBOL_FLAG_LABEL_DERIVED
+crpConstantStoreFlags:
+    sta CasmSymbolInsertFlags
+
+    lda CasmConstantRefVmmLo
+    sta CasmSymbolInsertRefVmmLo
+    lda CasmConstantRefVmmHi
+    sta CasmSymbolInsertRefVmmHi
+    lda CasmConstantRefLen
+    sta CasmSymbolInsertRefLen
+    lda CasmConstantRefAddendLo
+    sta CasmSymbolInsertRefAddendLo
+    lda CasmConstantRefAddendHi
+    sta CasmSymbolInsertRefAddendHi
+    lda CasmConstantRefAddendSign
+    sta CasmSymbolInsertRefSign
+    lda CasmConstantRefExtract
+    sta CasmSymbolInsertRefExtract
+    lda CasmLabelDefinedAtOffsetLo
+    sta CasmSymbolInsertDefinedAtOffsetLo
+    lda CasmLabelDefinedAtOffsetHi
+    sta CasmSymbolInsertDefinedAtOffsetHi
+
+    lda CasmLabelNameLen
+    ldx CasmConstantValueLo
+    ldy CasmConstantValueHi
+    jsr symbolsInsert
+    bcc :+
+    jmp crpFail
+    :
+    crpConstantCommit:
+    jsr crpListingCommit
+    bcc :+
+    jmp crpFail
+    :
+        jmp casmRunPass
 
 crpInsn:
     jsr opcodesFindOpcode
-    bcs crpFail
-    jsr emitInstruction
-    bcs crpFail
-    jsr crpListingCommit
-    bcs crpFail
-    jmp casmRunPass
+    bcc :+
+    jmp crpFail
+    :
+        jsr emitInstruction
+    bcc :+
+    jmp crpFail
+    :
+        jsr crpListingCommit
+    bcc :+
+    jmp crpFail
+    :
+        jmp casmRunPass
 
 crpDir:
     lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
@@ -436,14 +651,20 @@ crpDir:
     ; crpInclude commits the parent's own line itself, before pushing the
     ; child frame -- see its header comment.
     jsr crpInclude
-    bcs crpFail
-    jmp casmRunPass
+    bcc :+
+    jmp crpFail
+    :
+        jmp casmRunPass
 crpEmitDir:
     jsr emitDirective
-    bcs crpFail
-    jsr crpListingCommit
-    bcs crpFail
-    jmp casmRunPass
+    bcc :+
+    jmp crpFail
+    :
+        jsr crpListingCommit
+    bcc :+
+    jmp crpFail
+    :
+        jmp casmRunPass
 
 crpDone:
     ; EOF: commit any pending final (unterminated) physical line. This adds
@@ -453,8 +674,10 @@ crpDone:
     ; that ended cleanly on its last newline has nothing pending and this is
     ; a no-op.
     jsr crpListingCommit
-    bcs crpFail
-    clc
+    bcc :+
+    jmp crpFail
+    :
+        clc
     rts
 crpFail:
     rts                          ; C already set, A = CASM_DIAG_*
@@ -489,6 +712,378 @@ crpListingCommit:
     rts
 crpListingCommitPass2:
     jmp listingCommitLine
+
+; ---------------------------------------------------------------------------
+; casmResolveConstants (private, WP65)
+; Pass1->Pass2 boundary: resolve every named constant Pass 1 left deferred
+; (an identifier-RHS whose own reference wasn't yet in the symbol table at
+; definition time -- a forward reference to another constant defined later,
+; or to a label, whose address only becomes final once Pass 1 completes in
+; full). Called once, after Pass 1's own CasmPc snapshot and before Pass 2's
+; sourceRewind -- by this point every label and every constant's own name
+; already exists in the table (Pass 1 always inserts a constant's name
+; immediately, per crpConstant, even when its value is deferred), so a
+; deferred reference's target is guaranteed either already resolvable or
+; genuinely undefined; it can never still be "not yet reached".
+;
+; Walks every symbol record in definition order (symbolsReadByIndex); for
+; each still-unresolved constant, hands off to crcResolveChain to walk and
+; resolve its own reference chain, in full, before continuing the sweep.
+;
+; Inputs:    none (every label/constant already in the symbol table)
+; Outputs:   C clear on success (every constant resolved)
+;            C set, A = CASM_DIAG_EXPR_CIRCULAR, CASM_DIAG_UNDEFINED_SYMBOL,
+;                CASM_DIAG_EXPR_OVERFLOW, or CASM_DIAG_VMM_TRANSFER_FAILED
+;                on the first failure
+; Clobbers:  A, X, Y, Crc* scratch, symbols.s/source.s volatile state
+; ---------------------------------------------------------------------------
+casmResolveConstants:
+    lda #0
+    sta CrcSweepIndexLo
+    sta CrcSweepIndexHi
+
+crcSweepLoop:
+    ldx CrcSweepIndexLo
+    ldy CrcSweepIndexHi
+    jsr symbolsReadByIndex
+    bcc crcSweepReadOk
+    rts                              ; C set, A = CASM_DIAG_VMM_TRANSFER_FAILED
+crcSweepReadOk:
+    cmp #CASM_STREAM_EOF
+    beq crcSweepDone
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    and #CASM_SYMBOL_FLAG_CONSTANT
+    beq crcSweepNext
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    and #CASM_SYMBOL_FLAG_RESOLVED
+    bne crcSweepNext                 ; already resolved (a numeric RHS)
+    jsr crcResolveChain
+    bcc crcSweepNext
+    rts                              ; propagate C set, A = diagnostic
+crcSweepNext:
+    inc CrcSweepIndexLo
+    bne crcSweepLoop
+    inc CrcSweepIndexHi
+    jmp crcSweepLoop
+crcSweepDone:
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; crcResolveChain (private, WP65)
+; Resolve one unresolved constant's whole reference chain, starting at
+; CrcSweepIndexLo/Hi. Two phases: walk forward (crcWalkLoop) following each
+; node's own deferred reference, marking CrcBitmap and recording the path in
+; CrcChainLo/Hi, until reaching a symbol that is already resolved (a label,
+; or a constant an earlier sweep iteration already finished) -- that becomes
+; the chain's base value. Then unwind CrcChainLo/Hi in reverse (crcUnwind),
+; applying each visited node's own addend/extraction against the value
+; inherited from its successor, writing each node's final VAL_LO/HI and
+; CASM_SYMBOL_FLAG_RESOLVED back via symbolsUpdateByIndex as it goes -- so a
+; later chain that happens to pass through an already-unwound node (shared
+; by two different starting constants) finds it already resolved and stops
+; immediately, doing no repeated work.
+;
+; Inputs:    CrcSweepIndexLo/Hi = the starting (outermost) unresolved
+;                constant's record index
+; Outputs:   C clear on success (every node in the chain resolved and
+;                written back)
+;            C set, A = CASM_DIAG_EXPR_CIRCULAR (a true cycle, or the chain
+;                exceeded CASM_CONST_CHAIN_MAX), CASM_DIAG_UNDEFINED_SYMBOL
+;                (the chain's final reference names no symbol at all),
+;                CASM_DIAG_EXPR_OVERFLOW, or CASM_DIAG_VMM_TRANSFER_FAILED
+; Clobbers:  A, X, Y, Crc* scratch
+; ---------------------------------------------------------------------------
+crcResolveChain:
+    ldy #0
+crcClearBitmapLoop:
+    lda #0
+    sta CrcBitmap, y
+    iny
+    cpy #64
+    bne crcClearBitmapLoop
+
+    lda #0
+    sta CrcChainCount
+    lda CrcSweepIndexLo
+    sta CrcCurIndexLo
+    lda CrcSweepIndexHi
+    sta CrcCurIndexHi
+
+crcWalkLoop:
+    ; --- cycle check + mark CrcCurIndex visited ---
+    lda CrcCurIndexLo
+    and #7
+    sta CrcBitIndex
+    lda CrcCurIndexLo
+    sta CrcScratchLo
+    lda CrcCurIndexHi
+    sta CrcScratchHi
+    lsr CrcScratchHi
+    ror CrcScratchLo
+    lsr CrcScratchHi
+    ror CrcScratchLo
+    lsr CrcScratchHi
+    ror CrcScratchLo
+    lda CrcScratchLo
+    sta CrcByteIndex
+
+    ldx CrcBitIndex
+    lda CrcBitMaskTable, x
+    ldy CrcByteIndex
+    and CrcBitmap, y
+    beq crcNotVisited
+    jmp crcCircular
+crcNotVisited:
+    ldx CrcBitIndex
+    lda CrcBitMaskTable, x
+    ldy CrcByteIndex
+    ora CrcBitmap, y
+    sta CrcBitmap, y
+
+    ; --- depth check ---
+    lda CrcChainCount
+    cmp #CASM_CONST_CHAIN_MAX
+    bcc crcDepthOk
+    jmp crcCircular
+crcDepthOk:
+
+    ; --- record this index in the chain path ---
+    ldx CrcChainCount
+    lda CrcCurIndexLo
+    sta CrcChainLo, x
+    lda CrcCurIndexHi
+    sta CrcChainHi, x
+    inc CrcChainCount
+
+    ; --- read this node's own record to recover its deferred reference ---
+    ldx CrcCurIndexLo
+    ldy CrcCurIndexHi
+    jsr symbolsReadByIndex
+    bcc crcWalkReadOk
+    rts                               ; C set, A = CASM_DIAG_VMM_TRANSFER_FAILED
+crcWalkReadOk:
+    ; symbolsReadByIndex cannot report EOF here -- CrcCurIndex always names a
+    ; real record, either the sweep's own already-validated starting index
+    ; or a record symbolsLookup below just found.
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_LO
+    sta CrcRefVmmLo
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_HI
+    sta CrcRefVmmHi
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_REF_LEN
+    sta CrcRefLen
+
+    ; --- re-fetch the deferred reference's own name text from source ---
+    lda CrcRefVmmLo
+    sta CasmVmmOffLo
+    lda CrcRefVmmHi
+    sta CasmVmmOffHi
+    lda CrcRefLen
+    sta CasmIoLenLo
+    lda #0
+    sta CasmIoLenHi
+    ldx CasmSourceVmmSlot
+    jsr vmmWindowRead
+    bcc crcNameReadOk
+    rts                               ; C set, A = CASM_DIAG_VMM_TRANSFER_FAILED
+crcNameReadOk:
+    ldy #0
+crcCopyNameLoop:
+    cpy CrcRefLen
+    beq crcCopyNameDone
+    lda CasmVmmBuffer, y
+    sta CrcNameBuf, y
+    iny
+    jmp crcCopyNameLoop
+crcCopyNameDone:
+
+    ; --- look up the reference target ---
+    lda #<CrcNameBuf
+    sta CasmPtr0Lo
+    lda #>CrcNameBuf
+    sta CasmPtr0Hi
+    lda CrcRefLen
+    ldx #<CrcResolveView
+    ldy #>CrcResolveView
+    jsr symbolsLookup
+    bcc crcLookupOk
+    rts                               ; C set, A = CASM_DIAG_VMM_TRANSFER_FAILED
+crcLookupOk:
+    lda CrcResolveView + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne crcFound
+    jmp crcUndefined
+crcFound:
+    ; --- is the target itself already resolved (base), or another
+    ; unresolved constant to keep walking? ---
+    lda CrcResolveView + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_CONSTANT
+    beq crcBase                      ; a label: always resolved, always base
+    lda CrcResolveView + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_RESOLVED
+    beq crcContinue                  ; another unresolved constant: keep walking
+crcBase:
+    lda CrcResolveView + CASM_RESOLVE_VAL_LO
+    sta CrcValueLo
+    lda CrcResolveView + CASM_RESOLVE_VAL_HI
+    sta CrcValueHi
+    ; WP65 Increment 8: CASM_SYMBOL_FLAG_LABEL_DERIVED propagates to every
+    ; node in this chain, not just the one adjacent to the base -- a label
+    ; is always derived; an already-resolved constant base propagates its
+    ; own LABEL_DERIVED bit (itself already correctly propagated when that
+    ; constant's own chain was unwound, possibly by an earlier sweep
+    ; iteration).
+    lda CrcResolveView + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_CONSTANT
+    beq crcBaseLabelDerived      ; not a constant -> a label -> always derived
+    lda CrcResolveView + CASM_RESOLVE_SYM_FLAGS
+    and #CASM_SYMBOL_FLAG_LABEL_DERIVED
+    beq crcBaseNotDerived
+crcBaseLabelDerived:
+    lda #1
+    sta CrcLabelDerived
+    jmp crcUnwind
+crcBaseNotDerived:
+    lda #0
+    sta CrcLabelDerived
+    jmp crcUnwind
+
+crcContinue:
+    lda CrcResolveView + CASM_RESOLVE_ID_LO
+    sta CrcCurIndexLo
+    lda CrcResolveView + CASM_RESOLVE_ID_HI
+    sta CrcCurIndexHi
+    jmp crcWalkLoop
+
+crcCircular:
+    jsr diagClearLoc
+    lda #CASM_DIAG_EXPR_CIRCULAR
+    sec
+    rts
+
+crcUndefined:
+    jsr diagClearLoc
+    lda #CASM_DIAG_UNDEFINED_SYMBOL
+    sec
+    rts
+
+crcOverflow:
+    jsr diagClearLoc
+    lda #CASM_DIAG_EXPR_OVERFLOW
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; crcUnwind (private, WP65)
+; Apply CrcChainLo/Hi's path in reverse, from the node closest to the
+; resolved base back out to the original start, computing and persisting
+; each node's own final value. CrcValueLo/Hi enters holding the resolved
+; base value (crcBase, above).
+; ---------------------------------------------------------------------------
+crcUnwind:
+    lda CrcChainCount
+    bne crcUnwindLoop                 ; the normal case (a chain always
+                                       ; records at least its own start)
+    jmp crcUnwindDone                 ; unreachable in practice, kept for
+                                       ; safety
+crcUnwindLoop:
+    dec CrcChainCount
+    ldx CrcChainCount
+
+    lda CrcChainLo, x
+    sta CrcCurIndexLo
+    lda CrcChainHi, x
+    sta CrcCurIndexHi
+    ldx CrcCurIndexLo
+    ldy CrcCurIndexHi
+    jsr symbolsReadByIndex
+    bcc crcUnwindReadOk
+    rts                                ; C set, A = CASM_DIAG_VMM_TRANSFER_FAILED
+crcUnwindReadOk:
+
+    ; Apply the addend (checked 16-bit add/sub, mirroring expr.s's own
+    ; exprCheckedAdd/Sub -- duplicated here rather than reused, since those
+    ; read their operand from expr.s's own private, non-exported result
+    ; record, not from an externally-supplied sign/magnitude).
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_LO
+    ora CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_HI
+    beq crcUnwindExtract               ; zero addend: no-op
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_REF_SIGN
+    cmp #CASM_ADDEND_SIGN_POSITIVE
+    beq crcUnwindAdd
+    lda CrcValueLo
+    sec
+    sbc CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_LO
+    sta CrcValueLo
+    lda CrcValueHi
+    sbc CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_HI
+    sta CrcValueHi
+    bcs crcUnwindExtract
+    jmp crcOverflow
+crcUnwindAdd:
+    lda CrcValueLo
+    clc
+    adc CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_LO
+    sta CrcValueLo
+    lda CrcValueHi
+    adc CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_HI
+    sta CrcValueHi
+    bcc crcUnwindExtract
+    jmp crcOverflow
+
+crcUnwindExtract:
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_REF_EXTRACT
+    beq crcUnwindPatch                 ; FULL: nothing to apply
+    cmp #CASM_EXTRACTION_LO
+    beq crcUnwindClearHigh
+    lda CrcValueHi
+    sta CrcValueLo
+crcUnwindClearHigh:
+    lda #0
+    sta CrcValueHi
+
+crcUnwindPatch:
+    ; CasmVmmBuffer still holds this node's own freshly-read record (the
+    ; addend/extraction application above touched only CrcValueLo/Hi, not
+    ; the buffer) -- patch VAL_LO/HI and set RESOLVED in place, then write
+    ; the whole record back. The Ref* fields (reserved padding once
+    ; resolved) are zeroed too -- mapValidateRecord (map.s) requires that
+    ; whole span zero-filled, and this deferred reference's own bytes are
+    ; no longer meaningful once RESOLVED is set (ppsConstant's own
+    ; numeric-RHS path keeps this same invariant at definition time; this
+    ; is the deferred-RHS path's equivalent, established here instead of
+    ; at definition time since the value wasn't known until now).
+    lda CrcValueLo
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_VAL_LO
+    lda CrcValueHi
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_VAL_HI
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    ora #CASM_SYMBOL_FLAG_RESOLVED
+    ldx CrcLabelDerived
+    beq crcUnwindFlagsSet
+    ora #CASM_SYMBOL_FLAG_LABEL_DERIVED
+crcUnwindFlagsSet:
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    lda #0
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_LO
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_HI
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_LEN
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_LO
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_ADDEND_HI
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_SIGN
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_EXTRACT
+    ldx CrcCurIndexLo
+    ldy CrcCurIndexHi
+    jsr symbolsUpdateByIndex
+    bcc crcUnwindNext
+    rts                                 ; C set, A = CASM_DIAG_VMM_TRANSFER_FAILED
+crcUnwindNext:
+    lda CrcChainCount
+    beq crcUnwindDone
+    jmp crcUnwindLoop
+crcUnwindDone:
+    clc
+    rts
 
 ; ---------------------------------------------------------------------------
 ; crpInclude (private, WP47)
@@ -771,7 +1366,40 @@ CrpIncParentId:     .res 1
 CrpIncParentDevice: .res 1
 CrpIncChildIndex:   .res 1
 
+; WP65: casmResolveConstants/crcResolveChain's own private scratch (the
+; Pass1->Pass2 named-constant resolution sweep). CrcBitmap is a 512-bit
+; (64-byte) "visited during this chain's own walk" marker, one bit per
+; symbol record index, cleared fresh at the start of each top-level
+; unresolved constant crcResolveChain is called for -- catches a genuine
+; cycle (a=b, b=a) the instant the walk revisits an index already marked.
+; CrcChainLo/Hi/Count record the walk's own path (bounded by
+; CASM_CONST_CHAIN_MAX) so the addend/extraction each visited node's own
+; definition carries can be unwound in reverse, from the resolved base
+; back out to the original start, once the walk succeeds.
+CrcSweepIndexLo:   .res 1
+CrcSweepIndexHi:   .res 1
+CrcCurIndexLo:     .res 1
+CrcCurIndexHi:     .res 1
+CrcByteIndex:      .res 1
+CrcBitIndex:       .res 1
+CrcScratchLo:       .res 1
+CrcScratchHi:       .res 1
+CrcRefVmmLo:       .res 1
+CrcRefVmmHi:       .res 1
+CrcRefLen:         .res 1
+CrcChainCount:     .res 1
+CrcChainLo:        .res CASM_CONST_CHAIN_MAX
+CrcChainHi:        .res CASM_CONST_CHAIN_MAX
+CrcNameBuf:        .res CASM_TOKEN_TEXT_MAX
+CrcResolveView:    .res CASM_RESOLVE_SIZE
+CrcValueLo:        .res 1
+CrcValueHi:        .res 1
+CrcLabelDerived:   .res 1
+CrcBitmap:         .res 64
+
 .segment "RODATA"
+
+CrcBitMaskTable: .byte 1, 2, 4, 8, 16, 32, 64, 128
 
 versionBanner:
     .byte "CASM V", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."

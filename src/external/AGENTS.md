@@ -44,6 +44,49 @@ The purpose of the `src/external` directory is to contain external user space ap
    - Use `PRG_SIZE_HEX` for the link-time `MAIN` memory size and optional `CODE_ALIGN` only when the app embeds data that must stay page-aligned.
    - Add the target to the disk image list `IMAGE_PRG_TARGETS`.
 
+## Workflow for a CASM-Native External Application (No Host Assembler)
+
+Proven twice now — BANNER (`brain/plans/2026-08-20-banner-casm-native-migration.md`)
+and DASH's own further Phase 12 syntax pass — for an app that is assembled
+only by the real native CASM assembler, never by a host toolchain:
+
+1. **Source Setup**: Write the app entirely in CASM-safe syntax (see
+   `src/external/dash/AGENTS.md`'s "Dual-Assembler Subset" for the stricter
+   rules that still apply if the app *also* needs a ca65 cross-check;
+   drop those if it doesn't, as BANNER does). All uppercase ASCII —
+   `scripts/check_casm_source_bytes.py` enforces this at packaging time,
+   including inside comments and character/string literals, because
+   `cc1541 -w` copies host bytes verbatim with no PETSCII translation.
+2. **Dedicated Test Disk**: Package a CASM-only `.d64` (not `test.d64` —
+   see `.agents/workflows/per-phase-test-images.md`) with `command64`,
+   `casm`, and the app's source as SEQ file(s).
+3. **Live Assembly**: Boot the disk in VICE, dispatch
+   `CASM <ENTRY>.S /O:<NAME>`, per `.agents/workflows/vice-mcp-testing.md`.
+   Confirm `CASM: INPUT VALIDATED` and functionally exercise the app.
+4. **Extract and Review**: Detach the disk cleanly (flushes VICE's
+   write-behind cache), extract the assembled PRG with `cc1541 -X`, and
+   review its bytes — against a same-base prior assembly, an independent
+   ca65 cross-check build, or both, whichever the app's own provenance
+   model calls for.
+5. **Capture the Manifest**: Transcribe the reviewed PRG into a checked-in
+   hex manifest via a `scripts/build_<app>_manifest.py` script (a small
+   twin of `scripts/build_dash_manifest.py` — drop its `--cross-check`/
+   `--allow-host-bytes` machinery if the app has no host toolchain to
+   guard against at all, as `scripts/build_banner_manifest.py` does).
+   Regenerating the manifest is always a deliberate, reviewed act, never
+   a build step.
+6. **CMake Target**: Add an `add_custom_command`/`add_custom_target` pair
+   that runs `scripts/hex_manifest_to_bin.py` against the manifest at
+   build time (mirroring the `dash`/`banner` targets in `CMakeLists.txt`)
+   — this is what gives the app a `C64_PRG_PATH` property so
+   `add_c64_disk_image`'s `PRGS` list can package it like any other
+   compiled target. `--source-dir` on that call gives free stale-artifact
+   protection: an edited source without a regenerated manifest is a hard
+   build failure, not a silent stale ship.
+7. **Release Packaging**: Add the target to the appropriate disk image's
+   `PRGS` list (`IMAGE_PRG_TARGETS` for production, or a dedicated
+   dev-utility disk).
+
 # Verification
 
 - CMake configuration must succeed with no warnings/errors.

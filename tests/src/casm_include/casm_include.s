@@ -53,6 +53,9 @@
 .export diagStampStmtLoc
 .export exprEvaluate
 .export exprGetResult
+.export exprParseNumeric
+.export exprParseAddend
+.export exprApplyAddend
 .export symbolsLookup
 .export emitMarkStarted
 .export CasmPassMode
@@ -335,9 +338,15 @@ diagStampStmtLoc:
     rts
 
 ; Whole-object parser dependencies unreachable from include-only fixtures.
+; WP65: exprParseNumeric/exprParseAddend/exprApplyAddend joins this list --
+; parser.s's new ppsConstant references them, but this harness never parses
+; an `identifier = expr` statement.
 exprEvaluate:
 symbolsLookup:
 emitMarkStarted:
+exprParseNumeric:
+exprParseAddend:
+exprApplyAddend:
     lda #CASM_DIAG_EXPR_UNSUPPORTED
     sec
     rts

@@ -20,8 +20,13 @@
 .import lexerScanIncludeOperand
 .import CasmTokenRecord
 .import CasmTokenText
+.import CasmTokenStartOffsetLo
+.import CasmTokenStartOffsetHi
 .import exprEvaluate
 .import exprGetResult
+.import exprParseNumeric
+.import exprParseAddend
+.import exprApplyAddend
 .import CasmPassMode
 .import symbolsLookup
 
@@ -46,6 +51,19 @@
 .export CasmLabelNameLen
 .export CasmIncludeFilename
 .export CasmIncludeFilenameLen
+.export CasmConstantResolved
+.export CasmConstantValueLo
+.export CasmConstantValueHi
+.export CasmConstantRefVmmLo
+.export CasmConstantRefVmmHi
+.export CasmConstantRefLen
+.export CasmConstantRefAddendSign
+.export CasmConstantRefAddendLo
+.export CasmConstantRefAddendHi
+.export CasmConstantRefExtract
+.export CasmConstantIsCurAddr
+.export CasmLabelDefinedAtOffsetLo
+.export CasmLabelDefinedAtOffsetHi
 
 .segment "BSS"
 
@@ -64,6 +82,49 @@ CasmParserStmt:
 ; terminator byte that is never written here, kept only for the size match).
 CasmLabelName:    .res 32
 CasmLabelNameLen: .res 1
+
+; WP76: the just-consumed IDENTIFIER's own source position, stamped by
+; ppsLabel below from CasmTokenStartOffsetLo/Hi (lexer.s) before any further
+; token is read -- same "copy before it's overwritten" reasoning as
+; CasmLabelName itself, immediately above. Meaningful for a constant
+; definition only (crpConstant, casm.s, copies it into the symbol record);
+; a label statement leaves it populated but unused, harmless since labels
+; stay unconditionally force-abs regardless (WP39).
+CasmLabelDefinedAtOffsetLo: .res 1
+CasmLabelDefinedAtOffsetHi: .res 1
+
+; WP65: ppsConstant's own staged output for casm.s's crpConstant, mirroring
+; CasmLabelName/CasmLabelNameLen's precedent exactly -- a named constant's
+; own name reuses CasmLabelName/CasmLabelNameLen directly (a statement is
+; never simultaneously a label and a constant, so the buffer is never
+; needed for both at once). Resolved=1 means ValueLo/Hi already holds the
+; final value (a numeric RHS); Resolved=0 means the Ref* fields describe a
+; deferred reference for the resolution sweep to resolve later (an
+; identifier RHS) -- these map directly onto symbols.s's
+; CasmSymbolInsertFlags/CasmSymbolInsertRef* inputs.
+CasmConstantResolved:      .res 1
+CasmConstantValueLo:       .res 1
+CasmConstantValueHi:       .res 1
+CasmConstantRefVmmLo:      .res 1
+CasmConstantRefVmmHi:      .res 1
+CasmConstantRefLen:        .res 1
+CasmConstantRefAddendSign: .res 1
+CasmConstantRefAddendLo:   .res 1
+CasmConstantRefAddendHi:   .res 1
+CasmConstantRefExtract:    .res 1
+; WP66: set only by ppsConstant's '*'-RHS arm (never by the numeric or
+; identifier arms). '*' RHS reuses the identifier arm's own deferred-
+; addend/extraction staging shape (CasmConstantRef{AddendSign,AddendLo,
+; AddendHi,Extract}; CasmConstantRefVmmLo/Hi/Len stay zero -- there is no
+; name to look up), but unlike an identifier's forward reference, its base
+; value (CasmPc) is already known the instant crpConstant (casm.s) runs --
+; no Pass1->Pass2 resolution-sweep involvement needed. crpConstant computes
+; CasmPc [+/- addend][extraction] itself when this flag is set, then ORs
+; CASM_SYMBOL_FLAG_LABEL_DERIVED into the inserted symbol's flags alongside
+; RESOLVED: '*' resolves immediately (like a numeric RHS, never label-
+; derived) but is relocatable-by-construction (like a label), so it needs
+; both bits together -- a combination no other RHS kind produces.
+CasmConstantIsCurAddr:     .res 1
 
 ; WP44: .INCLUDE filenames exceed the frozen 31-byte token payload. Keep the
 ; original PETSCII bytes in parser-owned bounded state for the later semantic
@@ -197,14 +258,27 @@ ppsSyntaxError:
 ; the caller (the future Pass 1 driver) reads CasmLabelName/CasmLabelNameLen
 ; and CasmPc and calls symbolsInsert; this module never calls symbolsInsert.
 ;
+; WP65: the token after the copied identifier now also accepts EQUALS (a
+; named-constant definition, `identifier = expr`) alongside the original
+; COLON (a label). Position alone disambiguates -- no lookahead beyond the
+; one token this routine already required. See ppsConstant below for the
+; EQUALS branch's own grammar and outputs.
+;
 ; Inputs:    current token is the just-consumed IDENTIFIER
-; Outputs:   success: C clear, A = CASM_TOKEN_IDENTIFIER, CasmParserStmt and
-;                      CasmLabelName/CasmLabelNameLen populated, COLON consumed
+; Outputs:   success (label): C clear, A = CASM_TOKEN_IDENTIFIER,
+;                      CasmParserStmt and CasmLabelName/CasmLabelNameLen
+;                      populated, COLON consumed
+;            success (constant): see ppsConstant
 ;            failure: C set, A = CASM_DIAG_SYNTAX_ERROR (or a propagated
 ;                      lexer/source diagnostic)
 ; Clobbers:  A, X, Y, CasmParserStmt, CasmLabelName, CasmLabelNameLen
 ; ---------------------------------------------------------------------------
 ppsLabel:
+    lda CasmTokenStartOffsetLo
+    sta CasmLabelDefinedAtOffsetLo
+    lda CasmTokenStartOffsetHi
+    sta CasmLabelDefinedAtOffsetHi
+
     lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
     sta CasmLabelNameLen
     ldy #0
@@ -217,19 +291,318 @@ ppsLabel:
     jmp @copyLoop
 @copyDone:
 
-    ; Require and consume COLON.
+    ; Require and consume COLON or EQUALS.
     jsr lexerNext
     bcc @ok1
     rts
 @ok1:
     cmp #CASM_TOKEN_COLON
     beq @colonOk
+    cmp #CASM_TOKEN_EQUALS
+    beq ppsConstant
     jsr diagSetLocFromToken     ; the token that should have been a colon
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
 @colonOk:
     lda #CASM_TOKEN_IDENTIFIER
+    sta CasmParserStmt + CASM_PARSER_STMT_TYPE
+    lda #CASM_SUBTYPE_NONE
+    sta CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    sta CasmParserStmt + CASM_PARSER_STMT_REG_SUBTYPE
+    sta CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; ppsConstant (WP65)
+; Parse a named-constant definition's RHS: `['<'|'>'] (NUMBER|IDENTIFIER)
+; [('+'|'-') NUMBER]` -- today's existing bounded expression grammar,
+; exactly as WP64's contract froze it (no parentheses, no new operators).
+; A NUMBER (or NUMBER extraction/addend) RHS is fully resolvable now, since
+; it depends on nothing else; its final value is computed here directly. An
+; IDENTIFIER RHS may forward-reference a symbol not yet defined (another
+; constant later in the source, or a label whose address isn't final until
+; Pass 1 completes), so it is never resolved here -- only its own defining
+; reference is captured (name length + the absolute source-position
+; bookmark CasmTokenStartOffsetLo/Hi already stamps on every token, plus
+; the addend/extraction) for casm.s's Pass1->Pass2 resolution sweep to
+; resolve later. See brain/plans/2026-08-13-casm-phase12-wp65-named-
+; constants.md's Technical Design section.
+;
+; This routine does not call symbolsInsert (same separation ppsLabel keeps
+; from crpLabel): it stages CasmConstant* fields for casm.s's own
+; crpConstant to read and act on.
+;
+; Inputs:    current token is EQUALS, just matched by ppsLabel above;
+;            CasmLabelName/CasmLabelNameLen already hold the constant's own
+;            name (copied before the COLON/EQUALS lookahead, same as a
+;            label's)
+; Outputs:   success: C clear, A = CASM_TOKEN_EQUALS, CasmParserStmt
+;                      populated (Type = CASM_TOKEN_EQUALS, all other
+;                      fields zeroed -- a constant carries no addressing-
+;                      mode/emission payload of its own), CasmConstant*
+;                      populated, terminator (NEWLINE/EOF) consumed
+;            failure: C set, A = CASM_DIAG_* (CASM_DIAG_EXPR_MALFORMED for
+;                      an unrecognized primary, CASM_DIAG_EXPR_UNSUPPORTED
+;                      for a trailing token the grammar can't consume,
+;                      CASM_DIAG_EXPECTED_NEWLINE for anything else before
+;                      the terminator, CASM_DIAG_OPERAND_OUT_OF_RANGE on
+;                      numeric overflow, or a propagated lexer/source
+;                      diagnostic)
+; Clobbers:  A, X, Y, CasmParserStmt, CasmConstant*, expression module's
+;            private result record and numeric scratch
+; ---------------------------------------------------------------------------
+ppsConstant:
+    ; Determinism: zero every staged field before parsing rather than
+    ; relying solely on CasmConstantResolved to gate their use -- no stale
+    ; bytes from a previous constant's parse survive into this one's
+    ; record, matching this project's existing determinism conventions.
+    ; Load-bearing, not just cosmetic: symbolsInsert copies the Ref* fields
+    ; into the record's reserved-padding span (common.inc) for ANY
+    ; constant, including a numeric RHS that never touches them again --
+    ; map.s's mapValidateRecord requires that whole span zero-filled, so a
+    ; numeric constant's Ref* fields must already be clean here, not just
+    ; unused.
+    lda #0
+    sta CasmConstantValueLo
+    sta CasmConstantValueHi
+    sta CasmConstantRefVmmLo
+    sta CasmConstantRefVmmHi
+    sta CasmConstantRefLen
+    sta CasmConstantRefAddendSign
+    sta CasmConstantRefAddendLo
+    sta CasmConstantRefAddendHi
+    sta CasmConstantIsCurAddr
+    jsr lexerNext               ; consume '=', fetch the RHS's first token
+    bcc @haveFirst
+    rts
+@haveFirst:
+    lda #CASM_EXTRACTION_FULL
+    sta CasmConstantRefExtract
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_LESS
+    beq @lowPrefix
+    cmp #CASM_TOKEN_GREATER
+    bne @primary
+    lda #CASM_EXTRACTION_HI
+    sta CasmConstantRefExtract
+    jmp @consumePrefix
+@lowPrefix:
+    lda #CASM_EXTRACTION_LO
+    sta CasmConstantRefExtract
+@consumePrefix:
+    jsr lexerNext
+    bcc @primary
+    rts
+
+@primary:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_NUMBER
+    beq @numeric
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq @identifier
+    cmp #CASM_TOKEN_STAR
+    bne @notCurAddr
+    jmp @curAddr
+@notCurAddr:
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_EXPR_MALFORMED
+    sec
+    rts
+
+@numeric:
+    jsr exprParseNumeric        ; X/Y = value; token remains current (NUMBER)
+    stx CasmConstantValueLo
+    sty CasmConstantValueHi
+    jsr lexerNext                ; advance past NUMBER
+    bcc @numericAddend
+    rts
+@numericAddend:
+    ; exprParseAddend always safely zeroes the addend when no +/- is
+    ; present (and leaves the token untouched in that case), so it is
+    ; called unconditionally -- but on the sign-present path it leaves the
+    ; addend NUMBER itself as the current token (exprParseNumeric's own
+    ; "token remains current" contract), so an explicit extra lexerNext is
+    ; still needed to advance past it there, exactly mirroring expr.s's own
+    ; consumeIdentifier/consumeAddend sequence (expr.s:191-193), not
+    ; assumed from exprParseAddend's name.
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq @numericAddendSign
+    cmp #CASM_TOKEN_MINUS
+    beq @numericAddendSign
+    jsr exprParseAddend
+    bcc @numericApply
+    rts
+@numericAddendSign:
+    jsr exprParseAddend
+    bcc @numericAddendConsume
+    rts
+@numericAddendConsume:
+    jsr lexerNext                ; advance past the addend NUMBER
+    bcc @numericApply
+    rts
+@numericApply:
+    ldx CasmConstantValueLo
+    ldy CasmConstantValueHi
+    jsr exprApplyAddend           ; X/Y = value + addend, checked
+    bcc @numericApplied
+    rts
+@numericApplied:
+    stx CasmConstantValueLo
+    sty CasmConstantValueHi
+    lda CasmConstantRefExtract
+    beq @numericTerminator        ; FULL: nothing to apply
+    cmp #CASM_EXTRACTION_LO
+    beq @numericClearHigh
+    lda CasmConstantValueHi        ; HI: move high byte down
+    sta CasmConstantValueLo
+@numericClearHigh:
+    lda #0
+    sta CasmConstantValueHi
+@numericTerminator:
+    ; Already applied above -- clear so the resolved record's reserved
+    ; padding stays zero-filled (see this proc's own top-of-routine note).
+    lda #0
+    sta CasmConstantRefExtract
+    lda #1
+    sta CasmConstantResolved
+    jmp @requireTerminator
+
+@identifier:
+    ; Capture length and start-offset while the token is still IDENTIFIER --
+    ; the very next lexerNext overwrites CasmTokenText, exactly the hazard
+    ; exprEvaluate's own identifier branch already documents (expr.s).
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    sta CasmConstantRefLen
+    lda CasmTokenStartOffsetLo
+    sta CasmConstantRefVmmLo
+    lda CasmTokenStartOffsetHi
+    sta CasmConstantRefVmmHi
+    jsr lexerNext                 ; consume the identifier
+    bcc @identifierAddend
+    rts
+@identifierAddend:
+    ; Same two-step as @numericAddend above: exprParseAddend is always
+    ; called (safely zeroes the addend when absent), but a sign-present
+    ; result leaves the addend NUMBER itself as the current token, needing
+    ; one more explicit lexerNext -- expr.s's own consumeIdentifier does
+    ; this same extra advance (expr.s:191-193) after its own call.
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq @identifierAddendSign
+    cmp #CASM_TOKEN_MINUS
+    beq @identifierAddendSign
+    jsr exprParseAddend
+    bcc @identifierStore
+    rts
+@identifierAddendSign:
+    jsr exprParseAddend
+    bcc @identifierAddendConsume
+    rts
+@identifierAddendConsume:
+    jsr lexerNext                 ; advance past the addend NUMBER
+    bcc @identifierStore
+    rts
+@identifierStore:
+    ; CasmExprResultRecord is expr.s's own private BSS, never exported by
+    ; name -- exprGetResult is the only sanctioned accessor (mirrors how
+    ; every other expr.s consumer reaches it).
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_ADDEND_SIGN
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendSign
+    ldy #CASM_EXPR_ADDEND_MAG_LO
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendLo
+    ldy #CASM_EXPR_ADDEND_MAG_HI
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendHi
+    lda #0
+    sta CasmConstantResolved
+    ; fall through to @requireTerminator
+
+; WP66: '*' RHS. Reuses @identifierAddend's own addend-capture tail
+; verbatim (same exprParseAddend/exprGetResult sequence, staging into the
+; same CasmConstantRefAddendSign/Lo/Hi fields) -- the only difference from
+; @identifier is that there is no name to capture (CasmConstantRefVmmLo/
+; Hi/Len stay at their top-of-routine zero) and CasmConstantIsCurAddr is
+; set instead of leaving CasmConstantResolved clear, telling crpConstant
+; (casm.s) to compute CasmPc [+/- addend][extraction] itself rather than
+; deferring to the Pass1->Pass2 resolution sweep.
+@curAddr:
+    jsr lexerNext                 ; consume '*'
+    bcc @curAddrAddend
+    rts
+@curAddrAddend:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_PLUS
+    beq @curAddrAddendSign
+    cmp #CASM_TOKEN_MINUS
+    beq @curAddrAddendSign
+    jsr exprParseAddend
+    bcc @curAddrStore
+    rts
+@curAddrAddendSign:
+    jsr exprParseAddend
+    bcc @curAddrAddendConsume
+    rts
+@curAddrAddendConsume:
+    jsr lexerNext                 ; advance past the addend NUMBER
+    bcc @curAddrStore
+    rts
+@curAddrStore:
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_ADDEND_SIGN
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendSign
+    ldy #CASM_EXPR_ADDEND_MAG_LO
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendLo
+    ldy #CASM_EXPR_ADDEND_MAG_HI
+    lda (CasmPtr0Lo), y
+    sta CasmConstantRefAddendHi
+    lda #1
+    sta CasmConstantIsCurAddr
+    jmp @requireTerminator
+
+@requireTerminator:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_NEWLINE
+    beq @terminatorOk
+    cmp #CASM_TOKEN_EOF
+    beq @terminatorOk
+    jsr diagSetLocFromToken
+    cmp #CASM_TOKEN_PLUS
+    beq @unsupported
+    cmp #CASM_TOKEN_MINUS
+    beq @unsupported
+    cmp #CASM_TOKEN_LESS
+    beq @unsupported
+    cmp #CASM_TOKEN_GREATER
+    beq @unsupported
+    cmp #CASM_TOKEN_NUMBER
+    beq @unsupported
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq @unsupported
+    lda #CASM_DIAG_EXPECTED_NEWLINE
+    sec
+    rts
+@unsupported:
+    lda #CASM_DIAG_EXPR_UNSUPPORTED
+    sec
+    rts
+@terminatorOk:
+    lda #CASM_TOKEN_EQUALS
     sta CasmParserStmt + CASM_PARSER_STMT_TYPE
     lda #CASM_SUBTYPE_NONE
     sta CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
@@ -271,6 +644,18 @@ parseOperandSequence:
     beq posAbsoluteJmp
     cmp #CASM_TOKEN_GREATER
     beq posAbsoluteJmp
+    ; WP68 Increment 7: current-address (WP66, pre-existing gap) and unary
+    ; '-'/'~' (this WP) can all start a non-immediate operand expression
+    ; ("LDA *", "LDA -1", "LDA ~1") -- without these, exprEvaluate's own
+    ; parsePrimary (which already handles all three) is never reached at
+    ; all, rejected here first as CASM_DIAG_SYNTAX_ERROR. Same class of gap
+    ; WP67 fixed for a leading '(' in posImmediate's own whitelist below.
+    cmp #CASM_TOKEN_STAR
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_MINUS
+    beq posAbsoluteJmp
+    cmp #CASM_TOKEN_TILDE
+    beq posAbsoluteJmp
     cmp #CASM_TOKEN_REGISTER
     beq posAccumulatorJmp
     cmp #CASM_TOKEN_LPAREN
@@ -304,12 +689,54 @@ posImmediate:
     beq posImmediateNumber
     cmp #CASM_TOKEN_GREATER
     beq posImmediateNumber
+    ; WP67: '(' after '#' is a parenthesized sub-expression (e.g.
+    ; `lda #(1+2)`), not indirect addressing -- that ambiguity is already
+    ; resolved one token earlier, since no 6502 indirect-addressing form
+    ; begins with '#'. Without this, exprEvaluate's own parsePrimary
+    ; (which does correctly accept '(' here) is never reached at all --
+    ; this whitelist gate runs first and would otherwise reject it as
+    ; CASM_DIAG_SYNTAX_ERROR before parserParseExpressionValue is even
+    ; called.
+    cmp #CASM_TOKEN_LPAREN
+    beq posImmediateNumber
+    ; WP68 Increment 7: same class of gap as '(' immediately above, for
+    ; current-address (WP66, pre-existing gap) and unary '-'/'~' (this WP)
+    ; as the first token after '#' (e.g. `lda #*`, `lda #-1`, `lda #~1`).
+    cmp #CASM_TOKEN_STAR
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_MINUS
+    beq posImmediateNumber
+    cmp #CASM_TOKEN_TILDE
+    beq posImmediateNumber
+    ; WP69: a character literal is a direct 8-bit value, never a general
+    ; expression primary (this WP's own scoping decision) -- short-circuits
+    ; straight to CasmTokenText[0], bypassing parserParseExpressionValue/
+    ; exprEvaluate entirely, so expr.s needs no change for this feature.
+    cmp #CASM_TOKEN_CHAR
+    beq posImmediateChar
     jmp posSyntaxError
 posImmediateNumber:
     jsr parserParseExpressionValue
     bcc @ok1
     rts
 @ok1:
+    lda #CASM_OPKIND_IMMEDIATE
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    jmp posValidateTerminator
+posImmediateChar:
+    jsr emitMarkStarted
+    bcc @ok1
+    rts
+@ok1:
+    lda CasmTokenText
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    lda #0
+    sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    sta CasmParserStmt + CASM_PARSER_STMT_FLAGS
+    jsr lexerNext                ; advance past CHAR, leave delimiter current
+    bcc @ok2
+    rts
+@ok2:
     lda #CASM_OPKIND_IMMEDIATE
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
     jmp posValidateTerminator

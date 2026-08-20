@@ -59,6 +59,9 @@ file(WRITE "${OUTPUT_DIR}/casmvmm128.seq" "${CASM_VMM_CHUNK_128}")
 string(ASCII 13 CASM_CR)
 string(ASCII 10 CASM_LF)
 set(CASM_CRLF "${CASM_CR}${CASM_LF}")
+# WP69: a control byte ($01), outside the printable-PETSCII range a
+# character literal's content byte must fall in.
+string(ASCII 1 CASM_CTRL_A)
 
 # CR-only line endings (classic-Mac style).
 file(WRITE "${OUTPUT_DIR}/casmcr.seq" "LINE1${CASM_CR}LINE2${CASM_CR}")
@@ -446,6 +449,14 @@ file(WRITE "${OUTPUT_DIR}/casmnumerrd.seq" ".ORG \$C000\n.WORD 65536\n")
 file(WRITE "${OUTPUT_DIR}/casmnumerrh.seq" ".ORG \$C000\n.WORD \$10000\n")
 file(WRITE "${OUTPUT_DIR}/casmnumerrb.seq" ".ORG \$C000\n.WORD %11111111111111111\n")
 
+# WP68 Increment 6 Atomic Step 5: minimal production fixture solely to prove
+# CASM_DIAG_EXPR_DIV_ZERO's message routes correctly through the real
+# casm.prg binary (not just the harness's coded diagnostic-number
+# assertion). Not part of CASM_REF_NAMES -- like casmnumerrd/h/b above, it is
+# meant to fail, not assemble to a comparable reference PRG. Deliberately
+# not the full multiply/divide production matrix, which Increment 9 owns.
+file(WRITE "${OUTPUT_DIR}/casmdivzero.seq" ".ORG \$C000\n.WORD 2/0\n")
+
 # Phase 5 WP20 production adapter fixtures. casmexprn exercises every parser and
 # directive delimiter context with numeric extraction; casmexpru proves an
 # identifier is routed to the production resolver and rejected before emission.
@@ -554,6 +565,14 @@ file(WRITE "${OUTPUT_DIR}/p1size1.seq"
     "RTS\n"
     "DATA: .BYTE \$01, \$02, \$03\n"
     "VALS: .WORD \$ABCD, \$1234\n"
+)
+
+# WP74 Increment 3: empty and non-empty STRING items mixed with numeric,
+# character-literal, and expression entries. Four emitted bytes advance the
+# measure-pass PC from $C000 to $C004; the empty string advances it by zero.
+file(WRITE "${OUTPUT_DIR}/p1string1.seq"
+    ".ORG \$C000\n"
+    ".BYTE \"\", \$11, 'A', \"B\", 1+1\n"
 )
 
 # WP30 relative-branch fixtures. No prior fixture (Phase 4's casmbrp1/brp2/
@@ -1418,3 +1437,433 @@ file(WRITE "${OUTPUT_DIR}/casmopall.seq"
     "    TXA\n"
     "    TXS\n"
     "    TYA\n")
+
+# CASM Phase 12 WP65 Increment 10: named-constant end-to-end fixtures.
+# Uppercase identifiers, matching every existing fixture's own convention in
+# this file -- the lowercase-PETSCII convention (WP64's contract item 8,
+# memory reference-c64-lowercase-petscii-convention) governs new shipped
+# documentation/examples; a raw .seq fixture's lowercase bytes would need
+# explicit PETSCII-shifted-range construction (CASM_PETSCII_SHIFTED_A =
+# $C1, not ASCII 'a' = $61 -- see memory reference-casm-petscii-identifier-
+# case), a real correctness risk unrelated to WP65's own feature under
+# test, so this harness stays uppercase like its neighbors.
+#
+# casmconst1: a real end-to-end smoke test covering every WP65 resolution
+# path in one assembly -- ENTRY = START forward-references a label not yet
+# defined (deferred until the Pass1->Pass2 resolution sweep, since START's
+# address isn't final until Pass 1 completes); SCREENW is an immediately-
+# resolved numeric constant; BORDER = SCREENW + 10 is a constant
+# referencing another constant, with an addend, itself immediately
+# resolvable since SCREENW is already defined at that point. Expected
+# emitted bytes (START lands at $C000, the first byte after .ORG, since no
+# constant definition emits anything or advances CasmPc): A9 28 (LDA
+# #$28) 8D 20 D0 (STA $D020) A9 32 (LDA #$32) 8D 21 D0 (STA $D021) 4C 00
+# C0 (JMP $C000) -- 13 bytes.
+file(WRITE "${OUTPUT_DIR}/casmconst1.seq"
+    ".ORG \$C000\n"
+    "ENTRY = START\n"
+    "SCREENW = 40\n"
+    "BORDER = SCREENW + 10\n"
+    "START:\n"
+    "LDA #SCREENW\n"
+    "STA \$D020\n"
+    "LDA #BORDER\n"
+    "STA \$D021\n"
+    "JMP ENTRY\n"
+)
+
+# casmconst2: genuine transitive circular constant definition (FOO -> BAR
+# -> FOO), not just a direct self-reference -- proves crcResolveChain's
+# cycle-detection bitmap catches a real multi-hop cycle, not only the
+# trivial `SELF = SELF` case. Expects CASM_DIAG_EXPR_CIRCULAR ($43) and no
+# output PRG. Deliberately not named A/B/X/Y: those single letters lex as
+# CASM_TOKEN_REGISTER (the accumulator/index-register operand form, e.g.
+# `ROL A`), not CASM_TOKEN_IDENTIFIER -- confirmed live (a genuine `A = B`
+# fixture attempt produced SYNTAX ERROR, not CIRCULAR, since parserParse-
+# Statement's dispatch never reaches ppsLabel/ppsConstant for a REGISTER-
+# typed leading token at all).
+file(WRITE "${OUTPUT_DIR}/casmconst2.seq"
+    ".ORG \$C000\n"
+    "FOO = BAR\n"
+    "BAR = FOO\n"
+    "NOP\n"
+)
+
+# casmconst3: direct self-reference (`SELF = SELF`), the degenerate
+# single-node cycle -- distinct code path from casmconst2's two-node walk
+# (the very first bitmap check on SELF's own record already catches it,
+# before any symbolsLookup call even runs). Expects CASM_DIAG_EXPR_CIRCULAR
+# ($43). Not named X (or Y): same CASM_TOKEN_REGISTER collision as
+# casmconst2's own A/B avoidance above.
+file(WRITE "${OUTPUT_DIR}/casmconst3.seq"
+    ".ORG \$C000\n"
+    "SELF = SELF\n"
+    "NOP\n"
+)
+
+# casmconst4: a constant redefining an already-defined label's name.
+# Expects CASM_DIAG_DUPLICATE_SYMBOL ($2C) -- symbolsFindChain's exact-name
+# match is kind-agnostic (WP65 Increment 2 confirmed this, not assumed),
+# so this needs no new code path of its own, only proof the existing one
+# still fires correctly across the label/constant boundary.
+file(WRITE "${OUTPUT_DIR}/casmconst4.seq"
+    ".ORG \$C000\n"
+    "START:\n"
+    "NOP\n"
+    "START = 5\n"
+)
+
+# casmcuraddr1 (WP66): 'name = *' -- a named constant whose RHS is the
+# current-address symbol. BUFSTART = * is the first statement after .ORG,
+# before any byte is emitted, so it captures $C000 itself (constant
+# definitions never advance CasmPc, same fact casmconst1 above already
+# relies on for START). Referenced afterward via <BUFSTART/>BUFSTART like
+# any other relocatable constant -- proves crpConstant's new
+# CASM_SYMBOL_FLAG_LABEL_DERIVED handling classifies it correctly through
+# the ordinary extraction path, not just crpConstant's own insertion.
+# Expected bytes: A9 00 (LDA #$00, <BUFSTART) 8D 20 D0 (STA $D020) A9 C0
+# (LDA #$C0, >BUFSTART) 8D 21 D0 (STA $D021) 4C 00 C0 (JMP BUFSTART) -- 13
+# bytes, BUFSTART = $C000.
+file(WRITE "${OUTPUT_DIR}/casmcuraddr1.seq"
+    ".ORG \$C000\n"
+    "BUFSTART = *\n"
+    "LDA #<BUFSTART\n"
+    "STA \$D020\n"
+    "LDA #>BUFSTART\n"
+    "STA \$D021\n"
+    "JMP BUFSTART\n"
+)
+
+# casmcuraddr2 (WP66): bare '*' as an ordinary operand (not through a named
+# constant), combined with both extraction and an addend in one expression
+# (<*+3) -- the one-token grammar's own '[<|>] primary [+|- NUMBER]' shape,
+# exercised directly against exprEvaluate's new curAddr primary-dispatch
+# arm. NOP occupies $C000, so the following LDA instruction's own opcode
+# byte sits at $C001 -- CasmPc's value the instant this operand's '*'
+# evaluates, before LDA itself emits (same "current statement's own
+# address" fact casmcuraddr1 above relies on for BUFSTART). $C001+3 =
+# $C004; low byte extraction yields $04. Expected bytes: EA (NOP) A9 04
+# (LDA #$04) 8D 20 D0 (STA $D020) -- 6 bytes.
+file(WRITE "${OUTPUT_DIR}/casmcuraddr2.seq"
+    ".ORG \$C000\n"
+    "NOP\n"
+    "LDA #<*+3\n"
+    "STA \$D020\n"
+)
+
+# casmparen1 (WP67): parenthesized sub-expressions as a real operand,
+# exercised through exprEvaluate's new precedence-climbing loop end to
+# end. START lands at $C000 (first byte after .ORG). SCREENW = 40 is a
+# WP65 named constant referenced inside a group. `#<(SCREENW+2)` proves
+# a '(' immediately after '#' (immediate mode) is NOT the operand's own
+# leading token from parser.s's own indirect-addressing dispatch's point
+# of view (that only claims a bare leading '(', no '#' prefix) -- so
+# exprEvaluate's top-level parsePrimary is free to treat it as a group,
+# same as any nested one. `#(1+2)` (pure numeric, no symbol at all)
+# proves WP67's own lifted NUMBER-can-take-an-operator restriction
+# reaches inside a group too. `JMP START` closes the loop with an
+# ordinary label reference (unrelated to parens, confirming the
+# surrounding statements still assemble normally).
+# Expected bytes: A9 2A (LDA #$2A, <(42)) 8D 20 D0 (STA $D020) A9 03
+# (LDA #$03, (1+2)) 8D 21 D0 (STA $D021) 4C 00 C0 (JMP START) -- 13 bytes.
+file(WRITE "${OUTPUT_DIR}/casmparen1.seq"
+    ".ORG \$C000\n"
+    "SCREENW = 40\n"
+    "START:\n"
+    "LDA #<(SCREENW+2)\n"
+    "STA \$D020\n"
+    "LDA #(1+2)\n"
+    "STA \$D021\n"
+    "JMP START\n"
+)
+
+# casmparen2 (WP67): two relocatable labels combined via a parenthesized
+# group -- LBL1+(LBL2). No .ORG (default relocatable output, unlike
+# casmparen1's static fixture above), so both labels are genuinely
+# relocatable and this combination is not representable as one symbol +
+# a static addend (WP64's rule) -- expects CASM_DIAG_EXPR_RELOC_UNSUPPORTED
+# ($45), live-proving both the diagnostic itself and its new message text
+# (diagnostics.s) actually print, not just that the unit-test harness's
+# own diagnostic *code* comparison passes.
+file(WRITE "${OUTPUT_DIR}/casmparen2.seq"
+    "LBL1:\n"
+    "NOP\n"
+    "LBL2:\n"
+    "NOP\n"
+    "LDA #<(LBL1+LBL2)\n"
+)
+
+# WP68 Increment 7: production parser/emitter integration for the new
+# arithmetic/bitwise operators, one representative operator per family
+# (*, &, <<, unary -) per the increment plan's own Scoping Decision 1.
+# Pure numeric constants across every operand context this WP68 grammar
+# reaches (immediate, absolute, .BYTE, .WORD), plus one parenthesized RHS
+# combining WP67 grouping with a WP68 operator -- the same "every parser
+# and directive delimiter context" precedent casmexprn.seq (WP20)
+# established for extraction. .ORG $C000 keeps this fixed-address (no
+# relocatable symbols involved at all, so mode is irrelevant here).
+#
+# Unary '-'/'~' both produce a full 16-bit two's-complement/complement
+# result (Scoping Decision 1 of the WP68 parent plan); any nonzero '-'
+# result and most '~' results carry a nonzero high byte, which
+# ofRequire8Bit (opcodes.s) correctly rejects as CASM_DIAG_OPERAND_OUT_OF_
+# RANGE for an immediate or .BYTE operand -- not a bug, the same rule any
+# other >255 literal already hits. "LDA -1" (absolute, no '#') exercises
+# unary '-' as an instruction operand instead, deliberately proving the
+# WP68 Increment 7 parser-dispatch fix (parser.s's outer
+# parseOperandSequence whitelist, not just posImmediate's inner one).
+# "LDA #~$FF00" keeps unary '~' in immediate context with an input chosen
+# so the complement's high byte is zero ($FF00 -> $00FF).
+# COMP-verified against a hand-derived casmarith2.ref.hex, registered in
+# CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmarith2.seq"
+    ".ORG \$C000\n"
+    "LDA #2*3\n"
+    "LDA #\$0F&\$03\n"
+    "LDA #1<<3\n"
+    "LDA #~\$FF00\n"
+    "LDA -1\n"
+    ".BYTE 2*3, 1<<3\n"
+    ".WORD \$0F&\$03, (2+3)*2\n"
+)
+
+# WP68 Increment 7: forward-referenced, non-relocatable named constant
+# combined with a new operator, proving genuine two-pass Pass 1/Pass 2
+# width agreement -- the same proof shape WP61 Increment 4's casmfa2p.seq/
+# .ref.hex established for a bare forward-referenced label, now through a
+# WP68 operator. FWDCONST is not yet in the symbol table when "LDA
+# FWDCONST*2" is first measured (Pass 1): CASM_EXPR_FLAG_SYMBOL_DERIVED is
+# still set unconditionally (expr.s:318-320) and CASM_PARSER_STMT_FORCE_ABS
+# derived from it (parser.s:928-940) forces 3-byte absolute addressing
+# before FWDCONST's value ($5) or the multiply result ($000A) is known at
+# all -- even though $000A would fit zero page as a literal. Pass 2
+# independently re-derives the identical FORCE_ABS classification once
+# FWDCONST is fully resolved (casmResolveConstants has run by then), and
+# commits the same 3-byte absolute opcode to the real output. Explicit
+# .ORG $0010 is load-bearing here (see the WP68 Increment 7 plan's Atomic
+# Step 1 audit): it keeps CasmRelocatableMode static/0 for the whole
+# assembly, so the forward reference's stale/unspecified resolver
+# CASM_RESOLVE_SYM_FLAGS byte cannot accidentally set RELOCATABLE and
+# trigger CASM_DIAG_EXPR_RELOC_UNSUPPORTED instead of succeeding
+# statically. COMP-verified against a hand-derived casmarithfwd.ref.hex,
+# registered in CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmarithfwd.seq"
+    ".ORG \$0010\n"
+    "LDA FWDCONST*2\n"
+    "FWDCONST = 5\n"
+)
+
+# WP68 Increment 7: forbidden form, a real (relocatable) label combined
+# with a new operator, through the real parser -- not the synthetic RELVAL
+# resolver tests/src/casm_expr/casm_expr.s uses. Deliberately no .ORG
+# (implicit relocatable default, emit.s:536, matching casmparen2.seq's own
+# precedent immediately above): under a fixed-address build every symbol
+# is static regardless of kind (WP68 Increment 7 plan's Atomic Step 1
+# audit), so this rejection is only reachable in a genuinely relocatable
+# assembly. Expects CASM_DIAG_EXPR_RELOC_UNSUPPORTED; no .ref (failure
+# case), live-verified for the exact message and source location.
+file(WRITE "${OUTPUT_DIR}/casmareloc1.seq"
+    "LOOP:\n"
+    "NOP\n"
+    "LDA #LOOP*2\n"
+)
+
+# WP68 Increment 7: forbidden form, a label-derived named constant
+# (BUFSTART = *, WP66's CASM_SYMBOL_FLAG_LABEL_DERIVED) combined with a new
+# operator. Proves relocation rejection generalizes beyond bare labels to
+# any relocatable-flagged symbol, including constant-derived ones. Same
+# no-.ORG reasoning as casmareloc1.seq above. Expects
+# CASM_DIAG_EXPR_RELOC_UNSUPPORTED; no .ref, live-verified.
+file(WRITE "${OUTPUT_DIR}/casmareloc2.seq"
+    "BUFSTART = *\n"
+    "NOP\n"
+    "LDA #BUFSTART*2\n"
+)
+
+# WP68 Increment 9: the remaining WP68 operators not yet exercised through
+# the real production pipeline by Increment 7's representative sample (*,
+# &, <<, unary -): / (division), ^ (XOR), | (OR), >> (right shift), across
+# immediate/.BYTE/.WORD contexts. .ORG $C000 keeps this fixed-address (no
+# relocatable symbols involved). $8001>>1 = $4000 proves the shift is
+# logical/zero-filling, not arithmetic, through the real pipeline.
+# COMP-verified against a hand-derived casmarith3.ref.hex, registered in
+# CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmarith3.seq"
+    ".ORG \$C000\n"
+    "LDA #10/2\n"
+    "LDA #\$0F^\$03\n"
+    "LDA #\$0F|\$03\n"
+    ".BYTE 10/2, \$0F^\$03\n"
+    ".WORD \$0F|\$03, \$8001>>1\n"
+)
+
+# WP68 Increment 9: forbidden form, division by a static zero. Proves
+# CASM_DIAG_EXPR_DIV_ZERO (expr.s:676-682, unconditional zero-divisor
+# check before any division arithmetic) through the real production
+# pipeline for the first time -- common.inc:770's own comment still says
+# "not yet raised anywhere," stale as of Increment 6's synthetic-harness
+# wiring; this is the first live end-to-end proof. No .ORG needed (a
+# static-constant division, not a relocation case). No .ref (failure
+# case), live-verified for the exact message and source location.
+file(WRITE "${OUTPUT_DIR}/casmdivzero.seq"
+    "LDA #5/0\n"
+)
+
+# WP69: character literals. casmchar1 is the success case -- an immediate
+# operand and a .BYTE list entry, both using a character literal directly
+# (no case folding/charmap reinterpretation: source 'A'/'H'/'I' are already
+# plain ASCII uppercase, numerically identical to unshifted PETSCII).
+# COMP-verified against a hand-derived casmchar1.ref.hex, registered in
+# CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmchar1.seq"
+    ".ORG \$C000\n"
+    "LDA #'A'\n"
+    ".BYTE 'H', 'I'\n"
+)
+
+# WP69: forbidden form, a character literal used as a bare (non-immediate)
+# instruction operand -- excluded by this WP's own scoping decision
+# (character literals are not a general expression primary). Expects
+# CASM_DIAG_SYNTAX_ERROR from parseOperandSequence's own whitelist, which
+# never gained CASM_TOKEN_CHAR (deliberately, unlike the outer whitelist's
+# WP66/68 entries). No .ref, live-verified for the exact message/location.
+file(WRITE "${OUTPUT_DIR}/casmcharbare.seq"
+    "LDA 'A'\n"
+)
+
+# WP69: forbidden form, an unterminated character literal -- the content
+# byte is followed by something other than a closing '. No .ORG needed. No
+# .ref, live-verified for the exact CASM_DIAG_CHAR_UNTERMINATED
+# message/location.
+file(WRITE "${OUTPUT_DIR}/casmcharunterm.seq"
+    "LDA #'A\n"
+)
+
+# WP69: forbidden form, a character literal's content byte outside the
+# printable-PETSCII range (a raw control byte, $01). No .ref, live-verified
+# for the exact CASM_DIAG_CHAR_INVALID_BYTE message/location.
+file(WRITE "${OUTPUT_DIR}/casmcharinval.seq"
+    "LDA #'${CASM_CTRL_A}'\n"
+)
+
+# WP74: production STRING fixtures. The accepted fixed-origin case has a
+# hand-derived reference; the others prove excluded contexts and diagnostics.
+file(WRITE "${OUTPUT_DIR}/casmstring1.seq"
+    ".ORG \$C000\n"
+    ".BYTE \"HELLO\", 0, \$11, \"\", 'A', \"Z\", 1+1\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrimm.seq"
+    "LDA #\"X\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrword.seq"
+    ".WORD \"X\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrequat.seq"
+    "NAME = \"X\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstradj.seq"
+    ".BYTE \"A\" \"B\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrunterm.seq"
+    ".BYTE \"ABC\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmstrinval.seq"
+    ".BYTE \"${CASM_CTRL_A}\"\n"
+)
+
+# WP70: the "accepted" side of WP64's representability contract -- a
+# relocatable label combined with a static addend via '+', with the
+# static side wrapped in a parenthesized group, in genuinely relocatable
+# (no .ORG) mode. Proves a real R6 relocation table entry is still
+# correct when reached through WP67's recursive parsePrimary/
+# parseOperatorTail architecture -- no prior fixture combines a
+# relocatable label with an addend and verifies the resulting R6 table
+# (WP70 plan's own Research Findings). COMP-verified against a
+# hand-derived casmrelacc.ref.hex (including the R6 table/footer),
+# registered in CASM_REF_NAMES.
+file(WRITE "${OUTPUT_DIR}/casmrelacc.seq"
+    "START:\n"
+    "    JMP MID\n"
+    "MID:\n"
+    "    LDA TARGET+(1+0)\n"
+    "TARGET:\n"
+    "    NOP\n"
+)
+
+# WP70: a second, distinct WP68 static-only operator (& -- bitwise AND,
+# not * already proven in WP68 Increment 7) applied to a real
+# relocatable label, live-proving checkStaticReloc's shared mechanism a
+# second time rather than resting on the algebraic "one shared routine"
+# argument alone. No .ORG (implicit relocatable default). Expects
+# CASM_DIAG_EXPR_RELOC_UNSUPPORTED; no .ref (failure case),
+# live-verified for the exact message and source location.
+file(WRITE "${OUTPUT_DIR}/casmarelocb.seq"
+    "LOOP:\n"
+    "NOP\n"
+    "LDA #LOOP&\$FF\n"
+)
+
+# WP72: end-to-end proof of the named-constant zero-page width-selection
+# fix (expr.s::identifier). DISPATCHVECTOR = $70 mirrors DASH's own real
+# equate (dmain.s) -- the exact source shape WP71 found miscompiling.
+# Before the fix, both STA lines below assembled as 3-byte absolute (8D 70
+# 00 / 8D 71 00); the fix makes them 2-byte zero-page (85 70 / 85 71),
+# matching what a bare literal operand (STA $70) already produced. The
+# second line (DISPATCHVECTOR+1) exercises the addend-combination path
+# (expr.s combineAddend/combineFlags), proving the fix's flag-clearing
+# at the primary identifier propagates through '+' unchanged, not just
+# the bare-symbol case. COMP-verified against a hand-derived
+# casmzpconst1.ref.hex.
+file(WRITE "${OUTPUT_DIR}/casmzpconst1.seq"
+    ".ORG \$C000\n"
+    "DISPATCHVECTOR = \$70\n"
+    "STA DISPATCHVECTOR\n"
+    "STA DISPATCHVECTOR+1\n"
+)
+
+# WP73: minimal production reproduction of stale resolver symbol-kind state.
+# The resolved CHARSTASH constant lookup immediately precedes an unresolved
+# forward label lookup in Pass 1. Before the fix, FWDLABEL inherited stale
+# CONSTANT|RESOLVED flags, lost SYMBOL_DERIVED, and selected zero-page in
+# Pass 1 but absolute in Pass 2. COMP against casmfwdstale1.ref proves stable
+# width and the complete loop/control-flow shape that exposed the defect.
+file(WRITE "${OUTPUT_DIR}/casmfwdstale1.seq"
+    ".ORG \$C000\n"
+    "COLORPTR = \$7B\n"
+    "CHARSTASH = \$7D\n"
+    "MAXLEN = \$7E\n"
+    "START:\n"
+    "LDX #0\n"
+    "OUTERLOOP:\n"
+    "CPX #3\n"
+    "BEQ OUTERDONE\n"
+    "LDA #\$0E\n"
+    "CPX #0\n"
+    "BNE COLORSET\n"
+    "LDA #\$01\n"
+    "COLORSET:\n"
+    "STA CHARSTASH\n"
+    "LDA FWDLABEL\n"
+    "CLC\n"
+    "ADC #\$50\n"
+    "STA COLORPTR\n"
+    "LDA #\$D8\n"
+    "STA COLORPTR+1\n"
+    "LDA #5\n"
+    "STA MAXLEN\n"
+    "LDY #0\n"
+    "FILLLOOP:\n"
+    "CPY MAXLEN\n"
+    "BCS NEXTTAB\n"
+    "LDA CHARSTASH\n"
+    "STA (COLORPTR), Y\n"
+    "INY\n"
+    "JMP FILLLOOP\n"
+    "NEXTTAB:\n"
+    "INX\n"
+    "JMP OUTERLOOP\n"
+    "OUTERDONE:\n"
+    "RTS\n"
+    "FWDLABEL:\n"
+    ".BYTE 0\n"
+)

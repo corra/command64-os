@@ -1,25 +1,27 @@
 # command64 OS BANNER Utility Manual
 
 **File Name:** `banner.prg`
-**Build Counter:** `1005` (`src/external/banner/BUILD_BANNER`)
+**Build Counter:** `1000` (`src/external/banner/BUILD_BANNER`)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
-**Disk Image:** `command64_casm_utils.d64` (label `CASM UTILS`)
+**Disk Image:** `command64_casm_utils.d64` (label `CASM UTILS`), source also on `image.d64`
 
 ## Overview
 
 `BANNER` is a UNIX-style external utility that renders a short text message in
 large 5×6 block characters, in the spirit of the classic `banner(1)` command.
-Each glyph is drawn from the `#` character (`$23`) for set cells and a regular
-space (`$20`) for clear cells, printed through `KERNAL CHROUT` (`$FFD2`).
+Each glyph is drawn from the `#` character for set cells and a regular space
+for clear cells, printed through `KERNAL CHROUT`.
 
-`BANNER` is also the project's reference case for **native CASM source
-compatibility**. Its source, `src/external/banner/banner.s`, is deliberately
-self-contained and segment-free — all zero-page equates and font data are
-inlined — so the same file assembles both on the host with ca65/ld65 and on the
-C64 itself with `CASM`. The host build's PRG load-address header is isolated in
-a separate `src/external/banner/header.s`, which CASM does not need. The
-`command64_casm_utils.d64` image therefore ships both `banner.prg` and
-`banner.s` (as a SEQ file) so the source can be reassembled on-target.
+`BANNER` is a **CASM-native application** — it is assembled only by the real
+native CASM assembler, never by ca65. Its source,
+`src/external/banner/banner.s`, is deliberately self-contained and
+segment-free (all zero-page named constants and font data are inlined) and
+uses CASM Phase 12 syntax throughout: named constants for the zero-page
+workspace and OS/KERNAL entry points, `.BYTE "..."` string literals for its
+usage text, and `'x'` character literals for punctuation and flag
+comparisons. Both `image.d64` (source only, for the end user to assemble
+themselves) and `command64_casm_utils.d64` (source plus a compiled
+`banner.prg`) ship the same `banner.s`.
 
 ## Command Syntax
 
@@ -42,8 +44,41 @@ USAGE: BANNER <TEXT>
 ```
 
 > **Note:** the version string in the usage text is a hardcoded literal in
-> `USAGE_STR` and does not track the `BUILD_BANNER` counter, so it still reads
-> `1.0.0.1000` at build 1005.
+> `USAGE_STR` and does not track the `BUILD_BANNER` counter.
+
+---
+
+## Building BANNER from Source
+
+BANNER is **not** assembled by any host tool — it is assembled by CASM
+running on the C64 (or in VICE), from the single self-contained
+`banner.s`:
+
+```text
+DRIVE 8
+CASM BANNER.S /O:BANNER.PRG
+```
+
+### Source, Candidate, and Shipping Artifact
+
+Same three-stage model as [DASH](dash-utility.md#source-candidate-and-shipping-artifact),
+scaled down to one file:
+
+* **Source** — `src/external/banner/banner.s`, the only thing anyone edits.
+* **Candidate** — the PRG a real `CASM BANNER.S /O:BANNER.PRG` run on native
+  CASM produces. Nothing on the host can reproduce this run.
+* **Reviewed/shipping artifact** — `src/external/banner/banner.ref.hex`, a
+  human-reviewed hex manifest transcribed from a candidate via
+  `scripts/build_banner_manifest.py`, which `scripts/hex_manifest_to_bin.py`
+  turns back into the `banner.prg` CMake packages onto
+  `command64_casm_utils.d64` at build time. Editing `banner.s` without
+  regenerating this manifest is caught, not silent: the manifest embeds a
+  `source_sha256` line, and the build hard-fails if it no longer matches.
+
+Unlike DASH, there is no ca65 cross-check step here at all — BANNER has no
+ca65 build to cross-check against, so `build_banner_manifest.py` has no
+`--cross-check`/`--allow-host-bytes` machinery. Native CASM is the only
+assembler in the picture.
 
 ---
 
@@ -115,15 +150,16 @@ Prints the two-line usage banner and exits without rendering.
 
 ## Technical Notes
 
-* **Exit path:** `BANNER` terminates via `DOS_EXIT` (`$4C`) through the OS
-  Service Bus at `JSR $1000`, returning cleanly to the shell prompt.
-* **Argument source:** the message is read from `CommandBuffer` (`$033C`)
-  starting at the shell's `ParsePos` (`$63`), skipping the command name token
+* **Exit path:** `BANNER` terminates via the named constant `DOS_EXIT`
+  (`$4C`) through the OS Service Bus at `OS_API` (`$1000`), returning
+  cleanly to the shell prompt.
+* **Argument source:** the message is read from `COMMANDBUFFER` (`$033C`)
+  starting at the shell's `PARSEPOS` (`$63`), skipping the command name token
   and any spaces that follow it.
 * **Zero page:** uses `$72`–`$76`, `$78`, `$79` for render state and `$FB`/`$FC`
-  as the string print pointer — all within the external-application safe area
-  described in the [Programmer's Reference](programmers-reference.md).
-* **Size bound:** the ca65 target is built with a `$0800` (2 KB) PRG size limit.
+  as the string print pointer (named `BANNERLINELEN`/`BANNERROWIDX`/etc. and
+  `PRINTPTRLO`/`PRINTPTRHI` in source) — all within the external-application
+  safe area described in the [Programmer's Reference](programmers-reference.md).
 
 ## Related Documents
 

@@ -21,8 +21,7 @@ PAGEROUTINETABLE:
 ; STRING ALSO KEEPS THIS IMMUNE TO THE PRINTDEC16 SPACING BUG IT EXISTS TO
 ; HELP DIAGNOSE, SINCE IT NEVER CALLS FORMATDEC16/PRINTDEC16 AT ALL.
 DASHVERSTR:
-    .BYTE $04, $01, $13, $08, $20, $16, $30, $2E, $31, $2E
-    .BYTE $34, $00
+    .BYTE $04, $01, $13, $08, $20, $16, "0.1.4", $00
 
 ; FMTBUF - SHARED 5-BYTE APPLICATION-RAM FORMATTING BUFFER.
 ; USED BY FORMATHEX8 (3 OF 5 BYTES), FORMATHEX16 (ALL 5), AND FORMATDEC16
@@ -32,8 +31,7 @@ FMTBUF:
 
 ; HEXDIGITS - SCREEN-CODE DIGITS FOR VALUES 0-15: '0'-'9' THEN 'A'-'F'.
 HEXDIGITS:
-    .BYTE $30, $31, $32, $33, $34, $35, $36, $37
-    .BYTE $38, $39, $01, $02, $03, $04, $05, $06
+    .BYTE "0123456789", $01, $02, $03, $04, $05, $06
 
 ; TABCOLSTART/TABCOLLEN - TAB ROW (ROW 2) LABEL COLUMN RANGES, ONE ENTRY PER
 ; PAGE (SYSTEM, APPLICATIONS, VMM TEST), USED BY HIGHLIGHTTABS.
@@ -52,19 +50,19 @@ TITLEROW:
     .BYTE $5D, $20, $03, $0F, $0D, $0D, $01, $0E, $04, $20
     .BYTE $36, $34, $20, $13, $19, $13, $14, $05, $0D, $20
     .BYTE $04, $01, $13, $08, $02, $0F, $01, $12, $04, $20
-    .BYTE $20, $20, $20, $20, $20, $20, $20, $20, $20, $5D
+    .BYTE "         ", $5D
 
 TABSROW:
     .BYTE $5D, $20, $13, $19, $13, $14, $05, $0D, $20, $20
     .BYTE $20, $01, $10, $10, $0C, $09, $03, $01, $14, $09
     .BYTE $0F, $0E, $13, $20, $20, $20, $16, $0D, $0D, $20
-    .BYTE $14, $05, $13, $14, $20, $20, $20, $20, $20, $5D
+    .BYTE $14, $05, $13, $14, "     ", $5D
 
 STATUSROW:
     .BYTE $5D, $20, $06, $31, $2F, $06, $33, $2F, $06, $35
     .BYTE $20, $10, $01, $07, $05, $20, $20, $12, $20, $12
     .BYTE $05, $06, $12, $05, $13, $08, $20, $20, $11, $20
-    .BYTE $11, $15, $09, $14, $20, $20, $20, $20, $20, $5D
+    .BYTE $11, $15, $09, $14, "     ", $5D
 
 SYSTITLESTR:
     .BYTE $13, $19, $13, $14, $05, $0D, $20, $10, $01, $07, $05, $00
@@ -85,16 +83,16 @@ SYSFAILSTR:
 
 SYSL_VER:
     .BYTE $0F, $13, $20, $16, $05, $12, $13, $09, $0F, $0E
-    .BYTE $3A, $20, $00
+    .BYTE ": ", $00
 
 SYSL_DEV_STAGE:
     .BYTE $20, $28, $04, $05, $16, $29, $00
 
 SYSL_DEVICE:
-    .BYTE $04, $05, $16, $09, $03, $05, $3A, $20, $00
+    .BYTE $04, $05, $16, $09, $03, $05, ": ", $00
 
 SYSL_VIDEO:
-    .BYTE $16, $09, $04, $05, $0F, $3A, $20, $00
+    .BYTE $16, $09, $04, $05, $0F, ": ", $00
 
 SYSL_NTSC:
     .BYTE $0E, $14, $13, $03, $00
@@ -107,10 +105,10 @@ SYSL_UNKNOWN:
 
 SYSL_RANGE:
     .BYTE $15, $13, $05, $12, $20, $12, $01, $0E, $07, $05
-    .BYTE $3A, $20, $24, $00
+    .BYTE ": $", $00
 
 SYSL_DASHDOLLAR:
-    .BYTE $2D, $24, $00
+    .BYTE "-$", $00
 
 SYSL_PROTECTED:
     .BYTE $10, $12, $0F, $14, $05, $03, $14, $05, $04, $3A
@@ -118,7 +116,7 @@ SYSL_PROTECTED:
     .BYTE $06, $06, $00
 
 SYSL_VMM:
-    .BYTE $16, $0D, $0D, $3A, $20, $00
+    .BYTE $16, $0D, $0D, ": ", $00
 
 SYSL_ACTIVE:
     .BYTE $01, $03, $14, $09, $16, $05, $00
@@ -127,7 +125,7 @@ SYSL_INACTIVE:
     .BYTE $09, $0E, $01, $03, $14, $09, $16, $05, $00
 
 SYSL_REU:
-    .BYTE $20, $20, $12, $05, $15, $3A, $20, $00
+    .BYTE "  ", $12, $05, $15, ": ", $00
 
 SYSL_PROBED:
     .BYTE $10, $12, $0F, $02, $05, $04, $00
@@ -137,25 +135,25 @@ SYSL_UNPROBED:
 
 SYSL_PGSIZE:
     .BYTE $16, $0D, $0D, $20, $10, $01, $07, $05, $20, $13
-    .BYTE $09, $1A, $05, $3A, $20, $00
+    .BYTE $09, $1A, $05, ": ", $00
 
 SYSL_BYTES:
     .BYTE $20, $02, $19, $14, $05, $13, $00
 
 SYSL_PGTOTAL:
     .BYTE $16, $0D, $0D, $20, $10, $01, $07, $05, $13, $20
-    .BYTE $14, $0F, $14, $01, $0C, $3A, $20, $00
+    .BYTE $14, $0F, $14, $01, $0C, ": ", $00
 
 SYSL_USEDFREE:
     .BYTE $16, $0D, $0D, $20, $15, $13, $05, $04, $2F, $06
-    .BYTE $12, $05, $05, $3A, $20, $00
+    .BYTE $12, $05, $05, ": ", $00
 
 SYSL_SLASH:
-    .BYTE $20, $2F, $20, $00
+    .BYTE " / ", $00
 
 SYSL_APPS:
     .BYTE $01, $10, $10, $0C, $09, $03, $01, $14, $09, $0F
-    .BYTE $0E, $13, $3A, $20, $00
+    .BYTE $0E, $13, ": ", $00
 
 SYSL_NA:
     .BYTE $0E, $2F, $01, $00
@@ -205,7 +203,7 @@ APPERRSTR:
     .BYTE $05, $12, $12, $0F, $12, $00
 
 APPRANGEBADSTR:
-    .BYTE $3F, $3F, $3F, $3F, $00
+    .BYTE "????", $00
 
 VMMTITLESTR:
     .BYTE $16, $0D, $0D, $20, $14, $05, $13, $14, $20, $10, $01, $07, $05, $00
@@ -256,7 +254,7 @@ VMMBLOCKIDX:
     .BYTE 0
 
 VMMLABEL1:
-    .BYTE $13, $14, $01, $14, $15, $13, $3A, $20, $00
+    .BYTE $13, $14, $01, $14, $15, $13, ": ", $00
 
 VMML_UNAVAILSHORT:
     .BYTE $15, $0E, $01, $16, $01, $09, $0C, $01, $02, $0C, $05, $00
@@ -287,29 +285,28 @@ VMML_ALLOC:
     .BYTE $01, $0C, $0C, $0F, $03, $01, $14, $09, $0F, $0E, $00
 
 VMML_SEGBANK:
-    .BYTE $13, $05, $07, $3A, $20, $24, $00
+    .BYTE $13, $05, $07, ": $", $00
 
 VMML_BANK:
-    .BYTE $20, $02, $01, $0E, $0B, $3A, $20, $24, $00
+    .BYTE " ", $02, $01, $0E, $0B, ": $", $00
 
 VMML_PATTERN:
     .BYTE $10, $01, $14, $14, $05, $12, $0E, $3A, $20, $00
 
 VMML_OF3:
-    .BYTE $20, $2F, $20, $33, $00
+    .BYTE " / 3", $00
 
 VMML_STAGE:
-    .BYTE $13, $14, $01, $07, $05, $3A, $20, $00
+    .BYTE $13, $14, $01, $07, $05, ": ", $00
 
 VMML_OFFSET:
-    .BYTE $0F, $06, $06, $13, $05, $14, $3A, $20, $24, $00
+    .BYTE $0F, $06, $06, $13, $05, $14, ": $", $00
 
 VMML_EXPECT:
-    .BYTE $05, $18, $10, $05, $03, $14, $05, $04, $3A, $20
-    .BYTE $24, $00
+    .BYTE $05, $18, $10, $05, $03, $14, $05, $04, ": $", $00
 
 VMML_ACTUAL:
-    .BYTE $20, $01, $03, $14, $15, $01, $0C, $3A, $20, $24, $00
+    .BYTE " ", $01, $03, $14, $15, $01, $0C, ": $", $00
 
 VMML_PRESST:
     .BYTE $10, $12, $05, $13, $13, $20, $14, $20, $14, $0F
