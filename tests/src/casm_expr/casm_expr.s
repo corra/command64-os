@@ -20,6 +20,8 @@
 .export CasmTokenRecord
 .export CasmTokenText
 .export CasmPc
+.export CasmTokenStartOffsetLo
+.export CasmTokenStartOffsetHi
 
 ; WP28: moved off $70/$71 (CasmPtr0Lo/CasmPtr0Hi). expr.s's exprEvaluate
 ; identifier branch now stages the resolver's name pointer through
@@ -351,6 +353,15 @@ resolveConst:
     ldy #CASM_RESOLVE_SYM_FLAGS
     lda #(CASM_SYMBOL_FLAG_CONSTANT | CASM_SYMBOL_FLAG_RESOLVED)
     sta (OutputLo), y
+    ; WP76: zero the defined-at bookmark to match CasmTokenStartOffsetLo/Hi's
+    ; own zero default (this harness has no real lexer to stamp either one),
+    ; so the new position check sees 0 >= 0 -- at-or-after, safe -- and this
+    ; case's pre-WP76 expected outcome (SYMBOL_DERIVED cleared) is unchanged.
+    ldy #CASM_RESOLVE_DEFINED_AT_OFFSET_LO
+    lda #0
+    sta (OutputLo), y
+    ldy #CASM_RESOLVE_DEFINED_AT_OFFSET_HI
+    sta (OutputLo), y
     clc
     rts
 
@@ -421,6 +432,17 @@ ExpectedColumn: .res 1
 TokenOrdinal:   .res 1
 CaseRelocModeIn: .res 1
 CasmPc:         .res 2
+
+; WP76: expr.s's identifier: proc now imports these (lexer.s owns the real
+; ones; this synthetic harness has no lexer at all). Left at their BSS
+; zero-init default for every existing fixture -- resolveConst below zeros
+; the matching CASM_RESOLVE_DEFINED_AT_OFFSET_LO/HI so its "resolved
+; constant" case compares 0 >= 0 (at-or-after, safe), preserving every
+; pre-WP76 fixture's expected outcome unchanged. No fixture here currently
+; exercises the new before-definition (unsafe) branch -- see this harness's
+; own end-to-end sibling fixtures (casm_phase12_test.d64) for that.
+CasmTokenStartOffsetLo: .res 1
+CasmTokenStartOffsetHi: .res 1
 
 .segment "RODATA"
 passMsg: .byte "CASM EXPR: PASS", $0D, 0

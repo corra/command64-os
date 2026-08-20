@@ -72,6 +72,12 @@ CasmSymScratchHeadHi:   .res 1
 ; set (a label caller may leave them unset; the zero-fill already in
 ; symbolsInsert covers that case for CONSTANT callers with a resolved
 ; numeric RHS too, since those simply never populate them).
+; WP76: the constant's own defining statement's source position (copied
+; from CasmLabelDefinedAtOffsetLo/Hi, parser.s, which ppsLabel stamps from
+; CasmTokenStartOffsetLo/Hi before consuming any further tokens). Copied
+; into the new record unconditionally alongside the Ref* fields, same
+; CONSTANT-flag gate -- a label caller doesn't need it (labels stay
+; unconditionally force-abs regardless, WP39).
 .export CasmSymbolInsertFlags
 .export CasmSymbolInsertRefVmmLo
 .export CasmSymbolInsertRefVmmHi
@@ -80,6 +86,8 @@ CasmSymScratchHeadHi:   .res 1
 .export CasmSymbolInsertRefAddendHi
 .export CasmSymbolInsertRefSign
 .export CasmSymbolInsertRefExtract
+.export CasmSymbolInsertDefinedAtOffsetLo
+.export CasmSymbolInsertDefinedAtOffsetHi
 CasmSymbolInsertFlags:        .res 1
 CasmSymbolInsertRefVmmLo:     .res 1
 CasmSymbolInsertRefVmmHi:     .res 1
@@ -87,6 +95,8 @@ CasmSymbolInsertRefLen:       .res 1
 CasmSymbolInsertRefAddendLo:  .res 1
 CasmSymbolInsertRefAddendHi:  .res 1
 CasmSymbolInsertRefSign:      .res 1
+CasmSymbolInsertDefinedAtOffsetLo: .res 1
+CasmSymbolInsertDefinedAtOffsetHi: .res 1
 CasmSymbolInsertRefExtract:   .res 1
 
 .assert CASM_SYMBOL_BUCKET_COUNT * 2 = 256, error, "CASM symbol bucket table size changed"
@@ -286,7 +296,9 @@ sfcAdvance:
 ; record's REF_* fields (meaningful only until CASM_SYMBOL_FLAG_RESOLVED is
 ; later set by the resolution sweep); a label caller (CONSTANT clear)
 ; leaves them at whatever they last held, since the record's own zero-fill
-; already covers that case.
+; already covers that case. WP76: CasmSymbolInsertDefinedAtOffsetLo/Hi is
+; copied the same way, alongside the Ref* fields -- unlike them it stays
+; meaningful for the constant's entire lifetime, not just pre-resolution.
 ;
 ; Inputs:  CasmPtr0Lo/CasmPtr0Hi = namePtr; A = nameLen (1..31);
 ;          X/Y = value (Lo/Hi); CasmSymbolInsertFlags = record flags;
@@ -371,6 +383,10 @@ siNameDone:
     sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_SIGN
     lda CasmSymbolInsertRefExtract
     sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_EXTRACT
+    lda CasmSymbolInsertDefinedAtOffsetLo
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO
+    lda CasmSymbolInsertDefinedAtOffsetHi
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI
 siRefDone:
 
     ; Prepend: Next = the bucket's ORIGINAL head (captured by
@@ -447,9 +463,12 @@ siCountDone:
 ;              on a match with the matched record's own CASM_SYMBOL_REC_
 ;              FLAGS byte (DEFINED/CONSTANT/RESOLVED/LABEL_DERIVED),
 ;              distinct from CASM_RESOLVE_FLAGS' CASM_EXPR_FLAG_* meaning;
-;              CASM_RESOLVE_FLAGS clear (RESOLVED clear) and the remaining
-;              view bytes (including CASM_RESOLVE_SYM_FLAGS) unspecified on
-;              no match
+;              CASM_RESOLVE_DEFINED_AT_OFFSET_LO/HI (WP76) is also
+;              populated on a match from the record's own field; CASM_
+;              RESOLVE_FLAGS clear (RESOLVED clear) and the remaining view
+;              bytes (including CASM_RESOLVE_SYM_FLAGS and
+;              CASM_RESOLVE_DEFINED_AT_OFFSET_LO/HI) unspecified on no
+;              match
 ;          C set + A = CASM_DIAG_VMM_TRANSFER_FAILED is the ONE exception:
 ;              an internal VMM failure during the chain walk, which is not a
 ;              resolution outcome at all
@@ -486,6 +505,12 @@ symbolsLookup:
     sta (CasmPtr1Lo), y
     ldy #CASM_RESOLVE_SYM_FLAGS
     lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    sta (CasmPtr1Lo), y
+    ldy #CASM_RESOLVE_DEFINED_AT_OFFSET_LO
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO
+    sta (CasmPtr1Lo), y
+    ldy #CASM_RESOLVE_DEFINED_AT_OFFSET_HI
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI
     sta (CasmPtr1Lo), y
     clc
     rts

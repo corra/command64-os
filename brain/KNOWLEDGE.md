@@ -3137,6 +3137,52 @@ been failing to build because the manifest's recorded `source_sha256`
 for the four edited files no longer matched their (behaviorally
 unchanged) content; it builds clean now.
 
+## CASM Phase 12 WP76 Forward-Reference Pass-Agreement Fix (complete 2026-08-20)
+
+Fixed a genuine Pass 1/Pass 2 instruction-width disagreement discovered
+during WP75 Increment 5's fresh fixture sweep (Taskwarrior task 44,
+originally logged as task 45 before Taskwarrior's session-local numeric
+IDs shifted): `casmarithfwd.s` (`.ORG $0010` / `LDA FWDCONST*2` /
+`FWDCONST = 5`, forward-referenced named constant + arithmetic operator)
+produced `CASM: PASS 1/2 MISMATCH` instead of `CASM: INPUT VALIDATED`.
+
+Root cause, confirmed live via direct memory read (`CasmPass1FinalPc =
+$0013`, `CasmPc = $0012`): Pass 1 evaluates the forward reference while
+`FWDCONST` is still undefined, forcing absolute (3-byte) addressing; by
+Pass 2 the symbol table is fully populated, so the same reference sees
+`FWDCONST` already resolved and WP72's zero-page exemption fires (2
+bytes) -- a 1-byte width disagreement. WP72's own governing comment
+("a resolved, non-label-derived constant's value can never differ
+between Pass 1 and Pass 2") was true of the *value* but not of the
+*resolution state at a specific reference's own position* -- true for
+backward references, false for forward ones.
+
+Fixed by extending the symbol record with a `DEFINED_AT_OFFSET_LO/HI`
+bookmark (`common.inc`, offsets 44-45), stamped from the already-global
+`CasmTokenStartOffsetLo/Hi` at each constant's own defining statement
+(`ppsLabel`/`crpConstant`/`symbolsInsert`), and surfaced through the
+resolver output view (`CASM_RESOLVE_SIZE` 6->8) at zero extra VMM-read
+cost. `expr.s`'s WP72 exemption now only fires when the *current*
+reference's own source position is at or after the constant's
+`DEFINED_AT_OFFSET` -- both passes replay the same source top-to-bottom,
+so this comparison yields the same answer in both, restoring agreement.
+
+Live-verified: `casmarithfwd.s` now `CASM: INPUT VALIDATED` + `FILES
+COMPARE OK`; a consolidated fresh re-run of all 11 WP75 Increment 5
+fixtures together shows zero regressions. Found and fixed an
+unanticipated build break in `tests/src/casm_expr/casm_expr.s` (a
+synthetic `expr.s` unit-test harness with no real `lexer.s`) along the
+way. Also found and explicitly deferred a second, unrelated defect
+(Taskwarrior task 45: chaining a named constant to another named
+constant breaks parsing of the following line) -- not investigated here,
+per this project's disclose-and-defer norm.
+
+The user approved this walkthrough on 2026-08-20. Plan:
+`brain/plans/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
+Walkthrough:
+`brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
+WP75 resumes from Increment 6.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

@@ -1060,7 +1060,15 @@ CASM_RESOLVE_VAL_HI    = 4
 ; is set; zero on a not-found outcome. Lets a caller (expr.s) distinguish a
 ; constant from a label without a second lookup.
 CASM_RESOLVE_SYM_FLAGS = 5
-CASM_RESOLVE_SIZE      = 6
+; WP76: the matched symbol's own CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO/HI,
+; copied straight out of the record symbolsLookup already has loaded (no
+; extra VMM read) -- meaningful only when CASM_RESOLVE_SYM_FLAGS has
+; CONSTANT set (a label's own defining statement is always at or before
+; any reference to it that matters, WP39's unconditional force-abs already
+; covers it, so this is never populated/consulted for a label match).
+CASM_RESOLVE_DEFINED_AT_OFFSET_LO = 6
+CASM_RESOLVE_DEFINED_AT_OFFSET_HI = 7
+CASM_RESOLVE_SIZE      = 8
 CASM_RESOLVE_FLAG_MASK = CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_RELOCATABLE
 
 .assert CASM_EXPR_VAL_HI = CASM_EXPR_VAL_LO + 1, error, "CASM expression value offsets changed"
@@ -1085,7 +1093,9 @@ CASM_RESOLVE_FLAG_MASK = CASM_EXPR_FLAG_RESOLVED | CASM_EXPR_FLAG_RELOCATABLE
 .assert CASM_RESOLVE_VAL_LO = CASM_RESOLVE_ID_HI + 1, error, "CASM resolver value offset changed"
 .assert CASM_RESOLVE_VAL_HI = CASM_RESOLVE_VAL_LO + 1, error, "CASM resolver value offsets changed"
 .assert CASM_RESOLVE_SYM_FLAGS = CASM_RESOLVE_VAL_HI + 1, error, "CASM resolver symbol-flags offset changed"
-.assert CASM_RESOLVE_SIZE = CASM_RESOLVE_SYM_FLAGS + 1, error, "CASM resolver output size changed"
+.assert CASM_RESOLVE_DEFINED_AT_OFFSET_LO = CASM_RESOLVE_SYM_FLAGS + 1, error, "CASM resolver defined-at offset changed"
+.assert CASM_RESOLVE_DEFINED_AT_OFFSET_HI = CASM_RESOLVE_DEFINED_AT_OFFSET_LO + 1, error, "CASM resolver defined-at offsets changed"
+.assert CASM_RESOLVE_SIZE = CASM_RESOLVE_DEFINED_AT_OFFSET_HI + 1, error, "CASM resolver output size changed"
 .assert CASM_RESOLVE_FLAG_MASK = %00000101, error, "CASM resolver flag mask changed"
 
 ; ---------------------------------------------------------------------------
@@ -1144,6 +1154,32 @@ CASM_SYMBOL_REC_REF_ADDEND_HI = 41  ; static addend magnitude, high byte
 CASM_SYMBOL_REC_REF_SIGN      = 42  ; 0 = '+' addend, 1 = '-' addend
 CASM_SYMBOL_REC_REF_EXTRACT   = 43  ; CASM_EXTRACTION_FULL/LO/HI, applied to the resolved value
 
+; ---------------------------------------------------------------------------
+; Phase 12 WP76 symbol record extension (constant defined-at bookmark)
+; ---------------------------------------------------------------------------
+;
+; A named constant's own defining statement's source position, stamped from
+; CasmTokenStartOffsetLo/Hi (lexer.s, stamped on every token) the moment
+; crpConstant processes it. Written for every constant, numeric-RHS or
+; identifier-RHS alike -- unlike the REF_* bookmark above (only meaningful
+; pre-resolution, for a deferred identifier-RHS constant), this field stays
+; meaningful for the constant's entire lifetime.
+;
+; expr.s's identifier: proc (WP72's exemption branch) compares this against
+; the CURRENT reference's own CasmTokenStartOffsetLo/Hi before granting the
+; zero-page/absolute value-based selection: a reference strictly before this
+; offset was necessarily unresolved when Pass 1 first evaluated it (this
+; constant did not exist yet), so Pass 2 -- which always sees it fully
+; resolved once the symbol table is complete -- must still force the same
+; absolute width Pass 1 chose, or the two passes disagree on instruction
+; length (CASM_DIAG_PASS_MISMATCH). A reference at or after this offset was
+; already resolved in Pass 1 too (same source, same top-to-bottom order both
+; passes replay identically), so both passes agree on the value-based
+; selection already. See
+; `brain/plans/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
+CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO = 44
+CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI = 45
+
 ; Bounded capacity: 512 records x 64 bytes = 32768 bytes, one vmmStoreAlloc
 ; call, well under CASM_VMM_ALLOC_MAX_BYTES. 128 hash buckets (a power of
 ; two, masked with $7F -- no division needed).
@@ -1185,6 +1221,9 @@ CASM_EXPR_PAREN_MAX_DEPTH = 8
 .assert CASM_SYMBOL_REC_REF_SIGN = CASM_SYMBOL_REC_REF_ADDEND_HI + 1, error, "CASM symbol record ref-sign offset changed"
 .assert CASM_SYMBOL_REC_REF_EXTRACT = CASM_SYMBOL_REC_REF_SIGN + 1, error, "CASM symbol record ref-extract offset changed"
 .assert CASM_SYMBOL_REC_REF_EXTRACT < CASM_SYMBOL_REC_SIZE, error, "CASM symbol record ref bookmark overflows record"
+.assert CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO = CASM_SYMBOL_REC_REF_EXTRACT + 1, error, "CASM symbol record defined-at offset changed"
+.assert CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI = CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO + 1, error, "CASM symbol record defined-at offsets changed"
+.assert CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI < CASM_SYMBOL_REC_SIZE, error, "CASM symbol record defined-at bookmark overflows record"
 .assert CASM_SYMBOL_REC_SIZE = 64, error, "CASM symbol record size changed"
 .assert CASM_SYMBOL_REC_SIZE = CASM_VMM_BUFFER_SIZE, error, "CASM symbol record must fit one VMM transfer exactly"
 .assert CASM_SYMBOL_BUCKET_COUNT = CASM_SYMBOL_BUCKET_MASK + 1, error, "CASM symbol bucket count/mask mismatch"

@@ -445,3 +445,21 @@ Phase 12 (and this WP) completes only when:
   is paused here pending user direction** on task 45 — root-causing this
   needs live breakpoint debugging through the two-pass agreement check,
   not further guessing.
+- 2026-08-20: **Task 45 fixed under a dedicated corrective WP (WP76),
+  WP75 resumes.** Root-caused live (confirmed via direct memory read:
+  `CasmPass1FinalPc=$0013` vs `CasmPc=$0012` at the mismatch point —
+  Pass 1 forced absolute addressing for `FWDCONST` while unresolved
+  ahead of its own definition; Pass 2 always sees it resolved and WP72's
+  zero-page exemption fired, disagreeing on instruction width). Fixed by
+  giving each named constant a `DEFINED_AT_OFFSET` bookmark and gating
+  WP72's exemption on the current reference's own source position being
+  at or after it. `casmarithfwd.s` now produces `CASM: INPUT VALIDATED`
+  + `FILES COMPARE OK`; a consolidated fresh re-run of all 11 WP75
+  Increment 5 fixtures together shows zero regressions. Full project
+  build and no-change rebuild both clean. Full detail:
+  `brain/plans/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`,
+  `brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
+  WP75's remaining scope (Increment 6: DASH regen re-verify; Increment 7:
+  docs reconciliation, deferred per user direction until this Phase's own
+  close; Increment 8: version promotion; Increment 9: tracker sync;
+  Increment 10: final walkthrough) resumes from here.

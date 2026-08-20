@@ -2962,13 +2962,15 @@
 
 # CASM Phase 12 - Constants and Expanded Expressions (CASM 0.3)
 
-- **Current map (reconciled 2026-08-18):** WP64 contract freeze; WP65 named
+- **Current map (reconciled 2026-08-20):** WP64 contract freeze; WP65 named
   constants; WP66 current address; WP67 precedence; WP68 operators; WP69
   character literals; WP70 relocation closure; WP71 DASH adoption; WP72
   constant zero-page correction; WP73 resolver-state correction; WP74 `.BYTE`
-  strings (active); WP75 consolidated completion gate. Earlier numbering notes
+  strings; WP75 consolidated completion gate (in progress, resumed from
+  Increment 6 after WP76); WP76 forward-reference Pass 1/2 width-agreement
+  fix (complete, corrective WP inserted mid-WP75). Earlier numbering notes
   below are historical and superseded by this map.
-- Current implementation: CASM `0.2.7` build `1319`; `0.3.0` remains the WP75
+- Current implementation: CASM `0.2.8` build `1323`; `0.3.0` remains the WP75
   completion-promotion target.
 
 - [/] Taskwarrior #43 (`c547c74f-5080-4f2e-b086-e4e2273b5336`): CASM Phase
@@ -3512,6 +3514,25 @@
       normal `c64[8]:>` return. Walkthrough: `brain/walkthroughs/2026-08-19-
       casm-phase12-wp74-string-literals.md`. User approved completion on
       2026-08-19; CASM advanced `0.2.7` -> `0.2.8`.
+    - [x] WP76 forward-reference Pass 1/2 width-agreement fix complete,
+      user-approved 2026-08-20 (Taskwarrior task 44, UUID
+      `25420ff2-5dd5-46d0-a790-4d10dda0b947` -- discovered mid-WP75
+      Increment 5, corrective WP inserted per the WP72/WP73 precedent).
+      Root cause confirmed live (`CasmPass1FinalPc=$0013` vs
+      `CasmPc=$0012`): a forward-referenced named constant combined with
+      an arithmetic operator (`casmarithfwd.s`) forced absolute width in
+      Pass 1 (unresolved) but took WP72's zero-page exemption in Pass 2
+      (always resolved), disagreeing by 1 byte. Fixed with a per-constant
+      `DEFINED_AT_OFFSET` bookmark (`common.inc`/`parser.s`/`casm.s`/
+      `symbols.s`) gating WP72's exemption on source-position order in
+      `expr.s`. All 11 WP75 Increment 5 fixtures re-verified together,
+      zero regressions; full project build and no-change rebuild clean.
+      Found and disclosed a second, unrelated defect (constant-to-
+      constant chaining breaks parsing) as its own Taskwarrior task 45,
+      deferred. Plan: `brain/plans/2026-08-20-casm-phase12-wp76-forward-
+      reference-pass-agreement-fix.md`. Walkthrough:
+      `brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-
+      pass-agreement-fix.md`. WP75 resumes from Increment 6.
 
 - [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
       progress and processing indication feature

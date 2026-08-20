@@ -13,6 +13,8 @@
 .import CasmTokenText
 .import diagSetLocFromToken
 .import CasmPc
+.import CasmTokenStartOffsetLo
+.import CasmTokenStartOffsetHi
 
 .export exprInit
 .export exprGetResult
@@ -351,21 +353,40 @@ resolverValid:
     lda CasmExprResolverOutput + CASM_RESOLVE_SYM_FLAGS
     and #CASM_SYMBOL_FLAG_LABEL_DERIVED
     bne evApplyMode
-    ; WP72: a resolved, non-label-derived constant's value can never differ
-    ; between Pass 1 and Pass 2 (casmResolveConstants, casm.s, fully resolves
-    ; every such constant before either pass ever evaluates an instruction
-    ; operand naming it -- see this proc's own WP65 comment above), unlike a
-    ; label or the current-address symbol, whose SYMBOL_DERIVED must stay set
-    ; unconditionally so parserParseExpressionValue's FORCE_ABS derivation
-    ; (parser.s) can never disagree in width between passes. Clearing
-    ; SYMBOL_DERIVED here lets such a constant fall through to the same
-    ; value-based zero-page/absolute selection in opcodes.s that a bare
-    ; numeric literal already gets -- fixing STA SYMBOL (SYMBOL = $70)
-    ; wrongly assembling as 3-byte absolute instead of 2-byte zero-page.
-    ; The binary-operator RHS-propagation sites below (combineFlags/
-    ; staticFlags) need no matching change: they only OR in whatever
-    ; SYMBOL_DERIVED state an operand already carries, so a compound
-    ; expression like SYMBOL+1 correctly inherits this same clear bit.
+    ; WP76: a resolved, non-label-derived constant's VALUE can never differ
+    ; between Pass 1 and Pass 2, but this specific REFERENCE'S resolution
+    ; STATE can -- if this reference occurs (in source order) before the
+    ; constant's own defining statement, Pass 1 necessarily evaluated it
+    ; while still unresolved (forced absolute, the label-shaped path above),
+    ; while Pass 2 always sees the fully-populated symbol table and would
+    ; otherwise take the value-based path below, disagreeing on instruction
+    ; width (CASM_DIAG_PASS_MISMATCH). Compare this token's own source
+    ; position (stamped on every token, lexer.s) against the matched
+    ; constant's CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO/HI (symbols.s,
+    ; stamped from the same field at the constant's own definition,
+    ; casm.s's crpConstant): strictly-before falls through to evApplyMode,
+    ; the same unconditional label-shaped path an unresolved reference
+    ; already takes, so both passes agree on width regardless of which one
+    ; is evaluating. At-or-after is safe: both passes replay the same
+    ; source top-to-bottom, so a reference already at/after the constant's
+    ; definition sees it resolved in Pass 1 too, identically to Pass 2.
+    lda CasmTokenStartOffsetHi
+    cmp CasmExprResolverOutput + CASM_RESOLVE_DEFINED_AT_OFFSET_HI
+    bcc evApplyMode                  ; this reference is strictly before
+    bne wp76SafeToClear              ; strictly after: safe regardless of lo
+    lda CasmTokenStartOffsetLo
+    cmp CasmExprResolverOutput + CASM_RESOLVE_DEFINED_AT_OFFSET_LO
+    bcc evApplyMode                  ; same hi, strictly before
+wp76SafeToClear:
+    ; WP72: clearing SYMBOL_DERIVED here lets such a constant fall through
+    ; to the same value-based zero-page/absolute selection in opcodes.s
+    ; that a bare numeric literal already gets -- fixing STA SYMBOL
+    ; (SYMBOL = $70) wrongly assembling as 3-byte absolute instead of
+    ; 2-byte zero-page. The binary-operator RHS-propagation sites below
+    ; (combineFlags/staticFlags) need no matching change: they only OR in
+    ; whatever SYMBOL_DERIVED state an operand already carries, so a
+    ; compound expression like SYMBOL+1 correctly inherits this same clear
+    ; bit.
     lda CasmExprResultRecord + CASM_EXPR_FLAGS
     and #($FF - CASM_EXPR_FLAG_SYMBOL_DERIVED)
     sta CasmExprResultRecord + CASM_EXPR_FLAGS

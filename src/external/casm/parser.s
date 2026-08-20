@@ -62,6 +62,8 @@
 .export CasmConstantRefAddendHi
 .export CasmConstantRefExtract
 .export CasmConstantIsCurAddr
+.export CasmLabelDefinedAtOffsetLo
+.export CasmLabelDefinedAtOffsetHi
 
 .segment "BSS"
 
@@ -80,6 +82,16 @@ CasmParserStmt:
 ; terminator byte that is never written here, kept only for the size match).
 CasmLabelName:    .res 32
 CasmLabelNameLen: .res 1
+
+; WP76: the just-consumed IDENTIFIER's own source position, stamped by
+; ppsLabel below from CasmTokenStartOffsetLo/Hi (lexer.s) before any further
+; token is read -- same "copy before it's overwritten" reasoning as
+; CasmLabelName itself, immediately above. Meaningful for a constant
+; definition only (crpConstant, casm.s, copies it into the symbol record);
+; a label statement leaves it populated but unused, harmless since labels
+; stay unconditionally force-abs regardless (WP39).
+CasmLabelDefinedAtOffsetLo: .res 1
+CasmLabelDefinedAtOffsetHi: .res 1
 
 ; WP65: ppsConstant's own staged output for casm.s's crpConstant, mirroring
 ; CasmLabelName/CasmLabelNameLen's precedent exactly -- a named constant's
@@ -262,6 +274,11 @@ ppsSyntaxError:
 ; Clobbers:  A, X, Y, CasmParserStmt, CasmLabelName, CasmLabelNameLen
 ; ---------------------------------------------------------------------------
 ppsLabel:
+    lda CasmTokenStartOffsetLo
+    sta CasmLabelDefinedAtOffsetLo
+    lda CasmTokenStartOffsetHi
+    sta CasmLabelDefinedAtOffsetHi
+
     lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
     sta CasmLabelNameLen
     ldy #0

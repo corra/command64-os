@@ -52,6 +52,8 @@
 .import CasmParserStmt
 .import CasmLabelName
 .import CasmLabelNameLen
+.import CasmLabelDefinedAtOffsetLo
+.import CasmLabelDefinedAtOffsetHi
 .import opcodesFindOpcode
 .import diagPrintPhase2Ready
 
@@ -66,6 +68,8 @@
 .import CasmSymbolInsertRefAddendHi
 .import CasmSymbolInsertRefSign
 .import CasmSymbolInsertRefExtract
+.import CasmSymbolInsertDefinedAtOffsetLo
+.import CasmSymbolInsertDefinedAtOffsetHi
 
 ; WP65: ppsConstant's own staged output (parser.s) for a just-parsed
 ; `identifier = expr` statement.
@@ -606,6 +610,10 @@ crpConstantStoreFlags:
     sta CasmSymbolInsertRefSign
     lda CasmConstantRefExtract
     sta CasmSymbolInsertRefExtract
+    lda CasmLabelDefinedAtOffsetLo
+    sta CasmSymbolInsertDefinedAtOffsetLo
+    lda CasmLabelDefinedAtOffsetHi
+    sta CasmSymbolInsertDefinedAtOffsetHi
 
     lda CasmLabelNameLen
     ldx CasmConstantValueLo

@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM forward-referenced constant Pass 1/2 width agreement (Phase 12
+  WP76)**: Fixed a genuine instruction-width disagreement between Pass 1
+  and Pass 2 for a named constant referenced (inside an arithmetic
+  expression) before its own defining statement -- Pass 1 forced absolute
+  addressing while unresolved, Pass 2 always saw it resolved and took
+  WP72's zero-page exemption, disagreeing by 1 byte
+  (`CASM: PASS 1/2 MISMATCH`). Fixed with a per-constant `DEFINED_AT_
+  OFFSET` bookmark so both passes agree on width regardless of which one
+  is evaluating. `casmarithfwd.s` now passes; all 11 WP75 Increment 5
+  production fixtures re-verified together with zero regressions.
+  Completion was approved on 2026-08-20.
 - **DASH Phase 12 syntax adoption and native provenance (WP71)**: Replaced
   private zero-page magic addresses with named constants across DASH's seven
   dual-assembler sources. Native CASM `0.2.6.1318` now produces the reviewed
