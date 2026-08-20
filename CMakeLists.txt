@@ -1268,6 +1268,7 @@ endif()
 set(SYNC_FILES
     api-reference.md
     banner-utility.md
+    casm-programmers-reference.md
     casm-utility.md
     debug-test-plan.md
     debug-utility.md
