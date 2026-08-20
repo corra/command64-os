@@ -258,7 +258,7 @@ DAPPRANGEBAD:
 DAPPPRINTFLAGS:
     LDA APPBUF+3
     PHA
-    AND #$01                    ; BIT 0: USED
+    AND #1<<0                    ; BIT 0: USED
     BEQ DAPPFU_OFF
     LDA #$15                    ; 'U'
     JMP DAPPFU_PRINT
@@ -269,7 +269,7 @@ DAPPFU_PRINT:
 
     PLA
     PHA
-    AND #$02                    ; BIT 1: RUNNING
+    AND #1<<1                    ; BIT 1: RUNNING
     BEQ DAPPFR_OFF
     LDA #$12                    ; 'R'
     JMP DAPPFR_PRINT
@@ -280,7 +280,7 @@ DAPPFR_PRINT:
 
     PLA
     PHA
-    AND #$04                    ; BIT 2: REU
+    AND #1<<2                    ; BIT 2: REU
     BEQ DAPPFV_OFF
     LDA #$16                    ; 'V'
     JMP DAPPFV_PRINT
@@ -290,7 +290,7 @@ DAPPFV_PRINT:
     JSR SCREENPUTCHAR
 
     PLA
-    AND #$08                    ; BIT 3: STACK
+    AND #1<<3                    ; BIT 3: STACK
     BEQ DAPPFS_OFF
     LDA #$13                    ; 'S'
     JMP DAPPFS_PRINT
