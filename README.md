@@ -14,7 +14,7 @@ command64 provides a familiar command-line interface and DOS-compatible API for 
 - **Virtual Memory:** 4KB page-based allocation in the REU (up to 16MB).
 - **Handle-based I/O:** Modern file management system mapping handles to C64 channels.
 - **Multi-Device Support:** Seamlessly switch between C64 devices 8-11.
-- **External Utilities:** Support for external applications (e.g., `DEBUG`, `LABEL`, `EDLIN`, `CASM`, `BANNER`, `CONWAY`, `PACMAN`).
+- **External Utilities:** Support for external applications (e.g., `DEBUG`, `LABEL`, `EDLIN`, `CASM`, `DASH`, `BANNER`, `CONWAY`, `PACMAN`).
 - **Native Assembler:** `CASM` assembles 6502 source into a runnable PRG on the C64 itself.
 - **App Manager:** Resident registry of loaded programs (`APPS`/`PS`, `FREE`) with memory-safe pre-flight validation and dynamic auto-slotting on `LOAD`.
 - **Binary Relocator:** Load relocatable binaries at arbitrary memory addresses.
@@ -92,7 +92,7 @@ The project is built using **CMake**. A `Makefile` wrapper is also provided at t
 ## For Users
 
 See the **[User Manual](docs/user-manual.md)** for a comprehensive guide to using command64.
-Per-utility manuals for `DEBUG`, `LABEL`, `EDLIN`, `CASM`, `BANNER`, `CONWAY`, and `PACMAN` are indexed in the **[Wiki Documentation Hub](wiki/Home.md)**.
+Per-utility manuals for `DEBUG`, `LABEL`, `EDLIN`, `CASM`, `DASH`, `BANNER`, `CONWAY`, and `PACMAN` are indexed in the **[Wiki Documentation Hub](wiki/Home.md)**.
 
 ## For Developers
 
