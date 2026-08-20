@@ -407,3 +407,41 @@ Phase 12 (and this WP) completes only when:
   reconciliation), Increment 8 (version promotion 0.2.8->0.3.0),
   Increment 9 (tracker sync), Increment 10 (final walkthrough + user's
   own manual approval).
+- 2026-08-20: **Increment 5's fixture survey found a genuine, reproducible
+  regression (task 45) — Stop Condition hit, disclose-and-defer per the
+  plan.** On a branch dedicated to this increment
+  (`feature/casm-phase12-wp75-increment5`), re-ran all ten Phase 12
+  production fixtures live against a freshly-attached `casm_phase12_test.d64`
+  (real `casm.prg`, real `comp.prg`, no synthetic harness): the WP70
+  relocation algebra closure set (`casmrelacc.s` -> `CASM: INPUT VALIDATED`
+  + `FILES COMPARE OK`; `casmarelocb.s`/`casmareloc1.s`/`casmareloc2.s` ->
+  their exact documented `CASM: EXPRESSION RELOCATION UNSUPPORTED`
+  diagnostics at the exact line/col/offset) all matched their WP68/WP70
+  documented outcomes exactly. `casmarith2.s`, `casmarith3.s`, `casmchar1.s`,
+  `casmzpconst1.s` (the WP72 fixture itself), `casmstring1.s` (WP74),
+  and `casmfwdstale1.s` (the WP73 fixture itself) all produced
+  `CASM: INPUT VALIDATED` and `FILES COMPARE OK` against their trusted
+  references. Only **`casmarithfwd.s`** (WP68 Increment 7: `.ORG $0010` /
+  `LDA FWDCONST*2` / `FWDCONST = 5` — a forward-referenced named constant
+  inside an arithmetic-operator expression, resolving to a zero-page-
+  eligible operand) failed, reproducibly (twice, both with clean `FLUSH`
+  drive status), with `CASM: PASS 1/2 MISMATCH` instead of its documented
+  `CASM: INPUT VALIDATED`. This fixture's source is unchanged since its
+  WP68 creation (only touched by commit `4cc412f`, via
+  `cmake/GenerateCasmTestFixtures.cmake`) and was never re-run since WP68's
+  own verification — so a regression introduced anywhere between WP68 and
+  WP74 would not have been caught until this fresh Increment 5 run. Leading
+  theory (not yet verified): WP72 or WP73's own changes to zero-page-width
+  selection / forward-label-resolver state broke specifically this
+  "forward-reference + arithmetic operator -> zero-page-eligible result"
+  combination — notable that WP72's and WP73's own dedicated fixtures
+  (`casmzpconst1.s`, `casmfwdstale1.s`) pass individually, so the defect is
+  in the *combination* this older fixture exercises, not either WP's own
+  fixture shape. Logged as Taskwarrior task 45 with full investigation
+  notes. Per the plan's Stop Conditions ("Any harness ... fails
+  unexpectedly in the fresh consolidated session, even if it passed
+  individually in its own WP" and "A genuinely new defect is discovered
+  outside prior WPs' own scope: default is disclose-and-defer"), **WP75
+  is paused here pending user direction** on task 45 — root-causing this
+  needs live breakpoint debugging through the two-pass agreement check,
+  not further guessing.
