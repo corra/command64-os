@@ -3183,7 +3183,7 @@ Walkthrough:
 `brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-pass-agreement-fix.md`.
 WP75 resumes from Increment 6.
 
-## CASM Phase 12 (WP64-76) — Pending Final Closure at `0.3.0` build `1324`
+## CASM Phase 12 Complete (WP64-76, closed 2026-08-20 at `0.3.0` build `1324`)
 
 Phase 12 added named constants (WP65), the current-address symbol `*`
 (WP66), parenthesized/precedence expressions (WP67), the full
@@ -3217,14 +3217,14 @@ walkthrough-completion-gate.md`) is Phase 12's consolidated closing WP:
 all 30 `test_casm_*` harnesses plus all 11 Phase 12 production fixtures
 re-run fresh in single continuous live-VICE sessions, DASH's regen
 re-verified byte-identical after WP76's fix, a full clean regression
-build and no-change rebuild both clean, and this documentation
-reconciliation pass (this section plus `wiki/casm-utility.md`,
-`wiki/casm-programmers-reference.md`, `CHANGELOG.md`). **Not yet closed**:
-tracker sync (Taskwarrior, `brain/task.md`, `wiki/tasks/casm.md`) and the
-final walkthrough with the user's own manual runtime approval remain —
-this section records what's been verified so far, not a self-declared
-completion. Update this heading once WP75's own completion gate is
-actually met.
+build and no-change rebuild both clean, this documentation reconciliation
+pass (this section plus `wiki/casm-utility.md`,
+`wiki/casm-programmers-reference.md`, `CHANGELOG.md`), and tracker sync
+(`wiki/tasks/casm.md`, Taskwarrior tasks 42/43). The user completed their
+own manual runtime walkthrough and approved closing Phase 12 on
+2026-08-20. Final walkthrough:
+`brain/walkthroughs/2026-08-20-casm-phase12-wp75-verification-
+walkthrough-completion-gate.md`.
 
 One genuinely new, unrelated defect was found and explicitly deferred
 along the way, not fixed under Phase 12: chaining a named constant to

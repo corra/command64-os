@@ -155,7 +155,9 @@ the user's own approval were still outstanding at annotation time.
 
 ## Completion Gate
 
-Pending the user's own manual runtime walkthrough and explicit approval.
-Once approved: Taskwarrior tasks 42 and 43 close, and this walkthrough's
-own heading and `brain/KNOWLEDGE.md`'s Phase 12 section update from
-"pending" to "complete."
+The user completed their own manual runtime walkthrough and approved
+closing Phase 12 on 2026-08-20. Taskwarrior tasks 42 (Phase 12 parent)
+and 43 (WP75) are closed. `brain/KNOWLEDGE.md`'s Phase 12 section is
+updated from "pending final closure" to "complete."
+
+**CASM Phase 12 (WP64-76) is closed at `0.3.0` build `1324`.**
