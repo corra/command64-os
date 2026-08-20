@@ -3090,6 +3090,53 @@ The user approved the completion gate on 2026-08-18. CASM advanced from
 - DASH dogfoods the feature with `.BYTE "0.1.4"`; native CASM, ca65, and the
   shipping result are byte-identical.
 
+## BANNER Migration to Native CASM (2026-08-20)
+
+BANNER retired its ca65 build path entirely (`add_ca65_app`, `header.s`
+deleted) and now ships purely from native CASM, following DASH's
+manifest-provenance model but without a ca65 cross-check step — there is
+no second toolchain building BANNER to diverge from. `banner.s` adopted
+CASM Phase 12 syntax throughout: named constants for the zero-page
+workspace and OS/KERNAL entry points, WP74 string literals for
+`USAGE_STR`, and WP69 character literals for punctuation/flag
+comparisons (two case-folding literals reverted to hex: `check_casm_
+source_bytes.py` rejects lowercase ASCII bytes anywhere in a CASM-packaged
+source, including inside a character literal, since `cc1541 -w` copies
+host bytes verbatim with no PETSCII translation — the same class of
+constraint DASH's own AGENTS.md already documents for a different reason).
+
+Verified via 4 independent live-VICE native-CASM assemblies (refactored
+source, pre-refactor source at the same relocatable base, and the final
+checker-compliant source, twice): all produced the identical 1011-byte
+PRG. The compiled `banner.prg` now ships on `command64_casm_utils.d64`
+from a new reviewed manifest (`banner.ref.hex` +
+`scripts/build_banner_manifest.py`, a single-source twin of
+`scripts/build_dash_manifest.py`). `image.d64`'s existing source-only
+distribution of `banner.s` is unchanged.
+
+Plan: `brain/plans/2026-08-20-banner-casm-native-migration.md`.
+
+## DASH Further Phase 12 Syntax Adoption (2026-08-20)
+
+Beyond WP71's named-constant-only pass, DASH's four remaining sources
+(`dapp.s`, `dscr.s`, `dsys.s`, `ddata.s`) adopted WP68 shift/arithmetic
+expressions (`AND #1<<0`-style bitmasks, `$0400+1*40`-style screen-row
+offsets, `(25*40)-(3*256)`-style cell counts) and WP74 string literals
+for the audited `$20`-`$3F` punctuation/digit range (digit runs, `": "`,
+`" / "`, `"????"`), staying inside `AGENTS.md`'s Dual-Assembler Subset
+rule throughout (literal-only arithmetic, no screen-code letters as
+string content, no character literals).
+
+Regenerated `dash.ref.hex` from a real native-CASM `0.2.8` build `1322`
+run on a dedicated CASM-only test disk (`dash_casm_test.d64`), per
+BANNER's own migration methodology — not a re-stamp of the existing
+manifest. The resulting bytes are identical to both the ca65 cross-check
+build and the previously-shipped manifest (`sha256 3238b786...`
+unchanged), confirming this is a pure syntax refactor. `image_d64` had
+been failing to build because the manifest's recorded `source_sha256`
+for the four edited files no longer matched their (behaviorally
+unchanged) content; it builds clean now.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

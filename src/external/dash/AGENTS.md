@@ -60,12 +60,18 @@ DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a P
 - The cross-check is non-circular: ca65 and CASM share no code and derive relocation entries by completely different means — `tools/reloc.py` diffs two links one page apart, while CASM classifies each operand as relocatable during emission. A defect in one cannot reproduce itself in the other.
 - **Stale-artifact protection (WP9)**: `dash.ref.hex` embeds one `# source_sha256: <name>=<hash>` line per source file, written by `build_dash_manifest.py`. The `dash` CMake target always passes `--source-dir` to `hex_manifest_to_bin.py`, which recomputes each file's hash and hard-fails the build on any mismatch, missing file, or a manifest with no recorded hashes at all — editing a source without regenerating the manifest is a build failure, not a silent stale ship.
 - **Current provenance**: `dash.ref.hex`'s shipping bytes come from native CASM
-  `0.2.7` build `1321` running under VICE 3.10 with a 16MB REU on
-  `command64_casm_utils.d64` (2026-08-18). Native `COMP DASH.PRG DASH.REF`
-  and host `--cross-check build/dash_ref.prg` both confirmed all 4,766 bytes
-  match the independent ca65 reference. No `--allow-host-bytes` override was
-  used. `dash` ships on `image_d64` (production only, never `test.d64`) from
-  these reviewed native bytes.
+  `0.2.8` build `1322` running under VICE 3.10 with a 16MB REU on a dedicated
+  CASM-only test disk, `dash_casm_test.d64` (2026-08-20) — following the same
+  dedicated-d64-per-app methodology BANNER's own migration established
+  (`brain/plans/2026-08-20-banner-casm-native-migration.md`). This run
+  carried a further Phase 12 syntax pass beyond WP71's named-constant-only
+  adoption (WP68 shift/arithmetic expressions, WP74 string literals for the
+  audited range). Host `--cross-check build/dash_ref.prg` confirmed all
+  4,766 bytes match the independent ca65 reference, and match the prior
+  shipping manifest byte-for-byte — the syntax pass changed nothing
+  observable. No `--allow-host-bytes` override was used. `dash` ships on
+  `image_d64` (production only, never `test.d64`) from these reviewed
+  native bytes.
 
 # Native Assembly Workflow
 

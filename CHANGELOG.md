@@ -14,6 +14,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   lists, focused diagnostics, production fixtures, and DASH adoption with
   native CASM/ca65/shipping byte identity. Completion was approved on
   2026-08-19 and CASM advanced from `0.2.7` to `0.2.8`.
+- **BANNER migrated to native CASM**: Retired BANNER's ca65 build path
+  entirely (`add_ca65_app`, `header.s` removed) and adopted CASM Phase 12
+  syntax throughout `banner.s` (named constants, WP74 string literals, WP69
+  character literals). The compiled `banner.prg` now ships from a new
+  reviewed hex manifest (`banner.ref.hex` + `scripts/build_banner_manifest.py`)
+  with no ca65 cross-check, verified byte-identical across 4 independent
+  live-VICE native-CASM assemblies.
+- **DASH further Phase 12 syntax adoption**: Beyond WP71's named-constant
+  pass, `dapp.s`/`dscr.s`/`dsys.s`/`ddata.s` adopted WP68 shift/arithmetic
+  expressions and WP74 string literals for the audited punctuation/digit
+  range. `dash.ref.hex` regenerated from a real native-CASM run on a
+  dedicated test disk, confirmed byte-identical to the prior shipping
+  manifest and the ca65 cross-check.
 
 ### Fixed
 
