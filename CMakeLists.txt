@@ -1270,6 +1270,8 @@ set(SYNC_FILES
     banner-utility.md
     casm-programmers-reference.md
     casm-utility.md
+    conway-utility.md
+    dash-utility.md
     debug-test-plan.md
     debug-utility.md
     edlin-utility.md
