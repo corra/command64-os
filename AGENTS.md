@@ -287,6 +287,8 @@ When the user requests a durable behavior change, record it here or in the relev
 
 - Keep a healthy VICE emulator running after tests. It is part of the user's Twitch and
   YouTube stream layout; stop it only for problem recovery or when the user explicitly asks.
+- Use exact PETSCII keyboard-buffer input for VICE shell commands nearly exclusively;
+  translated text entry is a fallback only when exact PETSCII is unavailable.
 - Every numbered Phase/Work Package requires an approved `brain/plans/`
   doc before implementation and a `brain/walkthroughs/` completion-gate
   doc with explicit sign-off before it's marked done — applies to every

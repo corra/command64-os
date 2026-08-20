@@ -128,14 +128,20 @@ glyph identity, color, or layout (not just character content) is what's being ve
 6. Observe screen state (see State verification) no more than twice while waiting for
    startup. Require the first row to decode to `Command 64-DOS Version`; otherwise machine
    context remains `unknown` or `basic`.
-7. At the Command64 shell, use `vice_keyboard_type` with the verified D64 application name
-   followed by `\n`. Shell commands are lowercase-only case-sensitive — send lowercase text
-   and leave `petscii_upper` at its default. Do not issue a BASIC `LOAD` or `RUN`, and do not
-   call `vice_autostart` for the application. If exact bytes matter (a filename character
-   `vice_keyboard_type`'s ASCII mapping can't represent), use `vice_keyboard_petscii` with
-   explicit byte values — verify every non-alphanumeric byte against a PETSCII table first;
-   ASCII `$5F` is left-arrow in PETSCII, not underscore, and a hand-rolled mistake here fails
-   silently and looks exactly like a missing file.
+7. At the Command64 shell, prefer `vice_keyboard_petscii` with explicit bytes and Return
+   (`$0D`) for nearly every command. Verify every non-alphanumeric byte against a PETSCII
+   table first; underscore is PETSCII `$A4`, while ASCII `$5F` is left-arrow. **Letter case is
+   inverted**: shell commands are lowercase-only case-sensitive (see the State verification
+   section's own screen-code table), but PETSCII's own letter encoding is the mirror image of
+   ASCII's — send the byte for the *uppercase* ASCII letter (`$41`-`$5A`, e.g. `$46` for the
+   glyph `f`) to get a *lowercase* screen glyph, and vice versa. Confirmed empirically
+   2026-08-20: raw byte `$66` (ASCII/PETSCII lowercase `f`) rendered as uppercase `F` (screen
+   code `$46`) and was rejected by the shell; byte `$46` (ASCII uppercase `F`) rendered as
+   lowercase `f` (screen code `$06`) and was accepted — verified via direct screen-RAM memory
+   reads, not just visual inspection. Use `vice_keyboard_type` only as a fallback when exact
+   PETSCII is unavailable — it does this ASCII-to-PETSCII conversion for you, so plain
+   lowercase input text works there without inverting anything yourself. Do not issue a
+   BASIC `LOAD` or `RUN`, and do not call `vice_autostart` for the application.
    If the shell responds `BAD COMMAND OR FILE NAME` (a mistyped/garbled dispatch attempt,
    not a real missing-file condition), send `flush\n` (optionally `flush <device>\n` for a
    non-default unit) before retyping the command. `FLUSH` manually reads and clears the
