@@ -183,3 +183,13 @@ implementation.
   a narrower Phase-13-only alternative). Awaiting nothing further --
   plan approved in the same exchange the scoping question was answered;
   implementation begins at Increment 1.
+- 2026-08-21: Increment 1 (full clean rebuild) complete: `rm -rf build &&
+  cmake -B build && cmake --build build` exit 0, zero errors/overflows/
+  unresolved externals. CASM version banner confirmed still `0.3.0` build
+  `1348` (unchanged baseline before Increment 9's promotion).
+  Increment 2 (disk-session leg 1, `test.d64`) complete: fresh Command64
+  boot, all four harnesses dispatched and PASS live in VICE --
+  `test_casm_reloc` (`CASM RELOC: PASS`), `test_casm_symbols`
+  (`CASM SYMBOLS: PASS`), `test_casm_vmm` (`CASM VMM: PASS`),
+  `test_casm_faultinject` (`CASM FAULTINJECT: PASS`). Clean shell return
+  after each.
