@@ -19,6 +19,8 @@
 .import lexerNext
 .import lexerScanIncludeOperand
 .import lexerScanIncbinOperand
+.import CasmStringLength
+.import CasmStringBuffer
 .import CasmTokenRecord
 .import CasmTokenText
 .import CasmTokenStartOffsetLo
@@ -70,6 +72,10 @@
 .export CasmFillCountLo
 .export CasmFillCountHi
 .export CasmFillValue
+.export CasmAssertValueLo
+.export CasmAssertValueHi
+.export CasmAssertMessage
+.export CasmAssertMessageLen
 
 .segment "BSS"
 
@@ -163,6 +169,25 @@ CasmFillCountLo: .res 1
 CasmFillCountHi: .res 1
 CasmFillValue:   .res 1
 
+; WP83: ppsAssert's own staged output for emit.s's emitAssert. The resolved
+; expression value gets dedicated scratch for the same reason WP81's
+; CasmFillCountLo/Hi/CasmFillValue does (CasmParserStmt.Val* would already
+; be gone by the time emitAssert runs, once ppsAssert's own subsequent
+; token-consuming calls -- the comma/message lookahead -- overwrite it). The
+; message is copied here immediately from the lexer's shared
+; CasmStringBuffer (Scoping Decision 5: no dedicated scanner, just the
+; existing lnString/CASM_TOKEN_STRING tokenizer) rather than read from that
+; shared scratch later, since nothing guarantees it survives untouched
+; between ppsAssert's return and emitAssert's own call.
+CasmAssertValueLo:    .res 1
+CasmAssertValueHi:    .res 1
+CasmAssertMessage:    .res CASM_ASSERT_MESSAGE_BUFFER_SIZE
+CasmAssertMessageLen: .res 1
+CasmAssertMessageEnd:
+
+.assert CasmAssertMessageLen - CasmAssertMessage = CASM_ASSERT_MESSAGE_BUFFER_SIZE, error, "CASM assert message buffer layout changed"
+.assert CasmAssertMessageEnd - CasmAssertMessage = CASM_ASSERT_MESSAGE_BUFFER_SIZE + 1, error, "CASM assert message state must be exactly 65 bytes"
+
 .segment "CODE"
 
 ; ---------------------------------------------------------------------------
@@ -252,12 +277,16 @@ ppsMnemonic:
     beq ppsFillDirectiveDispatch
     cmp #CASM_DIRECTIVE_INCBIN
     beq ppsIncbinDispatch
+    cmp #CASM_DIRECTIVE_ASSERT
+    beq ppsAssertDispatch
 ppsGrammar:
     jmp parseOperandSequence
 ppsFillDirectiveDispatch:
     jmp ppsFillDirective
 ppsIncbinDispatch:
     jmp ppsIncbin
+ppsAssertDispatch:
+    jmp ppsAssert
 ppsDeferOperands:
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
@@ -407,6 +436,119 @@ ppsFillDirective:
 @valueRangeOk:
     lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
     sta CasmFillValue
+@requireTerminator:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_NEWLINE
+    beq @terminatorOk
+    cmp #CASM_TOKEN_EOF
+    beq @terminatorOk
+    jsr diagSetLocFromToken     ; the unexpected trailing token
+    lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+@terminatorOk:
+    lda #CASM_OPKIND_IMPLIED
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; ppsAssert (WP83)
+; Parse .ASSERT's grammar: `expr [',' STRING]`. The expression uses the
+; full existing expression grammar (parserParseExpressionValue) and must
+; fully resolve *in this pass* -- a forward reference is a diagnostic
+; error, not a tolerated Pass-1 placeholder, same convention WP81
+; established for .RES/.FILL/.ALIGN's count/boundary operand (Scoping
+; Decision 1, brain/plans/2026-08-21-casm-phase13-wp83-assert.md).
+;
+; The optional message is scanned by an ordinary lexerNext call after the
+; comma, which lands on the lexer's existing lnString/CASM_TOKEN_STRING
+; tokenizer (WP74's `.BYTE "string"` support) -- no dedicated scanner
+; (Scoping Decision 5). Its bytes are copied into CasmAssertMessage
+; immediately, since CasmStringBuffer is shared scratch not guaranteed to
+; survive until emit.s's emitAssert runs.
+;
+; CasmParserStmt.Subtype (CASM_DIRECTIVE_ASSERT) is already staged by
+; ppsMnemonic before this routine is dispatched.
+;
+; Inputs:    current token begins the assert expression
+; Outputs:   success: C clear, A = CasmParserStmt.Type, CasmAssertValueLo/Hi
+;                      = resolved expression value, CasmAssertMessageLen = 0
+;                      (no message given) or 1-63 with CasmAssertMessage
+;                      populated, terminator consumed
+;            failure: C set, A = CASM_DIAG_ASSERT_UNRESOLVED,
+;                      CASM_DIAG_ASSERT_MESSAGE_TOO_LONG,
+;                      CASM_DIAG_SYNTAX_ERROR, or a propagated
+;                      expression/string diagnostic
+; Clobbers:  A, X, Y, CasmParserStmt.Val*/Flags, CasmAssertValueLo/Hi,
+;            CasmAssertMessage/Len, expression module's private result
+;            record
+; ---------------------------------------------------------------------------
+ppsAssert:
+    jsr lexerNext
+    bcc @haveToken
+    rts
+@haveToken:
+    jsr parserParseExpressionValue
+    bcc @haveExpr
+    rts
+@haveExpr:
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne @exprResolved
+    lda #CASM_DIAG_ASSERT_UNRESOLVED
+    sec
+    rts
+@exprResolved:
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    sta CasmAssertValueLo
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    sta CasmAssertValueHi
+    lda #0
+    sta CasmAssertMessageLen
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_COMMA
+    beq @haveComma
+    jmp @requireTerminator
+@haveComma:
+    jsr lexerNext                ; consume ',', fetch the message token
+    bcc @ok2
+    rts
+@ok2:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_STRING
+    beq @haveMessage
+    jsr diagSetLocFromToken     ; the token that should have been a string
+    lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+@haveMessage:
+    lda CasmStringLength
+    cmp #CASM_ASSERT_MESSAGE_MAX + 1
+    bcc @messageLenOk
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_ASSERT_MESSAGE_TOO_LONG
+    sec
+    rts
+@messageLenOk:
+    sta CasmAssertMessageLen
+    ldy #0
+@copyLoop:
+    cpy CasmAssertMessageLen
+    beq @copyDone
+    lda CasmStringBuffer, y
+    sta CasmAssertMessage, y
+    iny
+    jmp @copyLoop
+@copyDone:
+    jsr lexerNext                ; consume the STRING token, fetch terminator
+    bcc @requireTerminator
+    rts
 @requireTerminator:
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_NEWLINE

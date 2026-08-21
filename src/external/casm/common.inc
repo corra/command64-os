@@ -236,6 +236,17 @@ CASM_INCLUDE_PRINT_HI_MAX          = $FE
 .assert CASM_PETSCII_QUOTE >= CASM_INCLUDE_PRINT_LO_MIN, error, "CASM include quote below printable range"
 .assert CASM_PETSCII_QUOTE <= CASM_INCLUDE_PRINT_LO_MAX, error, "CASM include quote above printable range"
 
+; WP83 .ASSERT's optional message. The payload itself is scanned by the
+; lexer's existing lnString/CASM_TOKEN_STRING tokenizer (WP74, up to
+; CASM_STRING_BUFFER_SIZE = 255 bytes) -- this bound is ppsAssert's own
+; stricter cap on top of that (Scoping Decision 4), mirroring
+; CASM_INCLUDE_FILENAME_MAX/BUFFER_SIZE's precedent exactly for sizing
+; consistency across Phase 13's quoted-string operands.
+CASM_ASSERT_MESSAGE_MAX         = 63
+CASM_ASSERT_MESSAGE_BUFFER_SIZE = CASM_ASSERT_MESSAGE_MAX + 1
+
+.assert CASM_ASSERT_MESSAGE_BUFFER_SIZE = 64, error, "CASM assert message buffer changed"
+
 ; Phase 9 WP45 physical file catalog contract. One 8KB VMM allocation (Phase
 ; 0C.19 freeze) holds the physical-file catalog; WP45 writes only the first
 ; CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZE bytes of it. The

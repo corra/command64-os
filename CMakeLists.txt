@@ -355,7 +355,11 @@ if(Ca65_FOUND)
     # implementation) overflowed $6900 by 71 measured bytes; $6A00 (+256)
     # is the smallest round-page fit, 185 bytes headroom. User-approved
     # 2026-08-21.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6A00")
+    # WP83 Increment 4: parser.s's ppsAssert plus its CasmAssertValueLo/Hi/
+    # CasmAssertMessage/Len staging fields overflowed $6A00 by 59 measured
+    # bytes; $6B00 (+256) is the smallest round-page fit, 197 bytes
+    # headroom. User-approved 2026-08-21.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6B00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()

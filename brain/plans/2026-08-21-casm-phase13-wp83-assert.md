@@ -412,3 +412,22 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   reuse it rather than write a new `lexerScanAssertMessage` — no
   `lexer.s` change needed for this increment; the buffer-copy work moves
   into Increment 4. No code changed in this increment.
+- 2026-08-21: Increment 4 (parser dispatch) complete: new
+  `CASM_ASSERT_MESSAGE_MAX`/`_BUFFER_SIZE` constants (`common.inc`,
+  mirroring `CASM_INCLUDE_FILENAME_MAX`/`_BUFFER_SIZE` exactly);
+  `CasmAssertValueLo/Hi`/`CasmAssertMessage`/`CasmAssertMessageLen` staging
+  fields and `ppsAssert` added to `parser.s`, dispatched from
+  `ppsMnemonic`. `ppsAssert` parses the expression via
+  `parserParseExpressionValue`, requires `CASM_EXPR_FLAG_RESOLVED` (Decision
+  1), and — if a comma follows — calls `lexerNext` again to land on the
+  existing `lnString`/`CASM_TOKEN_STRING` tokenizer (Decision 5), copying
+  `CasmStringBuffer` into `CasmAssertMessage` with its own
+  `CASM_DIAG_ASSERT_MESSAGE_TOO_LONG` cap check. Envelope overflowed
+  `$6A00` by 59 measured bytes (the new BSS staging fields); bumped to
+  `$6B00` (+256, smallest round-page fit, 197 bytes headroom),
+  user-approved 2026-08-21. Build clean, no-change rebuild stable.
+  `emitDirective` has no `CASM_DIRECTIVE_ASSERT` case yet (Increment 5), so
+  `.ASSERT` currently falls through cleanly to the existing
+  `.STATIC`/`.RELOC` `CASM_DIAG_NOT_IMPLEMENTED` catch-all — confirmed safe,
+  no crash risk. No fixtures added this increment (none planned until
+  Increment 5's first end-to-end slice).
