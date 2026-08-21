@@ -2,10 +2,9 @@
 
 ## Status
 
-**Proposed.** Implementation complete, live-verified in VICE. Awaiting
-explicit user sign-off before WP84 is marked done.
+**Approved by the user on 2026-08-21.** WP84 is complete.
 
-## Result (proposed)
+## Result
 
 DASH's real source (`src/external/dash/ddata.s`) now uses CASM's Phase 13
 `.RES count[, value]` in place of five long hand-written zero/fill-byte
@@ -160,7 +159,7 @@ production or test-harness envelope was affected.
       rebuild verified.
 - [x] CASM's own regression witnesses confirmed clean.
 - [x] Walkthrough recorded here.
-- [ ] **User explicitly approves closing WP84.**
+- [x] **User explicitly approves closing WP84.** Approved 2026-08-21.
 
-Phase 13 remains open for WP85 (consolidated verification and version
-promotion to `0.4.0`).
+WP84 is complete. Phase 13 remains open for WP85 (consolidated
+verification and version promotion to `0.4.0`).

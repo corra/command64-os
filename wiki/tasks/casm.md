@@ -19,11 +19,9 @@ walkthrough: `brain/walkthroughs/2026-08-20-casm-phase12-wp75-
 verification-walkthrough-completion-gate.md`.
 
 **Phase 13 (Data Construction Directives) is underway.** WP81
-(`.RES`/`.FILL`/`.ALIGN`), WP82 (`.INCBIN`), and WP83 (`.ASSERT`) are
-complete, user-approved 2026-08-21. WP84 (DASH adoption of `.RES`) is
-implemented and live-verified, awaiting user sign-off
-(`brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-adoption.md`).
-WP85 remains open. See the Phase 13 section below.
+(`.RES`/`.FILL`/`.ALIGN`), WP82 (`.INCBIN`), WP83 (`.ASSERT`), and WP84
+(DASH adoption of `.RES`) are complete, user-approved 2026-08-21. WP85
+remains open. See the Phase 13 section below.
 
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
@@ -167,8 +165,8 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       `test_casm_pass1`/`test_casm_frame`) confirmed clean. Plan:
       `brain/plans/2026-08-21-casm-phase13-wp83-assert.md`. Walkthrough:
       `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
-- [x] WP84 **DASH adoption of `.RES`, implemented and live-verified,
-      awaiting user sign-off**. Converts `ddata.s`'s five zero/fill-byte
+- [x] WP84 **DASH adoption of `.RES` complete, user-approved
+      2026-08-21**. Converts `ddata.s`'s five zero/fill-byte
       sites (`FMTBUF`/`SYSINFOBUF`/`APPBUF`/`BORDERROW`/`VMMBUFFER`) to
       `.RES`. Narrowed from the master plan's original framing on two
       independently verified findings: `.ASSERT` DASH adoption deferred

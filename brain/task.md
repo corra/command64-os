@@ -3686,8 +3686,8 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       diagnostics), all live-verified. Regression witnesses clean. Full
       detail: `brain/plans/2026-08-21-casm-phase13-wp83-assert.md`,
       `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
-- [ ] WP84 (project `casm.phase13`, `+wp84`): implemented and live
-      VICE-verified 2026-08-21, awaiting user sign-off. Converts
+- [x] WP84 (project `casm.phase13`, `+wp84`): complete, live
+      VICE-verified and user-approved 2026-08-21. Converts
       `ddata.s`'s five zero/fill-byte sites (`FMTBUF`/`SYSINFOBUF`/
       `APPBUF`/`BORDERROW`/`VMMBUFFER`) to `.RES`. Narrowed from the
       master plan on two independently verified findings: `.ASSERT` DASH

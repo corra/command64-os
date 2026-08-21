@@ -12,9 +12,9 @@ depends-on: CASM Phase 13 WP81/WP82/WP83, all complete and merged into
 
 ## Status
 
-**Implementation complete, live-verified in VICE.** See the completion
-walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-
-adoption.md`. Awaiting explicit user sign-off before WP84 is marked done.
+**Complete.** Approved 2026-08-21 on `feature/casm-phase13-wp84`. See the
+completion walkthrough:
+`brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-adoption.md`.
 
 Parent plan: `brain/plans/2026-08-21-casm-phase13-data-construction-
 directives.md`. Branch: `feature/casm-phase13-wp84`, to be cut from
