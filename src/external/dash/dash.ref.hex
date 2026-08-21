@@ -4,7 +4,7 @@
 # back to a binary at build time by scripts/hex_manifest_to_bin.py,
 # which contains no 6502 knowledge and no assembler of any kind.
 #
-# provenance:  native CASM 0.2.8 build 1322 on a dedicated live-VICE test disk (dash_casm_test.d64), 2026-08-20; further Phase 12 syntax adoption beyond WP71 (WP68 shift/arithmetic expressions for bitmasks and screen-row offsets, WP74 string literals for the audited $20-$3F punctuation/digit range) -- byte-identical to both the prior shipped manifest and the ca65 cross-check build
+# provenance:  native CASM 0.3.0 build 1348 on command64_casm_utils.d64 under VICE 3.10 with a 16MB REU, 2026-08-21; WP84 .RES adoption in ddata.s (FMTBUF/SYSINFOBUF/APPBUF/BORDERROW/VMMBUFFER) -- byte-identical to the prior shipped manifest and the ca65 cross-check build
 # cross-check: MATCHES dash_ref.prg (4766 bytes) byte-for-byte
 # load addr:   $3400
 #
@@ -16,7 +16,7 @@
 # source_sha256: dsys.s=7ba6c799f7b62ab204b032f077d09e5e4e56a23c42624df8a18de3a17a055e71
 # source_sha256: dapp.s=a88988d2351e3db529472ac9adab238be275102fae94fe164c2cd0cb9254336a
 # source_sha256: dvmm.s=64141df29ebea3362104ad9215403521195da865866118bb40348eb569fb6659
-# source_sha256: ddata.s=970627fb6c8fcad808ab794d0998949631328ee59bf78f26631e28fc5555f981
+# source_sha256: ddata.s=c05da3366424496c66cc9a37757ee7a0571fd736ce08726ff654b0104c6db8eb
 
 00 34 D8 A9 00 8D 91 3E A9 01 8D 92 3E AD 92 3E
 F0 08 A9 00 8D 92 3E 20 8F 34 20 E4 FF AA F0 ED

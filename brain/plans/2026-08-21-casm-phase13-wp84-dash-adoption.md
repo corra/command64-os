@@ -320,3 +320,29 @@ DASH's own real source, not a CASM test fixture.
   planning pass, recorded so a future adopter doesn't rediscover it the
   hard way. `dash_ref` rebuilds clean (documentation-only change, no
   build impact expected or found).
+- 2026-08-21: Increments 4-6 complete. **Native CASM assembly + COMP**
+  (Increment 4): `command64_casm_utils.d64` attached at unit 9 (`DRIVE 9`
+  to switch `CurrentDevice`), `CASM DMAIN.S /O:DASH.PRG` under VICE with
+  the default-attached 16MB REU, clean shell return in well under the
+  declared deadline. `COMP DASH.PRG DASH.REF` → `FILES COMPARE OK`.
+  Extracted the produced `dash.prg` directly from the host `.d64` file via
+  `cc1541 -X` (no need for a second live-VICE round trip) — 4,766 bytes,
+  SHA-256 `3238b786...`, **byte-identical to the pre-conversion
+  `dash.ref.hex`'s own recorded hash**, independent host-side confirmation
+  that the `.RES` conversion changed nothing observable.
+  **Manifest regeneration** (Increment 5): `scripts/build_dash_manifest.py
+  --cross-check build/dash_ref.prg` regenerated `dash.ref.hex` with fresh
+  `source_sha256` entries (ddata.s's own source hash changed; shipping
+  bytes did not) and updated provenance text. `dash`/`image_d64` rebuild
+  clean against the new manifest; a full clean rebuild from scratch
+  (`rm -rf build && cmake -B build && cmake --build build`) completed with
+  zero errors.
+  **Relocation spot-check** (Increment 6): fresh Command64 boot,
+  `image.d64` attached at unit 8. Default dispatch (`$3800`) rendered the
+  System page correctly. `LOAD DASH 5000`/`RUN 5000` rendered correctly;
+  Applications page (F3 — sent as the real PETSCII/GETIN byte `$86`
+  `dmain.s` checks for, not the named-key press, which stopped registering
+  after the first use) reported `dash 5000-5ef3`. `LOAD DASH 9000`/
+  `RUN 9000` rendered correctly; Applications page reported
+  `dash 9000-9ef3` — both exactly matching WP71's own recorded results at
+  these addresses. VICE left healthy at a clean `c64[8]:>` shell return.
