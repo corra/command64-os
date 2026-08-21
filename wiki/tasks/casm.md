@@ -18,6 +18,10 @@ corrective forward-reference Pass 1/2 width-agreement fix). Final
 walkthrough: `brain/walkthroughs/2026-08-20-casm-phase12-wp75-
 verification-walkthrough-completion-gate.md`.
 
+**Phase 13 (Data Construction Directives) is underway.** WP81
+(`.RES`/`.FILL`/`.ALIGN`) is complete, user-approved 2026-08-21. WP82-85
+remain open. See the Phase 13 section below.
+
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
 Construction Directives, see `brain/plans/2026-07-16-casm-assembler-
@@ -74,9 +78,45 @@ implementation-plan.md:468`) was approved 2026-08-20:
       `brain/plans/2026-08-20-casm-post-phase12-hardening.md`.
 
 **This hardening plan is closed** (user-approved 2026-08-21) with WP77,
-WP78, and WP80 complete, and WP79 explicitly left open/deferred. Next: the
-master plan's actual Phase 13 (Data Construction Directives) remains
-unscoped and separate from this hardening effort.
+WP78, and WP80 complete, and WP79 explicitly left open/deferred.
+
+## Phase 13 - Data Construction Directives (CASM 0.4, target)
+
+Plan: `brain/plans/2026-08-21-casm-phase13-data-construction-directives.md`.
+Adds `.RES`, `.FILL`, `.ALIGN`, `.INCBIN`, and `.ASSERT`. Approved
+2026-08-21. WP numbering continues Phase 12's running counter (WP81-85);
+version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
+
+- [x] WP81 **`.RES`/`.FILL`/`.ALIGN` fixed-fill directives complete,
+      user-approved 2026-08-21** (Taskwarrior 42). New
+      `CASM_DIRECTIVE_RES/FILL/ALIGN` ($07-$09) and four diagnostics
+      ($4B-$4E: unresolved operand, `.FILL` value required, value out of
+      range, `.ALIGN` boundary zero). `parser.s`'s new `ppsFillDirective`
+      requires both operands to fully resolve in the parsing pass itself
+      (no Pass-1-tolerant placeholder, unlike an ordinary instruction
+      operand) -- a genuine forward reference is a diagnostic error.
+      `emit.s`'s new `emitRes`/`emitFill`/`emitAlign`/`emitFillLoop`/
+      `emitAlignMod` share one byte-loop-emission shape; none interact with
+      the R6 relocation table. Found and fixed a real defect during
+      fixture verification: `ppsFillDirective` was missing its initial
+      `lexerNext`, producing a spurious `MALFORMED EXPRESSION` on every
+      fixture. New `test_casm_directives` isolation harness (9/9
+      live-verified, modeled on `casm_bounds.s`'s narrow-link precedent)
+      plus 7 production fixtures on the new, proactively-created
+      `casm_phase13_test_d64` disk (3 accepted COMP-verified byte-identical,
+      4 rejected diagnostics live-verified). Regression witnesses
+      (`test_casm_expr`/`test_casm_pass1`/`test_casm_frame`) confirmed
+      clean. Nine envelope bumps plus one disk relocation
+      (`test_casm_event` moved off the now-full `casm_overflow_test_d64`).
+      Plan: `brain/plans/2026-08-21-casm-phase13-wp81-res-fill-align.md`.
+      Walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp81-res-
+      fill-align.md`.
+- [ ] WP82 **`.INCBIN`** -- not yet started.
+- [ ] WP83 **`.ASSERT`** -- not yet started.
+- [ ] WP84 **DASH adoption** (`.RES`/`.FILL`/`.ASSERT` into real DASH
+      source) -- not yet started.
+- [ ] WP85 **consolidated completion gate, version promotion to `0.4.0`**
+      -- not yet started.
 
 ## Phase 1 Prerequisite
 

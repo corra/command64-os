@@ -3626,3 +3626,22 @@ implementation-plan.md:468`), unrelated to this defect-fix set.
 
 **This hardening plan is closed** (user-approved 2026-08-21): WP77, WP78,
 and WP80 complete; WP79 explicitly deferred, not abandoned.
+
+## CASM Phase 13 (Data Construction Directives)
+
+- [x] WP81 Taskwarrior task 42: complete, live VICE-verified and
+      user-approved 2026-08-21. `.RES`/`.FILL`/`.ALIGN` implemented in
+      `parser.s` (new `ppsFillDirective`) and `emit.s` (new
+      `emitRes`/`emitFill`/`emitAlign`/`emitFillLoop`/`emitAlignMod`), four
+      new diagnostics, both operands required to fully resolve in the
+      parsing pass itself (forward references rejected outright, not
+      tolerated as a Pass-1 placeholder). Found and fixed a real defect:
+      `ppsFillDirective` was missing its initial `lexerNext`, producing a
+      spurious `MALFORMED EXPRESSION` on every fixture until fixed. New
+      `test_casm_directives` isolation harness (9/9 live) plus 7 production
+      fixtures on the new `casm_phase13_test_d64` disk (3 accepted
+      COMP-verified, 4 rejected diagnostics verified). Regression witnesses
+      clean. Nine envelope bumps, one disk relocation
+      (`test_casm_event` -> `casm_include_test_d64`). Full detail:
+      `brain/plans/2026-08-21-casm-phase13-wp81-res-fill-align.md`,
+      `brain/walkthroughs/2026-08-21-casm-phase13-wp81-res-fill-align.md`.

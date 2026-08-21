@@ -123,6 +123,15 @@ diagPrintString:
 ; diagPrintSourceContext call), unlike every entry in the main table, so
 ; they could not share its tail unconditionally even if renumbered into it.
 ;
+; WP81: activates $4B-$4E (.RES/.FILL/.ALIGN diagnostics) through their own
+; small parallel table (diagWp81MessageLo/Hi), checked via a bcc/bcs range
+; test right after the listing range check. Unlike the listing table these
+; four are locationed (falls through to diagPrintSourceContext), but they
+; still needed pulling out of the main cmp/beq chain below: the chain's
+; existing beq's index straight into 6502-relative-branch range, and simply
+; appending four more cmp/beq pairs pushed the earliest ones' targets out of
+; range (a real assembly error hit during this WP, not a hypothetical).
+;
 ; Inputs:  A = CASM_DIAG_* identifier
 ; Outputs: none
 ; Flags:   undefined after diagPrintString
@@ -133,6 +142,22 @@ diagPrintFatal:
     bcc dpfMainRange
     cmp #CASM_DIAG_LISTING_SHORT_WRITE + 1
     bcc dpfListingRange
+    cmp #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
+    bcc dpfSymbolRange
+    cmp #CASM_DIAG_PHASE13_WP81_LAST + 1
+    bcs dpfSymbolRange
+    sec
+    sbc #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
+    tax
+    lda diagWp81MessageLo, x
+    pha
+    lda diagWp81MessageHi, x
+    tay
+    pla
+    tax
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfSymbolRange:
     cmp #CASM_DIAG_SYMBOL_MAP_INVALID
     beq dpfSymbolMapInvalid
     cmp #CASM_DIAG_EXPR_CIRCULAR
@@ -1372,6 +1397,29 @@ diagListMessageHiEnd:
 .assert diagListMessageLoEnd - diagListMessageLo = CASM_DIAG_LISTING_SHORT_WRITE - CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM listing diagnostic low table is incomplete"
 .assert diagListMessageHiEnd - diagListMessageHi = CASM_DIAG_LISTING_SHORT_WRITE - CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM listing diagnostic high table is incomplete"
 
+; WP81: .RES/.FILL/.ALIGN's own small parallel table, indexed by
+; (A - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED) -- pulled out of the main
+; cmp/beq chain in diagPrintFatal purely to keep every existing beq target
+; in that chain within 6502 branch range (adding four more entries to the
+; chain itself pushed the earliest beq's target out of range). Unlike the
+; listing table, these are locationed: diagPrintFatal still falls through
+; to diagPrintSourceContext after the message prints.
+diagWp81MessageLo:
+    .byte <msgResFillAlignUnresolved
+    .byte <msgFillValueRequired
+    .byte <msgValueOutOfRange
+    .byte <msgAlignBoundaryZero
+diagWp81MessageLoEnd:
+diagWp81MessageHi:
+    .byte >msgResFillAlignUnresolved
+    .byte >msgFillValueRequired
+    .byte >msgValueOutOfRange
+    .byte >msgAlignBoundaryZero
+diagWp81MessageHiEnd:
+
+.assert diagWp81MessageLoEnd - diagWp81MessageLo = CASM_DIAG_PHASE13_WP81_LAST - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostic low table is incomplete"
+.assert diagWp81MessageHiEnd - diagWp81MessageHi = CASM_DIAG_PHASE13_WP81_LAST - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostic high table is incomplete"
+
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
 msgRegistryFull:
@@ -1519,6 +1567,15 @@ msgStringUnterminated:
     .byte "CASM: STRING UNTERMINATED", PetCr, 0
 msgStringInvalidByte:
     .byte "CASM: STRING INVALID BYTE", PetCr, 0
+; WP81: .RES/.FILL/.ALIGN diagnostics.
+msgResFillAlignUnresolved:
+    .byte "CASM: OPERAND NOT RESOLVED", PetCr, 0
+msgFillValueRequired:
+    .byte "CASM: .FILL REQUIRES A VALUE", PetCr, 0
+msgValueOutOfRange:
+    .byte "CASM: VALUE OUT OF RANGE", PetCr, 0
+msgAlignBoundaryZero:
+    .byte "CASM: ALIGN BOUNDARY ZERO", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.

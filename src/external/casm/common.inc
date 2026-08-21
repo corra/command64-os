@@ -543,7 +543,10 @@ CASM_DIRECTIVE_WORD    = $03
 CASM_DIRECTIVE_INCLUDE = $04
 CASM_DIRECTIVE_STATIC  = $05
 CASM_DIRECTIVE_RELOC   = $06
-CASM_DIRECTIVE_COUNT   = $07
+CASM_DIRECTIVE_RES     = $07
+CASM_DIRECTIVE_FILL    = $08
+CASM_DIRECTIVE_ALIGN   = $09
+CASM_DIRECTIVE_COUNT   = $0A
 
 CASM_REGISTER_A     = $00
 CASM_REGISTER_X     = $01
@@ -619,7 +622,7 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_STRING_BUFFER_SIZE = 255, error, "CASM string buffer bound changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
-.assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_RELOC + 1, error, "CASM directive subtype range changed"
+.assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_ALIGN + 1, error, "CASM directive subtype range changed"
 .assert CASM_REGISTER_COUNT = CASM_REGISTER_Y + 1, error, "CASM register subtype range changed"
 .assert CASM_NUMBER_COUNT = CASM_NUMBER_BINARY + 1, error, "CASM number subtype range changed"
 .assert CASM_TOKEN_REC_SUBTYPE = CASM_TOKEN_REC_TYPE + 1, error, "CASM token subtype offset changed"
@@ -791,6 +794,18 @@ CASM_DIAG_PHASE12_WP69_LAST = CASM_DIAG_CHAR_INVALID_BYTE
 CASM_DIAG_STRING_UNTERMINATED = $49
 CASM_DIAG_STRING_INVALID_BYTE = $4A
 CASM_DIAG_PHASE12_WP74_LAST = CASM_DIAG_STRING_INVALID_BYTE
+; WP81: .RES/.FILL/.ALIGN count/boundary operand didn't resolve fully in
+; this pass -- diagnosed outright rather than tolerated as a Pass-1
+; placeholder (Scoping Decision 1, unlike an ordinary instruction operand).
+CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED = $4B
+; WP81: .FILL with no second (value) operand -- unlike .RES/.ALIGN, .FILL's
+; value has no default.
+CASM_DIAG_FILL_VALUE_REQUIRED = $4C
+; WP81: .RES/.FILL/.ALIGN's value/fill operand resolved outside 0-255.
+CASM_DIAG_VALUE_OUT_OF_RANGE = $4D
+; WP81: .ALIGN boundary resolved to 0 (divide-by-zero-equivalent).
+CASM_DIAG_ALIGN_BOUNDARY_ZERO = $4E
+CASM_DIAG_PHASE13_WP81_LAST = CASM_DIAG_ALIGN_BOUNDARY_ZERO
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -854,6 +869,11 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_STRING_UNTERMINATED = CASM_DIAG_PHASE12_WP69_LAST + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
 .assert CASM_DIAG_STRING_INVALID_BYTE = CASM_DIAG_STRING_UNTERMINATED + 1, error, "CASM Phase 12 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE12_WP74_LAST = $4A, error, "CASM WP74 diagnostic range changed"
+.assert CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED = CASM_DIAG_PHASE12_WP74_LAST + 1, error, "CASM Phase 13 diagnostics must follow Phase 12"
+.assert CASM_DIAG_FILL_VALUE_REQUIRED = CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostics must remain contiguous"
+.assert CASM_DIAG_VALUE_OUT_OF_RANGE = CASM_DIAG_FILL_VALUE_REQUIRED + 1, error, "CASM WP81 diagnostics must remain contiguous"
+.assert CASM_DIAG_ALIGN_BOUNDARY_ZERO = CASM_DIAG_VALUE_OUT_OF_RANGE + 1, error, "CASM WP81 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE13_WP81_LAST = $4E, error, "CASM WP81 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

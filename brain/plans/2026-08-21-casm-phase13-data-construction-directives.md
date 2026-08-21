@@ -10,12 +10,8 @@ depends-on: CASM Phase 12, complete (brain/walkthroughs/2026-08-20-casm-phase12-
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-08-21 for user review, per
-this project's per-work-package-plan-approval requirement
-(`.agents/workflows/phased-implementation-planning.md`). This document
-authorizes nothing by itself — WP81 (the first work package) needs its own
-detailed plan and explicit approval before any implementation begins,
-same as every other WP in this project.
+**Approved 2026-08-21.** WP81 (the first work package) is now underway on
+`feature/casm-phase13-wp81`, branched from `feature/casm-phase13`.
 
 Parent plan: `brain/plans/2026-07-16-casm-assembler-implementation-plan.md`
 — see its own Phase 13 section (`## Future Native Release Phases`) for the

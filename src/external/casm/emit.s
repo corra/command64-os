@@ -33,6 +33,12 @@
 .import relocRecord
 .import listingMirrorByte
 
+; WP81: .RES/.FILL/.ALIGN's resolved count/boundary and value/fill byte,
+; staged by parser.s's ppsFillDirective.
+.import CasmFillCountLo
+.import CasmFillCountHi
+.import CasmFillValue
+
 ; WP15 diagnostic context. Statement-level failures use the stamped statement
 ; location; failures inside a .BYTE/.WORD operand list use the token record,
 ; which still points at the offending value.
@@ -83,6 +89,17 @@ CasmEmitBuffer: .res CASM_EMIT_BUFFER_SIZE
 ; harness can poke both cells directly and prove the comparison itself works
 ; -- casm.s's own HEADER/entry point can never be linked by a harness.
 CasmPass1FinalPc: .res 2
+
+; WP81: emitAlign's own bounded 16-iteration restoring-division scratch
+; (CasmPc mod boundary), same algorithm shape as expr.s's private
+; divUnsigned16 but remainder-only (no quotient needed) and self-contained
+; here rather than exporting expr.s's private division internals just for
+; this one caller.
+CasmAlignDividendLo: .res 1
+CasmAlignDividendHi: .res 1
+CasmAlignRemLo:      .res 1
+CasmAlignRemHi:      .res 1
+CasmAlignRemExt:      .res 1
 
 .segment "CODE"
 
@@ -322,6 +339,12 @@ emitDirective:
     beq edByte
     cmp #CASM_DIRECTIVE_WORD
     beq edWord
+    cmp #CASM_DIRECTIVE_RES
+    beq edRes
+    cmp #CASM_DIRECTIVE_FILL
+    beq edFill
+    cmp #CASM_DIRECTIVE_ALIGN
+    beq edAlign
     cmp #CASM_DIRECTIVE_UNKNOWN
     beq edSyntax
     cmp #CASM_DIRECTIVE_INCLUDE
@@ -330,6 +353,12 @@ emitDirective:
     lda #CASM_DIAG_NOT_IMPLEMENTED
     sec
     rts
+edRes:
+    jmp emitRes
+edFill:
+    jmp emitFill
+edAlign:
+    jmp emitAlign
 edInternal:
     ; Includes alter the token source and are owned by casmRunPass. Reaching
     ; the emitter indicates an internal dispatch error, not unsupported syntax.
@@ -527,6 +556,161 @@ ewlSyntax:
 ewlDone:
     clc
 ewlRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; emitRes / emitFill (WP81)
+; Emit CasmFillCountLo/Hi bytes, each CasmFillValue, both already resolved by
+; parser.s's ppsFillDirective in this pass (Scoping Decision 1 -- no
+; unresolved-operand path reaches here). No relocation interaction: padding/
+; reserved bytes are inert filler, identical to a `.BYTE $00` byte today
+; (parent plan's Research Summary point 4).
+; Outputs: C clear on success; C set with A = CASM_DIAG_* on failure
+; ---------------------------------------------------------------------------
+emitRes:
+    jsr emitMarkStarted
+    bcs erRet
+    lda CasmFillCountLo
+    sta CasmEmitScratch0
+    lda CasmFillCountHi
+    sta CasmEmitScratch1
+    jmp emitFillLoop
+erRet:
+    rts
+
+emitFill:
+    jsr emitMarkStarted
+    bcs efRet
+    lda CasmFillCountLo
+    sta CasmEmitScratch0
+    lda CasmFillCountHi
+    sta CasmEmitScratch1
+    jmp emitFillLoop
+efRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; emitAlign (WP81)
+; Pad with CasmFillValue bytes until CasmPc is a multiple of the resolved
+; boundary (CasmFillCountLo/Hi -- ppsFillDirective stages .ALIGN's boundary
+; operand into the same field .RES/.FILL use for their count). Padding is
+; computed fresh from this pass's own CasmPc every call, never cached/
+; carried between passes (Technical Design, brain/plans/2026-08-21-casm-
+; phase13-wp81-res-fill-align.md).
+; Outputs: C clear on success; C set with A = CASM_DIAG_ALIGN_BOUNDARY_ZERO
+;          or another CASM_DIAG_* on failure
+; ---------------------------------------------------------------------------
+emitAlign:
+    jsr emitMarkStarted
+    bcs eaRet
+    lda CasmFillCountLo
+    ora CasmFillCountHi
+    bne eaBoundaryOk
+    jsr diagSetLocFromStmt      ; the .ALIGN statement itself
+    lda #CASM_DIAG_ALIGN_BOUNDARY_ZERO
+    sec
+    rts
+eaBoundaryOk:
+    jsr emitAlignMod            ; CasmAlignRemLo/Hi = CasmPc mod boundary
+    lda CasmAlignRemLo
+    ora CasmAlignRemHi
+    beq eaPadZero
+    sec
+    lda CasmFillCountLo
+    sbc CasmAlignRemLo
+    sta CasmEmitScratch0
+    lda CasmFillCountHi
+    sbc CasmAlignRemHi
+    sta CasmEmitScratch1
+    jmp emitFillLoop
+eaPadZero:
+    lda #0
+    sta CasmEmitScratch0
+    sta CasmEmitScratch1
+    jmp emitFillLoop
+eaRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; emitAlignMod (private)
+; Bounded 16-iteration unsigned restoring division, remainder only: computes
+; CasmAlignRemLo/Hi = CasmPc mod (CasmFillCountLo/Hi), the resolved nonzero
+; boundary. Same shape as expr.s's private divUnsigned16 (which discards its
+; own remainder) but self-contained here -- exporting expr.s's division
+; internals for this one caller was not worth the coupling.
+; Inputs:    CasmFillCountLo/Hi nonzero (caller's own eaBoundaryOk gate)
+; Outputs:   CasmAlignRemLo/Hi = CasmPc mod boundary
+; Clobbers:  A, X, CasmAlignDividendLo/Hi, CasmAlignRemLo/Hi/Ext
+; ---------------------------------------------------------------------------
+emitAlignMod:
+    lda CasmPc
+    sta CasmAlignDividendLo
+    lda CasmPc + 1
+    sta CasmAlignDividendHi
+    lda #0
+    sta CasmAlignRemLo
+    sta CasmAlignRemHi
+    sta CasmAlignRemExt
+    ldx #16
+eamLoop:
+    asl CasmAlignDividendLo
+    rol CasmAlignDividendHi
+    rol CasmAlignRemLo
+    rol CasmAlignRemHi
+    rol CasmAlignRemExt
+    lda CasmAlignRemExt
+    bne eamDoSub
+    lda CasmAlignRemHi
+    cmp CasmFillCountHi
+    bcc eamNoSub
+    bne eamDoSub
+    lda CasmAlignRemLo
+    cmp CasmFillCountLo
+    bcc eamNoSub
+eamDoSub:
+    sec
+    lda CasmAlignRemLo
+    sbc CasmFillCountLo
+    sta CasmAlignRemLo
+    lda CasmAlignRemHi
+    sbc CasmFillCountHi
+    sta CasmAlignRemHi
+    lda CasmAlignRemExt
+    sbc #0
+    sta CasmAlignRemExt
+eamNoSub:
+    dex
+    bne eamLoop
+    rts
+
+; ---------------------------------------------------------------------------
+; emitFillLoop (private, WP81)
+; Shared byte-emission loop for emitRes/emitFill/emitAlign: emit
+; CasmEmitScratch1:CasmEmitScratch0 (16-bit remaining count) bytes of
+; CasmFillValue, decrementing the count each iteration. emitByte's own
+; CasmPassMode gate already handles Pass 1 discarding the write while CasmPc
+; still advances for real (Research Summary point 2) -- no separate
+; measure-only path needed here.
+; Inputs:    CasmEmitScratch0/1 = remaining count (16-bit); CasmFillValue
+; Outputs:   C clear on success; C set with A = CASM_DIAG_* on failure
+; Clobbers:  A, X, Y, CasmEmitScratch0/1, CasmPc, emitByte's own volatile state
+; ---------------------------------------------------------------------------
+emitFillLoop:
+    lda CasmEmitScratch0
+    ora CasmEmitScratch1
+    beq eflDone
+    lda CasmFillValue
+    jsr emitByte
+    bcs eflRet
+    lda CasmEmitScratch0
+    bne eflDec
+    dec CasmEmitScratch1
+eflDec:
+    dec CasmEmitScratch0
+    jmp emitFillLoop
+eflDone:
+    clc
+eflRet:
     rts
 
 ; ---------------------------------------------------------------------------

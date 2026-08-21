@@ -1,0 +1,32 @@
+# CASM Phase 13 WP81 trusted reference: casmalign1
+#
+# Independently hand-assembled from the casmalign1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves
+# .ALIGN's padding computation (boundary - (CasmPc mod boundary)) produces
+# correct bytes through the real production parser/emitter (parser.s's
+# ppsFillDirective, emit.s's emitAlign/emitAlignMod/emitFillLoop), followed
+# by a genuine instruction landing exactly on the resulting boundary.
+#
+# Source (.ORG $C003, fixed address -- no relocatable symbols involved):
+#   .ORG $C003
+#   .ALIGN $10    ; pad with default fill value $00 up to the next $10 boundary
+#   .BYTE 1
+#
+# Hand assembly:
+#   The load-address header is the .ORG operand itself, $C003, written
+#   little-endian as 03 C0 (low byte first).
+#   CasmPc starts at $C003. $C003 mod $10 = 3 ($C000 is itself a multiple of
+#   $10, and $C003 = $C000+3). Padding = $10 - 3 = $0D (13) bytes of $00.
+#   CasmPc after padding = $C003 + $0D = $C010, the next $10 boundary.
+#   .BYTE 1 then emits a single byte, $01, at $C010.
+#
+#   03 C0                                              PRG load-address header ($C003)
+#   00 00 00 00 00 00 00 00 00 00 00 00 00             .ALIGN $10 (13 zero bytes)
+#   01                                                  .BYTE 1
+#
+# bytes: 16
+
+03 C0
+00 00 00 00 00 00 00 00
+00 00 00 00 00
+01

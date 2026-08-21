@@ -1883,3 +1883,54 @@ file(WRITE "${OUTPUT_DIR}/casmchain1.seq"
     "LDA #DEFCONST\n"
     "RTS\n"
 )
+
+# WP81: production .RES/.FILL/.ALIGN fixtures. One accepted case per
+# directive (COMP-verified against a hand-derived .ref.hex) plus four
+# rejected-form cases proving this WP's new diagnostics through the real
+# production pipeline.
+#
+# casmres1: two-operand (explicit fill value) and one-operand (default
+# fill value 0) forms.
+file(WRITE "${OUTPUT_DIR}/casmres1.seq"
+    ".ORG \$C000\n"
+    ".RES 3,\$AA\n"
+    ".RES 2\n"
+)
+# casmfill1: required two-operand grammar.
+file(WRITE "${OUTPUT_DIR}/casmfill1.seq"
+    ".ORG \$C000\n"
+    ".FILL 4,\$40\n"
+)
+# casmalign1: nonzero padding (CasmPc not already on the boundary) followed
+# by a real instruction landing exactly on the resulting boundary.
+file(WRITE "${OUTPUT_DIR}/casmalign1.seq"
+    ".ORG \$C003\n"
+    ".ALIGN \$10\n"
+    ".BYTE 1\n"
+)
+# Forward-referenced count is a diagnostic error (Scoping Decision 1): COUNT
+# is not yet defined when Pass 1 reaches `.RES COUNT` (defined later in the
+# same source), so parserParseExpressionValue would ordinarily tolerate it
+# as an unresolved placeholder -- ppsFillDirective's own explicit RESOLVED
+# check rejects it outright instead. No .ref (failure case), live-verified
+# for CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED.
+file(WRITE "${OUTPUT_DIR}/casmresfwd.seq"
+    ".RES COUNT\n"
+    "COUNT = 5\n"
+)
+# .FILL with no second (value) operand -- unlike .RES/.ALIGN, .FILL's value
+# has no default. No .ref, live-verified for CASM_DIAG_FILL_VALUE_REQUIRED.
+file(WRITE "${OUTPUT_DIR}/casmfillnoval.seq"
+    ".FILL 5\n"
+)
+# .ALIGN 0 -- a divide-by-zero-equivalent boundary, diagnosed rather than
+# silently treated as no-op. No .ref, live-verified for
+# CASM_DIAG_ALIGN_BOUNDARY_ZERO.
+file(WRITE "${OUTPUT_DIR}/casmalignzero.seq"
+    ".ALIGN 0\n"
+)
+# Value operand out of byte range (256 = \$100, ValHi != 0). No .ref,
+# live-verified for CASM_DIAG_VALUE_OUT_OF_RANGE.
+file(WRITE "${OUTPUT_DIR}/casmresrange.seq"
+    ".FILL 1,256\n"
+)

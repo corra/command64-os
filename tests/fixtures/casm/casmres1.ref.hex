@@ -1,0 +1,23 @@
+# CASM Phase 13 WP81 trusted reference: casmres1
+#
+# Independently hand-assembled from the casmres1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves .RES's
+# two-operand (explicit fill value) and one-operand (default fill value 0)
+# forms both produce correct bytes through the real production parser/
+# emitter (parser.s's ppsFillDirective, emit.s's emitRes/emitFillLoop).
+#
+# Source (.ORG $C000, fixed address -- no relocatable symbols involved):
+#   .ORG $C000
+#   .RES 3,$AA   ; 3 bytes, each $AA
+#   .RES 2       ; 2 bytes, default value $00 (no second operand)
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   AA AA AA     .RES 3,$AA
+#   00 00        .RES 2 (default fill value 0)
+#
+# bytes: 7
+
+00 C0
+AA AA AA
+00 00

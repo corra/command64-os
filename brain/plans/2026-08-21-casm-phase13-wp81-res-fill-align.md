@@ -10,11 +10,9 @@ depends-on: CASM Phase 13 master plan approval (brain/plans/2026-08-21-casm-phas
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-08-21 for user review, per
-this project's per-work-package-plan-approval requirement
-(`.agents/workflows/phased-implementation-planning.md`). No implementation
-is authorized until this plan — and its parent, the Phase 13 master plan —
-are both approved.
+**Complete.** Approved 2026-08-21 on `feature/casm-phase13-wp81`. See the
+completion walkthrough:
+`brain/walkthroughs/2026-08-21-casm-phase13-wp81-res-fill-align.md`.
 
 Parent plan: `brain/plans/2026-08-21-casm-phase13-data-construction-
 directives.md`. WP81 is the first work package; nothing depends on it
@@ -270,3 +268,16 @@ diagnostic needed for "reservation runs past `$FFFF`".
 
 - 2026-08-21: Plan drafted alongside the Phase 13 master plan. Awaiting
   approval of both before implementation begins.
+- 2026-08-21: Both plans approved. Increments 1-3 complete (contract
+  freeze, lexer recognition, full parser/emitter implementation), including
+  9 envelope bumps and one disk relocation (all recorded in the completion
+  walkthrough). Found and fixed a real defect during fixture verification:
+  `ppsFillDirective` was missing its initial `lexerNext`, producing a
+  spurious `MALFORMED EXPRESSION` on every fixture. New
+  `test_casm_directives` isolation harness (9/9 live-verified) plus 7
+  production fixtures on the new `casm_phase13_test_d64` disk (3 accepted
+  COMP-verified, 4 rejected diagnostics verified) all pass live in VICE.
+  Regression witnesses (`test_casm_expr`/`test_casm_pass1`/
+  `test_casm_frame`) confirmed clean. Completion walkthrough drafted
+  (`brain/walkthroughs/2026-08-21-casm-phase13-wp81-res-fill-align.md`),
+  awaiting user sign-off.

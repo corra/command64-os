@@ -64,6 +64,9 @@
 .export CasmConstantIsCurAddr
 .export CasmLabelDefinedAtOffsetLo
 .export CasmLabelDefinedAtOffsetHi
+.export CasmFillCountLo
+.export CasmFillCountHi
+.export CasmFillValue
 
 .segment "BSS"
 
@@ -136,6 +139,16 @@ CasmIncludeFilenameEnd:
 .assert CasmIncludeFilenameLen - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE, error, "CASM include filename buffer layout changed"
 .assert CasmIncludeFilenameEnd - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM include filename state must be exactly 65 bytes"
 
+; WP81: ppsFillDirective's own staged output for emit.s's emitRes/emitFill/
+; emitAlign, mirroring CasmLabelName/CasmConstant*'s precedent of dedicated
+; parser-owned scratch rather than reusing CasmParserStmt.Val* -- that field
+; is clobbered by the *second* parserParseExpressionValue call (the value/
+; fill operand), which would otherwise overwrite the already-resolved count/
+; boundary from the first call.
+CasmFillCountLo: .res 1
+CasmFillCountHi: .res 1
+CasmFillValue:   .res 1
+
 .segment "CODE"
 
 ; ---------------------------------------------------------------------------
@@ -176,8 +189,10 @@ parserParseStatement:
     cmp #CASM_TOKEN_DIRECTIVE
     beq ppsMnemonic
     cmp #CASM_TOKEN_IDENTIFIER
-    beq ppsLabel
+    beq ppsLabelDispatch
     jmp ppsSyntaxError
+ppsLabelDispatch:
+    jmp ppsLabel
 
 ppsEmpty:
     sta CasmParserStmt + CASM_PARSER_STMT_TYPE
@@ -215,8 +230,16 @@ ppsMnemonic:
     beq ppsDeferOperands
     cmp #CASM_DIRECTIVE_WORD
     beq ppsDeferOperands
+    cmp #CASM_DIRECTIVE_RES
+    beq ppsFillDirectiveDispatch
+    cmp #CASM_DIRECTIVE_FILL
+    beq ppsFillDirectiveDispatch
+    cmp #CASM_DIRECTIVE_ALIGN
+    beq ppsFillDirectiveDispatch
 ppsGrammar:
     jmp parseOperandSequence
+ppsFillDirectiveDispatch:
+    jmp ppsFillDirective
 ppsDeferOperands:
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
@@ -237,6 +260,125 @@ ppsInclude:
     rts
 
 ppsFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; ppsFillDirective (WP81)
+; Parse .RES/.FILL/.ALIGN's shared grammar: `expr [',' expr]`. Both operands
+; use the full existing expression grammar (parserParseExpressionValue --
+; named constants, '*', parens, operators; whatever the shared evaluator
+; already accepts). Unlike an ordinary instruction operand, both must fully
+; resolve *in this pass* (Scoping Decision 1, brain/plans/2026-08-21-casm-
+; phase13-wp81-res-fill-align.md) -- a forward reference is a diagnostic
+; error here, not a tolerated Pass-1 placeholder, since a .RES count feeds
+; directly into byte length rather than an addressing-mode width decision
+; that stays pass-invariant regardless of value.
+;
+; CasmParserStmt.Subtype (CASM_DIRECTIVE_RES/FILL/ALIGN) is already staged by
+; ppsMnemonic before this routine is dispatched.
+;
+; Inputs:    current token begins the first (count/boundary) expression
+; Outputs:   success: C clear, A = CasmParserStmt.Type, CasmFillCountLo/Hi =
+;                      resolved count/boundary, CasmFillValue = resolved
+;                      value/fill byte (0 default for .RES/.ALIGN),
+;                      terminator consumed
+;            failure: C set, A = CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED,
+;                      CASM_DIAG_FILL_VALUE_REQUIRED,
+;                      CASM_DIAG_VALUE_OUT_OF_RANGE, CASM_DIAG_SYNTAX_ERROR,
+;                      or a propagated expression diagnostic
+; Clobbers:  A, X, Y, CasmParserStmt.Val*/Flags, CasmFillCountLo/Hi,
+;            CasmFillValue, expression module's private result record
+; ---------------------------------------------------------------------------
+ppsFillDirective:
+    ; Consume the DIRECTIVE token itself and fetch the first operand token --
+    ; the current token on entry is still .RES/.FILL/.ALIGN (ppsMnemonic's own
+    ; lexerNext fetched it, not this routine's), same opening move as
+    ; parseOperandSequence's own first line. Missing this, caught live: an
+    ; earlier revision called parserParseExpressionValue directly against the
+    ; still-current DIRECTIVE token, which exprEvaluate's parsePrimary cannot
+    ; recognize, producing a spurious CASM_DIAG_EXPR_MALFORMED at column 1
+    ; instead of ever reaching the real operand.
+    jsr lexerNext
+    bcc @haveToken
+    rts
+@haveToken:
+    jsr parserParseExpressionValue
+    bcc @haveCount
+    rts
+@haveCount:
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne @countResolved
+    lda #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
+    sec
+    rts
+@countResolved:
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    sta CasmFillCountLo
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    sta CasmFillCountHi
+    lda #0
+    sta CasmFillValue
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_COMMA
+    beq @haveComma
+    lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
+    cmp #CASM_DIRECTIVE_FILL
+    bne @requireTerminator
+    jsr diagSetLocFromToken     ; missing-value position (NEWLINE/EOF/junk)
+    lda #CASM_DIAG_FILL_VALUE_REQUIRED
+    sec
+    rts
+@haveComma:
+    jsr lexerNext                ; consume ',', fetch the value/fill expr
+    bcc @ok2
+    rts
+@ok2:
+    jsr parserParseExpressionValue
+    bcc @haveValue
+    rts
+@haveValue:
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne @valueResolved
+    lda #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
+    sec
+    rts
+@valueResolved:
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    beq @valueRangeOk
+    ; parserParseExpressionValue preserved the expression-start location
+    ; before advancing to this operand's own delimiter (same precedent as
+    ; emit.s's emitByteList/eblRange).
+    lda #CASM_DIAG_VALUE_OUT_OF_RANGE
+    sec
+    rts
+@valueRangeOk:
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    sta CasmFillValue
+@requireTerminator:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_NEWLINE
+    beq @terminatorOk
+    cmp #CASM_TOKEN_EOF
+    beq @terminatorOk
+    jsr diagSetLocFromToken     ; the unexpected trailing token
+    lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+@terminatorOk:
+    lda #CASM_OPKIND_IMPLIED
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
     rts
 
 ppsSyntaxError:

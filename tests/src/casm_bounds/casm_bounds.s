@@ -76,6 +76,13 @@
 .export relocRecord
 .export listingMirrorByte
 .export fileWrite
+; WP81: emit.s links whole, so its new emitRes/emitFill/emitAlign pull in
+; parser.s's CasmFillCountLo/Hi/CasmFillValue externs even though this
+; harness never dispatches .RES/.FILL/.ALIGN -- one-byte stand-ins, same
+; precedent as CasmTokenText/CasmStringLength/CasmStringBuffer above.
+.export CasmFillCountLo
+.export CasmFillCountHi
+.export CasmFillValue
 
 ; BNE, Implied CLC -- real documented NMOS opcodes, independently known
 ; (also cross-checked against the WP60 Increment 1 oracle: BNE/Relative =
@@ -97,6 +104,9 @@ CasmTokenRecord:   .res CASM_TOKEN_REC_SIZE
 CasmTokenText:     .res 1
 CasmStringLength:  .res 1
 CasmStringBuffer:  .res 1
+CasmFillCountLo:   .res 1
+CasmFillCountHi:   .res 1
+CasmFillValue:     .res 1
 FailCount:         .res 1
 OrgLo:             .res 1
 OrgHi:             .res 1

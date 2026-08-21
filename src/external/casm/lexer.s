@@ -757,6 +757,30 @@ lnDirective:
     ldx #CASM_DIRECTIVE_RELOC
     jmp lexerEmitWithSubtype
 @notReloc:
+    ldx #<dirResStr
+    ldy #>dirResStr
+    jsr compareTokenText
+    bcs @notRes
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_RES
+    jmp lexerEmitWithSubtype
+@notRes:
+    ldx #<dirFillStr
+    ldy #>dirFillStr
+    jsr compareTokenText
+    bcs @notFill
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_FILL
+    jmp lexerEmitWithSubtype
+@notFill:
+    ldx #<dirAlignStr
+    ldy #>dirAlignStr
+    jsr compareTokenText
+    bcs @notAlign
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_ALIGN
+    jmp lexerEmitWithSubtype
+@notAlign:
     lda #CASM_TOKEN_DIRECTIVE
     ldx #CASM_DIRECTIVE_UNKNOWN
     jmp lexerEmitWithSubtype
@@ -1325,6 +1349,9 @@ dirWordStr:     .byte ".WORD", 0
 dirIncludeStr:  .byte ".INCLUDE", 0
 dirStaticStr:   .byte ".STATIC", 0
 dirRelocStr:    .byte ".RELOC", 0
+dirResStr:      .byte ".RES", 0
+dirFillStr:     .byte ".FILL", 0
+dirAlignStr:    .byte ".ALIGN", 0
 
 mnemonicTable:
     .byte "ADC", "AND", "ASL", "BCC", "BCS", "BEQ", "BIT", "BMI"

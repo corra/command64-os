@@ -1,0 +1,20 @@
+# CASM Phase 13 WP81 trusted reference: casmfill1
+#
+# Independently hand-assembled from the casmfill1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves
+# .FILL's required two-operand grammar produces correct bytes through the
+# real production parser/emitter (parser.s's ppsFillDirective, emit.s's
+# emitFill/emitFillLoop).
+#
+# Source (.ORG $C000, fixed address -- no relocatable symbols involved):
+#   .ORG $C000
+#   .FILL 4,$40   ; 4 bytes, each $40
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   40 40 40 40  .FILL 4,$40
+#
+# bytes: 6
+
+00 C0
+40 40 40 40
