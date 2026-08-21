@@ -378,3 +378,14 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   rebuild confirmed stable (second build produced no work). Message-buffer
   BSS staging (`CasmAssertMessage`/`Len`) deferred to Increment 4
   (parser dispatch), per the plan's own increment split.
+- 2026-08-21: Increment 2 (lexer recognition) complete: new `dirAssertStr`
+  constant and a `@notIncbin`→`@notAssert` block appended to
+  `lnDirective`'s chain (`lexer.s`), same shape as every prior directive
+  there. Build clean, no-change rebuild stable. No standalone lexer-only
+  live check performed — `test_casm_lexer` is narrowly scoped to
+  identifier-length boundary testing, not general directive tokenization,
+  and no isolation harness for directive-token classification exists
+  (checked). Following WP81's own precedent (its Progress log records
+  Increments 1-3 together), live verification that `.ASSERT` classifies
+  correctly is deferred to Increment 5's first end-to-end fixture, where a
+  wrong subtype would surface immediately as a parser dispatch failure.

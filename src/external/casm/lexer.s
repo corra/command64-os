@@ -970,6 +970,14 @@ lnDirective:
     ldx #CASM_DIRECTIVE_INCBIN
     jmp lexerEmitWithSubtype
 @notIncbin:
+    ldx #<dirAssertStr
+    ldy #>dirAssertStr
+    jsr compareTokenText
+    bcs @notAssert
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_ASSERT
+    jmp lexerEmitWithSubtype
+@notAssert:
     lda #CASM_TOKEN_DIRECTIVE
     ldx #CASM_DIRECTIVE_UNKNOWN
     jmp lexerEmitWithSubtype
@@ -1542,6 +1550,7 @@ dirResStr:      .byte ".RES", 0
 dirFillStr:     .byte ".FILL", 0
 dirAlignStr:    .byte ".ALIGN", 0
 dirIncbinStr:   .byte ".INCBIN", 0
+dirAssertStr:   .byte ".ASSERT", 0
 
 mnemonicTable:
     .byte "ADC", "AND", "ASL", "BCC", "BCS", "BEQ", "BIT", "BMI"
