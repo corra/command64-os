@@ -20,8 +20,10 @@ verification-walkthrough-completion-gate.md`.
 
 **Phase 13 (Data Construction Directives) is underway.** WP81
 (`.RES`/`.FILL`/`.ALIGN`), WP82 (`.INCBIN`), and WP83 (`.ASSERT`) are
-complete, user-approved 2026-08-21. WP84-85 remain open. See the Phase 13
-section below.
+complete, user-approved 2026-08-21. WP84 (DASH adoption of `.RES`) is
+implemented and live-verified, awaiting user sign-off
+(`brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-adoption.md`).
+WP85 remains open. See the Phase 13 section below.
 
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
@@ -165,8 +167,27 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       `test_casm_pass1`/`test_casm_frame`) confirmed clean. Plan:
       `brain/plans/2026-08-21-casm-phase13-wp83-assert.md`. Walkthrough:
       `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
-- [ ] WP84 **DASH adoption** (`.RES`/`.FILL`/`.ASSERT` into real DASH
-      source) -- not yet started.
+- [x] WP84 **DASH adoption of `.RES`, implemented and live-verified,
+      awaiting user sign-off**. Converts `ddata.s`'s five zero/fill-byte
+      sites (`FMTBUF`/`SYSINFOBUF`/`APPBUF`/`BORDERROW`/`VMMBUFFER`) to
+      `.RES`. Narrowed from the master plan's original framing on two
+      independently verified findings: `.ASSERT` DASH adoption deferred
+      entirely (its targets are equality invariants, same
+      comparison-operator gap WP83 found); `.FILL` DASH adoption dropped
+      in favor of `.RES` with an explicit value (**ca65 has no `.FILL`
+      directive at all**, verified directly -- would have broken the
+      dual-assembler cross-check). Native CASM assembly `COMP`-verified
+      against the ca65 cross-check build; regenerated `dash.ref.hex`
+      proven byte-identical to the pre-conversion manifest three
+      independent ways (live `COMP`, host-side `cc1541 -X` extraction +
+      SHA-256, `build_dash_manifest.py --cross-check`). Relocation
+      spot-check clean at `$3800`/`$5000`/`$9000`, matching WP71's own
+      recorded results exactly. `AGENTS.md` updated to document
+      `.RES`/`.FILL`'s dual-assembler status. CASM's own regression
+      witnesses confirmed clean. Plan:
+      `brain/plans/2026-08-21-casm-phase13-wp84-dash-adoption.md`.
+      Walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-
+      adoption.md`.
 - [ ] WP85 **consolidated completion gate, version promotion to `0.4.0`**
       -- not yet started.
 

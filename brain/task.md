@@ -3686,3 +3686,22 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       diagnostics), all live-verified. Regression witnesses clean. Full
       detail: `brain/plans/2026-08-21-casm-phase13-wp83-assert.md`,
       `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
+- [ ] WP84 (project `casm.phase13`, `+wp84`): implemented and live
+      VICE-verified 2026-08-21, awaiting user sign-off. Converts
+      `ddata.s`'s five zero/fill-byte sites (`FMTBUF`/`SYSINFOBUF`/
+      `APPBUF`/`BORDERROW`/`VMMBUFFER`) to `.RES`. Narrowed from the
+      master plan on two independently verified findings: `.ASSERT` DASH
+      adoption deferred entirely (equality-invariant targets, same
+      comparison-operator gap WP83 found); `.FILL` dropped in favor of
+      `.RES` with an explicit value (ca65 has no `.FILL` directive at
+      all, verified directly -- would break the dual-assembler
+      cross-check). Native CASM assembly `COMP`-verified against ca65;
+      regenerated `dash.ref.hex` proven byte-identical to the
+      pre-conversion manifest three independent ways (live `COMP`,
+      host-side `cc1541 -X` extraction + SHA-256, `build_dash_manifest.py
+      --cross-check`). Relocation spot-check clean at `$3800`/`$5000`/
+      `$9000`, matching WP71's own recorded results exactly. `AGENTS.md`
+      updated. CASM's own regression witnesses confirmed clean. Full
+      detail: `brain/plans/2026-08-21-casm-phase13-wp84-dash-
+      adoption.md`, `brain/walkthroughs/2026-08-21-casm-phase13-wp84-
+      dash-adoption.md`.

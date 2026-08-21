@@ -12,8 +12,9 @@ depends-on: CASM Phase 13 WP81/WP82/WP83, all complete and merged into
 
 ## Status
 
-**Approved 2026-08-21.** All three Scoping Decisions confirmed (see
-below). Implementation authorized on `feature/casm-phase13-wp84`.
+**Implementation complete, live-verified in VICE.** See the completion
+walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-
+adoption.md`. Awaiting explicit user sign-off before WP84 is marked done.
 
 Parent plan: `brain/plans/2026-08-21-casm-phase13-data-construction-
 directives.md`. Branch: `feature/casm-phase13-wp84`, to be cut from
@@ -356,3 +357,6 @@ DASH's own real source, not a CASM test fixture.
   session); a fresh instance was started per the workflow's
   one-clean-restart allowance and the remaining witness re-run cleanly
   from a fresh Command64 boot.
+- 2026-08-21: Increment 8 complete. Completion-gate walkthrough drafted
+  at `brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-adoption.md`.
+  Awaiting explicit user sign-off to close WP84.
