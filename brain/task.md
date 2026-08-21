@@ -3561,3 +3561,68 @@
     `mapPrint` once, after Pass 2 and `/L` are committed; this idea emits
     each row as it is defined instead
   - No plan drafted yet
+
+## CASM Post-Phase-12 Hardening (WP77-WP80, non-numbered interim effort)
+
+Plan approved 2026-08-20:
+`brain/plans/2026-08-20-casm-post-phase12-hardening.md`. Deliberately not
+"Phase 13" — that name/number stays reserved for the master plan's Data
+Construction Directives (`brain/plans/2026-07-16-casm-assembler-
+implementation-plan.md:468`), unrelated to this defect-fix set.
+
+- [x] WP80 `.TEXT` disposition closed on approval, 2026-08-20 (no Taskwarrior
+      task; documentation only). User decision: `.BYTE "string"` literals
+      (WP74) remain the sole, deduplicated string spelling; `.TEXT` is not
+      added. No `.TEXT` implementation ever existed to remove.
+- [x] WP77 Taskwarrior task 42 (`b1369c8c-8fc6-4038-825c-1103a106257c`):
+      complete, live-verified 2026-08-20. Root cause: `ppsConstant`'s
+      `@identifierStore` (`parser.s:512`) claimed to fall through to
+      `@requireTerminator` but actually fell into `@curAddr`'s `*`-RHS
+      handler, whose `jsr lexerNext` consumed the real NEWLINE terminator,
+      desyncing parsing onto the following line -- matching the live repro
+      exactly (`CASM: EXPECTED NEWLINE` reported against the line *after*
+      the constant chain). Fixed with a one-line explicit `jmp
+      @requireTerminator`. `test_casm_expr` re-run clean, no regression;
+      new permanent fixture `casmchain1.s`/`.ref` added and COMP-verified.
+      Full detail in `brain/plans/2026-08-20-casm-post-phase12-
+      hardening.md`'s Progress log.
+- [x] WP78 Taskwarrior task 40 (`be8ca0bf-ac7c-40f6-960e-2ca816bc7fb8`):
+      complete, live VICE-verified 2026-08-20. Root cause was Command64's
+      generic `TYPE` command (`cmdType`, `src/command64/shell.asm`), not
+      `listing.s` (whose 40-column rows are correct by design and locked
+      by `.assert` invariants in `common.inc`) -- `cmdType` forwarded a
+      file's raw CR to KERNAL CHROUT unconditionally, even when the
+      KERNAL's own deferred line-wrap had already advanced the cursor.
+      Fixed by skipping the CR when `KernalScreenColumn` ($D3) reads 40
+      (the real KERNAL's lazy-wrap pending value; a first attempt checking
+      for 0 silently did nothing, caught only by an empirical `PEEK(211)`
+      BASIC test). Also hit and resolved a `CommandShell` segment
+      zero-slack overflow by moving `cmdType` into the `ShellExt` overflow
+      segment (matching the existing `cmdMore` pattern). Full detail in
+      `brain/plans/2026-08-20-casm-post-phase12-hardening.md`'s Progress
+      log.
+- [ ] WP79 **deferred, not fixed**, Taskwarrior task 41
+      (`882433f0-cde1-4849-8b3c-df32613518c3`): `sourceNextByte` phantom
+      EOF byte on exactly-1-byte source files. Independently reproduced by
+      WP60 Increment 7's `srcOneByte1` fixture in
+      `tests/src/casm_spanread/casm_spanread.s`, deliberately not called
+      from `start`. Investigated live 2026-08-20: instrumented
+      `sourceLoad` directly and confirmed `CasmSourceLoadedLenLo/Hi` = 4,
+      not 1 (one real byte plus 3 phantom padding bytes -- matches
+      Taskwarrior task 35's own "~3 phantom bytes" description). Cross-
+      checked the raw D64 image byte-for-byte: `cc1541`'s on-disk data and
+      byte-count field for the 1-byte fixture are correct. The extra bytes
+      come from the real 1541-DOS-firmware/VICE-true-drive-emulation layer
+      itself (a sector whose valid data is only 1 byte past the 2-byte
+      T/S-link header), not from any Command64 code -- `file.asm`'s
+      `fileRead` has no available status signal to distinguish a genuine
+      last byte from this phantom padding. A first fix attempt (per-handle
+      "already saw EOI" latch in `file.asm`) did not resolve it and was
+      reverted (`git checkout --`, confirmed clean). **Recommended next
+      step: a dedicated investigation absorbing Taskwarrior tasks 22 and
+      35 (same underlying defect class), not a continuation of this
+      plan.** Full trail in `brain/plans/2026-08-20-casm-post-phase12-
+      hardening.md`'s Progress log.
+
+**This hardening plan is closed** (user-approved 2026-08-21): WP77, WP78,
+and WP80 complete; WP79 explicitly deferred, not abandoned.

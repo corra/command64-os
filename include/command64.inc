@@ -20,6 +20,7 @@
 .label KernalCLOSE     = $FFC3  // Close a logical file
 .label KernalREADST    = $FFB7  // Read status byte
 .label KernalStatus    = $90    // KERNAL I/O status byte
+.label KernalScreenColumn = $D3 // KERNAL screen-editor cursor column (PNT)
 .label KernalCHKIN     = $FFC6  // Set input channel
 .label KernalCHKOUT    = $FFC9  // Set output channel
 .label KernalCLRCHN    = $FFCC  // Clear I/O channels

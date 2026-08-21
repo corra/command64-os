@@ -1633,7 +1633,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmopall
     casmfa2p
     casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
-    casmfwdstale1)
+    casmfwdstale1 casmchain1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -2000,6 +2000,19 @@ add_custom_command(
         -w "${CASM_REF_DIR}/casmfwdstale1.ref"
         "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
     COMMENT "Appending WP73 stale resolver-state fixture and its trusted reference to casm_phase12_test.d64"
+    VERBATIM
+)
+
+# WP77 (post-Phase-12 hardening): named-constant chaining fix.
+add_custom_command(
+    TARGET casm_phase12_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmchain1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmchain1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmchain1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmchain1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase12_test.d64"
+    COMMENT "Appending WP77 named-constant chaining fixture and its trusted reference to casm_phase12_test.d64"
     VERBATIM
 )
 add_dependencies(casm_phase12_test_d64 casm_test_fixtures casm_reference_fixtures)
@@ -2592,12 +2605,13 @@ add_custom_command(
 # casmrelacc.s source also lives only on casm_phase12_test_d64.
 # WP72's casmzpconst1 is excluded for the same reason: its matching
 # casmzpconst1.s source also lives only on casm_phase12_test_d64. WP73's
-# casmfwdstale1 follows the same dedicated-disk rule.
+# casmfwdstale1 follows the same dedicated-disk rule. WP77's casmchain1
+# follows the same dedicated-disk rule.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
        AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
        AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmstring1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1"
-       AND NOT REF_NAME STREQUAL "casmfwdstale1")
+       AND NOT REF_NAME STREQUAL "casmfwdstale1" AND NOT REF_NAME STREQUAL "casmchain1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

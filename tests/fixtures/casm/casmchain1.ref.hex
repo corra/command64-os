@@ -1,0 +1,25 @@
+# CASM post-Phase-12 hardening (WP77) trusted reference: casmchain1
+#
+# Independently hand-assembled from the casmchain1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves the
+# WP77 fix: a named constant whose right-hand side is another identifier
+# (constant-to-constant chaining), with no arithmetic operator, must parse
+# and terminate its own statement correctly instead of desyncing onto the
+# following line.
+#
+# Source (.ORG $C000):
+#   BASECONST = $05
+#   DEFCONST = BASECONST
+#   LDA #DEFCONST
+#   RTS
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   A9 05        LDA #$05  (immediate, 2 bytes -- DEFCONST resolves to $05)
+#   60           RTS
+#
+# bytes: 5
+
+00 C0
+A9 05
+60

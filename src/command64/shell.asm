@@ -984,6 +984,8 @@ dirExit:
     sta CurrentDevice
     rts
 
+.segment ShellExt
+
 // TYPE — display contents of a file
 cmdType:
     ldy ParsePos
@@ -1041,7 +1043,15 @@ ctReadLoop:
     ora HexValHi
     beq ctReadDone
 
-    // Print the bytes we read
+    // Print the bytes we read. A raw CR is skipped when the KERNAL's own
+    // screen-line cursor column ($D3/KernalScreenColumn) already reads 40:
+    // the real screen editor defers the actual line wrap until the next
+    // character is printed (PNTR holds 40, not 0, right after the 40th
+    // column is written), so forwarding a CR at that point (as this loop
+    // used to) still triggers its own full line advance -- which lands one
+    // row past where the deferred wrap will resolve to, leaving a blank
+    // line. A CR reached with the column not already pinned at 40 still
+    // prints normally.
     ldy #0
 ctPrintLoop:
     lda CommandBuffer, y
@@ -1050,7 +1060,14 @@ ctPrintLoop:
     tya
     pha
     lda CommandBuffer, y
+    cmp #PetCr
+    bne ctPrintDo
+    ldx KernalScreenColumn
+    cpx #40                 // KERNAL defers the wrap: column reads 40 (not
+    beq ctPrintSkip         // 0) right after the last column, until the
+ctPrintDo:                  // next char forces the actual line advance
     jsr KernalChROUT
+ctPrintSkip:
     pla
     tay
     jmp ctPrintNext
@@ -1091,8 +1108,6 @@ ctOpenErr:
     lda #PetCr
     jsr KernalChROUT
     rts
-
-.segment ShellExt
 
 // MORE — display contents of a file one screen at a time
 cmdMore:

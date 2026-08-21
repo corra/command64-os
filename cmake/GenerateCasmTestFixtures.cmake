@@ -1867,3 +1867,19 @@ file(WRITE "${OUTPUT_DIR}/casmfwdstale1.seq"
     "FWDLABEL:\n"
     ".BYTE 0\n"
 )
+
+# WP77 (post-Phase-12 hardening): minimal reproduction of a named constant
+# chained to another named constant (IDENTIFIER = IDENTIFIER, no arithmetic
+# operator). Before the fix, ppsConstant's @identifierStore fell through
+# into @curAddr's '*'-RHS handler instead of jumping to @requireTerminator,
+# consuming one extra token (the real NEWLINE terminator) and desyncing
+# parsing onto the following statement -- reproduced live as `CASM: EXPECTED
+# NEWLINE` reported against the *next* line, not the constant-chain line
+# itself. COMP-verified against a hand-derived casmchain1.ref.hex.
+file(WRITE "${OUTPUT_DIR}/casmchain1.seq"
+    ".ORG \$C000\n"
+    "BASECONST = \$05\n"
+    "DEFCONST = BASECONST\n"
+    "LDA #DEFCONST\n"
+    "RTS\n"
+)

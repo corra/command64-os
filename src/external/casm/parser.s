@@ -527,7 +527,7 @@ ppsConstant:
     sta CasmConstantRefAddendHi
     lda #0
     sta CasmConstantResolved
-    ; fall through to @requireTerminator
+    jmp @requireTerminator
 
 ; WP66: '*' RHS. Reuses @identifierAddend's own addend-capture tail
 ; verbatim (same exprParseAddend/exprGetResult sequence, staging into the

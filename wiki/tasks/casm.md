@@ -16,9 +16,67 @@ R6-relocatable PRG files.
 `1324` (WP64-76, including WP71's full DASH adoption and WP76's
 corrective forward-reference Pass 1/2 width-agreement fix). Final
 walkthrough: `brain/walkthroughs/2026-08-20-casm-phase12-wp75-
-verification-walkthrough-completion-gate.md`. Next: Phase 13 scoping (not
-yet started) — see the `.TEXT` disposition question WP74 flagged, and any
-other Phase 13 candidates in the Future Feature Backlog below.
+verification-walkthrough-completion-gate.md`.
+
+An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
+13" — that name/number stays reserved for the master plan's Data
+Construction Directives, see `brain/plans/2026-07-16-casm-assembler-
+implementation-plan.md:468`) was approved 2026-08-20:
+`brain/plans/2026-08-20-casm-post-phase12-hardening.md`.
+
+- [x] WP80 **`.TEXT` disposition closed, user-approved 2026-08-20** (no
+      Taskwarrior task; documentation only). Decision: `.BYTE "string"`
+      literals (WP74) remain the sole, deduplicated string spelling; `.TEXT`
+      is not added. No `.TEXT` implementation ever existed in
+      `src/external/casm/` to remove.
+- [x] WP77 **named-constant chaining parse failure fixed, user-approved
+      2026-08-20** (Taskwarrior 42,
+      `b1369c8c-8fc6-4038-825c-1103a106257c`). Root cause: `ppsConstant`'s
+      `@identifierStore` (`parser.s:512`) claimed to fall through to
+      `@requireTerminator` but actually fell into `@curAddr`'s `*`-RHS
+      handler, whose `jsr lexerNext` consumed the real NEWLINE terminator,
+      desyncing parsing onto the following line. Fixed with an explicit
+      `jmp @requireTerminator`. `test_casm_expr` re-run clean, no
+      regression; new permanent fixture `casmchain1.s`/`.ref` added
+      (COMP-verified `FILES COMPARE OK`). Plan:
+      `brain/plans/2026-08-20-casm-post-phase12-hardening.md`. Walkthrough:
+      `brain/walkthroughs/2026-08-20-casm-post-phase12-hardening-wp77.md`.
+- [x] WP78 **listing/TYPE screen double-line-advance fix complete,
+      user-approved 2026-08-20** (Taskwarrior 40,
+      `be8ca0bf-ac7c-40f6-960e-2ca816bc7fb8`). Root cause was not
+      `listing.s` (its 40-column rows are correct by design, locked by
+      `.assert` invariants) but Command64's generic `TYPE` command
+      (`cmdType`, `src/command64/shell.asm`) forwarding a file's raw CR to
+      KERNAL CHROUT unconditionally, even when the KERNAL's own deferred
+      line-wrap had already advanced the cursor. Fixed by skipping the CR
+      when `KernalScreenColumn` ($D3) already reads 40 (the KERNAL's
+      lazy-wrap pending state, not 0 -- confirmed empirically via a live
+      `PEEK(211)` BASIC test after a first, incorrect `==0` check silently
+      failed to fix anything). Hit and resolved a real `CommandShell`
+      segment zero-slack overflow by moving `cmdType` into the existing
+      `ShellExt` overflow segment (same pattern as `cmdMore`). Plan:
+      `brain/plans/2026-08-20-casm-post-phase12-hardening.md` (Progress
+      log has full detail).
+- [ ] WP79 **deferred, not fixed** (Taskwarrior 41,
+      `882433f0-cde1-4849-8b3c-df32613518c3`): `sourceNextByte` phantom EOF
+      byte on exactly-1-byte sources. Investigated live 2026-08-20 and
+      root-caused to a real 1541-DOS-firmware/VICE-true-drive-emulation
+      quirk -- a SEQ file whose last sector holds only 1 valid byte
+      delivers 3 phantom padding bytes via KERNAL CHRIN before READST
+      signals EOI. Confirmed via direct D64 sector inspection that
+      `cc1541`'s on-disk data and byte-count field are correct; the extra
+      bytes come from the emulated drive/KERNAL layer itself, not from
+      `source.s`/`fileio.s`/`file.asm`. A first fix attempt (per-handle
+      "already saw EOI" latch in `file.asm`) did not resolve it and was
+      reverted. Recommended next step: a dedicated investigation absorbing
+      Taskwarrior tasks 22 and 35 (same underlying defect class), not a
+      continuation of this plan. Full trail:
+      `brain/plans/2026-08-20-casm-post-phase12-hardening.md`.
+
+**This hardening plan is closed** (user-approved 2026-08-21) with WP77,
+WP78, and WP80 complete, and WP79 explicitly left open/deferred. Next: the
+master plan's actual Phase 13 (Data Construction Directives) remains
+unscoped and separate from this hardening effort.
 
 ## Phase 1 Prerequisite
 
