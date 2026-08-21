@@ -154,12 +154,39 @@ new-capability item in this WP.
 
 ### Decision 3: truthiness rule for the expression
 
-Proposed: `.ASSERT`'s expression is treated as **false only when it
-resolves to exactly `0`**, true for any other resolved value (matches
-ca65's own `.assert` semantics and is the obvious reading of "expression
-check"). No separate boolean/comparison-operator requirement — `.ASSERT
-symbol = value` already works today because `=` is an existing expression
-operator producing `0`/`1`, not new grammar. **Confirmed.**
+`.ASSERT`'s expression is treated as **false only when it resolves to
+exactly `0`**, true for any other resolved value (matches ca65's own
+`.assert` semantics and is the obvious reading of "expression check").
+**Confirmed.**
+
+**Correction (found during Increment 5 implementation, 2026-08-21):** this
+plan originally claimed `.ASSERT symbol = value` "already works today
+because `=` is an existing expression operator producing `0`/`1`" — that
+claim was wrong, not verified against `expr.s` before writing it.
+`parseOperatorTail` (`expr.s:509-560`) only classifies
+`+ - | ^ & << >> * /` as binary operators; `CASM_TOKEN_EQUALS` is used
+exclusively at the *statement* level for named-constant definitions
+(`identifier = expr`, WP65), never inside an expression. `CASM_TOKEN_LESS`/
+`GREATER` are the `<`/`>` byte-extraction prefixes (low/high byte of a
+label), not comparison operators either (confirmed via their only other
+call sites, `parser.s`'s addend-extraction grammar).
+
+**Consequence, confirmed with the user 2026-08-21:** CASM's expression
+grammar has no equality/comparison operator at all, so `.ASSERT` can only
+usefully express **nonzero-arithmetic** truthiness checks (a pointer/
+size/flag is nonzero) — it cannot express an equality or alignment
+invariant (`a = b`, `(addr & $FF) = 0`) the way ca65's own `.assert`
+commonly is used, including the master plan's own cited DASH target
+(`DISPATCHRETURN` must be exactly one byte past
+`DISPATCHRETURNMINUSONE`). **Decision: ship `.ASSERT` with nonzero-only
+truthiness as originally scoped (no new expression syntax); a real
+comparison operator is deferred as a separate, separately-planned
+follow-up** (it would expand Phase 12's frozen expression grammar
+project-wide, not just for `.ASSERT`), not fixed inline in this WP. WP84
+(DASH adoption) will need to find genuinely nonzero-truthy target sites,
+restate its planned equality checks some other way, or skip sites that
+need true equality — to be resolved when WP84 itself is planned, not
+here.
 
 ### Decision 4: message buffer size
 
@@ -431,3 +458,79 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   `.STATIC`/`.RELOC` `CASM_DIAG_NOT_IMPLEMENTED` catch-all — confirmed safe,
   no crash risk. No fixtures added this increment (none planned until
   Increment 5's first end-to-end slice).
+- 2026-08-21: Increment 5 (no-message emission path) complete. `emitAssert`
+  (`emit.s`) dispatched from `emitDirective`: compares `CasmAssertValueLo/
+  Hi` against zero, `clc; rts` on nonzero (no `emitMarkStarted`, no bytes),
+  diagnoses `CASM_DIAG_ASSERTION_FAILED` on zero. `diagnostics.s` gained the
+  WP83 dispatch range-check block and `diagWp83MessageLo/Hi` message table
+  for all three WP83 diagnostics (`ASSERT_UNRESOLVED`/`_MESSAGE_TOO_LONG`/
+  `ASSERTION_FAILED`) — while wiring this in, `diagPrintFatal`'s very first
+  branch (`bcc dpfMainRange`) fell out of 6502 branch range from the new
+  block's own size, the same class of hazard WP81's own comment already
+  flags for this function; fixed with a `bcs`/`jmp` inversion, no logic
+  change.
+  Two production fixtures added (`casmassert1.seq`/`.ref.hex`,
+  `casmassertfail.seq`), packaged on `casm_phase13_test_d64`:
+  `casmassert1` (`.ASSERT 1` then `.BYTE $AA`) is COMP-verified byte-exact,
+  proving zero-byte emission on success; `casmassertfail` (`.ASSERT 0`, no
+  message) is live-diagnosed for the generic failure text.
+  **Real defect found and corrected while drafting these fixtures**: the
+  original plan's Decision 3 claimed `.ASSERT symbol = value` already
+  worked because `=` was "an existing expression operator producing 0/1" —
+  false, not verified before writing it. `expr.s`'s `parseOperatorTail`
+  only classifies `+ - | ^ & << >> * /`; `CASM_TOKEN_EQUALS` is exclusively
+  the *statement*-level named-constant assignment (`identifier = expr`,
+  WP65), and `CASM_TOKEN_LESS`/`GREATER` are the `<`/`>` byte-extraction
+  prefixes, not comparisons. CASM's expression grammar has **no
+  equality/comparison operator at all**, so `.ASSERT` can only usefully
+  test nonzero-arithmetic truthiness — it cannot express an equality or
+  alignment invariant (the master plan's own cited DASH
+  `DISPATCHRETURN`/`DISPATCHRETURNMINUSONE` use case included). Confirmed
+  with the user: ship `.ASSERT` nonzero-only as originally scoped (no new
+  expression syntax this WP); a real comparison operator is deferred as a
+  separate, separately-planned follow-up, to be resolved when WP84 (DASH
+  adoption) is itself planned. Fixtures were rewritten to use plain
+  nonzero/zero literals instead of the originally-drafted (invalid)
+  equality form.
+  Five envelope bumps, all user-approved: `casm` `$6A00`→`$6B00` (already
+  recorded, Increment 4); `test_casm_pass1` `$6200`→`$6300` (+256, 166-byte
+  overflow); `test_casm_frame` `$6100`→`$6300` (+512, 286-byte overflow,
+  exceeded a single page); `test_casm_listcap` `$6600`→`$6700` (+256,
+  210-byte overflow); `test_casm_passcheck` `$5E00`→`$5F00` (+256,
+  180-byte overflow); `test_casm_include` `$1800`→`$1900` (+256, 54-byte
+  overflow, this WP's own lexer recognition from Increment 2).
+  `test_casm_passcheck` also retripped the recurring `expr.s`
+  `jmp (CasmExprResolverAddrLo)` page-boundary hazard (WP46/WP54/WP82's own
+  prior occurrences); `CasmExprResolverAddrPad` widened 3→4 bytes,
+  user-approved, same mechanical fix as every prior occurrence.
+  `test_casm_bounds` and `test_casm_directives` (WP81's isolation harness)
+  each needed a one-byte `CasmAssertValueLo`/`CasmAssertValueHi` stand-in
+  pair, same precedent as their existing `CasmFillCountLo/Hi`/
+  `CasmIncbinFilename` stand-ins — `emit.s` links whole in both, so the new
+  `emitAssert` import pulled these in even though neither harness
+  dispatches `.ASSERT`.
+  **Disk-full blocker, resolved with the user**: `test_casm_frame`'s own
+  envelope bump grew its PRG enough that `casm_listing_test.d64` (which it
+  shared with several other harnesses) hit 0 free blocks, live-confirmed
+  (`casmfrr2.seq` failed to write). Relocated `test_casm_frame` and its own
+  `casmfrp1-4`/`casmfrc1-3`/`casmfrcr1`/`casmfrr1-2` fixtures to
+  `casm_phase13_test_d64` (469 free blocks before the move, 345 after) —
+  same "move the largest occupant off a full disk" precedent this project
+  has used before (WP52, WP67, WP53 increment 4's original move of
+  `test_casm_frame` onto that disk in the first place).
+  A full clean rebuild from scratch (`rm -rf build && cmake -B build &&
+  cmake --build build`) completed with zero errors, zero overflows, zero
+  unresolved externals; a subsequent no-op `cmake --build build` re-ran
+  only disk-packaging POST_BUILD steps (this project's existing, known
+  non-idempotent packaging behavior — not a regression) with no
+  compile/link work and no errors.
+  Live-VICE evidence: `casmassert1.s` → `comp casmassert1.prg
+  casmassert1.ref` → `FILES COMPARE OK`. `casmassertfail.s` → `CASM:
+  ASSERTION FAILED` at line 1, col 1 (offset 0), correct caret context.
+  Regression witnesses re-run fresh on the rebuilt binaries:
+  `test_casm_frame` → `CASM FRAME: PASS`; `test_casm_expr` → `CASM EXPR:
+  PASS`; `test_casm_pass1` → `CASM PASS1: PASS`. (VICE crashed once,
+  unprompted, mid-session during a disk-attach call between the frame and
+  expr/pass1 runs — a fresh instance was started per the workflow's
+  one-clean-restart allowance, Command64 reboot and regression re-run from
+  scratch confirmed identical results.)

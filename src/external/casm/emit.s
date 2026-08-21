@@ -43,6 +43,8 @@
 ; managed input-stream wrappers (fileio.s) and the shared 256-byte I/O
 ; buffer they stream through.
 .import CasmIncbinFilename
+.import CasmAssertValueLo
+.import CasmAssertValueHi
 .import inputStreamOpen
 .import inputStreamRead
 .import inputStreamClose
@@ -363,6 +365,8 @@ emitDirective:
     beq edAlign
     cmp #CASM_DIRECTIVE_INCBIN
     beq edIncbin
+    cmp #CASM_DIRECTIVE_ASSERT
+    beq edAssert
     cmp #CASM_DIRECTIVE_UNKNOWN
     beq edSyntax
     cmp #CASM_DIRECTIVE_INCLUDE
@@ -379,6 +383,8 @@ edAlign:
     jmp emitAlign
 edIncbin:
     jmp emitIncbin
+edAssert:
+    jmp emitAssert
 edInternal:
     ; Includes alter the token source and are owned by casmRunPass. Reaching
     ; the emitter indicates an internal dispatch error, not unsupported syntax.
@@ -798,6 +804,34 @@ eibEmitFail:
     sec
     rts
 eibRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; emitAssert (WP83)
+; Check ppsAssert's resolved expression value (CasmAssertValueLo/Hi):
+; nonzero is a passing assertion (zero bytes emitted, success), zero fails
+; the whole assembly with a diagnostic. No emitMarkStarted call -- .ASSERT
+; never emits a byte, so it cannot be "the first statement" of a
+; relocatable assembly in any meaningful sense (Language Contract,
+; brain/plans/2026-08-21-casm-phase13-wp83-assert.md).
+;
+; This increment only implements the no-message failure path
+; (CASM_DIAG_ASSERTION_FAILED) regardless of whether CasmAssertMessageLen
+; is nonzero -- the message-echo diagnostic path is Increment 6's own
+; work, per the plan's own increment split.
+; Outputs: C clear on success (no bytes emitted); C set with
+;          A = CASM_DIAG_ASSERTION_FAILED on failure
+; ---------------------------------------------------------------------------
+emitAssert:
+    lda CasmAssertValueLo
+    ora CasmAssertValueHi
+    bne eaeOk
+    jsr diagSetLocFromStmt      ; the failing .ASSERT statement itself
+    lda #CASM_DIAG_ASSERTION_FAILED
+    sec
+    rts
+eaeOk:
+    clc
     rts
 
 ; ---------------------------------------------------------------------------

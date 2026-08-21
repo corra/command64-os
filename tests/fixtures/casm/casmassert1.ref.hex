@@ -1,0 +1,21 @@
+# CASM Phase 13 WP83 trusted reference: casmassert1
+#
+# Independently hand-assembled from the casmassert1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves
+# .ASSERT emits zero bytes on a passing assertion -- the following .BYTE
+# lands immediately after the .ORG load-address header with nothing
+# in between.
+#
+# Source (.ORG $C000, fixed address -- no relocatable symbols involved):
+#   .ORG $C000
+#   .ASSERT 1    ; resolves to 1 (nonzero) -- passes, emits nothing
+#   .BYTE $AA
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   AA           .BYTE $AA (.ASSERT contributed no bytes)
+#
+# bytes: 3
+
+00 C0
+AA

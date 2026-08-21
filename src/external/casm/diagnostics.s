@@ -139,7 +139,9 @@ diagPrintString:
 ; ---------------------------------------------------------------------------
 diagPrintFatal:
     cmp #CASM_DIAG_LISTING_CREATE_FAILED
-    bcc dpfMainRange
+    bcs dpfNotMain
+    jmp dpfMainRange
+dpfNotMain:
     cmp #CASM_DIAG_LISTING_SHORT_WRITE + 1
     bcc dpfListingRange
     cmp #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
@@ -161,13 +163,29 @@ dpfWp82Check:
     cmp #CASM_DIAG_INCBIN_FILENAME_EXPECTED
     bcc dpfSymbolRange
     cmp #CASM_DIAG_PHASE13_WP82_LAST + 1
-    bcs dpfSymbolRange
+    bcs dpfWp83Check
     sec
     sbc #CASM_DIAG_INCBIN_FILENAME_EXPECTED
     tax
     lda diagWp82MessageLo, x
     pha
     lda diagWp82MessageHi, x
+    tay
+    pla
+    tax
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfWp83Check:
+    cmp #CASM_DIAG_ASSERT_UNRESOLVED
+    bcc dpfSymbolRange
+    cmp #CASM_DIAG_PHASE13_WP83_LAST + 1
+    bcs dpfSymbolRange
+    sec
+    sbc #CASM_DIAG_ASSERT_UNRESOLVED
+    tax
+    lda diagWp83MessageLo, x
+    pha
+    lda diagWp83MessageHi, x
     tay
     pla
     tax
@@ -1453,6 +1471,25 @@ diagWp82MessageHiEnd:
 .assert diagWp82MessageLoEnd - diagWp82MessageLo = CASM_DIAG_PHASE13_WP82_LAST - CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostic low table is incomplete"
 .assert diagWp82MessageHiEnd - diagWp82MessageHi = CASM_DIAG_PHASE13_WP82_LAST - CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostic high table is incomplete"
 
+; WP83: .ASSERT diagnostics, same precedent as diagWp81MessageLo/Hi and
+; diagWp82MessageLo/Hi above. CASM_DIAG_ASSERTION_FAILED's message here is
+; the generic (no-message) text; Increment 6 adds a separate message-echo
+; print path for the case where the user supplied one, without changing
+; this table.
+diagWp83MessageLo:
+    .byte <msgAssertUnresolved
+    .byte <msgAssertMessageTooLong
+    .byte <msgAssertionFailed
+diagWp83MessageLoEnd:
+diagWp83MessageHi:
+    .byte >msgAssertUnresolved
+    .byte >msgAssertMessageTooLong
+    .byte >msgAssertionFailed
+diagWp83MessageHiEnd:
+
+.assert diagWp83MessageLoEnd - diagWp83MessageLo = CASM_DIAG_PHASE13_WP83_LAST - CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostic low table is incomplete"
+.assert diagWp83MessageHiEnd - diagWp83MessageHi = CASM_DIAG_PHASE13_WP83_LAST - CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostic high table is incomplete"
+
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
 msgRegistryFull:
@@ -1616,6 +1653,13 @@ msgInvalidIncbinFilename:
     .byte "CASM: INVALID INCBIN FILENAME", PetCr, 0
 msgIncbinFilenameTooLong:
     .byte "CASM: INCBIN FILENAME TOO LONG", PetCr, 0
+; WP83: .ASSERT diagnostics.
+msgAssertUnresolved:
+    .byte "CASM: ASSERT OPERAND NOT RESOLVED", PetCr, 0
+msgAssertMessageTooLong:
+    .byte "CASM: ASSERT MESSAGE TOO LONG", PetCr, 0
+msgAssertionFailed:
+    .byte "CASM: ASSERTION FAILED", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.

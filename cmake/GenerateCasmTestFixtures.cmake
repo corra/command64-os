@@ -1950,3 +1950,22 @@ file(WRITE "${OUTPUT_DIR}/casmincbinmiss.seq"
 file(WRITE "${OUTPUT_DIR}/casmincbinbadname.seq"
     ".INCBIN nofile\n"
 )
+
+# WP83: .ASSERT production fixtures (no-message path, Increment 5). CASM's
+# expression grammar has no equality/comparison operator (Decision 3's
+# correction, brain/plans/2026-08-21-casm-phase13-wp83-assert.md) -- these
+# fixtures test plain nonzero/zero truthiness, not an equality invariant.
+#
+# casmassert1: a passing assertion (nonzero literal) alongside a real byte
+# emission, proving .ASSERT itself emits zero bytes (the following .BYTE
+# lands immediately after the .ORG with nothing in between).
+file(WRITE "${OUTPUT_DIR}/casmassert1.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1\n"
+    ".BYTE \$AA\n"
+)
+# A failing assertion (resolves to 0), no message operand. No .ref,
+# live-verified for the generic CASM_DIAG_ASSERTION_FAILED.
+file(WRITE "${OUTPUT_DIR}/casmassertfail.seq"
+    ".ASSERT 0\n"
+)

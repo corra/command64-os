@@ -1417,8 +1417,11 @@ CasmExprTempExt:  .res 1
 ; fix grew CODE again and retripped the same assert for
 ; TEST_CASM_PASSCHECK specifically; re-tuned from 1 to 2 bytes. WP82's
 ; lexerScanIncbinOperand (lexer.s) grew CODE again and retripped the same
-; assert for TEST_CASM_PASS1; re-tuned from 2 to 3 bytes.
-CasmExprResolverAddrPad: .res 3
+; assert for TEST_CASM_PASS1; re-tuned from 2 to 3 bytes. WP83's
+; ppsAssert/emitAssert (parser.s/emit.s) grew CODE again and retripped the
+; same assert for TEST_CASM_PASSCHECK specifically; re-tuned from 3 to 4
+; bytes.
+CasmExprResolverAddrPad: .res 4
 CasmExprResolverAddrLo: .res 1
 CasmExprResolverAddrHi: .res 1
 CasmExprResolverOutput: .res CASM_RESOLVE_SIZE

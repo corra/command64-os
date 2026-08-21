@@ -72,6 +72,11 @@
 .export inputStreamOpen
 .export inputStreamRead
 .export inputStreamClose
+; WP83: emit.s links whole, so its new emitAssert pulls in parser.s's
+; CasmAssertValueLo/Hi externs even though this harness never dispatches
+; .ASSERT -- same unreachable stand-in precedent as above.
+.export CasmAssertValueLo
+.export CasmAssertValueHi
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -97,6 +102,8 @@ CasmFillCountHi:   .res 1
 CasmFillValue:     .res 1
 CasmIncbinFilename: .res 1
 CasmIoBuffer:      .res 1
+CasmAssertValueLo: .res 1
+CasmAssertValueHi: .res 1
 FailCount:         .res 1
 OrgLo:             .res 1
 OrgHi:             .res 1

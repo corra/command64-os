@@ -10,7 +10,16 @@ endif()
 
 project(command64-os VERSION 0.4.1 LANGUAGES NONE)
 
-set(C64_THEME_DIR "" CACHE PATH "Path to local c64_theme repository for OBS notifications")
+set(C64_THEME_DIR "$ENV{C64_THEME_DIR}" CACHE PATH "Path to local c64_theme repository for OBS notifications")
+
+# Self-heal after a build/ wipe: if no explicit value was given (env var or
+# -D), and the known local c64_theme checkout is present on disk, default to
+# it so `cmake -B build` alone keeps overlay build events wired without
+# needing to remember a flag. An explicit -DC64_THEME_DIR=... always wins and
+# is never overwritten by this. See .agents/workflows/overlay-build-events.md.
+if(C64_THEME_DIR STREQUAL "" AND EXISTS "/home/morgan/streaming/c64_theme/scripts/notify_obs.py")
+    set(C64_THEME_DIR "/home/morgan/streaming/c64_theme" CACHE PATH "Path to local c64_theme repository for OBS notifications" FORCE)
+endif()
 
 # Include custom CMake modules
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
@@ -978,7 +987,12 @@ if(Ca65_FOUND)
             # harness's own existing fixtures) overflowed $6100 by 27
             # measured bytes; $6200 (+256) is the smallest round-page fit.
             # User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "6200")
+            # WP83 Increment 5: parser.s's ppsAssert/emit.s's emitAssert
+            # staging fields (unused by this harness's own existing
+            # fixtures) overflowed $6200 by 166 measured bytes; $6300
+            # (+256) is the smallest round-page fit. User-approved
+            # 2026-08-21.
+            set(TEST_PRG_SIZE "6300")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -1065,7 +1079,11 @@ if(Ca65_FOUND)
             # harness's own width/agreement-only coverage) overflowed $5D00
             # by 41 measured bytes; $5E00 (+256) is the smallest round-page
             # fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "5E00")
+            # WP83 Increment 5: parser.s's ppsAssert/emit.s's emitAssert
+            # (unused by this harness's own width/agreement-only coverage)
+            # overflowed $5E00 by 180 measured bytes; $5F00 (+256) is the
+            # smallest round-page fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "5F00")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1094,7 +1112,11 @@ if(Ca65_FOUND)
             # overflowed $1600 by 300 measured bytes; $1700 (+256) would
             # still overflow, so $1800 (+512) is the smallest round-page
             # fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "1800")
+            # WP83 Increment 2: lexer.s's new .ASSERT token recognition
+            # (unused by this harness's own include-focused coverage)
+            # overflowed $1800 by 54 measured bytes; $1900 (+256) is the
+            # smallest round-page fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "1900")
         endif()
         if(TEST_NAME STREQUAL "casm_catalog")
             # WP45: include.s plus every module sourceAppendFile transitively
@@ -1239,7 +1261,12 @@ if(Ca65_FOUND)
             # overflowed $5F00 by 278 measured bytes; $6000 (+256) would
             # still overflow, so $6100 (+512) is the smallest round-page
             # fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "6100")
+            # WP83 Increment 5: parser.s's ppsAssert/emit.s's emitAssert
+            # (linked whole, unused by this harness's own real-path frame
+            # coverage) overflowed $6100 by 286 measured bytes; $6200
+            # (+256) would still overflow, so $6300 (+512) is the smallest
+            # round-page fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "6300")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1352,7 +1379,12 @@ if(Ca65_FOUND)
             # harness's own real-path listing-capture coverage) overflowed
             # $6500 by 71 measured bytes; $6600 (+256) is the smallest
             # round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "6600")
+            # WP83 Increment 5: parser.s's ppsAssert/emit.s's emitAssert
+            # (unused by this harness's own real-path listing-capture
+            # coverage) overflowed $6600 by 210 measured bytes; $6700
+            # (+256) is the smallest round-page fit. User-approved
+            # 2026-08-21.
+            set(TEST_PRG_SIZE "6700")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1761,7 +1793,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmfa2p
     casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
     casmfwdstale1 casmchain1
-    casmres1 casmfill1 casmalign1 casmincbin1)
+    casmres1 casmfill1 casmalign1 casmincbin1 casmassert1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -2314,11 +2346,23 @@ add_custom_command(
 # (rather than reactively shuffling fixtures once a generic disk fills up,
 # as every earlier Phase's own trail of "disk full, moved to X" comments
 # above had to). Self-bootable (carries command64 + casm + comp).
+#
+# WP83 Increment 5: test_casm_frame (and its own casmfrp*/casmfrc*/
+# casmfrcr1/casmfrr1/casmfrr2 fixtures, moved below) relocated here from
+# casm_listing_test_d64. This WP's own ppsAssert/emitAssert growth pushed
+# test_casm_frame's own envelope from $6100 to $6300 (+512 measured
+# bytes), which grew its PRG large enough that casm_listing_test_d64 ran
+# out of room entirely (confirmed live: 0 free blocks, casmfrr2.seq
+# failed to write). Moving the single largest occupant off a full disk is
+# this project's own established precedent (WP52's test_l15release/
+# test_casm_passcheck move, WP67's test_casm_bounds/cliderive/lexer move,
+# WP53 increment 4's original move of test_casm_frame onto that disk in
+# the first place) -- this disk has 469 free blocks and ample headroom.
 add_c64_disk_image(casm_phase13_test_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     DISK_LABEL "${DISK_NAME}"
     DISK_ID "${DISK_ID}"
-    PRGS command64 casm comp
+    PRGS command64 casm comp test_casm_frame
 )
 add_dependencies(casm_phase13_test_d64 casm_test_fixtures casm_reference_fixtures)
 
@@ -2403,6 +2447,25 @@ add_custom_command(
     VERBATIM
 )
 
+# WP83 Increment 5: .ASSERT production fixtures (no-message path) -- one
+# accepted case (COMP-verified against a hand-derived .ref.hex, proving
+# zero-byte emission) plus one rejected case proving the generic
+# CASM_DIAG_ASSERTION_FAILED diagnostic.
+add_custom_command(
+    TARGET casm_phase13_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmassert1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmassert1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmassert1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmassert1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmassertfail.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmassertfail.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending WP83 .ASSERT fixtures and trusted reference to casm_phase13_test.d64"
+    VERBATIM
+)
+
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source
@@ -2461,7 +2524,10 @@ add_c64_disk_image(casm_listing_test_d64
     # WP67 already established: self-contained, no companion fixtures, and
     # (for test_casm_opcodes specifically) already covered independently by
     # its own dedicated casm_opcode_test_d64 exhaustive disk.
-    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_frame test_casm_flist test_casm_flmeta test_casm_faultvmm
+    # WP83 Increment 5: test_casm_frame relocated to casm_phase13_test_d64
+    # (see that disk's own comment for why -- this disk ran out of room
+    # entirely after test_casm_frame's own envelope bump).
+    PRGS command64 test_casm_listing test_casm_listcap test_casm_map test_casm_passcheck test_l15release test_casm_spanread test_casm_spancommit test_casm_listwrite test_casm_flist test_casm_flmeta test_casm_faultvmm
 )
 add_dependencies(casm_listing_test_d64 casm_test_fixtures)
 foreach(CASM_LISTCAP_FIXTURE casmlc01 casmlc02 casmlc03 casmlc04 casmlc05
@@ -2764,44 +2830,47 @@ add_custom_command(
 # largest harness there, with its own fixtures, is a smaller blast radius
 # than trimming this disk's real CASM fixtures -- same reasoning WP52 used
 # when relocating test_l15release/test_casm_passcheck.
+# WP83 Increment 5: relocated again, to casm_phase13_test_d64 (see that
+# disk's own comment for the full reason -- test_casm_frame's own envelope
+# bump left casm_listing_test_d64 with 0 free blocks).
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)
     set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
-        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_listing_test_d64" "--error" "--")
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase13_test_d64" "--error" "--")
 endif()
 add_custom_command(
-    TARGET casm_listing_test_d64 POST_BUILD
+    TARGET casm_phase13_test_d64 POST_BUILD
     COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmfrp1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp1.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrc1.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp2" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp2.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc2" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrc2.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrc3" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrc3.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp3" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp3.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrcr1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrcr1.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrp4" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrp4.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrr1" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrr1.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmfrr2" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmfrr2.seq"
-        "${CMAKE_BINARY_DIR}/casm_listing_test.d64"
-    COMMENT "Appending WP46 test_casm_frame fixtures to casm_listing_test.d64"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending WP46 test_casm_frame fixtures to casm_phase13_test.d64"
     VERBATIM
 )
 
@@ -2842,14 +2911,15 @@ add_custom_command(
 # follows the same dedicated-disk rule.
 # WP81's casmres1/casmfill1/casmalign1 are excluded for the same reason:
 # their matching .seq sources live only on the new casm_phase13_test_d64
-# (per-phase-test-images.md), not test.d64.
+# (per-phase-test-images.md), not test.d64. WP83's casmassert1 follows the
+# same dedicated-disk rule.
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     if(NOT REF_NAME STREQUAL "casmbig1" AND NOT REF_NAME STREQUAL "casmopall" AND NOT REF_NAME STREQUAL "casmfa2p"
        AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
        AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmstring1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1"
        AND NOT REF_NAME STREQUAL "casmfwdstale1" AND NOT REF_NAME STREQUAL "casmchain1"
        AND NOT REF_NAME STREQUAL "casmres1" AND NOT REF_NAME STREQUAL "casmfill1" AND NOT REF_NAME STREQUAL "casmalign1"
-       AND NOT REF_NAME STREQUAL "casmincbin1")
+       AND NOT REF_NAME STREQUAL "casmincbin1" AND NOT REF_NAME STREQUAL "casmassert1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

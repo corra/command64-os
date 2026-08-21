@@ -46,6 +46,16 @@ If `C64_THEME_DIR` is unset (the default), every `WRAPPER_CMD`/equivalent
 resolves to empty and the wrapped commands run exactly as before — no
 behavior change, no dependency on the overlay server being reachable.
 
+`CMakeLists.txt` (~line 13) self-heals this cache var after a `build/` wipe:
+if it's empty *and* `/home/morgan/streaming/c64_theme/scripts/notify_obs.py`
+exists on disk, it defaults `C64_THEME_DIR` to that path, so the plain
+`cmake -B build` from `CLAUDE.md` keeps overlay events wired without anyone
+having to remember `-DC64_THEME_DIR=...`. An explicit `-D`/env override
+always wins and is never overwritten back to the default. This is a
+machine-specific hardcoded path (Morgan's local `c64_theme` checkout) —
+intentional, since this whole feature is inherently personal
+streaming-setup config, not something other clones/forks need.
+
 `hex_manifest_to_bin.py` (the `dash` target's manifest-transcription step,
 `CMakeLists.txt` ~line 1145, and the `casm_reference_fixtures` target's
 per-name loop) is deliberately **not** wrapped: it's not a compiler/linker
