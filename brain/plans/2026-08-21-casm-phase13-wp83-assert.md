@@ -572,3 +572,15 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   only the known non-idempotent disk-packaging steps. Regression witnesses
   (`test_casm_frame`/`test_casm_expr`/`test_casm_pass1`) re-run live in
   VICE against this final build, all PASS.
+- 2026-08-21: Increment 7 (unresolved-operand diagnostic fixture)
+  complete. New `casmassertfwd.seq` (`.ASSERT COUNT` / `COUNT = 5`,
+  mirroring WP81's `casmresfwd.seq` precedent exactly) packaged on
+  `casm_phase13_test_d64`. No code change was needed — `ppsAssert`'s
+  strict `CASM_EXPR_FLAG_RESOLVED` check (Increment 4) already covers
+  this case. Live-VICE confirmed: `CASM: ASSERT OPERAND NOT RESOLVED` at
+  `AT LINE 1, COL 9 (OFFSET 8)` (exactly where `COUNT` begins, after
+  `.ASSERT ` — 8 characters), correct caret-context line (`.assert
+  count`), clean `c64[8]:>` return. Confirms Scoping Decision 1: a
+  forward reference is rejected outright in Pass 1, not silently
+  tolerated as a placeholder the way an ordinary instruction operand
+  would be.

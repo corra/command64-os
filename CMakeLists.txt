@@ -2489,6 +2489,17 @@ add_custom_command(
     VERBATIM
 )
 
+# WP83 Increment 7: forward-referenced operand -- proves CASM_DIAG_ASSERT_
+# UNRESOLVED fires rather than silently tolerating a Pass-1 placeholder.
+add_custom_command(
+    TARGET casm_phase13_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmassertfwd.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmassertfwd.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending WP83 Increment 7 .ASSERT unresolved-operand fixture to casm_phase13_test.d64"
+    VERBATIM
+)
+
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source

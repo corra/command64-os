@@ -1975,3 +1975,14 @@ file(WRITE "${OUTPUT_DIR}/casmassertfail.seq"
 file(WRITE "${OUTPUT_DIR}/casmassertmsg.seq"
     ".ASSERT 0, \"CUSTOM MESSAGE\"\n"
 )
+# WP83 Increment 7: forward-referenced operand -- COUNT is not yet defined
+# when Pass 1 reaches `.ASSERT COUNT` (defined later in the same source),
+# so parserParseExpressionValue would ordinarily tolerate it as an
+# unresolved placeholder -- ppsAssert's own explicit RESOLVED check
+# rejects it outright instead (Scoping Decision 1, same precedent as
+# WP81's casmresfwd.seq). No .ref (failure case), live-verified for
+# CASM_DIAG_ASSERT_UNRESOLVED.
+file(WRITE "${OUTPUT_DIR}/casmassertfwd.seq"
+    ".ASSERT COUNT\n"
+    "COUNT = 5\n"
+)
