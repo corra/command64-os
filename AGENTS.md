@@ -135,6 +135,9 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
       MCP server is embedded in VICE itself, so nothing can launch it from inside MCP.
     + Don't: Launch Command64 applications from BASIC or with VICE Autostart; boot
       Command64 first and launch applications by name from its shell.
+    + Don't: Hand-derive PETSCII bytes for shell commands/filenames. Run
+      `tools/vice_type_command.py "<text>"` and pass its printed `data` array to
+      `vice_keyboard_petscii` — see "User Preferences" below for why.
     + Don't: **NEVER** Use a web based emulator as a fall back.
     + Do: **ALWAYS**  Ask user to perform tests when an MCP server is unavailable.
 
@@ -288,7 +291,16 @@ When the user requests a durable behavior change, record it here or in the relev
 - Keep a healthy VICE emulator running after tests. It is part of the user's Twitch and
   YouTube stream layout; stop it only for problem recovery or when the user explicitly asks.
 - Use exact PETSCII keyboard-buffer input for VICE shell commands nearly exclusively;
-  translated text entry is a fallback only when exact PETSCII is unavailable.
+  translated text entry is a fallback only when exact PETSCII is unavailable. **Never
+  hand-derive the bytes.** Run `tools/vice_type_command.py "<text>"` and pass its printed
+  `data` array to `vice_keyboard_petscii` verbatim — it encodes the underscore ($A4) and
+  inverted-letter-case rules correctly every time; hand-derivation has repeatedly gotten one
+  or both wrong across sessions and agents. This applies to every agent operating this repo,
+  not a Claude-specific convention — see `.agents/workflows/vice-mcp-testing.md` step 7.
+  Claude Code sessions additionally get a `PreToolUse` hook (`.claude/settings.json`) that
+  blocks a bad `vice_keyboard_type` call and warns on `vice_keyboard_petscii`, but that hook
+  is Claude Code-specific tooling layered on top of this rule, not the rule itself — any
+  agent without it must still follow this bullet unassisted.
 - Every numbered Phase/Work Package requires an approved `brain/plans/`
   doc before implementation and a `brain/walkthroughs/` completion-gate
   doc with explicit sign-off before it's marked done — applies to every

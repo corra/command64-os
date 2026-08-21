@@ -129,18 +129,25 @@ glyph identity, color, or layout (not just character content) is what's being ve
    startup. Require the first row to decode to `Command 64-DOS Version`; otherwise machine
    context remains `unknown` or `basic`.
 7. At the Command64 shell, prefer `vice_keyboard_petscii` with explicit bytes and Return
-   (`$0D`) for nearly every command. Verify every non-alphanumeric byte against a PETSCII
-   table first; underscore is PETSCII `$A4`, while ASCII `$5F` is left-arrow. **Letter case is
-   inverted**: shell commands are lowercase-only case-sensitive (see the State verification
-   section's own screen-code table), but PETSCII's own letter encoding is the mirror image of
-   ASCII's — send the byte for the *uppercase* ASCII letter (`$41`-`$5A`, e.g. `$46` for the
-   glyph `f`) to get a *lowercase* screen glyph, and vice versa. Confirmed empirically
-   2026-08-20: raw byte `$66` (ASCII/PETSCII lowercase `f`) rendered as uppercase `F` (screen
-   code `$46`) and was rejected by the shell; byte `$46` (ASCII uppercase `F`) rendered as
-   lowercase `f` (screen code `$06`) and was accepted — verified via direct screen-RAM memory
-   reads, not just visual inspection. Use `vice_keyboard_type` only as a fallback when exact
-   PETSCII is unavailable — it does this ASCII-to-PETSCII conversion for you, so plain
-   lowercase input text works there without inverting anything yourself. Do not issue a
+   (`$0D`) for nearly every command. **Do not hand-derive these bytes.** Run
+   `tools/vice_type_command.py "<text>"` and pass its printed `data` array straight to
+   `vice_keyboard_petscii` — it encodes both traps below correctly every time, which
+   hand-derivation has repeatedly gotten wrong across sessions. If it rejects a character,
+   verify the byte against `C64_MCP_USAGE.md` and extend the script deliberately rather than
+   typing around it. The traps it encodes: underscore is PETSCII `$A4`, while ASCII `$5F` is
+   left-arrow. **Letter case is inverted**: shell commands are lowercase-only case-sensitive
+   (see the State verification section's own screen-code table), but PETSCII's own letter
+   encoding is the mirror image of ASCII's — send the byte for the *uppercase* ASCII letter
+   (`$41`-`$5A`, e.g. `$46` for the glyph `f`) to get a *lowercase* screen glyph, and vice
+   versa. Confirmed empirically 2026-08-20: raw byte `$66` (ASCII/PETSCII lowercase `f`)
+   rendered as uppercase `F` (screen code `$46`) and was rejected by the shell; byte `$46`
+   (ASCII uppercase `F`) rendered as lowercase `f` (screen code `$06`) and was accepted —
+   verified via direct screen-RAM memory reads, not just visual inspection. Use
+   `vice_keyboard_type` only as a fallback when exact PETSCII is unavailable — it does this
+   ASCII-to-PETSCII conversion for you, so plain lowercase input text works there without
+   inverting anything yourself, but it cannot type a real underscore at all (observed
+   rendering `_` as `+`), so any command/filename containing `_` must go through
+   `vice_keyboard_petscii` via the script above. Do not issue a
    BASIC `LOAD` or `RUN`, and do not call `vice_autostart` for the application.
    If the shell responds `BAD COMMAND OR FILE NAME` (a mistyped/garbled dispatch attempt,
    not a real missing-file condition), send `flush\n` (optionally `flush <device>\n` for a
