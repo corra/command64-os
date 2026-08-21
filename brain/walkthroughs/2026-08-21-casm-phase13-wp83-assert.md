@@ -2,10 +2,9 @@
 
 ## Status
 
-**Proposed.** Implementation complete, live-verified in VICE. Awaiting
-explicit user sign-off before WP83 is marked done.
+**Approved by the user on 2026-08-21.** WP83 is complete.
 
-## Result (proposed)
+## Result
 
 `.ASSERT expr[, "message"]` is implemented end-to-end in native CASM: a
 compile-time expression check with zero byte emission. A nonzero resolved
@@ -198,7 +197,9 @@ dispatch `.ASSERT`.
 - [x] No-change rebuild confirmed stable.
 - [x] Envelope bumps explicitly approved, not silently absorbed.
 - [x] Walkthrough recorded here.
-- [ ] **User explicitly approves closing WP83.**
+- [x] **User explicitly approves closing WP83.** Approved 2026-08-21.
+
+WP83 is complete.
 
 Phase 13 remains open for WP84 (DASH adoption -- will need to find
 genuinely nonzero-truthy target sites given the comparison-operator gap

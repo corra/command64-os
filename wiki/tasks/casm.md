@@ -19,10 +19,9 @@ walkthrough: `brain/walkthroughs/2026-08-20-casm-phase12-wp75-
 verification-walkthrough-completion-gate.md`.
 
 **Phase 13 (Data Construction Directives) is underway.** WP81
-(`.RES`/`.FILL`/`.ALIGN`) and WP82 (`.INCBIN`) are complete, user-approved
-2026-08-21. WP83 (`.ASSERT`) is implemented and live-verified, awaiting
-user sign-off (`brain/walkthroughs/2026-08-21-casm-phase13-wp83-
-assert.md`). WP84-85 remain open. See the Phase 13 section below.
+(`.RES`/`.FILL`/`.ALIGN`), WP82 (`.INCBIN`), and WP83 (`.ASSERT`) are
+complete, user-approved 2026-08-21. WP84-85 remain open. See the Phase 13
+section below.
 
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
@@ -139,8 +138,8 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       harnesses. Plan:
       `brain/plans/2026-08-21-casm-phase13-wp82-incbin.md`. Walkthrough:
       `brain/walkthroughs/2026-08-21-casm-phase13-wp82-incbin.md`.
-- [x] WP83 **`.ASSERT` implemented and live-verified, awaiting user
-      sign-off** (Taskwarrior task, project `casm.phase13`, `+wp83`). New
+- [x] WP83 **`.ASSERT` complete, user-approved 2026-08-21** (Taskwarrior
+      task, project `casm.phase13`, `+wp83`). New
       `CASM_DIRECTIVE_ASSERT` ($0B) and three diagnostics ($52-$54).
       `parser.s`'s new `ppsAssert` requires the expression to fully
       resolve in both passes (strict, mirrors WP81's own `.RES`/`.FILL`/

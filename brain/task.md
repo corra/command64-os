@@ -3664,8 +3664,8 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       witnesses clean. Fifteen envelope bumps. Full detail:
       `brain/plans/2026-08-21-casm-phase13-wp82-incbin.md`,
       `brain/walkthroughs/2026-08-21-casm-phase13-wp82-incbin.md`.
-- [ ] WP83 (project `casm.phase13`, `+wp83`): implemented and live
-      VICE-verified 2026-08-21, awaiting user sign-off. `.ASSERT
+- [x] WP83 (project `casm.phase13`, `+wp83`): complete, live
+      VICE-verified and user-approved 2026-08-21. `.ASSERT
       expr[, "message"]` implemented in `parser.s` (new `ppsAssert`,
       strict both-pass resolution) and `emit.s` (new `emitAssert`, zero
       bytes emitted); `diagnostics.s` echoes a user-supplied message

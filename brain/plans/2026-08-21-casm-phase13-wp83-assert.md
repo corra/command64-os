@@ -12,8 +12,9 @@ depends-on: CASM Phase 13 WP82 (.INCBIN), complete on feature/casm-phase13-wp82
 
 ## Status
 
-**Approved 2026-08-21.** All four Scoping Decisions confirmed (see below).
-Implementation authorized on `feature/casm-phase13-wp83`.
+**Complete.** Approved 2026-08-21 on `feature/casm-phase13-wp83`. See the
+completion walkthrough:
+`brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
 
 Parent plan: `brain/plans/2026-08-21-casm-phase13-data-construction-
 directives.md`. Branch: `feature/casm-phase13-wp83`, to be cut from
