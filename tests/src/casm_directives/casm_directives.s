@@ -63,6 +63,15 @@
 .export CasmFillCountLo
 .export CasmFillCountHi
 .export CasmFillValue
+; WP82: emit.s links whole, so its new emitIncbin pulls in parser.s's
+; CasmIncbinFilename and fileio.s's inputStreamOpen/Read/Close/CasmIoBuffer
+; externs even though this harness never dispatches .INCBIN -- same
+; unreachable stand-in precedent as casm_bounds.s.
+.export CasmIncbinFilename
+.export CasmIoBuffer
+.export inputStreamOpen
+.export inputStreamRead
+.export inputStreamClose
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -86,6 +95,8 @@ CasmStringBuffer:  .res 1
 CasmFillCountLo:   .res 1
 CasmFillCountHi:   .res 1
 CasmFillValue:     .res 1
+CasmIncbinFilename: .res 1
+CasmIoBuffer:      .res 1
 FailCount:         .res 1
 OrgLo:             .res 1
 OrgHi:             .res 1
@@ -499,6 +510,18 @@ diagClearLoc:
 ; ---------------------------------------------------------------------------
 lexerNext:
 parserParseExpressionValue:
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; inputStreamOpen / inputStreamRead / inputStreamClose (local stand-ins,
+; WP82)
+; Only reachable from emitDirective's .INCBIN path, which this harness
+; never invokes. Same defensive-C-clear precedent as lexerNext above.
+; ---------------------------------------------------------------------------
+inputStreamOpen:
+inputStreamRead:
+inputStreamClose:
     clc
     rts
 

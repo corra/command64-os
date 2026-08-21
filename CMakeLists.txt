@@ -343,7 +343,19 @@ if(Ca65_FOUND)
     # .RES/.FILL/.ALIGN implementation) overflowed $6600 by 237 measured
     # bytes; $6700 (+256) is the smallest round-page fit, 19 bytes headroom.
     # User-approved 2026-08-21.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6700")
+    # WP82 Increment 1: the new CASM_DIRECTIVE_INCBIN constant plus its
+    # diagnostics.s dispatch and message text (no directive behavior yet)
+    # overflowed $6700 by 116 measured bytes; $6800 (+256) is the smallest
+    # round-page fit, 140 bytes headroom. User-approved 2026-08-21.
+    # WP82 Increment 3: lexer.s's new lexerScanIncbinOperand (a dedicated
+    # filename scanner, own diagnostic identity per Scoping Decision 1)
+    # overflowed $6800 by 202 measured bytes; $6900 (+256) is the smallest
+    # round-page fit, 54 bytes headroom. User-approved 2026-08-21.
+    # WP82 Increment 5: emit.s's new emitIncbin (the real file-streaming
+    # implementation) overflowed $6900 by 71 measured bytes; $6A00 (+256)
+    # is the smallest round-page fit, 185 bytes headroom. User-approved
+    # 2026-08-21.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6A00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -567,7 +579,11 @@ if(Ca65_FOUND)
             # WP74 Increment 6: diagnostics.s's STRING messages/routing
             # overflowed the prior $2D00 whole-link envelope by 39 bytes.
             # User approved $2E00, the smallest fitting page.
-            set(TEST_PRG_SIZE "2E00")
+            # WP82 Increment 1: diagnostics.s's new dispatch range-check and
+            # message table for .INCBIN (unused by this harness) overflowed
+            # $2E00 by 59 measured bytes; $2F00 (+256) is the smallest
+            # round-page fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "2F00")
         endif()
         if(TEST_NAME STREQUAL "casm_fsym")
             # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
@@ -746,7 +762,11 @@ if(Ca65_FOUND)
             # WP74 Increment 6: $3000 -> $3100 -- STRING diagnostics and
             # token names overflowed the shared diagnostics consumer by 89
             # measured bytes; $3100 is the smallest page-aligned fit.
-            set(TEST_PRG_SIZE "3100")
+            # WP82 Increment 1: diagnostics.s's new dispatch range-check and
+            # message table for .INCBIN overflowed $3100 by 109 measured
+            # bytes; $3200 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "3200")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -942,7 +962,19 @@ if(Ca65_FOUND)
             # this harness's own existing fixtures) overflowed $5E00 by 193
             # measured bytes; $5F00 (+256) is the smallest round-page fit.
             # User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "5F00")
+            # WP82 Increment 1: diagnostics.s's new dispatch range-check and
+            # message table for .INCBIN (unused by this harness) overflowed
+            # $5F00 by 72 measured bytes; $6000 (+256) is the smallest
+            # round-page fit. User-approved 2026-08-21.
+            # WP82 Increment 3: lexer.s's new lexerScanIncbinOperand (unused
+            # by this harness's own existing fixtures) overflowed $6000 by
+            # 158 measured bytes; $6100 (+256) is the smallest round-page
+            # fit. User-approved 2026-08-21.
+            # WP82 Increment 5: emit.s's new emitIncbin (unused by this
+            # harness's own existing fixtures) overflowed $6100 by 27
+            # measured bytes; $6200 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "6200")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -1017,7 +1049,19 @@ if(Ca65_FOUND)
             # mechanical cap bump used everywhere else in this plan.
             # Measured overflow at $5100 was 924 bytes; $5B00 (+2560) is the
             # smallest round-page fit. User-approved 2026-08-15.
-            set(TEST_PRG_SIZE "5B00")
+            # WP82 Increment 1: diagnostics.s's new dispatch range-check and
+            # message table for .INCBIN (unused by this harness) overflowed
+            # $5B00 by 86 measured bytes; $5C00 (+256) is the smallest
+            # round-page fit. User-approved 2026-08-21.
+            # WP82 Increment 3: lexer.s's new lexerScanIncbinOperand (unused
+            # by this harness's own width/agreement-only coverage)
+            # overflowed $5C00 by 172 measured bytes; $5D00 (+256) is the
+            # smallest round-page fit. User-approved 2026-08-21.
+            # WP82 Increment 5: emit.s's new emitIncbin (unused by this
+            # harness's own width/agreement-only coverage) overflowed $5D00
+            # by 41 measured bytes; $5E00 (+256) is the smallest round-page
+            # fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "5E00")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1042,7 +1086,11 @@ if(Ca65_FOUND)
             # unused by this harness's own include-focused coverage)
             # overflowed $1500 by 50 measured bytes; $1600 (+256) is the
             # smallest round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "1600")
+            # WP82 Increment 3: lexer.s's new lexerScanIncbinOperand
+            # overflowed $1600 by 300 measured bytes; $1700 (+256) would
+            # still overflow, so $1800 (+512) is the smallest round-page
+            # fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "1800")
         endif()
         if(TEST_NAME STREQUAL "casm_catalog")
             # WP45: include.s plus every module sourceAppendFile transitively
@@ -1182,7 +1230,12 @@ if(Ca65_FOUND)
             # overflowed $5D00 by 313 measured bytes; $5E00 (+256) would
             # still overflow, so $5F00 (+512) is the smallest round-page
             # fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "5F00")
+            # WP82 Increment 3: lexer.s's new lexerScanIncbinOperand (linked
+            # whole, unused by this harness's own real-path frame coverage)
+            # overflowed $5F00 by 278 measured bytes; $6000 (+256) would
+            # still overflow, so $6100 (+512) is the smallest round-page
+            # fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "6100")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1283,7 +1336,19 @@ if(Ca65_FOUND)
             # whole, unused by this harness's own real-path listing-capture
             # coverage) overflowed $6200 by 237 measured bytes; $6300 (+256)
             # is the smallest round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "6300")
+            # WP82 Increment 1: diagnostics.s's new dispatch range-check and
+            # message table for .INCBIN (unused by this harness) overflowed
+            # $6300 by 116 measured bytes; $6400 (+256) is the smallest
+            # round-page fit. User-approved 2026-08-21.
+            # WP82 Increment 3: lexer.s's new lexerScanIncbinOperand (unused
+            # by this harness's own real-path listing-capture coverage)
+            # overflowed $6400 by 202 measured bytes; $6500 (+256) is the
+            # smallest round-page fit. User-approved 2026-08-21.
+            # WP82 Increment 5: emit.s's new emitIncbin (unused by this
+            # harness's own real-path listing-capture coverage) overflowed
+            # $6500 by 71 measured bytes; $6600 (+256) is the smallest
+            # round-page fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "6600")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -1692,7 +1757,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmfa2p
     casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
     casmfwdstale1 casmchain1
-    casmres1 casmfill1 casmalign1)
+    casmres1 casmfill1 casmalign1 casmincbin1)
 set(CASM_REF_BINS "")
 foreach(REF_NAME IN LISTS CASM_REF_NAMES)
     set(REF_MANIFEST "${CASM_REF_MANIFEST_DIR}/${REF_NAME}.ref.hex")
@@ -2298,6 +2363,42 @@ add_custom_command(
     VERBATIM
 )
 
+# WP82: .INCBIN production fixtures -- one accepted case (a real 4-byte
+# binary asset, COMP-verified against a hand-derived .ref.hex) plus two
+# rejected-form cases proving this WP's new diagnostics.
+add_custom_command(
+    TARGET casm_phase13_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmincbin1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmincbin1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    # cc1541 -f encodes a lowercase-typed argument as unshifted PETSCII
+    # (numerically identical to uppercase ASCII, e.g. 'c' -> $43) but an
+    # uppercase-typed argument as shifted/bit-7-set PETSCII ('C' -> $C3) --
+    # confirmed live via cc1541 -a's own reconstruction of a first, failed
+    # attempt that passed "CASMINCBIN1.DAT" (uppercase) here, which does
+    # NOT match the plain ASCII bytes CASM's own .INCBIN source text
+    # contains and made even Command64's TYPE command unable to find the
+    # file. -f must be given lowercase so its unshifted-PETSCII encoding
+    # matches the uppercase ASCII text in casmincbin1.seq's own quoted
+    # filename -- same established pairing as this project's existing
+    # .INCLUDE fixtures (CASMFRC1/CASMFRC2 in source text, "casmfrc1"/
+    # "casmfrc2" lowercase as their own -f arguments).
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmincbin1.dat" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/tests/fixtures/casm/casmincbin1.dat"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmincbin1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmincbin1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmincbinmiss.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmincbinmiss.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmincbinbadname.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmincbinbadname.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending WP82 .INCBIN fixtures and trusted reference to casm_phase13_test.d64"
+    VERBATIM
+)
+
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source
@@ -2743,7 +2844,8 @@ foreach(REF_NAME IN LISTS CASM_REF_NAMES)
        AND NOT REF_NAME STREQUAL "casmarith2" AND NOT REF_NAME STREQUAL "casmarithfwd" AND NOT REF_NAME STREQUAL "casmarith3"
        AND NOT REF_NAME STREQUAL "casmchar1" AND NOT REF_NAME STREQUAL "casmstring1" AND NOT REF_NAME STREQUAL "casmrelacc" AND NOT REF_NAME STREQUAL "casmzpconst1"
        AND NOT REF_NAME STREQUAL "casmfwdstale1" AND NOT REF_NAME STREQUAL "casmchain1"
-       AND NOT REF_NAME STREQUAL "casmres1" AND NOT REF_NAME STREQUAL "casmfill1" AND NOT REF_NAME STREQUAL "casmalign1")
+       AND NOT REF_NAME STREQUAL "casmres1" AND NOT REF_NAME STREQUAL "casmfill1" AND NOT REF_NAME STREQUAL "casmalign1"
+       AND NOT REF_NAME STREQUAL "casmincbin1")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)
             set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"

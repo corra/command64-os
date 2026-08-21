@@ -34,6 +34,8 @@
 .import CasmTokenText
 .import CasmIncludeFilename
 .import CasmIncludeFilenameLen
+.import CasmIncbinFilename
+.import CasmIncbinFilenameLen
 
 ; Source layer: the byte stream and the just-delivered byte's own true
 ; provenance (WP46 fix -- captured by sourceFetchPhysical itself, after any
@@ -57,6 +59,7 @@
 .export lexerNext
 .export lexerGetToken
 .export lexerScanIncludeOperand
+.export lexerScanIncbinOperand
 .export CasmTokenStartOffsetLo
 .export CasmTokenStartOffsetHi
 .export CasmStringLength
@@ -525,6 +528,184 @@ lsioFailWithA:
     rts
 
 ; ---------------------------------------------------------------------------
+; lexerScanIncbinOperand (WP82)
+; Scan the quoted filename following an already-consumed .INCBIN directive.
+; Byte-for-byte the same grammar as lexerScanIncludeOperand above (leading
+; whitespace, opening quote, printable-PETSCII payload, closing quote,
+; trailing whitespace/comment, NEWLINE/EOF) -- kept as its own routine
+; rather than a call into lexerScanIncludeOperand so a malformed .INCBIN
+; operand reports its own diagnostic identity, not an .INCLUDE-branded one
+; (this WP's own Scoping Decision 1, user-confirmed 2026-08-21).
+;
+; Inputs:    lexer READY; lookahead points at, or can fetch, the first source
+;            result after the .INCBIN token
+; Outputs:   success: 1..63 original PETSCII bytes plus null in
+;                     CasmIncbinFilename, length committed, A =
+;                     CASM_DIAG_NONE, C clear
+;            failure: lexer ERROR, A = incbin grammar diagnostic or
+;                     CASM_DIAG_EXPECTED_NEWLINE, C set; operand invalid
+; Preserves: token record, balanced stack, resources and pass/emitter state
+; Clobbers:  A, X, Y, flags, CasmLexerScratch0/1, lookahead, source volatile
+;            state, CasmIncbinFilename/CasmIncbinFilenameLen
+; ---------------------------------------------------------------------------
+lexerScanIncbinOperand:
+    lda #0
+    sta CasmLexerScratch0       ; working payload length; commit only on success
+    sta CasmIncbinFilenameLen
+
+lsibLeading:
+    jsr lexerFill
+    bcc :+
+    jmp lsibPropagatedFail
+:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    beq :+
+    jmp lsibExpectedPos
+:
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_SPACE
+    beq lsibConsumeLeading
+    cmp #CASM_PETSCII_TAB
+    beq lsibConsumeLeading
+    cmp #CASM_PETSCII_QUOTE
+    beq :+
+    jmp lsibExpectedByte
+:
+
+    ; Preserve the opening quote's exact location for empty and unterminated
+    ; operands before consuming it and advancing the live source cursor.
+    jsr diagSetLocFromLookahead
+    jsr lexerConsume
+
+lsibPayload:
+    jsr lexerFill
+    bcc :+
+    jmp lsibPropagatedFail
+:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    beq :+
+    jmp lsibInvalidAtOpening
+:
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_QUOTE
+    beq lsibClose
+
+    ; Printable raw PETSCII is $20-$7E or $A0-$FE. Quote was handled above as
+    ; the delimiter; controls, $7F-$9F, and $FF fail at the offending byte.
+    cmp #CASM_INCLUDE_PRINT_LO_MIN
+    bcs :+
+    jmp lsibInvalidByte
+:
+    cmp #CASM_INCLUDE_PRINT_LO_MAX + 1
+    bcc lsibAppend
+    cmp #CASM_INCLUDE_PRINT_HI_MIN
+    bcs :+
+    jmp lsibInvalidByte
+:
+    cmp #CASM_INCLUDE_PRINT_HI_MAX + 1
+    bcs lsibInvalidByte
+
+lsibAppend:
+    ldx CasmLexerScratch0
+    cpx #CASM_INCLUDE_FILENAME_MAX
+    bcc :+
+    jmp lsibTooLong
+:
+    sta CasmIncbinFilename, x
+    inc CasmLexerScratch0
+    jsr lexerConsume
+    jmp lsibPayload
+
+lsibClose:
+    lda CasmLexerScratch0
+    beq lsibInvalidAtOpening
+    jsr lexerConsume
+
+lsibTrailing:
+    jsr lexerFill
+    bcs lsibPropagatedFail
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    bne lsibSuccess
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_SPACE
+    beq lsibConsumeTrailing
+    cmp #CASM_PETSCII_TAB
+    beq lsibConsumeTrailing
+    cmp #CASM_PETSCII_SEMICOLON
+    beq lsibCommentStart
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_EXPECTED_NEWLINE
+    jmp lsibFailWithA
+
+lsibConsumeLeading:
+    jsr lexerConsume
+    jmp lsibLeading
+
+lsibConsumeTrailing:
+    jsr lexerConsume
+    jmp lsibTrailing
+
+lsibCommentStart:
+    jsr lexerConsume
+lsibComment:
+    jsr lexerFill
+    bcs lsibPropagatedFail
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_BYTE
+    bne lsibSuccess
+    jsr lexerConsume
+    jmp lsibComment
+
+lsibSuccess:
+    ldx CasmLexerScratch0
+    lda #0
+    sta CasmIncbinFilename, x
+    stx CasmIncbinFilenameLen
+    lda #CASM_DIAG_NONE
+    clc
+    rts
+
+lsibExpectedPos:
+    jsr diagSetLocFromLookaheadPos
+    lda #CASM_DIAG_INCBIN_FILENAME_EXPECTED
+    jmp lsibFailWithA
+
+lsibExpectedByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INCBIN_FILENAME_EXPECTED
+    jmp lsibFailWithA
+
+lsibInvalidByte:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INVALID_INCBIN_FILENAME
+    jmp lsibFailWithA
+
+lsibInvalidAtOpening:
+    lda #CASM_DIAG_INVALID_INCBIN_FILENAME
+    jmp lsibFailWithA
+
+lsibTooLong:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INCBIN_FILENAME_TOO_LONG
+    jmp lsibFailWithA
+
+lsibPropagatedFail:
+    ; lexerFill already latched lexer ERROR and returned the source diagnostic.
+    sec
+    rts
+
+lsibFailWithA:
+    pha
+    lda #CASM_LEXER_STATE_ERROR
+    sta CasmLexerState
+    pla
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
 ; lexerFill (private)
 ; Ensure the one-result lookahead is valid. Provenance is captured AFTER the
 ; fetch, from sourceFetchPhysical's own CasmSourceResultFileId/LineLo/Hi/
@@ -781,6 +962,14 @@ lnDirective:
     ldx #CASM_DIRECTIVE_ALIGN
     jmp lexerEmitWithSubtype
 @notAlign:
+    ldx #<dirIncbinStr
+    ldy #>dirIncbinStr
+    jsr compareTokenText
+    bcs @notIncbin
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_INCBIN
+    jmp lexerEmitWithSubtype
+@notIncbin:
     lda #CASM_TOKEN_DIRECTIVE
     ldx #CASM_DIRECTIVE_UNKNOWN
     jmp lexerEmitWithSubtype
@@ -1352,6 +1541,7 @@ dirRelocStr:    .byte ".RELOC", 0
 dirResStr:      .byte ".RES", 0
 dirFillStr:     .byte ".FILL", 0
 dirAlignStr:    .byte ".ALIGN", 0
+dirIncbinStr:   .byte ".INCBIN", 0
 
 mnemonicTable:
     .byte "ADC", "AND", "ASL", "BCC", "BCS", "BEQ", "BIT", "BMI"

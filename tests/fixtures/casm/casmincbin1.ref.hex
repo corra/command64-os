@@ -1,0 +1,34 @@
+# CASM Phase 13 WP82 trusted reference: casmincbin1
+#
+# Independently hand-assembled from the casmincbin1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves
+# .INCBIN streams a real binary asset's bytes verbatim through the real
+# production parser/emitter (parser.s's ppsIncbin, emit.s's emitIncbin).
+#
+# Source (.ORG $C000, fixed address):
+#   .ORG $C000
+#   .INCBIN "CASMINCBIN1.DAT"
+#
+# Filename is uppercase in source text (plain ASCII bytes $43 $41 $53...).
+# cc1541 -f encodes a lowercase-typed argument as unshifted PETSCII
+# (numerically identical to uppercase ASCII) but an uppercase-typed
+# argument as shifted/bit-7-set PETSCII -- confirmed live via cc1541 -a's
+# own reconstruction of a first, failed attempt. CMakeLists.txt's own
+# packaging command therefore passes -f "casmincbin1.dat" (lowercase) to
+# get the byte-matching unshifted encoding, same established pairing as
+# this project's existing .INCLUDE fixtures (CASMFRC1/CASMFRC2 in source
+# text, "casmfrc1"/"casmfrc2" lowercase as their own -f arguments).
+#
+# tests/fixtures/casm/casmincbin1.dat is a real 4-byte binary asset, bytes
+# DE AD BE EF (independently verified: xxd tests/fixtures/casm/
+# casmincbin1.dat), packaged onto casm_phase13_test_d64 under a directory
+# name that is byte-identical to this source's own quoted filename string.
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   DE AD BE EF  .INCBIN "CASMINCBIN1.DAT" (verbatim file contents)
+#
+# bytes: 6
+
+00 C0
+DE AD BE EF

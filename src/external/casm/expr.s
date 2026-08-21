@@ -1415,8 +1415,10 @@ CasmExprTempExt:  .res 1
 ; worked, since expr.o links before source.o/state.o and its own BSS
 ; offset is fixed by everything before *it*, not after. WP54's listing.s
 ; fix grew CODE again and retripped the same assert for
-; TEST_CASM_PASSCHECK specifically; re-tuned from 1 to 2 bytes.
-CasmExprResolverAddrPad: .res 2
+; TEST_CASM_PASSCHECK specifically; re-tuned from 1 to 2 bytes. WP82's
+; lexerScanIncbinOperand (lexer.s) grew CODE again and retripped the same
+; assert for TEST_CASM_PASS1; re-tuned from 2 to 3 bytes.
+CasmExprResolverAddrPad: .res 3
 CasmExprResolverAddrLo: .res 1
 CasmExprResolverAddrHi: .res 1
 CasmExprResolverOutput: .res CASM_RESOLVE_SIZE

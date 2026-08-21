@@ -145,13 +145,29 @@ diagPrintFatal:
     cmp #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
     bcc dpfSymbolRange
     cmp #CASM_DIAG_PHASE13_WP81_LAST + 1
-    bcs dpfSymbolRange
+    bcs dpfWp82Check
     sec
     sbc #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
     tax
     lda diagWp81MessageLo, x
     pha
     lda diagWp81MessageHi, x
+    tay
+    pla
+    tax
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfWp82Check:
+    cmp #CASM_DIAG_INCBIN_FILENAME_EXPECTED
+    bcc dpfSymbolRange
+    cmp #CASM_DIAG_PHASE13_WP82_LAST + 1
+    bcs dpfSymbolRange
+    sec
+    sbc #CASM_DIAG_INCBIN_FILENAME_EXPECTED
+    tax
+    lda diagWp82MessageLo, x
+    pha
+    lda diagWp82MessageHi, x
     tay
     pla
     tax
@@ -1420,6 +1436,23 @@ diagWp81MessageHiEnd:
 .assert diagWp81MessageLoEnd - diagWp81MessageLo = CASM_DIAG_PHASE13_WP81_LAST - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostic low table is incomplete"
 .assert diagWp81MessageHiEnd - diagWp81MessageHi = CASM_DIAG_PHASE13_WP81_LAST - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostic high table is incomplete"
 
+; WP82: .INCBIN's own small parallel table, indexed by
+; (A - CASM_DIAG_INCBIN_FILENAME_EXPECTED) -- same branch-range-avoidance
+; precedent as diagWp81MessageLo/Hi immediately above.
+diagWp82MessageLo:
+    .byte <msgIncbinFilenameExpected
+    .byte <msgInvalidIncbinFilename
+    .byte <msgIncbinFilenameTooLong
+diagWp82MessageLoEnd:
+diagWp82MessageHi:
+    .byte >msgIncbinFilenameExpected
+    .byte >msgInvalidIncbinFilename
+    .byte >msgIncbinFilenameTooLong
+diagWp82MessageHiEnd:
+
+.assert diagWp82MessageLoEnd - diagWp82MessageLo = CASM_DIAG_PHASE13_WP82_LAST - CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostic low table is incomplete"
+.assert diagWp82MessageHiEnd - diagWp82MessageHi = CASM_DIAG_PHASE13_WP82_LAST - CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostic high table is incomplete"
+
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
 msgRegistryFull:
@@ -1576,6 +1609,13 @@ msgValueOutOfRange:
     .byte "CASM: VALUE OUT OF RANGE", PetCr, 0
 msgAlignBoundaryZero:
     .byte "CASM: ALIGN BOUNDARY ZERO", PetCr, 0
+; WP82: .INCBIN filename-grammar diagnostics.
+msgIncbinFilenameExpected:
+    .byte "CASM: INCBIN FILENAME EXPECTED", PetCr, 0
+msgInvalidIncbinFilename:
+    .byte "CASM: INVALID INCBIN FILENAME", PetCr, 0
+msgIncbinFilenameTooLong:
+    .byte "CASM: INCBIN FILENAME TOO LONG", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.

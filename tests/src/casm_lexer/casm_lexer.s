@@ -51,6 +51,8 @@
 .export CasmTokenText
 .export CasmIncludeFilename
 .export CasmIncludeFilenameLen
+.export CasmIncbinFilename
+.export CasmIncbinFilenameLen
 .export CasmDiagCapture
 .export CasmSourceResultByte
 .export CasmSourceResultFileId
@@ -86,6 +88,8 @@ CasmTokenRecord:      .res CASM_TOKEN_REC_SIZE
 CasmTokenText:        .res CASM_TOKEN_TEXT_BUFFER_SIZE
 CasmIncludeFilename:      .res CASM_INCLUDE_FILENAME_BUFFER_SIZE
 CasmIncludeFilenameLen:   .res 1
+CasmIncbinFilename:       .res CASM_INCLUDE_FILENAME_BUFFER_SIZE
+CasmIncbinFilenameLen:    .res 1
 CasmDiagCapture:      .res 1
 CasmSourceResultByte:    .res 1
 CasmSourceResultFileId:  .res 1

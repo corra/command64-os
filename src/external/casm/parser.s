@@ -18,6 +18,7 @@
 
 .import lexerNext
 .import lexerScanIncludeOperand
+.import lexerScanIncbinOperand
 .import CasmTokenRecord
 .import CasmTokenText
 .import CasmTokenStartOffsetLo
@@ -51,6 +52,8 @@
 .export CasmLabelNameLen
 .export CasmIncludeFilename
 .export CasmIncludeFilenameLen
+.export CasmIncbinFilename
+.export CasmIncbinFilenameLen
 .export CasmConstantResolved
 .export CasmConstantValueLo
 .export CasmConstantValueHi
@@ -138,6 +141,17 @@ CasmIncludeFilenameEnd:
 
 .assert CasmIncludeFilenameLen - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE, error, "CASM include filename buffer layout changed"
 .assert CasmIncludeFilenameEnd - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM include filename state must be exactly 65 bytes"
+
+; WP82: .INCBIN's own filename state, mirroring CasmIncludeFilename/Len's
+; own precedent exactly (same 65-byte shape, same buffer size constant --
+; the grammar is byte-identical, only the diagnostic identity differs,
+; per this WP's own Scoping Decision 1).
+CasmIncbinFilename:    .res CASM_INCLUDE_FILENAME_BUFFER_SIZE
+CasmIncbinFilenameLen: .res 1
+CasmIncbinFilenameEnd:
+
+.assert CasmIncbinFilenameLen - CasmIncbinFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE, error, "CASM incbin filename buffer layout changed"
+.assert CasmIncbinFilenameEnd - CasmIncbinFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM incbin filename state must be exactly 65 bytes"
 
 ; WP81: ppsFillDirective's own staged output for emit.s's emitRes/emitFill/
 ; emitAlign, mirroring CasmLabelName/CasmConstant*'s precedent of dedicated
@@ -236,10 +250,14 @@ ppsMnemonic:
     beq ppsFillDirectiveDispatch
     cmp #CASM_DIRECTIVE_ALIGN
     beq ppsFillDirectiveDispatch
+    cmp #CASM_DIRECTIVE_INCBIN
+    beq ppsIncbinDispatch
 ppsGrammar:
     jmp parseOperandSequence
 ppsFillDirectiveDispatch:
     jmp ppsFillDirective
+ppsIncbinDispatch:
+    jmp ppsIncbin
 ppsDeferOperands:
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
@@ -252,6 +270,31 @@ ppsInclude:
     ; leaving NEWLINE/EOF buffered. Include semantics remain the pass driver's
     ; responsibility; this parser path performs no file or emitter operation.
     jsr lexerScanIncludeOperand
+    bcs ppsFail
+    lda #CASM_OPKIND_IMPLIED
+    sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
+    lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; ppsIncbin (WP82)
+; Parse .INCBIN's quoted-filename operand via the dedicated
+; lexerScanIncbinOperand (own diagnostic identity, Scoping Decision 1).
+; Performs no file I/O itself -- that is emit.s's emitIncbin's job, same
+; separation ppsInclude keeps from the real include semantics.
+;
+; Inputs:    current token is the .INCBIN DIRECTIVE, just classified by
+;            ppsMnemonic
+; Outputs:   success: C clear, A = CasmParserStmt.Type, CasmIncbinFilename/
+;                     Len populated, terminator consumed
+;            failure: C set, A = CASM_DIAG_INCBIN_FILENAME_EXPECTED/
+;                     CASM_DIAG_INVALID_INCBIN_FILENAME/
+;                     CASM_DIAG_INCBIN_FILENAME_TOO_LONG/
+;                     CASM_DIAG_EXPECTED_NEWLINE
+; ---------------------------------------------------------------------------
+ppsIncbin:
+    jsr lexerScanIncbinOperand
     bcs ppsFail
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND

@@ -39,6 +39,15 @@
 .import CasmFillCountHi
 .import CasmFillValue
 
+; WP82: .INCBIN's filename, staged by parser.s's ppsIncbin, plus the
+; managed input-stream wrappers (fileio.s) and the shared 256-byte I/O
+; buffer they stream through.
+.import CasmIncbinFilename
+.import inputStreamOpen
+.import inputStreamRead
+.import inputStreamClose
+.import CasmIoBuffer
+
 ; WP15 diagnostic context. Statement-level failures use the stamped statement
 ; location; failures inside a .BYTE/.WORD operand list use the token record,
 ; which still points at the offending value.
@@ -100,6 +109,13 @@ CasmAlignDividendHi: .res 1
 CasmAlignRemLo:      .res 1
 CasmAlignRemHi:      .res 1
 CasmAlignRemExt:      .res 1
+
+; WP82: emitIncbin's own per-chunk remaining-byte counter (16-bit; a full
+; CasmIoBuffer chunk is up to 256 bytes, so CasmIncbinRemHi can be 0 or 1)
+; and buffer read index.
+CasmIncbinRemLo: .res 1
+CasmIncbinRemHi: .res 1
+CasmIncbinIdx:   .res 1
 
 .segment "CODE"
 
@@ -345,6 +361,8 @@ emitDirective:
     beq edFill
     cmp #CASM_DIRECTIVE_ALIGN
     beq edAlign
+    cmp #CASM_DIRECTIVE_INCBIN
+    beq edIncbin
     cmp #CASM_DIRECTIVE_UNKNOWN
     beq edSyntax
     cmp #CASM_DIRECTIVE_INCLUDE
@@ -359,6 +377,8 @@ edFill:
     jmp emitFill
 edAlign:
     jmp emitAlign
+edIncbin:
+    jmp emitIncbin
 edInternal:
     ; Includes alter the token source and are owned by casmRunPass. Reaching
     ; the emitter indicates an internal dispatch error, not unsupported syntax.
@@ -711,6 +731,73 @@ eflDec:
 eflDone:
     clc
 eflRet:
+    rts
+
+; ---------------------------------------------------------------------------
+; emitIncbin (WP82)
+; Stream CasmIncbinFilename's entire contents through emitByte, verbatim,
+; starting at the current CasmPc. Opens/reads/closes the file transiently
+; every pass (CasmInputState is guaranteed CLOSED whenever a statement is
+; being parsed/emitted -- sourceLoad has already closed the main source by
+; the time any statement runs, WP82 plan's own Research Summary point 3),
+; relying on emitByte's existing CasmPassMode gate for Pass 1's discard-but-
+; advance behavior (same minimalism as emitFillLoop, no separate measure-
+; only path) and on the existing whole-assembly emitCheckPassAgreement for
+; Pass1/Pass2 length agreement (Scoping Decision 2, user-confirmed
+; 2026-08-21 -- no dedicated per-occurrence check).
+; Outputs: C clear on success; C set with A = CASM_DIAG_* on failure
+; ---------------------------------------------------------------------------
+emitIncbin:
+    jsr emitMarkStarted
+    bcs eibRet
+    ldx #<CasmIncbinFilename
+    ldy #>CasmIncbinFilename
+    jsr inputStreamOpen
+    bcs eibRet
+eibReadLoop:
+    jsr inputStreamRead
+    bcs eibReadFail
+    cmp #CASM_STREAM_EOF
+    beq eibEof
+    lda CasmIoLenLo
+    sta CasmIncbinRemLo
+    lda CasmIoLenHi
+    sta CasmIncbinRemHi
+    lda #0
+    sta CasmIncbinIdx
+eibByteLoop:
+    lda CasmIncbinRemLo
+    ora CasmIncbinRemHi
+    beq eibReadLoop             ; chunk exhausted -- read the next one
+    ldx CasmIncbinIdx
+    lda CasmIoBuffer, x
+    jsr emitByte
+    bcs eibEmitFail
+    inc CasmIncbinIdx
+    lda CasmIncbinRemLo
+    bne eibDec
+    dec CasmIncbinRemHi
+eibDec:
+    dec CasmIncbinRemLo
+    jmp eibByteLoop
+eibEof:
+    jmp inputStreamClose        ; C/A = its own NONE/CLOSE_FAILED result
+eibReadFail:
+    ; A/C already hold inputStreamRead's own diagnostic. Best-effort close
+    ; without disturbing it -- a failed close here is not the reported cause.
+    pha
+    jsr inputStreamClose
+    pla
+    sec
+    rts
+eibEmitFail:
+    ; Same precedent as eibReadFail -- emitByte's own diagnostic wins.
+    pha
+    jsr inputStreamClose
+    pla
+    sec
+    rts
+eibRet:
     rts
 
 ; ---------------------------------------------------------------------------

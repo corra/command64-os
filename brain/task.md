@@ -3645,3 +3645,22 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       (`test_casm_event` -> `casm_include_test_d64`). Full detail:
       `brain/plans/2026-08-21-casm-phase13-wp81-res-fill-align.md`,
       `brain/walkthroughs/2026-08-21-casm-phase13-wp81-res-fill-align.md`.
+- [x] WP82 Taskwarrior task 44: complete, live VICE-verified and
+      user-approved 2026-08-21. `.INCBIN "filename"` implemented in
+      `lexer.s` (new `lexerScanIncbinOperand`, mirroring
+      `lexerScanIncludeOperand`), `parser.s` (new `ppsIncbin`, mirroring
+      `ppsInclude`), and `emit.s` (new `emitIncbin`, streaming through the
+      existing managed `inputStreamOpen`/`Read`/`Close` wrappers and
+      `emitByte` -- no catalog/VMM machinery needed unlike `.INCLUDE`).
+      Found and fixed two real defects: a recurring `jmp (abs)`
+      page-boundary hazard in `expr.s` (third occurrence, widened
+      `CasmExprResolverAddrPad` 2->3 bytes), and a `cc1541 -f`
+      filename-encoding mismatch (uppercase-typed argument -> bit-7-set
+      PETSCII, lowercase-typed -> unshifted PETSCII) that explains why
+      this project's existing `.INCLUDE` fixtures already pair uppercase
+      source text with lowercase `-f` packaging arguments. One accepted
+      fixture (COMP-verified against a real binary asset) plus two
+      rejected diagnostics fixtures, all live-verified. Regression
+      witnesses clean. Fifteen envelope bumps. Full detail:
+      `brain/plans/2026-08-21-casm-phase13-wp82-incbin.md`,
+      `brain/walkthroughs/2026-08-21-casm-phase13-wp82-incbin.md`.

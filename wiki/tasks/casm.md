@@ -19,8 +19,8 @@ walkthrough: `brain/walkthroughs/2026-08-20-casm-phase12-wp75-
 verification-walkthrough-completion-gate.md`.
 
 **Phase 13 (Data Construction Directives) is underway.** WP81
-(`.RES`/`.FILL`/`.ALIGN`) is complete, user-approved 2026-08-21. WP82-85
-remain open. See the Phase 13 section below.
+(`.RES`/`.FILL`/`.ALIGN`) and WP82 (`.INCBIN`) are complete, user-approved
+2026-08-21. WP83-85 remain open. See the Phase 13 section below.
 
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
@@ -111,7 +111,32 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       Plan: `brain/plans/2026-08-21-casm-phase13-wp81-res-fill-align.md`.
       Walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp81-res-
       fill-align.md`.
-- [ ] WP82 **`.INCBIN`** -- not yet started.
+- [x] WP82 **`.INCBIN` complete, user-approved 2026-08-21** (Taskwarrior
+      44). New `CASM_DIRECTIVE_INCBIN` ($0A) and three filename-grammar
+      diagnostics ($4F-$51, own identity per Scoping Decision 1, not a
+      reuse of `.INCLUDE`'s). `lexer.s`'s new `lexerScanIncbinOperand`
+      mirrors `lexerScanIncludeOperand`'s structure exactly; `parser.s`'s
+      new `ppsIncbin` mirrors `ppsInclude`'s thin shape; `emit.s`'s new
+      `emitIncbin` streams the file through the existing managed
+      `inputStreamOpen`/`Read`/`Close` wrappers and `emitByte` (no
+      catalog/VMM machinery needed, unlike `.INCLUDE` -- Scoping Decision
+      2: relies on the existing whole-assembly `emitCheckPassAgreement`
+      for Pass1/Pass2 length agreement, no dedicated per-occurrence
+      check). Found and fixed two real defects: a recurring `jmp (abs)`
+      page-boundary hazard in `expr.s` (third occurrence, widened
+      `CasmExprResolverAddrPad` 2->3 bytes), and a `cc1541 -f`
+      filename-encoding mismatch (uppercase-typed argument encodes as
+      bit-7-set PETSCII, lowercase-typed as unshifted -- explains, for
+      the first time in this project's own history, why existing
+      `.INCLUDE` fixtures already pair uppercase source text with
+      lowercase `-f` packaging arguments). One accepted production
+      fixture (COMP-verified against a real 4-byte binary asset) plus two
+      rejected diagnostics fixtures, all live-verified. Regression
+      witnesses (`test_casm_expr`/`test_casm_pass1`/`test_casm_frame`)
+      confirmed clean. Fifteen envelope bumps across `casm` and six test
+      harnesses. Plan:
+      `brain/plans/2026-08-21-casm-phase13-wp82-incbin.md`. Walkthrough:
+      `brain/walkthroughs/2026-08-21-casm-phase13-wp82-incbin.md`.
 - [ ] WP83 **`.ASSERT`** -- not yet started.
 - [ ] WP84 **DASH adoption** (`.RES`/`.FILL`/`.ASSERT` into real DASH
       source) -- not yet started.

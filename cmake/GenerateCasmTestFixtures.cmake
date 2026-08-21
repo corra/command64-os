@@ -1934,3 +1934,19 @@ file(WRITE "${OUTPUT_DIR}/casmalignzero.seq"
 file(WRITE "${OUTPUT_DIR}/casmresrange.seq"
     ".FILL 1,256\n"
 )
+
+# WP82: .INCBIN production fixtures. casmincbin1 includes a real 4-byte
+# binary asset (tests/fixtures/casm/casmincbin1.dat, packaged onto
+# casm_phase13_test_d64 as "casmincbin1.dat" -- see CMakeLists.txt), COMP-
+# verified against a hand-derived casmincbin1.ref.hex. The other two are
+# rejected-form cases (missing file, malformed filename operand), no .ref.
+file(WRITE "${OUTPUT_DIR}/casmincbin1.seq"
+    ".ORG \$C000\n"
+    ".INCBIN \"CASMINCBIN1.DAT\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmincbinmiss.seq"
+    ".INCBIN \"nonexistent.dat\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmincbinbadname.seq"
+    ".INCBIN nofile\n"
+)
