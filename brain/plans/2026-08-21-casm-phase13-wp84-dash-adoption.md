@@ -298,5 +298,18 @@ DASH's own real source, not a CASM test fixture.
 - 2026-08-21: All three Scoping Decisions confirmed by the user: (1) bare
   `.RES count` on the all-zero sites, (2) remove the stale comments
   entirely, (3) bundle the `AGENTS.md` update into this WP. Plan approved.
-  Awaiting branch cut and Taskwarrior task creation before implementation
-  begins.
+  Branch `feature/casm-phase13-wp84` cut from `feature/casm-phase13`
+  (WP81/82/83 merged in). Taskwarrior task created (project
+  `casm.phase13`, `+wp84`).
+- 2026-08-21: Increment 1 (source conversion) complete. All five
+  `ddata.s` sites converted: `FMTBUF` -> `.RES 5`, `SYSINFOBUF` -> `.RES
+  24`, `APPBUF` -> `.RES 24`, `BORDERROW` -> `.BYTE $5B` / `.RES 38, $40`
+  / `.BYTE $5B`, `VMMBUFFER` -> `.RES 256`. **Correction to the plan's own
+  Research Summary**: on closer reading, only `VMMBUFFER`'s comment
+  actually explained the "CASM has no reserve directive" workaround
+  (trimmed per Decision 2); `FMTBUF`/`SYSINFOBUF`/`APPBUF`'s comments are
+  purely descriptive (what the buffer is for, not why it's a manual
+  zero-list) and were left untouched, not four stale comments as
+  originally assumed. `dash_ref` (ca65) builds clean against the edited
+  source — confirms the dual-assembler subset claim (Increment 3's own
+  check, done early as a cheap sanity confirmation of Increment 1).
