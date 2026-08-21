@@ -1969,3 +1969,9 @@ file(WRITE "${OUTPUT_DIR}/casmassert1.seq"
 file(WRITE "${OUTPUT_DIR}/casmassertfail.seq"
     ".ASSERT 0\n"
 )
+# WP83 Increment 6: a failing assertion with a user-supplied message,
+# live-verified that the custom text is actually echoed (not just the
+# generic CASM_DIAG_ASSERTION_FAILED text).
+file(WRITE "${OUTPUT_DIR}/casmassertmsg.seq"
+    ".ASSERT 0, \"CUSTOM MESSAGE\"\n"
+)

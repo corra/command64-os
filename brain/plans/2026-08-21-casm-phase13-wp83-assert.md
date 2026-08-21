@@ -534,3 +534,41 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   expr/pass1 runs — a fresh instance was started per the workflow's
   one-clean-restart allowance, Command64 reboot and regression re-run from
   scratch confirmed identical results.)
+- 2026-08-21: Increment 6 (message-echo diagnostic path) complete.
+  `diagnostics.s`'s `dpfWp83Check` gained a carve-out: `CASM_DIAG_
+  ASSERTION_FAILED` with `CasmAssertMessageLen != 0` prints a new
+  `msgAssertionFailedPrefix` ("CASM: ASSERTION FAILED: ", no trailing CR)
+  followed by `CasmAssertMessage` itself (now null-terminated by
+  `ppsAssert`'s copy loop) and a one-byte `msgCrOnly` line terminator,
+  before falling into the normal `diagPrintSourceContext` call — the
+  no-message case is unchanged, reusing the existing table-driven
+  generic path. No new "print a runtime buffer" primitive was needed:
+  `diagPrintString`/`DOS_PRINT_STR` already prints whatever null-terminated
+  buffer X/Y point at, whether a ROM literal or `CasmAssertMessage`'s RAM
+  contents.
+  Wiring this in tripped the *same* branch-range hazard as Increment 5's
+  own `dpfNotMain` fix (WP81's own comment already flags `diagPrintFatal`
+  as prone to this): `dpfNotMain`'s `bcc dpfListingRange` fell out of
+  range from the new carve-out's size; fixed with the same `bcs`/`jmp`
+  inversion, no logic change.
+  New fixture: `casmassertmsg.seq` (`.ASSERT 0, "CUSTOM MESSAGE"`),
+  packaged on `casm_phase13_test_d64`. Live-VICE confirmed the full output
+  line-by-line: `CASM: ASSERTION FAILED: custom message` (the echoed text
+  renders lowercase per this project's usual raw-PETSCII-source display
+  convention, matching every other runtime-read string in this codebase —
+  not a defect), then `AT LINE 1, COL 1 (OFFSET 0)`, then the caret-context
+  line `.assert 0, "custom message"` with the caret under column 1, then a
+  clean `c64[8]:>` return.
+  Two envelope bumps, user-approved: `casm` `$6B00`→`$6C00` (+256, 25-byte
+  overflow); `test_casm_listcap` `$6700`→`$6800` (+256, 25-byte overflow).
+  `test_casm_faultsource` and `test_casm_spanread` each needed a new
+  one-byte `CasmAssertMessage`/`CasmAssertMessageLen` stand-in pair (same
+  precedent as Increment 5's `test_casm_bounds`/`test_casm_directives`
+  stand-ins) — `diagnostics.s` links whole in both and its new import
+  pulled these in even though neither harness raises `.ASSERT`
+  diagnostics.
+  A full clean rebuild from scratch completed with zero errors, zero
+  overflows, zero unresolved externals; a subsequent no-op build re-ran
+  only the known non-idempotent disk-packaging steps. Regression witnesses
+  (`test_casm_frame`/`test_casm_expr`/`test_casm_pass1`) re-run live in
+  VICE against this final build, all PASS.

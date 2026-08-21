@@ -368,7 +368,11 @@ if(Ca65_FOUND)
     # CasmAssertMessage/Len staging fields overflowed $6A00 by 59 measured
     # bytes; $6B00 (+256) is the smallest round-page fit, 197 bytes
     # headroom. User-approved 2026-08-21.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6B00")
+    # WP83 Increment 6: diagnostics.s's message-echo dispatch (the
+    # CasmAssertMessage import plus the new prefix/CR message text)
+    # overflowed $6B00 by 25 measured bytes; $6C00 (+256) is the smallest
+    # round-page fit, 231 bytes headroom. User-approved 2026-08-21.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6C00")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -779,7 +783,10 @@ if(Ca65_FOUND)
             # message table for .INCBIN overflowed $3100 by 109 measured
             # bytes; $3200 (+256) is the smallest round-page fit.
             # User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "3200")
+            # WP83 Increment 6: diagnostics.s's message-echo dispatch
+            # overflowed $3200 by 45 measured bytes; $3300 (+256) is the
+            # smallest round-page fit. User-approved 2026-08-21.
+            set(TEST_PRG_SIZE "3300")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -1384,7 +1391,12 @@ if(Ca65_FOUND)
             # coverage) overflowed $6600 by 210 measured bytes; $6700
             # (+256) is the smallest round-page fit. User-approved
             # 2026-08-21.
-            set(TEST_PRG_SIZE "6700")
+            # WP83 Increment 6: diagnostics.s's message-echo dispatch
+            # (unused by this harness's own real-path listing-capture
+            # coverage) overflowed $6700 by 25 measured bytes; $6800
+            # (+256) is the smallest round-page fit. User-approved
+            # 2026-08-21.
+            set(TEST_PRG_SIZE "6800")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
@@ -2463,6 +2475,17 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmassertfail.seq"
         "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
     COMMENT "Appending WP83 .ASSERT fixtures and trusted reference to casm_phase13_test.d64"
+    VERBATIM
+)
+
+# WP83 Increment 6: message-echo fixture -- a failing assertion with a
+# user-supplied message, live-verified that the custom text is echoed.
+add_custom_command(
+    TARGET casm_phase13_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmassertmsg.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmassertmsg.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending WP83 Increment 6 .ASSERT message-echo fixture to casm_phase13_test.d64"
     VERBATIM
 )
 

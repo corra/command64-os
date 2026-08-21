@@ -540,11 +540,14 @@ ppsAssert:
     ldy #0
 @copyLoop:
     cpy CasmAssertMessageLen
-    beq @copyDone
+    beq @copyTerminate
     lda CasmStringBuffer, y
     sta CasmAssertMessage, y
     iny
     jmp @copyLoop
+@copyTerminate:
+    lda #0
+    sta CasmAssertMessage, y      ; null-terminate for diagPrintString (emit.s)
 @copyDone:
     jsr lexerNext                ; consume the STRING token, fetch terminator
     bcc @requireTerminator

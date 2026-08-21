@@ -61,6 +61,11 @@
 ; link. Same stand-in precedent as casm_listcap.s -- never written here, since
 ; no case in this file opens an output file.
 .export CasmOutputName
+; WP83 Increment 6: diagnostics.s links whole and its new message-echo
+; path imports parser.s's CasmAssertMessage/Len, unreachable here -- same
+; one-byte stand-in precedent as casm_faultsource.s.
+.export CasmAssertMessage
+.export CasmAssertMessageLen
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -951,3 +956,5 @@ RunCount:     .res 1
 CasmSourceNames: .res CASM_FILENAME_BUFFER_SIZE
 CasmSourceCount: .res 1
 CasmOutputName:  .res CASM_FILENAME_BUFFER_SIZE
+CasmAssertMessage: .res 1
+CasmAssertMessageLen: .res 1

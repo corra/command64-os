@@ -60,6 +60,11 @@
 .import CasmFrameSiteLineHi
 .import CasmFrameSiteColumn
 
+; WP83 Increment 6: .ASSERT's optional user-supplied message, echoed on a
+; failing assertion instead of the generic fixed text.
+.import CasmAssertMessage
+.import CasmAssertMessageLen
+
 .import CasmDiagLineBufA
 .import CasmDiagLineBufB
 .import CasmDiagLineSel
@@ -143,7 +148,9 @@ diagPrintFatal:
     jmp dpfMainRange
 dpfNotMain:
     cmp #CASM_DIAG_LISTING_SHORT_WRITE + 1
-    bcc dpfListingRange
+    bcs dpfNotListing
+    jmp dpfListingRange
+dpfNotListing:
     cmp #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
     bcc dpfSymbolRange
     cmp #CASM_DIAG_PHASE13_WP81_LAST + 1
@@ -180,6 +187,29 @@ dpfWp83Check:
     bcc dpfSymbolRange
     cmp #CASM_DIAG_PHASE13_WP83_LAST + 1
     bcs dpfSymbolRange
+    ; WP83 Increment 6: CASM_DIAG_ASSERTION_FAILED with a user-supplied
+    ; message (CasmAssertMessageLen != 0) echoes that message instead of
+    ; the generic table text below -- the only WP83 diagnostic with
+    ; per-occurrence dynamic content. cmp does not disturb A, so it still
+    ; holds the raw diagnostic identifier for the generic path's own
+    ; sbc #CASM_DIAG_ASSERT_UNRESOLVED index computation below.
+    cmp #CASM_DIAG_ASSERTION_FAILED
+    bne dpfWp83Generic
+    lda CasmAssertMessageLen
+    beq dpfWp83GenericReloadA
+    ldx #<msgAssertionFailedPrefix
+    ldy #>msgAssertionFailedPrefix
+    jsr diagPrintString
+    ldx #<CasmAssertMessage
+    ldy #>CasmAssertMessage
+    jsr diagPrintString
+    ldx #<msgCrOnly
+    ldy #>msgCrOnly
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+dpfWp83GenericReloadA:
+    lda #CASM_DIAG_ASSERTION_FAILED
+dpfWp83Generic:
     sec
     sbc #CASM_DIAG_ASSERT_UNRESOLVED
     tax
@@ -1660,6 +1690,13 @@ msgAssertMessageTooLong:
     .byte "CASM: ASSERT MESSAGE TOO LONG", PetCr, 0
 msgAssertionFailed:
     .byte "CASM: ASSERTION FAILED", PetCr, 0
+; WP83 Increment 6: printed immediately before the echoed CasmAssertMessage
+; text (no trailing CR -- the echoed message's own null terminator ends the
+; payload, and msgCrOnly below supplies the line break after it).
+msgAssertionFailedPrefix:
+    .byte "CASM: ASSERTION FAILED: ", 0
+msgCrOnly:
+    .byte PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.
