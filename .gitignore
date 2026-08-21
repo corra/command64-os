@@ -26,6 +26,11 @@ package-lock.json
 package.json
 node_modules/
 
-# Local tool state (Claude Code settings, MCP index cache)
-.claude/
+# Local tool state (Claude Code settings, MCP index cache). Skills are
+# agent-neutral-ish, checked-in tooling (see .claude/skills/*/SKILL.md's
+# own note that they're a thin, non-authoritative layer over agent-neutral
+# docs) and are tracked; settings.json/settings.local.json stay untracked
+# for now pending a pass to split trackable vs. local-only fields.
+.claude/*
+!.claude/skills/
 .codebase-memory.json
