@@ -20,7 +20,9 @@ verification-walkthrough-completion-gate.md`.
 
 **Phase 13 (Data Construction Directives) is underway.** WP81
 (`.RES`/`.FILL`/`.ALIGN`) and WP82 (`.INCBIN`) are complete, user-approved
-2026-08-21. WP83-85 remain open. See the Phase 13 section below.
+2026-08-21. WP83 (`.ASSERT`) is implemented and live-verified, awaiting
+user sign-off (`brain/walkthroughs/2026-08-21-casm-phase13-wp83-
+assert.md`). WP84-85 remain open. See the Phase 13 section below.
 
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
@@ -137,7 +139,33 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       harnesses. Plan:
       `brain/plans/2026-08-21-casm-phase13-wp82-incbin.md`. Walkthrough:
       `brain/walkthroughs/2026-08-21-casm-phase13-wp82-incbin.md`.
-- [ ] WP83 **`.ASSERT`** -- not yet started.
+- [x] WP83 **`.ASSERT` implemented and live-verified, awaiting user
+      sign-off** (Taskwarrior task, project `casm.phase13`, `+wp83`). New
+      `CASM_DIRECTIVE_ASSERT` ($0B) and three diagnostics ($52-$54).
+      `parser.s`'s new `ppsAssert` requires the expression to fully
+      resolve in both passes (strict, mirrors WP81's own `.RES`/`.FILL`/
+      `.ALIGN` precedent) and reuses the lexer's existing `lnString`/
+      `CASM_TOKEN_STRING` tokenizer (WP74) for the optional message --
+      no new dedicated scanner needed, a mid-implementation simplification
+      confirmed with the user. `emit.s`'s new `emitAssert` emits zero
+      bytes on success, diagnoses `CASM_DIAG_ASSERTION_FAILED` on a
+      zero/false expression; `diagnostics.s` echoes a user-supplied
+      message inline when one is given. **Found and corrected a real
+      error in this WP's own plan**: CASM's expression grammar has no
+      equality/comparison operator at all (verified against `expr.s`),
+      so `.ASSERT` can only test nonzero-arithmetic truthiness, not
+      equality/alignment invariants -- shipped as scoped, a real
+      comparison operator deferred as a separate follow-up (affects
+      WP84's real DASH target sites). Also found and fixed a recurring
+      `jmp (abs)` page-boundary hazard in `expr.s` (fourth occurrence,
+      widened `CasmExprResolverAddrPad` 3->4 bytes) and `diagPrintFatal`'s
+      own branch-range fragility (twice, same class WP81's own comment
+      already flags). Four production fixtures (one accepted, COMP-
+      verified zero-byte emission; three rejected diagnostics), all
+      live-verified. Regression witnesses (`test_casm_expr`/
+      `test_casm_pass1`/`test_casm_frame`) confirmed clean. Plan:
+      `brain/plans/2026-08-21-casm-phase13-wp83-assert.md`. Walkthrough:
+      `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
 - [ ] WP84 **DASH adoption** (`.RES`/`.FILL`/`.ASSERT` into real DASH
       source) -- not yet started.
 - [ ] WP85 **consolidated completion gate, version promotion to `0.4.0`**

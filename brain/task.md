@@ -3664,3 +3664,25 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       witnesses clean. Fifteen envelope bumps. Full detail:
       `brain/plans/2026-08-21-casm-phase13-wp82-incbin.md`,
       `brain/walkthroughs/2026-08-21-casm-phase13-wp82-incbin.md`.
+- [ ] WP83 (project `casm.phase13`, `+wp83`): implemented and live
+      VICE-verified 2026-08-21, awaiting user sign-off. `.ASSERT
+      expr[, "message"]` implemented in `parser.s` (new `ppsAssert`,
+      strict both-pass resolution) and `emit.s` (new `emitAssert`, zero
+      bytes emitted); `diagnostics.s` echoes a user-supplied message
+      inline on failure by printing straight from the runtime
+      `CasmAssertMessage` buffer (no new print primitive needed). Reuses
+      the existing `lnString`/`CASM_TOKEN_STRING` tokenizer for the
+      message operand rather than a dedicated scanner (a mid-
+      implementation simplification, user-confirmed). **Found and
+      corrected a real error in this WP's own plan**: CASM's expression
+      grammar has no equality/comparison operator at all (verified
+      against `expr.s`'s `parseOperatorTail`), so `.ASSERT` can only test
+      nonzero-arithmetic truthiness -- shipped as scoped, a real
+      comparison operator deferred as a separate follow-up. Also found
+      and fixed a recurring `jmp (abs)` page-boundary hazard in `expr.s`
+      (fourth occurrence, widened `CasmExprResolverAddrPad` 3->4 bytes)
+      and `diagPrintFatal`'s own branch-range fragility (twice). Four
+      production fixtures (one accepted COMP-verified, three rejected
+      diagnostics), all live-verified. Regression witnesses clean. Full
+      detail: `brain/plans/2026-08-21-casm-phase13-wp83-assert.md`,
+      `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.

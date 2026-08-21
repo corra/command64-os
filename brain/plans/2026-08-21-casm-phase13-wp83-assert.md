@@ -584,3 +584,17 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   forward reference is rejected outright in Pass 1, not silently
   tolerated as a placeholder the way an ordinary instruction operand
   would be.
+- 2026-08-21: Increments 8 (regression) and 9 (envelope check) confirmed
+  already satisfied by the incremental work above — Increment 7 made no
+  code change, so Increment 6's fresh live-VICE regression pass
+  (`test_casm_expr`/`test_casm_pass1`/`test_casm_frame`, all PASS) still
+  holds against the current build; a follow-up `cmake --build build`
+  confirmed zero errors/overflows/unresolved externals. Every envelope
+  bump this WP needed was measured and user-approved at the point it
+  occurred (Increments 4, 5, 6), not deferred to a single end-of-WP
+  negotiation. Proceeding to Increment 10 (consolidated verification +
+  walkthrough).
+- 2026-08-21: Increment 10 complete. Completion-gate walkthrough drafted
+  at `brain/walkthroughs/2026-08-21-casm-phase13-wp83-assert.md`.
+  `wiki/tasks/casm.md` and `brain/task.md` updated with WP83's summary.
+  Awaiting explicit user sign-off to close WP83.
