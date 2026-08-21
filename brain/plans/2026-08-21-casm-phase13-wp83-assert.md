@@ -213,14 +213,26 @@ New `dirAssertStr` constant (`.byte ".ASSERT", 0`) and a
 `lnDirective`'s chain, before the final `CASM_DIRECTIVE_UNKNOWN`
 fallback (same shape as every prior directive there).
 
-New (if Decision 2 = (b) or the message operand is accepted at all,
-which every option requires syntactically) `lexerScanAssertMessage`,
-covering only the quoted-string half of `lexerScanIncludeOperand`'s
-structure (leading whitespace after the comma, opening quote, printable-
-PETSCII payload, closing quote, trailing whitespace/comment, terminator)
-— no filename-specific semantics to inherit, so this is a narrower
-routine than `lexerScanIncludeOperand`/`lexerScanIncbinOperand`, not a
-copy of either.
+**Decision 5 (added during implementation, user-confirmed 2026-08-21): no
+new scanner.** The lexer already has a general quoted-string token type,
+`lnString`/`CASM_TOKEN_STRING` (WP74, added for `.BYTE "string"` literals)
+— dispatched automatically by the main `lexerNext` byte-dispatch table
+whenever the next raw byte is a quote, in any normal token-scanning
+position (`lexer.s:189-190`, `lnStringJmp`). Since `ppsAssert`'s message
+operand is scanned via an ordinary `lexerNext` call after the comma (not
+a directive-adjacent raw-byte scan like `.INCLUDE`/`.INCBIN`'s filename,
+which must run *before* normal tokenization resumes), it gets `lnString`
+for free: same printable-PETSCII payload rule, same
+`CASM_DIAG_STRING_UNTERMINATED`/`CASM_DIAG_STRING_INVALID_BYTE`
+diagnostics, into the existing `CasmStringBuffer`/`CasmStringLength`
+(255-byte capacity, `CASM_STRING_BUFFER_SIZE`). No `lexerScanAssertMessage`
+routine, no new filename-style diagnostics for the message grammar.
+`ppsAssert` (Parser section below) copies `CasmStringBuffer`'s bytes into
+its own `CasmAssertMessage` buffer immediately after recognizing
+`CASM_TOKEN_STRING`, rather than relying on the shared scratch surviving
+until `emitAssert` runs later — same reasoning as WP81's own
+dedicated-scratch precedent (`CasmFillCountLo/Hi`/`CasmFillValue`, not a
+reused `CasmParserStmt.Val*`).
 
 ### Parser (`parser.s`)
 
@@ -278,10 +290,13 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
 1. **Contract freeze**: `CASM_DIRECTIVE_ASSERT` constant, the new
    diagnostic block, `.assert` chain updates. No behavior change yet.
 2. **Lexer recognition**: `.ASSERT` token recognition in `lnDirective`.
-3. **Message scanner**: `lexerScanAssertMessage` (quoted-string half
-   only, per Technical Design above).
+3. **Message scanner**: none needed (Decision 5) — reuses the existing
+   `lnString`/`CASM_TOKEN_STRING` tokenizer. This increment becomes a
+   no-op on `lexer.s`; folded into Increment 4's parser work.
 4. **Parser dispatch**: `ppsAssert`, expr + strict-resolution check +
-   optional message staging.
+   optional message staging (calls `lexerNext` after the comma, checks
+   for `CASM_TOKEN_STRING`, copies `CasmStringBuffer` into
+   `CasmAssertMessage`/`Len`).
 5. **Emission — no-message path**: `emitAssert`'s zero/nonzero check and
    `CASM_DIAG_ASSERTION_FAILED` path first (simplest end-to-end slice).
    First fixtures here: a passing `.ASSERT 1 = 1` (or similar
@@ -389,3 +404,11 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
   Increments 1-3 together), live verification that `.ASSERT` classifies
   correctly is deferred to Increment 5's first end-to-end fixture, where a
   wrong subtype would surface immediately as a parser dispatch failure.
+- 2026-08-21: Increment 3 (message scanner) revised mid-implementation:
+  discovered the lexer already has a general quoted-string token type
+  (`lnString`/`CASM_TOKEN_STRING`, WP74's `.BYTE "string"` support)
+  dispatched automatically by the main `lexerNext` table on any leading
+  quote in normal token position. Confirmed with the user (Decision 5) to
+  reuse it rather than write a new `lexerScanAssertMessage` — no
+  `lexer.s` change needed for this increment; the buffer-copy work moves
+  into Increment 4. No code changed in this increment.
