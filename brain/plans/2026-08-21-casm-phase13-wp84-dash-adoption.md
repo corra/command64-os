@@ -346,3 +346,13 @@ DASH's own real source, not a CASM test fixture.
   `RUN 9000` rendered correctly; Applications page reported
   `dash 9000-9ef3` — both exactly matching WP71's own recorded results at
   these addresses. VICE left healthy at a clean `c64[8]:>` shell return.
+- 2026-08-21: Increment 7 (regression) complete. `test_casm_expr` →
+  `CASM EXPR: PASS` (`casm_phase12_test.d64`); `test_casm_pass1` →
+  `CASM PASS1: PASS` (same disk); `test_casm_frame` → `CASM FRAME: PASS`
+  (`casm_phase13_test.d64`) — all three re-run live in VICE against the
+  fresh full-clean-rebuild binaries, confirming this WP's DASH-only
+  changes left CASM's own regression suite untouched. VICE crashed once
+  more, unprompted, mid-session (same recurring pattern as WP83's own
+  session); a fresh instance was started per the workflow's
+  one-clean-restart allowance and the remaining witness re-run cleanly
+  from a fresh Command64 boot.
