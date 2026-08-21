@@ -366,5 +366,15 @@ New contiguous block starting at `CASM_DIAG_PHASE13_WP82_LAST + 1`
 - 2026-08-21: All four Scoping Decisions confirmed by the user: (1) strict
   both-pass resolution mirroring WP81, (2) minimal message echo (option
   b), (3) zero-is-false truthiness, (4) 65-byte message buffer mirroring
-  the `.INCLUDE`/`.INCBIN` filename precedent. Plan approved. Awaiting
-  branch cut and Taskwarrior task creation before implementation begins.
+  the `.INCLUDE`/`.INCBIN` filename precedent. Plan approved. Branch
+  `feature/casm-phase13-wp83` cut from `feature/casm-phase13` (WP82 merged
+  in first). Taskwarrior task created (project `casm.phase13`, `+wp83`).
+- 2026-08-21: Increment 1 (contract freeze) complete: `CASM_DIRECTIVE_ASSERT`
+  = `$0B` added, `CASM_DIRECTIVE_COUNT` bumped to `$0C`; new diagnostic
+  block `CASM_DIAG_ASSERT_UNRESOLVED`/`_MESSAGE_TOO_LONG`/
+  `CASM_DIAG_ASSERTION_FAILED` ($52-$54) added with matching `.assert`
+  chain entries; `CASM_DIAG_PHASE13_WP83_LAST` sentinel added. No behavior
+  change — build is clean, all `.assert` range checks pass, no-change
+  rebuild confirmed stable (second build produced no work). Message-buffer
+  BSS staging (`CasmAssertMessage`/`Len`) deferred to Increment 4
+  (parser dispatch), per the plan's own increment split.

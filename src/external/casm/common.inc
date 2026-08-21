@@ -547,7 +547,8 @@ CASM_DIRECTIVE_RES     = $07
 CASM_DIRECTIVE_FILL    = $08
 CASM_DIRECTIVE_ALIGN   = $09
 CASM_DIRECTIVE_INCBIN  = $0A
-CASM_DIRECTIVE_COUNT   = $0B
+CASM_DIRECTIVE_ASSERT  = $0B
+CASM_DIRECTIVE_COUNT   = $0C
 
 CASM_REGISTER_A     = $00
 CASM_REGISTER_X     = $01
@@ -623,7 +624,7 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_STRING_BUFFER_SIZE = 255, error, "CASM string buffer bound changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
-.assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_INCBIN + 1, error, "CASM directive subtype range changed"
+.assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_ASSERT + 1, error, "CASM directive subtype range changed"
 .assert CASM_REGISTER_COUNT = CASM_REGISTER_Y + 1, error, "CASM register subtype range changed"
 .assert CASM_NUMBER_COUNT = CASM_NUMBER_BINARY + 1, error, "CASM number subtype range changed"
 .assert CASM_TOKEN_REC_SUBTYPE = CASM_TOKEN_REC_TYPE + 1, error, "CASM token subtype offset changed"
@@ -817,6 +818,18 @@ CASM_DIAG_INVALID_INCBIN_FILENAME = $50
 ; WP82: filename exceeds the 63-byte payload bound.
 CASM_DIAG_INCBIN_FILENAME_TOO_LONG = $51
 CASM_DIAG_PHASE13_WP82_LAST = CASM_DIAG_INCBIN_FILENAME_TOO_LONG
+; WP83: .ASSERT's expression operand didn't resolve fully in this pass --
+; diagnosed outright rather than tolerated as a Pass-1 placeholder, same
+; convention as WP81's CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED (Scoping
+; Decision 1, user-confirmed 2026-08-21).
+CASM_DIAG_ASSERT_UNRESOLVED = $52
+; WP83: .ASSERT's optional quoted message exceeds the 63-byte payload
+; bound (Scoping Decision 4).
+CASM_DIAG_ASSERT_MESSAGE_TOO_LONG = $53
+; WP83: .ASSERT's expression resolved to 0 (false) -- no message operand
+; given, so a generic diagnostic is printed.
+CASM_DIAG_ASSERTION_FAILED = $54
+CASM_DIAG_PHASE13_WP83_LAST = CASM_DIAG_ASSERTION_FAILED
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -889,6 +902,10 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_INVALID_INCBIN_FILENAME = CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostics must remain contiguous"
 .assert CASM_DIAG_INCBIN_FILENAME_TOO_LONG = CASM_DIAG_INVALID_INCBIN_FILENAME + 1, error, "CASM WP82 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE13_WP82_LAST = $51, error, "CASM WP82 diagnostic range changed"
+.assert CASM_DIAG_ASSERT_UNRESOLVED = CASM_DIAG_PHASE13_WP82_LAST + 1, error, "CASM WP83 diagnostics must follow WP82"
+.assert CASM_DIAG_ASSERT_MESSAGE_TOO_LONG = CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostics must remain contiguous"
+.assert CASM_DIAG_ASSERTION_FAILED = CASM_DIAG_ASSERT_MESSAGE_TOO_LONG + 1, error, "CASM WP83 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE13_WP83_LAST = $54, error, "CASM WP83 diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
