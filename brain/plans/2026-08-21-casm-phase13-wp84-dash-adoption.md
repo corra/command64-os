@@ -313,3 +313,10 @@ DASH's own real source, not a CASM test fixture.
   originally assumed. `dash_ref` (ca65) builds clean against the edited
   source — confirms the dual-assembler subset claim (Increment 3's own
   check, done early as a cheap sanity confirmation of Increment 1).
+- 2026-08-21: Increment 2 (`AGENTS.md` update) complete. New bullet added
+  to the "Dual-Assembler Subset" list documenting `.RES count[, value]`
+  as shared with ca65's own `.res`, and explicitly warning that `.FILL`
+  has no ca65 equivalent at all — the exact finding from this WP's own
+  planning pass, recorded so a future adopter doesn't rediscover it the
+  hard way. `dash_ref` rebuilds clean (documentation-only change, no
+  build impact expected or found).
