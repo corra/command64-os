@@ -243,3 +243,18 @@ implementation.
   Scoping Decision called for. No regressions found; no new defect
   surfaced (unlike WP76's own precedent, this sweep found the phase
   already clean).
+- 2026-08-21: Increment 8 (DASH re-verification) complete: fresh
+  `dash_ref` (ca65) build's SHA-256 matches WP84's own recorded
+  `dash.ref.hex` hash exactly (`3238b786...`) -- cheap host-side
+  confirmation, no full hardware re-run needed since WP84 already did
+  that this same phase.
+  Increment 9 (version promotion) complete: `casm.s`'s
+  `VERSION_MINOR` bumped `"3"` → `"4"` (`0.3.0` → `0.4.0`). Live-verified
+  in VICE: `CASM V0.4.0.1349` banner, `casm casmassert1.s` still assembles
+  cleanly, `comp casmassert1.prg casmassert1.ref` → `FILES COMPARE OK` --
+  confirming the bump is behavior-neutral, same commit precedent WP75
+  used for `0.2.8`→`0.3.0`.
+  Increment 10 (no-change rebuild check) complete: full clean rebuild
+  from scratch with the version bump in place, zero errors/overflows/
+  unresolved externals; a subsequent `cmake --build build` triggered zero
+  compile/link work.
