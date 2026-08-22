@@ -200,3 +200,12 @@ implementation.
   PASS`), `test_casm_catalog` (`CASM CATALOG: PASS`),
   `test_casm_faultsource` (`CASM FAULT SOURCE: PASS`). Clean `c64[9]:>`
   shell return after each.
+  Increment 4 (disk-session leg 3, `casm_include_test.d64`) complete: all
+  nine harnesses PASS live in VICE -- `test_casm_freloc` (`CASM FAULT
+  RELOC: PASS`), `test_casm_bounds` (`CASM BOUNDS: PASS`),
+  `test_casm_cliderive` (`CASM CLIDERIVE: PASS`), `test_casm_lexer`
+  (`CASM LEXER: PASS`), `test_casm_fsym` (`CASM FAULT SYMBOLS: PASS`),
+  `test_casm_finc` (`CASM FAULT INCLUDE: PASS`), `test_casm_opcodes`
+  (`CASM OPCODES: PASS`), `test_casm_event` (`CASM EVENT TESTS PASS`),
+  `test_casm_directives` (`CASM DIRECTIVES: PASS`). Clean shell return
+  after each.
