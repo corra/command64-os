@@ -212,3 +212,17 @@ implementation.
   Increment 5 (disk-session leg 4, `casm_phase12_test.d64`) complete:
   fresh Command64 boot, `test_casm_expr` (`CASM EXPR: PASS`) and
   `test_casm_pass1` (`CASM PASS1: PASS`) both PASS live in VICE.
+  Increment 6 (disk-session leg 5, `casm_phase13_test.d64`) complete:
+  fresh Command64 boot, `test_casm_frame` → `CASM FRAME: PASS`. All 14
+  Phase 13 production fixtures re-verified together in one continuous
+  session, each matching its own WP's original recorded result exactly:
+  `casmres1`/`casmfill1`/`casmalign1`/`casmincbin1`/`casmassert1` all
+  `FILES COMPARE OK`; `casmresfwd` → `CASM: OPERAND NOT RESOLVED`;
+  `casmfillnoval` → `CASM: FILL REQUIRES A VALUE`; `casmalignzero` →
+  `CASM: ALIGN BOUNDARY ZERO`; `casmresrange` → `CASM: VALUE OUT OF
+  RANGE`; `casmincbinmiss` → `CASM: CANNOT OPEN INPUT`;
+  `casmincbinbadname` → `CASM: INCBIN FILENAME EXPECTED`;
+  `casmassertfail` → `CASM: ASSERTION FAILED`; `casmassertmsg` →
+  `CASM: ASSERTION FAILED: custom message`; `casmassertfwd` →
+  `CASM: ASSERT OPERAND NOT RESOLVED` — every diagnostic at its
+  documented line/column, clean shell return after each.
