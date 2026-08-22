@@ -13,9 +13,10 @@ depends-on: CASM Phase 13 WP81/82/83/84, all complete and merged into
 
 ## Status
 
-**Approved 2026-08-21.** Sweep scope confirmed (full 29-harness sweep,
-see Scoping Decision below). Implementation authorized on
-`feature/casm-phase13-wp85`.
+**Consolidated sweep complete, live-verified in VICE.** See the
+completion walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-
+wp85-consolidated-completion.md`. Awaiting explicit user sign-off before
+WP85 -- and the whole of Phase 13 -- is marked done.
 
 Parent plan: `brain/plans/2026-08-21-casm-phase13-data-construction-
 directives.md`. Branch: `feature/casm-phase13-wp85`, cut from
@@ -266,3 +267,7 @@ implementation.
   including both scoping-narrowing findings and their verification
   method); `wiki/tasks/casm.md`/`brain/task.md` updated with the WP85
   entry and Phase 13 marked fully closed.
+- 2026-08-21: Increment 12 complete. Consolidated completion-gate
+  walkthrough drafted at `brain/walkthroughs/2026-08-21-casm-phase13-
+  wp85-consolidated-completion.md`. Awaiting explicit user sign-off to
+  close WP85 and the whole of Phase 13.
