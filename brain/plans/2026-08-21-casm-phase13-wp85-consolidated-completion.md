@@ -226,3 +226,20 @@ implementation.
   `CASM: ASSERTION FAILED: custom message`; `casmassertfwd` →
   `CASM: ASSERT OPERAND NOT RESOLVED` — every diagnostic at its
   documented line/column, clean shell return after each.
+  Increment 7 (disk-session leg 6, `casm_listing_test.d64`) complete:
+  fresh Command64 boot, all ten harnesses PASS live in VICE --
+  `test_casm_listing` (`CASM LISTING: PASS`), `test_casm_listcap`
+  (`CASM LISTCAP: PASS`), `test_casm_map` (`CASM MAP: PASS`),
+  `test_casm_passcheck` (`CASM PASSCHECK: PASS`), `test_casm_spanread`
+  (`CASM SPANREAD: PASS`), `test_casm_spancommit` (`CASM SPANCOMMIT:
+  PASS`), `test_casm_listwrite` (`CASM LISTWRITE: PASS`), `test_casm_flist`
+  (`CASM FAULT LIST: PASS`), `test_casm_flmeta` (`CASM FAULT META: PASS`),
+  `test_casm_faultvmm` (`CASM FAULT VMM: PASS`). Clean shell return after
+  each.
+
+  **All 29 `test_casm_*` harnesses now confirmed clean in this
+  session** (4 + 3 + 9 + 2 + 1 + 10 = 29 across the six disk-session legs),
+  plus all 14 Phase 13 production fixtures -- the full consolidated sweep
+  Scoping Decision called for. No regressions found; no new defect
+  surfaced (unlike WP76's own precedent, this sweep found the phase
+  already clean).
