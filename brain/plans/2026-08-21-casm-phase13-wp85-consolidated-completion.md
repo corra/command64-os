@@ -209,3 +209,6 @@ implementation.
   (`CASM OPCODES: PASS`), `test_casm_event` (`CASM EVENT TESTS PASS`),
   `test_casm_directives` (`CASM DIRECTIVES: PASS`). Clean shell return
   after each.
+  Increment 5 (disk-session leg 4, `casm_phase12_test.d64`) complete:
+  fresh Command64 boot, `test_casm_expr` (`CASM EXPR: PASS`) and
+  `test_casm_pass1` (`CASM PASS1: PASS`) both PASS live in VICE.
