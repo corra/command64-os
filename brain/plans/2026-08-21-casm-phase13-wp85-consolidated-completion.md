@@ -13,10 +13,10 @@ depends-on: CASM Phase 13 WP81/82/83/84, all complete and merged into
 
 ## Status
 
-**Consolidated sweep complete, live-verified in VICE.** See the
+**Complete.** Approved 2026-08-21 on `feature/casm-phase13-wp85`. See the
 completion walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-
-wp85-consolidated-completion.md`. Awaiting explicit user sign-off before
-WP85 -- and the whole of Phase 13 -- is marked done.
+wp85-consolidated-completion.md`. CASM Phase 13 (WP81-85) is fully
+closed at `0.4.0` build `1349`.
 
 Parent plan: `brain/plans/2026-08-21-casm-phase13-data-construction-
 directives.md`. Branch: `feature/casm-phase13-wp85`, cut from

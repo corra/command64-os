@@ -2,11 +2,10 @@
 
 ## Status
 
-**Proposed.** Consolidated sweep complete, version promoted, all
-documentation reconciled. Awaiting explicit user sign-off before WP85 —
-and the whole of Phase 13 — is marked done.
+**Approved by the user on 2026-08-21.** WP85 is complete. CASM Phase 13
+(WP81-85) is fully closed at `0.4.0` build `1349`.
 
-## Result (proposed)
+## Result
 
 CASM Phase 13 (WP81-84: `.RES`/`.FILL`/`.ALIGN`, `.INCBIN`, `.ASSERT`,
 DASH adoption of `.RES`) is closed. A fresh consolidated regression
@@ -117,8 +116,7 @@ cleanly; `comp casmassert1.prg casmassert1.ref` → `FILES COMPARE OK`.
 - [x] `CHANGELOG.md`/`brain/KNOWLEDGE.md`/`wiki/tasks/casm.md`/
       `brain/task.md` all synchronized.
 - [x] Consolidated walkthrough recorded here.
-- [ ] **User explicitly approves closing WP85 and the whole of Phase
-      13.**
+- [x] **User explicitly approves closing WP85 and the whole of Phase
+      13.** Approved 2026-08-21.
 
-Phase 13 (WP81-85) will be fully closed on approval, at CASM `0.4.0`
-build `1349`.
+**Phase 13 (WP81-85) is fully closed**, at CASM `0.4.0` build `1349`.

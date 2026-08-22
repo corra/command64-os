@@ -189,7 +189,8 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       Walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-
       adoption.md`.
 - [x] WP85 **consolidated completion gate complete, user-approved
-      2026-08-21** (Taskwarrior task, project `casm.phase13`, `+wp85`).
+      2026-08-21, closing the whole of Phase 13** (Taskwarrior task,
+      project `casm.phase13`, `+wp85`).
       Full sweep (confirmed with the user, matching WP75's own Phase-12-
       closing precedent over a narrower Phase-13-only pass): all 29
       `test_casm_*` harnesses mapped to their six disk images by direct

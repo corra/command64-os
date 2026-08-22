@@ -3706,7 +3706,8 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       adoption.md`, `brain/walkthroughs/2026-08-21-casm-phase13-wp84-
       dash-adoption.md`.
 - [x] WP85 (project `casm.phase13`, `+wp85`): complete, live VICE-verified
-      and user-approved 2026-08-21. Consolidated completion gate for the
+      and user-approved 2026-08-21, closing the whole of Phase 13.
+      Consolidated completion gate for the
       whole of Phase 13 -- full sweep (confirmed with the user, matching
       WP75's own Phase-12-closing precedent): all 29 `test_casm_*`
       harnesses mapped to their six disk images by direct `CMakeLists.txt`
