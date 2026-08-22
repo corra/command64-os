@@ -193,3 +193,10 @@ implementation.
   (`CASM SYMBOLS: PASS`), `test_casm_vmm` (`CASM VMM: PASS`),
   `test_casm_faultinject` (`CASM FAULTINJECT: PASS`). Clean shell return
   after each.
+  Increment 3 (disk-session leg 2, `casm_overflow_test.d64`, companion-disk
+  pattern) complete: `casm_overflow_test.d64` attached at unit 9 alongside
+  `test.d64`'s already-resident Command64 at unit 8, `DRIVE 9`, all three
+  harnesses PASS live in VICE -- `test_casm_include` (`CASM INCLUDE: ALL
+  PASS`), `test_casm_catalog` (`CASM CATALOG: PASS`),
+  `test_casm_faultsource` (`CASM FAULT SOURCE: PASS`). Clean `c64[9]:>`
+  shell return after each.
