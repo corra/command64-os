@@ -9,6 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM data-construction directives (Phase 13 WP81-84)**: Added `.RES
+  count[, value]` (reserve N bytes, default fill `0`), `.FILL count, value`
+  (required fill value), `.ALIGN boundary[, fill]` (pad to a boundary), and
+  `.INCBIN "filename"` (include a raw binary file's bytes verbatim,
+  Pass1/Pass2 identity relying on the existing whole-assembly agreement
+  check). `.RES`/`.FILL`/`.ALIGN`'s count/boundary operands must fully
+  resolve in both passes -- a forward reference is a diagnostic error, not
+  a tolerated Pass-1 placeholder. DASH's real source (`ddata.s`) adopted
+  `.RES` for its five zero/fill-byte buffers (`FMTBUF`/`SYSINFOBUF`/
+  `APPBUF`/`BORDERROW`/`VMMBUFFER`), verified byte-identical to the prior
+  shipping manifest three independent ways. Completion was approved on
+  2026-08-21 and CASM advanced from `0.3.0` to `0.4.0`.
+- **CASM `.ASSERT expr[, "message"]` (Phase 13 WP83)**: A compile-time
+  expression check with zero byte emission -- a nonzero resolved value
+  passes silently, a zero value fails the whole assembly, optionally
+  echoing a user-supplied message. The expression must fully resolve in
+  both passes, same strict convention as `.RES`/`.FILL`/`.ALIGN`. CASM's
+  expression grammar has no equality/comparison operator, so `.ASSERT` can
+  only test nonzero-arithmetic truthiness, not equality/alignment
+  invariants -- a real comparison operator is deferred as separate future
+  work, and DASH's own equality-invariant candidates (the
+  `DISPATCHRETURN`/`DISPATCHRETURNMINUSONE` offset-by-one check, buffer-
+  size assertions) are not adopted this phase for that reason.
 - **CASM `.BYTE` string literals (Phase 12 WP74)**: Added bounded, verbatim
   printable-PETSCII double-quoted strings to `.BYTE`, including empty and mixed
   lists, focused diagnostics, production fixtures, and DASH adoption with
@@ -30,6 +53,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM `0.4.0` (Phase 13 completion promotion, WP85)**: Completion-only
+  version bump, no behavior change in the same commit -- mirrors the
+  `0.2.8`->`0.3.0` WP75 precedent. Closes CASM Phase 13 (WP81-84: `.RES`/
+  `.FILL`/`.ALIGN`, `.INCBIN`, `.ASSERT`, and DASH's own adoption of
+  `.RES`) after a fresh consolidated live-VICE re-run of all 29
+  `test_casm_*` harnesses and all 14 Phase 13 production fixtures in one
+  continuous set of sessions, a DASH manifest re-check, a clean regression
+  build, and a byte-identical no-change rebuild. Found no regressions and
+  no new defects.
 - **CASM forward-referenced constant Pass 1/2 width agreement (Phase 12
   WP76)**: Fixed a genuine instruction-width disagreement between Pass 1
   and Pass 2 for a named constant referenced (inside an arithmetic

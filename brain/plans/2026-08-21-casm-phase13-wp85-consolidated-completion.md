@@ -258,3 +258,11 @@ implementation.
   from scratch with the version bump in place, zero errors/overflows/
   unresolved externals; a subsequent `cmake --build build` triggered zero
   compile/link work.
+  Increment 11 (documentation reconciliation) complete: `CHANGELOG.md`
+  new entries (Phase 13 directives/DASH adoption under Added, the
+  `0.4.0` completion promotion under Fixed, mirroring the `0.3.0` WP75
+  entry's exact shape); `brain/KNOWLEDGE.md` new "CASM Phase 13 Complete"
+  closing section (mirroring the existing Phase 12 section's shape,
+  including both scoping-narrowing findings and their verification
+  method); `wiki/tasks/casm.md`/`brain/task.md` updated with the WP85
+  entry and Phase 13 marked fully closed.

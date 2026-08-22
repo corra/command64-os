@@ -3705,3 +3705,35 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
       detail: `brain/plans/2026-08-21-casm-phase13-wp84-dash-
       adoption.md`, `brain/walkthroughs/2026-08-21-casm-phase13-wp84-
       dash-adoption.md`.
+- [x] WP85 (project `casm.phase13`, `+wp85`): complete, live VICE-verified
+      and user-approved 2026-08-21. Consolidated completion gate for the
+      whole of Phase 13 -- full sweep (confirmed with the user, matching
+      WP75's own Phase-12-closing precedent): all 29 `test_casm_*`
+      harnesses mapped to their six disk images by direct `CMakeLists.txt`
+      inspection, re-run fresh in one continuous set of live-VICE
+      sessions, all PASS; all 14 Phase 13 production fixtures
+      re-verified together, each matching its own WP's original recorded
+      result exactly. DASH's `dash.ref.hex` re-confirmed via a cheap
+      host-side SHA-256 check. CASM promoted `0.3.0` -> `0.4.0`
+      (completion-only, no behavior change), live-verified via version
+      banner and a COMP-clean fixture re-run. Full clean rebuild and
+      no-change rebuild both stable. No regressions or new defects found.
+      Full detail: `brain/plans/2026-08-21-casm-phase13-wp85-
+      consolidated-completion.md`, `brain/walkthroughs/2026-08-21-casm-
+      phase13-wp85-consolidated-completion.md`.
+
+**CASM Phase 13 is fully closed** (WP81-85, `0.4.0` build `1349`).
+
+# Shell: `dir /p` Paged Directory Listing
+
+- [ ] `dir /p` paging (project `command64.shell`, Taskwarrior task 44,
+      `5ae09831-1204-4204-a962-0cbf0a228197`): plan approved 2026-08-21,
+      not yet implemented. Adds a `/p` option to `cmdDir`
+      (`src/command64/shell.asm:785`) that pauses output after 23 lines
+      and waits for a keypress, modeled on `more`'s existing
+      `morePause`/`mpWaitKey` pattern. Plan flags a real risk: `cmdDir`
+      lives in the `CommandShell` segment, packed into the fixed,
+      capped window between `$1000` (`ApiStub`) and `$1FA0`
+      (`VmmData`) — Increment 1 is a build-and-measure headroom check
+      before any logic is written. Full detail:
+      `brain/plans/2026-08-21-dir-p-paging.md`.

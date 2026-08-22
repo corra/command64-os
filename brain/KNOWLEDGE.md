@@ -3241,6 +3241,68 @@ Resolver-State Fix, WP74 String Literal Contract, WP76 Forward-Reference
 Pass-Agreement Fix) and in each WP's own plan/walkthrough pair under
 `brain/plans/`/`brain/walkthroughs/`.
 
+## CASM Phase 13 Complete (WP81-85, closed 2026-08-21 at `0.4.0` build `1349`)
+
+Phase 13 ("Data Construction Directives") added four new directives —
+`.RES count[, value]` (WP81, reserve N bytes), `.FILL count, value` (WP81,
+required fill value), `.ALIGN boundary[, fill]` (WP81, pad to a boundary),
+`.INCBIN "filename"` (WP82, include a raw binary file's bytes verbatim),
+and `.ASSERT expr[, "message"]` (WP83, a compile-time expression check
+with zero byte emission) — none of them changing any already-shipped
+Phase 1-12 program's assembled bytes. `.RES`/`.FILL`/`.ALIGN`'s count/
+boundary operands and `.ASSERT`'s own expression must fully resolve in
+both passes — a forward reference is a diagnostic error, not a tolerated
+Pass-1 placeholder, the same strict convention WP81 established and every
+later WP this phase reused rather than re-litigating.
+
+WP84 adopted `.RES` into DASH's real source (`ddata.s`'s five zero/fill-
+byte buffers: `FMTBUF`/`SYSINFOBUF`/`APPBUF`/`BORDERROW`/`VMMBUFFER`),
+narrowed from the master plan's original framing on two findings, each
+confirmed with the user before implementation rather than assumed:
+
+- **`.ASSERT` DASH adoption deferred entirely.** The master plan's own
+  targets (the `DISPATCHRETURN`/`DISPATCHRETURNMINUSONE` offset-by-one
+  invariant, buffer-size checks) are all equality invariants. WP83 found —
+  by checking `expr.s`'s `parseOperatorTail` directly, not assuming —
+  that CASM's expression grammar has **no equality/comparison operator at
+  all**; `.ASSERT` can only test nonzero-arithmetic truthiness (there is
+  no arithmetic identity that inverts "is zero" into "is true" without a
+  real comparison operator). A real comparison operator is left as
+  separate, future CASM work.
+- **`.FILL` DASH adoption dropped for `.RES`.** Independently verified
+  (a standalone `ca65`+`ld65` test, not assumed) that **ca65 has no
+  `.FILL` directive at all** — using it in DASH's dual-assembler source
+  would have broken the ca65 cross-check `AGENTS.md` requires. `.RES`
+  with an explicit fill value (`.RES 38, $40` for `BORDERROW`) produces
+  byte-identical output on both assemblers instead.
+
+Both findings were real corrections to this phase's own plans, caught by
+verifying claims against the actual toolchain rather than trusting a
+prior assumption — the same discipline the project's `feedback-verify-
+agent-hardware-claims` memory already calls for, applied here to
+compiler/assembler semantics instead of hardware behavior.
+
+WP85 is Phase 13's consolidated closing WP
+(`brain/plans/2026-08-21-casm-phase13-wp85-consolidated-completion.md`):
+all 29 `test_casm_*` harnesses (mapped to their six disk images by direct
+`CMakeLists.txt` inspection, not assumed) plus all 14 Phase 13 production
+fixtures re-run fresh in one continuous set of live-VICE sessions — the
+full sweep, matching WP75's own Phase-12-closing precedent rather than a
+narrower Phase-13-only pass, since WP75's own full sweep is what caught
+WP76's real cross-harness defect. This sweep found the phase already
+clean: no regressions, no new defects. DASH's `dash.ref.hex` was
+re-confirmed (a cheap host-side SHA-256 check against a fresh `ca65`
+build, not a second full hardware run — WP84 already did that this same
+phase), CASM promoted `0.3.0` → `0.4.0` (completion-only, no behavior
+change, live-verified via version banner and a COMP-clean fixture
+re-run), and a full clean rebuild plus no-change rebuild both confirmed
+stable.
+
+Full per-WP detail lives in each WP's own plan/walkthrough pair under
+`brain/plans/`/`brain/walkthroughs/` (`2026-08-21-casm-phase13-wp81-res-
+fill-align`, `-wp82-incbin`, `-wp83-assert`, `-wp84-dash-adoption`,
+`-wp85-consolidated-completion`).
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

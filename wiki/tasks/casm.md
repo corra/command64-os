@@ -18,10 +18,12 @@ corrective forward-reference Pass 1/2 width-agreement fix). Final
 walkthrough: `brain/walkthroughs/2026-08-20-casm-phase12-wp75-
 verification-walkthrough-completion-gate.md`.
 
-**Phase 13 (Data Construction Directives) is underway.** WP81
-(`.RES`/`.FILL`/`.ALIGN`), WP82 (`.INCBIN`), WP83 (`.ASSERT`), and WP84
-(DASH adoption of `.RES`) are complete, user-approved 2026-08-21. WP85
-remains open. See the Phase 13 section below.
+**Phase 13 (Data Construction Directives) is complete**, user-approved
+2026-08-21 at CASM `0.4.0` build `1349` (WP81-85: `.RES`/`.FILL`/`.ALIGN`,
+`.INCBIN`, `.ASSERT`, DASH adoption of `.RES`, and a consolidated
+completion gate covering all 29 `test_casm_*` harnesses and all 14 Phase
+13 production fixtures). Final walkthrough: `brain/walkthroughs/
+2026-08-21-casm-phase13-wp85-consolidated-completion.md`.
 
 An unnumbered interim hardening effort (WP77-WP80, deliberately not "Phase
 13" — that name/number stays reserved for the master plan's Data
@@ -186,8 +188,25 @@ version promotes to `0.4.0` at WP85 (whole-phase completion), not per-WP.
       `brain/plans/2026-08-21-casm-phase13-wp84-dash-adoption.md`.
       Walkthrough: `brain/walkthroughs/2026-08-21-casm-phase13-wp84-dash-
       adoption.md`.
-- [ ] WP85 **consolidated completion gate, version promotion to `0.4.0`**
-      -- not yet started.
+- [x] WP85 **consolidated completion gate complete, user-approved
+      2026-08-21** (Taskwarrior task, project `casm.phase13`, `+wp85`).
+      Full sweep (confirmed with the user, matching WP75's own Phase-12-
+      closing precedent over a narrower Phase-13-only pass): all 29
+      `test_casm_*` harnesses mapped to their six disk images by direct
+      `CMakeLists.txt` inspection, then re-run fresh in one continuous
+      set of live-VICE sessions, all PASS; all 14 Phase 13 production
+      fixtures re-verified together, each matching its own WP's original
+      recorded result exactly. DASH's `dash.ref.hex` re-confirmed via a
+      cheap host-side SHA-256 check (no second hardware run needed).
+      CASM promoted `0.3.0` -> `0.4.0` (completion-only, no behavior
+      change), live-verified via version banner and a COMP-clean fixture
+      re-run. Full clean rebuild and no-change rebuild both stable. No
+      regressions or new defects found. Plan: `brain/plans/2026-08-21-
+      casm-phase13-wp85-consolidated-completion.md`. Walkthrough:
+      `brain/walkthroughs/2026-08-21-casm-phase13-wp85-consolidated-
+      completion.md`.
+
+**Phase 13 is fully closed.**
 
 ## Phase 1 Prerequisite
 
