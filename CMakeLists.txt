@@ -372,7 +372,16 @@ if(Ca65_FOUND)
     # CasmAssertMessage import plus the new prefix/CR message text)
     # overflowed $6B00 by 25 measured bytes; $6C00 (+256) is the smallest
     # round-page fit, 231 bytes headroom. User-approved 2026-08-21.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "6C00")
+    # Progress Increment 2/3: the new progress.s module (Increment 2
+    # design/ABI review) overflowed $6C00 by 503 measured bytes even
+    # before any casm.s wiring exists, because CASM_SRCS globs
+    # src/external/casm/*.s and ld65 links whole object files -- creating
+    # the file alone makes it real for this target regardless of import
+    # wiring. Per the Increment 2 review's user-approved split
+    # resolution (scope trim + MAIN growth), $7000 (+1024) is the grown
+    # budget; a real re-link at this size measured 1033 bytes of fresh
+    # headroom. User-approved 2026-08-24.
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "7000")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -1397,6 +1406,16 @@ if(Ca65_FOUND)
             # (+256) is the smallest round-page fit. User-approved
             # 2026-08-21.
             set(TEST_PRG_SIZE "6800")
+        endif()
+        if(TEST_NAME STREQUAL "casm_progress")
+            # Progress Increment 3: links the real progress.s directly --
+            # it imports nothing (no diagnostics.s/listing.s/map.s/VMM/
+            # resources dependency by design), so unlike most other CASM
+            # module harnesses this one needs no stand-in stubs at all.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
         endif()
         add_ca65_app(${TEST_TARGET} "${TEST_CA65_SRC}" TMP_CA65_SRCS_${TEST_NAME} 1000 "${TEST_PRG_SIZE}"
             EXTRA_INCLUDE_DIRS ${TEST_EXTRA_INCLUDE_DIRS_${TEST_NAME}})
