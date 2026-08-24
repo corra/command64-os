@@ -150,6 +150,15 @@
 .import progressStatement
 .import progressCompletePass
 .import progressCheckPassTotals
+.import progressRenderTransient
+.import progressSourceLoadBytes
+.import CasmProgArgDepth
+.import CasmProgArgFileId
+.import CasmProgArgLineLo
+.import CasmProgArgLineHi
+.import CasmProgArgNameBuf
+.import CasmSourceLineLo
+.import CasmSourceLineHi
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -222,6 +231,16 @@ startListingNameDone:
 
     jsr symbolsInit
     bcs startInitFatal
+    ; Progress Increment 5: seed the load line's identity before sourceLoad
+    ; opens anything. CasmSourceFileId is not yet meaningful here (nothing
+    ; has been traversed), so the top-level slot 0 name is resolved directly
+    ; -- the first file sourceLoad reads. Included files re-seed this from
+    ; crpInclude before their own sourceAppendFile runs.
+    lda #0
+    sta CasmProgArgFileId
+    sta CasmProgLastFileId
+    lda #0                       ; top-level slot 0 = the first source file
+    jsr crpSnapshotName
     jsr sourceLoad
     bcs startInitFatal
     ; WP47: allocate the include metadata store (physical catalog + event
@@ -262,6 +281,9 @@ startPass1:
     sta CasmPassMode
     ; Progress Increment 4: begin Pass 1 only after CasmPassMode is set to
     ; MEASURE, per the Hook Contract -- progressBeginPass cannot fail.
+    lda #$FF                    ; Increment 5: force a name snapshot on the
+    sta CasmProgLastFileId       ; first statement of this pass
+    sta CasmProgLastDepth
     lda #1
     jsr progressBeginPass
     jsr casmRunPass
@@ -329,7 +351,8 @@ startPass2Setup:
     and #CASM_OPT_LIST
     beq startListingCaptureDone
     jsr listingCaptureInit
-    bcs startFatalNear
+    bcs startFatalNear2          ; Increment 5 growth pushed startFatalNear
+                                 ; out of range from here too
 startListingCaptureDone:
     jsr lexerInit
     bcs startFatalNear
@@ -350,6 +373,9 @@ startListingCaptureDone:
     ; Progress Increment 4: begin Pass 2 only after CasmPassMode is set to
     ; EMIT. Resets the active counter/divider and flips the internal
     ; pass-2 flag; cannot fail.
+    lda #$FF                    ; Increment 5: force a name snapshot on the
+    sta CasmProgLastFileId       ; first statement of this pass
+    sta CasmProgLastDepth
     lda #2
     jsr progressBeginPass
     jsr casmRunPass
@@ -518,29 +544,181 @@ crpBeginOk:
 ; fresh from CasmParserStmt in memory, not from a carried-over register.
 ; ---------------------------------------------------------------------------
 crpCountLabel:
-    jsr progressStatement
+    jsr crpProgressHook
     bcc :+
     jmp crpFail
     :
         jmp crpLabel
 crpCountConstant:
-    jsr progressStatement
+    jsr crpProgressHook
     bcc :+
     jmp crpFail
     :
         jmp crpConstant
 crpCountInsn:
-    jsr progressStatement
+    jsr crpProgressHook
     bcc :+
     jmp crpFail
     :
         jmp crpInsn
 crpCountDir:
-    jsr progressStatement
+    jsr crpProgressHook
     bcc :+
     jmp crpFail
     :
         jmp crpDir
+
+; ---------------------------------------------------------------------------
+; crpProgressHook (Progress Increment 5, private)
+; Count one dispatched statement, then redraw the transient line when either
+; the 64-statement throttle says one is due OR the active physical file has
+; changed since the last redraw.
+;
+; The identity check is what makes this one hook cover every case the
+; Increment 5 Hook Contract lists -- include frame push, frame pop, EVERY
+; cascading pop, and each committed root transition -- without a single hook
+; inside source.s's own frame machinery. Any of those events changes
+; CasmSourceFileId; the next dispatched statement observes the change and
+; redraws immediately with a freshly resolved filename, bypassing the
+; throttle. This is strictly "after commit" by construction (the statement
+; cannot dispatch until the traversal state is committed), and it keeps
+; every cli.s/include.s dependency here in casm.s, which already imports
+; them -- source.s must not depend on include.s (the layering WP46 froze).
+;
+; Out: C=0 on success; C=1 with A = CASM_DIAG_* propagated from
+;      progressStatement's own counter-overflow guard.
+; Clobbers: A, X, Y
+; ---------------------------------------------------------------------------
+crpProgressHook:
+    jsr progressStatement
+    bcs cphOut                   ; overflow -> propagate C=1 and A untouched
+    tax                          ; X = throttle verdict (1 = redraw due)
+    ; Identity is (file id, frame depth), not file id alone. Increment 5
+    ; verified live that CasmSourceFileId reads F00 for BOTH a parent and
+    ; its included child, so keying on it alone never fires on a push or
+    ; pop -- the child's name stayed on screen after the pop returned to
+    ; the parent. CasmFrameDepth does change on every push, pop, and each
+    ; step of a cascading pop, and the pair together still distinguishes
+    ; two different roots that happen to sit at the same depth.
+    lda CasmFrameDepth
+    cmp CasmProgLastDepth
+    bne cphIdentityChanged
+    lda CasmSourceFileId
+    cmp CasmProgLastFileId
+    beq cphThrottleOnly          ; same file and depth -> honor the throttle
+cphIdentityChanged:
+    lda CasmFrameDepth
+    sta CasmProgLastDepth
+    lda CasmSourceFileId
+    sta CasmProgLastFileId
+    jsr crpSnapshotName          ; identity changed -> refresh the name and
+    jmp cphRender                ; redraw now, regardless of the throttle
+cphThrottleOnly:
+    cpx #0
+    beq cphOk
+cphRender:
+    lda CasmFrameDepth
+    sta CasmProgArgDepth
+    lda CasmSourceFileId
+    sta CasmProgArgFileId
+    lda CasmSourceLineLo
+    sta CasmProgArgLineLo
+    lda CasmSourceLineHi
+    sta CasmProgArgLineHi
+    jsr progressRenderTransient
+cphOk:
+    clc
+cphOut:
+    rts
+
+; ---------------------------------------------------------------------------
+; crpSnapshotName (Progress Increment 5, private)
+; Fill CasmProgArgNameBuf with the first eight characters of the active
+; file's name, space-padded, resolving the packed identity in
+; CasmSourceFileId the same way diagnostics.s's diagPrintIncludeIdentity
+; does: bit 7 clear = a top-level slot (cliSourceSlotLo/Hi), bit 7 set = an
+; include-catalog record. Kept explicitly distinct, per the Hook Contract's
+; "top-level ID, include catalog ID, packed diagnostic ID, and displayed
+; physical-file ID" separation -- this routine is the single place the
+; packed form is decoded for display.
+;
+; A failed includeCatalogRead is not fatal here: the buffer is left
+; space-filled and the line simply shows a blank name, since progress
+; rendering must never mask or replace a real assembler diagnostic.
+; In: A = packed physical-file identity to resolve (NOT read from
+;     CasmSourceFileId directly -- the pre-traversal top-level load call
+;     site has no meaningful CasmSourceFileId yet and passes slot 0).
+; Clobbers: A, X, Y, CasmPtr0Lo/Hi
+; ---------------------------------------------------------------------------
+crpSnapshotName:
+    ; Resolve from the FRAME STACK, not from CasmSourceFileId's packed
+    ; form. Increment 5 verified live that CasmSourceFileId reads $00
+    ; throughout an included file's traversal -- it never carries the
+    ; frame flag or the catalog index -- so decoding it returns the
+    ; top-level slot no matter how deep the include nesting is, which is
+    ; exactly the wrong answer (the child's correct name, seeded by
+    ; crpInclude, was being overwritten with the parent's on every push).
+    ; CasmFrameCatalogIndex[depth-1] is the authoritative catalog index of
+    ; the file actually being traversed; depth 0 means a top-level source
+    ; slot. A is ignored and kept only for call-site compatibility.
+    ldx CasmFrameDepth
+    beq csnTopLevel
+    dex
+    lda CasmFrameCatalogIndex, x
+    jsr includeCatalogRead
+    bcc csnStage
+    ldx #<msgProgBlankName       ; unavailable -> render a blank name
+    ldy #>msgProgBlankName
+    jmp crpSnapshotNameFromPtr
+csnTopLevel:
+    ; Depth 0: the active top-level source slot. CasmSourceFileId IS
+    ; meaningful here (it selects among multiple top-level files).
+    lda CasmSourceFileId
+    and #CASM_DIAG_FILEID_ID_MASK
+    tax
+    lda cliSourceSlotHi, x
+    tay
+    lda cliSourceSlotLo, x
+    tax
+    jmp crpSnapshotNameFromPtr
+csnStage:
+    ldx #<(CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_NAME)
+    ldy #>(CasmIncludeRecordStage + CASM_INCLUDE_PHYS_REC_NAME)
+    ; fall through
+
+; ---------------------------------------------------------------------------
+; crpSnapshotNameFromPtr (Progress Increment 5, private)
+; Copy up to eight bytes of a null-terminated name into the transient
+; line's fixed 8-byte field, space-padding a shorter name. Shared by the
+; packed-identity resolver above and by crpInclude, which seeds a child's
+; name straight from CasmIncludeFilename before the child is loaded (the
+; catalog index that would let the packed resolver find it does not exist
+; until includeCatalogLoad returns).
+; In: X/Y = pointer lo/hi to a null-terminated name
+; Clobbers: A, X, Y, CasmPtr0Lo/Hi
+; ---------------------------------------------------------------------------
+crpSnapshotNameFromPtr:
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #7
+    lda #' '
+csnBlank:
+    sta CasmProgArgNameBuf, y
+    dey
+    bpl csnBlank
+    ldy #0
+csnCopyLoop:
+    lda (CasmPtr0Lo), y
+    beq csnDone                  ; short name -> keep the space padding
+    sta CasmProgArgNameBuf, y
+    iny
+    cpy #8
+    bne csnCopyLoop
+csnDone:
+    rts
+
+msgProgBlankName:
+    .byte 0
 
 crpLabel:
     ; WP38: mark output started (and, on the very first qualifying statement
@@ -1225,6 +1403,15 @@ crpInclude:
     bne crpIncReplay
 
     ; --- Pass 1: discover, load (or reuse), and record -------------------
+    ; Progress Increment 5: seed the load line's name from the operand we
+    ; just parsed, before the child is opened -- the packed-identity
+    ; resolver cannot help here, since the catalog index it needs is only
+    ; assigned by includeCatalogLoad below. The id field still shows the
+    ; parent's until that index exists; the name, which is what actually
+    ; identifies the file on screen, is correct from the first block.
+    ldx #<CasmIncludeFilename
+    ldy #>CasmIncludeFilename
+    jsr crpSnapshotNameFromPtr
     lda CrpIncParentDevice
     ldx #<CasmIncludeFilename
     ldy #>CasmIncludeFilename
@@ -1438,6 +1625,15 @@ artifactsAbort:
     jmp exitFatal
 
 .segment "BSS"
+
+; Progress Increment 5: the physical file identity the transient line was
+; last drawn for. Compared against CasmSourceFileId on every counted
+; statement so any include push, pop, cascading pop, or root transition
+; forces an immediate redraw with a freshly resolved name. Seeded to $FF
+; (never a valid packed id -- the id mask is $7F) at each pass start so the
+; first statement of both passes always snapshots a name.
+CasmProgLastFileId:  .res 1
+CasmProgLastDepth:   .res 1   ; frame depth the transient line last showed
 
 ; WP47 `.INCLUDE` dispatch scratch. Held only across one crpInclude call, but
 ; kept in named BSS rather than shared zero-page scratch: crpInclude calls

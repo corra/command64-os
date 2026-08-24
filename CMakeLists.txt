@@ -372,6 +372,13 @@ if(Ca65_FOUND)
     # CasmAssertMessage import plus the new prefix/CR message text)
     # overflowed $6B00 by 25 measured bytes; $6C00 (+256) is the smallest
     # round-page fit, 231 bytes headroom. User-approved 2026-08-21.
+    # Progress Increment 5: restoring the source/include byte-cadence
+    # display (user-directed) plus two real rendering-defect fixes (the
+    # transient line's width contract, and the first-render cursor guard)
+    # took $7000 down to 42 bytes of headroom, with Increments 6-11 still
+    # ahead and one known defect left to fix. $7400 (+1024) restores ~1KB
+    # of working room and still clears the hard $C000 I/O boundary by
+    # ~4.4KB. Measured, not estimated. User-approved 2026-08-24.
     # Progress Increment 2/3: the new progress.s module (Increment 2
     # design/ABI review) overflowed $6C00 by 503 measured bytes even
     # before any casm.s wiring exists, because CASM_SRCS globs
@@ -381,7 +388,7 @@ if(Ca65_FOUND)
     # resolution (scope trim + MAIN growth), $7000 (+1024) is the grown
     # budget; a real re-link at this size measured 1033 bytes of fresh
     # headroom. User-approved 2026-08-24.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "7000")
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "7400")
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
@@ -594,6 +601,7 @@ if(Ca65_FOUND)
             # runtime OS_API fault hook.
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
@@ -613,7 +621,19 @@ if(Ca65_FOUND)
             # dispatch block and message table (unused by this harness)
             # overflowed $2F00 by 104 measured bytes; $3000 (+256) is the
             # smallest round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "3000")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $3000 by 668 measured bytes; $3300 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $3300 by 718 measured bytes; $3600 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $3600 by 9 measured bytes; $3700 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "3700")
         endif()
         if(TEST_NAME STREQUAL "casm_fsym")
             # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
@@ -769,6 +789,7 @@ if(Ca65_FOUND)
             # precedent.
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
@@ -799,7 +820,15 @@ if(Ca65_FOUND)
             # WP83 Increment 6: diagnostics.s's message-echo dispatch
             # overflowed $3200 by 45 measured bytes; $3300 (+256) is the
             # smallest round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "3300")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $3300 by 718 measured bytes; $3600 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $3600 by 9 measured bytes; $3700 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "3700")
         endif()
         if(TEST_NAME STREQUAL "casm_spancommit")
             # WP53 increment 3: fileio.s (outputCommit/outputAbort plus
@@ -902,6 +931,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
@@ -1017,7 +1047,11 @@ if(Ca65_FOUND)
             # own existing fixtures) overflowed $6300 by 88 measured
             # bytes; $6400 (+256) is the smallest round-page fit.
             # User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "6400")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $6400 by 652 measured bytes; $6700 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6700")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -1031,6 +1065,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
@@ -1113,7 +1148,11 @@ if(Ca65_FOUND)
             # own width/agreement-only coverage) overflowed $5F00 by 102
             # measured bytes; $6000 (+256) is the smallest round-page fit.
             # User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "6000")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $6000 by 666 measured bytes; $6300 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6300")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1160,6 +1199,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
@@ -1176,7 +1216,11 @@ if(Ca65_FOUND)
             # WP53 increment 2: $1E00 -> $1F00. source.s's new
             # sourceReadSpanChunk (linked whole, unused by this harness)
             # overflowed $1E00 by 25 measured bytes.
-            set(TEST_PRG_SIZE "1F00")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $1F00 by 634 measured bytes; $2200 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "2200")
         endif()
         if(TEST_NAME STREQUAL "casm_event")
             # WP47: include.s (the event log) plus every module it
@@ -1188,6 +1232,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
@@ -1201,7 +1246,11 @@ if(Ca65_FOUND)
             # WP53 increment 2: $1E00 -> $1F00. source.s's new
             # sourceReadSpanChunk (linked whole, unused by this harness)
             # overflowed $1E00 by 61 measured bytes.
-            set(TEST_PRG_SIZE "1F00")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $1F00 by 670 measured bytes; $2200 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "2200")
         endif()
         if(TEST_NAME STREQUAL "casm_frame")
             # WP46: include.s (for includeCatalogLoad) plus the same
@@ -1214,6 +1263,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
@@ -1296,7 +1346,11 @@ if(Ca65_FOUND)
             # coverage) overflowed $6100 by 286 measured bytes; $6200
             # (+256) would still overflow, so $6300 (+512) is the smallest
             # round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "6300")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $6300 by 772 measured bytes; $6700 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6700")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1312,6 +1366,7 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/include.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/fileio.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/source.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/progress.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/state.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/parser.s"
@@ -1419,7 +1474,11 @@ if(Ca65_FOUND)
             # coverage) overflowed $6700 by 25 measured bytes; $6800
             # (+256) is the smallest round-page fit. User-approved
             # 2026-08-21.
-            set(TEST_PRG_SIZE "6800")
+            # Progress Increment 5: progress.s linked in (source.s now calls
+            # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
+            # overflowed $6800 by 696 measured bytes; $6B00 is the smallest
+            # round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6B00")
         endif()
         if(TEST_NAME STREQUAL "casm_progress")
             # Progress Increment 3: links the real progress.s directly --

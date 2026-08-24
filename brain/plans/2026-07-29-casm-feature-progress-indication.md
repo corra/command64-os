@@ -114,6 +114,22 @@ p1: d03 f07 FILENAME l00128 t00412
 - Exact spacing and field widths may be tightened during design review, but all
   fields must remain visible in 40 columns and the first eight filename bytes
   must be retained when available.
+- **Frozen 2026-08-24 (Increment 5):** the status line is exactly 34
+  columns, `p1: dNN fNN NAMENAME lNNNNN tNNNNN`, and the load line is
+  padded to the same 34. Every transient line MUST print exactly
+  `CASM_PROG_LINE_WIDTH` characters: the in-place redraw rewinds by that
+  many cursor-left bytes and the erase space-fills that many columns, so a
+  line shorter than the constant walks backwards into the output above it
+  (a real defect found live in Increment 5 and fixed there).
+
+**Re-amended 2026-08-24 (Increment 5):** the user reinstated the
+**source-loading** byte-cadence display (top-level and included files);
+`progressSourceLoadBytes` is implemented and live. The other three
+byte-cadence cases (output finalization, `.INCBIN`, and
+`.RES`/`.FILL`/`.ALIGN`) remain dropped. MAIN was grown a second time,
+`$7000` -> `$7400` (+1024 bytes), on measured evidence, to pay for it and
+to leave room for Increments 6-11. The original Increment 2 amendment
+follows, superseded only for the source-loading case:
 
 **Amended 2026-08-24 (Increment 2 design/ABI review):** the four
 byte-cadence transient updates below (source loading, output finalization,

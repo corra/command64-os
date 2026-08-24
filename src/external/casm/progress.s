@@ -39,6 +39,7 @@
 .export progressStatement
 .export progressRenderTransient
 .export progressCompletePass
+.export progressSourceLoadBytes
 .export progressAccumulateOutputBytes
 .export progressClearTransient
 .export progressSuspend
@@ -97,6 +98,8 @@ CasmProgArgNameBuf:    .res 8
 CasmProgDecScratchLo:  .res 1   ; private to progressPrintDec
 CasmProgDecScratchHi:  .res 1
 CasmProgBeginPassArg:  .res 1   ; private to progressBeginPass
+CasmProgLoadLo:        .res 1   ; private to progressSourceLoadBytes (display
+CasmProgLoadHi:        .res 1   ; value only -- never an accumulator)
 
 CASM_PROG_FLAG_VISIBLE   = $01
 CASM_PROG_FLAG_PASS2     = $02
@@ -190,7 +193,14 @@ progressPrintDec:
 ; because ahPrintChar/KernalChROUT never touch it.
 ; Clobbers: A, Y
 ; ---------------------------------------------------------------------------
-CASM_PROG_LINE_WIDTH = 38
+; Every transient line MUST print exactly this many characters, so the
+; cursor-left return below lands on column 0 and the space-fill in
+; progressClearTransient erases exactly what was drawn. Increment 5 found
+; this the hard way: the status line printed 27 characters against a
+; width of 38, so each redraw walked 11 columns further left and shredded
+; the scrollback above it. Both builders below are commented with their
+; own character budget; change one and you must change this.
+CASM_PROG_LINE_WIDTH = 34
 progressReturnToStart:
     ldy #CASM_PROG_LINE_WIDTH
 @loop:
@@ -307,7 +317,18 @@ progressStatement:
 ; Clobbers: A, X, Y. Sets the visible flag.
 ; ---------------------------------------------------------------------------
 progressRenderTransient:
+    ; Only rewind when a transient line is already on screen. On the FIRST
+    ; render after a persistent line (which ends in PetCr, leaving the
+    ; cursor at column 0 of a fresh row) there is nothing to rewind over,
+    ; and rewinding anyway walks 34 columns LEFT off the start of the row
+    ; -- straight into the tail of the persistent line above, which it then
+    ; overwrites. Increment 5 caught this live: "P1: START" was being
+    ; chewed down to "P1: ST" by the first status redraw.
+    lda CasmProgFlags
+    and #CASM_PROG_FLAG_VISIBLE
+    beq :+
     jsr progressReturnToStart
+    :
     lda CasmProgFlags
     and #CASM_PROG_FLAG_PASS2
     beq @p1c
@@ -318,30 +339,44 @@ progressRenderTransient:
     ldx #<msgP1Prefix
     ldy #>msgP1Prefix
 @gotPrefix:
-    jsr progressPrintStr
+    jsr progressPrintStr         ; "p1: d" / "p2: d"          5
     lda CasmProgArgDepth
     ldx #0
     ldy #2
-    jsr progressPrintDec
+    jsr progressPrintDec         ; depth                      2  = 7
+    lda #' '
+    jsr progressPrintChar        ;                            1  = 8
+    lda #'F'
+    jsr progressPrintChar        ; 'f' marker                 1  = 9
     lda CasmProgArgFileId
     ldx #0
     ldy #2
-    jsr progressPrintDec
+    jsr progressPrintDec         ; file id                    2  = 11
+    lda #' '
+    jsr progressPrintChar        ;                            1  = 12
     ldy #0
 @nameLoop:
     lda CasmProgArgNameBuf, y
-    jsr progressPrintChar
+    jsr progressPrintChar        ; name                       8  = 20
     iny
     cpy #8
     bne @nameLoop
+    lda #' '
+    jsr progressPrintChar        ;                            1  = 21
+    lda #'L'
+    jsr progressPrintChar        ; 'l' marker                 1  = 22
     lda CasmProgArgLineLo
     ldx CasmProgArgLineHi
     ldy #5
-    jsr progressPrintDec
+    jsr progressPrintDec         ; line                       5  = 27
+    lda #' '
+    jsr progressPrintChar        ;                            1  = 28
+    lda #'T'
+    jsr progressPrintChar        ; 't' marker                 1  = 29
     lda CasmProgActiveLo
     ldx CasmProgActiveHi
     ldy #5
-    jsr progressPrintDec
+    jsr progressPrintDec         ; statement count            5  = 34
     lda CasmProgFlags
     ora #CASM_PROG_FLAG_VISIBLE
     sta CasmProgFlags
@@ -397,6 +432,67 @@ progressAccumulateOutputBytes:
     txa
     adc CasmProgByteHi
     sta CasmProgByteHi
+    rts
+
+; ---------------------------------------------------------------------------
+; progressSourceLoadBytes
+; Transient load line: "load fNN NAME NNNNN" -- numeric physical-file
+; identity, the first eight filename characters, and cumulative bytes
+; committed so far for the file being loaded.
+;
+; Restored in Increment 5 (the Increment 2 scope trim had dropped it; the
+; user reinstated it for the source/include load case only -- the
+; .INCBIN/.RES/.FILL/.ALIGN directive byte cadence stays dropped).
+;
+; Takes the CUMULATIVE committed cursor directly rather than a per-block
+; delta to accumulate: source.s's CasmSourceStreamCursor is advanced only
+; after vmmWindowWrite succeeds, so it is already exactly the "cumulative
+; committed cursor, not final 64-byte chunk" the Hook Contract asks for.
+; Passing it whole means progress.s needs no load accumulator of its own
+; and cannot drift out of step with the real committed total.
+;
+; The caller populates CasmProgArgFileId and CasmProgArgNameBuf for the
+; file being loaded before the first call -- progress.s resolves no
+; filename itself (it imports neither cli.s nor include.s, by its module
+; boundary).
+; In: A/X = cumulative committed bytes lo/hi
+; Clobbers: A, X, Y
+; ---------------------------------------------------------------------------
+progressSourceLoadBytes:
+    sta CasmProgLoadLo
+    stx CasmProgLoadHi
+    lda CasmProgFlags            ; same first-render guard as
+    and #CASM_PROG_FLAG_VISIBLE  ; progressRenderTransient below
+    beq :+
+    jsr progressReturnToStart
+    :
+    ldx #<msgLoadPrefix
+    ldy #>msgLoadPrefix
+    jsr progressPrintStr
+    lda CasmProgArgFileId
+    ldx #0
+    ldy #2
+    jsr progressPrintDec
+    ldy #0
+@nameLoop:
+    lda CasmProgArgNameBuf, y
+    jsr progressPrintChar
+    iny
+    cpy #8
+    bne @nameLoop
+    lda CasmProgLoadLo
+    ldx CasmProgLoadHi
+    ldy #5
+    jsr progressPrintDec         ; "load f" 6 + id 2 + name 8 + bytes 5 = 21
+    ldy #CASM_PROG_LINE_WIDTH - 21
+@pad:
+    lda #' '
+    jsr progressPrintChar        ; pad to the shared width       = 34
+    dey
+    bne @pad
+    lda CasmProgFlags
+    ora #CASM_PROG_FLAG_VISIBLE
+    sta CasmProgFlags
     rts
 
 ; ---------------------------------------------------------------------------
@@ -511,3 +607,4 @@ msgDonePrefix: .byte "DONE: P1 ", 0
 msgP2Mid:      .byte ", P2 ", 0
 msgBytesMid:   .byte ", ", 0
 msgBytesTail:  .byte " BYTES", PetCr, 0
+msgLoadPrefix: .byte "LOAD F", 0

@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment05-source-include-integration
 created: 2026-08-24
-status: proposed
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment04-pass-integration, approved and complete
 ---
@@ -10,8 +10,27 @@ depends-on: casm-progress-increment04-pass-integration, approved and complete
 
 ## Status
 
-**Proposed, not yet approved.** Parent plan:
+**Approved 2026-08-24**, with one scope reconciliation the user decided at
+the outset (see Scope Reconciliation below). Parent plan:
 `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
+
+## Scope Reconciliation (user-decided 2026-08-24)
+
+This plan's Hook Contract was drafted *before* the Increment 2 design/ABI
+review. Its first two bullets (256-byte committed-block load notification
+for top-level and included files) ask for the `progressSourceLoadBytes`
+byte-cadence display that Increment 2 **dropped**, with user approval and a
+formal parent-plan amendment, to fit the MAIN envelope.
+
+Presented with that conflict, the user chose **"reconciled scope + restore
+byte cadence"**: implement everything Increment 2 left in scope *and*
+restore the dropped source/include byte-cadence reporting. The parent plan's
+own amendment is therefore partially reverted for the source-load case (not
+for `.INCBIN`/`.RES`/`.FILL`/`.ALIGN`, which stay dropped) and re-amended to
+match. Increment 5 also closes a real gap Increment 4 left: production never
+called `progressRenderTransient` at all, so the transient line did not
+render, and `progressStatement`'s throttle result was computed and
+discarded.
 
 ## Objective
 
@@ -73,3 +92,26 @@ evidence is recorded, trackers agree, and the user approves Increment 5.
 ## Progress
 
 - 2026-08-24: Detailed plan drafted; source/include hooks not authorized.
+- 2026-08-24: Approved (with the scope reconciliation above) and executed.
+  The transient status line renders for the first time -- Increment 4 had
+  wired counting but never called progressRenderTransient, so its throttle
+  verdict was computed and discarded. Added: progressSourceLoadBytes
+  (restored, taking the cumulative committed cursor directly), one
+  committed-block hook in sourceAppendFile, and crpProgressHook/
+  crpSnapshotName in casm.s. Identity change is keyed on (file id, frame
+  depth), which covers push, pop, every cascading pop, and root transitions
+  with no hook inside source.s's frame machinery -- keeping include.s/cli.s
+  dependencies in casm.s, where the WP46 layering requires them.
+  Four real defects found live and fixed: a 34-vs-38 width mismatch that
+  shredded the scrollback, a first-render cursor rewind that ate the
+  persistent line, include loads showing the parent's filename, and --
+  the root cause behind the last of them -- CasmSourceFileId reading $00
+  for both parent and child, so the packed decode borrowed from
+  diagnostics.s could never resolve an included file; resolution now comes
+  from CasmFrameCatalogIndex[depth-1]. MAIN grown $7000 -> $7400 (+1KB) on
+  measured evidence, user-approved; nine harness envelopes bumped. Live
+  VICE: full push/pop/name/depth/throttle behavior correct across both
+  passes, and CASM CASMOPALL.S output byte-identical to Increment 1's
+  baseline hash. Full detail:
+  brain/walkthroughs/2026-08-24-casm-progress-increment05-source-include-integration.md.
+  Awaiting user approval before Increment 6.
