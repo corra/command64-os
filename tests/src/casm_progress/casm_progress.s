@@ -52,8 +52,8 @@
 .import CasmProgPass1TotalLo
 .import CasmProgPass1TotalHi
 
-CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = $55
-CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = $56
+; CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/PASS_TOTAL_MISMATCH come from
+; common.inc (Increment 4 moved them there); no local copy needed.
 
 .segment "HEADER"
     .word __MAIN_START__

@@ -65,17 +65,11 @@
 .export CasmProgPass1TotalLo
 .export CasmProgPass1TotalHi
 
-; New diagnostic IDs, contiguous after the last allocated Phase 13 id
-; ($54), with the codebase's own compile-time contiguity assert. Distinct
-; from the pre-existing CASM_DIAG_PASS_MISMATCH ($2F, Phase 6B/WP30,
-; raised today by emit.s's emitCheckPassAgreement on final-PC disagreement)
-; -- the parent plan is explicit that this statement-count check is
-; "an additional deterministic-replay check, not a replacement for" that
-; one, so reusing its ID would blur two distinct failure causes under one
-; message.
-CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = $55
-CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = $56
-.assert CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostics must remain contiguous"
+; CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/PASS_TOTAL_MISMATCH now live in
+; common.inc (Increment 4), alongside every other CASM_DIAG_* constant,
+; not here -- diagnostics.s needs them for its own message-dispatch table,
+; which cannot .include this file (progress.s must not be a dependency of
+; diagnostics.s beyond the one-way progressClearTransient import).
 
 .segment "BSS"
 

@@ -609,7 +609,11 @@ if(Ca65_FOUND)
             # message table for .INCBIN (unused by this harness) overflowed
             # $2E00 by 59 measured bytes; $2F00 (+256) is the smallest
             # round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "2F00")
+            # Progress Increment 4: diagnostics.s's new dpfProgressCheck
+            # dispatch block and message table (unused by this harness)
+            # overflowed $2F00 by 104 measured bytes; $3000 (+256) is the
+            # smallest round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "3000")
         endif()
         if(TEST_NAME STREQUAL "casm_fsym")
             # WP58 Increment 4: symbols.s's four OS_API-reachable call sites
@@ -1008,7 +1012,12 @@ if(Ca65_FOUND)
             # fixtures) overflowed $6200 by 166 measured bytes; $6300
             # (+256) is the smallest round-page fit. User-approved
             # 2026-08-21.
-            set(TEST_PRG_SIZE "6300")
+            # Progress Increment 4: diagnostics.s's new dpfProgressCheck
+            # dispatch block and message table (unused by this harness's
+            # own existing fixtures) overflowed $6300 by 88 measured
+            # bytes; $6400 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6400")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -1099,7 +1108,12 @@ if(Ca65_FOUND)
             # (unused by this harness's own width/agreement-only coverage)
             # overflowed $5E00 by 180 measured bytes; $5F00 (+256) is the
             # smallest round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "5F00")
+            # Progress Increment 4: diagnostics.s's new dpfProgressCheck
+            # dispatch block and message table (unused by this harness's
+            # own width/agreement-only coverage) overflowed $5F00 by 102
+            # measured bytes; $6000 (+256) is the smallest round-page fit.
+            # User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6000")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}

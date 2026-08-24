@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment04-pass-integration
 created: 2026-08-24
-status: proposed
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment03-progress-core, approved and complete
 ---
@@ -10,7 +10,7 @@ depends-on: casm-progress-increment03-progress-core, approved and complete
 
 ## Status
 
-**Proposed, not yet approved.** Parent plan:
+**Approved 2026-08-24.** Parent plan:
 `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
 
 ## Objective
@@ -73,3 +73,23 @@ and no-change behavior have evidence in the walkthrough and user approval.
 ## Progress
 
 - 2026-08-24: Detailed plan drafted; pass integration not authorized.
+- 2026-08-24: Approved and executed. progress.s wired into casm.s's real
+  orchestration: progressInit/progressBeginPass at pass start,
+  progressStatement via four small dispatch trampolines
+  (crpCountLabel/Constant/Insn/Dir -- one shared hook, four call sites,
+  since the existing token-type cmp/beq chain can't tolerate an A-clobbering
+  call mid-chain), progressCheckPassTotals + progressCompletePass at
+  Pass 2 completion, ordered exactly per the Hook Contract (after
+  emitCheckPassAgreement, before listing finalization). Diagnostic IDs
+  moved to common.inc and wired into diagnostics.s's real dispatch table.
+  Two branch-range trampolines added (casm.s, diagnostics.s) and three
+  test harnesses' fixed envelopes bumped (test_casm_faultsource,
+  test_casm_pass1, test_casm_passcheck) -- all the same "unused but
+  linked" class of correction this codebase's own history documents
+  repeatedly. Live VICE evidence: test_casm_progress still 20/20 PASS;
+  a real CASM CASMOPALL.S run produced the exact P1:/P2: persistent-line
+  sequence with matching totals (160=160) and output byte-identical to
+  Increment 1's own baseline hash. Final envelope: 340 bytes (1.2%)
+  headroom. Full detail:
+  brain/walkthroughs/2026-08-24-casm-progress-increment04-pass-integration.md.
+  Awaiting user approval before Increment 5.

@@ -144,6 +144,13 @@
 .import relocInit
 .import relocFinalize
 
+; Progress Increment 4.
+.import progressInit
+.import progressBeginPass
+.import progressStatement
+.import progressCompletePass
+.import progressCheckPassTotals
+
 .segment "HEADER"
     .word __MAIN_START__
 
@@ -240,6 +247,11 @@ startInitFatal:
     jmp startFatal
 
 startPass1:
+    ; Progress Increment 4: initialize before the first visible progress
+    ; transition (Pass 1's own "p1: start" persistent line, printed by
+    ; progressBeginPass just below). progressInit cannot fail (no C/A
+    ; output), so no fatal check follows it.
+    jsr progressInit
     ; Pass 1 (WP29): measure addresses and define labels. No output file
     ; exists yet -- emitOrg's header write and every emitRawByte call
     ; automatically no-op under CASM_PASS_MODE_MEASURE (emit.s), so it is
@@ -248,9 +260,17 @@ startPass1:
     bcs startFatalNear1
     lda #CASM_PASS_MODE_MEASURE
     sta CasmPassMode
+    ; Progress Increment 4: begin Pass 1 only after CasmPassMode is set to
+    ; MEASURE, per the Hook Contract -- progressBeginPass cannot fail.
+    lda #1
+    jsr progressBeginPass
     jsr casmRunPass
     bcs startFatalNear1         ; outputAbort is a safe no-op: no output
                                  ; file was ever created this pass
+    ; Progress Increment 4: Pass 1 dispatch is done -- latch its total and
+    ; print "p1: done NNNNN statements" before moving on to constant
+    ; resolution/Pass 2 setup. Cannot fail.
+    jsr progressCompletePass
     jmp startPass1Continue
 
 startFatalNear1:
@@ -275,12 +295,23 @@ startPass1Continue:
     bcc startPass1ConstantsOk
     jmp startFatal
 startPass1ConstantsOk:
+    jmp startPass2Setup
+
+; Progress Increment 4: Pass 1's completion sequence (progressInit's call
+; site, progressBeginPass/progressCompletePass) pushed sourceRewind's and
+; includeReplayReset's own fatal checks out of branch range from
+; startFatalNear -- this near trampoline reaches it directly, same
+; precedent as startFatalNear1 above.
+startFatalNear2:
+    jmp startFatalNear
+
+startPass2Setup:
 
     ; Pass 2 (WP29): rewind the identical source, recreate the output PRG,
     ; and re-drive the same dispatch for real now that every label the
     ; source defines is in the symbol table.
     jsr sourceRewind
-    bcs startFatalNear
+    bcs startFatalNear2
     ; WP47: rewind the include-event replay cursor alongside the source
     ; itself. sourceRewind deliberately knows nothing about include.s (that
     ; module has never been a source.s dependency, and the reverse layering
@@ -289,7 +320,7 @@ startPass1ConstantsOk:
     ; *count* is deliberately preserved: it is precisely what Pass 2 must
     ; consume in full.
     jsr includeReplayReset
-    bcs startFatalNear
+    bcs startFatalNear2
     ; WP54: enable listing capture (both VMM stores plus source-side line
     ; capture) only for /L, and only after the rewind/replay reset above --
     ; capture must observe Pass 2's real traversal from its very first
@@ -316,6 +347,11 @@ startListingCaptureDone:
     bcs startFatalNear
     lda #CASM_PASS_MODE_EMIT
     sta CasmPassMode
+    ; Progress Increment 4: begin Pass 2 only after CasmPassMode is set to
+    ; EMIT. Resets the active counter/divider and flips the internal
+    ; pass-2 flag; cannot fail.
+    lda #2
+    jsr progressBeginPass
     jsr casmRunPass
     bcs startFatalNear
 
@@ -334,6 +370,15 @@ startListingCaptureDone:
     ; not a demonstrated user-reachable path.
     jsr emitCheckPassAgreement
     bcs startFatalNear
+
+    ; Progress Increment 4: an additional deterministic-replay check, not a
+    ; replacement for the final-PC/include-event agreement checks above --
+    ; per the Hook Contract, this runs after both of them and before
+    ; listing capture finalization, and "p2: done" (progressCompletePass,
+    ; just below) prints only once this has also passed.
+    jsr progressCheckPassTotals
+    bcs startFatalNear
+    jsr progressCompletePass
 
     ; WP54: close out listing capture (flush the final byte-mirror stage,
     ; disable source-side capture) before emitFinalize/relocFinalize touch
@@ -436,16 +481,16 @@ crpBeginOk:
     :
         lda CasmParserStmt + CASM_PARSER_STMT_TYPE
     cmp #CASM_TOKEN_IDENTIFIER
-    beq crpLabel
+    beq crpCountLabel
     cmp #CASM_TOKEN_EQUALS
-    beq crpConstant
+    beq crpCountConstant
     cmp #CASM_TOKEN_MNEMONIC
     bne :+
-    jmp crpInsn
+    jmp crpCountInsn
     :
     cmp #CASM_TOKEN_DIRECTIVE
     bne :+
-    jmp crpDir
+    jmp crpCountDir
     :
     cmp #CASM_TOKEN_EOF
     bne :+
@@ -457,6 +502,45 @@ crpBeginOk:
     jmp crpFail
     :
         jmp casmRunPass
+
+; ---------------------------------------------------------------------------
+; crpCountLabel/Constant/Insn/Dir (Progress Increment 4, private)
+; The shared statement-count hook (progressStatement) for the four token
+; types the parent plan says to count: label, constant, mnemonic, and
+; directive (.INCLUDE counts once here too, as a DIRECTIVE, before crpDir's
+; own INCLUDE/emit split). Four tiny trampolines, not one shared call site,
+; because the dispatch above is a sequential cmp/beq chain against a single
+; loaded A -- calling progressStatement (which clobbers A) partway through
+; that chain would corrupt the remaining comparisons for token types
+; checked later in the chain. Each trampoline already knows statically
+; which handler it's headed to, so there is nothing to "reload" once inside
+; one: the four real handlers below were already reading whatever they need
+; fresh from CasmParserStmt in memory, not from a carried-over register.
+; ---------------------------------------------------------------------------
+crpCountLabel:
+    jsr progressStatement
+    bcc :+
+    jmp crpFail
+    :
+        jmp crpLabel
+crpCountConstant:
+    jsr progressStatement
+    bcc :+
+    jmp crpFail
+    :
+        jmp crpConstant
+crpCountInsn:
+    jsr progressStatement
+    bcc :+
+    jmp crpFail
+    :
+        jmp crpInsn
+crpCountDir:
+    jsr progressStatement
+    bcc :+
+    jmp crpFail
+    :
+        jmp crpDir
 
 crpLabel:
     ; WP38: mark output started (and, on the very first qualifying statement
