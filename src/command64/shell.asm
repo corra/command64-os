@@ -304,6 +304,7 @@ sdExtGotLen:
     ldy NamePtrHi
     jsr findFile
     bcs sdExtError
+    stx SrcHandle           // findFile returns normalized length in X; aptRegister needs it
 
     // Found it! Load to UserProgStart
     lda #0                  // 0 = Relocated (uses HexVal)
@@ -322,6 +323,8 @@ sdExtGotLen:
     // differs. Relocate before execution; non-relocatable PRGs are unchanged
     // and aptRelocate's carry is intentionally ignored for that case.
     jsr relocateExternalCommand
+
+    jsr sdExtAptBookkeep    // app-table eviction + registration (ShellExt)
 
     lda SavedDevice
     sta CurrentDevice
@@ -3789,3 +3792,58 @@ dirSizeLo:   .byte 0
 dirSizeMid:  .byte 0
 dirSizeHi:   .byte 0
 dirLeadZero: .byte 0
+
+// --- sdExtAptBookkeep ---
+// App-table bookkeeping for the direct external-command dispatch path
+// (sdExt*), giving it the same accounting cmdLoad already gets. Lives in
+// ShellExt because the CommandShell segment has no slack left.
+//
+// Direct dispatch keeps its privilege of loading over a registered app
+// without a pre-flight check, but must not leave the table claiming that app
+// is still resident: evict every slot whose registered range overlaps what
+// was just loaded, then register this load. Skipped entirely when the app
+// table was never allocated (no REU), since aptCheckRange/aptRemove/
+// aptRegister all read the VMM-backed table.
+//
+// Input:  HexValLo/Hi = load address (UserProgStart on this path)
+//         TempLo/Hi   = end address + 1 (post-aptRelocate, truncated)
+//         NamePtrLo/Hi + SrcHandle = loaded file name and its length
+// Output: none (carry undefined)
+// Clobbers: A, X, Y, DstHandle, VmmSegLo/Hi, VmmOffLo/Hi, AptTemp* scratch
+sdExtAptBookkeep:
+    lda AptSegLo
+    ora AptSegHi
+    bne sdExtAptGo
+    rts                     // no REU/app table -> no bookkeeping at all
+sdExtAptGo:
+    // TempLo/Hi holds end_addr+1 (aptRelocate/aptRegister convention), but
+    // aptCheckRange wants a byte count. Convert in place: size = Temp - HexVal
+    // (HexVal is still UserProgStart, untouched since before the load).
+    sec
+    lda TempLo
+    sbc HexValLo
+    sta TempLo
+    lda TempHi
+    sbc HexValHi
+    sta TempHi
+
+sdExtEvictLoop:
+    jsr aptCheckRange       // C=0: no overlap left. C=1 + X=slot: overlapping slot
+    bcc sdExtEvictDone
+    cpx #$FF                // $FF = protected-region hit; impossible here
+    beq sdExtEvictDone      // (UserProgStart is never protected), handled defensively
+    jsr aptRemove           // deregister the stale slot, then re-scan
+    jmp sdExtEvictLoop
+sdExtEvictDone:
+
+    // Restore the end_addr+1 convention for aptRegister.
+    clc
+    lda TempLo
+    adc HexValLo
+    sta TempLo
+    lda TempHi
+    adc HexValHi
+    sta TempHi
+
+    jsr aptRegister         // register/overwrite this load, as cmdLoad does
+    rts

@@ -57,6 +57,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Direct-dispatch app-table bookkeeping parity with `LOAD`**: Typing an
+  external command's name directly (`sdExt*` dispatch) now performs the same
+  app-table accounting `LOAD` already did. After the load and relocation it
+  deregisters any registered slot whose range overlaps the memory just
+  written, then registers itself, so the table can no longer report an app
+  as resident after something else has overwritten it. Direct dispatch keeps
+  its privilege of loading over a registered app with no pre-flight range
+  check -- that behavior is unchanged; only the stale bookkeeping is fixed.
+  Eviction is silent (no new output). Also captures `findFile`'s returned
+  name length into `SrcHandle` on this path, which the registration needs to
+  copy a correct name. All bookkeeping is skipped when the app table was
+  never allocated (no REU). The logic lives in `sdExtAptBookkeep` in the
+  `ShellExt` segment -- `CommandShell` had no room for it inline.
+
 - **CASM `0.4.0` (Phase 13 completion promotion, WP85)**: Completion-only
   version bump, no behavior change in the same commit -- mirrors the
   `0.2.8`->`0.3.0` WP75 precedent. Closes CASM Phase 13 (WP81-84: `.RES`/
