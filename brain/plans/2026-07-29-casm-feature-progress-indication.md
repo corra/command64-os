@@ -115,6 +115,23 @@ p1: d03 f07 FILENAME l00128 t00412
   fields must remain visible in 40 columns and the first eight filename bytes
   must be retained when available.
 
+**Amended 2026-08-24 (Increment 2 design/ABI review):** the four
+byte-cadence transient updates below (source loading, output finalization,
+`.INCBIN`, and `.RES`/`.FILL`/`.ALIGN`) are **dropped from this revision's
+scope**, per the user's split-the-difference resolution of Finding 1 in
+`brain/reviews/2026-08-24-casm-progress-design-abi-review.md`. Their own
+byte accumulators fed nothing else in the contract (the final summary's
+byte count still comes from output-write accounting, retained), and
+removing them saved 70 of the 573 measured overflow bytes -- the rest was
+closed by growing MAIN `$6C00` -> `$7000`. During these four operations the
+transient line simply does not update until the operation completes, at
+which point the next per-statement redraw or persistent-line transition
+resumes visible progress; nothing scrolls, freezes, or crashes in the
+interim. Restoring this text below at implementation time would cost
+roughly 70 more bytes of MAIN, well within the 1033 bytes of headroom the
+grown budget left free -- noted as an easy future increment if wanted, not
+attempted in this revision.
+
 During source loading, including a newly discovered `.INCLUDE`, the transient
 line reports numeric file identity, the first eight filename characters, and
 cumulative bytes loaded. It updates after every completed 256-byte source block
@@ -247,8 +264,24 @@ would duplicate counts and add avoidable overhead.
   listing, map, include, symbol, or directive records.
 - Any MAIN envelope increase requires measured evidence and explicit approval at
   implementation time. Do not pre-authorize an address or size increase here.
+  **Amended 2026-08-24 (Increment 2 design/ABI review):** a full-spec
+  `progress.s` was written, assembled, and linked against CASM's real
+  `casm_3800.cfg` and real compiled objects, producing `ld65`'s own overflow
+  error at exactly 573 bytes over the Increment-1-measured 231-byte
+  headroom -- measured evidence, not an estimate. The user approved growing
+  MAIN from `$6C00` to `$7000` (+1024 bytes) in `casm_3800.cfg` and its
+  `casm_3900.cfg` twin, combined with a scope trim (see User-Visible
+  Contract amendment below), verified by a real re-link at 1033 bytes of
+  fresh headroom remaining. Full detail:
+  `brain/reviews/2026-08-24-casm-progress-design-abi-review.md`.
 - New diagnostic identifiers, if needed for statement overflow or count
   disagreement, must be allocated contiguously with compile-time range asserts.
+  **Amended 2026-08-24:** frozen as `CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = $55`
+  and `CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = $56`, contiguous after the
+  last allocated Phase 13 id (`$54`). Distinct from the pre-existing
+  `CASM_DIAG_PASS_MISMATCH` ($2F, Phase 6B/WP30) -- that ID belongs to
+  `emitCheckPassAgreement`'s final-PC check and is not reused, matching this
+  plan's own "not a replacement for final PC ... agreement" instruction.
 - Existing parser statement records, include event records, physical catalog
   records, frame records, token records, and relocation records must not grow for
   this feature.

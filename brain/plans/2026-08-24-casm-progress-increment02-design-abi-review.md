@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment02-design-abi-review
 created: 2026-08-24
-status: proposed
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment01-activation-baseline, approved and complete
 ---
@@ -10,8 +10,8 @@ depends-on: casm-progress-increment01-activation-baseline, approved and complete
 
 ## Status
 
-**Proposed, not yet approved.** This review freezes implementation contracts; it
-does not add production behavior. Parent plan:
+**Approved 2026-08-24.** This review froze implementation contracts; it did
+not add production behavior. Parent plan:
 `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
 
 ## Objective
@@ -90,3 +90,21 @@ design before Increment 3 source edits.
 ## Progress
 
 - 2026-08-24: Detailed plan drafted with five proposed decisions.
+- 2026-08-24: Approved and executed. All five proposed decisions adopted as
+  written. A real `progress.s` was written against the full spec, assembled
+  and linked with `ca65`/`ld65` against CASM's actual `casm_3800.cfg` and
+  actual compiled objects to get exact numbers rather than estimates. Found
+  the full spec overflows the Increment-1-measured 231-byte headroom by
+  exactly 573 bytes (ld65's own error, not a calculation); a caller-supplied
+  filename pointer needs zero page (forbidden) and was redesigned around a
+  caller-copied buffer instead; and `CASM_DIAG_PASS_MISMATCH` ($2F) already
+  exists but is a different check, so two new contiguous IDs ($55/$56) were
+  frozen instead of reused. User chose to split the difference: scope
+  trimmed (dropped source-load and `.INCBIN`/`.RES`/`.FILL`/`.ALIGN`
+  byte-cadence display, -70 measured bytes) and MAIN grown `$6C00` -> `$7000`
+  in `casm_3800.cfg`/`casm_3900.cfg`, verified by a real link at 1033 bytes
+  of fresh headroom to spare. Full ABI, BSS map, screen protocol, and
+  diagnostics frozen in
+  `brain/reviews/2026-08-24-casm-progress-design-abi-review.md`. Walkthrough:
+  `brain/walkthroughs/2026-08-24-casm-progress-increment02-design-abi-review.md`.
+  Awaiting final user approval before Increment 3 source edits begin.
