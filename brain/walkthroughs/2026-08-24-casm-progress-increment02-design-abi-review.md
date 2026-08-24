@@ -2,7 +2,7 @@
 feature: casm-progress-increment02-design-abi-review
 plan: brain/plans/2026-08-24-casm-progress-increment02-design-abi-review.md
 date: 2026-08-24
-status: awaiting-approval
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 ---
 
@@ -118,6 +118,6 @@ condition triggered.
 - [x] Every ABI/storage/layout decision is explicit (review document).
 - [x] Peer review has no unresolved finding.
 - [x] This walkthrough exists.
-- [ ] Trackers agree (Taskwarrior annotation and plan Progress update follow
+- [x] Trackers agree (Taskwarrior annotation and plan Progress update follow
       this walkthrough).
-- [ ] User approves the design before Increment 3 source edits.
+- [x] User approves the design before Increment 3 source edits.

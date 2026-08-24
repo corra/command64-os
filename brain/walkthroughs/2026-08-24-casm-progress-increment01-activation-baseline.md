@@ -2,7 +2,7 @@
 feature: casm-progress-increment01-activation-baseline
 plan: brain/plans/2026-08-24-casm-progress-increment01-activation-baseline.md
 date: 2026-08-24
-status: awaiting-approval
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 ---
 
@@ -239,7 +239,7 @@ build is stable, and disk capacity was measured, not assumed.
       `casmincbin1.ref.hex`).
 - [x] Trackers agree (Taskwarrior 33 tagged `activated`, not completed;
       parent plan's reconciliation confirmed current).
-- [ ] User explicitly approves Increment 1's baseline.
+- [x] User explicitly approves Increment 1's baseline.
 
 ## Carry-forward for Increment 2 (design/ABI review)
 

@@ -2,7 +2,7 @@
 feature: casm-progress-increment03-progress-core
 plan: brain/plans/2026-08-24-casm-progress-increment03-progress-core.md
 date: 2026-08-24
-status: awaiting-approval
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 ---
 
@@ -177,6 +177,6 @@ regression check found no artifact drift.
 - [x] No production hook is active (`grep`-confirmed zero references from
       any other CASM module).
 - [x] This walkthrough exists.
-- [ ] Trackers agree (Taskwarrior annotation and plan Progress update
+- [x] Trackers agree (Taskwarrior annotation and plan Progress update
       follow this walkthrough).
-- [ ] User approves Increment 3.
+- [x] User approves Increment 3.

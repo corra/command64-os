@@ -3540,10 +3540,36 @@
   - Task: `wiki/tasks/casm-progress-indication.md`
   - This feature is outside the master plan's numbered phases and does not
     replace Phase 10, Symbol Map and Listing.
-  - [ ] Complete design/ABI review after CASM Phase 9 closes.
+  - [x] Complete design/ABI review after CASM Phase 9 closes. Closed
+    2026-08-24 (Increment 2): full ABI/BSS/screen-protocol/diagnostics
+    frozen in `brain/reviews/2026-08-24-casm-progress-design-abi-review.md`
+    after a real progress.s measured 573 bytes over the then-231-byte MAIN
+    headroom; user-directed split (scope trim + `$6C00`->`$7000` growth).
   - [ ] Implement bounded load, include, pass, and output progress.
+    In progress: Increments 3-5 closed 2026-08-24, user-approved.
+    - [x] Increment 3 (progress core): `src/external/casm/progress.s` +
+      `test_casm_progress` (20 cases). Two real defects caught live under
+      VICE (X-register clobber infinite loop; pass-number-into-counter
+      off-by-one) and fixed.
+    - [x] Increment 4 (pass integration): wired into `casm.s`'s real
+      Pass 1/Pass 2 orchestration via four dispatch trampolines. Live
+      CASM CASMOPALL.S run confirmed matching totals and byte-identical
+      output vs. the Increment 1 baseline.
+    - [x] Increment 5 (source/include integration): the transient status
+      line renders for the first time (Increment 4 never called
+      `progressRenderTransient`). Four real defects found live and fixed
+      (line-width/redraw-range mismatch, first-render cursor guard,
+      include-load identity, pop not restoring parent identity --
+      `CasmSourceFileId` alone cannot distinguish parent/child, resolved
+      via `CasmFrameCatalogIndex`). MAIN grown again to `$7400`
+      (measured, user-approved).
+    - [ ] Increment 6 (directive integration): not started.
+    - [ ] Increment 7 (output/diagnostics/listing/map integration): not
+      started.
   - [ ] Meet the 5% representative and 10% stress slowdown limits.
   - [ ] Complete full implementation review before runtime acceptance or merge.
+    (Increments 8-11: automated verification, full review, runtime
+    acceptance, completion gate -- not started.)
 
 - [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
       build duration display on completion (success and failure)

@@ -2,7 +2,7 @@
 feature: casm-progress-increment04-pass-integration
 plan: brain/plans/2026-08-24-casm-progress-increment04-pass-integration.md
 date: 2026-08-24
-status: awaiting-approval
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 ---
 
@@ -210,6 +210,6 @@ budget); no-change rebuild is stable; and no unrelated defect was found.
       envelope corrections applied and verified, output bytes
       byte-identical to baseline.
 - [x] Size (340 bytes / 1.2% headroom) and no-change behavior recorded.
-- [ ] Trackers agree (Taskwarrior annotation and plan Progress update
+- [x] Trackers agree (Taskwarrior annotation and plan Progress update
       follow this walkthrough).
-- [ ] User approves Increment 4.
+- [x] User approves Increment 4.

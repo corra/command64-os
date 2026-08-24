@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment03-progress-core
 created: 2026-08-24
-status: approved
+status: closed
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment02-design-abi-review, approved and complete
 ---
@@ -97,3 +97,4 @@ active, walkthrough and trackers exist, and the user approves Increment 3.
   brain/walkthroughs/2026-08-24-casm-progress-increment03-progress-core.md.
   Awaiting user approval before Increment 4 wires real orchestration call
   sites.
+- 2026-08-24: **Closed, user-approved.** Increment 3 complete; walkthrough's Completion Gate fully checked.

@@ -2,7 +2,7 @@
 feature: casm-progress-increment05-source-include-integration
 plan: brain/plans/2026-08-24-casm-progress-increment05-source-include-integration.md
 date: 2026-08-24
-status: awaiting-approval
+status: approved
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 ---
 
@@ -157,5 +157,5 @@ Live under VICE, assembling a 452-statement two-file fixture
       `CASM_PASS_MODE_MEASURE` branch of `crpInclude`.
 - [x] No catalog/frame/event record changed; no new zero page.
 - [x] Envelope growth measured and approved; no-change rebuild stable.
-- [ ] Trackers agree (Taskwarrior annotated; plan Progress update pending).
-- [ ] User approves Increment 5.
+- [x] Trackers agree (Taskwarrior annotated; plan Progress update below).
+- [x] User approves Increment 5.

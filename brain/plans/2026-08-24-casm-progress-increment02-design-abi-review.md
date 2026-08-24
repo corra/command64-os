@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment02-design-abi-review
 created: 2026-08-24
-status: approved
+status: closed
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment01-activation-baseline, approved and complete
 ---
@@ -108,3 +108,4 @@ design before Increment 3 source edits.
   `brain/reviews/2026-08-24-casm-progress-design-abi-review.md`. Walkthrough:
   `brain/walkthroughs/2026-08-24-casm-progress-increment02-design-abi-review.md`.
   Awaiting final user approval before Increment 3 source edits begin.
+- 2026-08-24: **Closed, user-approved.** Increment 2 complete; walkthrough's Completion Gate fully checked.

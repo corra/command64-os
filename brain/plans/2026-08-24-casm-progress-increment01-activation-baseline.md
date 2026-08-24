@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment01-activation-baseline
 created: 2026-08-24
-status: approved
+status: closed
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: CASM Phases 9-13, complete and user-approved
 ---
@@ -96,3 +96,4 @@ outputs reproduce, trackers agree, and the user explicitly approves Increment 1.
   increment. Full detail:
   `brain/walkthroughs/2026-08-24-casm-progress-increment01-activation-baseline.md`.
   Awaiting user approval of the baseline before Increment 2 begins.
+- 2026-08-24: **Closed, user-approved.** Increment 1 complete; walkthrough's Completion Gate fully checked.

@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment05-source-include-integration
 created: 2026-08-24
-status: approved
+status: closed
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment04-pass-integration, approved and complete
 ---
@@ -115,3 +115,4 @@ evidence is recorded, trackers agree, and the user approves Increment 5.
   baseline hash. Full detail:
   brain/walkthroughs/2026-08-24-casm-progress-increment05-source-include-integration.md.
   Awaiting user approval before Increment 6.
+- 2026-08-24: **Closed, user-approved.** Increment 5 complete; walkthrough's Completion Gate fully checked.

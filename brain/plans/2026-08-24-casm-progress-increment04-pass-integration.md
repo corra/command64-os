@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment04-pass-integration
 created: 2026-08-24
-status: approved
+status: closed
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment03-progress-core, approved and complete
 ---
@@ -93,3 +93,4 @@ and no-change behavior have evidence in the walkthrough and user approval.
   headroom. Full detail:
   brain/walkthroughs/2026-08-24-casm-progress-increment04-pass-integration.md.
   Awaiting user approval before Increment 5.
+- 2026-08-24: **Closed, user-approved.** Increment 4 complete; walkthrough's Completion Gate fully checked.
