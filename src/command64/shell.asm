@@ -786,6 +786,47 @@ cmdDir:
     ldy ParsePos
     jsr shellSkipSpaces
     sty ParsePos
+
+    lda #0
+    sta dirPagingEnabled
+    ldy ParsePos
+cdPagingScan:
+    lda CommandBuffer, y
+    beq cdPagingDone
+    cmp #' '
+    beq cdPagingNext
+    cmp #'/'
+    bne cdPagingSkipToken
+    lda CommandBuffer + 1, y
+    cmp #'p'
+    bne cdPagingSkipToken
+    lda CommandBuffer + 2, y
+    beq cdPagingFound
+    cmp #' '
+    bne cdPagingSkipToken
+cdPagingFound:
+    lda #1
+    sta dirPagingEnabled
+cdPagingExcise:
+    lda CommandBuffer + 2, y
+    sta CommandBuffer, y
+    beq cdPagingDone
+    iny
+    bne cdPagingExcise
+cdPagingSkipToken:
+    iny
+    lda CommandBuffer, y
+    beq cdPagingDone
+    cmp #' '
+    bne cdPagingSkipToken
+cdPagingNext:
+    iny
+    cpy #79
+    bcc cdPagingScan
+cdPagingDone:
+    ldy ParsePos
+    jsr shellSkipSpaces
+    sty ParsePos
     
     lda #<CommandBuffer
     clc
@@ -839,6 +880,7 @@ cdOpenNoErr:            // Preflight passed but the real OPEN still failed —
 
     lda #1
     sta dirIsHeader
+    sta dirPageRow
 
     // Skip 2-byte load address
     jsr KernalGetIn
@@ -956,10 +998,35 @@ _skipSize:
 
     lda #PetCr
     jsr KernalChROUT
+
+    lda dirPagingEnabled
+    beq cdPageDone
+    inc dirPageRow
+    lda dirPageRow
+    cmp #24
+    bcc cdPageDone
+    jsr dirPause
+cdPageDone:
     
     jsr KernalREADST
     bne cdDone
     jmp cdLineLoop
+
+dirPause:
+    jsr KernalCLRCHN
+    lda #<morePromptMsg
+    ldy #>morePromptMsg
+    jsr petPrintString
+cdpWaitKey:
+    jsr KernalGetIn
+    beq cdpWaitKey
+    lda #PetCr
+    jsr KernalChROUT
+    ldx #13
+    jsr KernalCHKIN
+    lda #1
+    sta dirPageRow
+    rts
 
 cdDone:
     jsr KernalCLRCHN
@@ -3134,7 +3201,7 @@ verMsg:
 helpMsg:
     .text "CLS    - CLEAR SCREEN"
     .byte $0D
-    .text "DIR    - LIST DIRECTORY"
+    .text "DIR    - LIST DIRECTORY [/p]"
     .byte $0D
     .text "ECHO   - ECHO [TEXT]"
     .byte $0D
@@ -3295,6 +3362,8 @@ morePromptMsg:
 
 // Directory state variables and formatting strings
 dirIsHeader:      .byte 0
+dirPagingEnabled: .byte 0
+dirPageRow:       .byte 0
 dirSawQuote:      .byte 0
 dirSavedBlockLo:  .byte 0
 dirSavedBlockHi:  .byte 0

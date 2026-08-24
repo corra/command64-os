@@ -3727,14 +3727,19 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
 
 # Shell: `dir /p` Paged Directory Listing
 
-- [ ] `dir /p` paging (project `command64.shell`, Taskwarrior task 44,
+- [x] `dir /p` paging (project `command64.shell`, Taskwarrior task 44,
       `5ae09831-1204-4204-a962-0cbf0a228197`): plan approved 2026-08-21,
-      not yet implemented. Adds a `/p` option to `cmdDir`
+      implementation started 2026-08-21. Increment 1's baseline build
+      succeeded: `CommandShell` occupies `$10D1-$1EFD`, leaving 162
+      bytes before `$1FA0`. Adds a `/p` option to `cmdDir`
       (`src/command64/shell.asm:785`) that pauses output after 23 lines
       and waits for a keypress, modeled on `more`'s existing
       `morePause`/`mpWaitKey` pattern. Plan flags a real risk: `cmdDir`
       lives in the `CommandShell` segment, packed into the fixed,
       capped window between `$1000` (`ApiStub`) and `$1FA0`
-      (`VmmData`) — Increment 1 is a build-and-measure headroom check
-      before any logic is written. Full detail:
-      `brain/plans/2026-08-21-dir-p-paging.md`.
+      (`VmmData`). Implementation and the five-check user verification are
+      complete; build 2676 is clean with 36 bytes of `CommandShell`
+      headroom. Completion-gate closure approved 2026-08-22; Taskwarrior UUID
+      completed through the CLI (current ID 43). Full detail:
+      `brain/plans/2026-08-21-dir-p-paging.md` and
+      `brain/walkthroughs/2026-08-21-dir-p-paging.md`.

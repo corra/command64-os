@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Paged directory listings**: Added lowercase `/p` to `DIR`, accepted
+  before or after an optional device prefix. Paged listings pause after
+  each 23-line screenful with the existing `-- More --` prompt and resume
+  on any key; plain `DIR` remains unpaged.
 - **CASM data-construction directives (Phase 13 WP81-84)**: Added `.RES
   count[, value]` (reserve N bytes, default fill `0`), `.FILL count, value`
   (required fill value), `.ALIGN boundary[, fill]` (pad to a boundary), and
