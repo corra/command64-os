@@ -104,6 +104,10 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - `casmiddp1.s`/`casmiddc1.s`/`casmiddc2.s` raise an invalid-byte diagnostic
   before an unterminated child EOF. Fatal line draining must not append
   `DRAINAFTER`, `ROOTAFTER`, or other parent bytes after frame EOF/pop.
+- `test_casm_progress` is packaged on `test.d64` under the physical 16-character
+  name `test_casm_progre`; launch it by the full documented name. Increment 6
+  extends it to 22 cases, including directive-kind reset and cumulative accepted
+  byte boundaries 0, 1, 255, 256, 257, and 65,535.
 
 ## Child DOX Index
 

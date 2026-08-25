@@ -37,6 +37,8 @@
 .import progressStatement
 .import progressRenderTransient
 .import progressCompletePass
+.import progressBeginDirective
+.import progressDirectiveBytes
 .import progressAccumulateOutputBytes
 .import progressClearTransient
 .import progressSuspend
@@ -51,6 +53,9 @@
 .import CasmProgActiveHi
 .import CasmProgPass1TotalLo
 .import CasmProgPass1TotalHi
+.import CasmProgDirectiveKind
+.import CasmProgDirectiveLo
+.import CasmProgDirectiveHi
 
 ; CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/PASS_TOTAL_MISMATCH come from
 ; common.inc (Increment 4 moved them there); no local copy needed.
@@ -146,6 +151,14 @@ start:
     lda #'T'
     jsr KernalChROUT
     jsr caseFinalSummaryClearsAndPrints
+    jsr reportCase
+    lda #'U'
+    jsr KernalChROUT
+    jsr caseBeginDirectiveResetsState
+    jsr reportCase
+    lda #'V'
+    jsr KernalChROUT
+    jsr caseDirectiveByteBoundaries
     jsr reportCase
 
     lda #$0D
@@ -597,6 +610,68 @@ caseFinalSummaryClearsAndPrints:
     clc
     rts
 
+; ---------------------------------------------------------------------------
+; progressBeginDirective must retain the subtype while resetting stale byte
+; state. CASM_DIRECTIVE_FILL is used only as a representative valid subtype;
+; the routine deliberately does not reinterpret parser ABI values.
+; ---------------------------------------------------------------------------
+caseBeginDirectiveResetsState:
+    jsr progressInit
+    lda #$AA
+    sta CasmProgDirectiveLo
+    sta CasmProgDirectiveHi
+    lda #CASM_DIRECTIVE_FILL
+    jsr progressBeginDirective
+    lda CasmProgDirectiveKind
+    cmp #CASM_DIRECTIVE_FILL
+    bne cbdrFail
+    lda CasmProgDirectiveLo
+    bne cbdrFail
+    lda CasmProgDirectiveHi
+    bne cbdrFail
+    clc
+    rts
+cbdrFail:
+    sec
+    rts
+
+; ---------------------------------------------------------------------------
+; Exercise every cadence boundary required by the Increment 6 plan. The
+; routine stores caller-authoritative cumulative accepted bytes exactly;
+; rendering and emitter call cadence are later atomic increments.
+; ---------------------------------------------------------------------------
+caseDirectiveByteBoundaries:
+    jsr progressInit
+    lda #CASM_DIRECTIVE_INCBIN
+    jsr progressBeginDirective
+    ldy #0
+cdbLoop:
+    lda cdbValuesLo, y
+    ldx cdbValuesHi, y
+    tya
+    pha
+    lda cdbValuesLo, y
+    jsr progressDirectiveBytes
+    pla
+    tay
+    lda CasmProgDirectiveLo
+    cmp cdbValuesLo, y
+    bne cdbFail
+    lda CasmProgDirectiveHi
+    cmp cdbValuesHi, y
+    bne cdbFail
+    iny
+    cpy #6
+    bne cdbLoop
+    lda CasmProgDirectiveKind
+    cmp #CASM_DIRECTIVE_INCBIN
+    bne cdbFail
+    clc
+    rts
+cdbFail:
+    sec
+    rts
+
 .segment "BSS"
 FailCount:       .res 1
 ThrottleLastA:   .res 1
@@ -607,3 +682,7 @@ passMsg:
     .byte "CASM PROGRESS: PASS", PetCr, 0
 failMsg:
     .byte "CASM PROGRESS: FAIL", PetCr, 0
+cdbValuesLo:
+    .byte <0, <1, <255, <256, <257, <65535
+cdbValuesHi:
+    .byte >0, >1, >255, >256, >257, >65535

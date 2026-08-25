@@ -1,8 +1,8 @@
 # CASM Progress and Processing Indication
 
-Status: [ ]
-Type: Optional Future Feature
-Classification: Optional Feature (deferred)
+Status: [/]
+Type: Optional Feature
+Classification: Active, incrementally approved
 Taskwarrior: 33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`)
 Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
 
@@ -12,8 +12,9 @@ Add an always-on, bounded progress display for CASM source loading, include
 processing, Pass 1, Pass 2, and output writing without changing assembly output
 or deterministic replay.
 
-This optional feature may be deferred. The plan is approved for future use, but
-implementation is not active or authorized until its design/ABI review passes.
+This optional feature is active under separately approved increments. The
+design/ABI review and Increments 1-5 are complete and user-approved; Increment 6
+was activated 2026-08-24 with directive cadence restored to scope.
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.
 
@@ -43,8 +44,8 @@ renumber Phase 10, Symbol Map and Listing.
       with explicit user approval on 2026-07-29; this does not activate this
       feature or master-plan Phase 10, or satisfy the feature's separate
       design/ABI review gate.
-- [ ] Complete and approve the pre-implementation design/ABI review.
-- [ ] Freeze exact screen layout, storage, diagnostics, and register/flag ABI.
+- [x] Complete and approve the pre-implementation design/ABI review.
+- [x] Freeze exact screen layout, storage, diagnostics, and register/flag ABI.
 - [ ] Implement only in separately approved atomic increments.
 - [ ] Complete automated build, artifact, functional, cleanup, and performance
       verification.

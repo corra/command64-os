@@ -362,6 +362,11 @@ that increment begins:
 The detailed plans were drafted as planning records only. Their proposed
 technical decisions do not amend this parent contract until approved.
 
+Increment 6 amendment, user-approved 2026-08-24: restore bounded directive-byte
+cadence for `.RES`, `.FILL`, `.ALIGN`, and `.INCBIN`, superseding the directive
+part of Increment 2's size-driven scope trim. Any growth beyond the current
+`$7400` MAIN envelope remains separately gated on measured evidence.
+
 1. **Activation and baseline:** confirm the recorded Phase 9-13 completion state,
    create the dedicated implementation branch, refresh graph/source traces, and
    capture current MAIN/BSS, output/listing hashes, map/listing screen output,

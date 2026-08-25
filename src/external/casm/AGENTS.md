@@ -90,8 +90,16 @@ The `src/external/casm` directory owns CASM, a native Command 64
   `/L` are both fully implemented and production-active (see the durable
   Phase 10 architecture notes below). Phase 11 (base-release hardening,
   WP56-WP61) followed that: closed 2026-08-12 at CASM `0.2.2` build `1266`
-  (see the Phase 11 notes below). Progress indication is a deferred optional
-  feature outside the numbered phases.
+  (see the Phase 11 notes below). Progress indication is an active optional
+  feature outside the numbered phases; Increments 1-5 are complete and
+  Increment 6 directive-cadence integration is active.
+- Progress directive cadence keeps its own ordinary-BSS snapshot only:
+  `progressBeginDirective` takes the directive subtype in A and resets the
+  cumulative count; `progressDirectiveBytes` takes caller-authoritative
+  cumulative successfully accepted bytes in A/X. Neither routine owns emitter
+  state, zero page, parser/directive records, or resources. Callers must notify
+  only after `emitByte` succeeds and must preserve existing carry/diagnostic
+  precedence.
 - WP44 implements only the quoted include operand grammar: 1-63 original
   printable PETSCII bytes are stored outside the frozen token record, and valid
   syntax returns NOT IMPLEMENTED before file, VMM, PC, output, or emitter

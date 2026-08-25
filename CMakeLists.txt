@@ -1051,7 +1051,11 @@ if(Ca65_FOUND)
             # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
             # overflowed $6400 by 652 measured bytes; $6700 is the smallest
             # round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "6700")
+            # Progress Increment 6 Atomic Increment 3: directive rendering in
+            # progress.s plus fixed-fill hooks overflowed $6700 by 212 measured
+            # bytes; $6800 is the smallest round-page fit. User-approved
+            # 2026-08-24.
+            set(TEST_PRG_SIZE "6800")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real
@@ -1152,7 +1156,14 @@ if(Ca65_FOUND)
             # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
             # overflowed $6000 by 666 measured bytes; $6300 is the smallest
             # round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "6300")
+            # Progress Increment 6 Atomic Increment 3: directive rendering in
+            # progress.s plus fixed-fill hooks overflowed $6300 by 226 measured
+            # bytes; $6400 is the smallest round-page fit. User-approved
+            # 2026-08-24.
+            # Progress Increment 6 Atomic Increment 4: .INCBIN block-cadence
+            # hooks overflowed $6400 by 5 measured bytes; $6500 is the
+            # smallest round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6500")
         endif()
         if(TEST_NAME STREQUAL "casm_include")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1220,7 +1231,10 @@ if(Ca65_FOUND)
             # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
             # overflowed $1F00 by 634 measured bytes; $2200 is the smallest
             # round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "2200")
+            # Progress Increment 6 Atomic Increment 3: directive rendering in
+            # progress.s overflowed $2200 by 101 measured bytes; $2300 is the
+            # smallest round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "2300")
         endif()
         if(TEST_NAME STREQUAL "casm_event")
             # WP47: include.s (the event log) plus every module it
@@ -1250,7 +1264,10 @@ if(Ca65_FOUND)
             # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
             # overflowed $1F00 by 670 measured bytes; $2200 is the smallest
             # round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "2200")
+            # Progress Increment 6 Atomic Increment 3: directive rendering in
+            # progress.s overflowed $2200 by 137 measured bytes; $2300 is the
+            # smallest round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "2300")
         endif()
         if(TEST_NAME STREQUAL "casm_frame")
             # WP46: include.s (for includeCatalogLoad) plus the same
@@ -1350,7 +1367,11 @@ if(Ca65_FOUND)
             # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
             # overflowed $6300 by 772 measured bytes; $6700 is the smallest
             # round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "6700")
+            # Progress Increment 6 Atomic Increment 3: directive rendering in
+            # progress.s plus fixed-fill hooks overflowed $6700 by 76 measured
+            # bytes; $6800 is the smallest round-page fit. User-approved
+            # 2026-08-24.
+            set(TEST_PRG_SIZE "6800")
         endif()
         if(TEST_NAME STREQUAL "casm_listcap")
             # WP51 Increment 6: the same whole-object surface as casm_frame
@@ -1478,7 +1499,14 @@ if(Ca65_FOUND)
             # progressSourceLoadBytes) plus casm.s/diagnostics.s growth
             # overflowed $6800 by 696 measured bytes; $6B00 is the smallest
             # round-page fit. User-approved 2026-08-24.
-            set(TEST_PRG_SIZE "6B00")
+            # Progress Increment 6 Atomic Increment 3: directive rendering in
+            # progress.s plus fixed-fill hooks overflowed $6B00 by 256 measured
+            # bytes; $6C00 is the smallest round-page fit. User-approved
+            # 2026-08-24.
+            # Progress Increment 6 Atomic Increment 4: .INCBIN block-cadence
+            # hooks overflowed $6C00 by 35 measured bytes; $6D00 is the
+            # smallest round-page fit. User-approved 2026-08-24.
+            set(TEST_PRG_SIZE "6D00")
         endif()
         if(TEST_NAME STREQUAL "casm_progress")
             # Progress Increment 3: links the real progress.s directly --

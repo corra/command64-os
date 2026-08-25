@@ -40,6 +40,8 @@
 .export progressRenderTransient
 .export progressCompletePass
 .export progressSourceLoadBytes
+.export progressBeginDirective
+.export progressDirectiveBytes
 .export progressAccumulateOutputBytes
 .export progressClearTransient
 .export progressSuspend
@@ -65,6 +67,9 @@
 .export CasmProgActiveHi
 .export CasmProgPass1TotalLo
 .export CasmProgPass1TotalHi
+.export CasmProgDirectiveKind
+.export CasmProgDirectiveLo
+.export CasmProgDirectiveHi
 
 ; CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/PASS_TOTAL_MISMATCH now live in
 ; common.inc (Increment 4), alongside every other CASM_DIAG_* constant,
@@ -100,6 +105,9 @@ CasmProgDecScratchHi:  .res 1
 CasmProgBeginPassArg:  .res 1   ; private to progressBeginPass
 CasmProgLoadLo:        .res 1   ; private to progressSourceLoadBytes (display
 CasmProgLoadHi:        .res 1   ; value only -- never an accumulator)
+CasmProgDirectiveKind: .res 1   ; active RES/FILL/ALIGN/INCBIN subtype
+CasmProgDirectiveLo:   .res 1   ; cumulative bytes accepted by emitByte
+CasmProgDirectiveHi:   .res 1
 
 CASM_PROG_FLAG_VISIBLE   = $01
 CASM_PROG_FLAG_PASS2     = $02
@@ -225,6 +233,9 @@ progressInit:
     sta CasmProgFlags
     sta CasmProgByteLo
     sta CasmProgByteHi
+    sta CasmProgDirectiveKind
+    sta CasmProgDirectiveLo
+    sta CasmProgDirectiveHi
     rts
 
 ; ---------------------------------------------------------------------------
@@ -496,6 +507,89 @@ progressSourceLoadBytes:
     rts
 
 ; ---------------------------------------------------------------------------
+; progressBeginDirective
+; Starts bounded directive-byte progress state. This is state-only in
+; Increment 6 Atomic Increment 1; later increments add emitter hooks and
+; rendering after the resulting production envelope has been measured.
+; In: A = CASM_DIRECTIVE_RES/FILL/ALIGN/INCBIN subtype
+; Clobbers: A
+; ---------------------------------------------------------------------------
+progressBeginDirective:
+    sta CasmProgDirectiveKind
+    lda #0
+    sta CasmProgDirectiveLo
+    sta CasmProgDirectiveHi
+    rts
+
+; ---------------------------------------------------------------------------
+; progressDirectiveBytes
+; Stores the caller-authoritative cumulative number of directive bytes that
+; emitByte has successfully accepted. It deliberately does not accumulate a
+; delta: fixed-fill and INCBIN owners retain their existing authoritative
+; counters, so progress cannot drift or alter emission semantics. Calls arrive
+; only after a complete up-to-256-byte chunk commits, so rendering here cannot
+; become a per-byte hot-path call.
+; In: A/X = cumulative accepted bytes low/high
+; Clobbers: A, X, Y
+; ---------------------------------------------------------------------------
+progressDirectiveBytes:
+    sta CasmProgDirectiveLo
+    stx CasmProgDirectiveHi
+    lda CasmProgFlags
+    and #CASM_PROG_FLAG_VISIBLE
+    beq :+
+    jsr progressReturnToStart
+    :
+    lda CasmProgFlags
+    and #CASM_PROG_FLAG_PASS2
+    beq @p1
+    ldx #<msgP2Operation
+    ldy #>msgP2Operation
+    jmp @prefix
+@p1:
+    ldx #<msgP1Operation
+    ldy #>msgP1Operation
+@prefix:
+    jsr progressPrintStr         ; "p1: " / "p2: "             4
+    lda CasmProgDirectiveKind
+    cmp #CASM_DIRECTIVE_FILL
+    beq @fill
+    cmp #CASM_DIRECTIVE_ALIGN
+    beq @align
+    cmp #CASM_DIRECTIVE_INCBIN
+    beq @incbin
+    ldx #<msgResOperation
+    ldy #>msgResOperation
+    jmp @kind
+@fill:
+    ldx #<msgFillOperation
+    ldy #>msgFillOperation
+    jmp @kind
+@align:
+    ldx #<msgAlignOperation
+    ldy #>msgAlignOperation
+    jmp @kind
+@incbin:
+    ldx #<msgIncbinOperation
+    ldy #>msgIncbinOperation
+@kind:
+    jsr progressPrintStr         ; fixed directive field         7 = 11
+    lda CasmProgDirectiveLo
+    ldx CasmProgDirectiveHi
+    ldy #5
+    jsr progressPrintDec         ; cumulative accepted bytes     5 = 16
+    ldy #CASM_PROG_LINE_WIDTH - 16
+@pad:
+    lda #' '
+    jsr progressPrintChar
+    dey
+    bne @pad
+    lda CasmProgFlags
+    ora #CASM_PROG_FLAG_VISIBLE
+    sta CasmProgFlags
+    rts
+
+; ---------------------------------------------------------------------------
 ; progressClearTransient
 ; Erases the transient line in place (space-fills it, returns cursor to
 ; column 0) and clears the visible flag. Idempotent: a no-op when the line
@@ -608,3 +702,9 @@ msgP2Mid:      .byte ", P2 ", 0
 msgBytesMid:   .byte ", ", 0
 msgBytesTail:  .byte " BYTES", PetCr, 0
 msgLoadPrefix: .byte "LOAD F", 0
+msgP1Operation: .byte "P1: ", 0
+msgP2Operation: .byte "P2: ", 0
+msgResOperation: .byte "RES    ", 0
+msgFillOperation: .byte "FILL   ", 0
+msgAlignOperation: .byte "ALIGN  ", 0
+msgIncbinOperation: .byte "INCBIN ", 0

@@ -282,6 +282,31 @@ Scratch Contract" section:
 
 No unresolved finding from this pass.
 
+## Increment 6 ABI Amendment (user-approved 2026-08-24)
+
+The user restored the directive byte-cadence scope that the original review had
+trimmed. The Increment 6 plan owns the detailed implementation and retains a
+measured stop gate for any growth beyond the current `$7400` MAIN envelope.
+
+Atomic Increment 1 adds three ordinary BSS bytes, no zero page and no existing
+record growth:
+
+```
+CasmProgDirectiveKind    1   CASM_DIRECTIVE_RES/FILL/ALIGN/INCBIN
+CasmProgDirectiveLo/Hi   2   cumulative successfully accepted bytes
+```
+
+It also adds two public, non-rendering routines:
+
+| Routine | In | Out | Clobbers | Notes |
+|---|---|---|---|---|
+| `progressBeginDirective` | A = directive subtype | none | A | Stores kind and resets cumulative directive bytes |
+| `progressDirectiveBytes` | A/X = cumulative accepted bytes lo/hi | none | A, X | Stores caller-authoritative cumulative count; no rendering or emitter ownership |
+
+This amendment supersedes lines 144-149 only for directive cadence. The original
+no-zero-page, no-record-growth, no-import-cycle, and best-effort rendering
+contracts remain unchanged.
+
 ## Completion Gate
 
 - [x] Every ABI/storage/layout decision above is explicit.
