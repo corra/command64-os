@@ -1,15 +1,15 @@
 ---
 feature: casm-progress-increment06-directive-integration
 plan: brain/plans/2026-08-24-casm-progress-increment06-directive-integration.md
-status: in-progress
+status: complete
 ---
 
 # CASM Progress Increment 6 Directive Integration Walkthrough
 
 ## Status
 
-Increment 6 is active. Atomic Increments 1-6 are complete; Atomic Increment 7
-remains pending. This walkthrough does not close Increment 6.
+Increment 6 and all seven atomic increments are complete and user-approved as
+of 2026-08-24.
 
 ## Scope Amendment
 
@@ -154,8 +154,8 @@ above; the aggregate build and focused no-change builds pass with them.
 - [x] Atomic Increment 4 user sign-off received 2026-08-24.
 - [x] Atomic Increment 5 user sign-off received 2026-08-24.
 - [x] Atomic Increment 6 user sign-off received 2026-08-24.
-- [ ] Atomic Increment 7 complete.
-- [ ] Full Increment 6 walkthrough approved by the user.
+- [x] Atomic Increment 7 approved complete 2026-08-24.
+- [x] Full Increment 6 walkthrough approved by the user 2026-08-24.
 
 ## Atomic Increment 4 Envelope Gate
 
@@ -276,3 +276,50 @@ Atomic Increment 6 consolidated regression and artifact evidence is complete,
 pending explicit user approval.
 
 Atomic Increment 6 received explicit user approval on 2026-08-24.
+
+## Atomic Increment 7 Final Closeout Evidence
+
+### Timing
+
+The expanded real-emitter `test_casm_directives` harness is the byte-heavy
+directive witness that did not exist at Increment 1 baseline time. One live run
+performs a 65,535-byte fixed fill, a 65,535-byte synthetic `.INCBIN`, all exact
+cadence boundaries, overflow/failure precedence, and both pass modes. Under the
+same PAL/true-drive VICE configuration it completed and returned to the shell
+within the declared 75-second window.
+
+This is a conservative upper bound rather than a subroutine-only cycle count,
+because it includes Command64 dispatch and PRG loading. It is still below the
+Increment 1 baseline's 86.24-second tiny `.INCBIN` proxy (`/L /M`) and therefore
+proves no end-to-end timing-cap breach despite exercising over 131KB of accepted
+directive bytes.
+
+### Envelope And Storage
+
+- Production CASM: 25,228 code bytes, 4,020 relocation points.
+- MAIN envelope: `$7400` (29,696 bytes), leaving 4,468 bytes headroom.
+- Focused directives harness: 2,802 code bytes, 506 relocation points.
+- All approved harness envelope increases remain the smallest measured
+  round-page fits; no Atomic Increment 7 growth was needed.
+- Fresh `casm_phase13_test.d64`: 327 free blocks before runtime outputs; 323
+  after the four one-block accepted fixture outputs.
+- No zero-page, record-layout, parser, catalog, stream, or resource contract
+  changed in Increment 6.
+
+### Final Gates
+
+- Exact no-change builds: all affected directive, expression, pass,
+  listing-capture, frame, fault, progress, and production CASM targets pass
+  without compilation, linking, or build-counter drift.
+- Four production directive artifacts remain COMP-identical to references.
+- `git diff --check`: pass.
+- VICE 3.10: responsive and running at the device-9 Command64 prompt.
+- DOX pass: existing `src/external/casm/AGENTS.md` and `tests/AGENTS.md`
+  contracts already describe the new ABI and harness packaging; no Atomic
+  Increment 7 contract change requires another DOX edit.
+
+Atomic Increment 7 and Increment 6 are verification-complete and
+user-approved.
+
+Atomic Increment 7 and Increment 6 received explicit user completion approval
+on 2026-08-24.

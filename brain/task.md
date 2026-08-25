@@ -3563,17 +3563,15 @@
       `CasmSourceFileId` alone cannot distinguish parent/child, resolved
       via `CasmFrameCatalogIndex`). MAIN grown again to `$7400`
       (measured, user-approved).
-    - [/] Increment 6 (directive integration): activated 2026-08-24 with
-      explicit user approval to restore `.RES`/`.FILL`/`.ALIGN`/`.INCBIN`
-      cadence. Atomic Increment 1 (operation state and focused boundaries)
-      complete: 22-case `test_casm_progress` passes live under VICE and all
-      focused/production/disk builds are clean. Atomic Increment 2 complete:
-      fixed-fill emission now uses explicit at-most-256-byte chunks; the
-      10-case real-emitter harness includes a 257-byte boundary case and passes
-      live under VICE. Atomic Increment 3 candidate implemented but paused at
-      the measured harness-envelope gate: six one-page increases require user
-      approval (catalog/event/pass1/passcheck/frame/listcap);
-      MAIN growth beyond `$7400` remains a measured approval gate.
+    - [x] Increment 6 (directive integration): complete and user-approved
+      2026-08-24. Restored bounded `.RES`/`.FILL`/`.ALIGN`/`.INCBIN` cadence
+      after each successfully accepted up-to-256-byte chunk. The 18-case
+      real-emitter harness covers exact 0/1/255/256/257/65535 boundaries,
+      overflow, read/emit/close precedence, and both pass modes. Seven
+      consolidated harnesses pass live; four Phase 13 artifacts are
+      COMP-identical to references. Production remains within `$7400` with
+      4,468 bytes headroom; directive-heavy timing completed within 75 seconds.
+      Walkthrough: `brain/walkthroughs/2026-08-24-casm-progress-increment06-directive-integration.md`.
     - [ ] Increment 7 (output/diagnostics/listing/map integration): not
       started.
   - [ ] Meet the 5% representative and 10% stress slowdown limits.

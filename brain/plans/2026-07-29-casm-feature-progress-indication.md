@@ -367,6 +367,9 @@ cadence for `.RES`, `.FILL`, `.ALIGN`, and `.INCBIN`, superseding the directive
 part of Increment 2's size-driven scope trim. Any growth beyond the current
 `$7400` MAIN envelope remains separately gated on measured evidence.
 
+Increment 6 completed and received explicit user approval on 2026-08-24. The
+feature remains active; Increment 7 is next under its detailed plan.
+
 1. **Activation and baseline:** confirm the recorded Phase 9-13 completion state,
    create the dedicated implementation branch, refresh graph/source traces, and
    capture current MAIN/BSS, output/listing hashes, map/listing screen output,

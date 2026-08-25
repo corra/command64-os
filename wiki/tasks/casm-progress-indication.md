@@ -13,8 +13,8 @@ processing, Pass 1, Pass 2, and output writing without changing assembly output
 or deterministic replay.
 
 This optional feature is active under separately approved increments. The
-design/ABI review and Increments 1-5 are complete and user-approved; Increment 6
-was activated 2026-08-24 with directive cadence restored to scope.
+design/ABI review and Increments 1-6 are complete and user-approved; Increment 6
+closed 2026-08-24 with bounded directive cadence restored.
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.
 

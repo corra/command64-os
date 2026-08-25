@@ -1,7 +1,7 @@
 ---
 feature: casm-progress-increment06-directive-integration
 created: 2026-08-24
-status: in-progress
+status: complete
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment05-source-include-integration, approved and complete
 ---
@@ -10,7 +10,7 @@ depends-on: casm-progress-increment05-source-include-integration, approved and c
 
 ## Status
 
-**Approved and activated 2026-08-24.** Parent plan:
+**Complete and user-approved 2026-08-24.** Parent plan:
 `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
 
 ## Scope Amendment (user-approved 2026-08-24)
@@ -226,3 +226,19 @@ performance, size, and regressions have walkthrough evidence and user approval.
   Increment 6 remains active; directive-heavy timing, final envelope/no-change
   verification, walkthrough reconciliation, and the Increment 6 completion
   gate are next.
+- 2026-08-24: **Atomic Increment 7 verification complete; Increment 6
+  completion sign-off pending.** The directive-heavy real-emitter harness
+  performs both 65,535-byte fixed-fill and `.INCBIN` paths plus exact boundary,
+  failure, and both-pass cases; it completed within its declared 75-second
+  PAL/true-drive window. This conservative upper bound is below Increment 1's
+  86.24-second tiny `.INCBIN` proxy baseline, so no timing cap was breached.
+  Production CASM remains at 25,228 code bytes/4,020 relocations with 4,468
+  bytes free in `$7400`. Every affected target is an exact no-change build.
+  The clean Phase 13 image had 327 free blocks before the four one-block runtime
+  outputs and 323 after. `git diff --check` passes; VICE 3.10 remains healthy.
+  The walkthrough is reconciled, but neither Atomic Increment 7 nor Increment 6
+  may be marked complete until explicit user approval.
+- 2026-08-24: **Atomic Increment 7 and Increment 6 approved complete.** The
+  user accepted timing, envelope, no-change, artifact, disk-capacity, DOX, and
+  walkthrough evidence. Increment 7 output/diagnostic/listing integration is
+  next under its separately approved plan.
