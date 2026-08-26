@@ -368,10 +368,14 @@ combinations pass, regressions and caps pass, walkthrough exists, and user appro
   the baseline was wall-time-without-warp against this session's cycles. A
   like-for-like isolation (pre-progress `casm.prg` from the merge-base, timed
   in the same session and bracket) is required before the budget can be
-  claimed. Recorded as **not demonstrated**; the tracker checkbox stays open.
-  This does not block Increment 7, whose Completion Gate covers correctness,
-  ordering, and regression -- the feature-level performance budget belongs to
-  master-plan Increment 11.
+  claimed.
+
+  **Resolved 2026-08-26**: the user accepted that the timing difference may
+  nominally exceed the established limits. Recorded as a formal amendment to
+  the parent plan's Performance Budget (the mechanism that section requires
+  for any threshold change); the caps are no longer blocking, "stop and
+  redesign" is waived, and no redesign is required. The isolation measurement
+  is optional, not a prerequisite.
 
   **Byte accounting** cross-checked against real reference file sizes across
   four output shapes: 323/323, 44/44, 6/6, and 6002/6002 -- static,

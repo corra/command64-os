@@ -338,6 +338,35 @@ Acceptance thresholds, measured in the same VICE configuration:
 - Stop and redesign if either threshold is exceeded. Do not weaken the threshold
   during implementation without a plan amendment and explicit approval.
 
+### Amendment, user-approved 2026-08-26
+
+**The user accepts that the measured timing difference may nominally exceed
+these limits.** The thresholds are no longer blocking for this feature, and
+the "stop and redesign" instruction above is waived accordingly. This is the
+plan amendment plus explicit approval that the preceding bullet requires.
+
+Measured position at the time of acceptance (after Increment 7, `CASM 0.4.0`
+build `1378`), raw end-to-end against Increment 1's baselines:
+
+| Fixture | Role | Baseline | Measured | Delta | Original cap |
+|---|---|---|---|---|---|
+| `casmbiga.s`+`casmbigb.s` | representative large | 228.14s | 257.06s | +12.7% | 5% |
+| `casmopall.s` | short-statement stress | 87.74s | 104.76s | +19.4% | 10% |
+
+These figures are not an isolated measurement of progress-indication
+overhead, and should not be cited as one. `casm.prg` grew from 31,185 to
+33,368 bytes between baseline and measurement, covering Phase 13 as well as
+this feature; under true-drive emulation that is added load time charged to
+every run regardless of statement count, visible in the floor moving from the
+baseline's 82-88s cluster to 95.24s. The baseline was recorded as wall time
+without warp, whereas the measurement used emulated cycles under
+`WarpMode: 1`, and the measurement brackets differ. A like-for-like isolation
+against a pre-progress `casm.prg` in a single session would separate feature
+overhead from code-size growth; it is **not** required for this feature to
+proceed, and remains available if a future increment needs the number.
+
+No redesign is required. Increments 8-11 proceed.
+
 ## Atomic Implementation Increments
 
 ### Detailed Plan Index

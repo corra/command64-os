@@ -84,15 +84,23 @@ renumber Phase 10, Symbol Map and Listing.
 
 Do not mark this task done until the user approves the completed walkthrough.
 
-## Open Performance Item (as of 2026-08-26)
+## Performance Thresholds -- Amended 2026-08-26
 
-The approved acceptance thresholds -- no more than 5% elapsed-time regression
-on the representative large fixture and 10% on the short-statement stress
-fixture -- are **not yet demonstrated met**. Raw end-to-end measurement after
-Increment 7 is over both (`casmbiga`+`casmbigb` +12.7%, `casmopall.s` +19.4%),
-but that measurement does not isolate this feature: `casm.prg` grew from
-31,185 to 33,368 bytes since the baseline, covering Phase 13 as well as
-progress, which adds true-drive load time to every run regardless of statement
-count. A like-for-like isolation against a pre-progress `casm.prg` in the same
-VICE session is required before the budget can be claimed or a redesign judged
-necessary. This must be settled before the feature's completion gate.
+The original acceptance thresholds were no more than 5% elapsed-time
+regression on the representative large fixture and 10% on the short-statement
+stress fixture. Raw end-to-end measurement after Increment 7 exceeded both
+(`casmbiga`+`casmbigb` 228.14s -> 257.06s, +12.7%; `casmopall.s` 87.74s ->
+104.76s, +19.4%).
+
+**The user accepted the nominal excess on 2026-08-26**, recorded as a formal
+amendment to the parent plan's Performance Budget. The caps are no longer
+blocking, the "stop and redesign" instruction is waived, and no redesign is
+required.
+
+These figures are not isolated progress-indication overhead and should not be
+cited as such. `casm.prg` grew from 31,185 to 33,368 bytes between baseline
+and measurement, covering Phase 13 as well as this feature; under true-drive
+emulation that is added load time charged to every run regardless of statement
+count, visible in the floor moving from 82-88s to 95.24s. A like-for-like
+isolation against a pre-progress `casm.prg` in a single session remains
+available but is optional.

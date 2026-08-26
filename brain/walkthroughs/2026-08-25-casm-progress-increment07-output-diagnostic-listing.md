@@ -175,7 +175,7 @@ baseline timed dispatch-to-`VALIDATED`; this harness includes stopwatch reset,
 subprocess spawn, and up to 0.5s poll granularity), so these figures are
 reported as an end-to-end envelope, not a precise per-statement cost.
 
-### Performance acceptance thresholds are NOT yet demonstrated met
+### Performance acceptance thresholds -- exceeded, and accepted by the user
 
 The parent plan's Performance Budget sets hard acceptance thresholds:
 **no more than 5% elapsed-time regression on the representative large
@@ -206,15 +206,18 @@ and material:
    only valid to the extent the baseline session was not itself throttled.
 3. The measurement brackets differ, as described above.
 
-**What this requires:** a like-for-like isolation before the feature can
-claim its budget -- a pre-progress `casm.prg` built from the merge-base and
-timed in the *same* VICE session, same warp setting, same bracket, as the
-current build. Until that is done, the acceptance thresholds are recorded as
-**not demonstrated**, and the corresponding tracker checkbox stays open. This
-is flagged rather than resolved here because Increment 7's own Completion
-Gate covers correctness, ordering, and regression -- not the feature-level
-performance budget, which belongs to the feature's own completion gate
-(master-plan Increment 11).
+**Resolution, 2026-08-26:** the user accepted that the measured timing
+difference may nominally exceed the established limits. This was recorded as
+a formal amendment to the parent plan's Performance Budget -- the mechanism
+that section itself requires for any threshold change -- so the thresholds
+are no longer blocking and the "stop and redesign" instruction is waived. No
+redesign is required and Increments 8-11 proceed.
+
+A like-for-like isolation (pre-progress `casm.prg` built from the merge-base
+and timed in the same VICE session, warp setting, and bracket) would separate
+feature overhead from code-size growth. It is **not** required for this
+feature to proceed, and remains available should a future increment need the
+number.
 
 ### Byte-accounting cross-checks
 

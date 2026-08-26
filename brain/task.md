@@ -3585,17 +3585,19 @@
       match real reference sizes exactly at 323/44/6/6002 across static, R6,
       minimal, and at-scale shapes. 666 bytes MAIN headroom at `$7400`.
       Walkthrough: `brain/walkthroughs/2026-08-25-casm-progress-increment07-output-diagnostic-listing.md`.
-  - [ ] Meet the 5% representative and 10% stress slowdown limits.
-    **OPEN and currently NOT demonstrated.** Raw end-to-end measurement on
-    2026-08-26 is over both caps (`casmbiga+casmbigb` +12.7% vs 5%;
-    `casmopall.s` +19.4% vs 10%), but does not isolate this feature:
-    `casm.prg` grew 31,185 -> 33,368 bytes since baseline covering Phase 13
-    *as well as* progress, adding true-drive load time to every run (floor
-    moved 82-88s -> 95.24s), and the baseline was wall-time-without-warp vs.
-    this session's cycles. Needs a like-for-like isolation -- pre-progress
-    `casm.prg` from the merge-base, timed in the same VICE session, warp
-    setting, and bracket -- before the budget can be claimed or a redesign
-    judged necessary. Must be settled before master-plan Increment 11.
+  - [x] 5% representative / 10% stress slowdown limits: **user accepted the
+    nominal excess 2026-08-26**, recorded as a formal amendment to the parent
+    plan's Performance Budget (the mechanism that section requires for any
+    threshold change). Caps are no longer blocking; "stop and redesign" is
+    waived; no redesign required. Measured raw end-to-end after Increment 7:
+    `casmbiga+casmbigb` 228.14s -> 257.06s (+12.7% vs a 5% cap);
+    `casmopall.s` 87.74s -> 104.76s (+19.4% vs a 10% cap). These are **not**
+    isolated feature overhead and must not be cited as such: `casm.prg` grew
+    31,185 -> 33,368 bytes since baseline covering Phase 13 *as well as*
+    progress, adding true-drive load time to every run (floor moved 82-88s ->
+    95.24s), and the baseline was wall-time-without-warp vs. this session's
+    emulated cycles. A like-for-like isolation against a pre-progress
+    `casm.prg` in one session remains available but is optional.
   - [ ] Complete full implementation review before runtime acceptance or merge.
     (Increments 8-11: automated verification, full review, runtime
     acceptance, completion gate -- not started.)
