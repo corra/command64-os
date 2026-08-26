@@ -1055,7 +1055,10 @@ if(Ca65_FOUND)
             # progress.s plus fixed-fill hooks overflowed $6700 by 212 measured
             # bytes; $6800 is the smallest round-page fit. User-approved
             # 2026-08-24.
-            set(TEST_PRG_SIZE "6800")
+            # Progress Increment 7 Atomic Increment 1: primary-artifact
+            # accounting hooks overflowed $6800 by 12 measured bytes; $6900
+            # is the smallest round-page fit. User-approved 2026-08-25.
+            set(TEST_PRG_SIZE "6900")
         endif()
         if(TEST_NAME STREQUAL "casm_passcheck")
             # WP30: exercises emitCheckPassAgreement in isolation (no real

@@ -61,6 +61,7 @@
 .export fileWrite
 .export progressBeginDirective
 .export progressDirectiveBytes
+.export progressAccumulateOutputBytes
 ; This harness supplies these directly (the whole point -- ppsFillDirective
 ; is bypassed), not as unreachable stand-ins.
 .export CasmFillCountLo
@@ -1034,6 +1035,9 @@ progressDirectiveBytes:
     bne :+
     inc ProgressCallsHi
     :
+    rts
+
+progressAccumulateOutputBytes:
     rts
 
 .segment "RODATA"

@@ -13,8 +13,13 @@ processing, Pass 1, Pass 2, and output writing without changing assembly output
 or deterministic replay.
 
 This optional feature is active under separately approved increments. The
-design/ABI review and Increments 1-6 are complete and user-approved; Increment 6
-closed 2026-08-24 with bounded directive cadence restored.
+design/ABI review and Increments 1-7 are complete and user-approved; Increment 6
+closed 2026-08-24 with bounded directive cadence restored. Increment 7 (output,
+diagnostic, listing, and map integration) was approved and activated 2026-08-25
+and closed 2026-08-26, delivering primary-output byte accounting, the
+`WRITE: <name>` line, a universal fatal-diagnostic transient clear, `/L` and
+`/M` suspension, and the `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` final summary.
+Increment 8 (automated verification) is next and not yet approved.
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.
 
@@ -78,3 +83,16 @@ renumber Phase 10, Symbol Map and Listing.
 7. Run the timing matrix and confirm both performance limits.
 
 Do not mark this task done until the user approves the completed walkthrough.
+
+## Open Performance Item (as of 2026-08-26)
+
+The approved acceptance thresholds -- no more than 5% elapsed-time regression
+on the representative large fixture and 10% on the short-statement stress
+fixture -- are **not yet demonstrated met**. Raw end-to-end measurement after
+Increment 7 is over both (`casmbiga`+`casmbigb` +12.7%, `casmopall.s` +19.4%),
+but that measurement does not isolate this feature: `casm.prg` grew from
+31,185 to 33,368 bytes since the baseline, covering Phase 13 as well as
+progress, which adds true-drive load time to every run regardless of statement
+count. A like-for-like isolation against a pre-progress `casm.prg` in the same
+VICE session is required before the budget can be claimed or a redesign judged
+necessary. This must be settled before the feature's completion gate.

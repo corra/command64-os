@@ -34,6 +34,7 @@
 .import listingMirrorByte
 .import progressBeginDirective
 .import progressDirectiveBytes
+.import progressAccumulateOutputBytes
 
 ; WP81: .RES/.FILL/.ALIGN's resolved count/boundary and value/fill byte,
 ; staged by parser.s's ppsFillDirective.
@@ -1108,6 +1109,9 @@ efWrite:
     ldy #>CasmEmitBuffer
     jsr fileWrite
     bcs efFail
+    lda CasmIoLenLo
+    ldx CasmIoLenHi
+    jsr progressAccumulateOutputBytes
     lda #0
     sta CasmEmitLen
     clc

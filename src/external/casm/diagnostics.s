@@ -80,6 +80,12 @@
 ; Terminal, fatal-path-only line recovery. See its contract in source.s.
 .import sourceDrainLineTail
 
+; Progress Increment 7 (Atomic Increment 4): one-way edge, matching
+; progress.s's own module boundary (see its file header) -- diagnostics.s
+; may import only this one routine, never anything else from progress.s,
+; and progress.s never imports anything back.
+.import progressClearTransient
+
 .segment "BSS"
 
 ; Fatal rendering can drain the remainder of an unterminated included line.
@@ -143,6 +149,19 @@ diagPrintString:
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 diagPrintFatal:
+    ; Progress Increment 7 (Atomic Increment 4): universal transient clear
+    ; before any fatal diagnostic prints, per the Hook Contract -- so a
+    ; stale progress line can never overwrite or precede diagnostic text,
+    ; source context, a caret, or an include traceback. Stashed across the
+    ; call because progressClearTransient documents "Clobbers: A, Y" and A
+    ; holds the diagnostic identifier the dispatch below still needs.
+    ; progressClearTransient cannot itself fail or recurse into a fatal
+    ; diagnostic -- it is a pure OS_API print sequence with no error path
+    ; (confirmed by reading its body: ahPrintChar's own KERNAL CHROUT call
+    ; is unconditionally successful).
+    pha
+    jsr progressClearTransient
+    pla
     cmp #CASM_DIAG_LISTING_CREATE_FAILED
     bcs dpfNotMain
     jmp dpfMainRange

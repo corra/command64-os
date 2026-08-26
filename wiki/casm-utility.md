@@ -77,8 +77,10 @@ are matched case-insensitively (`/o:out.prg` works the same as `/O:OUT.PRG`).
    references (using a label before its definition) work.
 3. **Pass 2** re-walks the same source from the start, now that every label
    resolves, and actually emits the PRG.
-4. On success, it prints `CASM: INPUT VALIDATED` and returns to the shell.
-   The output PRG is on disk and ready to `LOAD`.
+4. On success, it prints a `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` summary
+   (both passes' statement totals and the final PRG size), then
+   `CASM: INPUT VALIDATED`, and returns to the shell. The output PRG is on
+   disk and ready to `LOAD`.
 5. On any error, it prints one specific diagnostic (see
    [Example 4: Error Messages](#example-4-error-messages)), deletes the
    partial output file if one was created, and returns to the shell — no

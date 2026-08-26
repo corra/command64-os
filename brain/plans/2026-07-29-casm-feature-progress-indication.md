@@ -367,8 +367,13 @@ cadence for `.RES`, `.FILL`, `.ALIGN`, and `.INCBIN`, superseding the directive
 part of Increment 2's size-driven scope trim. Any growth beyond the current
 `$7400` MAIN envelope remains separately gated on measured evidence.
 
-Increment 6 completed and received explicit user approval on 2026-08-24. The
-feature remains active; Increment 7 is next under its detailed plan.
+Increment 6 completed and received explicit user approval on 2026-08-24.
+Increment 7 was approved and activated on 2026-08-25 under its detailed plan,
+and **completed with explicit user approval on 2026-08-26** -- all eight of its
+Atomic Increments closed, Completion Gate satisfied (see
+`brain/walkthroughs/2026-08-25-casm-progress-increment07-output-diagnostic-listing.md`).
+The feature remains active; Increment 8 (automated verification) is next and
+is not yet approved or activated.
 
 1. **Activation and baseline:** confirm the recorded Phase 9-13 completion state,
    create the dedicated implementation branch, refresh graph/source traces, and

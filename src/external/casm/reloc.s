@@ -35,6 +35,7 @@
 .import CasmPassMode
 .import CasmRelocatableMode
 .import fileWrite
+.import progressAccumulateOutputBytes
 
 .export relocInit
 .export relocRecord
@@ -222,6 +223,9 @@ rfChunkReady:
     ldy #>CasmVmmBuffer
     jsr fileWrite
     bcs rfRet
+    lda CasmIoLenLo
+    ldx CasmIoLenHi
+    jsr progressAccumulateOutputBytes
 
     lda RelocFinalizeOffsetLo
     clc
@@ -262,6 +266,9 @@ rfTableDone:
     ldy #>CasmVmmBuffer
     jsr fileWrite
     bcs rfRet
+    lda CasmIoLenLo
+    ldx CasmIoLenHi
+    jsr progressAccumulateOutputBytes
     clc
 rfRet:
     rts

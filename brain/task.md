@@ -3572,9 +3572,30 @@
       COMP-identical to references. Production remains within `$7400` with
       4,468 bytes headroom; directive-heavy timing completed within 75 seconds.
       Walkthrough: `brain/walkthroughs/2026-08-24-casm-progress-increment06-directive-integration.md`.
-    - [ ] Increment 7 (output/diagnostics/listing/map integration): not
-      started.
+    - [x] Increment 7 (output, diagnostics, listing, and map): complete and
+      user-approved 2026-08-26. Delivered primary-output byte accounting at
+      `emitFlush` and relocation table/footer boundaries, the `WRITE: <name>`
+      persistent line, a universal fatal-diagnostic transient clear
+      (`diagnostics.s` importing exactly one routine from `progress.s`, one-way
+      edge), `progressSuspend` before `/L` and `/M`, and the
+      `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` final summary ahead of the
+      documented `CASM: INPUT VALIDATED`. 31 harnesses across 6 images pass
+      with zero failures; five option combinations (`default`, `/M`, `/L`,
+      `/M /L`, `/S`) are byte-identical to references; reported byte counts
+      match real reference sizes exactly at 323/44/6/6002 across static, R6,
+      minimal, and at-scale shapes. 666 bytes MAIN headroom at `$7400`.
+      Walkthrough: `brain/walkthroughs/2026-08-25-casm-progress-increment07-output-diagnostic-listing.md`.
   - [ ] Meet the 5% representative and 10% stress slowdown limits.
+    **OPEN and currently NOT demonstrated.** Raw end-to-end measurement on
+    2026-08-26 is over both caps (`casmbiga+casmbigb` +12.7% vs 5%;
+    `casmopall.s` +19.4% vs 10%), but does not isolate this feature:
+    `casm.prg` grew 31,185 -> 33,368 bytes since baseline covering Phase 13
+    *as well as* progress, adding true-drive load time to every run (floor
+    moved 82-88s -> 95.24s), and the baseline was wall-time-without-warp vs.
+    this session's cycles. Needs a like-for-like isolation -- pre-progress
+    `casm.prg` from the merge-base, timed in the same VICE session, warp
+    setting, and bracket -- before the budget can be claimed or a redesign
+    judged necessary. Must be settled before master-plan Increment 11.
   - [ ] Complete full implementation review before runtime acceptance or merge.
     (Increments 8-11: automated verification, full review, runtime
     acceptance, completion gate -- not started.)

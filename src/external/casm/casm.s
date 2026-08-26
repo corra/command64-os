@@ -151,6 +151,8 @@
 .import progressCompletePass
 .import progressCheckPassTotals
 .import progressRenderTransient
+.import progressSuspend
+.import progressFinalSummary
 .import progressSourceLoadBytes
 .import CasmProgArgDepth
 .import CasmProgArgFileId
@@ -355,19 +357,21 @@ startPass2Setup:
                                  ; out of range from here too
 startListingCaptureDone:
     jsr lexerInit
-    bcs startFatalNear
+    bcs startFatalNear2          ; Increment 7 growth pushed startFatalNear
+                                 ; out of range from these three checks too
     ldx #<CasmOutputName
     ldy #>CasmOutputName
     jsr fileCreateOutput
-    bcs startFatalNear
+    bcs startFatalNear2
     ; WP40: allocate the relocation table once, before Pass 2's real
     ; emission begins, unconditionally regardless of static/relocatable
     ; mode -- a static assembly's table simply stays empty (Phase 0C.14/17
     ; freeze; see reloc.s).
     jsr relocInit
-    bcs startFatalNear
+    bcs startFatalNear2
     jsr emitInit
-    bcs startFatalNear
+    bcs startFatalNear2          ; Increment 7 growth pushed startFatalNear
+                                 ; out of range from this check too
     lda #CASM_PASS_MODE_EMIT
     sta CasmPassMode
     ; Progress Increment 4: begin Pass 2 only after CasmPassMode is set to
@@ -417,6 +421,27 @@ startListingCaptureDone:
     bcs startFatalNear
 startListingFinalizeDone:
 
+    ; Progress Increment 7 (Atomic Increment 3): the "write: <name>"
+    ; persistent finalization line, per the Hook Contract -- after pass/
+    ; listing-capture agreement, before emitFinalize. progressCompletePass
+    ; just above already cleared the transient line as its own first
+    ; action, so there is nothing left on screen to clear here. A one-shot
+    ; print straight from casm.s, not a progress.s routine: the Increment 2
+    ; design review's own conclusion for exactly this case ("load:"/
+    ; "write:" persistent lines are cheap enough for the calling module to
+    ; emit directly"). The full CasmOutputName is printed, not an 8-char
+    ; truncated field -- this is a persistent line, not the 34-column
+    ; transient status line, so no width contract applies.
+    ldx #<msgWritePrefix
+    ldy #>msgWritePrefix
+    jsr diagPrintString
+    ldx #<CasmOutputName
+    ldy #>CasmOutputName
+    jsr diagPrintString
+    ldx #<msgProgressCrOnly
+    ldy #>msgProgressCrOnly
+    jsr diagPrintString
+
     jsr emitFinalize
     bcs startFatalNear
     ; WP41: append the relocation table and R6 footer, unconditionally --
@@ -439,6 +464,18 @@ startListingFinalizeDone:
     lda CasmCliOptions
     and #CASM_OPT_LIST
     beq startListingWriteDone
+    ; Progress Increment 7 (Atomic Increment 5): suspend before
+    ; listingWriteFile, per the Hook Contract. progressCompletePass at
+    ; Pass 2's own end already cleared the transient line and nothing
+    ; between there and here renders it again -- this call is defensive
+    ; completeness against a future increment adding rendering to any of
+    ; the intervening steps, not a fix for an observed bug today.
+    ; progressSuspend is idempotent (its own progressClearTransient no-ops
+    ; when nothing is visible), so calling it here even though the line is
+    ; already clear costs nothing and asserts the ownership boundary
+    ; explicitly: listing rows, map symbol iteration, and VMM capture
+    ; loops must never be instrumented.
+    jsr progressSuspend
     jsr listingWriteFile
     bcs startFatalNear
 startListingWriteDone:
@@ -452,10 +489,26 @@ startListingWriteDone:
     and #CASM_OPT_MAP
     beq startMapDone
     jsr diagClearLoc
+    ; Progress Increment 7 (Atomic Increment 5): suspend before mapPrint --
+    ; same rationale as the listingWriteFile suspend above. Both fire in
+    ; sequence when /L and /M are combined, matching "including option
+    ; combinations."
+    jsr progressSuspend
     jsr mapPrint
     bcs startFatalNear
 startMapDone:
 
+    ; Progress Increment 7 (Atomic Increment 6): print the approved final
+    ; summary ("done: p1 NNNNN, p2 NNNNN, NNNNN bytes") ahead of the
+    ; existing success message, rather than replacing it. Keeping
+    ; "CASM: INPUT VALIDATED" is deliberate: docs/casm-utility.md documents
+    ; it as CASM's success signal verbatim ("On success, it prints CASM:
+    ; INPUT VALIDATED and returns to the shell"), so removing it would be a
+    ; breaking documentation change, not an internal detail -- user-decided
+    ; 2026-08-26. progressFinalSummary clears the transient line itself
+    ; first; nothing has rendered since the last mapPrint/listingWriteFile
+    ; suspend, so that call is a no-op here, not a fix for a live bug.
+    jsr progressFinalSummary
     jsr diagPrintPhase2Ready
     jmp exitSuccess
 
@@ -1684,4 +1737,10 @@ CrcBitMaskTable: .byte 1, 2, 4, 8, 16, 32, 64, 128
 versionBanner:
     .byte "CASM V", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."
     .byte BUILD_NUMBER
+    .byte PetCr, 0
+
+; Progress Increment 7.
+msgWritePrefix:
+    .byte "WRITE: ", 0
+msgProgressCrOnly:
     .byte PetCr, 0

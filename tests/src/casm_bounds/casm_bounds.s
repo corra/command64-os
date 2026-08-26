@@ -78,6 +78,7 @@
 .export fileWrite
 .export progressBeginDirective
 .export progressDirectiveBytes
+.export progressAccumulateOutputBytes
 ; WP81: emit.s links whole, so its new emitRes/emitFill/emitAlign pull in
 ; parser.s's CasmFillCountLo/Hi/CasmFillValue externs even though this
 ; harness never dispatches .RES/.FILL/.ALIGN -- one-byte stand-ins, same
@@ -679,6 +680,7 @@ fileWrite:
 ; ---------------------------------------------------------------------------
 progressBeginDirective:
 progressDirectiveBytes:
+progressAccumulateOutputBytes:
     rts
 
 .segment "RODATA"
