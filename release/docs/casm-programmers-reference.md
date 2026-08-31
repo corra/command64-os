@@ -8,8 +8,8 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 13 + progress indication complete (build 1380, version
-> 0.5.0).** Phase 13 (WP81-85) added the data-construction directives
+> **Status: Phase 13 + progress indication + memory optimization complete
+> (version 0.5.1).** Phase 13 (WP81-85) added the data-construction directives
 > `.RES` / `.FILL` / `.ALIGN` / `.INCBIN` / `.ASSERT` and closed at `0.4.0`
 > build `1349`. The optional **progress and processing indication** feature
 > (`progress.s`, outside the numbered phases) then added the in-place
@@ -235,7 +235,7 @@ buffer) is read but never modified.
 | Option | Meaning | Status |
 |---|---|---|
 | *(bare filename)* | Source file — **1 to 8** of them (`CASM_SOURCE_COUNT_MAX`), concatenated in command-line order | implemented |
-| `/O:<name>` | Explicit output filename (≤63 chars) | implemented |
+| `/O:<name>` | Explicit output filename (≤32 chars) | implemented |
 | `/S` | Static output: the assembly must supply its own `.ORG`, and the PRG carries no relocation trailer | implemented |
 | `/M` | Map file: prints the deterministic symbol map (`mapPrint`, `map.s`) after the PRG (and any `/L` listing) is committed | implemented (WP52 module, WP54 wiring) |
 | `/L` | Listing file: derives a `.LST` name (`cliDeriveListingName`), captures Pass 2's traversal, and serializes the frozen 40-column listing format (`listingWriteFile`, `listing.s`) after the PRG is committed | implemented (WP51/WP53 modules, WP54 wiring) |
@@ -261,7 +261,7 @@ read **slot 0** (the first source name), tracking the last `.` seen *after*
 the last `:` (device-prefix colons reset the tracked dot, so `8:foo.bar`
 treats `.bar` as the extension, not anything before the colon). If a dot was
 found, truncate there and append `PRG`; otherwise append `.PRG`. Both cases
-bounds-check against `CASM_FILENAME_MAX` (63) and fail with
+bounds-check against `CASM_FILENAME_MAX` (32) and fail with
 `CASM_DIAG_FILENAME_TOO_LONG` rather than silently truncating.
 
 ## 6. File & Stream Services (`fileio.s`)
@@ -462,7 +462,7 @@ buffer and one-byte length live in `lexer.s` BSS; consumers may read only
 payload is the outer bound, and the scanner also checks its buffer explicitly.
 
 **`lexerScanIncludeOperand`** is a second, deliberately separate entry point
-used only for a `.INCLUDE` operand, because an include filename (up to 63
+used only for a `.INCLUDE` operand, because an include filename (up to 32
 bytes) does not fit the frozen 31-byte token payload. It scans the quoted
 string following an already-consumed `.INCLUDE` directive into
 `parser.s`'s own `CasmIncludeFilename` buffer, leaves the stable token record
@@ -472,8 +472,8 @@ iteration is unaffected. The grammar it enforces:
 | Rule | Failure |
 |---|---|
 | A `"` must open the operand | `CASM_DIAG_INCLUDE_FILENAME_EXPECTED` |
-| 1-63 payload bytes, each printable PETSCII (`$20-$7E` or `$A0-$FE`); the quote itself is the delimiter and never payload | `CASM_DIAG_INVALID_INCLUDE_FILENAME` (empty or non-printable) |
-| A closing `"` within 63 bytes | `CASM_DIAG_INCLUDE_FILENAME_TOO_LONG` |
+| 1-32 payload bytes, each printable PETSCII (`$20-$7E` or `$A0-$FE`); the quote itself is the delimiter and never payload | `CASM_DIAG_INVALID_INCLUDE_FILENAME` (empty or non-printable) |
+| A closing `"` within 32 bytes | `CASM_DIAG_INCLUDE_FILENAME_TOO_LONG` |
 | Only the statement terminator may follow | `CASM_DIAG_EXPECTED_NEWLINE` |
 
 Payload bytes are stored in their **original** PETSCII spelling — no case
@@ -557,7 +557,7 @@ syntax/expression paths without STRING-specific parser integration.
 `lexerScanIncludeOperand` instead of the operand grammar above. The scanned
 filename lands in this module's `CasmIncludeFilename` (64 bytes) /
 `CasmIncludeFilenameLen`, kept here rather than in the token record because
-63 bytes do not fit the frozen 31-byte payload. The parser validates and
+32 bytes do not fit the frozen 31-byte payload. The parser validates and
 stores; it performs no file, VMM, PC or output effect of any kind
 ([§16](#16-include-processing-phase-9-complete)).
 
@@ -971,7 +971,7 @@ production build (`CASM DMAIN.S /O:DASH.PRG`, seven source files chained
 through one `.INCLUDE` from `dmain.s`) exercises this path on every real
 assembly. The phase contract (Phase 0C.19, in
 `brain/plans/2026-07-25-casm-phase9-include-processing.md`) freezes: quoted
-1-63-byte raw-PETSCII filenames, inherited parent devices unless explicitly
+"1-32"-byte raw-PETSCII filenames, inherited parent devices unless explicitly
 prefixed, immutable Pass 1 loading with filesystem-free Pass 2 replay, 16
 include levels, 32 physical files, 128 include events, and the existing
 65,535-byte combined source cap.
@@ -1164,7 +1164,7 @@ complete):
 - **Up to eight top-level source files**, concatenated in command-line order
   with per-file line numbers in diagnostics.
 - **`.INCLUDE`**, fully wired into `casmRunPass` dispatch (WP47): quoted
-  1-63-byte filenames, inherited parent device unless explicitly prefixed,
+  "1-32"-byte filenames, inherited parent device unless explicitly prefixed,
   up to 32 distinct physical files deduplicated by identity, 16 nesting
   levels, Pass 1 real I/O via `includeCatalogLoad` replayed filesystem-free
   in Pass 2 via `includeCatalogLookup` ([§16](#16-include-processing-phase-9-complete)).
@@ -1217,7 +1217,7 @@ Bounded capacities worth knowing before writing large source: 512 symbols,
 4,096 relocation entries, 31-byte identifiers, 8 source files, 64KB combined
 source, 4,096 listing records per assembly (`/L`). Frozen for Phase 9, in
 place but not yet exercised by a live assembly: 32 distinct included files,
-16 nesting levels, 63-byte include filenames.
+16 nesting levels, 32-byte include filenames.
 
 ## 19. Diagnostic Reference
 
@@ -1346,7 +1346,7 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$30` | `RELOC_TABLE_FULL` | RELOC TABLE FULL |  | `reloc.s` (4096 entries) *(Phase 8 range ends here)* |
 | `$31` | `INCLUDE_FILENAME_EXPECTED` | INCLUDE FILENAME EXPECTED | ✓ | `lexer.s` (no opening quote after `.INCLUDE`) |
 | `$32` | `INVALID_INCLUDE_FILENAME` | INVALID INCLUDE FILENAME | ✓ | `lexer.s` (empty or non-printable byte), `include.s` (empty post-prefix name) |
-| `$33` | `INCLUDE_FILENAME_TOO_LONG` | INCLUDE FILENAME TOO LONG | ✓ | `lexer.s` (>63 payload bytes) *(WP44 range ends here)* |
+| `$33` | `INCLUDE_FILENAME_TOO_LONG` | INCLUDE FILENAME TOO LONG | ✓ | `lexer.s` (>32 payload bytes) *(WP44 range ends here)* |
 | `$34` | `INCLUDE_CATALOG_FULL` | INCLUDE CATALOG FULL | ✓ | `include.s` (32 distinct physical files) *(WP45 range ends here)* |
 | `$35` | `INCLUDE_DEPTH_EXCEEDED` | INCLUDE DEPTH EXCEEDED | ✓ | `source.s` (`sourceFramePush`, 16 levels) |
 | `$36` | `INCLUDE_CYCLE_DETECTED` | INCLUDE CYCLE DETECTED | ✓ | `source.s` (candidate already in the active frame chain) *(WP46 range ends here)* |

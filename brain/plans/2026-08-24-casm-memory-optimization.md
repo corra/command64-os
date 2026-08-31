@@ -10,13 +10,14 @@ depends-on: CASM progress-indication feature (task 33) closed through Increment 
 
 ## Status
 
-**Approved 2026-08-31** (Taskwarrior 42,
-`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`, `depends:33`). Drafted 2026-08-24
-from a measured audit, per this project's per-work-package-plan-approval
-requirement (`.agents/workflows/phased-implementation-planning.md`).
-Implementation remains blocked until the prerequisite lands: the
-progress-indication feature (Taskwarrior 33) must close through its
-Increment 11 (Increments 8-11 still open as of approval).
+**All 10 increments executed 2026-08-31; awaiting user sign-off to close.**
+Approved 2026-08-31 (Taskwarrior 42,
+`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`). Prerequisite (progress-indication
+task 33) merged to `main` earlier the same day. **Recovered 2,068 bytes**
+of MAIN (D 482 + E 108 + A 653 + B 585 + C 240); headroom at `$7400`
+642 -> 2,710; MAIN still `$7400`; version `0.5.0` -> `0.5.1`. Walkthrough:
+`brain/walkthroughs/2026-08-24-casm-memory-optimization.md`. One
+pre-existing defect exposed and deferred (Taskwarrior 43).
 
 Prerequisite: the CASM progress-indication feature (Taskwarrior 33) closed
 through Increment 11. This WP is deliberately sequenced last (Scoping
@@ -952,3 +953,13 @@ become user-facing.
   pre-Pass-1 diagnostic, garbling the banner on early fatal exit -- from
   progress-indication Increment 7, confirmed byte-identical on `main`,
   deferred per the stop condition. Increment 10 (closeout) is next.
+- 2026-08-31: **Increment 10 (closeout) executed.** Full build clean;
+  no-change rebuild stable. Final envelope: `__MAIN_LAST__` `$A169`,
+  headroom at `$7400` **2,710** (from 642), MAIN unchanged. Total recovered
+  **2,068 bytes**. Assembled-output byte-identity argued on code review (no
+  emit-path file touched) and confirmed live (`casmpg128.s` -> `00129
+  BYTES`, matches pre-WP). Version `0.5.0` -> `0.5.1`. Updated `CHANGELOG`,
+  `brain/KNOWLEDGE.md`, `docs/` + `wiki/` CASM references (filename limit
+  63 -> 32), trackers; walkthrough written; four memories added. Stray root
+  PNGs removed from the branch. **Awaiting user sign-off to close
+  Taskwarrior 42.**

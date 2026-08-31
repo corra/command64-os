@@ -41,8 +41,8 @@ CASM <source>... [/O:<output>] [/S] [/M] [/L]
   assemble, up to 8, concatenated in the order given on the command line
   (each keeps its own line numbers for diagnostics). A 9th source name is
   `CASM: TOO MANY SOURCE FILES`.
-- **`/O:<output>`** (optional): explicit output filename, up to 63
-  characters. Without it, the output name is derived from the *first*
+- **`/O:<output>`** (optional): explicit output filename, up to 32
+  characters (reduced from 63 by the memory-optimization WP). Without it, the output name is derived from the *first*
   source file: its extension (the part after the last `.` that comes after
   any device-prefix `:`) is replaced with `.PRG`, or `.PRG` is appended if
   it has none. For example, `CASM GAME.CSM` writes `GAME.PRG`; `CASM
@@ -423,10 +423,10 @@ needing them all named on the `CASM` command line:
 
 Rules:
 
-- The filename must be a quoted string, 1-63 printable characters, right
+- The filename must be a quoted string, 1-32 printable characters, right
   after `.INCLUDE`. A missing opening quote is `CASM: INCLUDE FILENAME
   EXPECTED`; an empty or unprintable name is `CASM: INVALID INCLUDE
-  FILENAME`; over 63 characters is `CASM: INCLUDE FILENAME TOO LONG`.
+  FILENAME`; over 32 characters is `CASM: INCLUDE FILENAME TOO LONG`.
 - A file with no explicit device prefix (`8:`, `9:`, `10:`, `11:`) is read
   from the *including* file's own device — so a chain of includes stays on
   whichever disk the top-level source came from unless a child explicitly
