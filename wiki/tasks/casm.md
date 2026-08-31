@@ -2390,6 +2390,23 @@ behavior changed beyond the version/build artifact itself.
 
 ## Known Non-Critical Bugs
 
+- [/] Taskwarrior 43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`):
+      **`diagPrintFatal` reads uninitialized `CasmProgFlags` on an early
+      fatal, garbling the banner.** `casm.s:start` calls `progressInit`
+      only at `startPass1`, so any diagnostic raised before Pass 1 (CLI /
+      file / lexer-init failures -- `FILENAME TOO LONG`, `CANNOT OPEN
+      INPUT`, `UNKNOWN OPTION`, ...) reaches `diagPrintFatal` ->
+      `progressClearTransient` with `CasmProgFlags` holding uninitialized
+      RAM; if bit 0 is set, its 34-cursor-left + space-fill erase runs over
+      the current screen line. Diagnostic *text* is still correct; the
+      defect is cosmetic and pre-Pass-1 only. Pre-existing on `main` from
+      progress-indication Increment 7; exposed during the memory-
+      optimization WP's Increment 9 and deferred per that plan's stop
+      condition. **Plan approved 2026-08-31:**
+      `brain/plans/2026-08-31-casm-progclear-early-fatal-fix.md`, branch
+      `feature/casm-progclear-early-fatal-fix`. Fix: relocate the single
+      `jsr progressInit` up into `casm.s:start`'s early-init block.
+
 - [ ] Taskwarrior `be8ca0bf-ac7c-40f6-960e-2ca816bc7fb8`: **listing output
       shows a blank line between each row when printed to a real C64 screen.**
       Root cause: `listing.s` (Phase 10 / WP51-WP53) correctly emits exactly

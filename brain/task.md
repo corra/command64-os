@@ -3716,10 +3716,13 @@
     from progress-indication Increment 7; **confirmed byte-identical on
     `main`**. Disclosed and deferred per the memory-optimization plan's
     stop condition.
-  - Fix candidate (one line): clear `CasmProgFlags` (or call
-    `progressInit`) after `sourceInit` in `casm.s:start`, mirroring the
-    existing `diagClearLoc`/`listingStateInit` placement. Needs its own
-    approved plan before source edits.
+  - **Plan approved 2026-08-31:**
+    `brain/plans/2026-08-31-casm-progclear-early-fatal-fix.md`. Branch
+    `feature/casm-progclear-early-fatal-fix` off `main`. Fix: relocate the
+    single `jsr progressInit` from `startPass1` up into `casm.s:start`'s
+    early-init block (after `sourceInit`), mirroring the
+    `diagClearLoc`/`listingStateInit` placement. 3 increments (fix+static,
+    live checkpoint-read verification, closeout); CASM `0.5.1` -> `0.5.2`.
 
 - [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
       build duration display on completion (success and failure)

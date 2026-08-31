@@ -1,20 +1,21 @@
 ---
 feature: casm-progclear-early-fatal-fix
 created: 2026-08-31
-status: proposed
+status: approved
 taskwarrior: 43 (5dad4e4f-8392-468f-8807-0ff37a98c33c)
 depends-on: none (branches off main after the memory-optimization merge)
+branch: feature/casm-progclear-early-fatal-fix
 ---
 
 # Plan: CASM diagPrintFatal reads uninitialized CasmProgFlags on an early fatal
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-08-31 from the defect exposed
-during the CASM memory-optimization WP's Increment 9 live verification and
-deferred there per that plan's stop condition ("a genuinely new defect
-outside this WP's scope: disclose and defer"). No implementation until
-approved.
+**Approved 2026-08-31.** Drafted from the defect exposed during the CASM
+memory-optimization WP's Increment 9 live verification and deferred there
+per that plan's stop condition ("a genuinely new defect outside this WP's
+scope: disclose and defer"). Branch `feature/casm-progclear-early-fatal-fix`
+off `main` after the memory-optimization merge.
 
 Small corrective WP, same class as the Phase 12 WP72/WP73/WP76 forward-
 reference fixes -- one ordering change in `casm.s`, no new logic.
