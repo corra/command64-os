@@ -156,6 +156,98 @@ implementation approach should be re-planned against the current
 `diagnostics.s` before Increment 8, and Increments 7/9's matrices updated
 to the seven-table reality.
 
+## Increment 2 Finding D Research (executed 2026-08-31)
+
+**Result: Finding D proceeds. Cap = 32 for both `CASM_FILENAME_MAX` and
+`CASM_INCLUDE_FILENAME_MAX`. User-approved 2026-08-31, knowingly accepting a
+narrow diagnostic-text change (see below).**
+
+### True reachable maximum
+
+Command64's filesystem is CBM DOS end to end -- there is **no long-name
+path**. Confirmed by reading:
+
+- `src/command64/path.asm` `findFile`/`checkExistence`: name goes straight
+  to `KernalSETNAM` + `KernalOPEN`; matching is whatever the 1541 does (16
+  significant characters).
+- `src/command64/file.asm` `fileOpen`: `parsePointerDevice` strips a
+  `8:`..`11:` prefix, then the remainder is copied null-terminated into
+  `FileScratch` (`$1FA2..$1FFB`, 90 bytes) with **no length cap**, `,T,W`
+  (4 bytes) appended for write mode, then `SETNAM`. The only hard ceiling
+  the OS imposes is the 90-byte `FileScratch` overrun into `SysDate`.
+- `src/command64/apptable.asm:309,753`: app-name fields are `max 16 chars`.
+
+So the longest filename that can **actually resolve to a file on disk**:
+
+| Component | Bytes |
+| --- | --- |
+| CBM DOS directory entry (hard limit) | 16 |
+| Device prefix `8:`..`11:` (stored verbatim in CASM's buffers; the OS strips it) | +3 |
+| Synthetic `.PRG` / `.LST` extension appended by `cliDeriveOutputName` / `cliDeriveListingName` | +4 |
+| **Worst realistic case in a CASM buffer** | **23** |
+
+`.INCLUDE` / `.INCBIN` operands are user source text but must resolve to a
+real file, so the same 16 (+prefix) ceiling applies; longer operands are
+accepted into the buffer today and simply never open.
+
+### The behavior-contract tension and the decision
+
+`cliCopySource` / `cliParseOutput` (`cli.s:229,344`) and `lnString`
+(`lexer.s:434,612`) reject a filename token only at
+`CASM_FILENAME_MAX` / `CASM_INCLUDE_FILENAME_MAX` = 63, raising
+`FILENAME_TOO_LONG`. Names of 24..63 chars are **accepted today** and fail
+later (`CANNOT OPEN INPUT`, `CANNOT CREATE OUTPUT`, include-not-found).
+
+Lowering the cap to 32 moves that rejection boundary: inputs of 33..63
+chars now raise `CASM: FILENAME TOO LONG` at parse time instead of their
+current downstream diagnostic. **The outcome is identical** (assembly
+fails, no output artifact) and no name that can resolve to a real file is
+affected -- only the diagnostic *text* differs, and only for names that
+could never have opened. This does trip the plan's stop condition as
+literally worded; the user reviewed it and **approved cap = 32**
+(9 bytes margin over the proven 23) on 2026-08-31.
+
+### Buffers affected -- larger than the 2026-08-24 audit tallied
+
+The audit's Finding-D table listed 13 buffers / 832 bytes. Re-grep found
+more MAIN-resident BSS keyed off these two caps:
+
+| Symbol | File | Current | At cap 32 |
+| --- | --- | --- | --- |
+| `CasmSourceNames` (8 x `FILENAME_BUFFER_SIZE`) | `cli.s:41` | 512 | 264 |
+| `CasmOutputName`, `CasmListingName` | `cli.s:44,46` | 128 | 66 |
+| `CasmIncludeFilename` (+len), `CasmIncbinFilename` (+len) | `parser.s:144,155` | 128 | 66 |
+| `CasmIncludeKeyName` | `include.s:100` | 64 | 33 |
+| `CASM_LISTING_OPEN_NAME_SIZE` | `common.inc:1456` | 68 | ~36 |
+| `CASM_LISTING_RESOLVED_NAME_SIZE` | `common.inc:1465` | 68 | ~36 |
+| `CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE` | `common.inc:~373` | `>= 68` | `>= ~37` |
+| **Approx. MAIN total** | | **~1,090** | **~540** |
+
+Projected saving **~550 bytes**, in line with the audit's ~520.
+
+### Constraints Increment 3 must honor
+
+- `.assert`s to update (not drop): `common.inc:234` (`= 64`),
+  `common.inc:235` (`= 64`), `common.inc:307`, `common.inc:376`,
+  `common.inc:1457`, `common.inc:1466`, `common.inc:1467`;
+  `parser.s:148,149,159,160` (the "exactly 65 bytes" include/incbin state
+  asserts).
+- `cliDeriveOutputName` / `cliDeriveListingName` use `CASM_FILENAME_MAX - 2`
+  / `- 3` as the extension-write ceiling -- these keep working at 32
+  (32 - 3 = 29 >= the 23 worst case + the 4-char extension still fits the
+  33-byte buffer: 23 + 4 + null = 28 <= 33). Verify the exact `cpx`
+  comparisons still admit every derivable name <= the proven max.
+- **Include VMM physical record** (`CASM_INCLUDE_PHYS_REC_NAME` = offset 8,
+  `CASM_INCLUDE_PHYS_REC_SIZE` = 128, REU-resident, **zero MAIN cost**):
+  leave the 128-byte record alone. Increment 3 must check whether
+  `includeCatalog*` writes/reads the name field with a hardcoded 64 or with
+  `CASM_INCLUDE_FILENAME_BUFFER_SIZE`; if the latter, the on-REU name
+  reservation simply shrinks with the constant and the 2 x 64-byte window
+  transfer is unaffected (record stays 128). If a hardcoded 64 is found,
+  keep it -- do **not** widen the MAIN buffer back to match.
+- At-cap (exactly 32) and over-cap (33) fixtures for: a command-line source
+  name, an `/O` name, an `.INCLUDE` operand, an `.INCBIN` operand.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -403,3 +495,15 @@ become user-facing.
   set still exactly `$3D..$43`), but Increments 7-9 need re-scoping to the
   current structure before Finding C is implemented. Paused here for user
   direction on Finding C re-scoping vs. proceeding D/E/A/B first.
+- 2026-08-31: **Increment 2 (Finding D research) executed.** Command64's
+  filesystem is CBM DOS with no long-name path (verified in
+  `path.asm`/`file.asm`/`apptable.asm`); the true reachable filename max is
+  23 bytes (16-char DOS entry + 3-char device prefix + 4-char synthetic
+  extension). CASM currently accepts up to 63. **User approved cap = 32**
+  for both `CASM_FILENAME_MAX` and `CASM_INCLUDE_FILENAME_MAX`, knowingly
+  accepting that `FILENAME_TOO_LONG` now fires for 33..63-char inputs that
+  previously failed downstream with the same outcome but different
+  diagnostic text. Re-grep found more cap-keyed MAIN buffers than the audit
+  (~1,090 -> ~540 bytes, ~550 saved). See the new "Increment 2 Finding D
+  Research" section for the affected-buffer table and Increment 3
+  constraints. Increment 3 (implementation) is next.
