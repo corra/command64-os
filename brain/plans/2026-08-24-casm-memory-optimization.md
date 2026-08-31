@@ -10,7 +10,7 @@ depends-on: CASM progress-indication feature (task 33) closed through Increment 
 
 ## Status
 
-**All 10 increments executed 2026-08-31; awaiting user sign-off to close.**
+**COMPLETE -- user-approved close 2026-08-31 (Taskwarrior 42 done).**
 Approved 2026-08-31 (Taskwarrior 42,
 `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`). Prerequisite (progress-indication
 task 33) merged to `main` earlier the same day. **Recovered 2,068 bytes**

@@ -2,7 +2,7 @@
 feature: casm-memory-optimization
 plan: brain/plans/2026-08-24-casm-memory-optimization.md
 taskwarrior: 42 (33d69dd5-c96b-4d3a-a27c-9fd93cc31de3)
-status: awaiting user sign-off
+status: complete (user-approved 2026-08-31)
 completed: 2026-08-31
 ---
 
@@ -122,11 +122,10 @@ cosmetic and pre-Pass-1 only.
 - [x] Full build clean; no-change rebuild stable.
 - [x] Assembled output unchanged (no emit-path file touched; live byte count matches pre-WP).
 - [x] Envelope evidence recorded; MAIN still `$7400`.
-- [ ] Trackers agree and the user explicitly approves closing this WP.
+- [x] Trackers agree and the user explicitly approves closing this WP (2026-08-31).
 
-## Manual step for the user
+## Closed
 
-Nothing further to run -- the live verification is complete. Please review
-this walkthrough and the plan's per-increment sections, and confirm the WP
-may be closed (Taskwarrior 42 -> done). Task 43 (the deferred
+User approved 2026-08-31. Taskwarrior 42 done; branch
+`feature/casm-memory-optimization` merged to `main`. Task 43 (the deferred
 `CasmProgFlags` defect) stays open as its own follow-up.

@@ -3662,7 +3662,7 @@
     - Increments 9-11 all complete and user-approved 2026-08-31 (see
       above); the feature is closed and merged to `main`.
 
-- [ ] Taskwarrior #42 (`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`): CASM memory
+- [x] Taskwarrior #42 (`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`): CASM memory
       optimization -- recover ~2 KB of MAIN across five findings, strict
       "identical observable behavior" contract
   - Plan: `brain/plans/2026-08-24-casm-memory-optimization.md`; **approved
@@ -3700,7 +3700,7 @@
     sub-cases + Finding D filename cap, all correct. Exposed a pre-existing
     defect deferred to task 43.
   - Walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
-    **awaiting user sign-off to close (Taskwarrior 42 -> done).**
+    **CLOSED 2026-08-31, user-approved. Taskwarrior 42 done.**
 
 - [/] Taskwarrior #43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`): CASM --
       `diagPrintFatal`'s `progressClearTransient` reads uninitialized

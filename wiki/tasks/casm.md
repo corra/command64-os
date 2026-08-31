@@ -2352,7 +2352,7 @@ behavior changed beyond the version/build artifact itself.
 
 ## Optional Feature - Memory Optimization
 
-- [ ] Taskwarrior task 42, UUID `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`:
+- [x] Taskwarrior task 42, UUID `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3` (CLOSED 2026-08-31, user-approved):
       recover roughly 2 KB of CASM's MAIN envelope across five independent
       findings with a strict "identical observable behavior" contract -- no
       change to diagnostic text/identifiers, accepted filenames, assembled
@@ -2386,7 +2386,7 @@ behavior changed beyond the version/build artifact itself.
   pre-`startPass1` diagnostics; garbles the banner on early fatal exit;
   confirmed byte-identical on `main`, from progress-indication Increment 7).
 - Walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
-  **awaiting user sign-off to close (Taskwarrior 42 -> done).**
+  **CLOSED 2026-08-31, user-approved. Taskwarrior 42 done.**
 
 ## Known Non-Critical Bugs
 
