@@ -449,6 +449,52 @@ untouched.**
 Cumulative D + E + A + B: headroom `642 -> 2,470` (**1,828 bytes**).
 CASM build 1383 -> 1384.
 
+## Increment 7 Host-side diagnostic-table verifier (executed 2026-08-31)
+
+**Done. `scripts/verify_casm_diag_table.py` created, wired POST_BUILD on
+the `casm` target. Passes against the unmodified dispatch (86 ids + 2
+extras); catches both an internal `--self-test` corruption and a real
+injected message edit.**
+
+### What it does
+
+1. Re-assembles `diagnostics.s` with `ca65 -g`, relinks it with the other
+   `build/out_casm/*.o` at `$3800` with `ld65 -Ln` to get every local
+   label's address.
+2. Reads `casm.prg`, and for each diagnostic id walks `diagPrintFatal`'s
+   dispatch exactly as the 6502 code does: the six parallel `.byte <msg`
+   tables (`diagMessageLo`, `diagListMessageLo`, `diagWp81/82/83MessageLo`,
+   `diagProgressMessageLo`), then the nine-entry `cmp`/`beq` chain
+   (`$42..$4A`). Follows each pointer to its string.
+3. Demasks every byte `& 0x7F` (the `ca65 -t c64` charmap sets bit 7 /
+   swaps case -- the exact trap the audit's first verifier hit), renders
+   `msgCasmPrefix` + body + `msgCR`, and compares to a **frozen `EXPECTED`
+   dict** transcribed from the task-42 Increment 1 baseline and
+   cross-checked against `docs/casm-utility.md`.
+4. Also checks id coverage is exactly `$01..$56` and that `msgPhase2Ready`
+   / `msgUnknown` (the two non-table entries that share the helper) match.
+
+`decode_id_to_body()` is the one function Finding C rewrites: when the six
+tables collapse to one dense table, it becomes a single loop over that
+table and `BEQ_CHAIN` is deleted. The `EXPECTED` dict is the invariant and
+does not change.
+
+### Verification of the verifier
+
+| Run | Result |
+| --- | --- |
+| Current (post-Finding-B) dispatch | `OK: all 86 diagnostic identifiers + 2 extras` |
+| `--self-test` (appends `X` to one decoded body) | `FAIL 0x2A ...` then `self-test OK: corruption detected as expected` |
+| Real edit: `msgOrgRequired` `"ORG REQUIRED"` -> `"ORG MISSING"`, rebuild | `FAIL 0x21: 'CASM: ORG MISSING\r' != 'CASM: ORG REQUIRED\r'`, exit 1 |
+| After revert + rebuild | `OK`, exit 0 |
+
+### Wiring
+
+`CMakeLists.txt`: `add_custom_command(TARGET casm POST_BUILD ...)` running
+the script, so a broken id->message mapping fails the build. Skipped when
+`CASM_ENABLE_DIAG_DUMP_TOKEN=ON` (the verifier re-assembles `diagnostics.s`
+without that define). No MAIN size impact. CASM build 1384 -> 1386.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -750,3 +796,13 @@ become user-facing.
   `casm.s`/`map.s` untouched; full build clean. Cumulative D+E+A+B headroom
   `642 -> 2,470`. Increment 7 (host-side diagnostic-table verifier) is
   next.
+- 2026-08-31: **Increment 7 (host-side diagnostic-table verifier)
+  executed.** `scripts/verify_casm_diag_table.py` created -- re-links
+  `diagnostics.s` with `-g`/`-Ln`, walks `diagPrintFatal`'s six tables +
+  nine-entry `beq` chain in the linked `casm.prg`, demasks `& 0x7F`, and
+  compares every id's rendered text to a frozen `EXPECTED` dict from the
+  Increment 1 baseline. Passes on the current dispatch (86 ids + 2 extras);
+  `--self-test` and a real `msgOrgRequired` edit both caught (exit 1).
+  Wired `POST_BUILD` on the `casm` target. `decode_id_to_body()` is the
+  only part Finding C rewrites; the `EXPECTED` dict is the invariant.
+  Increment 8 (Finding C) is next.

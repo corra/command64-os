@@ -403,6 +403,22 @@ if(Ca65_FOUND)
     endif()
     add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "7400"
         EXTRA_DEFINES ${CASM_CA65_DEFINES})
+
+    # Finding C guard (memory-optimization WP, task 42): decode the linked
+    # casm.prg and check every fatal-diagnostic identifier ($01..$56) still
+    # renders exactly its frozen text. diagPrintFatal's id->message mapping
+    # has no build-time .assert -- a wrong entry prints a *misleading*
+    # diagnostic. Runs after every casm build; a mismatch fails the build.
+    if(NOT CASM_ENABLE_DIAG_DUMP_TOKEN)
+        add_custom_command(
+            TARGET casm POST_BUILD
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/scripts/verify_casm_diag_table.py"
+                "--build-dir" "${CMAKE_BINARY_DIR}"
+            COMMENT "Verifying CASM diagnostic id -> message table"
+            VERBATIM
+        )
+    endif()
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()
