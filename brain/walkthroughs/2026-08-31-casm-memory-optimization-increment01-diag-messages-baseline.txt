@@ -1,0 +1,150 @@
+msgInitFailed: |     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
+msgRegistryFull: |     .byte "CASM: RESOURCE REGISTRY FULL", PetCr, 0
+msgCleanupFailed: |     .byte "CASM: RESOURCE CLEANUP FAILED", PetCr, 0
+msgSourceRequired: |     .byte "CASM: SOURCE FILE REQUIRED", PetCr, 0
+msgExtraSource: |     .byte "CASM: TOO MANY SOURCE FILES", PetCr, 0
+msgMalformedOutput: |     .byte "CASM: MALFORMED /O OPTION", PetCr, 0
+msgDuplicateOption: |     .byte "CASM: DUPLICATE OPTION", PetCr, 0
+msgUnknownOption: |     .byte "CASM: UNKNOWN OPTION", PetCr, 0
+msgFilenameTooLong: |     .byte "CASM: FILENAME TOO LONG", PetCr, 0
+msgNotImplemented: |     .byte "CASM: FEATURE NOT IMPLEMENTED", PetCr, 0
+msgInputOpenFailed: |     .byte "CASM: CANNOT OPEN INPUT", PetCr, 0
+msgInputReadFailed: |     .byte "CASM: INPUT READ FAILED", PetCr, 0
+msgInputCloseFailed: |     .byte "CASM: INPUT CLOSE FAILED", PetCr, 0
+msgOutputCreateFailed: |     .byte "CASM: CANNOT CREATE OUTPUT", PetCr, 0
+msgOutputWriteFailed: |     .byte "CASM: OUTPUT WRITE FAILED", PetCr, 0
+msgOutputCloseFailed: |     .byte "CASM: OUTPUT CLOSE FAILED", PetCr, 0
+msgOutputDeleteFailed: |     .byte "CASM: OUTPUT DELETE FAILED", PetCr, 0
+msgOutputShortWrite: |     .byte "CASM: SHORT OUTPUT WRITE", PetCr, 0
+msgStreamStateFailed: |     .byte "CASM: INVALID STREAM STATE", PetCr, 0
+msgSourceRewindFailed: |     .byte "CASM: SOURCE REWIND FAILED", PetCr, 0
+msgSourceOffsetOverflow: |     .byte "CASM: SOURCE OFFSET OVERFLOW", PetCr, 0
+msgSourceLocationOverflow: |     .byte "CASM: SOURCE LOCATION OVERFLOW", PetCr, 0
+msgSourceLineTooLong: |     .byte "CASM: SOURCE LINE TOO LONG", PetCr, 0
+msgTokenTooLong: |     .byte "CASM: TOKEN TOO LONG", PetCr, 0
+msgInvalidSourceByte: |     .byte "CASM: INVALID SOURCE BYTE", PetCr, 0
+msgMalformedNumber: |     .byte "CASM: MALFORMED NUMBER", PetCr, 0
+msgLexerStateFailed: |     .byte "CASM: INVALID LEXER STATE", PetCr, 0
+msgSyntaxError: |     .byte "CASM: SYNTAX ERROR", PetCr, 0
+msgExpectedNewline: |     .byte "CASM: EXPECTED NEWLINE", PetCr, 0
+msgOperandOutOfRange: |     .byte "CASM: OPERAND OUT OF RANGE", PetCr, 0
+msgInvalidAddrMode: |     .byte "CASM: INVALID ADDRESSING MODE", PetCr, 0
+msgDuplicateOrg: |     .byte "CASM: DUPLICATE ORG", PetCr, 0
+msgOrgRequired: |     .byte "CASM: ORG REQUIRED", PetCr, 0
+msgAddressOverflow: |     .byte "CASM: ADDRESS OVERFLOW", PetCr, 0
+msgBranchOutOfRange: |     .byte "CASM: BRANCH OUT OF RANGE", PetCr, 0
+msgExprMalformed: |     .byte "CASM: MALFORMED EXPRESSION", PetCr, 0
+msgExprUnsupported: |     .byte "CASM: EXPRESSION UNSUPPORTED", PetCr, 0
+msgExprOverflow: |     .byte "CASM: EXPRESSION OVERFLOW", PetCr, 0
+msgResolverFailed: |     .byte "CASM: RESOLVER FAILED", PetCr, 0
+msgVmmUnavailable: |     .byte "CASM: VMM UNAVAILABLE", PetCr, 0
+msgVmmAllocFailed: |     .byte "CASM: VMM ALLOCATION FAILED", PetCr, 0
+msgVmmFreeFailed: |     .byte "CASM: VMM FREE FAILED", PetCr, 0
+msgVmmTransferFailed: |     .byte "CASM: VMM TRANSFER FAILED", PetCr, 0
+msgDuplicateSymbol: |     .byte "CASM: DUPLICATE SYMBOL", PetCr, 0
+msgUndefinedSymbol: |     .byte "CASM: UNDEFINED SYMBOL", PetCr, 0
+msgSymbolTableFull: |     .byte "CASM: SYMBOL TABLE FULL", PetCr, 0
+msgPassMismatch: |     .byte "CASM: PASS 1/2 MISMATCH", PetCr, 0
+msgRelocTableFull: |     .byte "CASM: RELOC TABLE FULL", PetCr, 0
+msgIncludeFilenameExpected: |     .byte "CASM: INCLUDE FILENAME EXPECTED", PetCr, 0
+msgInvalidIncludeFilename: |     .byte "CASM: INVALID INCLUDE FILENAME", PetCr, 0
+msgIncludeFilenameTooLong: |     .byte "CASM: INCLUDE FILENAME TOO LONG", PetCr, 0
+msgIncludeCatalogFull: |     .byte "CASM: INCLUDE CATALOG FULL", PetCr, 0
+msgIncludeDepthExceeded: |     .byte "CASM: INCLUDE DEPTH EXCEEDED", PetCr, 0
+msgIncludeCycleDetected: |     .byte "CASM: INCLUDE CYCLE DETECTED", PetCr, 0
+msgIncludeEventLogFull: |     .byte "CASM: INCLUDE EVENT LOG FULL", PetCr, 0
+msgIncludeReplayMismatch: |     .byte "CASM: INCLUDE REPLAY MISMATCH", PetCr, 0
+msgListingNameCollision: |     .byte "CASM: LISTING NAME COLLISION", PetCr, 0
+msgListingRecordsFull: |     .byte "CASM: LISTING RECORDS FULL", PetCr, 0
+msgListingBytesFull: |     .byte "CASM: LISTING BYTES FULL", PetCr, 0
+msgListingReplayMismatch: |     .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
+msgSymbolMapInvalid: |     .byte "CASM: SYMBOL MAP INVALID", PetCr, 0
+msgExprCircular: |     .byte "CASM: CIRCULAR CONSTANT DEFINITION", PetCr, 0
+msgExprDivZero: |     .byte "CASM: EXPRESSION DIVISION BY ZERO", PetCr, 0
+msgExprRelocUnsupported: |     .byte "CASM: EXPRESSION RELOCATION UNSUPPORTED", PetCr, 0
+msgExprParenTooDeep: |     .byte "CASM: EXPRESSION TOO DEEPLY NESTED", PetCr, 0
+msgCharUnterminated: |     .byte "CASM: CHARACTER LITERAL UNTERMINATED", PetCr, 0
+msgCharInvalidByte: |     .byte "CASM: CHARACTER LITERAL INVALID BYTE", PetCr, 0
+msgStringUnterminated: |     .byte "CASM: STRING UNTERMINATED", PetCr, 0
+msgStringInvalidByte: |     .byte "CASM: STRING INVALID BYTE", PetCr, 0
+msgResFillAlignUnresolved: |     .byte "CASM: OPERAND NOT RESOLVED", PetCr, 0
+msgFillValueRequired: |     .byte "CASM: .FILL REQUIRES A VALUE", PetCr, 0
+msgValueOutOfRange: |     .byte "CASM: VALUE OUT OF RANGE", PetCr, 0
+msgAlignBoundaryZero: |     .byte "CASM: ALIGN BOUNDARY ZERO", PetCr, 0
+msgIncbinFilenameExpected: |     .byte "CASM: INCBIN FILENAME EXPECTED", PetCr, 0
+msgInvalidIncbinFilename: |     .byte "CASM: INVALID INCBIN FILENAME", PetCr, 0
+msgIncbinFilenameTooLong: |     .byte "CASM: INCBIN FILENAME TOO LONG", PetCr, 0
+msgAssertUnresolved: |     .byte "CASM: ASSERT OPERAND NOT RESOLVED", PetCr, 0
+msgAssertMessageTooLong: |     .byte "CASM: ASSERT MESSAGE TOO LONG", PetCr, 0
+msgAssertionFailed: |     .byte "CASM: ASSERTION FAILED", PetCr, 0
+msgAssertionFailedPrefix: |     .byte "CASM: ASSERTION FAILED: ", 0
+msgProgressCounterOverflow: |     .byte "CASM: STATEMENT COUNT OVERFLOW", PetCr, 0
+msgProgressPassTotalMismatch: |     .byte "CASM: PASS 1/PASS 2 STATEMENT MISMATCH", PetCr, 0
+msgListingCreateFailed: |     .byte "CASM: LISTING CREATE FAILED", PetCr, 0
+msgListingWriteFailed: |     .byte "CASM: LISTING WRITE FAILED", PetCr, 0
+msgListingCloseFailed: |     .byte "CASM: LISTING CLOSE FAILED", PetCr, 0
+msgListingDeleteFailed: |     .byte "CASM: LISTING DELETE FAILED", PetCr, 0
+msgListingShortWrite: |     .byte "CASM: LISTING SHORT WRITE", PetCr, 0
+msgUnknown: |     .byte "CASM: INTERNAL ERROR", PetCr, 0
+msgPhase2Ready: |     .byte "CASM: INPUT VALIDATED", PetCr, 0
+msgPhase2Ready: | tokNameEof:       .byte "EOF", 0
+msgPhase2Ready: | tokNameNewline:   .byte "NEWLINE", 0
+msgPhase2Ready: | tokNameId:        .byte "IDENTIFIER", 0
+msgPhase2Ready: | tokNameMnem:      .byte "MNEMONIC", 0
+msgPhase2Ready: | tokNameDir:       .byte "DIRECTIVE", 0
+msgPhase2Ready: | tokNameReg:       .byte "REGISTER", 0
+msgPhase2Ready: | tokNameNum:       .byte "NUMBER", 0
+msgPhase2Ready: | tokNameComma:     .byte "COMMA", 0
+msgPhase2Ready: | tokNameColon:     .byte "COLON", 0
+msgPhase2Ready: | tokNameHash:      .byte "HASH", 0
+msgPhase2Ready: | tokNameLparen:    .byte "LPAREN", 0
+msgPhase2Ready: | tokNameRparen:    .byte "RPAREN", 0
+msgPhase2Ready: | tokNamePlus:      .byte "PLUS", 0
+msgPhase2Ready: | tokNameMinus:     .byte "MINUS", 0
+msgPhase2Ready: | tokNameLess:      .byte "LESS", 0
+msgPhase2Ready: | tokNameGreater:   .byte "GREATER", 0
+msgPhase2Ready: | tokNameEquals:    .byte "EQUALS", 0
+msgPhase2Ready: | tokNameStar:      .byte "STAR", 0
+msgPhase2Ready: | tokNameSlash:     .byte "SLASH", 0
+msgPhase2Ready: | tokNameAmpersand: .byte "AMPERSAND", 0
+msgPhase2Ready: | tokNameCaret:     .byte "CARET", 0
+msgPhase2Ready: | tokNamePipe:      .byte "PIPE", 0
+msgPhase2Ready: | tokNameTilde:     .byte "TILDE", 0
+msgPhase2Ready: | tokNameShl:       .byte "SHL", 0
+msgPhase2Ready: | tokNameShr:       .byte "SHR", 0
+msgPhase2Ready: | tokNameChar:      .byte "CHAR", 0
+msgPhase2Ready: | tokNameString:    .byte "STRING", 0
+msgUnknownTok: | msgUnknownTok:    .byte "UNKNOWN", 0
+msgUnknownTok: | dirNameUnknown:   .byte " (UNKNOWN)", 0
+msgUnknownTok: | dirNameOrg:       .byte " (ORG)", 0
+msgUnknownTok: | dirNameByte:      .byte " (BYTE)", 0
+msgUnknownTok: | dirNameWord:      .byte " (WORD)", 0
+msgUnknownTok: | dirNameInclude:   .byte " (INCLUDE)", 0
+msgUnknownTok: | dirNameStatic:    .byte " (STATIC)", 0
+msgUnknownTok: | dirNameReloc:     .byte " (RELOC)", 0
+msgUnknownTok: | regNameA:         .byte " (A)", 0
+msgUnknownTok: | regNameX:         .byte " (X)", 0
+msgUnknownTok: | regNameY:         .byte " (Y)", 0
+msgUnknownTok: | numNameDec:       .byte " (DECIMAL)", 0
+msgUnknownTok: | numNameHex:       .byte " (HEX)", 0
+msgUnknownTok: | numNameBin:       .byte " (BINARY)", 0
+msgSubUnknown: | msgSubUnknown:    .byte " (UNKNOWN)", 0
+msgMnemPrefix: | msgMnemPrefix:    .byte " (", 0
+msgMnemSuffix: | msgMnemSuffix:    .byte ")", 0
+msgTextPrefix: | msgTextPrefix:    .byte " [", 0
+msgTextSuffix: | msgTextSuffix:    .byte "]", 0
+msgLocLinePrefix: | msgLocLinePrefix: .byte " L:", 0
+msgLocColPrefix: | msgLocColPrefix:  .byte " C:", 0
+msgInFile: | msgInFile:       .byte "IN FILE ", 0
+msgIncludedFrom: | msgIncludedFrom: .byte "INCLUDED FROM ", 0
+msgLinePrefix: | msgLinePrefix:   .byte " LINE ", 0
+msgColumnPrefix: | msgColumnPrefix: .byte " COLUMN ", 0
+msgIncludeUnavailable: | msgIncludeUnavailable: .byte "<INCLUDE?>", 0
+msgAtLine: | msgAtLine:       .byte "AT LINE ", 0
+msgColPrefix: | msgColPrefix:    .byte ", COL ", 0
+msgOffsetPrefix: | msgOffsetPrefix: .byte " (OFFSET ", 0
+msgOffsetSuffix: | msgOffsetSuffix: .byte ")", 0
+msgBytePrefix: | msgBytePrefix:   .byte " BYTE ", 0
+msgIndent: | msgIndent:       .byte "  ", 0
+msgClipLeft: | msgClipLeft:     .byte "<.", 0
+msgClipRight: | msgClipRight:    .byte ".>", 0

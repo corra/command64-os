@@ -88,6 +88,74 @@ land anywhere and the display window slides afterward). Dropping the `B`
 previous-line buffer would recover 256 bytes but degrades diagnostic
 quality. That is a product decision, deliberately out of scope.
 
+## Increment 1 Re-baseline (measured 2026-08-31, branch `feature/casm-memory-optimization` off `main` `f4227cf`)
+
+CASM `V0.5.0` build 1380. Prerequisite met: progress-indication (task 33)
+merged to `main` 2026-08-31 through Increment 11.
+
+**Whole-program (real `ca65`/`ld65`, base cfg `$3800`, MAIN size `$7400`):**
+
+| Metric | 2026-08-24 audit | 2026-08-31 re-baseline |
+| --- | --- | --- |
+| `casm.prg` (relocatable) | -- | **33,398 bytes** (sha256 `e8a6731f…`) |
+| CODE segment | -- | `$3800..$8BE6` = `$53E7` (21,479) |
+| RODATA segment | -- | `$8BE7..$9AE5` = `$0EFF` (3,839) |
+| BSS segment | -- | `$9AE6..$A97D` = `$0E98` (3,736) |
+| `__MAIN_LAST__` | `$A901` (at `$7400`) | **`$A97D`** |
+| MAIN headroom at `$7400` | 767 | **642** (matches task 33's Increment 11 figure) |
+| `diagnostics.o` (CODE+RODATA+BSS) | 4,774 | **4,779** (CODE `$650`, RODATA `$C59`, BSS 2) |
+| `progress.o` (CODE+BSS) | -- | CODE `$409` (1,033), BSS `$1C` (28) |
+
+Baseline artifact hashes and the full diagnostic-message dump are captured
+in the scratchpad (`casm_baseline.map`, `casm_baseline.prg`,
+`casm_diag_messages_baseline.txt`) for Increment 10's byte-identity check.
+
+**Diagnostic ID map:** still **dense and contiguous `$01..$56`** (86 IDs)
+plus `$FF` UNKNOWN -- Finding C's density precondition holds. Phases 12/13
+and progress added `$44..$56` since the audit.
+
+**Findings still valid as written:**
+
+- **D** -- `CASM_FILENAME_MAX = 63` / `CASM_INCLUDE_FILENAME_MAX = 63`
+  unchanged; all 13 buffers present. Note two *new* dependent asserts since
+  the audit (`common.inc:1457`, `:1466`) size listing open/resolved-name
+  buffers off `CASM_FILENAME_MAX + 3` / `CASM_INCLUDE_FILENAME_MAX` -- these
+  must be updated in Increment 3 alongside the constants' own guards.
+- **A** -- `diagDumpToken` still has **zero** production callers (grep of
+  `src/external/casm/` outside `diagnostics.s`).
+- **B** -- `"CASM: "` prefix + trailing `PetCr` pattern intact across the
+  message tables.
+- **E** -- `PROG_DIGIT` is now expanded **5 times** (`10000/1000/100/10/1`),
+  not 6 as the audit stated; the `@narrow` path (width 2) shares the last
+  two. Saving estimate revises down slightly (~100 B gross, table + loop
+  overhead nets less) but the finding stands.
+
+**Finding C -- dispatch structure has drifted materially and Increments 7-8
+need re-scoping before implementation.** The audit described "six range
+blocks plus a 9-way `cmp`/`beq` chain". `diagPrintFatal` now dispatches
+through **seven** parallel message tables, each with its own range test:
+`dpfMainRange` (`$01..$3C`), `dpfListingRange` (`$3D..$41`),
+`diagWp81MessageLo/Hi` (`$4B..$4E`), `diagWp82MessageLo/Hi` (`$4F..$51`),
+`diagWp83MessageLo/Hi` (`$52..$54`, with a `CASM_DIAG_ASSERTION_FAILED`
+user-message echo special case), `diagProgressMessageLo/Hi` (`$55..$56`),
+plus the `cmp`/`beq` chain in `dpfSymbolRange` which is now **9-way**
+(`$42,$43,$44,$45,$46,$47,$48,$49,$4A`). The 231-byte saving predates
+roughly 400-600 bytes of new Phase 13 / progress dispatch code that a
+unified table would also subsume, so the achievable saving is likely
+*larger* now -- but the increment text, the "six former dispatch ranges"
+verification matrix (Increments 7 and 9), and the fault-injection plan all
+reference a structure that no longer exists.
+
+The two Finding C **hard preconditions still hold**: the ID range is dense,
+and the set of dispatch paths that skip `diagPrintSourceContext` entirely
+is still exactly `$3D..$43` (the listing table + `dpfSymbolMapInvalid` +
+`dpfExprCircular`). The `$55..$56` progress diagnostics are *semantically*
+locationless but are coded through the self-gating context call, so they do
+not widen the skip set. No Stop Condition is tripped -- but Finding C's
+implementation approach should be re-planned against the current
+`diagnostics.s` before Increment 8, and Increments 7/9's matrices updated
+to the seven-table reality.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -322,3 +390,16 @@ become user-facing.
   `+casm +feature`, `depends:33`); recorded in `brain/task.md` and
   `wiki/tasks/casm.md`. Implementation still blocked on progress-indication
   Increment 11.
+- 2026-08-31: **Increment 1 (re-baseline) executed.** Prerequisite now met
+  (task 33 merged to `main`). Branch `feature/casm-memory-optimization` off
+  `f4227cf`. All measurements re-taken against `V0.5.0` build 1380 -- see
+  the new "Increment 1 Re-baseline" section. Headroom moved 767 -> 642 at
+  `$7400` (consistent with task 33's own closeout figure). Diagnostic ID
+  range still dense `$01..$56`. Findings D/A/B unchanged; E revised (5
+  expansions not 6). **Finding C's dispatch structure has grown from the
+  audited "six ranges + 9-way chain" to seven parallel tables + a 9-way
+  chain** (Phase 13 WP81/82/83 + progress increments added their own tables
+  since 2026-08-24); no Stop Condition tripped (range dense, skip-context
+  set still exactly `$3D..$43`), but Increments 7-9 need re-scoping to the
+  current structure before Finding C is implemented. Paused here for user
+  direction on Finding C re-scoping vs. proceeding D/E/A/B first.
