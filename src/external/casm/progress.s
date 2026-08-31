@@ -199,7 +199,9 @@ progressPrintDec:
 ; iteration -- caught live by tests/src/casm_progress/casm_progress.s
 ; (Increment 3), which hung in exactly this loop before the fix. Y survives
 ; because ahPrintChar/KernalChROUT never touch it.
-; Clobbers: A, Y
+; Clobbers: A, X, Y (X via progressPrintChar's own tax; the Y-counter note
+;           above is about the loop index, not the full clobber set --
+;           Increment 9 review PR-1)
 ; ---------------------------------------------------------------------------
 ; Every transient line MUST print exactly this many characters, so the
 ; cursor-left return below lands on column 0 and the space-fill in
@@ -328,6 +330,18 @@ progressStatement:
 ; Clobbers: A, X, Y. Sets the visible flag.
 ; ---------------------------------------------------------------------------
 progressRenderTransient:
+    ; Increment 9 review PR-2: honor progressSuspend. The flag was
+    ; write-only before -- the /L and /M suspend calls in casm.s asserted a
+    ; screen-ownership boundary that nothing enforced. Guarding here (and in
+    ; progressSourceLoadBytes/progressDirectiveBytes) makes that boundary
+    ; real. No current path renders after a suspend, so this is
+    ; future-proofing, not a fix for an observed bug; progressInit zeroes
+    ; the flag every invocation so nothing gets stuck suspended.
+    lda CasmProgFlags
+    and #CASM_PROG_FLAG_SUSPENDED
+    beq :+
+    rts
+    :
     ; Only rewind when a transient line is already on screen. On the FIRST
     ; render after a persistent line (which ends in PetCr, leaving the
     ; cursor at column 0 of a fresh row) there is nothing to rewind over,
@@ -472,6 +486,11 @@ progressAccumulateOutputBytes:
 progressSourceLoadBytes:
     sta CasmProgLoadLo
     stx CasmProgLoadHi
+    lda CasmProgFlags            ; Increment 9 review PR-2: honor
+    and #CASM_PROG_FLAG_SUSPENDED ; progressSuspend (see progressRenderTransient)
+    beq :+
+    rts
+    :
     lda CasmProgFlags            ; same first-render guard as
     and #CASM_PROG_FLAG_VISIBLE  ; progressRenderTransient below
     beq :+
@@ -535,6 +554,11 @@ progressBeginDirective:
 progressDirectiveBytes:
     sta CasmProgDirectiveLo
     stx CasmProgDirectiveHi
+    lda CasmProgFlags            ; Increment 9 review PR-2: honor
+    and #CASM_PROG_FLAG_SUSPENDED ; progressSuspend (see progressRenderTransient)
+    beq :+
+    rts
+    :
     lda CasmProgFlags
     and #CASM_PROG_FLAG_VISIBLE
     beq :+
@@ -598,7 +622,11 @@ progressDirectiveBytes:
 ;
 ; Loop counter is Y, not X -- same progressPrintChar/X-clobber reason as
 ; progressReturnToStart above.
-; Clobbers: A, Y
+; Clobbers: A, X, Y (X via progressReturnToStart/progressPrintChar; the
+;           Increment 2 ABI table's "A, X" and this header's earlier
+;           "A, Y" were both incomplete -- Increment 9 review PR-1.
+;           diagPrintFatal, the one cross-module caller, saves only A and
+;           needs neither X nor Y, so this was a doc gap, not a live bug.)
 ; ---------------------------------------------------------------------------
 progressClearTransient:
     lda CasmProgFlags

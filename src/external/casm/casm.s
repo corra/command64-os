@@ -640,7 +640,13 @@ crpCountDir:
 ;
 ; Out: C=0 on success; C=1 with A = CASM_DIAG_* propagated from
 ;      progressStatement's own counter-overflow guard.
-; Clobbers: A, X, Y
+; Clobbers: A, X, Y, and -- on the identity-changed path only (first
+;           statement of a pass, every frame push/pop) -- CasmPtr0Lo/Hi,
+;           via crpSnapshotName. Verified safe (Increment 9 review PR-4):
+;           emit.s/opcodes.s never read CasmPtr0, and crpLabel/crpConstant/
+;           crpInclude set it fresh -- but a future CasmPtr0 use added to
+;           crpInsn/crpDir, or a parser change that left something durable
+;           there, would need this hook moved or CasmPtr0 saved.
 ; ---------------------------------------------------------------------------
 crpProgressHook:
     jsr progressStatement

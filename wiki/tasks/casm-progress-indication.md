@@ -36,9 +36,23 @@ mid-assembly fatal + partial-output cleanup case is noted non-blocking).
 Atomic Increments 6 (31-harness regression) and 7 (timing) were waived by
 the user 2026-08-31 as redundant re-checks of a byte-identical binary that
 Increment 7 already swept 31/31, with the performance caps non-blocking
-since the 2026-08-26 amendment. **Increment 8 is complete, user-approved
-2026-08-31.** Increments 9-11 (full implementation review, runtime
-acceptance, completion gate) remain.
+since the 2026-08-26 amendment. **Increment 8 is complete, user-approved 2026-08-31.**
+
+Increment 9 (full implementation review) was executed 2026-08-31: a
+line-by-line audit of the entire progress-feature diff against the
+Increment 2 frozen ABI. The core design and its integration were found
+sound and consistent with the Increment 4 live evidence. Five findings
+(register: `brain/reviews/2026-08-24-casm-progress-implementation-review.md`):
+PR-1 (private-helper/ABI clobber docs understated X/Y - fixed), PR-2
+(`CASM_PROG_FLAG_SUSPENDED` was write-only - fixed by gating the render
+entry points), PR-4 (undocumented `CasmPtr0` clobber in `crpProgressHook`
+- comment fixed); PR-3 (`DONE:` byte count wraps for output > 64KB -
+deferred as a known display limitation) and PR-5 (INFO). Remediation
+rebuilt clean (`BUILD_CASM` 1378 -> 1379, `$7400` envelope still fits),
+exact no-change rebuild stable, and a live-VICE smoke confirmed no
+behavioral regression. **Increment 9 is complete, user-approved
+2026-08-31.** Increments 10-11 (runtime acceptance, completion gate)
+remain.
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.
 

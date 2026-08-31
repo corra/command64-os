@@ -3598,7 +3598,19 @@
     95.24s), and the baseline was wall-time-without-warp vs. this session's
     emulated cycles. A like-for-like isolation against a pre-progress
     `casm.prg` in one session remains available but is optional.
-  - [ ] Complete full implementation review before runtime acceptance or merge.
+  - [~] Complete full implementation review before runtime acceptance or merge.
+    - [x] Increment 9 (full implementation review): **COMPLETE,
+      user-approved 2026-08-31.** Line-by-line audit of the
+      whole progress-feature diff vs the Increment 2 frozen ABI. Core
+      design sound. 5 findings: PR-1 (clobber docs wrong, FIXED), PR-2
+      (SUSPENDED flag write-only, FIXED - added render guards), PR-4
+      (undocumented CasmPtr0 clobber, FIXED - comment), PR-3 (>64KB output
+      wraps the DONE byte display, DEFERRED), PR-5 (INFO). Build clean,
+      `casm.prg` `72549659`, `BUILD_CASM` 1378->1379, no-change rebuild
+      stable, live-VICE smoke OK. Register:
+      `brain/reviews/2026-08-24-casm-progress-implementation-review.md`;
+      walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment09-implementation-review.md`.
     - [x] Increment 8 (automated verification): **COMPLETE, user-approved
       2026-08-31.** Plan approved 2026-08-31.
       Host side (Atomic Increments 1-3): new `casm_progress_test_d64`

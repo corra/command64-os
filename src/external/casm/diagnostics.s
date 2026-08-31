@@ -152,9 +152,12 @@ diagPrintFatal:
     ; Progress Increment 7 (Atomic Increment 4): universal transient clear
     ; before any fatal diagnostic prints, per the Hook Contract -- so a
     ; stale progress line can never overwrite or precede diagnostic text,
-    ; source context, a caret, or an include traceback. Stashed across the
-    ; call because progressClearTransient documents "Clobbers: A, Y" and A
-    ; holds the diagnostic identifier the dispatch below still needs.
+    ; source context, a caret, or an include traceback. A is stashed across
+    ; the call because progressClearTransient clobbers A, X, Y (Increment 9
+    ; review PR-1 corrected the ABI/header from an earlier "A, Y") and A
+    ; holds the diagnostic identifier the dispatch below still needs. X and
+    ; Y are dead at this entry -- the range dispatch re-derives everything
+    ; from A -- so only A needs saving.
     ; progressClearTransient cannot itself fail or recurse into a fatal
     ; diagnostic -- it is a pure OS_API print sequence with no error path
     ; (confirmed by reading its body: ahPrintChar's own KERNAL CHROUT call
