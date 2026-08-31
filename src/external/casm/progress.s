@@ -28,7 +28,7 @@
 ; resolution: the caller copies the already-truncated 8-byte field in
 ; before calling progressRenderTransient. This is "bounded rendering
 ; scratch," explicitly allowed; it is not "mirroring a whole filename"
-; (CASM_FILENAME_MAX is 63 bytes) -- only the display width the screen
+; (CASM_FILENAME_MAX is 32 bytes) -- only the display width the screen
 ; protocol already truncates to.
 
 .include "command64.inc"
@@ -152,38 +152,54 @@ progressPrintChar:
 ; In:  A/X = value low/high byte, Y = field width (2 or 5)
 ; Clobbers: A, X, Y
 ; ---------------------------------------------------------------------------
-.macro PROG_DIGIT divisor
-    ldy #0
-:   lda CasmProgDecScratchLo
-    sec
-    sbc #<(divisor)
-    tax
-    lda CasmProgDecScratchHi
-    sbc #>(divisor)
-    bcc :+
-    stx CasmProgDecScratchLo
-    sta CasmProgDecScratchHi
-    iny
-    jmp :-
-:   tya
-    clc
-    adc #'0'
-    jsr progressPrintChar
-.endmacro
+; Finding E (memory-optimization WP, task 42): the five fixed divisor steps
+; were a PROG_DIGIT macro expanded inline five times (~34 bytes each). A
+; divisor-table loop over the same five 16-bit constants is byte-for-byte
+; equivalent in output -- same repeated-subtraction digit extraction, same
+; fixed 2-or-5-digit width, same "the 2-digit case is just the last two
+; steps" behavior (it starts the loop at index 3 instead of falling through
+; a shared label) -- for ~105 fewer bytes. The tentative low byte rides the
+; stack across the 16-bit borrow test so no new zero-page or BSS scratch is
+; needed; X (the divisor index) is stack-saved across progressPrintChar,
+; which clobbers it.
+progDecDivLo: .byte <10000, <1000, <100, <10, <1
+progDecDivHi: .byte >10000, >1000, >100, >10, >1
 
 progressPrintDec:
     sta CasmProgDecScratchLo
     stx CasmProgDecScratchHi
+    ldx #0                       ; 5-digit: start at the 10000 divisor
     cpy #5
-    beq @full
-    jmp @narrow
-@full:
-    PROG_DIGIT 10000
-    PROG_DIGIT 1000
-    PROG_DIGIT 100
-@narrow:
-    PROG_DIGIT 10
-    PROG_DIGIT 1
+    beq ppdDigit
+    ldx #3                       ; 2-digit: start at the 10 divisor
+ppdDigit:
+    ldy #0                       ; Y = this digit's value
+ppdSub:
+    lda CasmProgDecScratchLo
+    sec
+    sbc progDecDivLo, x
+    pha                          ; tentative low byte
+    lda CasmProgDecScratchHi
+    sbc progDecDivHi, x
+    bcc ppdDigitDone             ; borrow -> this divisor no longer fits
+    sta CasmProgDecScratchHi
+    pla
+    sta CasmProgDecScratchLo
+    iny
+    jmp ppdSub
+ppdDigitDone:
+    pla                          ; discard the tentative low byte
+    txa
+    pha                          ; save the divisor index across the print
+    tya
+    clc
+    adc #'0'
+    jsr progressPrintChar
+    pla
+    tax
+    inx
+    cpx #5
+    bcc ppdDigit
     rts
 
 ; ---------------------------------------------------------------------------

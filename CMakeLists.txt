@@ -388,7 +388,37 @@ if(Ca65_FOUND)
     # resolution (scope trim + MAIN growth), $7000 (+1024) is the grown
     # budget; a real re-link at this size measured 1033 bytes of fresh
     # headroom. User-approved 2026-08-24.
-    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "7400")
+    # Finding A (memory-optimization WP, task 42): diagDumpToken, the
+    # lexer/parser development token-dump printer, has no production call
+    # site and shipped ~650 bytes of dead code+strings in every casm.prg
+    # (ld65 links whole objects). It is gated off in common.inc by default;
+    # this cache var flips CASM_ENABLE_DIAG_DUMP_TOKEN back on for a
+    # diagnostic build. OFF by default; toggling it re-assembles CASM (the
+    # ca65 command line changes) but does not bump the build number.
+    option(CASM_ENABLE_DIAG_DUMP_TOKEN
+        "Compile CASM's diagDumpToken development token-dump printer into casm.prg" OFF)
+    set(CASM_CA65_DEFINES "")
+    if(CASM_ENABLE_DIAG_DUMP_TOKEN)
+        list(APPEND CASM_CA65_DEFINES "CASM_ENABLE_DIAG_DUMP_TOKEN=1")
+    endif()
+    add_ca65_app(casm "${CASM_ENTRY}" CASM_SRCS 1000 "7400"
+        EXTRA_DEFINES ${CASM_CA65_DEFINES})
+
+    # Finding C guard (memory-optimization WP, task 42): decode the linked
+    # casm.prg and check every fatal-diagnostic identifier ($01..$56) still
+    # renders exactly its frozen text. diagPrintFatal's id->message mapping
+    # has no build-time .assert -- a wrong entry prints a *misleading*
+    # diagnostic. Runs after every casm build; a mismatch fails the build.
+    if(NOT CASM_ENABLE_DIAG_DUMP_TOKEN)
+        add_custom_command(
+            TARGET casm POST_BUILD
+            COMMAND "${Python3_EXECUTABLE}"
+                "${CMAKE_SOURCE_DIR}/scripts/verify_casm_diag_table.py"
+                "--build-dir" "${CMAKE_BINARY_DIR}"
+            COMMENT "Verifying CASM diagnostic id -> message table"
+            VERBATIM
+        )
+    endif()
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CASM target")
 endif()

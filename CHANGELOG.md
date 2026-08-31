@@ -206,6 +206,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM memory optimization** (optional, size-only WP, CASM `0.5.0` ->
+  `0.5.1`): recovered **2,068 bytes** of CASM's MAIN envelope with no
+  change to assembled output, progress display, or diagnostic behavior.
+  MAIN stays `$7400`; headroom at `$7400` grew 642 -> 2,710 bytes. Five
+  independent changes: (D) the self-imposed filename cap
+  `CASM_FILENAME_MAX` / `CASM_INCLUDE_FILENAME_MAX` reduced **63 -> 32**
+  after establishing that Command64's CBM-DOS filesystem has no name longer
+  than 16 chars + a 2-3 char device prefix + a 4-char synthetic extension;
+  the `FILENAME TOO LONG` / `INCLUDE FILENAME TOO LONG` /
+  `INCBIN FILENAME TOO LONG` diagnostics now fire at 33+ chars instead of
+  64+ (no name that could ever resolve to a real file is affected). Also
+  fixed a latent `cliInit` bug where the source-name clear loop erased a
+  fixed 512 bytes and would have run 248 bytes past the now-smaller buffer.
+  (E) `progress.s`'s `progressPrintDec` five inline `PROG_DIGIT` macro
+  expansions replaced by a divisor-table loop, output proven byte-for-byte
+  identical over all 65,536 values. (A) `diagnostics.s`'s `diagDumpToken`
+  development token-dump printer and its ~40 token-name strings gated
+  behind `CASM_ENABLE_DIAG_DUMP_TOKEN` (default off; the whole object had
+  shipped dead because `ld65` links whole objects). (B) the `"CASM: "`
+  prefix and trailing CR factored out of all 89 diagnostic message strings
+  into one `diagPrintMessage` helper. (C) `diagPrintFatal`'s six parallel
+  range tables and nine-way `cmp`/`beq` chain collapsed to one dense
+  86-entry table plus a two-compare locationless-window test, with
+  compile-time asserts pinning the table length and the `$3D..$43`
+  locationless run. A committed host-side verifier
+  (`scripts/verify_casm_diag_table.py`, run `POST_BUILD`) decodes the
+  linked `casm.prg` and checks every diagnostic identifier renders its
+  exact frozen text. User-approved 2026-08-31.
 - **CASM entry-point decimal-mode hardening (Phase 11 WP60 Increment 3)**:
   `casm.s`'s `start:` now begins with `CLD`, before any other initialization.
   CASM has no supported decimal-mode entry contract, and the first `OS_API`

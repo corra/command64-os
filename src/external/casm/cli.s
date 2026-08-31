@@ -83,14 +83,22 @@ ciClearLens:
     dex
     bpl ciClearLens
     ; CasmSourceNames is CASM_SOURCE_COUNT_MAX * CASM_FILENAME_BUFFER_SIZE
-    ; (512) bytes -- too large for an 8-bit index, so two 256-byte passes
-    ; sharing one wrapping X counter clear it instead.
+    ; bytes (264 at the Finding D cap) -- just over an 8-bit index, so one
+    ; wrapping 256-byte pass plus a short tail clears it. The tail count MUST
+    ; track the real buffer size: an over-long clear here would run off the
+    ; end of CasmSourceNames into CasmOutputName and the BSS beyond it.
+    .assert CASM_SOURCE_COUNT_MAX * CASM_FILENAME_BUFFER_SIZE > 256, error, "CASM source-name clear: buffer no longer needs the wrapping pass"
+    .assert CASM_SOURCE_COUNT_MAX * CASM_FILENAME_BUFFER_SIZE <= 512, error, "CASM source-name clear: buffer no longer fits one wrapping pass plus an 8-bit tail"
     ldx #0
 ciClearNames:
     sta CasmSourceNames, x
-    sta CasmSourceNames + 256, x
     inx
     bne ciClearNames
+    ldx #(CASM_SOURCE_COUNT_MAX * CASM_FILENAME_BUFFER_SIZE) - 256 - 1
+ciClearNamesTail:
+    sta CasmSourceNames + 256, x
+    dex
+    bpl ciClearNamesTail
     ldx #CASM_FILENAME_BUFFER_SIZE - 1
 ciClearOutput:
     sta CasmOutputName, x

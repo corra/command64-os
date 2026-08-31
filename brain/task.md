@@ -3662,7 +3662,7 @@
     - Increments 9-11 all complete and user-approved 2026-08-31 (see
       above); the feature is closed and merged to `main`.
 
-- [ ] Taskwarrior #42 (`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`): CASM memory
+- [x] Taskwarrior #42 (`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`): CASM memory
       optimization -- recover ~2 KB of MAIN across five findings, strict
       "identical observable behavior" contract
   - Plan: `brain/plans/2026-08-24-casm-memory-optimization.md`; **approved
@@ -3683,11 +3683,43 @@
   - Finding F (`CasmDiagLineBufA`/`B` 512-byte sizing) recorded but
     explicitly NOT actioned -- product tradeoff, out of scope. Envelope stays
     `$7400` per Scoping Decision 4; recovered bytes banked, not returned.
-  - **Implementation gated (`depends:33`) on the progress-indication feature
-    closing through Increment 11 (Scoping Decision 1).** Increments 8-11
-    there are still open. This WP is sequenced last.
-  - Per convention each Atomic Increment follows the approved plan; a
-    completion-gate walkthrough with user sign-off is required before close.
+  - **All 10 increments executed 2026-08-31** (prerequisite task 33 merged
+    to `main` earlier that day). Actual savings per finding: D 482, E 108,
+    A 653, B 585, C 240 = **2,068 bytes** recovered. `__MAIN_LAST__` `$A97D`
+    -> `$A169`; headroom at `$7400` 642 -> 2,710. MAIN stays `$7400`.
+    Version `0.5.0` -> `0.5.1`.
+  - Increment 2 established the true reachable filename max is 23 bytes
+    (CBM DOS 16-char entry + 3-char device prefix + 4-char synthetic
+    extension); user approved cap = 32, knowingly moving the
+    `FILENAME TOO LONG` boundary 63 -> 32 (no resolvable name affected).
+    Found+fixed a latent `cliInit` clear-loop bug along the way.
+  - Increment 7 added `scripts/verify_casm_diag_table.py` (POST_BUILD on
+    `casm`) -- decodes the linked `casm.prg`, checks every diagnostic id's
+    exact frozen text; proven fault-detecting.
+  - Increment 9 live VICE: 5/7 former dispatch ranges + both locationless
+    sub-cases + Finding D filename cap, all correct. Exposed a pre-existing
+    defect deferred to task 43.
+  - Walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
+    **CLOSED 2026-08-31, user-approved. Taskwarrior 42 done.**
+
+- [/] Taskwarrior #43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`): CASM --
+      `diagPrintFatal`'s `progressClearTransient` reads uninitialized
+      `CasmProgFlags` for any diagnostic raised before `startPass1`
+  - Every `startInitFatal` path (`resourcesInit`/`cliInit`/`fileIoInit`/
+    `sourceInit` failures, plus `cliParse`/`cliDeriveOutputName`/
+    `cliDeriveListingName`/`fileOpenInput`/`lexerInit`) reaches
+    `diagPrintFatal` before `progressInit` has zeroed `CasmProgFlags`. If
+    the garbage byte has bit 0 set, `progressClearTransient` erases the
+    current screen line -- garbled banner on an early fatal exit.
+  - Seen 2026-08-31 during memory-optimization Increment 9
+    (`FILENAME TOO LONG` run: banner rendered as `CASM V`). Pre-existing
+    from progress-indication Increment 7; **confirmed byte-identical on
+    `main`**. Disclosed and deferred per the memory-optimization plan's
+    stop condition.
+  - Fix candidate (one line): clear `CasmProgFlags` (or call
+    `progressInit`) after `sourceInit` in `casm.s:start`, mirroring the
+    existing `diagClearLoc`/`listingStateInit` placement. Needs its own
+    approved plan before source edits.
 
 - [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
       build duration display on completion (success and failure)

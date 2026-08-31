@@ -3347,6 +3347,79 @@ plans/walkthroughs `brain/{plans,walkthroughs}/2026-08-24-casm-progress-
 incrementNN-*.md`; implementation review
 `brain/reviews/2026-08-24-casm-progress-implementation-review.md`.
 
+## CASM Memory Optimization Complete (optional, size-only WP, closed 2026-08-31 at `0.5.1` build `1390`)
+
+An **optional WP outside the numbered phases** — recovered **2,068 bytes**
+of CASM's MAIN envelope with a strict "identical observable behavior"
+contract: no change to assembled output, progress display, or diagnostic
+text/behavior. MAIN stays `$7400` (recovered bytes banked as headroom, not
+returned); headroom at `$7400` went 642 → 2,710. Five independent changes,
+each its own approved increment:
+
+- **D — filename caps.** `CASM_FILENAME_MAX` and `CASM_INCLUDE_FILENAME_MAX`
+  reduced **63 → 32** (~482 bytes, mostly BSS across 13 buffers in
+  `cli.s`/`parser.s`/`include.s` plus two listing name buffers and the
+  include open-name buffer). Established first that Command64's filesystem
+  is CBM DOS end to end — the longest resolvable name is 16 (directory
+  entry) + 3 (`8:`..`11:` prefix, stored verbatim in CASM's buffers) + 4
+  (synthetic `.PRG`/`.LST`) = 23. User accepted that `FILENAME TOO LONG`
+  now fires at 33+ chars instead of 64+ (no resolvable name affected).
+  Found+fixed a latent `cliInit` bug: `ciClearNames` cleared a hardcoded
+  512 bytes and would have run 248 past the shrunk `CasmSourceNames`.
+  The REU-resident 128-byte include physical record was deliberately left
+  alone (zero MAIN cost; the two 64-byte window transfers depend on it).
+- **E — `progressPrintDec`.** Five inline `PROG_DIGIT` macro expansions →
+  one divisor-table loop (−108 bytes). Output proven byte-for-byte
+  identical over all 65,536 values × both field widths by a host-side
+  model (`brain/walkthroughs/2026-08-31-casm-memory-optimization-
+  increment04-progdec-equivalence.py`).
+- **A — `diagDumpToken`.** The lexer/parser development token-dump printer
+  and its ~40 token-name strings/tables gated behind
+  `CASM_ENABLE_DIAG_DUMP_TOKEN` (`.ifndef` default 0 in `common.inc`; new
+  `EXTRA_DEFINES` keyword in `cmake/Ca65.cmake`; `option(... OFF)` in
+  `CMakeLists.txt`). **−653 bytes** because `ld65` links whole objects, so
+  an exported-but-uncalled routine ships dead in every `casm.prg`.
+- **B — `diagPrintMessage`.** The `"CASM: "` prefix (89 strings) and
+  trailing CR (88) factored out of every diagnostic message into one new
+  internal helper; `diagPrintString` unchanged (the non-message prints —
+  filenames, source echo, carets, tracebacks, and `casm.s`/`map.s`'s
+  banner/header text — keep calling it). **−585 bytes.** The
+  `CASM_DIAG_ASSERTION_FAILED` user-message echo (`"CASM: ASSERTION
+  FAILED: " + user text + CR`) is the one path that can't use the helper.
+- **C — unified dispatch.** `diagPrintFatal`'s six parallel range tables
+  (`diagMessageLo` / `diagListMessageLo` / `diagWp81/82/83MessageLo` /
+  `diagProgressMessageLo`) and nine-way `cmp`/`beq` chain → one dense
+  86-entry table `diagMsgLo`/`Hi` (`$01..$56`), one range check, one
+  two-compare "locationless?" test over `CASM_DIAG_LOCLESS_FIRST..LAST`
+  (`$3D..$43`, named + `.assert`-pinned in `common.inc`). **−240 bytes**
+  (`+18` RODATA for the unified table, `−258` CODE). Every `id` still
+  renders exactly its old text and gets `diagPrintSourceContext` for all
+  but the `$3D..$43` locationless run.
+
+**Guard**: `scripts/verify_casm_diag_table.py` (committed, run `POST_BUILD`
+on the `casm` target) re-links `diagnostics.s` with `-g`/`-Ln`, decodes
+the linked `casm.prg`, and checks every diagnostic identifier renders its
+exact frozen text. Two lasting gotchas it encodes: `ld65` links whole
+objects (Finding A), and CASM message strings are PETSCII so a host-side
+decoder must mask `& 0x7F` (the `ca65 -t c64` charmap sets bit 7 / swaps
+case — the audit's first verifier "failed" every check before this fix).
+
+Live-verified under VICE: `BRANCH OUT OF RANGE` ($23, locationed),
+`CIRCULAR CONSTANT DEFINITION` ($43, **locationless — no source line**),
+`ALIGN BOUNDARY ZERO` ($4E) + a `9:`-prefixed filename, `ASSERTION FAILED:
+<text>` ($54 echo), `INCBIN FILENAME EXPECTED` ($4F, LOC_BYTE sub-path),
+`FILENAME TOO LONG` ($09) at the new cap, and a clean assembly with
+unchanged progress output. **Defect deferred (task 43):**
+`diagPrintFatal`'s `progressClearTransient` (from progress-indication
+Increment 7) reads uninitialized `CasmProgFlags` for any diagnostic raised
+before `startPass1`, garbling the banner on an early fatal exit —
+pre-existing on `main`, disclosed and deferred per the plan's stop
+condition.
+
+Parent plan `brain/plans/2026-08-24-casm-memory-optimization.md`;
+walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
+Taskwarrior 42.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

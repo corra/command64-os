@@ -2352,7 +2352,7 @@ behavior changed beyond the version/build artifact itself.
 
 ## Optional Feature - Memory Optimization
 
-- [ ] Taskwarrior task 42, UUID `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`:
+- [x] Taskwarrior task 42, UUID `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3` (CLOSED 2026-08-31, user-approved):
       recover roughly 2 KB of CASM's MAIN envelope across five independent
       findings with a strict "identical observable behavior" contract -- no
       change to diagnostic text/identifiers, accepted filenames, assembled
@@ -2369,12 +2369,24 @@ behavior changed beyond the version/build artifact itself.
   recorded but explicitly NOT actioned -- product tradeoff, out of scope.
 - Envelope stays `$7400` per Scoping Decision 4; recovered bytes are banked
   as working headroom, not returned.
-- Implementation is gated on the progress-indication feature (task 33) closing
-  through Increment 11 (Scoping Decision 1); Increments 8-11 there are still
-  open. This WP is deliberately sequenced last.
-- Per this project's convention, each increment follows the approved plan's
-  Atomic Increments; a completion-gate walkthrough with user sign-off is
-  required before it is marked done.
+- **All 10 increments executed 2026-08-31** (prerequisite task 33 merged to
+  `main` earlier that day). Actual savings: D 482, E 108, A 653, B 585,
+  C 240 = **2,068 bytes**. `__MAIN_LAST__` `$A97D` -> `$A169`; headroom at
+  `$7400` 642 -> 2,710. Version `0.5.0` -> `0.5.1`.
+- Increment 2 established the true reachable filename maximum is 23 bytes;
+  user approved cap = 32 (Finding D), moving the `FILENAME TOO LONG`
+  boundary 63 -> 32.
+- `scripts/verify_casm_diag_table.py` (POST_BUILD on `casm`) decodes the
+  linked `casm.prg` and checks every diagnostic id's exact frozen text;
+  proven fault-detecting.
+- Live VICE (Increment 9): 5/7 former dispatch ranges + both locationless
+  sub-cases + Finding D filename cap, all correct. Exposed a pre-existing
+  defect deferred to Taskwarrior 43 (`diagPrintFatal`'s
+  `progressClearTransient` reads uninitialized `CasmProgFlags` for
+  pre-`startPass1` diagnostics; garbles the banner on early fatal exit;
+  confirmed byte-identical on `main`, from progress-indication Increment 7).
+- Walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
+  **CLOSED 2026-08-31, user-approved. Taskwarrior 42 done.**
 
 ## Known Non-Critical Bugs
 
