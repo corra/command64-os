@@ -151,118 +151,50 @@ diagPrintMessage:
 
 ; ---------------------------------------------------------------------------
 ; diagPrintFatal
-; Select and print the stable message for a fatal diagnostic identifier. Phase
-; 2 diagnostic values $01-$13 are contiguous and index bounded parallel tables;
-; zero, out-of-range, and $FF values use the unknown fallback.
+; Select and print the stable "CASM: " message for a fatal diagnostic
+; identifier, then (for all but the locationless run) its source context.
 ;
-; WP51: the range check's upper bound tracks CASM_DIAG_PHASE10_WP51_LAST, not
-; CASM_DIAG_PHASE9_WP47_LAST -- Increment 1 added message-table entries and
-; text for $39-$3C (the four listing diagnostics) but the bound here was never
-; bumped alongside them, so printing any of those four fell through to the
-; generic "unknown" fallback despite real text existing for them.
-;
-; WP52: CASM_DIAG_SYMBOL_MAP_INVALID ($42) is checked as its own early case
-; rather than folded into the parallel-array table below, leaving that
-; table's contiguous range and bound exactly as WP51 left them.
-;
-; WP53 increment 4: activates $3D-$41 (the five listing-file diagnostics),
-; through their own small parallel table (diagListMessageLo/Hi) rather than
-; extending the main one -- these five are locationless (no
-; diagPrintSourceContext call), unlike every entry in the main table, so
-; they could not share its tail unconditionally even if renumbered into it.
-;
-; WP81: activates $4B-$4E (.RES/.FILL/.ALIGN diagnostics) through their own
-; small parallel table (diagWp81MessageLo/Hi), checked via a bcc/bcs range
-; test right after the listing range check. Unlike the listing table these
-; four are locationed (falls through to diagPrintSourceContext), but they
-; still needed pulling out of the main cmp/beq chain below: the chain's
-; existing beq's index straight into 6502-relative-branch range, and simply
-; appending four more cmp/beq pairs pushed the earliest ones' targets out of
-; range (a real assembly error hit during this WP, not a hypothetical).
+; Finding C (memory-optimization WP, task 42): one dense parallel table,
+; diagMsgLo/Hi, holds every message pointer in identifier order
+; ($01 = CASM_DIAG_INIT_FAILED .. $56 = CASM_DIAG_PROGRESS_LAST). Dispatch
+; is: reject out-of-range -> unknown fallback; peel off the
+; CASM_DIAG_ASSERTION_FAILED user-message echo; index the table; and skip
+; the trailing diagPrintSourceContext call for exactly the
+; CASM_DIAG_LOCLESS_FIRST..LAST window ($3D..$43), tested with two compares.
+; This replaces the six separate range tables (main / listing / WP81 / WP82
+; / WP83 / progress) and the nine-way cmp/beq chain that had accreted here,
+; each of which repeated the same 20-byte table-lookup idiom. The message
+; strings, their "CASM: " prefix (msgCasmPrefix) and trailing CR (msgCR)
+; are unchanged -- see diagPrintMessage.
 ;
 ; Inputs:  A = CASM_DIAG_* identifier
 ; Outputs: none
-; Flags:   undefined after diagPrintString
+; Flags:   undefined after diagPrintMessage
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 diagPrintFatal:
-    ; Progress Increment 7 (Atomic Increment 4): universal transient clear
-    ; before any fatal diagnostic prints, per the Hook Contract -- so a
-    ; stale progress line can never overwrite or precede diagnostic text,
-    ; source context, a caret, or an include traceback. A is stashed across
-    ; the call because progressClearTransient clobbers A, X, Y (Increment 9
-    ; review PR-1 corrected the ABI/header from an earlier "A, Y") and A
-    ; holds the diagnostic identifier the dispatch below still needs. X and
-    ; Y are dead at this entry -- the range dispatch re-derives everything
-    ; from A -- so only A needs saving.
-    ; progressClearTransient cannot itself fail or recurse into a fatal
-    ; diagnostic -- it is a pure OS_API print sequence with no error path
-    ; (confirmed by reading its body: ahPrintChar's own KERNAL CHROUT call
-    ; is unconditionally successful).
+    ; Progress Increment 7: universal transient clear before any fatal
+    ; diagnostic prints, per the Hook Contract. A holds the identifier the
+    ; dispatch still needs and progressClearTransient clobbers A/X/Y, so A
+    ; is stashed across the call. progressClearTransient has no error path
+    ; (a pure OS_API print sequence), so it cannot recurse here.
     pha
     jsr progressClearTransient
     pla
-    cmp #CASM_DIAG_LISTING_CREATE_FAILED
-    bcs dpfNotMain
-    jmp dpfMainRange
-dpfNotMain:
-    cmp #CASM_DIAG_LISTING_SHORT_WRITE + 1
-    bcs dpfNotListing
-    jmp dpfListingRange
-dpfNotListing:
-    cmp #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
-    bcs :+
-    jmp dpfSymbolRange          ; Progress Increment 4's new dpfProgressCheck
-                                 ; block pushed dpfSymbolRange out of bcc range
-    :
-    cmp #CASM_DIAG_PHASE13_WP81_LAST + 1
-    bcs dpfWp82Check
-    sec
-    sbc #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
-    tax
-    lda diagWp81MessageLo, x
-    pha
-    lda diagWp81MessageHi, x
-    tay
-    pla
-    tax
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfWp82Check:
-    cmp #CASM_DIAG_INCBIN_FILENAME_EXPECTED
-    bcc dpfSymbolRange
-    cmp #CASM_DIAG_PHASE13_WP82_LAST + 1
-    bcs dpfWp83Check
-    sec
-    sbc #CASM_DIAG_INCBIN_FILENAME_EXPECTED
-    tax
-    lda diagWp82MessageLo, x
-    pha
-    lda diagWp82MessageHi, x
-    tay
-    pla
-    tax
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfWp83Check:
-    cmp #CASM_DIAG_ASSERT_UNRESOLVED
-    bcc dpfSymbolRange
-    cmp #CASM_DIAG_PHASE13_WP83_LAST + 1
-    bcs dpfProgressCheck
-    ; WP83 Increment 6: CASM_DIAG_ASSERTION_FAILED with a user-supplied
-    ; message (CasmAssertMessageLen != 0) echoes that message instead of
-    ; the generic table text below -- the only WP83 diagnostic with
-    ; per-occurrence dynamic content. cmp does not disturb A, so it still
-    ; holds the raw diagnostic identifier for the generic path's own
-    ; sbc #CASM_DIAG_ASSERT_UNRESOLVED index computation below.
+
+    cmp #CASM_DIAG_INIT_FAILED
+    bcc dpfUnknown
+    cmp #CASM_DIAG_PROGRESS_LAST + 1
+    bcs dpfUnknown
+
+    ; CASM_DIAG_ASSERTION_FAILED ($54) with a user-supplied .ASSERT message
+    ; echoes that text between the message body and the CR -- the one id
+    ; that cannot go through diagPrintMessage. cmp leaves A intact for the
+    ; generic path.
     cmp #CASM_DIAG_ASSERTION_FAILED
-    bne dpfWp83Generic
+    bne dpfClassify
     lda CasmAssertMessageLen
-    beq dpfWp83GenericReloadA
-    ; Not diagPrintMessage: the "CASM: " prefix leads, but the echoed user
-    ; text follows the message body before the CR. Emit the shared prefix,
-    ; then the (now prefix-less) "ASSERTION FAILED: " lead-in, then the
-    ; user's text, then the CR.
+    beq dpfAssertNoMessage
     ldx #<msgCasmPrefix
     ldy #>msgCasmPrefix
     jsr diagPrintString
@@ -276,160 +208,37 @@ dpfWp83Check:
     ldy #>msgCR
     jsr diagPrintString
     jmp diagPrintSourceContext
-dpfWp83GenericReloadA:
-    lda #CASM_DIAG_ASSERTION_FAILED
-dpfWp83Generic:
-    sec
-    sbc #CASM_DIAG_ASSERT_UNRESOLVED
-    tax
-    lda diagWp83MessageLo, x
-    pha
-    lda diagWp83MessageHi, x
-    tay
-    pla
-    tax
-    jsr diagPrintMessage
+dpfAssertNoMessage:
+    lda #CASM_DIAG_ASSERTION_FAILED      ; the CasmAssertMessageLen load clobbered A
+
+dpfClassify:
+    ; A = identifier ($01..$56). The CASM_DIAG_LOCLESS_FIRST..LAST run is
+    ; printed bare; every other id also gets diagPrintSourceContext (which
+    ; self-gates when the raise site recorded no location).
+    cmp #CASM_DIAG_LOCLESS_FIRST
+    bcc dpfLocationed
+    cmp #CASM_DIAG_LOCLESS_LAST + 1
+    bcc dpfEmitFromTable                 ; $3D..$43: tail-call, no source context
+dpfLocationed:
+    jsr dpfEmitFromTable
     jmp diagPrintSourceContext
-; Progress Increment 4: CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/
-; PASS_TOTAL_MISMATCH ($55/$56), same generic table-driven precedent as
-; dpfWp81Check/dpfWp82Check/dpfWp83Generic above. Neither call site
-; (casm.s's crpCount* trampolines, and the Pass 2 tail's
-; progressCheckPassTotals check) stamps a source location first -- both
-; are locationless, like emitCheckPassAgreement's own final-PC check
-; immediately above in casm.s. diagPrintSourceContext is still called for
-; consistency with every other entry in this range; it is self-gating and
-; simply prints nothing when no location was set (see dpfMainRange's own
-; comment above).
-dpfProgressCheck:
-    cmp #CASM_DIAG_PROGRESS_COUNTER_OVERFLOW
-    bcc dpfSymbolRange
-    cmp #CASM_DIAG_PROGRESS_LAST + 1
-    bcs dpfSymbolRange
-    sec
-    sbc #CASM_DIAG_PROGRESS_COUNTER_OVERFLOW
-    tax
-    lda diagProgressMessageLo, x
-    pha
-    lda diagProgressMessageHi, x
-    tay
-    pla
-    tax
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfSymbolRange:
-    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
-    beq dpfSymbolMapInvalid
-    cmp #CASM_DIAG_EXPR_CIRCULAR
-    beq dpfExprCircular
-    cmp #CASM_DIAG_EXPR_DIV_ZERO
-    beq dpfExprDivZero
-    cmp #CASM_DIAG_EXPR_RELOC_UNSUPPORTED
-    beq dpfExprRelocUnsupported
-    cmp #CASM_DIAG_EXPR_PAREN_TOO_DEEP
-    beq dpfExprParenTooDeep
-    cmp #CASM_DIAG_CHAR_UNTERMINATED
-    beq dpfCharUnterminated
-    cmp #CASM_DIAG_CHAR_INVALID_BYTE
-    beq dpfCharInvalidByte
-    cmp #CASM_DIAG_STRING_UNTERMINATED
-    beq dpfStringUnterminated
-    cmp #CASM_DIAG_STRING_INVALID_BYTE
-    beq dpfStringInvalidByte
-    jmp dpfUnknown
-dpfListingRange:
-    sec
-    sbc #CASM_DIAG_LISTING_CREATE_FAILED
-    tax
-    lda diagListMessageLo, x
-    pha
-    lda diagListMessageHi, x
-    tay
-    pla
-    tax
-    jmp diagPrintMessage         ; locationless -- no diagPrintSourceContext
-dpfMainRange:
-    cmp #CASM_DIAG_INIT_FAILED
-    bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE10_WP51_LAST + 1
-    bcs dpfUnknown
+
+; Index diagMsgLo/Hi by (identifier - CASM_DIAG_INIT_FAILED) and hand the
+; message body to diagPrintMessage.
+; In:  A = identifier ($01..$56)
+; Out: tail-calls diagPrintMessage (ends in rts)
+dpfEmitFromTable:
     sec
     sbc #CASM_DIAG_INIT_FAILED
     tax
-    lda diagMessageLo, x
+    lda diagMsgLo, x
     pha
-    lda diagMessageHi, x
+    lda diagMsgHi, x
     tay
     pla
     tax
-    jsr diagPrintMessage
-    ; WP15: append the source location and caret when the raise site recorded
-    ; one. Self-gating, so diagnostics with no source position are unchanged.
-    jmp diagPrintSourceContext
-dpfSymbolMapInvalid:
-    ldx #<msgSymbolMapInvalid
-    ldy #>msgSymbolMapInvalid
     jmp diagPrintMessage
-; WP65: locationless like dpfSymbolMapInvalid -- raised by the Pass1->Pass2
-; resolution sweep (casm.s), which runs after the live lexer/parser state
-; that diagSetLocFromToken depends on has already moved past the constant's
-; own definition statement; the record's VMM bookmark is a raw byte offset,
-; not a line/column, so there is no cheap way to recover a source position
-; here without a dedicated offset-to-line reverse lookup this project does
-; not have.
-dpfExprCircular:
-    ldx #<msgExprCircular
-    ldy #>msgExprCircular
-    jmp diagPrintMessage
-; WP68 Increment 6 Atomic Step 5: division by a static zero, raised by
-; combineStatic's own divide dispatch (Atomic Step 6) with
-; diagSetLocFromToken already called at the raise site -- same shape as
-; dpfExprRelocUnsupported/dpfExprParenTooDeep immediately below, not the
-; locationless single-step pattern.
-dpfExprDivZero:
-    ldx #<msgExprDivZero
-    ldy #>msgExprDivZero
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-; WP67: unlike dpfSymbolMapInvalid/dpfExprCircular above, both of these are
-; raised with a valid source location already set (diagSetLocFromToken, at
-; the raise site -- parseOperatorTail/parsePrimary in expr.s, both still
-; mid-parse when they fire, unlike the Pass1->Pass2 resolution sweep) --
-; same shape as dpfMainRange's own two-step print, not the locationless
-; single-step pattern.
-dpfExprRelocUnsupported:
-    ldx #<msgExprRelocUnsupported
-    ldy #>msgExprRelocUnsupported
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfExprParenTooDeep:
-    ldx #<msgExprParenTooDeep
-    ldy #>msgExprParenTooDeep
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-; WP69: both raised by lexer.s's lnChar with diagSetLocFromLookahead
-; already called at the raise site -- same two-step shape as
-; dpfExprRelocUnsupported/dpfExprParenTooDeep above, not the locationless
-; single-step pattern.
-dpfCharUnterminated:
-    ldx #<msgCharUnterminated
-    ldy #>msgCharUnterminated
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfCharInvalidByte:
-    ldx #<msgCharInvalidByte
-    ldy #>msgCharInvalidByte
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfStringUnterminated:
-    ldx #<msgStringUnterminated
-    ldy #>msgStringUnterminated
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
-dpfStringInvalidByte:
-    ldx #<msgStringInvalidByte
-    ldy #>msgStringInvalidByte
-    jsr diagPrintMessage
-    jmp diagPrintSourceContext
+
 dpfUnknown:
     ldx #<msgUnknown
     ldy #>msgUnknown
@@ -1412,231 +1221,194 @@ diagDumpToken:
 
 .segment "RODATA"
 
-diagMessageLo:
-    .byte <msgInitFailed
-    .byte <msgRegistryFull
-    .byte <msgCleanupFailed
-    .byte <msgSourceRequired
-    .byte <msgExtraSource
-    .byte <msgMalformedOutput
-    .byte <msgDuplicateOption
-    .byte <msgUnknownOption
-    .byte <msgFilenameTooLong
-    .byte <msgNotImplemented
-    .byte <msgInputOpenFailed
-    .byte <msgInputReadFailed
-    .byte <msgInputCloseFailed
-    .byte <msgOutputCreateFailed
-    .byte <msgOutputWriteFailed
-    .byte <msgOutputCloseFailed
-    .byte <msgOutputDeleteFailed
-    .byte <msgOutputShortWrite
-    .byte <msgStreamStateFailed
-    .byte <msgSourceRewindFailed
-    .byte <msgSourceOffsetOverflow
-    .byte <msgSourceLocationOverflow
-    .byte <msgSourceLineTooLong
-    .byte <msgTokenTooLong
-    .byte <msgInvalidSourceByte
-    .byte <msgMalformedNumber
-    .byte <msgLexerStateFailed
-    .byte <msgSyntaxError
-    .byte <msgExpectedNewline
-    .byte <msgOperandOutOfRange
-    .byte <msgInvalidAddrMode
-    .byte <msgDuplicateOrg
-    .byte <msgOrgRequired
-    .byte <msgAddressOverflow
-    .byte <msgBranchOutOfRange
-    .byte <msgExprMalformed
-    .byte <msgExprUnsupported
-    .byte <msgExprOverflow
-    .byte <msgResolverFailed
-    .byte <msgVmmUnavailable
-    .byte <msgVmmAllocFailed
-    .byte <msgVmmFreeFailed
-    .byte <msgVmmTransferFailed
-    .byte <msgDuplicateSymbol
-    .byte <msgUndefinedSymbol
-    .byte <msgSymbolTableFull
-    .byte <msgPassMismatch
-    .byte <msgRelocTableFull
-    .byte <msgIncludeFilenameExpected
-    .byte <msgInvalidIncludeFilename
-    .byte <msgIncludeFilenameTooLong
-    .byte <msgIncludeCatalogFull
-    .byte <msgIncludeDepthExceeded
-    .byte <msgIncludeCycleDetected
-    .byte <msgIncludeEventLogFull
-    .byte <msgIncludeReplayMismatch
-    .byte <msgListingNameCollision
-    .byte <msgListingRecordsFull
-    .byte <msgListingBytesFull
-    .byte <msgListingReplayMismatch
-diagMessageLoEnd:
+; Finding C (memory-optimization WP, task 42): one dense message table in
+; identifier order -- $01 CASM_DIAG_INIT_FAILED .. $56 CASM_DIAG_PROGRESS_LAST.
+; Replaces diagMessageLo/Hi + diagListMessageLo/Hi + diagWp81/82/83MessageLo/Hi
+; + diagProgressMessageLo/Hi. diagPrintFatal indexes it by
+; (identifier - CASM_DIAG_INIT_FAILED). Order is fixed by the CASM_DIAG_*
+; numbering and the contiguity asserts in common.inc; the two asserts below
+; pin the table length to the last identifier so a new CASM_DIAG_* without a
+; matching entry here fails the build.
+diagMsgLo:
+    .byte <msgInitFailed           ; $01
+    .byte <msgRegistryFull         ; $02
+    .byte <msgCleanupFailed        ; $03
+    .byte <msgSourceRequired       ; $04
+    .byte <msgExtraSource          ; $05
+    .byte <msgMalformedOutput      ; $06
+    .byte <msgDuplicateOption      ; $07
+    .byte <msgUnknownOption        ; $08
+    .byte <msgFilenameTooLong      ; $09
+    .byte <msgNotImplemented       ; $0A
+    .byte <msgInputOpenFailed      ; $0B
+    .byte <msgInputReadFailed      ; $0C
+    .byte <msgInputCloseFailed     ; $0D
+    .byte <msgOutputCreateFailed   ; $0E
+    .byte <msgOutputWriteFailed    ; $0F
+    .byte <msgOutputCloseFailed    ; $10
+    .byte <msgOutputDeleteFailed   ; $11
+    .byte <msgOutputShortWrite     ; $12
+    .byte <msgStreamStateFailed    ; $13
+    .byte <msgSourceRewindFailed   ; $14
+    .byte <msgSourceOffsetOverflow ; $15
+    .byte <msgSourceLocationOverflow ; $16
+    .byte <msgSourceLineTooLong    ; $17
+    .byte <msgTokenTooLong         ; $18
+    .byte <msgInvalidSourceByte    ; $19
+    .byte <msgMalformedNumber      ; $1A
+    .byte <msgLexerStateFailed     ; $1B
+    .byte <msgSyntaxError          ; $1C
+    .byte <msgExpectedNewline      ; $1D
+    .byte <msgOperandOutOfRange    ; $1E
+    .byte <msgInvalidAddrMode      ; $1F
+    .byte <msgDuplicateOrg         ; $20
+    .byte <msgOrgRequired          ; $21
+    .byte <msgAddressOverflow      ; $22
+    .byte <msgBranchOutOfRange     ; $23
+    .byte <msgExprMalformed        ; $24
+    .byte <msgExprUnsupported      ; $25
+    .byte <msgExprOverflow         ; $26
+    .byte <msgResolverFailed       ; $27
+    .byte <msgVmmUnavailable       ; $28
+    .byte <msgVmmAllocFailed       ; $29
+    .byte <msgVmmFreeFailed        ; $2A
+    .byte <msgVmmTransferFailed    ; $2B
+    .byte <msgDuplicateSymbol      ; $2C
+    .byte <msgUndefinedSymbol      ; $2D
+    .byte <msgSymbolTableFull      ; $2E
+    .byte <msgPassMismatch         ; $2F
+    .byte <msgRelocTableFull       ; $30
+    .byte <msgIncludeFilenameExpected ; $31
+    .byte <msgInvalidIncludeFilename ; $32
+    .byte <msgIncludeFilenameTooLong ; $33
+    .byte <msgIncludeCatalogFull   ; $34
+    .byte <msgIncludeDepthExceeded ; $35
+    .byte <msgIncludeCycleDetected ; $36
+    .byte <msgIncludeEventLogFull  ; $37
+    .byte <msgIncludeReplayMismatch ; $38
+    .byte <msgListingNameCollision ; $39
+    .byte <msgListingRecordsFull   ; $3A
+    .byte <msgListingBytesFull     ; $3B
+    .byte <msgListingReplayMismatch ; $3C
+    .byte <msgListingCreateFailed  ; $3D
+    .byte <msgListingWriteFailed   ; $3E
+    .byte <msgListingCloseFailed   ; $3F
+    .byte <msgListingDeleteFailed  ; $40
+    .byte <msgListingShortWrite    ; $41
+    .byte <msgSymbolMapInvalid     ; $42
+    .byte <msgExprCircular         ; $43
+    .byte <msgExprDivZero          ; $44
+    .byte <msgExprRelocUnsupported ; $45
+    .byte <msgExprParenTooDeep     ; $46
+    .byte <msgCharUnterminated     ; $47
+    .byte <msgCharInvalidByte      ; $48
+    .byte <msgStringUnterminated   ; $49
+    .byte <msgStringInvalidByte    ; $4A
+    .byte <msgResFillAlignUnresolved ; $4B
+    .byte <msgFillValueRequired    ; $4C
+    .byte <msgValueOutOfRange      ; $4D
+    .byte <msgAlignBoundaryZero    ; $4E
+    .byte <msgIncbinFilenameExpected ; $4F
+    .byte <msgInvalidIncbinFilename ; $50
+    .byte <msgIncbinFilenameTooLong ; $51
+    .byte <msgAssertUnresolved     ; $52
+    .byte <msgAssertMessageTooLong ; $53
+    .byte <msgAssertionFailed      ; $54
+    .byte <msgProgressCounterOverflow ; $55
+    .byte <msgProgressPassTotalMismatch ; $56
+diagMsgLoEnd:
 
-diagMessageHi:
-    .byte >msgInitFailed
-    .byte >msgRegistryFull
-    .byte >msgCleanupFailed
-    .byte >msgSourceRequired
-    .byte >msgExtraSource
-    .byte >msgMalformedOutput
-    .byte >msgDuplicateOption
-    .byte >msgUnknownOption
-    .byte >msgFilenameTooLong
-    .byte >msgNotImplemented
-    .byte >msgInputOpenFailed
-    .byte >msgInputReadFailed
-    .byte >msgInputCloseFailed
-    .byte >msgOutputCreateFailed
-    .byte >msgOutputWriteFailed
-    .byte >msgOutputCloseFailed
-    .byte >msgOutputDeleteFailed
-    .byte >msgOutputShortWrite
-    .byte >msgStreamStateFailed
-    .byte >msgSourceRewindFailed
-    .byte >msgSourceOffsetOverflow
-    .byte >msgSourceLocationOverflow
-    .byte >msgSourceLineTooLong
-    .byte >msgTokenTooLong
-    .byte >msgInvalidSourceByte
-    .byte >msgMalformedNumber
-    .byte >msgLexerStateFailed
-    .byte >msgSyntaxError
-    .byte >msgExpectedNewline
-    .byte >msgOperandOutOfRange
-    .byte >msgInvalidAddrMode
-    .byte >msgDuplicateOrg
-    .byte >msgOrgRequired
-    .byte >msgAddressOverflow
-    .byte >msgBranchOutOfRange
-    .byte >msgExprMalformed
-    .byte >msgExprUnsupported
-    .byte >msgExprOverflow
-    .byte >msgResolverFailed
-    .byte >msgVmmUnavailable
-    .byte >msgVmmAllocFailed
-    .byte >msgVmmFreeFailed
-    .byte >msgVmmTransferFailed
-    .byte >msgDuplicateSymbol
-    .byte >msgUndefinedSymbol
-    .byte >msgSymbolTableFull
-    .byte >msgPassMismatch
-    .byte >msgRelocTableFull
-    .byte >msgIncludeFilenameExpected
-    .byte >msgInvalidIncludeFilename
-    .byte >msgIncludeFilenameTooLong
-    .byte >msgIncludeCatalogFull
-    .byte >msgIncludeDepthExceeded
-    .byte >msgIncludeCycleDetected
-    .byte >msgIncludeEventLogFull
-    .byte >msgIncludeReplayMismatch
-    .byte >msgListingNameCollision
-    .byte >msgListingRecordsFull
-    .byte >msgListingBytesFull
-    .byte >msgListingReplayMismatch
-diagMessageHiEnd:
+diagMsgHi:
+    .byte >msgInitFailed           ; $01
+    .byte >msgRegistryFull         ; $02
+    .byte >msgCleanupFailed        ; $03
+    .byte >msgSourceRequired       ; $04
+    .byte >msgExtraSource          ; $05
+    .byte >msgMalformedOutput      ; $06
+    .byte >msgDuplicateOption      ; $07
+    .byte >msgUnknownOption        ; $08
+    .byte >msgFilenameTooLong      ; $09
+    .byte >msgNotImplemented       ; $0A
+    .byte >msgInputOpenFailed      ; $0B
+    .byte >msgInputReadFailed      ; $0C
+    .byte >msgInputCloseFailed     ; $0D
+    .byte >msgOutputCreateFailed   ; $0E
+    .byte >msgOutputWriteFailed    ; $0F
+    .byte >msgOutputCloseFailed    ; $10
+    .byte >msgOutputDeleteFailed   ; $11
+    .byte >msgOutputShortWrite     ; $12
+    .byte >msgStreamStateFailed    ; $13
+    .byte >msgSourceRewindFailed   ; $14
+    .byte >msgSourceOffsetOverflow ; $15
+    .byte >msgSourceLocationOverflow ; $16
+    .byte >msgSourceLineTooLong    ; $17
+    .byte >msgTokenTooLong         ; $18
+    .byte >msgInvalidSourceByte    ; $19
+    .byte >msgMalformedNumber      ; $1A
+    .byte >msgLexerStateFailed     ; $1B
+    .byte >msgSyntaxError          ; $1C
+    .byte >msgExpectedNewline      ; $1D
+    .byte >msgOperandOutOfRange    ; $1E
+    .byte >msgInvalidAddrMode      ; $1F
+    .byte >msgDuplicateOrg         ; $20
+    .byte >msgOrgRequired          ; $21
+    .byte >msgAddressOverflow      ; $22
+    .byte >msgBranchOutOfRange     ; $23
+    .byte >msgExprMalformed        ; $24
+    .byte >msgExprUnsupported      ; $25
+    .byte >msgExprOverflow         ; $26
+    .byte >msgResolverFailed       ; $27
+    .byte >msgVmmUnavailable       ; $28
+    .byte >msgVmmAllocFailed       ; $29
+    .byte >msgVmmFreeFailed        ; $2A
+    .byte >msgVmmTransferFailed    ; $2B
+    .byte >msgDuplicateSymbol      ; $2C
+    .byte >msgUndefinedSymbol      ; $2D
+    .byte >msgSymbolTableFull      ; $2E
+    .byte >msgPassMismatch         ; $2F
+    .byte >msgRelocTableFull       ; $30
+    .byte >msgIncludeFilenameExpected ; $31
+    .byte >msgInvalidIncludeFilename ; $32
+    .byte >msgIncludeFilenameTooLong ; $33
+    .byte >msgIncludeCatalogFull   ; $34
+    .byte >msgIncludeDepthExceeded ; $35
+    .byte >msgIncludeCycleDetected ; $36
+    .byte >msgIncludeEventLogFull  ; $37
+    .byte >msgIncludeReplayMismatch ; $38
+    .byte >msgListingNameCollision ; $39
+    .byte >msgListingRecordsFull   ; $3A
+    .byte >msgListingBytesFull     ; $3B
+    .byte >msgListingReplayMismatch ; $3C
+    .byte >msgListingCreateFailed  ; $3D
+    .byte >msgListingWriteFailed   ; $3E
+    .byte >msgListingCloseFailed   ; $3F
+    .byte >msgListingDeleteFailed  ; $40
+    .byte >msgListingShortWrite    ; $41
+    .byte >msgSymbolMapInvalid     ; $42
+    .byte >msgExprCircular         ; $43
+    .byte >msgExprDivZero          ; $44
+    .byte >msgExprRelocUnsupported ; $45
+    .byte >msgExprParenTooDeep     ; $46
+    .byte >msgCharUnterminated     ; $47
+    .byte >msgCharInvalidByte      ; $48
+    .byte >msgStringUnterminated   ; $49
+    .byte >msgStringInvalidByte    ; $4A
+    .byte >msgResFillAlignUnresolved ; $4B
+    .byte >msgFillValueRequired    ; $4C
+    .byte >msgValueOutOfRange      ; $4D
+    .byte >msgAlignBoundaryZero    ; $4E
+    .byte >msgIncbinFilenameExpected ; $4F
+    .byte >msgInvalidIncbinFilename ; $50
+    .byte >msgIncbinFilenameTooLong ; $51
+    .byte >msgAssertUnresolved     ; $52
+    .byte >msgAssertMessageTooLong ; $53
+    .byte >msgAssertionFailed      ; $54
+    .byte >msgProgressCounterOverflow ; $55
+    .byte >msgProgressPassTotalMismatch ; $56
+diagMsgHiEnd:
 
-.assert diagMessageLoEnd - diagMessageLo = CASM_DIAG_PHASE10_WP51_LAST, error, "CASM diagnostic low table is incomplete"
-.assert diagMessageHiEnd - diagMessageHi = CASM_DIAG_PHASE10_WP51_LAST, error, "CASM diagnostic high table is incomplete"
-
-; WP53 increment 4: the five listing-file I/O diagnostics' own small table,
-; indexed by (A - CASM_DIAG_LISTING_CREATE_FAILED) -- see diagPrintFatal's
-; own header comment for why these are not folded into the main table above.
-diagListMessageLo:
-    .byte <msgListingCreateFailed
-    .byte <msgListingWriteFailed
-    .byte <msgListingCloseFailed
-    .byte <msgListingDeleteFailed
-    .byte <msgListingShortWrite
-diagListMessageLoEnd:
-diagListMessageHi:
-    .byte >msgListingCreateFailed
-    .byte >msgListingWriteFailed
-    .byte >msgListingCloseFailed
-    .byte >msgListingDeleteFailed
-    .byte >msgListingShortWrite
-diagListMessageHiEnd:
-
-.assert diagListMessageLoEnd - diagListMessageLo = CASM_DIAG_LISTING_SHORT_WRITE - CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM listing diagnostic low table is incomplete"
-.assert diagListMessageHiEnd - diagListMessageHi = CASM_DIAG_LISTING_SHORT_WRITE - CASM_DIAG_LISTING_CREATE_FAILED + 1, error, "CASM listing diagnostic high table is incomplete"
-
-; WP81: .RES/.FILL/.ALIGN's own small parallel table, indexed by
-; (A - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED) -- pulled out of the main
-; cmp/beq chain in diagPrintFatal purely to keep every existing beq target
-; in that chain within 6502 branch range (adding four more entries to the
-; chain itself pushed the earliest beq's target out of range). Unlike the
-; listing table, these are locationed: diagPrintFatal still falls through
-; to diagPrintSourceContext after the message prints.
-diagWp81MessageLo:
-    .byte <msgResFillAlignUnresolved
-    .byte <msgFillValueRequired
-    .byte <msgValueOutOfRange
-    .byte <msgAlignBoundaryZero
-diagWp81MessageLoEnd:
-diagWp81MessageHi:
-    .byte >msgResFillAlignUnresolved
-    .byte >msgFillValueRequired
-    .byte >msgValueOutOfRange
-    .byte >msgAlignBoundaryZero
-diagWp81MessageHiEnd:
-
-.assert diagWp81MessageLoEnd - diagWp81MessageLo = CASM_DIAG_PHASE13_WP81_LAST - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostic low table is incomplete"
-.assert diagWp81MessageHiEnd - diagWp81MessageHi = CASM_DIAG_PHASE13_WP81_LAST - CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED + 1, error, "CASM WP81 diagnostic high table is incomplete"
-
-; WP82: .INCBIN's own small parallel table, indexed by
-; (A - CASM_DIAG_INCBIN_FILENAME_EXPECTED) -- same branch-range-avoidance
-; precedent as diagWp81MessageLo/Hi immediately above.
-diagWp82MessageLo:
-    .byte <msgIncbinFilenameExpected
-    .byte <msgInvalidIncbinFilename
-    .byte <msgIncbinFilenameTooLong
-diagWp82MessageLoEnd:
-diagWp82MessageHi:
-    .byte >msgIncbinFilenameExpected
-    .byte >msgInvalidIncbinFilename
-    .byte >msgIncbinFilenameTooLong
-diagWp82MessageHiEnd:
-
-.assert diagWp82MessageLoEnd - diagWp82MessageLo = CASM_DIAG_PHASE13_WP82_LAST - CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostic low table is incomplete"
-.assert diagWp82MessageHiEnd - diagWp82MessageHi = CASM_DIAG_PHASE13_WP82_LAST - CASM_DIAG_INCBIN_FILENAME_EXPECTED + 1, error, "CASM WP82 diagnostic high table is incomplete"
-
-; WP83: .ASSERT diagnostics, same precedent as diagWp81MessageLo/Hi and
-; diagWp82MessageLo/Hi above. CASM_DIAG_ASSERTION_FAILED's message here is
-; the generic (no-message) text; Increment 6 adds a separate message-echo
-; print path for the case where the user supplied one, without changing
-; this table.
-diagWp83MessageLo:
-    .byte <msgAssertUnresolved
-    .byte <msgAssertMessageTooLong
-    .byte <msgAssertionFailed
-diagWp83MessageLoEnd:
-diagWp83MessageHi:
-    .byte >msgAssertUnresolved
-    .byte >msgAssertMessageTooLong
-    .byte >msgAssertionFailed
-diagWp83MessageHiEnd:
-
-.assert diagWp83MessageLoEnd - diagWp83MessageLo = CASM_DIAG_PHASE13_WP83_LAST - CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostic low table is incomplete"
-.assert diagWp83MessageHiEnd - diagWp83MessageHi = CASM_DIAG_PHASE13_WP83_LAST - CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostic high table is incomplete"
-
-; Progress Increment 4: same generic table precedent as diagWp81/82/83
-; above. Both diagnostics are raised by progress.s's own checks
-; (progressStatement's overflow guard, progressCheckPassTotals), called
-; from casm.s/emit.s -- progress.s itself never prints, per its module
-; boundary (see progress.s's own file header).
-diagProgressMessageLo:
-    .byte <msgProgressCounterOverflow
-    .byte <msgProgressPassTotalMismatch
-diagProgressMessageLoEnd:
-diagProgressMessageHi:
-    .byte >msgProgressCounterOverflow
-    .byte >msgProgressPassTotalMismatch
-diagProgressMessageHiEnd:
-
-.assert diagProgressMessageLoEnd - diagProgressMessageLo = CASM_DIAG_PROGRESS_LAST - CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostic low table is incomplete"
-.assert diagProgressMessageHiEnd - diagProgressMessageHi = CASM_DIAG_PROGRESS_LAST - CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostic high table is incomplete"
+.assert diagMsgLoEnd - diagMsgLo = CASM_DIAG_PROGRESS_LAST, error, "CASM diagnostic message table (lo) length must equal the last diagnostic identifier"
+.assert diagMsgHiEnd - diagMsgHi = CASM_DIAG_PROGRESS_LAST, error, "CASM diagnostic message table (hi) length must equal the last diagnostic identifier"
 
 ; Finding B (memory-optimization WP, task 42): the "CASM: " that used to
 ; lead every one of the ~89 message strings below, and the trailing PETSCII
@@ -1769,9 +1541,10 @@ msgListingReplayMismatch:
     .byte "LISTING REPLAY MISMATCH", 0
 msgSymbolMapInvalid:
     .byte "SYMBOL MAP INVALID", 0
-; WP65: locationless, same as msgSymbolMapInvalid above -- the resolution
-; sweep runs after the live lexer/parser have moved on, with no line/column
-; to attach (see dpfExprCircular's own comment).
+; WP65: locationless (in the CASM_DIAG_LOCLESS_FIRST..LAST run, see
+; common.inc), same as msgSymbolMapInvalid above -- the Pass1->Pass2
+; resolution sweep runs after the live lexer/parser have moved on, with no
+; line/column to attach.
 msgExprCircular:
     .byte "CIRCULAR CONSTANT DEFINITION", 0
 ; WP68 Increment 6 Atomic Step 5: static division by zero.
@@ -1830,9 +1603,8 @@ msgProgressCounterOverflow:
     .byte "STATEMENT COUNT OVERFLOW", 0
 msgProgressPassTotalMismatch:
     .byte "PASS 1/PASS 2 STATEMENT MISMATCH", 0
-; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
-; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
-; below indexes this same order.
+; The five listing-file I/O diagnostics ($3D-$41): the head of the
+; CASM_DIAG_LOCLESS_FIRST..LAST locationless run (see common.inc).
 msgListingCreateFailed:
     .byte "LISTING CREATE FAILED", 0
 msgListingWriteFailed:

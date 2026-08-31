@@ -143,22 +143,6 @@ EXPECTED_EXTRA = {
     "msgUnknown": "INTERNAL ERROR",
 }
 
-# cmp/beq chain in diagPrintFatal: identifier -> message label. This is the
-# one part of the id->label mapping that is not a contiguous table today.
-# Finding C folds it into the unified table; when that lands, delete this
-# and read those ids straight from the table like every other id.
-BEQ_CHAIN = {
-    0x42: "msgSymbolMapInvalid",
-    0x43: "msgExprCircular",
-    0x44: "msgExprDivZero",
-    0x45: "msgExprRelocUnsupported",
-    0x46: "msgExprParenTooDeep",
-    0x47: "msgCharUnterminated",
-    0x48: "msgCharInvalidByte",
-    0x49: "msgStringUnterminated",
-    0x4A: "msgStringInvalidByte",
-}
-
 LINK_BASE = 0x3800
 CA65_ARGS = ["-t", "c64"]
 
@@ -188,11 +172,6 @@ def const_values(common_inc):
             elif raw in vals:
                 vals[name] = vals[raw]
     return vals
-
-
-def parse_table(src, label):
-    m = re.search(label + r":\s*\n((?:\s*\.byte <\w+\s*\n?)+)", src)
-    return re.findall(r"<(\w+)", m.group(1)) if m else []
 
 
 def link_with_labels(build_dir, workdir):
@@ -238,32 +217,19 @@ def read_cstr(mem, addr):
 
 
 def decode_id_to_body(mem, syms, consts):
-    """id -> message body text, by walking diagPrintFatal's dispatch tables
-    and the cmp/beq chain exactly as the 6502 code does.
+    """id -> message body text, decoded from diagPrintFatal's dispatch.
 
-    FINDING C: when the six tables collapse to one dense table, replace this
-    whole function body with a single loop over that table."""
-    src = open(os.path.join(repo_root(), "src/external/casm/diagnostics.s")).read()
-
-    def table_bodies(label, first_id):
-        lo = syms[label]
-        hi = syms[label.replace("Lo", "Hi")]
-        names = parse_table(src, label)
-        out = {}
-        for i in range(len(names)):
-            ptr = mem[lo - LINK_BASE + i] | (mem[hi - LINK_BASE + i] << 8)
-            out[first_id + i] = read_cstr(mem, ptr)
-        return out
-
+    Since Finding C (task 42) that dispatch is one dense table, diagMsgLo /
+    diagMsgHi, indexed by (id - CASM_DIAG_INIT_FAILED) for every id in
+    $01..CASM_DIAG_PROGRESS_LAST. (Before Finding C this walked six separate
+    range tables plus a nine-entry cmp/beq chain.)"""
+    first_id = consts["CASM_DIAG_INIT_FAILED"]
+    last_id = consts["CASM_DIAG_PROGRESS_LAST"]
+    lo, hi = syms["diagMsgLo"], syms["diagMsgHi"]
     bodies = {}
-    bodies.update(table_bodies("diagMessageLo", consts["CASM_DIAG_INIT_FAILED"]))
-    bodies.update(table_bodies("diagListMessageLo", consts["CASM_DIAG_LISTING_CREATE_FAILED"]))
-    bodies.update(table_bodies("diagWp81MessageLo", consts["CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED"]))
-    bodies.update(table_bodies("diagWp82MessageLo", consts["CASM_DIAG_INCBIN_FILENAME_EXPECTED"]))
-    bodies.update(table_bodies("diagWp83MessageLo", consts["CASM_DIAG_ASSERT_UNRESOLVED"]))
-    bodies.update(table_bodies("diagProgressMessageLo", consts["CASM_DIAG_PROGRESS_COUNTER_OVERFLOW"]))
-    for diag_id, label in BEQ_CHAIN.items():
-        bodies[diag_id] = read_cstr(mem, syms[label])
+    for i in range(last_id - first_id + 1):
+        ptr = mem[lo - LINK_BASE + i] | (mem[hi - LINK_BASE + i] << 8)
+        bodies[first_id + i] = read_cstr(mem, ptr)
     return bodies
 
 

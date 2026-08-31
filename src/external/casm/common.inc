@@ -974,6 +974,27 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostics must remain contiguous"
 .assert CASM_DIAG_PROGRESS_LAST = $56, error, "CASM progress diagnostic range changed"
 
+; The contiguous run of *locationless* fatal diagnostics: diagPrintFatal
+; (diagnostics.s, unified-table dispatch -- memory-optimization WP task 42,
+; Finding C) prints these WITHOUT the trailing diagPrintSourceContext call
+; that every other id gets. Their raise sites do not stamp a source
+; location, and calling diagPrintSourceContext for them would risk
+; attaching a stale location from an earlier raise. Five listing-file I/O
+; errors ($3D-$41), SYMBOL MAP INVALID ($42, mapPrint), CIRCULAR CONSTANT
+; DEFINITION ($43, the Pass1->Pass2 resolution sweep). The dispatch encodes
+; exactly this [FIRST, LAST] window as two compares; a new locationless
+; diagnostic means extending this range AND confirming its raise site sets
+; no location, and a new *locationed* diagnostic must NOT be numbered
+; inside it.
+CASM_DIAG_LOCLESS_FIRST = CASM_DIAG_LISTING_CREATE_FAILED
+CASM_DIAG_LOCLESS_LAST  = CASM_DIAG_EXPR_CIRCULAR
+
+.assert CASM_DIAG_LOCLESS_FIRST = $3D, error, "CASM locationless diagnostic run start moved -- re-audit diagPrintFatal's context-skip window"
+.assert CASM_DIAG_LOCLESS_LAST = $43, error, "CASM locationless diagnostic run end moved -- re-audit diagPrintFatal's context-skip window"
+.assert CASM_DIAG_LOCLESS_LAST - CASM_DIAG_LOCLESS_FIRST = 6, error, "CASM locationless diagnostic run must be exactly 7 wide"
+.assert CASM_DIAG_LOCLESS_FIRST = CASM_DIAG_LISTING_REPLAY_MISMATCH + 1, error, "CASM locationless run must start right after the last locationed listing-capture diagnostic"
+.assert CASM_DIAG_EXPR_DIV_ZERO = CASM_DIAG_LOCLESS_LAST + 1, error, "CASM first locationed expression diagnostic must sit right after the locationless run"
+
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract
 ; ---------------------------------------------------------------------------

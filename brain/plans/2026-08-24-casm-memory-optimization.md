@@ -495,6 +495,69 @@ the script, so a broken id->message mapping fails the build. Skipped when
 `CASM_ENABLE_DIAG_DUMP_TOKEN=ON` (the verifier re-assembles `diagnostics.s`
 without that define). No MAIN size impact. CASM build 1384 -> 1386.
 
+## Increment 8 Finding C (executed 2026-08-31)
+
+**Done. 240 bytes recovered (258 CODE, +18 RODATA for the unified table --
+exactly the audit's "+18" figure). Verifier passes all 86 ids against the
+new dispatch; every diagnostic byte-identical to the Increment 1
+baseline.**
+
+### Mechanism
+
+`diagPrintFatal` had grown to **seven** parallel range tables
+(`diagMessageLo` / `diagListMessageLo` / `diagWp81/82/83MessageLo` /
+`diagProgressMessageLo`) plus a **nine-way `cmp`/`beq` chain**, each
+repeating the same ~20-byte table-lookup idiom. Replaced with:
+
+- **One dense table** `diagMsgLo` / `diagMsgHi`, 86 entries in identifier
+  order (`$01`..`$56`), indexed by `id - CASM_DIAG_INIT_FAILED`.
+- **One range check** (`< $01` or `>= $57` -> `dpfUnknown`).
+- **One two-compare context test**: `id` in
+  `[CASM_DIAG_LOCLESS_FIRST, CASM_DIAG_LOCLESS_LAST]` (`$3D..$43`) ->
+  tail-call `diagPrintMessage` (bare, no source context); otherwise
+  `jsr` + `jmp diagPrintSourceContext` (self-gating). Replaces what the
+  audit had budgeted as an 11-byte bitmap.
+- The `CASM_DIAG_ASSERTION_FAILED` user-message echo path is peeled off
+  before the table index and is byte-for-byte the Increment 6 version.
+
+### Compile-time asserts added
+
+- `common.inc`: `CASM_DIAG_LOCLESS_FIRST`/`LAST` named, with five
+  `.assert`s pinning the window to `$3D..$43`, its width to 7, and its
+  neighbours (`= CASM_DIAG_LISTING_REPLAY_MISMATCH + 1`,
+  `CASM_DIAG_EXPR_DIV_ZERO = LAST + 1`).
+- `diagnostics.s`: `diagMsgLoEnd - diagMsgLo = CASM_DIAG_PROGRESS_LAST`
+  (and Hi) -- a new `CASM_DIAG_*` id with no table entry fails the build.
+
+Negative-tested: dropping one table entry fires the length assert; moving
+`CASM_DIAG_LOCLESS_LAST` fires three asserts; both restore clean.
+
+### Verification
+
+- POST_BUILD `verify_casm_diag_table.py` (`decode_id_to_body()` rewritten to
+  the single table, `BEQ_CHAIN` deleted) -> **`OK: all 86 diagnostic
+  identifiers + 2 extras`** against the new dispatch.
+- Fault injection: swapping the `$41` (ex-`dpfListingRange`) and `$4B`
+  (ex-`dpfWp81`) table entries -> verifier reports `FAIL 0x41` + `FAIL 0x4B`
+  and the build fails. Restored -> `OK`. `--self-test` still catches an
+  internal corruption.
+- 88 message strings byte-identical to the Increment 1 baseline;
+  `casm.s`/`map.s`/`emit.s` untouched.
+- Full `cmake --build build` clean, all harnesses link.
+- Live per-range render + both locationless sub-cases: **Increment 9**.
+
+### Measurement
+
+| | Increment 6 | Increment 8 |
+| --- | --- | --- |
+| `diagnostics.o` CODE | `$0575` | `$0473` (-258) |
+| `diagnostics.o` RODATA | `$085E` | `$0870` (+18) |
+| `__MAIN_LAST__` | `$A259` | `$A169` |
+| MAIN headroom at `$7400` | 2,470 | **2,710** |
+
+Cumulative D + E + A + B + C: headroom `642 -> 2,710` (**2,068 bytes** --
+past the plan's ~2,000 objective). CASM build 1384 -> 1387.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -806,3 +869,16 @@ become user-facing.
   Wired `POST_BUILD` on the `casm` target. `decode_id_to_body()` is the
   only part Finding C rewrites; the `EXPECTED` dict is the invariant.
   Increment 8 (Finding C) is next.
+- 2026-08-31: **Increment 8 (Finding C) executed.** `diagPrintFatal`'s
+  seven parallel range tables + nine-way `cmp`/`beq` chain collapsed to one
+  86-entry dense table (`diagMsgLo`/`Hi`), one range check, and one
+  two-compare locationless-window test (`CASM_DIAG_LOCLESS_FIRST..LAST`,
+  `$3D..$43`). New compile-time asserts pin the table length to the last
+  id and the window to `$3D..$43` +/- neighbours; both negative-tested. The
+  `verify_casm_diag_table.py` decode rewritten to the single table -- passes
+  all 86 ids, catches an across-former-range-boundary entry swap
+  (`FAIL 0x41` + `FAIL 0x4B`, build fails), self-test still works. **240
+  bytes** recovered (258 CODE, +18 RODATA for the unified table). Message
+  strings byte-identical to Increment 1; `casm.s`/`map.s` untouched.
+  Cumulative D+E+A+B+C headroom `642 -> 2,710` (2,068 recovered, past the
+  ~2,000 target). Increment 9 (live VICE verification) is next.
