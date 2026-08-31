@@ -11,7 +11,9 @@
 .export diagPrintString
 .export diagPrintFatal
 .export diagPrintPhase2Ready
+.if CASM_ENABLE_DIAG_DUMP_TOKEN
 .export diagDumpToken
+.endif
 .export diagClearLoc
 .export diagSetLocFromLookahead
 .export diagSetLocFromLookaheadPos
@@ -20,7 +22,9 @@
 .export diagStampStmtLoc
 
 .import CasmTokenRecord
-.import CasmTokenText
+.if CASM_ENABLE_DIAG_DUMP_TOKEN
+.import CasmTokenText          ; used only by diagDumpToken
+.endif
 
 .import CasmLookaheadLineLo
 .import CasmLookaheadLineHi
@@ -1214,8 +1218,13 @@ diagPrintIncludeTraceback:
 
 ; ---------------------------------------------------------------------------
 ; diagDumpToken
-; Format and print the current token to screen.
+; Format and print the current token to screen. Lexer/parser development aid
+; with no production call site since the Phase 3 WP10 token loop was
+; replaced; gated off by default (see CASM_ENABLE_DIAG_DUMP_TOKEN in
+; common.inc). The routine and its token-name tables/strings below are
+; wrapped in the same .if so ld65 has nothing to link when it is off.
 ; ---------------------------------------------------------------------------
+.if CASM_ENABLE_DIAG_DUMP_TOKEN
 diagDumpToken:
     ; Print type name:
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
@@ -1359,6 +1368,7 @@ diagDumpToken:
     ldy #>msgCR
     jsr diagPrintString
     rts
+.endif  ; CASM_ENABLE_DIAG_DUMP_TOKEN
 
 .segment "RODATA"
 
@@ -1788,7 +1798,10 @@ msgUnknown:
 msgPhase2Ready:
     .byte "CASM: INPUT VALIDATED", PetCr, 0
 
-; Token dump tables and strings
+; Token dump tables and strings -- gated with diagDumpToken itself (Finding
+; A). msgCR below is deliberately outside the .if: it is shared by
+; diagPrintFatal and the source-context/traceback printers.
+.if CASM_ENABLE_DIAG_DUMP_TOKEN
 tokNamesLo:
     .byte <tokNameEof, <tokNameNewline, <tokNameId, <tokNameMnem
     .byte <tokNameDir, <tokNameReg, <tokNameNum, <tokNameComma
@@ -1875,6 +1888,7 @@ msgTextPrefix:    .byte " [", 0
 msgTextSuffix:    .byte "]", 0
 msgLocLinePrefix: .byte " L:", 0
 msgLocColPrefix:  .byte " C:", 0
+.endif  ; CASM_ENABLE_DIAG_DUMP_TOKEN
 msgCR:            .byte PetCr, 0
 
 ; WP15 source context strings.

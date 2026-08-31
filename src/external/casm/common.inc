@@ -11,6 +11,22 @@
 CASM_COMMON_INC = 1
 
 ; ---------------------------------------------------------------------------
+; Build-time switches
+;
+; CASM_ENABLE_DIAG_DUMP_TOKEN -- compiles diagnostics.s's diagDumpToken
+; (the lexer/parser development token-dump printer) and its ~30 token-name
+; strings back into the build. It has had no production call site since the
+; Phase 3 WP10 token loop was replaced; ld65 links whole objects, so it and
+; its tables shipped dead weight in every casm.prg (~500 bytes). Gated off
+; by default (memory-optimization WP, task 42, Finding A -- Scoping Decision
+; 2 keeps the source rather than deleting it). Turn it back on with the
+; CMake cache var `-D CASM_ENABLE_DIAG_DUMP_TOKEN=ON`, or a direct
+; `ca65 ... -D CASM_ENABLE_DIAG_DUMP_TOKEN=1`.
+.ifndef CASM_ENABLE_DIAG_DUMP_TOKEN
+CASM_ENABLE_DIAG_DUMP_TOKEN = 0
+.endif
+
+; ---------------------------------------------------------------------------
 ; Application-private zero page: $70-$8F
 ;
 ; These fixed-address aliases are transient scratch shared by CASM modules.

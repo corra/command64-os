@@ -333,6 +333,60 @@ on-screen digit truth is verified live -- that lands in Increment 9/10).
 Cumulative D + E: headroom `642 -> 1,232` (**590 bytes** recovered).
 CASM build 1381 -> 1382; `TEST_CASM_PROGRESS` -> 1013.
 
+## Increment 5 Finding A (executed 2026-08-31)
+
+**Done. 653 bytes recovered (251 CODE + 402 RODATA in `diagnostics.o`) --
+more than the audit's 509 estimate, because the token-name tables grew
+with the CHAR/STRING token types since 2026-08-24. Switch-on build
+restores `diagnostics.o` to byte-identical pre-Finding-A size.**
+
+### Mechanism (Scoping Decision 2 -- gate, don't delete)
+
+- `common.inc` new "Build-time switches" block: `CASM_ENABLE_DIAG_DUMP_TOKEN`
+  defaults to 0 via an `.ifndef` guard, so a `ca65 -D CASM_ENABLE_DIAG_DUMP_TOKEN=1`
+  (or the CMake cache var) overrides it.
+- `diagnostics.s`: `.if CASM_ENABLE_DIAG_DUMP_TOKEN` wraps (a) the
+  `.export diagDumpToken`, (b) the `.import CasmTokenText` (used only here --
+  `CasmTokenRecord` stays, it is also used by `diagSetLocFromToken`), (c) the
+  `diagDumpToken` routine, (d) the RODATA token-name tables + strings
+  (`tokNames*`, `dirSubtypeNames*`, `regSubtypeNames*`, `numSubtypeNames*`,
+  the ~40 `tokName*`/`dirName*`/`regName*`/`numName*` strings, `msgUnknownTok`,
+  `msgSubUnknown`, `msgMnem*`, `msgText*`, `msgLoc*Prefix`). `msgCR`
+  immediately after the block is **outside** the `.if` -- it is shared by
+  `diagPrintFatal` and the source-context/traceback printers.
+- `cmake/Ca65.cmake`: `add_ca65_app` gains an `EXTRA_DEFINES` multi-value
+  keyword (mirrors the existing `EXTRA_INCLUDE_DIRS`), threaded into every
+  ca65 call as `-D` flags so a shared-`.inc` switch is consistent across the
+  whole link.
+- `CMakeLists.txt`: `option(CASM_ENABLE_DIAG_DUMP_TOKEN ... OFF)` at the
+  casm call site, passed through `EXTRA_DEFINES`. Toggling it re-assembles
+  CASM (the ca65 command line changes, so the generator rebuilds) but does
+  not bump the build number.
+
+### Verification
+
+- Default build (`OFF`): full `cmake --build build` clean, all harnesses
+  link. `diagnostics.o` CODE `$650 -> $555`, RODATA `$C59 -> $AC7`.
+- `cmake -B build -D CASM_ENABLE_DIAG_DUMP_TOKEN=ON` then build: clean,
+  `diagnostics.o` back to **exactly** `$650` / `$C59` (the Inc 1 baseline),
+  whole-CODE back to `$5380` (= Inc 4, pre-Finding-A). `.import CasmTokenText`
+  resolves against `lexer.s`. Reverted to `OFF`, rebuilt clean.
+- Every `CASM:` diagnostic message string byte-identical to the Increment 1
+  baseline dump (Finding A removed only token-*name* strings, never a
+  diagnostic message).
+
+### Measurement
+
+| | Increment 4 | Increment 5 |
+| --- | --- | --- |
+| `diagnostics.o` CODE | `$0650` | `$0555` |
+| `diagnostics.o` RODATA | `$0C59` | `$0AC7` |
+| `__MAIN_LAST__` | `$A72F` | `$A4A2` |
+| MAIN headroom at `$7400` | 1,232 | **1,885** |
+
+Cumulative D + E + A: headroom `642 -> 1,885` (**1,243 bytes** recovered).
+CASM build 1382 -> 1383.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -611,3 +665,14 @@ become user-facing.
   both field widths**. Build + `test_casm_progress` clean. **progress.o
   CODE -108 bytes**; cumulative D+E headroom `642 -> 1,232`. Increment 5
   (Finding A -- gate `diagDumpToken`) is next.
+- 2026-08-31: **Increment 5 (Finding A) executed.** `diagDumpToken`, its
+  `.export`, its `.import CasmTokenText`, and its ~40 token-name
+  strings/tables gated behind `CASM_ENABLE_DIAG_DUMP_TOKEN` (`.ifndef`
+  default 0 in `common.inc`; new `EXTRA_DEFINES` keyword in
+  `cmake/Ca65.cmake`; `option(... OFF)` at the casm call site). Default
+  build drops **653 bytes** (251 CODE + 402 RODATA -- above the audit's 509
+  because Phase 12 grew the token tables). `-D ...=ON` build verified: clean
+  link, `diagnostics.o` restored byte-for-byte to the pre-Finding-A size.
+  All `CASM:` diagnostic messages byte-identical to the Increment 1
+  baseline. Cumulative D+E+A headroom `642 -> 1,885`. Increment 6
+  (Finding B -- `diagPrintMessage` shared prefix/CR helper) is next.

@@ -60,7 +60,7 @@
 # build resolves the identical operand ca65-side, without renaming any
 # checked-in source file.
 function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZE_HEX)
-    cmake_parse_arguments(CA65APP "" "BASE_HEX" "EXTRA_INCLUDE_DIRS" ${ARGN})
+    cmake_parse_arguments(CA65APP "" "BASE_HEX" "EXTRA_INCLUDE_DIRS;EXTRA_DEFINES" ${ARGN})
 
     # CODE_ALIGN stays positional so the existing 6-arg call sites need no
     # change; it is simply whatever positional argument survives keyword parsing.
@@ -190,6 +190,15 @@ SEGMENTS {
             list(APPEND EXTRA_I_FLAGS "-I" "${EXTRA_DIR}")
         endforeach()
 
+        # Optional -D SYMBOL[=value] conditional-assembly defines, applied to
+        # every translation unit so a switch guarded in a shared .inc is
+        # consistent across the whole link. Only CASM uses this today
+        # (CASM_ENABLE_DIAG_DUMP_TOKEN); mirrors EXTRA_INCLUDE_DIRS' pattern.
+        set(EXTRA_D_FLAGS "")
+        foreach(EXTRA_DEF ${CA65APP_EXTRA_DEFINES})
+            list(APPEND EXTRA_D_FLAGS "-D" "${EXTRA_DEF}")
+        endforeach()
+
         set(WRAPPER_CMD "")
         if(C64_THEME_DIR)
             if(FIRST_SRC)
@@ -207,6 +216,7 @@ SEGMENTS {
             COMMAND ${WRAPPER_CMD} "${CA65_EXECUTABLE}" "${SRC_ABS}"
                 -I "${SRC_DIR}" -I "${CMAKE_SOURCE_DIR}/include/ca65" -I "${INC_DIR}"
                 ${EXTRA_I_FLAGS}
+                ${EXTRA_D_FLAGS}
                 -t c64 -o "${OBJ}"
             # DEPENDS the full source/include set (via HASH_SOURCES, which
             # -- like add_external_app's SOURCES_VAR convention -- should
