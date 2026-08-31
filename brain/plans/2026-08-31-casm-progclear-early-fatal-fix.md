@@ -287,3 +287,24 @@ merge to `main`.
   close (`__MAIN_LAST__` `$A169`, headroom 2,710, CODE `$51A3`) -- the
   relocation is exactly net-zero size. `image_d64` / `test_image_d64` /
   `casm_progress_test_d64` rebuilt. Increment 2 (live verification) next.
+- 2026-08-31: **Increment 2 (live verification) executed.** Command64
+  booted fresh from the rebuilt `casm_progress_test.d64`; banner
+  `CASM V0.5.2.1392` -- provenance confirmed.
+  - `casm <37-char name>` -> `CASM: FILENAME TOO LONG` (cliParse raise
+    site): **full `CASM V0.5.2.1392` banner** on its own line, then the
+    diagnostic, then the prompt. (Pre-fix in memory-opt Increment 9 this
+    same case truncated the banner to `CASM V`.)
+  - `casm nonesuch.s` -> `CASM: CANNOT OPEN INPUT` (a different, later
+    raise site -- `fileOpenInput`): **full banner**, clean return.
+  - `casm casmpg128.s`: identical progress sequence
+    (`P1/P2 START/DONE 00128`, `WRITE:`, `DONE: P1 00128, P2 00128, 00129
+    BYTES`, `CASM: INPUT VALIDATED`) -- **`00129 BYTES` unchanged**.
+    Assembled output and progress display unaffected.
+  - `test_casm_progress` harness: 20+ cases, `CASM PROGRESS: PASS`.
+  The plan's checkpoint read of `CasmProgFlags = $00` was **substituted by
+  the Increment 1 static disassembly proof** (`progressInit` at `$380A`,
+  the 4th call in `start`, ahead of `resourcesInit` / `cliParse` / the
+  banner / every fatal branch, all four preceding inits infallible), which
+  establishes `CasmProgFlags = $00` at `progressClearTransient` for *every*
+  RAM state, plus the two live clean-banner confirmations -- stronger than
+  a single-value checkpoint read. Increment 3 (closeout) next.
