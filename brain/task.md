@@ -3702,7 +3702,7 @@
   - Walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
     **CLOSED 2026-08-31, user-approved. Taskwarrior 42 done.**
 
-- [/] Taskwarrior #43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`): CASM --
+- [x] Taskwarrior #43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`): CASM --
       `diagPrintFatal`'s `progressClearTransient` reads uninitialized
       `CasmProgFlags` for any diagnostic raised before `startPass1`
   - Every `startInitFatal` path (`resourcesInit`/`cliInit`/`fileIoInit`/
@@ -3716,10 +3716,15 @@
     from progress-indication Increment 7; **confirmed byte-identical on
     `main`**. Disclosed and deferred per the memory-optimization plan's
     stop condition.
-  - Fix candidate (one line): clear `CasmProgFlags` (or call
-    `progressInit`) after `sourceInit` in `casm.s:start`, mirroring the
-    existing `diagClearLoc`/`listingStateInit` placement. Needs its own
-    approved plan before source edits.
+  - **CLOSED 2026-08-31, user-approved -- CASM `0.5.2` build 1392.**
+    Plan/walkthrough `brain/{plans,walkthroughs}/2026-08-31-casm-progclear-
+    early-fatal-fix.md`. Fix: moved the single `jsr progressInit` from
+    `startPass1` up into `casm.s:start`'s early-init block, before
+    `resourcesInit` (with `diagClearLoc`/`listingStateInit`). Net code size
+    zero. Static proof (`progressInit` at `$380A`, 4th call, ahead of every
+    fatal branch; all preceding inits infallible) + live: full banner on
+    two early-fatal raise sites, `casmpg128` byte count unchanged,
+    `test_casm_progress` PASS.
 
 - [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
       build duration display on completion (success and failure)

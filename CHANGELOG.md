@@ -78,6 +78,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CASM garbled banner on an early fatal exit** (CASM `0.5.1` -> `0.5.2`,
+  Taskwarrior 43): a diagnostic raised before Pass 1 -- CLI/file/lexer-init
+  failures such as `FILENAME TOO LONG`, `CANNOT OPEN INPUT`, `UNKNOWN
+  OPTION` -- reached `diagPrintFatal`, whose first act
+  (`progressClearTransient`, from the progress-indication feature) tests
+  `CasmProgFlags`. That byte was only cleared by `progressInit`, which
+  `casm.s` did not call until `startPass1`, so it held uninitialized RAM;
+  a bit-0-set garbage value made `progressClearTransient` run its
+  cursor-left + space-fill erase over the current screen line, truncating
+  the version banner (and any other text on that line). Fixed by moving
+  the single `jsr progressInit` up into `casm.s:start`'s early-init block,
+  alongside `diagClearLoc` / `listingStateInit` / `listingFileInit`. No
+  change to any successful assembly, assembled output, or progress
+  display; net code size zero. Live-verified on two early-fatal raise
+  sites.
 - **Direct-dispatch app-table bookkeeping parity with `LOAD`**: Typing an
   external command's name directly (`sdExt*` dispatch) now performs the same
   app-table accounting `LOAD` already did. After the load and relocation it

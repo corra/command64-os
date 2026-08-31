@@ -16,7 +16,7 @@
 
 .define VERSION_MAJOR "0"
 .define VERSION_MINOR "5"
-.define VERSION_STAGE "1"
+.define VERSION_STAGE "2"
 .include "build_casm.inc"
 
 .import __MAIN_START__
@@ -197,6 +197,18 @@ start:
     ; identical "stale BSS at a locationless early fatal" reason.
     jsr listingStateInit
     jsr listingFileInit
+    ; Progress state: zeroed HERE, not at startPass1 (task 43), for the same
+    ; reason as the three clears above. Any diagnostic raised before Pass 1
+    ; -- CLI/file/lexer-init failures -- reaches diagPrintFatal, whose first
+    ; act is progressClearTransient; that routine tests CasmProgFlags, which
+    ; only progressInit clears. Without this call CasmProgFlags is
+    ; uninitialized RAM and a bit-0-set garbage byte makes
+    ; progressClearTransient erase the current screen line (the banner).
+    ; progressInit is a pure BSS clear, no OS/VMM call, cannot fail.
+    ; Placed before resourcesInit so even a future fallible early init is
+    ; covered. Nothing writes progress state between here and
+    ; progressBeginPass, so one init point is correct.
+    jsr progressInit
     jsr resourcesInit
     bcs startInitFatal
     jsr cliInit
@@ -268,11 +280,10 @@ startInitFatal:
     jmp startFatal
 
 startPass1:
-    ; Progress Increment 4: initialize before the first visible progress
-    ; transition (Pass 1's own "p1: start" persistent line, printed by
-    ; progressBeginPass just below). progressInit cannot fail (no C/A
-    ; output), so no fatal check follows it.
-    jsr progressInit
+    ; Progress Increment 4 placed progressInit here (before Pass 1's first
+    ; "p1: start" line). Task 43 moved it up into the early-init block, so
+    ; diagPrintFatal is safe on a pre-Pass-1 fatal too; nothing between
+    ; there and here touches progress state.
     ; Pass 1 (WP29): measure addresses and define labels. No output file
     ; exists yet -- emitOrg's header write and every emitRawByte call
     ; automatically no-op under CASM_PASS_MODE_MEASURE (emit.s), so it is
