@@ -267,3 +267,23 @@ merge to `main`.
 - 2026-08-31: Plan drafted. Root cause traced and confirmed pre-existing
   on `main`. Fix is a one-line relocation of `jsr progressInit` in
   `casm.s:start`. Not yet approved.
+- 2026-08-31: **Approved.** Branch `feature/casm-progclear-early-fatal-fix`
+  off `main` `96eb057`; recorded in `brain/task.md` / `wiki/tasks/casm.md`.
+- 2026-08-31: **Increment 1 (fix + static + no-regression build)
+  executed.** `jsr progressInit` moved from `startPass1` to the early-init
+  block -- placed *before* `resourcesInit` (with `diagClearLoc` /
+  `listingStateInit` / `listingFileInit`), not merely after `sourceInit`,
+  so even a future fallible early init is covered. Both comments rewritten.
+  CASM `0.5.1` -> `0.5.2` (build 1392). **Static (disassembly of `start`):**
+  `$380A JSR progressInit` is the 4th call, ahead of `resourcesInit`,
+  `cliParse`, the `versionBanner` print (`$382A`), and both
+  `JMP startPass1` / `JMP startFatal`; `startPass1` no longer calls
+  `progressInit` (exactly one `jsr progressInit` in the module). Also
+  confirmed `resourcesInit`/`cliInit`/`fileIoInit`/`sourceInit` are all
+  unconditionally `clc`/`rts` (infallible), so nothing can reach
+  `diagPrintFatal` before `$380A`. **No regression:** full build clean,
+  `verify_casm_diag_table.py` passes, no-change rebuild stable
+  (BUILD_CASM 1392). Envelope byte-identical to the memory-optimization
+  close (`__MAIN_LAST__` `$A169`, headroom 2,710, CODE `$51A3`) -- the
+  relocation is exactly net-zero size. `image_d64` / `test_image_d64` /
+  `casm_progress_test_d64` rebuilt. Increment 2 (live verification) next.
