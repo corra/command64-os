@@ -295,6 +295,44 @@ files); the host-side fixtures cover the CLI and lexer rejection paths.
 CASM build auto-bumped 1380 -> 1381; `TEST_CASM_INCLUDE` -> 1039;
 `TEST_CASM_CLIDERIVE` -> 1017.
 
+## Increment 4 Finding E (executed 2026-08-31)
+
+**Done. progress.o CODE -108 bytes. Output proven byte-for-byte identical
+to the old macro across all 65,536 values x both field widths.**
+
+`progressPrintDec`'s five inline `PROG_DIGIT` macro expansions
+(`10000/1000/100/10/1`, ~34 bytes each) replaced with a divisor-table loop
+over the same five 16-bit constants in `progress.s`. Equivalence points:
+
+- Same repeated-16-bit-subtraction digit extraction, same `digit + '0'`
+  emission via `progressPrintChar`.
+- Same fixed 2-or-5-digit width selection (`cpy #5`). The 2-digit case
+  previously fell through a shared label into the last two macro
+  expansions; the loop instead starts at table index 3, which visits
+  exactly those same two divisors (`10`, `1`).
+- No new zero-page or BSS scratch: the tentative low byte rides the stack
+  across the 16-bit borrow test, and X (the divisor index) is stack-saved
+  across `progressPrintChar` (which clobbers it). ABI unchanged --
+  `A`/`X` = value lo/hi, `Y` = width in; `A`/`X`/`Y` clobbered out.
+
+**Verification:** a host-side model of both the old `PROG_DIGIT` semantics
+and the new loop (`scratchpad/progdec_equiv.py`) produced **0 mismatches**
+over `v` in `0..65535` for width 2 and width 5. Full build + `test_casm_progress`
+build clean (its assertions are state/carry/overrun only; it documents that
+on-screen digit truth is verified live -- that lands in Increment 9/10).
+
+### Measurement
+
+| | Increment 3 | Increment 4 |
+| --- | --- | --- |
+| `progress.o` CODE | `$0409` (1,033) | `$039D` (925), -108 |
+| CODE segment | `$53EC` | `$5380` |
+| `__MAIN_LAST__` | `$A79B` | `$A72F` |
+| MAIN headroom at `$7400` | 1,124 | **1,232** |
+
+Cumulative D + E: headroom `642 -> 1,232` (**590 bytes** recovered).
+CASM build 1381 -> 1382; `TEST_CASM_PROGRESS` -> 1013.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -565,3 +603,11 @@ become user-facing.
   Host-side harness VICE run folded into Increment 9/10. See the new
   "Increment 3 Finding D Implementation" section. Increment 4 (Finding E)
   is next.
+- 2026-08-31: **Increment 4 (Finding E) executed.** `progressPrintDec`'s
+  five inline `PROG_DIGIT` expansions replaced with a divisor-table loop;
+  no new scratch (stack-carries the tentative low byte and the divisor
+  index across the print). A host-side model of both the old and new
+  digit-extraction logic showed **0 mismatches over all 65,536 values x
+  both field widths**. Build + `test_casm_progress` clean. **progress.o
+  CODE -108 bytes**; cumulative D+E headroom `642 -> 1,232`. Increment 5
+  (Finding A -- gate `diagDumpToken`) is next.
