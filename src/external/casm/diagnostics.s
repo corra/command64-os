@@ -117,6 +117,39 @@ diagPrintString:
     rts
 
 ; ---------------------------------------------------------------------------
+; diagPrintMessage
+; Print one diagnostic line: the shared "CASM: " prefix, then the
+; null-terminated message body at X/Y, then a trailing PETSCII CR. This is
+; the form every fatal/summary diagnostic shares -- factoring the prefix and
+; CR out of all ~89 message strings into one place (memory-optimization WP,
+; task 42, Finding B). diagPrintString above stays byte-for-byte unchanged:
+; the non-message prints (filenames, source-line echo, carets, location
+; lines, include tracebacks -- and casm.s/map.s's banner/header/row text)
+; must NOT gain a prefix or a forced CR, so they keep calling it directly.
+;
+; Inputs:  X = message body address low byte
+;          Y = message body address high byte
+; Outputs: none
+; Clobbers: A, X, Y and OS API-defined volatile registers
+; ---------------------------------------------------------------------------
+diagPrintMessage:
+    txa
+    pha
+    tya
+    pha
+    ldx #<msgCasmPrefix
+    ldy #>msgCasmPrefix
+    jsr diagPrintString
+    pla
+    tay
+    pla
+    tax
+    jsr diagPrintString
+    ldx #<msgCR
+    ldy #>msgCR
+    jmp diagPrintString
+
+; ---------------------------------------------------------------------------
 ; diagPrintFatal
 ; Select and print the stable message for a fatal diagnostic identifier. Phase
 ; 2 diagnostic values $01-$13 are contiguous and index bounded parallel tables;
@@ -193,7 +226,7 @@ dpfNotListing:
     tay
     pla
     tax
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfWp82Check:
     cmp #CASM_DIAG_INCBIN_FILENAME_EXPECTED
@@ -209,7 +242,7 @@ dpfWp82Check:
     tay
     pla
     tax
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfWp83Check:
     cmp #CASM_DIAG_ASSERT_UNRESOLVED
@@ -226,14 +259,21 @@ dpfWp83Check:
     bne dpfWp83Generic
     lda CasmAssertMessageLen
     beq dpfWp83GenericReloadA
+    ; Not diagPrintMessage: the "CASM: " prefix leads, but the echoed user
+    ; text follows the message body before the CR. Emit the shared prefix,
+    ; then the (now prefix-less) "ASSERTION FAILED: " lead-in, then the
+    ; user's text, then the CR.
+    ldx #<msgCasmPrefix
+    ldy #>msgCasmPrefix
+    jsr diagPrintString
     ldx #<msgAssertionFailedPrefix
     ldy #>msgAssertionFailedPrefix
     jsr diagPrintString
     ldx #<CasmAssertMessage
     ldy #>CasmAssertMessage
     jsr diagPrintString
-    ldx #<msgCrOnly
-    ldy #>msgCrOnly
+    ldx #<msgCR
+    ldy #>msgCR
     jsr diagPrintString
     jmp diagPrintSourceContext
 dpfWp83GenericReloadA:
@@ -248,7 +288,7 @@ dpfWp83Generic:
     tay
     pla
     tax
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 ; Progress Increment 4: CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/
 ; PASS_TOTAL_MISMATCH ($55/$56), same generic table-driven precedent as
@@ -274,7 +314,7 @@ dpfProgressCheck:
     tay
     pla
     tax
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfSymbolRange:
     cmp #CASM_DIAG_SYMBOL_MAP_INVALID
@@ -306,7 +346,7 @@ dpfListingRange:
     tay
     pla
     tax
-    jmp diagPrintString          ; locationless -- no diagPrintSourceContext
+    jmp diagPrintMessage         ; locationless -- no diagPrintSourceContext
 dpfMainRange:
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
@@ -321,14 +361,14 @@ dpfMainRange:
     tay
     pla
     tax
-    jsr diagPrintString
+    jsr diagPrintMessage
     ; WP15: append the source location and caret when the raise site recorded
     ; one. Self-gating, so diagnostics with no source position are unchanged.
     jmp diagPrintSourceContext
 dpfSymbolMapInvalid:
     ldx #<msgSymbolMapInvalid
     ldy #>msgSymbolMapInvalid
-    jmp diagPrintString
+    jmp diagPrintMessage
 ; WP65: locationless like dpfSymbolMapInvalid -- raised by the Pass1->Pass2
 ; resolution sweep (casm.s), which runs after the live lexer/parser state
 ; that diagSetLocFromToken depends on has already moved past the constant's
@@ -339,7 +379,7 @@ dpfSymbolMapInvalid:
 dpfExprCircular:
     ldx #<msgExprCircular
     ldy #>msgExprCircular
-    jmp diagPrintString
+    jmp diagPrintMessage
 ; WP68 Increment 6 Atomic Step 5: division by a static zero, raised by
 ; combineStatic's own divide dispatch (Atomic Step 6) with
 ; diagSetLocFromToken already called at the raise site -- same shape as
@@ -348,7 +388,7 @@ dpfExprCircular:
 dpfExprDivZero:
     ldx #<msgExprDivZero
     ldy #>msgExprDivZero
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 ; WP67: unlike dpfSymbolMapInvalid/dpfExprCircular above, both of these are
 ; raised with a valid source location already set (diagSetLocFromToken, at
@@ -359,12 +399,12 @@ dpfExprDivZero:
 dpfExprRelocUnsupported:
     ldx #<msgExprRelocUnsupported
     ldy #>msgExprRelocUnsupported
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfExprParenTooDeep:
     ldx #<msgExprParenTooDeep
     ldy #>msgExprParenTooDeep
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 ; WP69: both raised by lexer.s's lnChar with diagSetLocFromLookahead
 ; already called at the raise site -- same two-step shape as
@@ -373,27 +413,27 @@ dpfExprParenTooDeep:
 dpfCharUnterminated:
     ldx #<msgCharUnterminated
     ldy #>msgCharUnterminated
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfCharInvalidByte:
     ldx #<msgCharInvalidByte
     ldy #>msgCharInvalidByte
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfStringUnterminated:
     ldx #<msgStringUnterminated
     ldy #>msgStringUnterminated
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfStringInvalidByte:
     ldx #<msgStringInvalidByte
     ldy #>msgStringInvalidByte
-    jsr diagPrintString
+    jsr diagPrintMessage
     jmp diagPrintSourceContext
 dpfUnknown:
     ldx #<msgUnknown
     ldy #>msgUnknown
-    jmp diagPrintString
+    jmp diagPrintMessage
 
 ; ---------------------------------------------------------------------------
 ; diagPrintPhase2Ready
@@ -407,7 +447,7 @@ dpfUnknown:
 diagPrintPhase2Ready:
     ldx #<msgPhase2Ready
     ldy #>msgPhase2Ready
-    jmp diagPrintString
+    jmp diagPrintMessage
 
 ; ---------------------------------------------------------------------------
 ; diagClearLoc
@@ -1598,205 +1638,215 @@ diagProgressMessageHiEnd:
 .assert diagProgressMessageLoEnd - diagProgressMessageLo = CASM_DIAG_PROGRESS_LAST - CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostic low table is incomplete"
 .assert diagProgressMessageHiEnd - diagProgressMessageHi = CASM_DIAG_PROGRESS_LAST - CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostic high table is incomplete"
 
+; Finding B (memory-optimization WP, task 42): the "CASM: " that used to
+; lead every one of the ~89 message strings below, and the trailing PETSCII
+; CR that ended all but msgAssertionFailedPrefix, are factored out here and
+; into diagPrintMessage. Every message below is now just the bare text plus
+; a null terminator; diagPrintMessage emits msgCasmPrefix, the body, then
+; msgCR.
+msgCasmPrefix:
+    .byte "CASM: ", 0
+
 msgInitFailed:
-    .byte "CASM: INITIALIZATION FAILED", PetCr, 0
+    .byte "INITIALIZATION FAILED", 0
 msgRegistryFull:
-    .byte "CASM: RESOURCE REGISTRY FULL", PetCr, 0
+    .byte "RESOURCE REGISTRY FULL", 0
 msgCleanupFailed:
-    .byte "CASM: RESOURCE CLEANUP FAILED", PetCr, 0
+    .byte "RESOURCE CLEANUP FAILED", 0
 msgSourceRequired:
-    .byte "CASM: SOURCE FILE REQUIRED", PetCr, 0
+    .byte "SOURCE FILE REQUIRED", 0
 msgExtraSource:
-    .byte "CASM: TOO MANY SOURCE FILES", PetCr, 0
+    .byte "TOO MANY SOURCE FILES", 0
 msgMalformedOutput:
-    .byte "CASM: MALFORMED /O OPTION", PetCr, 0
+    .byte "MALFORMED /O OPTION", 0
 msgDuplicateOption:
-    .byte "CASM: DUPLICATE OPTION", PetCr, 0
+    .byte "DUPLICATE OPTION", 0
 msgUnknownOption:
-    .byte "CASM: UNKNOWN OPTION", PetCr, 0
+    .byte "UNKNOWN OPTION", 0
 msgFilenameTooLong:
-    .byte "CASM: FILENAME TOO LONG", PetCr, 0
+    .byte "FILENAME TOO LONG", 0
 msgNotImplemented:
-    .byte "CASM: FEATURE NOT IMPLEMENTED", PetCr, 0
+    .byte "FEATURE NOT IMPLEMENTED", 0
 msgInputOpenFailed:
-    .byte "CASM: CANNOT OPEN INPUT", PetCr, 0
+    .byte "CANNOT OPEN INPUT", 0
 msgInputReadFailed:
-    .byte "CASM: INPUT READ FAILED", PetCr, 0
+    .byte "INPUT READ FAILED", 0
 msgInputCloseFailed:
-    .byte "CASM: INPUT CLOSE FAILED", PetCr, 0
+    .byte "INPUT CLOSE FAILED", 0
 msgOutputCreateFailed:
-    .byte "CASM: CANNOT CREATE OUTPUT", PetCr, 0
+    .byte "CANNOT CREATE OUTPUT", 0
 msgOutputWriteFailed:
-    .byte "CASM: OUTPUT WRITE FAILED", PetCr, 0
+    .byte "OUTPUT WRITE FAILED", 0
 msgOutputCloseFailed:
-    .byte "CASM: OUTPUT CLOSE FAILED", PetCr, 0
+    .byte "OUTPUT CLOSE FAILED", 0
 msgOutputDeleteFailed:
-    .byte "CASM: OUTPUT DELETE FAILED", PetCr, 0
+    .byte "OUTPUT DELETE FAILED", 0
 msgOutputShortWrite:
-    .byte "CASM: SHORT OUTPUT WRITE", PetCr, 0
+    .byte "SHORT OUTPUT WRITE", 0
 msgStreamStateFailed:
-    .byte "CASM: INVALID STREAM STATE", PetCr, 0
+    .byte "INVALID STREAM STATE", 0
 msgSourceRewindFailed:
-    .byte "CASM: SOURCE REWIND FAILED", PetCr, 0
+    .byte "SOURCE REWIND FAILED", 0
 msgSourceOffsetOverflow:
-    .byte "CASM: SOURCE OFFSET OVERFLOW", PetCr, 0
+    .byte "SOURCE OFFSET OVERFLOW", 0
 msgSourceLocationOverflow:
-    .byte "CASM: SOURCE LOCATION OVERFLOW", PetCr, 0
+    .byte "SOURCE LOCATION OVERFLOW", 0
 msgSourceLineTooLong:
-    .byte "CASM: SOURCE LINE TOO LONG", PetCr, 0
+    .byte "SOURCE LINE TOO LONG", 0
 msgTokenTooLong:
-    .byte "CASM: TOKEN TOO LONG", PetCr, 0
+    .byte "TOKEN TOO LONG", 0
 msgInvalidSourceByte:
-    .byte "CASM: INVALID SOURCE BYTE", PetCr, 0
+    .byte "INVALID SOURCE BYTE", 0
 msgMalformedNumber:
-    .byte "CASM: MALFORMED NUMBER", PetCr, 0
+    .byte "MALFORMED NUMBER", 0
 msgLexerStateFailed:
-    .byte "CASM: INVALID LEXER STATE", PetCr, 0
+    .byte "INVALID LEXER STATE", 0
 msgSyntaxError:
-    .byte "CASM: SYNTAX ERROR", PetCr, 0
+    .byte "SYNTAX ERROR", 0
 msgExpectedNewline:
-    .byte "CASM: EXPECTED NEWLINE", PetCr, 0
+    .byte "EXPECTED NEWLINE", 0
 msgOperandOutOfRange:
-    .byte "CASM: OPERAND OUT OF RANGE", PetCr, 0
+    .byte "OPERAND OUT OF RANGE", 0
 msgInvalidAddrMode:
-    .byte "CASM: INVALID ADDRESSING MODE", PetCr, 0
+    .byte "INVALID ADDRESSING MODE", 0
 msgDuplicateOrg:
-    .byte "CASM: DUPLICATE ORG", PetCr, 0
+    .byte "DUPLICATE ORG", 0
 msgOrgRequired:
-    .byte "CASM: ORG REQUIRED", PetCr, 0
+    .byte "ORG REQUIRED", 0
 msgAddressOverflow:
-    .byte "CASM: ADDRESS OVERFLOW", PetCr, 0
+    .byte "ADDRESS OVERFLOW", 0
 msgBranchOutOfRange:
-    .byte "CASM: BRANCH OUT OF RANGE", PetCr, 0
+    .byte "BRANCH OUT OF RANGE", 0
 msgExprMalformed:
-    .byte "CASM: MALFORMED EXPRESSION", PetCr, 0
+    .byte "MALFORMED EXPRESSION", 0
 msgExprUnsupported:
-    .byte "CASM: EXPRESSION UNSUPPORTED", PetCr, 0
+    .byte "EXPRESSION UNSUPPORTED", 0
 msgExprOverflow:
-    .byte "CASM: EXPRESSION OVERFLOW", PetCr, 0
+    .byte "EXPRESSION OVERFLOW", 0
 msgResolverFailed:
-    .byte "CASM: RESOLVER FAILED", PetCr, 0
+    .byte "RESOLVER FAILED", 0
 msgVmmUnavailable:
-    .byte "CASM: VMM UNAVAILABLE", PetCr, 0
+    .byte "VMM UNAVAILABLE", 0
 msgVmmAllocFailed:
-    .byte "CASM: VMM ALLOCATION FAILED", PetCr, 0
+    .byte "VMM ALLOCATION FAILED", 0
 msgVmmFreeFailed:
-    .byte "CASM: VMM FREE FAILED", PetCr, 0
+    .byte "VMM FREE FAILED", 0
 msgVmmTransferFailed:
-    .byte "CASM: VMM TRANSFER FAILED", PetCr, 0
+    .byte "VMM TRANSFER FAILED", 0
 msgDuplicateSymbol:
-    .byte "CASM: DUPLICATE SYMBOL", PetCr, 0
+    .byte "DUPLICATE SYMBOL", 0
 msgUndefinedSymbol:
-    .byte "CASM: UNDEFINED SYMBOL", PetCr, 0
+    .byte "UNDEFINED SYMBOL", 0
 msgSymbolTableFull:
-    .byte "CASM: SYMBOL TABLE FULL", PetCr, 0
+    .byte "SYMBOL TABLE FULL", 0
 msgPassMismatch:
-    .byte "CASM: PASS 1/2 MISMATCH", PetCr, 0
+    .byte "PASS 1/2 MISMATCH", 0
 msgRelocTableFull:
-    .byte "CASM: RELOC TABLE FULL", PetCr, 0
+    .byte "RELOC TABLE FULL", 0
 msgIncludeFilenameExpected:
-    .byte "CASM: INCLUDE FILENAME EXPECTED", PetCr, 0
+    .byte "INCLUDE FILENAME EXPECTED", 0
 msgInvalidIncludeFilename:
-    .byte "CASM: INVALID INCLUDE FILENAME", PetCr, 0
+    .byte "INVALID INCLUDE FILENAME", 0
 msgIncludeFilenameTooLong:
-    .byte "CASM: INCLUDE FILENAME TOO LONG", PetCr, 0
+    .byte "INCLUDE FILENAME TOO LONG", 0
 msgIncludeCatalogFull:
-    .byte "CASM: INCLUDE CATALOG FULL", PetCr, 0
+    .byte "INCLUDE CATALOG FULL", 0
 msgIncludeDepthExceeded:
-    .byte "CASM: INCLUDE DEPTH EXCEEDED", PetCr, 0
+    .byte "INCLUDE DEPTH EXCEEDED", 0
 msgIncludeCycleDetected:
-    .byte "CASM: INCLUDE CYCLE DETECTED", PetCr, 0
+    .byte "INCLUDE CYCLE DETECTED", 0
 msgIncludeEventLogFull:
-    .byte "CASM: INCLUDE EVENT LOG FULL", PetCr, 0
+    .byte "INCLUDE EVENT LOG FULL", 0
 msgIncludeReplayMismatch:
-    .byte "CASM: INCLUDE REPLAY MISMATCH", PetCr, 0
+    .byte "INCLUDE REPLAY MISMATCH", 0
 msgListingNameCollision:
-    .byte "CASM: LISTING NAME COLLISION", PetCr, 0
+    .byte "LISTING NAME COLLISION", 0
 msgListingRecordsFull:
-    .byte "CASM: LISTING RECORDS FULL", PetCr, 0
+    .byte "LISTING RECORDS FULL", 0
 msgListingBytesFull:
-    .byte "CASM: LISTING BYTES FULL", PetCr, 0
+    .byte "LISTING BYTES FULL", 0
 msgListingReplayMismatch:
-    .byte "CASM: LISTING REPLAY MISMATCH", PetCr, 0
+    .byte "LISTING REPLAY MISMATCH", 0
 msgSymbolMapInvalid:
-    .byte "CASM: SYMBOL MAP INVALID", PetCr, 0
+    .byte "SYMBOL MAP INVALID", 0
 ; WP65: locationless, same as msgSymbolMapInvalid above -- the resolution
 ; sweep runs after the live lexer/parser have moved on, with no line/column
 ; to attach (see dpfExprCircular's own comment).
 msgExprCircular:
-    .byte "CASM: CIRCULAR CONSTANT DEFINITION", PetCr, 0
+    .byte "CIRCULAR CONSTANT DEFINITION", 0
 ; WP68 Increment 6 Atomic Step 5: static division by zero.
 msgExprDivZero:
-    .byte "CASM: EXPRESSION DIVISION BY ZERO", PetCr, 0
+    .byte "EXPRESSION DIVISION BY ZERO", 0
 ; WP67: a relocatable value reached a combine that already had one --
 ; representable only as one symbol + a static addend (WP64's rule).
 msgExprRelocUnsupported:
-    .byte "CASM: EXPRESSION RELOCATION UNSUPPORTED", PetCr, 0
+    .byte "EXPRESSION RELOCATION UNSUPPORTED", 0
 ; WP67: parenthesized sub-expression nesting exceeded CASM_EXPR_PAREN_MAX_
 ; DEPTH (8).
 msgExprParenTooDeep:
-    .byte "CASM: EXPRESSION TOO DEEPLY NESTED", PetCr, 0
+    .byte "EXPRESSION TOO DEEPLY NESTED", 0
 ; WP69: character literal ('x') diagnostics.
 msgCharUnterminated:
-    .byte "CASM: CHARACTER LITERAL UNTERMINATED", PetCr, 0
+    .byte "CHARACTER LITERAL UNTERMINATED", 0
 msgCharInvalidByte:
-    .byte "CASM: CHARACTER LITERAL INVALID BYTE", PetCr, 0
+    .byte "CHARACTER LITERAL INVALID BYTE", 0
 msgStringUnterminated:
-    .byte "CASM: STRING UNTERMINATED", PetCr, 0
+    .byte "STRING UNTERMINATED", 0
 msgStringInvalidByte:
-    .byte "CASM: STRING INVALID BYTE", PetCr, 0
+    .byte "STRING INVALID BYTE", 0
 ; WP81: .RES/.FILL/.ALIGN diagnostics.
 msgResFillAlignUnresolved:
-    .byte "CASM: OPERAND NOT RESOLVED", PetCr, 0
+    .byte "OPERAND NOT RESOLVED", 0
 msgFillValueRequired:
-    .byte "CASM: .FILL REQUIRES A VALUE", PetCr, 0
+    .byte ".FILL REQUIRES A VALUE", 0
 msgValueOutOfRange:
-    .byte "CASM: VALUE OUT OF RANGE", PetCr, 0
+    .byte "VALUE OUT OF RANGE", 0
 msgAlignBoundaryZero:
-    .byte "CASM: ALIGN BOUNDARY ZERO", PetCr, 0
+    .byte "ALIGN BOUNDARY ZERO", 0
 ; WP82: .INCBIN filename-grammar diagnostics.
 msgIncbinFilenameExpected:
-    .byte "CASM: INCBIN FILENAME EXPECTED", PetCr, 0
+    .byte "INCBIN FILENAME EXPECTED", 0
 msgInvalidIncbinFilename:
-    .byte "CASM: INVALID INCBIN FILENAME", PetCr, 0
+    .byte "INVALID INCBIN FILENAME", 0
 msgIncbinFilenameTooLong:
-    .byte "CASM: INCBIN FILENAME TOO LONG", PetCr, 0
+    .byte "INCBIN FILENAME TOO LONG", 0
 ; WP83: .ASSERT diagnostics.
 msgAssertUnresolved:
-    .byte "CASM: ASSERT OPERAND NOT RESOLVED", PetCr, 0
+    .byte "ASSERT OPERAND NOT RESOLVED", 0
 msgAssertMessageTooLong:
-    .byte "CASM: ASSERT MESSAGE TOO LONG", PetCr, 0
+    .byte "ASSERT MESSAGE TOO LONG", 0
 msgAssertionFailed:
-    .byte "CASM: ASSERTION FAILED", PetCr, 0
-; WP83 Increment 6: printed immediately before the echoed CasmAssertMessage
-; text (no trailing CR -- the echoed message's own null terminator ends the
-; payload, and msgCrOnly below supplies the line break after it).
+    .byte "ASSERTION FAILED", 0
+; WP83 Increment 6: printed (after the shared msgCasmPrefix) immediately
+; before the echoed CasmAssertMessage text -- no trailing CR of its own,
+; the echoed message's null terminator ends the payload and dpfWp83's own
+; msgCR print supplies the line break after it. Finding B stripped the
+; "CASM: " that used to lead this string; the caller now prints
+; msgCasmPrefix explicitly.
 msgAssertionFailedPrefix:
-    .byte "CASM: ASSERTION FAILED: ", 0
-msgCrOnly:
-    .byte PetCr, 0
+    .byte "ASSERTION FAILED: ", 0
 ; Progress Increment 4.
 msgProgressCounterOverflow:
-    .byte "CASM: STATEMENT COUNT OVERFLOW", PetCr, 0
+    .byte "STATEMENT COUNT OVERFLOW", 0
 msgProgressPassTotalMismatch:
-    .byte "CASM: PASS 1/PASS 2 STATEMENT MISMATCH", PetCr, 0
+    .byte "PASS 1/PASS 2 STATEMENT MISMATCH", 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.
 msgListingCreateFailed:
-    .byte "CASM: LISTING CREATE FAILED", PetCr, 0
+    .byte "LISTING CREATE FAILED", 0
 msgListingWriteFailed:
-    .byte "CASM: LISTING WRITE FAILED", PetCr, 0
+    .byte "LISTING WRITE FAILED", 0
 msgListingCloseFailed:
-    .byte "CASM: LISTING CLOSE FAILED", PetCr, 0
+    .byte "LISTING CLOSE FAILED", 0
 msgListingDeleteFailed:
-    .byte "CASM: LISTING DELETE FAILED", PetCr, 0
+    .byte "LISTING DELETE FAILED", 0
 msgListingShortWrite:
-    .byte "CASM: LISTING SHORT WRITE", PetCr, 0
+    .byte "LISTING SHORT WRITE", 0
 msgUnknown:
-    .byte "CASM: INTERNAL ERROR", PetCr, 0
+    .byte "INTERNAL ERROR", 0
 msgPhase2Ready:
-    .byte "CASM: INPUT VALIDATED", PetCr, 0
+    .byte "INPUT VALIDATED", 0
 
 ; Token dump tables and strings -- gated with diagDumpToken itself (Finding
 ; A). msgCR below is deliberately outside the .if: it is shared by

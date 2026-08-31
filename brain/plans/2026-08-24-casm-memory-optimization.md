@@ -387,6 +387,68 @@ restores `diagnostics.o` to byte-identical pre-Finding-A size.**
 Cumulative D + E + A: headroom `642 -> 1,885` (**1,243 bytes** recovered).
 CASM build 1382 -> 1383.
 
+## Increment 6 Finding B (executed 2026-08-31)
+
+**Done. 585 bytes recovered (audit projected 587). Every diagnostic renders
+byte-identically: 88/88 host-side text checks pass, `casm.s`/`map.s`
+untouched.**
+
+### Mechanism
+
+- New `diagPrintMessage` entry point (not exported; internal to
+  `diagnostics.s`): pushes the caller's X/Y, prints `msgCasmPrefix`
+  (`"CASM: "`), restores X/Y and prints the body, then tail-calls
+  `diagPrintString` for `msgCR`. No BSS -- the body pointer rides the stack
+  across the prefix print. **`diagPrintString` is byte-for-byte unchanged**
+  in contract and body.
+- Every message string `msgInitFailed..msgPhase2Ready` stripped of its
+  leading `"CASM: "` and its trailing `PetCr` (89 strings; the transform
+  was a scoped 2-rule `perl -i` over the message-data line range only).
+  `msgAssertionFailedPrefix` lost its `"CASM: "` too but keeps its
+  no-CR form.
+- 17 message-print call sites in `diagPrintFatal` / `diagPrintPhase2Ready`
+  retargeted `diagPrintString` -> `diagPrintMessage` (11 table-driven +
+  `dpfSymbolMapInvalid`, `dpfExprCircular`, `dpfUnknown`,
+  `diagPrintPhase2Ready`, `dpfListingRange`, `dpfMainRange`). Audited each:
+  the ~30 remaining `diagPrintString` calls (in `diagPrintLineAndCaret`,
+  `diagPrintSourceContext`, `diagPrintIncludeIdentity`,
+  `diagPrintIncludeTraceback`, and the gated `diagDumpToken`) all print
+  non-message text -- filenames, source echo, carets, location lines,
+  tracebacks -- and stay on `diagPrintString`.
+- **Assert-echo special case** (`dpfWp83`, `CASM_DIAG_ASSERTION_FAILED`
+  with a user message): cannot use `diagPrintMessage` -- the echoed user
+  text sits between the message body and the CR. Restructured to print
+  `msgCasmPrefix`, then `msgAssertionFailedPrefix` (`"ASSERTION FAILED: "`),
+  then `CasmAssertMessage`, then `msgCR` -- rendering
+  `CASM: ASSERTION FAILED: <user text>\r`, identical to before.
+- `msgCrOnly` (a second `.byte PetCr,0`, only the assert path used it)
+  removed; that path now shares `msgCR`.
+
+### Verification
+
+- Full `cmake --build build` clean; all harnesses link (`diagPrintMessage`
+  is internal to `diagnostics.o`; the stub harnesses that don't link it
+  never reference it).
+- Host-side check: reconstruct each diagnostic's rendered form
+  (`"CASM: "` + new body + CR) and compare against the Increment 1
+  baseline dump -> **88 checked, 0 mismatches**. `msgPhase2Ready`
+  (`CASM: INPUT VALIDATED`, success) and `msgUnknown`
+  (`CASM: INTERNAL ERROR`, fallback) both confirmed routed through
+  `diagPrintMessage`.
+- `git diff --stat src/external/casm/casm.s src/external/casm/map.s` empty.
+
+### Measurement
+
+| | Increment 5 | Increment 6 |
+| --- | --- | --- |
+| `diagnostics.o` CODE | `$0555` | `$0575` (+32: the helper + assert-path prefix) |
+| `diagnostics.o` RODATA | `$0AC7` | `$085E` (-617) |
+| `__MAIN_LAST__` | `$A4A2` | `$A259` |
+| MAIN headroom at `$7400` | 1,885 | **2,470** |
+
+Cumulative D + E + A + B: headroom `642 -> 2,470` (**1,828 bytes**).
+CASM build 1383 -> 1384.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -676,3 +738,15 @@ become user-facing.
   All `CASM:` diagnostic messages byte-identical to the Increment 1
   baseline. Cumulative D+E+A headroom `642 -> 1,885`. Increment 6
   (Finding B -- `diagPrintMessage` shared prefix/CR helper) is next.
+- 2026-08-31: **Increment 6 (Finding B) executed.** New internal
+  `diagPrintMessage` (prefix + body + CR, body pointer on the stack, no
+  BSS); `diagPrintString` unchanged. All 89 message strings stripped of
+  `"CASM: "` and trailing `PetCr`; 17 message-print call sites in
+  `diagPrintFatal`/`diagPrintPhase2Ready` retargeted; the ~30 non-message
+  `diagPrintString` calls audited and left. Assert-echo special case
+  restructured (prefix + "ASSERTION FAILED: " + user text + CR).
+  **585 bytes** recovered (audit projected 587). Host-side: 88/88
+  diagnostics render byte-identically to the Increment 1 baseline;
+  `casm.s`/`map.s` untouched; full build clean. Cumulative D+E+A+B headroom
+  `642 -> 2,470`. Increment 7 (host-side diagnostic-table verifier) is
+  next.
