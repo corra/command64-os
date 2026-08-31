@@ -2390,9 +2390,8 @@ behavior changed beyond the version/build artifact itself.
 
 ## Known Non-Critical Bugs
 
-- [/] Taskwarrior 43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`), **fix
-      complete 2026-08-31, awaiting user sign-off (CASM `0.5.2` build
-      1392):** `diagPrintFatal` read uninitialized `CasmProgFlags` on an
+- [x] Taskwarrior 43 (`5dad4e4f-8392-468f-8807-0ff37a98c33c`), **CLOSED
+      2026-08-31, user-approved (CASM `0.5.2` build 1392):** `diagPrintFatal` read uninitialized `CasmProgFlags` on an
       early fatal, garbling the banner. `casm.s:start` called `progressInit`
       only at `startPass1`, so any diagnostic raised before Pass 1 (CLI /
       file / lexer-init failures -- `FILENAME TOO LONG`, `CANNOT OPEN

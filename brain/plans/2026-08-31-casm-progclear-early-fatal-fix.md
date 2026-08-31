@@ -1,7 +1,7 @@
 ---
 feature: casm-progclear-early-fatal-fix
 created: 2026-08-31
-status: approved
+status: complete (user-approved 2026-08-31)
 taskwarrior: 43 (5dad4e4f-8392-468f-8807-0ff37a98c33c)
 depends-on: none (branches off main after the memory-optimization merge)
 branch: feature/casm-progclear-early-fatal-fix
@@ -95,25 +95,27 @@ verbatim; it did not introduce this.
 ## The Fix
 
 Move the single `jsr progressInit` from `startPass1:` up into the
-early-init block in `casm.s:start`, immediately after
-`jsr sourceInit` / `bcs startInitFatal`:
+early-init block in `casm.s:start`. **As built (Increment 1): placed
+*before* `jsr resourcesInit`**, right after `jsr listingFileInit`, in the
+same "pure BSS clears, put first" group as `diagClearLoc` /
+`listingStateInit` / `listingFileInit` -- rather than merely after
+`sourceInit`. That covers even a future fallible early init (today
+`resourcesInit`/`cliInit`/`fileIoInit`/`sourceInit` are all unconditional
+`clc`/`rts`, so both placements are equivalent, but the earlier one is not
+fragile against that changing):
 
 ```
-    jsr sourceInit
-    bcs startInitFatal
-    ; Progress: initialize here, not at startPass1, so diagPrintFatal's
-    ; progressClearTransient can never read an uninitialized CasmProgFlags
-    ; on a fatal raised before Pass 1. progressInit is a pure BSS clear
-    ; with no OS/VMM call and cannot fail -- the same reason diagClearLoc /
-    ; listingStateInit / listingFileInit sit up here (stale BSS reached at
-    ; an early fatal). Nothing touches progress state between here and
-    ; progressBeginPass at startPass1, so a single init point is correct.
+    jsr listingStateInit
+    jsr listingFileInit
+    ; Progress state: zeroed HERE, not at startPass1 (task 43) ... [full
+    ; comment in casm.s]
     jsr progressInit
-    lda #CASM_PHASE_CLI_FILE
-    sta CasmPhase
+    jsr resourcesInit
+    bcs startInitFatal
+    ...
 ```
 
-and delete the `jsr progressInit` (and rewrite its now-stale comment) at
+and delete the `jsr progressInit` (rewriting its now-stale comment) at
 `startPass1:`.
 
 `casm.s` already `.import progressInit` (line 148). No new import, no

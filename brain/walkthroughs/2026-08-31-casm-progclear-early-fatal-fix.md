@@ -2,7 +2,7 @@
 feature: casm-progclear-early-fatal-fix
 plan: brain/plans/2026-08-31-casm-progclear-early-fatal-fix.md
 taskwarrior: 43 (5dad4e4f-8392-468f-8807-0ff37a98c33c)
-status: awaiting user sign-off
+status: complete (user-approved 2026-08-31)
 completed: 2026-08-31
 ---
 
@@ -80,9 +80,8 @@ emit-path file touched; assembled output unchanged (live `00129 BYTES`).
       (`test_casm_progress` PASS, `verify_casm_diag_table.py` PASS, full +
       no-change rebuild clean).
 - [x] CASM bumped `0.5.1` -> `0.5.2` (build 1392).
-- [ ] Trackers agree; user approves closing task 43.
+- [x] Trackers agree; user approved closing task 43 (2026-08-31).
 
-## Manual step for the user
+## Closed
 
-Nothing further to run. Please review and confirm task 43 may be closed;
-then the branch merges to `main`.
+User approved 2026-08-31; Taskwarrior 43 done; branch merged to `main`.
