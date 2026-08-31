@@ -3599,6 +3599,14 @@
     emulated cycles. A like-for-like isolation against a pre-progress
     `casm.prg` in one session remains available but is optional.
   - [~] Complete full implementation review before runtime acceptance or merge.
+    - [x] Increment 10 (runtime acceptance): **ACCEPTED by the user
+      2026-08-31.** Live matrix vs `CASM V0.4.0.1379`, 6 cases all pass,
+      no findings: short assemble, nested include + re-inclusion, `/M /L`
+      screen ownership (SYMBOL MAP clean), R6 WRITE line, mid-assembly
+      failure (new `casmpgbad.s` - transient cleared before the
+      `BRANCH OUT OF RANGE` diagnostic, no orphan PRG, `DIR`-confirmed),
+      repeated invocation (identical output, no resource leak). Walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment10-runtime-acceptance.md`.
     - [x] Increment 9 (full implementation review): **COMPLETE,
       user-approved 2026-08-31.** Line-by-line audit of the
       whole progress-feature diff vs the Increment 2 frozen ABI. Core

@@ -2092,3 +2092,19 @@ file(WRITE "${OUTPUT_DIR}/casmpgr6.seq"
     "TARGET:\n"
     "    NOP\n"
 )
+
+# Progress Increment 10 failure fixture: a source that fails PAST the point
+# the output PRG header is written and PAST the first throttled transient
+# redraw (statement 64), so the runtime acceptance matrix can prove
+# (a) diagPrintFatal's universal transient-clear wipes the status line
+# before the diagnostic prints, and (b) outputAbort deletes the partial
+# PRG (72 bytes: 2-byte header + 70 NOP) -- no orphan left on disk.
+# 70 NOP + .ORG = 71 counted statements (one redraw at 64); the BNE then
+# targets $D000, ~$1000 past the branch, well outside -128..+127 ->
+# CASM_DIAG_BRANCH_OUT_OF_RANGE ($23). No .ref (failure case).
+string(REPEAT "NOP\n" 70 CASM_PGBAD_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpgbad.seq"
+    ".ORG \$C000\n"
+    "${CASM_PGBAD_BODY}"
+    "BNE \$D000\n"
+)

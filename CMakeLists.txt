@@ -2721,6 +2721,20 @@ add_custom_command(
     VERBATIM
 )
 
+# Progress Increment 10: a mid-assembly failure fixture (no .ref -- it is
+# meant to fail). Fires CASM_DIAG_BRANCH_OUT_OF_RANGE after the PRG header
+# and 70 NOP bytes are written and after the first throttled transient
+# redraw, so runtime acceptance can prove the transient-clear-over-a-
+# diagnostic path and outputAbort's partial-PRG delete.
+add_custom_command(
+    TARGET casm_progress_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmpgbad.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmpgbad.seq"
+        "${CMAKE_BINARY_DIR}/casm_progress_test.d64"
+    COMMENT "Appending progress Increment 10 failure fixture to casm_progress_test.d64"
+    VERBATIM
+)
+
 # 6d. CASM Phase 10 WP51 listing-capture harness disk. Its own new image:
 # both test.d64 (1541 directory-entry ceiling) and casm_overflow_test.d64
 # (already near its byte-space ceiling from the WP34/WP36 large-source

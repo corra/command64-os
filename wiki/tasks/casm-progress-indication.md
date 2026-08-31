@@ -51,8 +51,17 @@ deferred as a known display limitation) and PR-5 (INFO). Remediation
 rebuilt clean (`BUILD_CASM` 1378 -> 1379, `$7400` envelope still fits),
 exact no-change rebuild stable, and a live-VICE smoke confirmed no
 behavioral regression. **Increment 9 is complete, user-approved
-2026-08-31.** Increments 10-11 (runtime acceptance, completion gate)
-remain.
+2026-08-31.**
+
+Increment 10 (runtime acceptance) was accepted by the user 2026-08-31
+after a live matrix against `CASM V0.4.0.1379`: six cases (short assemble,
+nested include + sequential re-inclusion, `/M /L` screen ownership, R6
+`WRITE` line, a new `casmpgbad.s` mid-assembly failure fixture, and a
+repeated invocation) all passed with no findings. The failure fixture
+confirmed `diagPrintFatal`'s transient-clear wipes the status line before
+the diagnostic and `outputAbort` leaves no orphan partial PRG. **Only
+Increment 11 (completion gate) remains.**
+
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.
 

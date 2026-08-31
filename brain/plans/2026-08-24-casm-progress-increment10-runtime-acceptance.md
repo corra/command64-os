@@ -1,7 +1,9 @@
 ---
 feature: casm-progress-increment10-runtime-acceptance
 created: 2026-08-24
-status: proposed
+status: complete
+approved: 2026-08-31
+closed: 2026-08-31
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 depends-on: casm-progress-increment09-implementation-review, approved and complete
 ---
@@ -10,8 +12,14 @@ depends-on: casm-progress-increment09-implementation-review, approved and comple
 
 ## Status
 
-**Proposed, not yet approved.** This is a live evidence and user-acceptance gate,
-not authority to change production behavior beyond separately approved fixes.
+**COMPLETE - user-accepted 2026-08-31.** Live evidence and user-acceptance
+gate; no production behavior change. User-confirmed decisions 2026-08-31:
+(1) add a `casmpgbad.s` mid-assembly-failure fixture to
+`casm_progress_test_d64` so the transient-clear-over-a-diagnostic +
+partial-output-cleanup case is on the same self-bootable disk; (2)
+re-drive a representative subset (~4 cases) live against the current
+`1379` binary with screenshots, and cite Increment 4 for the exhaustive
+10/10 + option-identity matrix.
 
 ## Objective
 
@@ -69,3 +77,29 @@ deferred without violating scope, and the user explicitly accepts runtime behavi
 ## Progress
 
 - 2026-08-24: Detailed runtime plan drafted; no live acceptance performed.
+- 2026-08-31: Plan approved. Added `casmpgbad.s` (mid-assembly failure
+  fixture) to `casm_progress_test_d64`; disk rebuilt clean, `casm.prg`
+  unchanged (`72549659`, `BUILD_CASM` 1379), `git diff --check` clean.
+- 2026-08-31: **Live runtime matrix executed** (VICE 3.10, fresh boot,
+  `CASM V0.4.0.1379`). Six cases, all pass, no findings:
+  1. `CASM CASMPG64.S` - `P1/P2 DONE 00064`, `WRITE`, `DONE ... 00065
+     BYTES`, legible + ordered.
+  2. `CASM CASMPGINCA` - nested include + re-inclusion, `00012` count =
+     all frames traversed, `DONE ... 00009 BYTES`.
+  3. `CASM CASMPG128.S /O:AL.PRG /M /L` - `SYMBOL MAP` / `000 SYMBOLS` /
+     `DONE` in clean order, no transient residue, `al.lst` written.
+  4. `CASM CASMPGR6.S` - `WRITE: casmpgr6.prg`, `DONE ... 00054 BYTES`
+     (R6 table + footer in the accounting).
+  5. `CASM CASMPGBAD.S` (NEW) - transient line cleared before the
+     `CASM: BRANCH OUT OF RANGE` diagnostic (rendered at statement 64,
+     wiped by `diagPrintFatal`); diagnostic + source context + caret fully
+     readable; `DIR` confirms **no `casmpgbad.prg` orphan**; clean shell
+     return.
+  6. `CASM CASMPG65.S /O:R1.PRG` then `/O:R2.PRG` - identical output both
+     runs, `comp r1.prg r2.prg` -> `FILES COMPARE OK`, no resource leak
+     between invocations.
+  Screenshots under this session's scratchpad. Walkthrough:
+  `brain/walkthroughs/2026-08-24-casm-progress-increment10-runtime-acceptance.md`.
+- 2026-08-31: **User accepted the runtime behavior.** Increment 10 closed;
+  `casmpgbad.s` fixture + walkthrough committed. Only Increment 11
+  (completion gate) remains for the feature.
