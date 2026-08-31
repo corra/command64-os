@@ -3409,12 +3409,14 @@ Live-verified under VICE: `BRANCH OUT OF RANGE` ($23, locationed),
 `ALIGN BOUNDARY ZERO` ($4E) + a `9:`-prefixed filename, `ASSERTION FAILED:
 <text>` ($54 echo), `INCBIN FILENAME EXPECTED` ($4F, LOC_BYTE sub-path),
 `FILENAME TOO LONG` ($09) at the new cap, and a clean assembly with
-unchanged progress output. **Defect deferred (task 43):**
+unchanged progress output. **Defect exposed here, fixed separately
+(task 43, closed 2026-08-31 at CASM `0.5.2` build 1392):**
 `diagPrintFatal`'s `progressClearTransient` (from progress-indication
-Increment 7) reads uninitialized `CasmProgFlags` for any diagnostic raised
-before `startPass1`, garbling the banner on an early fatal exit —
-pre-existing on `main`, disclosed and deferred per the plan's stop
-condition.
+Increment 7) read uninitialized `CasmProgFlags` for any diagnostic raised
+before `startPass1`, garbling the banner on an early fatal exit. Fixed by
+moving the single `jsr progressInit` up into `casm.s:start`'s early-init
+block (with `diagClearLoc` / `listingStateInit`). Plan
+`brain/plans/2026-08-31-casm-progclear-early-fatal-fix.md`.
 
 Parent plan `brain/plans/2026-08-24-casm-memory-optimization.md`;
 walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;

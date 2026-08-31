@@ -308,3 +308,10 @@ merge to `main`.
   establishes `CasmProgFlags = $00` at `progressClearTransient` for *every*
   RAM state, plus the two live clean-banner confirmations -- stronger than
   a single-value checkpoint read. Increment 3 (closeout) next.
+- 2026-08-31: **Increment 3 (closeout) executed.** `CHANGELOG.md` Fixed
+  entry; `brain/KNOWLEDGE.md` memory-optimization section's deferred note
+  updated to "fixed separately"; walkthrough written; memory
+  [[project-casm-progclear-uninitialized-flags]] -> resolved; trackers
+  updated. No `docs/`/`wiki/` user-facing text referenced the garbled
+  behavior, so none changed. **Awaiting user sign-off to close
+  Taskwarrior 43 and merge to `main`.**

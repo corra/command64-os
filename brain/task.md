@@ -3716,13 +3716,15 @@
     from progress-indication Increment 7; **confirmed byte-identical on
     `main`**. Disclosed and deferred per the memory-optimization plan's
     stop condition.
-  - **Plan approved 2026-08-31:**
-    `brain/plans/2026-08-31-casm-progclear-early-fatal-fix.md`. Branch
-    `feature/casm-progclear-early-fatal-fix` off `main`. Fix: relocate the
-    single `jsr progressInit` from `startPass1` up into `casm.s:start`'s
-    early-init block (after `sourceInit`), mirroring the
-    `diagClearLoc`/`listingStateInit` placement. 3 increments (fix+static,
-    live checkpoint-read verification, closeout); CASM `0.5.1` -> `0.5.2`.
+  - **Fix complete 2026-08-31, awaiting user sign-off -- CASM `0.5.2` build 1392.**
+    Plan/walkthrough `brain/{plans,walkthroughs}/2026-08-31-casm-progclear-
+    early-fatal-fix.md`. Fix: moved the single `jsr progressInit` from
+    `startPass1` up into `casm.s:start`'s early-init block, before
+    `resourcesInit` (with `diagClearLoc`/`listingStateInit`). Net code size
+    zero. Static proof (`progressInit` at `$380A`, 4th call, ahead of every
+    fatal branch; all preceding inits infallible) + live: full banner on
+    two early-fatal raise sites, `casmpg128` byte count unchanged,
+    `test_casm_progress` PASS.
 
 - [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
       build duration display on completion (success and failure)
