@@ -1,0 +1,26 @@
+# CASM progress-indication Increment 8 trusted reference: casmpginc
+#
+# Independently hand-derived, NOT produced by CASM. Root casmpginca.seq:
+#   .ORG $C000
+#   .INCLUDE "CASMPGINCB"
+#   NOP
+#   .INCLUDE "CASMPGINCB"        ; sequential re-inclusion (dedup cache hit,
+#                               ;   Phase 0C.19: bytes still re-traversed)
+# casmpgincb.seq: NOP / .INCLUDE "CASMPGINCC" / NOP
+# casmpgincc.seq: NOP
+#
+# Traversal order of emitted bytes:
+#   first  .INCLUDE B -> EA (B line1), EA (C), EA (B line3)
+#   parent            -> EA (NOP)
+#   second .INCLUDE B -> EA (B line1), EA (C), EA (B line3)
+# The progress transient line shows each frame's own filename on push and
+# restores the parent's on pop (identity keyed on fileid+depth).
+#
+# Hand assembly (.ORG $C000):
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   EA x 7       NOP (implied), $C000..$C006
+#
+# bytes: 9
+# sha256: 0b076077ef8b77f705a6d0d3430751de1b288182ad78814fb607222ac430cafd
+
+00 C0 EA EA EA EA EA EA EA

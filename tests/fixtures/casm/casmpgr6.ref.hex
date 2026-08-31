@@ -1,0 +1,36 @@
+# CASM progress-indication Increment 8 trusted reference: casmpgr6
+#
+# Independently hand-derived, NOT produced by CASM. casmpgr6.seq has no
+# .ORG (relocatable mode, default origin $3400) and a forward label
+# reference, so the R6 footer carries one real relocation entry -- the
+# case that exercises the WRITE line and the emitFlush + relocation-table
+# + 6-byte-footer byte accounting the progress DONE summary reports.
+#
+# Source (no .ORG):
+#   - START:  (label)
+#   -   NOP  x 40
+#   -   JMP TARGET
+#   - TARGET: (label)
+#   -   NOP
+#
+# START = $3400. 40 NOP occupy $3400..$3427. JMP (opcode $4C, 3 bytes) is
+# at $3428..$342A; TARGET resolves to $342B, so JMP encodes "4C 2B 34".
+# JMP's ValHi byte ($34) is at program offset $342A-$3400 = $2A -- the
+# sole relocation entry.
+#
+# Hand assembly:
+#   00 34        PRG load-address header ($3400, little-endian)
+#   EA x 40      NOP (implied), $3400..$3427
+#   4C 2B 34     JMP $342B    (forward reference resolved to TARGET)
+#   EA           NOP          (at $342B, defines TARGET)
+#   2A 00        R6 table: one entry, offset $2A (JMP's ValHi byte)
+#   00 34        R6 footer: base address ($3400, little-endian)
+#   01 00        R6 footer: relocation entry count (1)
+#   52 36        R6 footer: ASCII magic "R6"
+#
+# bytes: 54
+# sha256: 34d42ac5dbea14895780b4b4a3b5c118a96698124575ca5c9cbc1196b6db49b4
+
+00 34 EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA 4C 2B 34 EA 2A 00 00 34 01 00 52 36

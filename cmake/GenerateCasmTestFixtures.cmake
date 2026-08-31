@@ -1986,3 +1986,109 @@ file(WRITE "${OUTPUT_DIR}/casmassertfwd.seq"
     ".ASSERT COUNT\n"
     "COUNT = 5\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM progress-indication Increment 8 verification fixtures.
+#
+# The progress redraw throttle (progress.s CasmProgDivider) fires at exact
+# statement counts 64, 128, 192, ... via a mod-64 divider. These fixtures
+# pin the <64 / 64 / 65 / 128 statement-count boundaries plus the blank/
+# comment, multi-root, nested-include + re-inclusion, fixed-fill, .INCBIN,
+# and relocatable-output shapes the display touches. Every one assembles
+# successfully; the assembled output is byte-identical with or without
+# progress indication, which is exactly what the COMP checks against
+# tests/fixtures/casm/casmpg*.ref.hex prove. Trusted references are
+# hand-derived from the 6502 instruction set, never from CASM.
+# ---------------------------------------------------------------------------
+
+# Statement-count cadence. The progress statement hook (casm.s
+# crpProgressHook) counts label/constant/mnemonic/directive statements, so
+# ".ORG" itself counts: a fixture named for N *counted* statements carries
+# ".ORG" plus (N-1) NOP. The redraw throttle fires at exact counts 64, 128.
+string(REPEAT "NOP\n" 62 CASM_PG63_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpg63.seq" ".ORG \$C000\n${CASM_PG63_BODY}")
+string(REPEAT "NOP\n" 63 CASM_PG64_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpg64.seq" ".ORG \$C000\n${CASM_PG64_BODY}")
+string(REPEAT "NOP\n" 64 CASM_PG65_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpg65.seq" ".ORG \$C000\n${CASM_PG65_BODY}")
+string(REPEAT "NOP\n" 127 CASM_PG128_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpg128.seq" ".ORG \$C000\n${CASM_PG128_BODY}")
+
+# Blank lines and comment-only lines interleaved with exactly 5 NOP
+# statements: the progress statement counter must count only real
+# statements, so the pass-end line reports 5.
+file(WRITE "${OUTPUT_DIR}/casmpgblank.seq"
+    "; leading comment before any code\n"
+    "\n"
+    ".ORG \$C000\n"
+    "\n"
+    "    ; indented comment-only line\n"
+    "NOP\n"
+    "NOP\n"
+    "\n"
+    "NOP          ; trailing comment after a statement\n"
+    "\n"
+    "NOP\n"
+    "; another comment\n"
+    "NOP\n"
+    "; final comment at end of file\n"
+)
+
+# Multi top-level source. File A opens ".ORG $C000" with 40 NOP; file B has
+# 40 NOP and no re-.ORG, continuing the combined PC (casmmf1-3 convention).
+# Assemble with: CASM CASMPGRTA.S CASMPGRTB.S /O:CASMPGRT.PRG
+string(REPEAT "NOP\n" 40 CASM_PGRT_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpgrta.seq" ".ORG \$C000\n${CASM_PGRT_BODY}")
+file(WRITE "${OUTPUT_DIR}/casmpgrtb.seq" "${CASM_PGRT_BODY}")
+
+# Nested include + sequential re-inclusion. casmpginca includes casmpgincb
+# twice from two sites; casmpgincb includes casmpgincc once. The second
+# .INCLUDE of casmpgincb is a Phase 0C.19 deduplicated cache hit whose
+# bytes are still re-traversed (frame stack: push B, push C, pop, pop, ...
+# parent NOP ... push B, push C, pop, pop). Emitted order: EA EA EA (first
+# B+C) / EA (parent) / EA EA EA (second B+C) -> 7 bytes. The transient line
+# shows each frame's own filename on push and restores the parent's on pop.
+file(WRITE "${OUTPUT_DIR}/casmpginca.seq"
+    ".ORG \$C000\n"
+    ".INCLUDE \"CASMPGINCB\"\n"
+    "NOP\n"
+    ".INCLUDE \"CASMPGINCB\"\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmpgincb.seq"
+    "NOP\n"
+    ".INCLUDE \"CASMPGINCC\"\n"
+    "NOP\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmpgincc.seq" "NOP\n")
+
+# Large fixed-fill directives: .RES 100 ($00 filler) + .FILL 50,$AB +
+# .ALIGN 256 (PC $C096 -> pad 106 $00 bytes to $C100). Exercises Increment
+# 6's bounded per-chunk byte-cadence line.
+file(WRITE "${OUTPUT_DIR}/casmpgfill.seq"
+    ".ORG \$C000\n"
+    ".RES 100\n"
+    ".FILL 50, \$AB\n"
+    ".ALIGN 256\n"
+)
+
+# .INCBIN of a reviewed 8-byte binary asset (casmpgbin.dat, packaged onto
+# the disk as "casmpgbin.dat" -- see CMakeLists.txt). The quoted operand is
+# uppercase ASCII to match cc1541's lowercase -f packaging (the
+# WP82-established pairing).
+file(WRITE "${OUTPUT_DIR}/casmpgincbin.seq"
+    ".ORG \$C000\n"
+    ".INCBIN \"CASMPGBIN.DAT\"\n"
+)
+
+# Relocatable output (no .ORG, default origin $3400) with a forward label
+# reference, so the R6 footer carries one real relocation entry -- the case
+# that exercises the WRITE line and the emitFlush + relocation-table +
+# 6-byte-footer byte accounting the DONE summary reports.
+string(REPEAT "    NOP\n" 40 CASM_PGR6_BODY)
+file(WRITE "${OUTPUT_DIR}/casmpgr6.seq"
+    "START:\n"
+    "${CASM_PGR6_BODY}"
+    "    JMP TARGET\n"
+    "TARGET:\n"
+    "    NOP\n"
+)

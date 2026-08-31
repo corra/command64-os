@@ -1,0 +1,17 @@
+# CASM progress-indication Increment 8 trusted reference: casmpgblank
+#
+# Independently hand-derived, NOT produced by CASM. casmpgblank.seq
+# interleaves blank lines and comment-only lines among exactly 5 NOP
+# statements, all after ".ORG $C000". Blank and comment lines produce a
+# bare NEWLINE token and must NOT advance the progress statement counter,
+# so the pass-end line reports 5, not 5 plus the filler. Output bytes are
+# unaffected by progress indication.
+#
+# Hand assembly (.ORG $C000):
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   EA x 5       NOP (implied), $C000..$C004
+#
+# bytes: 7
+# sha256: 1274476ec547750c9f672fc95e99c3e846e7e707a1e1c601f858dbb3201752ca
+
+00 C0 EA EA EA EA EA

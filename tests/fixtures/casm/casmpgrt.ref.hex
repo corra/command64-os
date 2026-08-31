@@ -1,0 +1,22 @@
+# CASM progress-indication Increment 8 trusted reference: casmpgrt
+#
+# Independently hand-derived, NOT produced by CASM. Assembled from two
+# top-level sources through the real CLI:
+#   CASM CASMPGRTA.S CASMPGRTB.S /O:CASMPGRT.PRG
+# casmpgrta.seq is ".ORG $C000" + 40 NOP; casmpgrtb.seq is 40 NOP with no
+# re-.ORG, continuing the combined PC (the casmmf1-3 convention). The
+# progress LOAD line reports each root filename in turn; the pass counters
+# report the combined 80-statement total. Output is one contiguous PRG.
+#
+# Hand assembly:
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   EA x 80      NOP (implied), $C000..$C04F  (40 from each file)
+#
+# bytes: 82
+# sha256: 5d0cda9673a5d3c79ba1dae32181b004ecf06a4d34ee26026b658e5a31430226
+
+00 C0 EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA

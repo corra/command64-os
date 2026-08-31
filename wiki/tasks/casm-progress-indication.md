@@ -19,7 +19,26 @@ diagnostic, listing, and map integration) was approved and activated 2026-08-25
 and closed 2026-08-26, delivering primary-output byte accounting, the
 `WRITE: <name>` line, a universal fatal-diagnostic transient clear, `/L` and
 `/M` suspension, and the `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` final summary.
-Increment 8 (automated verification) is next and not yet approved.
+Increment 8 (automated verification) was approved 2026-08-31. Its host-side
+Atomic Increments 1-3 are done: a new self-bootable `casm_progress_test_d64`
+disk carrying `test_casm_progress` plus 13 `casmpg*` cadence/shape fixtures
+and 10 hand-derived trusted references (`tests/fixtures/casm/casmpg*.ref.hex`).
+The full build stays green with `casm.prg` byte-identical to the Increment 7
+baseline (`BUILD_CASM` 1378). Live-VICE 2026-08-31: Atomic Increment 4 is
+complete - all 10 `casmpg*` end-to-end fixtures plus the 5-way
+option-identity sub-matrix `FILES COMPARE OK`, with `DONE:` byte counts
+matching the hand-derived references exactly and the progress
+cadence/counter behaviour correct (directives counted, blank/comment lines
+excluded, nested-include + re-inclusion + multi-root all traversed).
+Atomic Increment 8 (exact no-change rebuild) is complete and byte-stable.
+Atomic Increment 5 is partial (fatal input-open path clean; the
+mid-assembly fatal + partial-output cleanup case is noted non-blocking).
+Atomic Increments 6 (31-harness regression) and 7 (timing) were waived by
+the user 2026-08-31 as redundant re-checks of a byte-identical binary that
+Increment 7 already swept 31/31, with the performance caps non-blocking
+since the 2026-08-26 amendment. **Increment 8 is complete, user-approved
+2026-08-31.** Increments 9-11 (full implementation review, runtime
+acceptance, completion gate) remain.
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.
 

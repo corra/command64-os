@@ -2326,6 +2326,32 @@ behavior changed beyond the version/build artifact itself.
 - A full implementation review is mandatory after automated verification and
   before runtime acceptance or merge.
 
+## Optional Feature - Memory Optimization
+
+- [ ] Taskwarrior task 42, UUID `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`:
+      recover roughly 2 KB of CASM's MAIN envelope across five independent
+      findings with a strict "identical observable behavior" contract -- no
+      change to diagnostic text/identifiers, accepted filenames, assembled
+      output, or progress display.
+- Plan: `brain/plans/2026-08-24-casm-memory-optimization.md` (approved
+  2026-08-31).
+- Findings: **D** filename caps (`CASM_FILENAME_MAX`/`CASM_INCLUDE_FILENAME_MAX`
+  = 63 multiplied into 13 MAIN buffers, ~520 B, runs first); **B** shared
+  `"CASM: "` prefix + trailing CR helper in `diagnostics.s` (587 B); **A**
+  gate the exported-but-uncalled `diagDumpToken` behind a build switch (509 B);
+  **C** dense diagnostic dispatch table replacing six range blocks + a 9-way
+  chain (231 B); **E** `PROG_DIGIT` macro (6 inline expansions) -> divisor-table
+  loop in `progress.s` (~150 B). Finding F (`CasmDiagLineBufA`/`B` sizing)
+  recorded but explicitly NOT actioned -- product tradeoff, out of scope.
+- Envelope stays `$7400` per Scoping Decision 4; recovered bytes are banked
+  as working headroom, not returned.
+- Implementation is gated on the progress-indication feature (task 33) closing
+  through Increment 11 (Scoping Decision 1); Increments 8-11 there are still
+  open. This WP is deliberately sequenced last.
+- Per this project's convention, each increment follows the approved plan's
+  Atomic Increments; a completion-gate walkthrough with user sign-off is
+  required before it is marked done.
+
 ## Known Non-Critical Bugs
 
 - [ ] Taskwarrior `be8ca0bf-ac7c-40f6-960e-2ca816bc7fb8`: **listing output

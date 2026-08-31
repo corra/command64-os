@@ -108,6 +108,18 @@ The purpose of the `tests` directory is to contain regression tests and manual i
   name `test_casm_progre`; launch it by the full documented name. Increment 6
   extends it to 22 cases, including directive-kind reset and cumulative accepted
   byte boundaries 0, 1, 255, 256, 257, and 65,535.
+- Progress-indication Increment 8 (automated verification) adds the
+  self-bootable `casm_progress_test.d64` (carries `command64` + `casm` +
+  `comp` + `test_casm_progress`). It holds the end-to-end `casmpg*`
+  fixtures: `casmpg63`/`casmpg64`/`casmpg65`/`casmpg128` (statement-count
+  redraw boundaries, cadence is mod-64), `casmpgblank`,
+  `casmpgrta`/`casmpgrtb` (multi-root, dispatch
+  `CASM CASMPGRTA.S CASMPGRTB.S /O:CASMPGRT.PRG`),
+  `casmpginca`/`casmpgincb`/`casmpgincc` (nested include + re-inclusion,
+  dispatch `CASM CASMPGINCA`), `casmpgfill`, `casmpgincbin` (+ payload
+  `casmpgbin.dat`), and `casmpgr6`. Each accepted case has a hand-derived
+  `casmpg*.ref` PRG for native `COMP`. The assembled output is
+  byte-identical with or without progress indication.
 
 ## Child DOX Index
 
