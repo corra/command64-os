@@ -6,15 +6,25 @@ status: in-progress
 
 # Plan: CASM Native 6502/6510 Assembler
 
-## Current Status (reconciled 2026-08-19)
+## Current Status (reconciled 2026-08-31)
 
-- Current implementation: CASM `0.2.8` build `1322`.
-- Phases 1-11 are complete and user-approved. Their sections below preserve
-  the original contracts and are explicitly marked as-built/closed.
-- Phase 12 is active. WP64-WP74 are complete; WP75 is the pending consolidated
-  Phase 12 completion gate.
-- `0.3.0` is the Phase 12 completion-promotion target, not the current version.
-- Phase 13 onward remains future roadmap.
+- Current implementation: CASM `0.5.0` build `1380`.
+- Phases 1-13 are complete and user-approved.
+- Phase 12 (named constants, `*`, parens/precedence, full operator set,
+  char/string literals, DASH adoption) closed at `0.3.0` build `1324`.
+- Phase 13 (Data Construction Directives: `.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/
+  `.ASSERT`) closed at `0.4.0` build `1349`.
+- **Change in scope (2026-08-31):** the optional **progress and processing
+  indication** feature — an in-place transient status line plus
+  `P1:`/`P2:`/`LOAD`/`WRITE`/`DONE` persistent lines, with byte-identical
+  assembled output — shipped as an **optional feature outside these
+  numbered phases** (parent plan
+  `brain/plans/2026-07-29-casm-feature-progress-indication.md`,
+  eleven separately-approved increments). CASM was promoted `0.4.0` ->
+  `0.5.0` at its completion gate. See
+  `wiki/tasks/casm.md` and `wiki/tasks/casm-progress-indication.md`.
+- No numbered CASM phases remain on the active roadmap; further work is
+  optional-feature or hardening scope.
 
 Authoritative Phase 12 work-package map:
 

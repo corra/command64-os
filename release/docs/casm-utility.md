@@ -77,12 +77,38 @@ are matched case-insensitively (`/o:out.prg` works the same as `/O:OUT.PRG`).
    references (using a label before its definition) work.
 3. **Pass 2** re-walks the same source from the start, now that every label
    resolves, and actually emits the PRG.
-4. On success, it prints `CASM: INPUT VALIDATED` and returns to the shell.
-   The output PRG is on disk and ready to `LOAD`.
+4. On success, it prints a `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` summary
+   (both passes' statement totals and the final PRG size), then
+   `CASM: INPUT VALIDATED`, and returns to the shell. The output PRG is on
+   disk and ready to `LOAD`.
 5. On any error, it prints one specific diagnostic (see
    [Example 4: Error Messages](#example-4-error-messages)), deletes the
    partial output file if one was created, and returns to the shell — no
    half-written PRG is left behind.
+
+### Progress Display
+
+While CASM works it keeps you informed. A single **transient status line**
+is redrawn in place (it never scrolls) showing the active pass, the
+include depth, the physical-file id, the first eight characters of the
+file name, the current source line, and a running statement count. It
+updates every 64 statements and immediately whenever an `.INCLUDE` file is
+entered or left.
+
+Between those, CASM prints **persistent** milestone lines:
+
+- `P1: START` … `P1: DONE nnnnn STATEMENTS` (and `P2:` for the second pass);
+- `LOAD F...` while a top-level source or an `.INCLUDE` file streams in;
+- a bounded byte-count line during a long `.RES`, `.FILL`, `.ALIGN`, or
+  `.INCBIN`;
+- `WRITE: <name>` as the output PRG is finalized;
+- `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` — both passes' statement totals
+  and the final PRG size — immediately before `CASM: INPUT VALIDATED`.
+
+The status line is cleared before any error message, and is suspended
+while `/M` or `/L` output is printed, so it never overwrites a diagnostic,
+the symbol map, or a listing. The **assembled output bytes are identical**
+whether or not the display appears — it is purely informational.
 
 ## Language Reference
 

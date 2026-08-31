@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM progress and processing indication** (optional feature, CASM
+  `0.4.0` -> `0.5.0`): CASM now shows what it is doing while it assembles.
+  During each pass a single in-place transient status line reports the
+  active pass, include depth, physical-file id, the first eight characters
+  of the file name, the current source line, and a running statement
+  count, redrawn on a 64-statement throttle and immediately on every
+  include frame push/pop. Persistent lines mark the milestones: `P1:
+  START` / `P1: DONE nnnnn STATEMENTS` (and `P2:` likewise), `LOAD F...`
+  while a source or `.INCLUDE` file streams in, bounded byte-cadence lines
+  during long `.RES`/`.FILL`/`.ALIGN`/`.INCBIN` runs, `WRITE: <name>` as
+  the output PRG is finalized, and a `DONE: P1 nnnnn, P2 nnnnn, nnnnn
+  BYTES` summary immediately before the existing `CASM: INPUT VALIDATED`.
+  The transient line never scrolls, is cleared before any fatal
+  diagnostic, and is suspended around `/M` and `/L` output. Assembled
+  output is byte-identical with or without the display. Two internal
+  deterministic-replay diagnostics were added
+  (`CASM_DIAG_PROGRESS_COUNTER_OVERFLOW` `$55`,
+  `CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH` `$56`). No new zero page; MAIN
+  grown `$6C00` -> `$7400` on measured evidence. The feature is outside the
+  master plan's numbered CASM phases; completed and user-approved
+  2026-08-31.
 - **Paged directory listings**: Added lowercase `/p` to `DIR`, accepted
   before or after an optional device prefix. Paged listings pause after
   each 23-line screenful with the existing `-- More --` prompt and resume

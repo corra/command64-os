@@ -3303,6 +3303,50 @@ Full per-WP detail lives in each WP's own plan/walkthrough pair under
 fill-align`, `-wp82-incbin`, `-wp83-assert`, `-wp84-dash-adoption`,
 `-wp85-consolidated-completion`).
 
+## CASM Progress Indication Complete (optional feature, closed 2026-08-31 at `0.5.0` build `1380`)
+
+An **optional feature outside the master plan's numbered CASM phases** —
+CASM now shows what it is doing while it assembles. `src/external/casm/
+progress.s` (new, ~720 lines) owns bounded progress state and its own
+rendering only; it imports nothing from `diagnostics.s`/`listing.s`/
+`map.s` and `diagnostics.s` imports exactly one routine back
+(`progressClearTransient`, a one-way edge). No new zero page; MAIN grown
+`$6C00` → `$7000` → `$7400` across the increments on measured evidence
+(642 bytes headroom at close). Two internal deterministic-replay
+diagnostics: `CASM_DIAG_PROGRESS_COUNTER_OVERFLOW` (`$55`),
+`CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH` (`$56`), contiguous after Phase
+13's `$54` with a compile-time `.assert`.
+
+**Screen protocol.** One in-place **transient** status line per pass
+(`P1: dNN fNN NAME lNNNNN tNNNNN`), fixed 34 columns, never emits a
+trailing CR so it never scrolls; redrawn on a **mod-64 statement**
+throttle (`CasmProgDivider`) and immediately on every include frame
+push/pop (identity keyed on `CasmFrameDepth` + `CasmSourceFileId`). The
+statement counter counts label/constant/mnemonic **and directive**
+statements (`.ORG` included); blank and comment-only lines do not.
+Persistent lines: `P1:`/`P2: START` … `DONE nnnnn STATEMENTS`, `LOAD F...`
+during source/`.INCLUDE` streaming, bounded byte-cadence during long
+`.RES`/`.FILL`/`.ALIGN`/`.INCBIN`, `WRITE: <name>` at finalize, and
+`DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` before the documented `CASM: INPUT
+VALIDATED`. The `nnnnn BYTES` field is the full output size (2-byte header
++ program + R6 table + 6-byte footer) — a 16-bit accumulator, so it wraps
+for output > 65535 bytes (recorded, deferred: the file itself is still
+correct). Transient line is cleared at `diagPrintFatal` entry and
+suspended around `/M`/`/L`. **Assembled output is byte-identical with or
+without the display.**
+
+Delivered over eleven separately-approved increments (design/ABI freeze,
+core, pass/source/include/directive/output integration, automated
+verification with a dedicated `casm_progress_test_d64`, a full
+implementation review that fixed three doc/robustness findings, live
+runtime acceptance, and this completion gate — a fresh 31-harness + 10
+`casmpg*` fixture consolidated live sweep against `V0.5.0.1380`, no
+findings). Version promoted `0.4.0` → `0.5.0` at the gate. Parent plan
+`brain/plans/2026-07-29-casm-feature-progress-indication.md`; per-increment
+plans/walkthroughs `brain/{plans,walkthroughs}/2026-08-24-casm-progress-
+incrementNN-*.md`; implementation review
+`brain/reviews/2026-08-24-casm-progress-implementation-review.md`.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

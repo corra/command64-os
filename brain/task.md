@@ -3534,8 +3534,15 @@
       `brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-
       pass-agreement-fix.md`. WP75 resumes from Increment 6.
 
-- [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
-      progress and processing indication feature
+- [x] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
+      progress and processing indication feature. **COMPLETE, user-approved
+      2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`; merged to `main`.**
+      Increment 11 (completion gate): version promoted; consolidated live
+      sweep 31/31 harnesses + 10/10 `casmpg*` fixtures + `casmpgbad`
+      failure + `/M /L` identity, all PASS against `V0.5.0.1380`, no
+      findings; full docs/DOX/KNOWLEDGE/CHANGELOG/release closeout.
+      Walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment11-completion-gate.md`.
   - Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
   - Task: `wiki/tasks/casm-progress-indication.md`
   - This feature is outside the master plan's numbered phases and does not
@@ -3598,7 +3605,18 @@
     95.24s), and the baseline was wall-time-without-warp vs. this session's
     emulated cycles. A like-for-like isolation against a pre-progress
     `casm.prg` in one session remains available but is optional.
-  - [~] Complete full implementation review before runtime acceptance or merge.
+  - [x] Complete full implementation review before runtime acceptance or merge.
+    - [x] Increment 11 (completion gate): **user signed off feature-complete
+      2026-08-31.** Version promoted `0.4.0` -> `0.5.0` (`casm.prg`
+      `e8a6731f`, `BUILD_CASM` 1380, 642 bytes MAIN headroom).
+      Consolidated fresh live sweep: 31/31 harnesses across 6 disks +
+      `test_casm_progress` on its own disk + 10/10 `casmpg*` fixtures
+      `COMP OK` + `casmpgbad` failure (transient cleared, no orphan PRG) +
+      `/M /L` output identity - all PASS against `V0.5.0.1380`, no
+      findings. Full CHANGELOG/KNOWLEDGE/docs/AGENTS/master-plan/release
+      closeout. Committed on the feature branch and merged to `main`.
+      Walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment11-completion-gate.md`.
     - [x] Increment 10 (runtime acceptance): **ACCEPTED by the user
       2026-08-31.** Live matrix vs `CASM V0.4.0.1379`, 6 cases all pass,
       no findings: short assemble, nested include + re-inclusion, `/M /L`
@@ -3641,8 +3659,8 @@
       Plan/Progress + walkthrough:
       `brain/plans/2026-08-24-casm-progress-increment08-automated-verification.md`,
       `brain/walkthroughs/2026-08-24-casm-progress-increment08-automated-verification.md`.
-    - Increments 9-11 (full review, runtime acceptance, completion gate)
-      not started.
+    - Increments 9-11 all complete and user-approved 2026-08-31 (see
+      above); the feature is closed and merged to `main`.
 
 - [ ] Taskwarrior #42 (`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`): CASM memory
       optimization -- recover ~2 KB of MAIN across five findings, strict

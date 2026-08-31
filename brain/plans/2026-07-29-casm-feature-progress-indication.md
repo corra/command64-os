@@ -1,7 +1,8 @@
 ---
 feature: casm-progress-indication
 created: 2026-07-29
-status: deferred-approved-plan
+status: complete
+closed: 2026-08-31
 taskwarrior: 1acb36e3-2c0e-4f24-998b-279b2578bee4
 reconciled: 2026-08-24
 ---
@@ -9,6 +10,22 @@ reconciled: 2026-08-24
 # CASM Feature Plan: Progress and Processing Indication
 
 ## Status and Authorization
+
+**COMPLETE — user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build
+`1380`; merged to `main`.** Delivered over eleven separately-approved
+increments (design/ABI freeze, `progress.s` core, pass/source/include/
+directive/output integration, automated verification with a dedicated
+`casm_progress_test_d64` disk, a full implementation review that fixed
+three doc/robustness findings, live runtime acceptance, and a consolidated
+completion gate — a fresh 31-harness + 10-`casmpg*`-fixture live
+re-verification with no findings). Increment plans/walkthroughs:
+`brain/{plans,walkthroughs}/2026-08-24-casm-progress-incrementNN-*.md`;
+implementation review
+`brain/reviews/2026-08-24-casm-progress-implementation-review.md`.
+
+The historical authorization text below is preserved for the record.
+
+---
 
 This is an approved plan for a future optional CASM feature outside the numbered
 phases in the CASM master plan. The feature may be deferred indefinitely. This

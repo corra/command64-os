@@ -90,9 +90,16 @@ The `src/external/casm` directory owns CASM, a native Command 64
   `/L` are both fully implemented and production-active (see the durable
   Phase 10 architecture notes below). Phase 11 (base-release hardening,
   WP56-WP61) followed that: closed 2026-08-12 at CASM `0.2.2` build `1266`
-  (see the Phase 11 notes below). Progress indication is an active optional
-  feature outside the numbered phases; Increments 1-5 are complete and
-  Increment 6 directive-cadence integration is active.
+  (see the Phase 11 notes below). The optional **progress and processing
+  indication** feature (`progress.s`, outside the numbered phases) is
+  **complete** — user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build
+  `1380`. `progress.s` owns bounded progress state and its own rendering
+  only; it imports nothing from `diagnostics.s`/`listing.s`/`map.s`, and
+  `diagnostics.s` imports exactly one routine back (`progressClearTransient`,
+  a one-way edge). No new zero page. The statement counter counts
+  label/constant/mnemonic AND directive statements (`.ORG` included), not
+  blank/comment lines; redraw throttle is mod-64. Assembled output is
+  byte-identical with or without the display.
 - Progress directive cadence keeps its own ordinary-BSS snapshot only:
   `progressBeginDirective` takes the directive subtype in A and resets the
   cumulative count; `progressDirectiveBytes` takes caller-authoritative

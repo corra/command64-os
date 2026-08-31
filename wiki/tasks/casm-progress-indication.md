@@ -59,8 +59,23 @@ nested include + sequential re-inclusion, `/M /L` screen ownership, R6
 `WRITE` line, a new `casmpgbad.s` mid-assembly failure fixture, and a
 repeated invocation) all passed with no findings. The failure fixture
 confirmed `diagPrintFatal`'s transient-clear wipes the status line before
-the diagnostic and `outputAbort` leaves no orphan partial PRG. **Only
-Increment 11 (completion gate) remains.**
+the diagnostic and `outputAbort` leaves no orphan partial PRG.
+
+**Increment 11 (completion gate) closed 2026-08-31 with user feature-complete
+sign-off.** CASM was promoted `0.4.0` -> `0.5.0` (build `1380`,
+`casm.prg` `e8a6731f`, 642 bytes MAIN headroom). A fresh consolidated
+live sweep - 31/31 `test_casm_*` harnesses across six disks (+
+`test_casm_progress` on its own disk), all 10 `casmpg*` fixtures
+`FILES COMPARE OK` with exact `DONE:` byte counts, the `casmpgbad`
+failure case (transient cleared, `DIR`-confirmed no orphan PRG), and the
+`/M /L` output-identity check - passed with **no findings**. Full
+CHANGELOG / KNOWLEDGE / user+programmer docs / AGENTS / master-plan /
+`release/` closeout completed. **The feature is complete and merged to
+`main`.**
+
+Deferred and recorded (not a blocker): the `DONE: ... nnnnn BYTES` display
+is a 16-bit accumulator and wraps for an output PRG larger than 65535
+bytes - the written file is still correct.
 
 It is not a numbered phase in the CASM master plan and does not replace or
 renumber Phase 10, Symbol Map and Listing.

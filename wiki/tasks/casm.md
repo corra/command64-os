@@ -12,6 +12,18 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
+**The optional progress and processing indication feature is complete**,
+user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`. It is
+outside the master plan's numbered phases: it adds an in-place transient
+status line and the `P1:`/`P2:`/`LOAD`/`WRITE`/`DONE` persistent lines
+while CASM assembles, with byte-identical assembled output. Delivered over
+eleven separately-approved increments, closing with a full implementation
+review (three doc/robustness findings fixed) and a fresh consolidated
+31-harness + 10-`casmpg*`-fixture live re-verification. Final walkthrough:
+`brain/walkthroughs/2026-08-24-casm-progress-increment11-completion-gate.md`.
+See the "Optional Feature - Progress and Processing Indication" section
+below and `wiki/tasks/casm-progress-indication.md`.
+
 **Phase 12 is complete**, user-approved 2026-08-20 at CASM `0.3.0` build
 `1324` (WP64-76, including WP71's full DASH adoption and WP76's
 corrective forward-reference Pass 1/2 width-agreement fix). Final
@@ -2314,17 +2326,29 @@ behavior changed beyond the version/build artifact itself.
 
 ## Optional Feature - Progress and Processing Indication
 
-- [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,
-      always-on progress for source loading, include traversal, both passes, and
-      output writing. This feature is deferred and must not activate before Phase
-      9 completion plus a separate design/ABI review approval.
-- Plan:
-  `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
+- [x] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: bounded,
+      always-on progress for source loading, include traversal, both passes,
+      and output writing. **COMPLETE, user-approved 2026-08-31 at CASM
+      `0.4.0` -> `0.5.0` build `1380`.**
+- Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
 - Task: `wiki/tasks/casm-progress-indication.md`.
-- This optional feature is outside the master plan's numbered phases and does
+- This optional feature is outside the master plan's numbered phases and did
   not replace Phase 10, Symbol Map and Listing.
-- A full implementation review is mandatory after automated verification and
-  before runtime acceptance or merge.
+- Delivered over eleven separately-approved increments: design/ABI freeze
+  (Inc 2), `progress.s` core + pass/source/include/directive/output
+  integration (Inc 3-7), automated verification with a dedicated
+  `casm_progress_test_d64` disk (Inc 8), full implementation review that
+  fixed three doc/robustness findings (Inc 9), live runtime acceptance
+  (Inc 10), and the consolidated completion gate (Inc 11: a fresh
+  31-harness + 10-`casmpg*`-fixture live sweep against `V0.5.0.1380`, no
+  findings). Increment plans/walkthroughs:
+  `brain/{plans,walkthroughs}/2026-08-24-casm-progress-incrementNN-*.md`;
+  implementation review
+  `brain/reviews/2026-08-24-casm-progress-implementation-review.md`.
+- Deferred, recorded: the `DONE: ... nnnnn BYTES` display is a 16-bit
+  accumulator and wraps for an output PRG larger than 65535 bytes (the
+  written file is still correct). Not worth a wider counter for a
+  whole-address-space `.FILL`.
 
 ## Optional Feature - Memory Optimization
 

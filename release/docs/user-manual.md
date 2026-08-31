@@ -69,8 +69,8 @@ The command64 shell is the primary interface for the OS.
 
 ### DIR
 
-**Description:** Lists the files on the currently active disk, including each file's size in bytes.
-**Syntax:** `DIR`
+**Description:** Lists the files on the currently active disk, including each file's size in bytes. Add lowercase `/p` to pause after each 23-line screenful; press any key to continue.
+**Syntax:** `DIR [device:] [/p]` or `DIR /p [device:]`
 **Example output:** `"MYPROG" (2032 bytes)`
 
 ### PS
