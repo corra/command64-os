@@ -76,6 +76,9 @@
 .export relocRecord
 .export listingMirrorByte
 .export fileWrite
+.export progressBeginDirective
+.export progressDirectiveBytes
+.export progressAccumulateOutputBytes
 ; WP81: emit.s links whole, so its new emitRes/emitFill/emitAlign pull in
 ; parser.s's CasmFillCountLo/Hi/CasmFillValue externs even though this
 ; harness never dispatches .RES/.FILL/.ALIGN -- one-byte stand-ins, same
@@ -667,6 +670,17 @@ listingMirrorByte:
 ; ---------------------------------------------------------------------------
 fileWrite:
     clc
+    rts
+
+; ---------------------------------------------------------------------------
+; Progress directive stand-ins (Increment 6)
+; This harness dispatches only .ORG and instructions, so the fixed-fill
+; progress paths are structurally unreachable. Resolve emit.s's whole-object
+; imports without linking progress.s, matching every stand-in above.
+; ---------------------------------------------------------------------------
+progressBeginDirective:
+progressDirectiveBytes:
+progressAccumulateOutputBytes:
     rts
 
 .segment "RODATA"

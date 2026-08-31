@@ -80,6 +80,12 @@
 ; Terminal, fatal-path-only line recovery. See its contract in source.s.
 .import sourceDrainLineTail
 
+; Progress Increment 7 (Atomic Increment 4): one-way edge, matching
+; progress.s's own module boundary (see its file header) -- diagnostics.s
+; may import only this one routine, never anything else from progress.s,
+; and progress.s never imports anything back.
+.import progressClearTransient
+
 .segment "BSS"
 
 ; Fatal rendering can drain the remainder of an unterminated included line.
@@ -143,6 +149,22 @@ diagPrintString:
 ; Clobbers: A, X, Y and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 diagPrintFatal:
+    ; Progress Increment 7 (Atomic Increment 4): universal transient clear
+    ; before any fatal diagnostic prints, per the Hook Contract -- so a
+    ; stale progress line can never overwrite or precede diagnostic text,
+    ; source context, a caret, or an include traceback. A is stashed across
+    ; the call because progressClearTransient clobbers A, X, Y (Increment 9
+    ; review PR-1 corrected the ABI/header from an earlier "A, Y") and A
+    ; holds the diagnostic identifier the dispatch below still needs. X and
+    ; Y are dead at this entry -- the range dispatch re-derives everything
+    ; from A -- so only A needs saving.
+    ; progressClearTransient cannot itself fail or recurse into a fatal
+    ; diagnostic -- it is a pure OS_API print sequence with no error path
+    ; (confirmed by reading its body: ahPrintChar's own KERNAL CHROUT call
+    ; is unconditionally successful).
+    pha
+    jsr progressClearTransient
+    pla
     cmp #CASM_DIAG_LISTING_CREATE_FAILED
     bcs dpfNotMain
     jmp dpfMainRange
@@ -152,7 +174,10 @@ dpfNotMain:
     jmp dpfListingRange
 dpfNotListing:
     cmp #CASM_DIAG_RES_FILL_ALIGN_UNRESOLVED
-    bcc dpfSymbolRange
+    bcs :+
+    jmp dpfSymbolRange          ; Progress Increment 4's new dpfProgressCheck
+                                 ; block pushed dpfSymbolRange out of bcc range
+    :
     cmp #CASM_DIAG_PHASE13_WP81_LAST + 1
     bcs dpfWp82Check
     sec
@@ -186,7 +211,7 @@ dpfWp83Check:
     cmp #CASM_DIAG_ASSERT_UNRESOLVED
     bcc dpfSymbolRange
     cmp #CASM_DIAG_PHASE13_WP83_LAST + 1
-    bcs dpfSymbolRange
+    bcs dpfProgressCheck
     ; WP83 Increment 6: CASM_DIAG_ASSERTION_FAILED with a user-supplied
     ; message (CasmAssertMessageLen != 0) echoes that message instead of
     ; the generic table text below -- the only WP83 diagnostic with
@@ -216,6 +241,32 @@ dpfWp83Generic:
     lda diagWp83MessageLo, x
     pha
     lda diagWp83MessageHi, x
+    tay
+    pla
+    tax
+    jsr diagPrintString
+    jmp diagPrintSourceContext
+; Progress Increment 4: CASM_DIAG_PROGRESS_COUNTER_OVERFLOW/
+; PASS_TOTAL_MISMATCH ($55/$56), same generic table-driven precedent as
+; dpfWp81Check/dpfWp82Check/dpfWp83Generic above. Neither call site
+; (casm.s's crpCount* trampolines, and the Pass 2 tail's
+; progressCheckPassTotals check) stamps a source location first -- both
+; are locationless, like emitCheckPassAgreement's own final-PC check
+; immediately above in casm.s. diagPrintSourceContext is still called for
+; consistency with every other entry in this range; it is self-gating and
+; simply prints nothing when no location was set (see dpfMainRange's own
+; comment above).
+dpfProgressCheck:
+    cmp #CASM_DIAG_PROGRESS_COUNTER_OVERFLOW
+    bcc dpfSymbolRange
+    cmp #CASM_DIAG_PROGRESS_LAST + 1
+    bcs dpfSymbolRange
+    sec
+    sbc #CASM_DIAG_PROGRESS_COUNTER_OVERFLOW
+    tax
+    lda diagProgressMessageLo, x
+    pha
+    lda diagProgressMessageHi, x
     tay
     pla
     tax
@@ -1520,6 +1571,23 @@ diagWp83MessageHiEnd:
 .assert diagWp83MessageLoEnd - diagWp83MessageLo = CASM_DIAG_PHASE13_WP83_LAST - CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostic low table is incomplete"
 .assert diagWp83MessageHiEnd - diagWp83MessageHi = CASM_DIAG_PHASE13_WP83_LAST - CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostic high table is incomplete"
 
+; Progress Increment 4: same generic table precedent as diagWp81/82/83
+; above. Both diagnostics are raised by progress.s's own checks
+; (progressStatement's overflow guard, progressCheckPassTotals), called
+; from casm.s/emit.s -- progress.s itself never prints, per its module
+; boundary (see progress.s's own file header).
+diagProgressMessageLo:
+    .byte <msgProgressCounterOverflow
+    .byte <msgProgressPassTotalMismatch
+diagProgressMessageLoEnd:
+diagProgressMessageHi:
+    .byte >msgProgressCounterOverflow
+    .byte >msgProgressPassTotalMismatch
+diagProgressMessageHiEnd:
+
+.assert diagProgressMessageLoEnd - diagProgressMessageLo = CASM_DIAG_PROGRESS_LAST - CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostic low table is incomplete"
+.assert diagProgressMessageHiEnd - diagProgressMessageHi = CASM_DIAG_PROGRESS_LAST - CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostic high table is incomplete"
+
 msgInitFailed:
     .byte "CASM: INITIALIZATION FAILED", PetCr, 0
 msgRegistryFull:
@@ -1697,6 +1765,11 @@ msgAssertionFailedPrefix:
     .byte "CASM: ASSERTION FAILED: ", 0
 msgCrOnly:
     .byte PetCr, 0
+; Progress Increment 4.
+msgProgressCounterOverflow:
+    .byte "CASM: STATEMENT COUNT OVERFLOW", PetCr, 0
+msgProgressPassTotalMismatch:
+    .byte "CASM: PASS 1/PASS 2 STATEMENT MISMATCH", PetCr, 0
 ; WP53 increment 4: the five listing-file I/O diagnostics ($3D-$41), in
 ; CASM_DIAG_LISTING_CREATE_FAILED..SHORT_WRITE order -- diagListMessageLo/Hi
 ; below indexes this same order.

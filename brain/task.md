@@ -3534,16 +3534,160 @@
       `brain/walkthroughs/2026-08-20-casm-phase12-wp76-forward-reference-
       pass-agreement-fix.md`. WP75 resumes from Increment 6.
 
-- [ ] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
-      progress and processing indication feature
+- [x] Taskwarrior #33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`): CASM optional
+      progress and processing indication feature. **COMPLETE, user-approved
+      2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`; merged to `main`.**
+      Increment 11 (completion gate): version promoted; consolidated live
+      sweep 31/31 harnesses + 10/10 `casmpg*` fixtures + `casmpgbad`
+      failure + `/M /L` identity, all PASS against `V0.5.0.1380`, no
+      findings; full docs/DOX/KNOWLEDGE/CHANGELOG/release closeout.
+      Walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment11-completion-gate.md`.
   - Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
   - Task: `wiki/tasks/casm-progress-indication.md`
   - This feature is outside the master plan's numbered phases and does not
     replace Phase 10, Symbol Map and Listing.
-  - [ ] Complete design/ABI review after CASM Phase 9 closes.
+  - [x] Complete design/ABI review after CASM Phase 9 closes. Closed
+    2026-08-24 (Increment 2): full ABI/BSS/screen-protocol/diagnostics
+    frozen in `brain/reviews/2026-08-24-casm-progress-design-abi-review.md`
+    after a real progress.s measured 573 bytes over the then-231-byte MAIN
+    headroom; user-directed split (scope trim + `$6C00`->`$7000` growth).
   - [ ] Implement bounded load, include, pass, and output progress.
-  - [ ] Meet the 5% representative and 10% stress slowdown limits.
-  - [ ] Complete full implementation review before runtime acceptance or merge.
+    In progress: Increments 3-5 closed 2026-08-24, user-approved.
+    - [x] Increment 3 (progress core): `src/external/casm/progress.s` +
+      `test_casm_progress` (20 cases). Two real defects caught live under
+      VICE (X-register clobber infinite loop; pass-number-into-counter
+      off-by-one) and fixed.
+    - [x] Increment 4 (pass integration): wired into `casm.s`'s real
+      Pass 1/Pass 2 orchestration via four dispatch trampolines. Live
+      CASM CASMOPALL.S run confirmed matching totals and byte-identical
+      output vs. the Increment 1 baseline.
+    - [x] Increment 5 (source/include integration): the transient status
+      line renders for the first time (Increment 4 never called
+      `progressRenderTransient`). Four real defects found live and fixed
+      (line-width/redraw-range mismatch, first-render cursor guard,
+      include-load identity, pop not restoring parent identity --
+      `CasmSourceFileId` alone cannot distinguish parent/child, resolved
+      via `CasmFrameCatalogIndex`). MAIN grown again to `$7400`
+      (measured, user-approved).
+    - [x] Increment 6 (directive integration): complete and user-approved
+      2026-08-24. Restored bounded `.RES`/`.FILL`/`.ALIGN`/`.INCBIN` cadence
+      after each successfully accepted up-to-256-byte chunk. The 18-case
+      real-emitter harness covers exact 0/1/255/256/257/65535 boundaries,
+      overflow, read/emit/close precedence, and both pass modes. Seven
+      consolidated harnesses pass live; four Phase 13 artifacts are
+      COMP-identical to references. Production remains within `$7400` with
+      4,468 bytes headroom; directive-heavy timing completed within 75 seconds.
+      Walkthrough: `brain/walkthroughs/2026-08-24-casm-progress-increment06-directive-integration.md`.
+    - [x] Increment 7 (output, diagnostics, listing, and map): complete and
+      user-approved 2026-08-26. Delivered primary-output byte accounting at
+      `emitFlush` and relocation table/footer boundaries, the `WRITE: <name>`
+      persistent line, a universal fatal-diagnostic transient clear
+      (`diagnostics.s` importing exactly one routine from `progress.s`, one-way
+      edge), `progressSuspend` before `/L` and `/M`, and the
+      `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` final summary ahead of the
+      documented `CASM: INPUT VALIDATED`. 31 harnesses across 6 images pass
+      with zero failures; five option combinations (`default`, `/M`, `/L`,
+      `/M /L`, `/S`) are byte-identical to references; reported byte counts
+      match real reference sizes exactly at 323/44/6/6002 across static, R6,
+      minimal, and at-scale shapes. 666 bytes MAIN headroom at `$7400`.
+      Walkthrough: `brain/walkthroughs/2026-08-25-casm-progress-increment07-output-diagnostic-listing.md`.
+  - [x] 5% representative / 10% stress slowdown limits: **user accepted the
+    nominal excess 2026-08-26**, recorded as a formal amendment to the parent
+    plan's Performance Budget (the mechanism that section requires for any
+    threshold change). Caps are no longer blocking; "stop and redesign" is
+    waived; no redesign required. Measured raw end-to-end after Increment 7:
+    `casmbiga+casmbigb` 228.14s -> 257.06s (+12.7% vs a 5% cap);
+    `casmopall.s` 87.74s -> 104.76s (+19.4% vs a 10% cap). These are **not**
+    isolated feature overhead and must not be cited as such: `casm.prg` grew
+    31,185 -> 33,368 bytes since baseline covering Phase 13 *as well as*
+    progress, adding true-drive load time to every run (floor moved 82-88s ->
+    95.24s), and the baseline was wall-time-without-warp vs. this session's
+    emulated cycles. A like-for-like isolation against a pre-progress
+    `casm.prg` in one session remains available but is optional.
+  - [x] Complete full implementation review before runtime acceptance or merge.
+    - [x] Increment 11 (completion gate): **user signed off feature-complete
+      2026-08-31.** Version promoted `0.4.0` -> `0.5.0` (`casm.prg`
+      `e8a6731f`, `BUILD_CASM` 1380, 642 bytes MAIN headroom).
+      Consolidated fresh live sweep: 31/31 harnesses across 6 disks +
+      `test_casm_progress` on its own disk + 10/10 `casmpg*` fixtures
+      `COMP OK` + `casmpgbad` failure (transient cleared, no orphan PRG) +
+      `/M /L` output identity - all PASS against `V0.5.0.1380`, no
+      findings. Full CHANGELOG/KNOWLEDGE/docs/AGENTS/master-plan/release
+      closeout. Committed on the feature branch and merged to `main`.
+      Walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment11-completion-gate.md`.
+    - [x] Increment 10 (runtime acceptance): **ACCEPTED by the user
+      2026-08-31.** Live matrix vs `CASM V0.4.0.1379`, 6 cases all pass,
+      no findings: short assemble, nested include + re-inclusion, `/M /L`
+      screen ownership (SYMBOL MAP clean), R6 WRITE line, mid-assembly
+      failure (new `casmpgbad.s` - transient cleared before the
+      `BRANCH OUT OF RANGE` diagnostic, no orphan PRG, `DIR`-confirmed),
+      repeated invocation (identical output, no resource leak). Walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment10-runtime-acceptance.md`.
+    - [x] Increment 9 (full implementation review): **COMPLETE,
+      user-approved 2026-08-31.** Line-by-line audit of the
+      whole progress-feature diff vs the Increment 2 frozen ABI. Core
+      design sound. 5 findings: PR-1 (clobber docs wrong, FIXED), PR-2
+      (SUSPENDED flag write-only, FIXED - added render guards), PR-4
+      (undocumented CasmPtr0 clobber, FIXED - comment), PR-3 (>64KB output
+      wraps the DONE byte display, DEFERRED), PR-5 (INFO). Build clean,
+      `casm.prg` `72549659`, `BUILD_CASM` 1378->1379, no-change rebuild
+      stable, live-VICE smoke OK. Register:
+      `brain/reviews/2026-08-24-casm-progress-implementation-review.md`;
+      walkthrough:
+      `brain/walkthroughs/2026-08-24-casm-progress-increment09-implementation-review.md`.
+    - [x] Increment 8 (automated verification): **COMPLETE, user-approved
+      2026-08-31.** Plan approved 2026-08-31.
+      Host side (Atomic Increments 1-3): new `casm_progress_test_d64`
+      self-bootable disk + 13 `casmpg*` fixtures + 10 hand-derived trusted
+      references + `casmpgbin.dat`.
+      **Live-VICE 2026-08-31:** Atomic Increment 4 COMPLETE - 10/10
+      `casmpg*` fixtures + 5/5 option-identity combos all `FILES COMPARE
+      OK`; `DONE:` byte counts exact; progress cadence/counter behaviour
+      correct (directives counted, blanks/comments excluded; nested
+      include + re-inclusion + multi-root all traversed). Atomic Increment
+      8 COMPLETE - no-change rebuild byte-stable (`casm.prg` `af1bacda`,
+      disk `1bf0df83`), `BUILD_CASM` 1378, `git diff --check` clean.
+      Atomic Increment 5 PARTIAL (fatal input-open path clean; mid-assembly
+      fatal + partial-output cleanup needs a bad fixture - noted
+      non-blocking). Atomic Increments 6 (31-harness regression) and 7
+      (timing) **waived** by the user 2026-08-31 - redundant re-checks of a
+      byte-identical binary Increment 7 already swept 31/31, caps
+      non-blocking since 2026-08-26. `docs/casm-utility.md` confirmed
+      drift-free. Increment 8 closed 2026-08-31.
+      Plan/Progress + walkthrough:
+      `brain/plans/2026-08-24-casm-progress-increment08-automated-verification.md`,
+      `brain/walkthroughs/2026-08-24-casm-progress-increment08-automated-verification.md`.
+    - Increments 9-11 all complete and user-approved 2026-08-31 (see
+      above); the feature is closed and merged to `main`.
+
+- [ ] Taskwarrior #42 (`33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`): CASM memory
+      optimization -- recover ~2 KB of MAIN across five findings, strict
+      "identical observable behavior" contract
+  - Plan: `brain/plans/2026-08-24-casm-memory-optimization.md`; **approved
+    2026-08-31**. Task record: `wiki/tasks/casm.md` "Optional Feature -
+    Memory Optimization".
+  - Findings: **D** filename caps (`CASM_FILENAME_MAX` /
+    `CASM_INCLUDE_FILENAME_MAX` = 63 multiplied into 13 MAIN buffers across
+    `cli.s`/`parser.s`/`include.s`, ~520 B -- runs first, Increment 2 proves
+    the true reachable maximum before any change); **B** shared `"CASM: "`
+    prefix + trailing-CR helper (`diagPrintMessage`, separate entry point --
+    `diagPrintString` unchanged) in `diagnostics.s`, 587 B; **A** gate the
+    exported-but-uncalled `diagDumpToken` + token-name tables behind a
+    build-time switch defaulting off, 509 B; **C** dense diagnostic dispatch
+    table replacing six range blocks + a 9-way chain, with compile-time
+    asserts pinning table length and the `$3D..$43` locationless range,
+    231 B; **E** `PROG_DIGIT` macro (6 inline expansions) -> divisor-table
+    loop in `progress.s`, ~150 B.
+  - Finding F (`CasmDiagLineBufA`/`B` 512-byte sizing) recorded but
+    explicitly NOT actioned -- product tradeoff, out of scope. Envelope stays
+    `$7400` per Scoping Decision 4; recovered bytes banked, not returned.
+  - **Implementation gated (`depends:33`) on the progress-indication feature
+    closing through Increment 11 (Scoping Decision 1).** Increments 8-11
+    there are still open. This WP is sequenced last.
+  - Per convention each Atomic Increment follows the approved plan; a
+    completion-gate walkthrough with user sign-off is required before close.
 
 - [ ] Taskwarrior #40 (`54dff46d-b802-4534-9b29-fc78bb907e26`): CASM optional
       build duration display on completion (success and failure)

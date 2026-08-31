@@ -108,6 +108,8 @@
 .import vmmStoreAlloc
 .import vmmWindowRead
 .import vmmWindowWrite
+; Progress Increment 5: best-effort load-progress display (see sourceAppendFile).
+.import progressSourceLoadBytes
 .import CasmVmmBuffer
 
 ; Phase 2 CLI ordered source list (WP34: multi-file top-level inputs).
@@ -736,7 +738,14 @@ sourceAppendFile:
     sta CasmSourceStreamCursorHi
 
     jsr inputStreamOpen
-    bcs safFail
+    bcs safFailNear
+
+    jmp safReadLoop
+
+; Progress Increment 5 trampoline: the committed-block progress hook below
+; pushed safFail out of 8-bit branch range from inputStreamOpen's own check.
+safFailNear:
+    jmp safFail
 
 safReadLoop:
     jsr inputStreamRead
@@ -757,7 +766,23 @@ safReadLoop:
 safWriteChunkLoop:
     lda CasmSourceScratch0
     ora CasmSourceScratch1
-    beq safReadLoop              ; block fully written -> read the next one
+    bne safWriteChunkMore
+    ; Progress Increment 5: this up-to-256-byte input block is now fully
+    ; committed to VMM (every one of its 64-byte chunks returned from
+    ; slVmmWrite successfully, each advancing CasmSourceStreamCursor only
+    ; on success). Report the cumulative committed cursor -- not the final
+    ; chunk -- exactly as the Hook Contract requires, then read the next
+    ; block. A short final block reaches this same point, so the "report
+    ; the final short block" requirement needs no separate EOF hook.
+    ;
+    ; Deliberately best-effort and after commit: progressSourceLoadBytes
+    ; returns nothing and cannot fail, so no carry path or rollback is
+    ; introduced into the load loop.
+    lda CasmSourceStreamCursorLo
+    ldx CasmSourceStreamCursorHi
+    jsr progressSourceLoadBytes
+    jmp safReadLoop              ; block fully written -> read the next one
+safWriteChunkMore:
 
     lda CasmSourceScratch1
     bne safWriteChunkFull        ; remaining hi != 0 -> remaining > 255

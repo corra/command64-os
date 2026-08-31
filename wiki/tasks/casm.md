@@ -12,6 +12,18 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
+**The optional progress and processing indication feature is complete**,
+user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`. It is
+outside the master plan's numbered phases: it adds an in-place transient
+status line and the `P1:`/`P2:`/`LOAD`/`WRITE`/`DONE` persistent lines
+while CASM assembles, with byte-identical assembled output. Delivered over
+eleven separately-approved increments, closing with a full implementation
+review (three doc/robustness findings fixed) and a fresh consolidated
+31-harness + 10-`casmpg*`-fixture live re-verification. Final walkthrough:
+`brain/walkthroughs/2026-08-24-casm-progress-increment11-completion-gate.md`.
+See the "Optional Feature - Progress and Processing Indication" section
+below and `wiki/tasks/casm-progress-indication.md`.
+
 **Phase 12 is complete**, user-approved 2026-08-20 at CASM `0.3.0` build
 `1324` (WP64-76, including WP71's full DASH adoption and WP76's
 corrective forward-reference Pass 1/2 width-agreement fix). Final
@@ -2314,17 +2326,55 @@ behavior changed beyond the version/build artifact itself.
 
 ## Optional Feature - Progress and Processing Indication
 
-- [ ] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: add bounded,
-      always-on progress for source loading, include traversal, both passes, and
-      output writing. This feature is deferred and must not activate before Phase
-      9 completion plus a separate design/ABI review approval.
-- Plan:
-  `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
+- [x] Taskwarrior `1acb36e3-2c0e-4f24-998b-279b2578bee4`: bounded,
+      always-on progress for source loading, include traversal, both passes,
+      and output writing. **COMPLETE, user-approved 2026-08-31 at CASM
+      `0.4.0` -> `0.5.0` build `1380`.**
+- Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`.
 - Task: `wiki/tasks/casm-progress-indication.md`.
-- This optional feature is outside the master plan's numbered phases and does
+- This optional feature is outside the master plan's numbered phases and did
   not replace Phase 10, Symbol Map and Listing.
-- A full implementation review is mandatory after automated verification and
-  before runtime acceptance or merge.
+- Delivered over eleven separately-approved increments: design/ABI freeze
+  (Inc 2), `progress.s` core + pass/source/include/directive/output
+  integration (Inc 3-7), automated verification with a dedicated
+  `casm_progress_test_d64` disk (Inc 8), full implementation review that
+  fixed three doc/robustness findings (Inc 9), live runtime acceptance
+  (Inc 10), and the consolidated completion gate (Inc 11: a fresh
+  31-harness + 10-`casmpg*`-fixture live sweep against `V0.5.0.1380`, no
+  findings). Increment plans/walkthroughs:
+  `brain/{plans,walkthroughs}/2026-08-24-casm-progress-incrementNN-*.md`;
+  implementation review
+  `brain/reviews/2026-08-24-casm-progress-implementation-review.md`.
+- Deferred, recorded: the `DONE: ... nnnnn BYTES` display is a 16-bit
+  accumulator and wraps for an output PRG larger than 65535 bytes (the
+  written file is still correct). Not worth a wider counter for a
+  whole-address-space `.FILL`.
+
+## Optional Feature - Memory Optimization
+
+- [ ] Taskwarrior task 42, UUID `33d69dd5-c96b-4d3a-a27c-9fd93cc31de3`:
+      recover roughly 2 KB of CASM's MAIN envelope across five independent
+      findings with a strict "identical observable behavior" contract -- no
+      change to diagnostic text/identifiers, accepted filenames, assembled
+      output, or progress display.
+- Plan: `brain/plans/2026-08-24-casm-memory-optimization.md` (approved
+  2026-08-31).
+- Findings: **D** filename caps (`CASM_FILENAME_MAX`/`CASM_INCLUDE_FILENAME_MAX`
+  = 63 multiplied into 13 MAIN buffers, ~520 B, runs first); **B** shared
+  `"CASM: "` prefix + trailing CR helper in `diagnostics.s` (587 B); **A**
+  gate the exported-but-uncalled `diagDumpToken` behind a build switch (509 B);
+  **C** dense diagnostic dispatch table replacing six range blocks + a 9-way
+  chain (231 B); **E** `PROG_DIGIT` macro (6 inline expansions) -> divisor-table
+  loop in `progress.s` (~150 B). Finding F (`CasmDiagLineBufA`/`B` sizing)
+  recorded but explicitly NOT actioned -- product tradeoff, out of scope.
+- Envelope stays `$7400` per Scoping Decision 4; recovered bytes are banked
+  as working headroom, not returned.
+- Implementation is gated on the progress-indication feature (task 33) closing
+  through Increment 11 (Scoping Decision 1); Increments 8-11 there are still
+  open. This WP is deliberately sequenced last.
+- Per this project's convention, each increment follows the approved plan's
+  Atomic Increments; a completion-gate walkthrough with user sign-off is
+  required before it is marked done.
 
 ## Known Non-Critical Bugs
 

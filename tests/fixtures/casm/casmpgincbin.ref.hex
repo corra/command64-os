@@ -1,0 +1,18 @@
+# CASM progress-indication Increment 8 trusted reference: casmpgincbin
+#
+# Independently hand-derived, NOT produced by CASM. casmpgincbin.seq:
+#   .ORG $C000
+#   .INCBIN "CASMPGBIN.DAT"
+# casmpgbin.dat is a reviewed 8-byte binary asset (01 02 03 04 05 06 07 08,
+# tests/fixtures/casm/casmpgbin.dat), streamed verbatim into the output.
+# Progress Increment 6 shows a bounded .INCBIN byte-cadence line; the
+# emitted bytes are the header plus the payload, unchanged.
+#
+# Hand assembly (.ORG $C000):
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   01 02 03 04 05 06 07 08   .INCBIN payload, $C000..$C007
+#
+# bytes: 10
+# sha256: 44d10afe43e666c31e192b55d4c8b2afc9ba656a66994514196006aecdcff17b
+
+00 C0 01 02 03 04 05 06 07 08

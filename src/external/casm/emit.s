@@ -32,6 +32,9 @@
 .import CasmCliOptions
 .import relocRecord
 .import listingMirrorByte
+.import progressBeginDirective
+.import progressDirectiveBytes
+.import progressAccumulateOutputBytes
 
 ; WP81: .RES/.FILL/.ALIGN's resolved count/boundary and value/fill byte,
 ; staged by parser.s's ppsFillDirective.
@@ -118,6 +121,17 @@ CasmAlignRemExt:      .res 1
 CasmIncbinRemLo: .res 1
 CasmIncbinRemHi: .res 1
 CasmIncbinIdx:   .res 1
+CasmIncbinAcceptedLo: .res 1
+CasmIncbinAcceptedHi: .res 1
+
+; CASM progress Increment 6: fixed-fill operations are processed in explicit
+; chunks of at most 256 successfully accepted bytes. The accepted count remains
+; emitter-owned until each chunk commits; Atomic Increment 3 will notify
+; progress.s only at that boundary, never from the per-byte inner loop.
+CasmFillChunkLo:    .res 1
+CasmFillChunkHi:    .res 1
+CasmFillAcceptedLo: .res 1
+CasmFillAcceptedHi: .res 1
 
 .segment "CODE"
 
@@ -596,6 +610,8 @@ ewlRet:
 emitRes:
     jsr emitMarkStarted
     bcs erRet
+    lda #CASM_DIRECTIVE_RES
+    jsr progressBeginDirective
     lda CasmFillCountLo
     sta CasmEmitScratch0
     lda CasmFillCountHi
@@ -607,6 +623,8 @@ erRet:
 emitFill:
     jsr emitMarkStarted
     bcs efRet
+    lda #CASM_DIRECTIVE_FILL
+    jsr progressBeginDirective
     lda CasmFillCountLo
     sta CasmEmitScratch0
     lda CasmFillCountHi
@@ -637,6 +655,8 @@ emitAlign:
     sec
     rts
 eaBoundaryOk:
+    lda #CASM_DIRECTIVE_ALIGN
+    jsr progressBeginDirective
     jsr emitAlignMod            ; CasmAlignRemLo/Hi = CasmPc mod boundary
     lda CasmAlignRemLo
     ora CasmAlignRemHi
@@ -710,30 +730,69 @@ eamNoSub:
     rts
 
 ; ---------------------------------------------------------------------------
-; emitFillLoop (private, WP81)
+; emitFillLoop (private, WP81; bounded chunks added by progress Increment 6)
 ; Shared byte-emission loop for emitRes/emitFill/emitAlign: emit
 ; CasmEmitScratch1:CasmEmitScratch0 (16-bit remaining count) bytes of
-; CasmFillValue, decrementing the count each iteration. emitByte's own
+; CasmFillValue in outer chunks of at most 256 bytes. The inner loop increments
+; CasmFillAccepted only after emitByte succeeds, then decrements both the
+; authoritative total remaining and current chunk remaining. emitByte's own
 ; CasmPassMode gate already handles Pass 1 discarding the write while CasmPc
 ; still advances for real (Research Summary point 2) -- no separate
 ; measure-only path needed here.
 ; Inputs:    CasmEmitScratch0/1 = remaining count (16-bit); CasmFillValue
 ; Outputs:   C clear on success; C set with A = CASM_DIAG_* on failure
-; Clobbers:  A, X, Y, CasmEmitScratch0/1, CasmPc, emitByte's own volatile state
+; Clobbers:  A, X, Y, CasmEmitScratch0/1, CasmFillChunkLo/Hi,
+;            CasmFillAcceptedLo/Hi, CasmPc, emitByte's own volatile state
 ; ---------------------------------------------------------------------------
 emitFillLoop:
+    lda #0
+    sta CasmFillAcceptedLo
+    sta CasmFillAcceptedHi
+eflNextChunk:
     lda CasmEmitScratch0
     ora CasmEmitScratch1
     beq eflDone
+    ; A nonzero high byte means at least 256 bytes remain: encode a full
+    ; chunk as $0100. Otherwise the low byte is the final 1-255-byte tail.
+    lda CasmEmitScratch1
+    beq eflFinalChunk
+    lda #0
+    sta CasmFillChunkLo
+    lda #1
+    sta CasmFillChunkHi
+    jmp eflByte
+eflFinalChunk:
+    lda CasmEmitScratch0
+    sta CasmFillChunkLo
+    lda #0
+    sta CasmFillChunkHi
+eflByte:
+    lda CasmFillChunkLo
+    ora CasmFillChunkHi
+    bne :+
+    lda CasmFillAcceptedLo
+    ldx CasmFillAcceptedHi
+    jsr progressDirectiveBytes
+    jmp eflNextChunk
+    :
     lda CasmFillValue
     jsr emitByte
     bcs eflRet
+    inc CasmFillAcceptedLo
+    bne :+
+    inc CasmFillAcceptedHi
+    :
     lda CasmEmitScratch0
-    bne eflDec
+    bne :+
     dec CasmEmitScratch1
-eflDec:
+    :
     dec CasmEmitScratch0
-    jmp emitFillLoop
+    lda CasmFillChunkLo
+    bne :+
+    dec CasmFillChunkHi
+    :
+    dec CasmFillChunkLo
+    jmp eflByte
 eflDone:
     clc
 eflRet:
@@ -756,6 +815,11 @@ eflRet:
 emitIncbin:
     jsr emitMarkStarted
     bcs eibRet
+    lda #CASM_DIRECTIVE_INCBIN
+    jsr progressBeginDirective
+    lda #0
+    sta CasmIncbinAcceptedLo
+    sta CasmIncbinAcceptedHi
     ldx #<CasmIncbinFilename
     ldy #>CasmIncbinFilename
     jsr inputStreamOpen
@@ -774,11 +838,20 @@ eibReadLoop:
 eibByteLoop:
     lda CasmIncbinRemLo
     ora CasmIncbinRemHi
-    beq eibReadLoop             ; chunk exhausted -- read the next one
+    bne :+
+    lda CasmIncbinAcceptedLo
+    ldx CasmIncbinAcceptedHi
+    jsr progressDirectiveBytes
+    jmp eibReadLoop             ; chunk committed -- read the next one
+    :
     ldx CasmIncbinIdx
     lda CasmIoBuffer, x
     jsr emitByte
     bcs eibEmitFail
+    inc CasmIncbinAcceptedLo
+    bne :+
+    inc CasmIncbinAcceptedHi
+    :
     inc CasmIncbinIdx
     lda CasmIncbinRemLo
     bne eibDec
@@ -1036,6 +1109,9 @@ efWrite:
     ldy #>CasmEmitBuffer
     jsr fileWrite
     bcs efFail
+    lda CasmIoLenLo
+    ldx CasmIoLenHi
+    jsr progressAccumulateOutputBytes
     lda #0
     sta CasmEmitLen
     clc

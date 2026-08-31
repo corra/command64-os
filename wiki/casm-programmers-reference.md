@@ -8,7 +8,18 @@ extending CASM itself. For end-user command-line usage, see the (not yet
 written) user manual; for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 12 complete (build 1324, version 0.3.0).** `/M`
+> **Status: Phase 13 + progress indication complete (build 1380, version
+> 0.5.0).** Phase 13 (WP81-85) added the data-construction directives
+> `.RES` / `.FILL` / `.ALIGN` / `.INCBIN` / `.ASSERT` and closed at `0.4.0`
+> build `1349`. The optional **progress and processing indication** feature
+> (`progress.s`, outside the numbered phases) then added the in-place
+> transient status line, the `P1:`/`P2:`/`LOAD`/`WRITE`/`DONE` persistent
+> lines, and two internal deterministic-replay diagnostics
+> (`CASM_DIAG_PROGRESS_COUNTER_OVERFLOW` `$55`,
+> `CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH` `$56`); assembled output is
+> byte-identical with or without it. Closed at `0.5.0` build `1380` after
+> a full implementation review and a consolidated 31-harness live
+> re-verification. `/M`
 > (symbol map) and `/L` (listing file) are both fully wired into production
 > `casm.s` and produce real output on every assembly that requests them —
 > see [§17](#17-symbol-map--listing-output-phase-10-complete). WP55

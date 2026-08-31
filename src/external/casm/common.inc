@@ -841,6 +841,17 @@ CASM_DIAG_ASSERT_MESSAGE_TOO_LONG = $53
 ; given, so a generic diagnostic is printed.
 CASM_DIAG_ASSERTION_FAILED = $54
 CASM_DIAG_PHASE13_WP83_LAST = CASM_DIAG_ASSERTION_FAILED
+
+; Progress Increment 4: distinct from the pre-existing CASM_DIAG_PASS_MISMATCH
+; ($2F, Phase 6B/WP30) -- that one is emitCheckPassAgreement's final-PC
+; disagreement check; this pair covers progress.s's own additional
+; deterministic-replay checks (statement-counter overflow before wraparound,
+; and Pass 1/Pass 2 statement-total disagreement), per the parent plan's own
+; "not a replacement for final PC ... agreement" instruction.
+CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = $55
+CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = $56
+CASM_DIAG_PROGRESS_LAST = CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH
+
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -917,6 +928,9 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_ASSERT_MESSAGE_TOO_LONG = CASM_DIAG_ASSERT_UNRESOLVED + 1, error, "CASM WP83 diagnostics must remain contiguous"
 .assert CASM_DIAG_ASSERTION_FAILED = CASM_DIAG_ASSERT_MESSAGE_TOO_LONG + 1, error, "CASM WP83 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE13_WP83_LAST = $54, error, "CASM WP83 diagnostic range changed"
+.assert CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = CASM_DIAG_PHASE13_WP83_LAST + 1, error, "CASM progress diagnostics must follow WP83"
+.assert CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostics must remain contiguous"
+.assert CASM_DIAG_PROGRESS_LAST = $56, error, "CASM progress diagnostic range changed"
 
 ; ---------------------------------------------------------------------------
 ; Phase 4 statement parser contract

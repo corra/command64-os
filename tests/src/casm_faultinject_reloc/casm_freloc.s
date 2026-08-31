@@ -65,6 +65,7 @@
 .export CasmPassMode
 .export CasmRelocatableMode
 .export fileWrite
+.export progressAccumulateOutputBytes
 
 .segment "HEADER"
     .word __MAIN_START__
@@ -265,6 +266,9 @@ diagPrintFatal:
 ; ---------------------------------------------------------------------------
 fileWrite:
     clc
+    rts
+
+progressAccumulateOutputBytes:
     rts
 
 .include "../casm_faultinject/faultstub.inc"

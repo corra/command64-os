@@ -1,0 +1,20 @@
+# CASM progress-indication Increment 8 trusted reference: casmpg63
+#
+# Independently hand-derived, NOT produced by CASM. casmpg63.seq is
+# ".ORG $C000" (1 counted statement) followed by 62 NOP statements
+# (NOP = $EA, the 1-byte implied-mode opcode per the 6502 instruction set)
+# -- 63 counted statements total. Pins the case: <64 counted statements: NO throttled mid-pass redraw.
+# The assembled output bytes are identical with or without progress
+# indication -- that invariant is exactly what the COMP check proves.
+#
+# Hand assembly (.ORG $C000):
+#   00 C0        PRG load-address header ($C000, little-endian)
+#   EA x 62      NOP (implied), $C000..$C03D
+#
+# bytes: 64
+# sha256: 969bbd3def5e0623db693d76d24f79c3813cc50c2ade715b4ea3bed1ffb12395
+
+00 C0 EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA EA
+EA EA EA EA

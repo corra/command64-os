@@ -55,6 +55,7 @@
 .export CasmPassMode
 .export CasmRelocatableMode
 .export fileWrite
+.export progressAccumulateOutputBytes
 
 ; WP60 Increment 7: fileWrite stub's source pointer, needed as a real
 ; zero-page location for (zp),y indirect-indexed addressing -- nothing else
@@ -610,6 +611,9 @@ fwCopyLoop:
     jmp fwCopyLoop
 fwCopyDone:
     clc
+    rts
+
+progressAccumulateOutputBytes:
     rts
 
 .segment "RODATA"
