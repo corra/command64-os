@@ -558,6 +558,61 @@ Negative-tested: dropping one table entry fires the length assert; moving
 Cumulative D + E + A + B + C: headroom `642 -> 2,710` (**2,068 bytes** --
 past the plan's ~2,000 objective). CASM build 1384 -> 1387.
 
+## Increment 9 Live VICE verification (executed 2026-08-31)
+
+**All diagnostic text and dispatch behavior verified correct on hardware.
+One pre-existing (task 33) defect exposed and deferred -- see below.**
+
+Booted Command64 `V0.4.1.2680` fresh from a rebuilt
+`casm_progress_test.d64` (unit 8) + `casm_phase13_test.d64` (unit 9);
+provenance proven by the on-screen `CASM V0.5.0.1389` banner (matches the
+committed `BUILD_CASM`, not the stale 1380 the emulator held). Screen
+state read from `$0400` screen RAM, decoded per the workflow table.
+
+| # | Command | Diagnostic (id) | Former dispatch range | Result |
+| --- | --- | --- | --- | --- |
+| 1 | `casm casmpg128.s` | `INPUT VALIDATED` (success) | `diagPrintMessage` success path | **PASS** -- `P1/P2 START/DONE 00128`, `WRITE:`, `DONE: P1 00128, P2 00128, 00129 BYTES`, `CASM: INPUT VALIDATED`, clean exit. Progress output format byte-for-byte the pre-WP shape. |
+| 2 | `casm casmpgbad.s` | `BRANCH OUT OF RANGE` ($23) | `dpfMainRange` | **PASS** -- `CASM: BRANCH OUT OF RANGE` + `AT LINE 72, COL 1 (OFFSET 0)` + `bne $d000` echo + `^` caret. Locationed path intact; transient cleared before the diagnostic. |
+| 3 | `casm casmcirc.s` | `CIRCULAR CONSTANT DEFINITION` ($43) | ex-`beq` chain | **PASS** -- `CASM: CIRCULAR CONSTANT DEFINITION` **then the shell prompt, with NO `AT LINE`/`COL` line**. This is the key Finding C check: the two-compare `CASM_DIAG_LOCLESS_FIRST..LAST` window correctly skips `diagPrintSourceContext`. |
+| 4 | `casm 9:casmalignzero.s` | `ALIGN BOUNDARY ZERO` ($4E) | ex-`dpfWp81` | **PASS** -- locationed, full source context. Also proves Finding D: the `9:` device-prefixed filename resolves on unit 9. |
+| 5 | `casm 9:casmassertmsg.s` | `ASSERTION FAILED: <text>` ($54 echo) | ex-`dpfWp83` special | **PASS** -- `CASM: ASSERTION FAILED: custom message` + source context. The one id that cannot use `diagPrintMessage` renders exactly. |
+| 6 | `casm 9:casmincbinbadnam` | `INCBIN FILENAME EXPECTED` ($4F) | ex-`dpfWp82` | **PASS** -- locationed, and the `CASM_DIAG_LOC_BYTE` sub-path (`BYTE $6E` for the offending `n`). |
+| 7 | `casm aaaa...aa.s` (36-char name) | `FILENAME TOO LONG` ($09) | ex-`dpfMainRange` | **PASS (text)** -- `CASM: FILENAME TOO LONG` at the new 32-char cap (Finding D), clean exit, no bogus source context. **But the banner rendered as `CASM V` only** -- see the deferred defect. |
+
+**Coverage:** 5 of the 7 former dispatch groups exercised live
+(`dpfMainRange`, ex-`beq` chain, `dpfWp81`, `dpfWp82`, `dpfWp83` + echo).
+Not triggerable without fault injection: `dpfListingRange` ($3D-$41,
+locationless listing-file I/O) and `dpfProgressCheck` ($55-$56,
+pass-count corruption). Both are text-verified for every id by
+`verify_casm_diag_table.py`, and `$3D-$41` share the *identical*
+locationless code path proven by test 3. Both locationless sub-cases:
+$42/$43 proven live (test 3); $3D-$41 same dispatch path + host-verified
+text.
+
+### Deferred defect (task 43, `5dad4e4f-8392-468f-8807-0ff37a98c33c`)
+
+Test 7's banner rendered as `CASM V` instead of `CASM V0.5.0.1389`.
+Root cause: `diagPrintFatal`'s opening `jsr progressClearTransient`
+(added by progress-indication Increment 7, task 33) reads
+**uninitialized `CasmProgFlags`** for any diagnostic raised before
+`startPass1` calls `progressInit` -- i.e. every `startInitFatal` path
+(`resourcesInit`/`cliInit`/`fileIoInit`/`sourceInit` failures, plus
+`cliParse`/`cliDeriveOutputName`/`cliDeriveListingName`/`fileOpenInput`/
+`lexerInit`). If the garbage byte has bit 0 set, `progressClearTransient`
+runs its 34-cursor-left + 34-space erase over whatever is on the line.
+**Confirmed pre-existing on `main`** (`casm.s` banner/`cliParse`/
+`startInitFatal` order and `diagPrintFatal`'s prologue are byte-identical
+there). Finding C kept the `progressClearTransient` call verbatim; it did
+not introduce this. Per this plan's stop condition ("a genuinely new
+defect outside this WP's scope: disclose and defer"), deferred to task 43.
+Fix candidate: one line in `casm.s:start` -- clear `CasmProgFlags` (or call
+`progressInit`) right after `sourceInit`, mirroring the existing
+`diagClearLoc` / `listingStateInit` placement done for exactly this
+"stale BSS at an early fatal" reason.
+
+The diagnostic *text* in test 7 was still correct and complete; the defect
+is cosmetic and affects only pre-Pass-1 failures.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -882,3 +937,18 @@ become user-facing.
   strings byte-identical to Increment 1; `casm.s`/`map.s` untouched.
   Cumulative D+E+A+B+C headroom `642 -> 2,710` (2,068 recovered, past the
   ~2,000 target). Increment 9 (live VICE verification) is next.
+- 2026-08-31: **Increment 9 (live VICE verification) executed.** Command64
+  booted fresh; provenance proven (`CASM V0.5.0.1389` banner). 7 live CASM
+  runs: clean assembly (progress format unchanged), `BRANCH OUT OF RANGE`
+  ($23, locationed), `CIRCULAR CONSTANT DEFINITION` ($43, **locationless --
+  no source line, the key Finding C check**), `ALIGN BOUNDARY ZERO` ($4E) +
+  `9:`-prefix filename (Finding D), `ASSERTION FAILED: <text>` ($54 echo),
+  `INCBIN FILENAME EXPECTED` ($4F, LOC_BYTE sub-path), `FILENAME TOO LONG`
+  ($09) at the new 32-char cap. All diagnostic text + dispatch behavior
+  correct. 5/7 former dispatch groups exercised live; the other two
+  ($3D-$41, $55-$56) are fault-inject-only and fully host-verified.
+  **Pre-existing defect exposed (task 43):** `diagPrintFatal`'s
+  `progressClearTransient` reads uninitialized `CasmProgFlags` for any
+  pre-Pass-1 diagnostic, garbling the banner on early fatal exit -- from
+  progress-indication Increment 7, confirmed byte-identical on `main`,
+  deferred per the stop condition. Increment 10 (closeout) is next.
