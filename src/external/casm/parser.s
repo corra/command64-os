@@ -146,7 +146,7 @@ CasmIncludeFilenameLen: .res 1
 CasmIncludeFilenameEnd:
 
 .assert CasmIncludeFilenameLen - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE, error, "CASM include filename buffer layout changed"
-.assert CasmIncludeFilenameEnd - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM include filename state must be exactly 65 bytes"
+.assert CasmIncludeFilenameEnd - CasmIncludeFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM include filename state must be exactly CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1 bytes"
 
 ; WP82: .INCBIN's own filename state, mirroring CasmIncludeFilename/Len's
 ; own precedent exactly (same 65-byte shape, same buffer size constant --
@@ -157,7 +157,7 @@ CasmIncbinFilenameLen: .res 1
 CasmIncbinFilenameEnd:
 
 .assert CasmIncbinFilenameLen - CasmIncbinFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE, error, "CASM incbin filename buffer layout changed"
-.assert CasmIncbinFilenameEnd - CasmIncbinFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM incbin filename state must be exactly 65 bytes"
+.assert CasmIncbinFilenameEnd - CasmIncbinFilename = CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1, error, "CASM incbin filename state must be exactly CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1 bytes"
 
 ; WP81: ppsFillDirective's own staged output for emit.s's emitRes/emitFill/
 ; emitAlign, mirroring CasmLabelName/CasmConstant*'s precedent of dedicated

@@ -168,11 +168,23 @@ CASM_VMM_BUFFER_SIZE = 64
 ; CommandBuffer is an 80-byte OS-owned buffer. CASM copies filenames into
 ; private bounded buffers and never inserts terminators into CommandBuffer.
 CASM_COMMAND_BUFFER_SIZE = 80
-CASM_FILENAME_MAX        = 63
+; Memory-optimization WP (task 42, Finding D): reduced 63 -> 32. Command64's
+; filesystem is CBM DOS with no long-name path (verified in path.asm /
+; file.asm / apptable.asm); the longest filename that can resolve to a real
+; file is 23 bytes -- a 16-char DOS directory entry, a 2-3 char "8:".."11:"
+; device prefix stored verbatim here, and a 4-char synthetic ".PRG"/".LST"
+; extension appended by cliDeriveOutputName/cliDeriveListingName. 32 clears
+; that with 9 bytes of margin. User-approved 2026-08-31, knowingly moving
+; the FILENAME_TOO_LONG rejection boundary from 63 to 32 (names of 33..63
+; chars now report FILENAME TOO LONG at parse time instead of failing
+; downstream with the same outcome -- assembly fails, no artifact -- but a
+; different diagnostic; no resolvable name is affected).
+CASM_FILENAME_MAX        = 32
 CASM_FILENAME_BUFFER_SIZE = CASM_FILENAME_MAX + 1
 CASM_IO_BUFFER_SIZE      = $0100
 
-.assert CASM_FILENAME_BUFFER_SIZE = 64, error, "CASM filename buffer changed"
+.assert CASM_FILENAME_MAX = 32, error, "CASM filename cap changed -- see Finding D reachable-maximum evidence before touching"
+.assert CASM_FILENAME_BUFFER_SIZE = 33, error, "CASM filename buffer changed"
 .assert CASM_FILENAME_BUFFER_SIZE <= CASM_COMMAND_BUFFER_SIZE, error, "CASM filename buffer exceeds command buffer"
 .assert CASM_IO_BUFFER_SIZE = 256, error, "CASM I/O buffer changed"
 
@@ -225,14 +237,21 @@ CASM_PETSCII_T     = $54
 ; Phase 9 WP44 quoted include operand grammar. Filename payload bytes preserve
 ; their original PETSCII spelling; quote is the delimiter and is therefore not
 ; part of either accepted printable range.
-CASM_INCLUDE_FILENAME_MAX         = 63
+; Memory-optimization WP (task 42, Finding D): reduced 63 -> 32, same
+; reachable-maximum evidence and same user-approved FILENAME_TOO_LONG
+; boundary move as CASM_FILENAME_MAX above. An .INCLUDE/.INCBIN operand is
+; user source text but must still resolve to a real CBM DOS file, so the
+; 16-char (+prefix) ceiling applies identically; longer operands were
+; accepted into this buffer before and simply never opened.
+CASM_INCLUDE_FILENAME_MAX         = 32
 CASM_INCLUDE_FILENAME_BUFFER_SIZE = CASM_INCLUDE_FILENAME_MAX + 1
 CASM_INCLUDE_PRINT_LO_MIN          = $20
 CASM_INCLUDE_PRINT_LO_MAX          = $7E
 CASM_INCLUDE_PRINT_HI_MIN          = $A0
 CASM_INCLUDE_PRINT_HI_MAX          = $FE
 
-.assert CASM_INCLUDE_FILENAME_BUFFER_SIZE = 64, error, "CASM include filename buffer changed"
+.assert CASM_INCLUDE_FILENAME_MAX = 32, error, "CASM include filename cap changed -- see Finding D reachable-maximum evidence before touching"
+.assert CASM_INCLUDE_FILENAME_BUFFER_SIZE = 33, error, "CASM include filename buffer changed"
 .assert CASM_PETSCII_QUOTE >= CASM_INCLUDE_PRINT_LO_MIN, error, "CASM include quote below printable range"
 .assert CASM_PETSCII_QUOTE <= CASM_INCLUDE_PRINT_LO_MAX, error, "CASM include quote above printable range"
 
@@ -257,9 +276,13 @@ CASM_INCLUDE_META_BYTES = 8192
 .assert CASM_INCLUDE_META_BYTES = 8192, error, "CASM include metadata allocation size changed"
 
 ; Physical-file record: 4 control bytes (flags/device/namelen/reserved), a
-; 2-byte source-store start offset, a 2-byte byte length, a 64-byte
-; null-terminated name slot (original spelling, prefix already removed), and
-; 56 reserved bytes -- 128 bytes total, transferred as two fixed 64-byte
+; 2-byte source-store start offset, a 2-byte byte length, a null-terminated
+; name slot (original spelling, prefix already removed) that occupies bytes
+; 8..8+CASM_INCLUDE_FILENAME_BUFFER_SIZE-1, and the balance reserved --
+; 128 bytes total (this REU-resident size is deliberately NOT reduced with
+; the Finding D filename-cap change: it costs no MAIN and the two 64-byte
+; window transfers below depend on the record being exactly 128), transferred
+; as two fixed 64-byte
 ; vmmWindowRead/vmmWindowWrite windows (matching CASM_VMM_BUFFER_SIZE
 ; exactly, the same one-record-per-transfer precedent CASM_SYMBOL_REC_SIZE
 ; established). Identity comparison folds the stored name's case live at
@@ -274,7 +297,7 @@ CASM_INCLUDE_PHYS_REC_START_LO  = 4
 CASM_INCLUDE_PHYS_REC_START_HI  = 5
 CASM_INCLUDE_PHYS_REC_LENGTH_LO = 6
 CASM_INCLUDE_PHYS_REC_LENGTH_HI = 7
-CASM_INCLUDE_PHYS_REC_NAME      = 8    ; 64-byte fixed slot, null-terminated
+CASM_INCLUDE_PHYS_REC_NAME      = 8    ; null-terminated name slot; see comment above
 CASM_INCLUDE_PHYS_REC_SIZE      = 128
 
 CASM_INCLUDE_PHYS_CAPACITY = 32
@@ -370,8 +393,11 @@ CASM_INCLUDE_EVENT_BASE = CASM_INCLUDE_PHYS_CAPACITY * CASM_INCLUDE_PHYS_REC_SIZ
 ; it only ever honors an explicit prefix in the string or else CurrentDevice).
 ; Sized independently of CASM_INCLUDE_FILENAME_BUFFER_SIZE (device digits +
 ; colon can add bytes the original spelling didn't have) and never persisted
-; into a catalog record.
-CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE = 68
+; into a catalog record. Finding D (task 42): tracked down with the filename
+; cap -- needs the longest catalog name (BUFFER_SIZE, incl. null) plus a
+; "<n>:" prefix of up to 4 bytes ("11:" + would-be null); 40 covers 33 + 4
+; with margin.
+CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE = 40
 
 .assert CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE >= CASM_INCLUDE_FILENAME_BUFFER_SIZE + 4, error, "CASM include open-name synthesis buffer too small"
 
@@ -1447,22 +1473,22 @@ CASM_LISTFILE_COMMITTED        = $01
 CASM_LISTFILE_DELETE_NOT_PENDING = $00
 CASM_LISTFILE_DELETE_PENDING     = $01
 
-; CasmListingName (cli.s) is bounded by CASM_FILENAME_BUFFER_SIZE (64,
+; CasmListingName (cli.s) is bounded by CASM_FILENAME_BUFFER_SIZE (33,
 ; CASM_FILENAME_MAX + 1). The real DOS_OPEN_FILE name embeds "@0:" (3 bytes)
 ; immediately after any device-prefix colon, or prepended if none exists, so
 ; the open-name buffer needs room for the longest possible CasmListingName
-; plus those 3 bytes plus its own terminating null: 63 + 3 + 1 = 67. $44 (68)
-; is the next round value at or above that.
-CASM_LISTING_OPEN_NAME_SIZE = $44
+; plus those 3 bytes plus its own terminating null: 32 + 3 + 1 = 36.
+; Finding D (task 42): 40 is the round value at or above that (was $44/68
+; when the cap was 63).
+CASM_LISTING_OPEN_NAME_SIZE = 40
 .assert CASM_LISTING_OPEN_NAME_SIZE >= CASM_FILENAME_MAX + 3 + 1, error, "CASM listing open-name buffer too small for CasmListingName plus the embedded @0: marker"
 
 ; WP53 increment 5: listingResolveFilename's output buffer. An included
 ; header's longest possible form is a 2-digit device ("10"/"11") + colon +
-; the longest catalog name (CASM_INCLUDE_FILENAME_MAX) + null: 2 + 1 + 63 +
-; 1 = 67. A top-level header's longest form is CASM_FILENAME_BUFFER_SIZE
-; (64). $44 (68) covers both with the same round value CASM_LISTING_OPEN_
-; NAME_SIZE already uses.
-CASM_LISTING_RESOLVED_NAME_SIZE = $44
+; the longest catalog name (CASM_INCLUDE_FILENAME_MAX) + null: 2 + 1 + 32 +
+; 1 = 36. A top-level header's longest form is CASM_FILENAME_BUFFER_SIZE
+; (33). Finding D (task 42): 40 covers both (was $44/68 at cap 63).
+CASM_LISTING_RESOLVED_NAME_SIZE = 40
 .assert CASM_LISTING_RESOLVED_NAME_SIZE >= 2 + 1 + CASM_INCLUDE_FILENAME_MAX + 1, error, "CASM listing resolved-name buffer too small for an included header"
 .assert CASM_LISTING_RESOLVED_NAME_SIZE >= CASM_FILENAME_BUFFER_SIZE, error, "CASM listing resolved-name buffer too small for a top-level header"
 

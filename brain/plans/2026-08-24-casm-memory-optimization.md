@@ -248,6 +248,53 @@ Projected saving **~550 bytes**, in line with the audit's ~520.
 - At-cap (exactly 32) and over-cap (33) fixtures for: a command-line source
   name, an `/O` name, an `.INCLUDE` operand, an `.INCBIN` operand.
 
+## Increment 3 Finding D Implementation (executed 2026-08-31)
+
+**Done. Net MAIN saving 482 bytes (487 BSS recovered, 5 spent on a
+corrected clear loop). Full build clean, every constant `.assert` across
+all 31 harnesses passed.**
+
+### Source changes
+
+| File | Change |
+| --- | --- |
+| `common.inc` | `CASM_FILENAME_MAX` 63 -> 32, `CASM_INCLUDE_FILENAME_MAX` 63 -> 32 (both `*_BUFFER_SIZE` track to 33). Added `.assert *_MAX = 32` pinning each new value with a comment pointing at the reachable-max evidence. `CASM_INCLUDE_OPEN_NAME_BUFFER_SIZE` 68 -> 40, `CASM_LISTING_OPEN_NAME_SIZE` `$44` -> 40, `CASM_LISTING_RESOLVED_NAME_SIZE` `$44` -> 40; their `>=` asserts re-checked (all still satisfied). Existing `= 64` layout asserts updated to `= 33`. |
+| `common.inc` | `CASM_INCLUDE_PHYS_REC_SIZE` **left at 128** (REU-resident, zero MAIN, and the two 64-byte window transfers depend on it); comment reworded to say the name slot now spans `8 .. 8+BUFFER_SIZE-1` and that this size is deliberately not reduced. The `PHYS_REC_NAME + BUFFER_SIZE <= PHYS_REC_SIZE` assert still holds (`8 + 33 = 41 <= 128`). |
+| `cli.s` | **Bug fix.** `cliInit`'s `ciClearNames` cleared a fixed 512 bytes via a wrapping two-store loop; `CasmSourceNames` is now `8 * 33 = 264`, so the old loop ran 248 bytes off the end into `CasmOutputName` and the BSS beyond. Replaced with one wrapping 256-byte pass + a `(TOTAL - 256)`-byte tail, guarded by two new `.assert`s pinning `256 < TOTAL <= 512`. |
+| `parser.s` | Two `.assert` message strings de-hardcoded ("exactly 65 bytes" -> "exactly CASM_INCLUDE_FILENAME_BUFFER_SIZE + 1 bytes"). |
+| `progress.s` | Stale comment `CASM_FILENAME_MAX is 63` -> `32`. |
+
+`includeCaptureKey`, `includeCatalog` read/compare/write, `cliCopySource`,
+`cliParseOutput`, `cliDeriveOutputName`/`ListingName`, `lnString` (both
+`.INCLUDE` and `.INCBIN` paths), `source.s`/`listing.s` slot reads, and
+`casm.s`'s frame-name reconstruction were all read and confirmed to bound
+by the constants (or by a caller-supplied length / null terminator that
+can't exceed them) -- no code logic change needed beyond the `cliInit`
+fix. `casm.s:1124 cpy #64` is `CrcBitmap` (512-symbol / 8), unrelated.
+
+### Fixture changes
+
+| Harness | Change |
+| --- | --- |
+| `tests/src/casm_cliderive/casm_cliderive.s` | `cderoverflow1` 60 -> 29-byte name (one past `CASM_FILENAME_MAX - 3`), `cderboundary1` 59 -> 28-byte name (produces a 32-byte = `CASM_FILENAME_MAX` listing name that fits exactly). Both were poking >33-byte names into the now-33-byte `CasmOutputName`/`CasmListingName` and would have overrun. |
+| `tests/src/casm_include/casm_include.s` | `valid63` (63 A's, expect OK) -> `validCap` (32 A's); `tooLong` 64 -> 33 A's; `expected63` -> `expectedCap`; `CASE` metadata (`scriptBytes` 75->44 / 76->45, `column` 74->43) updated. These pin the new at-cap / over-cap `.INCLUDE` boundary at the lexer level. |
+
+`.INCLUDE`/`.INCBIN` names that must actually *resolve* to a real file at
+the new cap are proven by Increment 9's live VICE run (they need real disk
+files); the host-side fixtures cover the CLI and lexer rejection paths.
+
+### Measurement
+
+| | Increment 1 baseline | Increment 3 |
+| --- | --- | --- |
+| BSS segment | `$0E98` (3,736) | `$0CB1` (3,249) |
+| CODE segment | `$53E7` | `$53EC` (+5, clear-loop tail) |
+| `__MAIN_LAST__` | `$A97D` | `$A79B` |
+| MAIN headroom at `$7400` | 642 | **1,124** |
+
+CASM build auto-bumped 1380 -> 1381; `TEST_CASM_INCLUDE` -> 1039;
+`TEST_CASM_CLIDERIVE` -> 1017.
+
 ## Scoping Decisions (user-confirmed 2026-08-24)
 
 1. **Sequencing:** run this WP only after the whole progress-indication
@@ -507,3 +554,14 @@ become user-facing.
   (~1,090 -> ~540 bytes, ~550 saved). See the new "Increment 2 Finding D
   Research" section for the affected-buffer table and Increment 3
   constraints. Increment 3 (implementation) is next.
+- 2026-08-31: **Increment 3 (Finding D implementation) executed.** Both
+  caps 63 -> 32; three cap-keyed buffers and the layout asserts updated;
+  new `.assert`s pin the 32 values. Found and fixed a real latent bug --
+  `cliInit`'s `ciClearNames` cleared a hardcoded 512 bytes and would now
+  run 248 bytes past the shrunk `CasmSourceNames` into adjacent BSS.
+  `casm_cliderive` and `casm_include` fixtures re-pinned to the new
+  boundary. Full build clean (every constant assert across 31 harnesses
+  passed). **Net MAIN saving 482 bytes**; headroom at `$7400` 642 -> 1,124.
+  Host-side harness VICE run folded into Increment 9/10. See the new
+  "Increment 3 Finding D Implementation" section. Increment 4 (Finding E)
+  is next.

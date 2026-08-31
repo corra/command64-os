@@ -365,9 +365,11 @@ exprGetResult:
 caseTable:
     CASE validOne,      13, 0, 1, expectedA, 0
     CASE validBounds,   17, 0, 6, expectedBounds, 0
-    CASE valid63,       75, 0, 63, expected63, 0
+    ; Finding D (task 42): the include filename cap dropped 63 -> 32. These
+    ; two cases pin the new at-cap / over-cap boundary.
+    CASE validCap,      44, 0, 32, expectedCap, 0
     CASE validSpace,    24, 0, 1, expectedA, 0
-    CASE tooLong,       76, CASM_DIAG_INCLUDE_FILENAME_TOO_LONG, 0, emptyExpected, 74
+    CASE tooLong,       45, CASM_DIAG_INCLUDE_FILENAME_TOO_LONG, 0, emptyExpected, 43
     CASE emptyName,     12, CASM_DIAG_INVALID_INCLUDE_FILENAME, 0, emptyExpected, 10
     CASE unterminated,  12, CASM_DIAG_INVALID_INCLUDE_FILENAME, 0, emptyExpected, 10
     CASE missingName,   10, CASM_DIAG_INCLUDE_FILENAME_EXPECTED, 0, emptyExpected, 10
@@ -381,13 +383,13 @@ caseTable:
 validOne:      .byte ".INCLUDE ", $22, "A", $22, $0D
 validBounds:   .byte ".include", $09, $22, $20, $21, $23, $7E, $A0, $FE, $22
 validSpace:    .byte ".INCLUDE  ", $22, "A", $22, $09, $20, ";COMMENT", $0D
-valid63:       .byte ".INCLUDE ", $22
-               .repeat 63
+validCap:      .byte ".INCLUDE ", $22
+               .repeat 32
                .byte "A"
                .endrepeat
                .byte $22, $0D
 tooLong:       .byte ".INCLUDE ", $22
-               .repeat 64
+               .repeat 33
                .byte "A"
                .endrepeat
                .byte $22, $0D
@@ -403,7 +405,7 @@ trailingByte:  .byte ".INCLUDE ", $22, "A", $22, "X", $0D
 
 expectedA:      .byte "A"
 expectedBounds: .byte $20, $21, $23, $7E, $A0, $FE
-expected63:     .repeat 63
+expectedCap:    .repeat 32
                 .byte "A"
                 .endrepeat
 emptyExpected:

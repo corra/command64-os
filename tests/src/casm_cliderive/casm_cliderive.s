@@ -292,9 +292,10 @@ cm1Pass:
 
 ; ---------------------------------------------------------------------------
 ; cderoverflow1
-; An explicit 60-byte dotless/colonless output name is one byte past the
-; largest name cliDeriveListingName can extend with ".LST" and fit in the
-; 64-byte buffer -- must raise CASM_DIAG_FILENAME_TOO_LONG.
+; Finding D (task 42): the filename cap dropped 63 -> 32. An explicit 29-byte
+; dotless/colonless output name is one byte past the largest name
+; cliDeriveListingName can extend with ".LST" and still fit
+; (CASM_FILENAME_MAX - 3 = 29) -- must raise CASM_DIAG_FILENAME_TOO_LONG.
 ; ---------------------------------------------------------------------------
 cderoverflow1:
     jsr cliInit
@@ -305,11 +306,11 @@ co1Fill:
     lda #$41                     ; PETSCII 'A'
     sta CasmOutputName, x
     inx
-    cpx #60
+    cpx #29
     bne co1Fill
     lda #0
     sta CasmOutputName, x
-    lda #60
+    lda #29
     sta CasmOutputLen
     jsr cliDeriveOutputName
     bcc :+
@@ -330,8 +331,8 @@ co1Pass:
 
 ; ---------------------------------------------------------------------------
 ; cderboundary1
-; The complementary boundary: a 59-byte dotless/colonless output name must
-; succeed, producing a 63-byte (CASM_FILENAME_MAX) listing name that fits
+; The complementary boundary: a 28-byte dotless/colonless output name must
+; succeed, producing a 32-byte (CASM_FILENAME_MAX) listing name that fits
 ; exactly.
 ; ---------------------------------------------------------------------------
 cderboundary1:
@@ -343,11 +344,11 @@ cb1Fill:
     lda #$41                     ; PETSCII 'A'
     sta CasmOutputName, x
     inx
-    cpx #59
+    cpx #28
     bne cb1Fill
     lda #0
     sta CasmOutputName, x
-    lda #59
+    lda #28
     sta CasmOutputLen
     jsr cliDeriveOutputName
     bcc :+

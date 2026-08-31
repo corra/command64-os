@@ -28,7 +28,7 @@
 ; resolution: the caller copies the already-truncated 8-byte field in
 ; before calling progressRenderTransient. This is "bounded rendering
 ; scratch," explicitly allowed; it is not "mirroring a whole filename"
-; (CASM_FILENAME_MAX is 63 bytes) -- only the display width the screen
+; (CASM_FILENAME_MAX is 32 bytes) -- only the display width the screen
 ; protocol already truncates to.
 
 .include "command64.inc"
