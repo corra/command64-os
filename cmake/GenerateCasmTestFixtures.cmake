@@ -2230,3 +2230,35 @@ file(WRITE "${OUTPUT_DIR}/casmlocconstr.seq"
     "    NOP\n"
     "Y1 = @X\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM Phase 14 WP90: /M symbol-map production fixtures. Assembled twice
+# each (no options / with /M / with /L) into distinct /O: names, so native
+# COMP proves /M and /L leave the PRG byte-identical. The /M screen output
+# is the real assertion (@local rows render as "<owner>@<local>"; a
+# resolved constant no longer trips SYMBOL MAP INVALID) -- checked live.
+# ---------------------------------------------------------------------------
+
+# casmmaploc: two global scopes, one @local under each. /M renders
+# "MAIN@LOOP" and "DRAW@DONE".
+file(WRITE "${OUTPUT_DIR}/casmmaploc.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "@LOOP:\n"
+    "    NOP\n"
+    "    BNE @LOOP\n"
+    "DRAW:\n"
+    "@DONE:\n"
+    "    NOP\n"
+    "    RTS\n"
+)
+
+# casmmapconst: a named constant defined past file offset 0. WP90 folded
+# in the fix for map.s rejecting any such constant as SYMBOL MAP INVALID
+# (a latent Phase 12 regression). /M must show "START" and "FOO".
+file(WRITE "${OUTPUT_DIR}/casmmapconst.seq"
+    ".ORG \$C000\n"
+    "START:\n"
+    "FOO = 5\n"
+    "    LDA #FOO\n"
+)

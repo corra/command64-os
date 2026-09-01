@@ -136,8 +136,30 @@ Pre-planning survey of the current tree (this session, 2026-09-01):
    constant's RHS is allowed to be a local label, that bookmark must also
    capture the scope. **Decision: forbid a local label on a named
    constant's RHS in Phase 14** (`@x = ...` and `foo = @x` both rejected
-   with a clear diagnostic) — keeps the sweep untouched. Revisit only if a
-   real need appears.
+   with a clear diagnostic) — keeps the sweep untouched.
+
+   **Precedent note (2026-09-01):** this is an implementation-cost decision,
+   not an industry norm. Both `@x = expr` and `foo = @x` assemble in
+   **ca65** (the toolchain CASM tracks and cross-checks against — see
+   `src/external/casm/AGENTS.md`) and in **Turbo Macro Pro running natively
+   on the C64** — the closest architectural analogue to CASM (native,
+   two-pass, forward refs resolved in Pass 2). ACME, 64tass, KickAssembler
+   and DASM likewise treat a local label as a first-class symbol legal on
+   either side of `=`. Some cross-assembler ports (e.g. tmpx / 64tass
+   reading TMP source) apply the stricter behavior CASM is adopting here.
+   CASM Phase 14 therefore knowingly ships a native-assembler-compatibility
+   gap: the `@name` *spelling* is ca65-compatible but the *usage rules* are
+   stricter, and a TMP/ca65 source using this construct will not port
+   cleanly. WP92 user-facing docs must state this divergence explicitly
+   alongside the syntax description, not leave it as an internal limit.
+
+   **Revisit trigger:** reconsider in the separately-planned anonymous-label
+   phase, or at the first real TMP/ca65 source-import friction — whichever
+   comes first — rather than waiting for an unspecified "real need". If
+   relaxed, the `REF_*` bookmark grows a 2-byte owning-scope field and the
+   Pass1→Pass2 sweep must re-establish `CasmCurrentScope` per deferred
+   re-eval (the same cross-pass scope-desync risk the Stop Conditions
+   guard).
 8. **Map output** (`map.s` `mapPrint`): iterates records in definition
    order via `symbolsReadByIndex`, prints name + value + flags. Local
    rendering adds a qualified-name branch keyed on the LOCAL flag +
@@ -415,7 +437,9 @@ Halt and get renewed direction if:
   `wiki/tasks/casm.md`; Taskwarrior task closed; per-WP walkthrough.
 - **At completion (WP92)**: `docs/casm-programmers-reference.md` (new
   "Local labels" section — syntax, scope rule, diagnostics, `/M`
-  rendering, the constant-RHS restriction), `docs/casm-utility.md`,
+  rendering, and the constant-RHS restriction stated explicitly as a
+  known ca65 / Turbo Macro Pro divergence, per Research item 7),
+  `docs/casm-utility.md`,
   `wiki/casm-programmers-reference.md` + `wiki/casm-utility.md` +
   `wiki/Home.md` mirrors, `wiki/tasks/casm.md` closeout paragraph,
   `brain/KNOWLEDGE.md` Phase 14 closing note, `CHANGELOG.md` Unreleased →
@@ -538,3 +562,32 @@ Phase 14 is complete only when **all** of:
   defect). Deliberate-break test confirmed the assert fires. Assembled
   logic byte-identical. Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-diag-table-single-source-of-truth.md`.
+- 2026-09-01: **WP89 approved by user.** WP89 (`bb4e956b`) closed. WP90
+  created (`f7010987-a1b3-4f97-8f07-439a496504db`), started.
+- 2026-09-01: Research item 7 expanded (no behavior change) after a user
+  industry-consistency question. Recorded that forbidding a local label on
+  a constant's RHS is an implementation-cost decision, not a norm: ca65
+  and Turbo Macro Pro (native on the C64 — CASM's closest architectural
+  analogue) both allow `@x = expr` and `foo = @x`; CASM matches the
+  stricter cross-assembler-port behavior instead. Item 7 now carries the
+  precedent survey, names it a known ca65/TMP divergence WP92 docs must
+  state explicitly, and replaces the vague "revisit if a real need
+  appears" trigger with "revisit in the anonymous-label phase or at first
+  TMP/ca65 source-import friction".
+- 2026-09-01: WP90 source-complete. `map.s`: `mapPrint`/`mapFormatRow`
+  render a `@local` row as `<owner>@<local>` (owner = the most recent
+  global in the definition-order walk), capped at 31 bytes;
+  `mapPrint` cross-checks each local's stored SCOPE ordinal against the
+  walk's global count. `mapValidateRecord` rebuilt per-field for the real
+  WP65/76/86 record layout -- **folded in a user-approved latent fix**:
+  before this, every named constant defined past file offset 0 tripped
+  `SYMBOL MAP INVALID` under `/M` (`DEFINED_AT_OFFSET` at 44-45 checked as
+  reserved; `/M` untested with constants since Phase 10). `test_casm_map`
+  now 25 cases (was 23), harness MAIN `$1400`->`$1600`; live `CASM MAP:
+  PASS`. Production fixtures `casmmaploc` (renders `MAIN@LOOP` /
+  `DRAW@DONE`) and `casmmapconst` (constant, no `SYMBOL MAP INVALID`) on
+  `casm_phase14_test_d64`, live-verified on `CASM V0.5.2.1403`; `/M` and
+  `/L` PRGs `FILES COMPARE OK` vs baseline. Overlay events fired via curl
+  (MCP still down). Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-phase14-wp90-map-local-rendering.md`.
+  Awaiting user sign-off before WP91.

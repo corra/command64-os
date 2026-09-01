@@ -27,7 +27,11 @@ source-complete and build/live-verified, awaiting sign-off. A standalone
 diag-table hardening (single `CASM_DIAG_LAST` source of truth so the
 `diagPrintFatal` runtime range check and the verify script can no longer
 drift behind the message table -- the WP89 defect) landed alongside,
-build-verified. WP90-92 remain (pass-driver wiring + production fixtures + scoped
+build-verified. WP90 (`/M` renders `@local` rows as `<owner>@<local>`;
+`mapValidateRecord` rebuilt per-field -- folding in a latent Phase 12
+fix where any constant defined past file offset 0 tripped `SYMBOL MAP
+INVALID` under `/M`; `test_casm_map` 25/25 live) is source-complete and
+build/live-verified, awaiting sign-off. WP91-92 remain (pass-driver wiring + production fixtures + scoped
 diagnostics, `/M` map rendering, DASH adoption, consolidated completion
 gate). Plan:
 `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.

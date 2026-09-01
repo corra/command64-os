@@ -49,6 +49,8 @@
 .import symbolsInit
 .import symbolsInsert
 .import CasmSymbolInsertFlags
+.import CasmSymbolInsertScopeLo
+.import CasmSymbolInsertScopeHi
 .import symbolsReadByIndex
 .import CasmSymbolVmmSlot
 .import vmmWindowRead
@@ -118,6 +120,10 @@ start:
     jsr mapvmmfail1
     jsr reportCase
     jsr mapfull1
+    jsr reportCase
+    jsr maplocalqualified1
+    jsr reportCase
+    jsr mapconstdefinedat1
     jsr reportCase
 
     ; Free the symbol table's VMM allocation before exit, matching
@@ -860,7 +866,10 @@ corruptRestoreOne:
 ; ---------------------------------------------------------------------------
 ; DEFINED clear is rejected independently from every reserved flag bit. The
 ; reserved-bit case walks $02 through $80 one bit at a time, always alongside
-; DEFINED, so no combination can mask an individual invalid bit.
+; DEFINED, so no combination can mask an individual invalid bit -- EXCEPT
+; $10 (CASM_SYMBOL_FLAG_LOCAL), which WP89/WP90 made a valid record type
+; (DEFINED|LOCAL = a @local label); that bit is skipped here and covered
+; positively by maplocalvalid1 below.
 ; ---------------------------------------------------------------------------
 mapdefinedclear1:
     lda #0
@@ -873,12 +882,15 @@ mapreservedflags1:
     lda #$02
 mrfLoop:
     sta ReservedFlagBit
+    cmp #CASM_SYMBOL_FLAG_LOCAL   ; WP90: bit 4 is a valid record, not reserved
+    beq mrfSkip
     ora #CASM_SYMBOL_FLAG_DEFINED
     sta CorruptValue
     lda #<corruptFlagsValue
     ldy #>corruptFlagsValue
     jsr mapInvalidWithRestore
     bcs mrfFail
+mrfSkip:
     asl ReservedFlagBit
     lda ReservedFlagBit
     bne mrfLoop
@@ -1282,6 +1294,181 @@ mf1Fail:
     sec
     rts
 
+; ---------------------------------------------------------------------------
+; maplocalqualified1 (WP90)
+; Fresh table: a global "MAIN" then a @local "@LOOP" scoped to it (ordinal
+; 0). Proves mapValidateRecord accepts DEFINED|LOCAL, exempts the SCOPE
+; field (offsets 46-47), and mapFormatRow renders the local's row as the
+; qualified "<owner>@<local>" = "MAIN@LOOP". Then breaks the local's stored
+; SCOPE ordinal and requires mapPrint -> SYMBOL_MAP_INVALID (the pass
+; driver's Pass1/Pass2 scope-tracking cross-check).
+; ---------------------------------------------------------------------------
+maplocalqualified1:
+    jsr mapFreeTable
+    jsr symbolsInit
+    bcc :+
+    jmp mlq1Fail
+:
+    lda #<nameMain
+    sta CasmPtr0Lo
+    lda #>nameMain
+    sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
+    lda #4
+    ldx #$00
+    ldy #$C0                      ; MAIN = $C000
+    jsr symbolsInsert
+    bcc :+
+    jmp mlq1Fail
+:
+    lda #<nameAtLoop
+    sta CasmPtr0Lo
+    lda #>nameAtLoop
+    sta CasmPtr0Hi
+    lda #(CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_LOCAL)
+    sta CasmSymbolInsertFlags
+    lda #0
+    sta CasmSymbolInsertScopeLo
+    sta CasmSymbolInsertScopeHi
+    lda #5                        ; "@LOOP"
+    ldx #$01
+    ldy #$C0                      ; @LOOP = $C001
+    jsr symbolsInsert
+    bcc :+
+    jmp mlq1Fail
+:
+    lda #2                        ; header=0, MAIN row=1, @LOOP row=2
+    jsr mapRunCapture
+    bcc :+
+    jmp mlq1Fail
+:
+    lda #<msgExpectQualifiedRow
+    sta CasmPtr1Lo
+    lda #>msgExpectQualifiedRow
+    sta CasmPtr1Hi
+    jsr mapCompareCapture
+    bcc :+
+    jmp mlq1Fail
+:
+    ; Break the ordinal: record 1's SCOPE_LO now says "5" but only one
+    ; global precedes it (ordinal 0). mapPrint must reject the map.
+    lda #1
+    sta CorruptRecordLo
+    lda #0
+    sta CorruptRecordHi
+    lda #<corruptScopeOrdinal
+    sta CorruptPtrLo
+    lda #>corruptScopeOrdinal
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    bcc :+
+    jmp mlq1Fail
+:
+    lda #0
+    jsr mapRunCapture
+    bcs :+                        ; must FAIL now
+    jmp mlq1Fail
+:
+    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
+    beq :+
+    jmp mlq1Fail
+:
+    clc
+    rts
+mlq1Fail:
+    sec
+    rts
+
+corruptScopeOrdinal:
+    lda #5
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_SCOPE_LO
+    lda #0
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_SCOPE_HI
+    rts
+
+; ---------------------------------------------------------------------------
+; mapconstdefinedat1 (WP90, folded-in latent fix)
+; A resolved named constant record carries its own source position at
+; offsets 44-45 (CASM_SYMBOL_REC_DEFINED_AT_OFFSET, WP76). Before WP90,
+; mapValidateRecord's "37-63 must be zero" check rejected ANY constant
+; defined past file offset 0 as SYMBOL MAP INVALID -- a latent Phase 12
+; regression to /M that no test caught. This proves a constant with a
+; nonzero DEFINED_AT now validates, while offsets 37-43 (REF_*) stay
+; strict even for a constant.
+; ---------------------------------------------------------------------------
+mapconstdefinedat1:
+    jsr mapFreeTable
+    jsr symbolsInit
+    bcc :+
+    jmp mcda1Fail
+:
+    lda #<nameFoo
+    sta CasmPtr0Lo
+    lda #>nameFoo
+    sta CasmPtr0Hi
+    lda #CASM_SYMBOL_FLAG_DEFINED
+    sta CasmSymbolInsertFlags
+    lda #3                        ; "FOO"
+    ldx #$05
+    ldy #$00                      ; FOO = $0005
+    jsr symbolsInsert
+    bcc :+
+    jmp mcda1Fail
+:
+    lda #0
+    sta CorruptRecordLo
+    sta CorruptRecordHi
+    lda #<corruptToConstantAt
+    sta CorruptPtrLo
+    lda #>corruptToConstantAt
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    bcc :+
+    jmp mcda1Fail
+:
+    lda #0
+    jsr mapRunCapture
+    bcc :+                        ; WP90: must SUCCEED
+    jmp mcda1Fail
+:
+    ; 37-43 still strict: poke REF_VMM_LO (offset 37) nonzero on top.
+    lda #<corruptRef37
+    sta CorruptPtrLo
+    lda #>corruptRef37
+    sta CorruptPtrHi
+    jsr mapCorruptRecord
+    bcc :+
+    jmp mcda1Fail
+:
+    lda #0
+    jsr mapRunCapture
+    bcs :+                        ; must FAIL now
+    jmp mcda1Fail
+:
+    cmp #CASM_DIAG_SYMBOL_MAP_INVALID
+    beq :+
+    jmp mcda1Fail
+:
+    clc
+    rts
+mcda1Fail:
+    sec
+    rts
+
+corruptToConstantAt:
+    lda #(CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_CONSTANT | CASM_SYMBOL_FLAG_RESOLVED)
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    lda #$1A                      ; a nonzero source offset
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO
+    lda #0
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI
+    rts
+corruptRef37:
+    lda #$01
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_REF_VMM_LO   ; offset 37
+    rts
+
 .segment "RODATA"
 
 passMsg:
@@ -1336,6 +1523,15 @@ msgExpectZeroRow:
     .byte "$0000 ZERO", PetCr, 0
 msgExpectMaxRow:
     .byte "$FFFF MAX", PetCr, 0
+; WP90
+msgExpectQualifiedRow:
+    .byte "$C001 MAIN@LOOP", PetCr, 0
+nameMain:
+    .byte "MAIN"
+nameAtLoop:
+    .byte "@LOOP"
+nameFoo:
+    .byte "FOO"
 
 msgExpectTotal009: .byte "009 SYMBOLS", PetCr, 0
 msgExpectTotal010: .byte "010 SYMBOLS", PetCr, 0

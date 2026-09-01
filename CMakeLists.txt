@@ -820,7 +820,11 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1400")
+            # Phase 14 WP90: the two new @local/constant validation cases
+            # (maplocalqualified1, mapconstdefinedat1) overflowed $1400 by
+            # 299 measured bytes; $1600 (+512) is the smallest round-page
+            # fit that clears it with headroom.
+            set(TEST_PRG_SIZE "1600")
         endif()
         if(TEST_NAME STREQUAL "casm_spanread")
             # WP53 increment 2: source.s plus the modules it needs to reach a
@@ -2763,7 +2767,13 @@ add_custom_command(
     COMMAND "${CC1541_EXECUTABLE}" -f "casmlocconstr.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmlocconstr.seq"
         "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
-    COMMENT "Appending WP89 @local-label fixtures and trusted references to casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmaploc.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmaploc.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmapconst.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmapconst.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMENT "Appending WP89/WP90 @local-label + /M fixtures and trusted references to casm_phase14_test.d64"
     VERBATIM
 )
 
