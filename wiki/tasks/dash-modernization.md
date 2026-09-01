@@ -47,7 +47,7 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       Manifest regenerated, hashes only. Key-ladder / `SELECT*` /
       `DRAWFRAME` literals deferred to WP4/WP5. AGENTS.md gained two
       dual-assembler notes (no comparison operator; constant-def RHS must
-      be a bare literal). Source-complete, awaiting sign-off. Plan:
+      be a bare literal). **Closed — user-approved 2026-09-01.** Plan:
       `brain/plans/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
       Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
 - [ ] **WP4 - DASH event loop / key dispatch / page dispatch refactor.**

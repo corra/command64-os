@@ -308,3 +308,7 @@ the cross-file symbol surface).
   `image_d64` green. Walkthrough:
   `brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
   Awaiting user sign-off before WP4.
+- 2026-09-01: **WP3 closed — user-approved.** Taskwarrior task 52 done.
+  WP4 (event loop / key dispatch / page dispatch refactor) needs its own
+  detailed sub-plan before implementation; it is the first WP that
+  changes shipped bytes, so runtime re-verification resumes there.

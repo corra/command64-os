@@ -1,7 +1,7 @@
 ---
 feature: dash-mod-wp3-computed-constants-assert-invariants
 created: 2026-09-01
-status: source-complete, awaiting sign-off
+status: done (user-approved 2026-09-01)
 taskwarrior: task 52 (child of 94ec17b3)
 depends-on: DASH-MOD WP2 (full @local migration, done + user-approved 2026-09-01 -- brain/walkthroughs/2026-09-01-dash-mod-wp2-full-local-migration.md); DASH-MOD WP1 (CASM .ASSERT ca65 action keyword)
 ---
@@ -10,7 +10,7 @@ depends-on: DASH-MOD WP2 (full @local migration, done + user-approved 2026-09-01
 
 ## Status
 
-**Approved 2026-09-01; source-complete, awaiting sign-off.** Third WP of
+**Done — user-approved 2026-09-01.** Third WP of
 the DASH Modernization increment. Parent:
 `brain/plans/2026-09-01-dash-modernization.md`. WP1 and WP2 done +
 approved. Branch: `feature/casm-phase14`. Baseline: DASH shipping
@@ -481,3 +481,4 @@ the pre-WP3 shipping-manifest transcription -> **byte-identical**.
   bare literal; `.ASSERT` -> equality/range invariants are ca65-only).
   Walkthrough written. Parent plan Progress + `wiki/tasks/
   dash-modernization.md` synced. Awaiting user sign-off before WP4.
+- 2026-09-01: **WP3 closed — user-approved.** Taskwarrior task 52 done.
