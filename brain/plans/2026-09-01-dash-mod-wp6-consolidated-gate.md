@@ -16,7 +16,7 @@ Modernization increment. Parent:
 Branch: `feature/casm-phase14`.
 
 Closes the whole increment. Baseline: post-WP5 shipping manifest sha256
-`4a49612e...`, 4579 bytes, 443 relocation entries.
+`4a49612e...`, 4579 bytes, 451 relocation entries.
 
 ## Objective
 
@@ -106,7 +106,7 @@ Walk `AGENTS.md`'s Verification-section rules against the final code:
   screen/colour RAM (`$0400`-`$07FF` / `$D800`-`$DBFF`), ZP `$70`-`$8F`,
   `#<label` low bytes, ZP-indirect `(ptr),Y`.
 - Confirm `reloc.py`'s final count is fully accounted for (WP4: 465->459,
-  WP5: 459->443, both audited in their walkthroughs; WP6 changes only a
+  WP5: 459->451, both audited in their walkthroughs; WP6 changes only a
   data string -> **0 reloc delta expected**).
 
 ## User hardware runtime matrix

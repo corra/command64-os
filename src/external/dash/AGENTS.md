@@ -1,6 +1,8 @@
 # Purpose
 
-DASH is a CASM-assembled, relocatable, three-page system dashboard utility for Command 64 OS. It displays system specifications, application registry listings, and runs VMM page/DMA hardware tests when an REU is present.
+DASH (`0.2.0`) is a CASM-assembled, relocatable, three-page system dashboard utility for Command 64 OS. It displays system specifications, application registry listings, and runs VMM page/DMA hardware tests when an REU is present.
+
+The seven sources were modernized across the **DASH Modernization** increment (2026-09-01, `feature/casm-phase14`, DASH-MOD WP1-6): every routine-internal label is a `@local`; every magic number is a named constant declared in `dmain.s`'s prologue; structural invariants are `.assert`-guarded (`dash_wrapper.s`); the event loop, key dispatch and page renderers are helper-backed with no inline duplication. No user-visible behaviour changed. Shipping size fell `4766 -> 4579` bytes. Per-WP detail: `brain/plans/2026-09-01-dash-mod-wp*.md` + walkthroughs.
 
 # Ownership
 
@@ -10,6 +12,8 @@ DASH is a CASM-assembled, relocatable, three-page system dashboard utility for C
 # Local Contracts
 
 - **Origin**: Relocatable R6 binary targeting implicit `$3400` base.
+- **Version**: `DASHVERSTR` in `ddata.s` is a hand-edited static screen-code string (`DASH v<x.y.z>`, printed on screen row 24 by `DRAWVERSIONBANNER`). It stays a literal string rather than computed digits — a static banner is immune to the `PRINTDEC16` spacing bug it partly exists to help diagnose. Bump it by hand when DASH changes.
+- **Named constants**: The `$70-$8F` ZP equates and every other DASH magic number (page model, screen geometry, `SYS_OFF_*` / `APP_OFF_*` record maps, `VMMSTATE_*` / `VMMFAIL_*` enums, `DOS_*` API codes, `KEY_*`, `ROW_*`, `COL_*`) are named constants at the top of `dmain.s`, before any code (DASH-MOD WP3). A named-constant definition's RHS must be a bare literal — see the Dual-Assembler Subset note.
 - **Source Files**: Seven ordered files:
   1. `dmain.s` (entry, event loop, dispatch trampoline)
   2. `dscr.s` (screen clear, layouts, frame, borders)
@@ -40,14 +44,15 @@ DASH is a CASM-assembled, relocatable, three-page system dashboard utility for C
 - **UPPERCASE ONLY (load-bearing)**: Every byte of these files — mnemonics, labels, hex digits, **and comment text** — must be uppercase ASCII. `cc1541 -w` writes host bytes to the SEQ verbatim with no translation, and ASCII lowercase `a`-`z` (`$61`-`$7A`) are *not* letters in PETSCII; CASM rejects them with `CASM_DIAG_INVALID_SOURCE_BYTE`. ASCII uppercase `A`-`Z` (`$41`-`$5A`) coincides exactly with the PETSCII letter range, so an all-uppercase host file needs no conversion step. `banner.s` follows the same rule and is the proven precedent. This is safe for identifiers only because no two differ solely by case — check that before renaming anything.
 - **Dual-Assembler Subset (load-bearing)**: The seven sources are written in the strict syntactic subset that **both** ca65 and native CASM accept, so the identical bytes on disk can be assembled either way and the outputs compared. Anything outside that subset breaks the cross-check, not just one build. Concretely:
   - **No segment directives.** CASM has no segment concept — it emits one linear stream in command-line file order. The single `.segment` ca65 needs lives in `dash_wrapper.s`, the ca65-only wrapper.
-  - **Audited string literals only.** CASM WP74 supports raw-PETSCII strings in
+  - **Audited string literals only.** CASM supports raw-PETSCII strings in
     `.BYTE` lists. Use them only for runs proven byte-identical under ca65's
-    active C64 charmap; digits and punctuation in `DASHVERSTR` are the initial
-    safe adoption. Screen-code letters remain explicit bytes because ca65
+    active C64 charmap: digits, `.`, `-`, `/`, `$`, space, `?` are proven
+    safe (`DASHVERSTR`, `APPRANGEBADSTR`, the `SYSL_*`/`VMML_*` label
+    fragments). Screen-code **letters** remain explicit bytes because ca65
     remaps source letters and would break native/host identity.
-  - **Equates must precede every use.** Both assemblers accept named constants, but ca65 cannot select zero-page addressing for a forward-referenced equate. Declare shared equates at the top of `dmain.s`, before executable code.
-  - **No character literals.** ca65's character mapping does not preserve the raw keyboard-byte values native CASM assigns to uppercase literals (`'T'` becomes `$D4`, not `$54`). Keep keyboard and screen-code operands as explicit hex bytes.
-  - **`@local` labels are shared (CASM Phase 14 WP87-90); anonymous `:+`/`:-` are NOT.** A `@name` label is a cheap local scoped to the nearest preceding non-`@` label in **both** assemblers — ca65's native cheap-local feature and CASM's own `@local` (WP89). Use them for routine-internal loop/skip/done targets that are never branched to from outside their own routine (`dfmt.s`'s `FORMATDEC16`/`PETTOSCREEN`/`DIV10` adopted `@LOOP`/`@DONE`/`@SKIP` in WP91). Two constraints keep the two assemblers in agreement:
+  - **Equates must precede every use, and there are no mid-code equates.** ca65 cannot select zero-page addressing for a forward-referenced equate, and a mid-code `=` splits a `@local` scope differently under each assembler (see below). Every DASH constant lives in the `dmain.s` prologue before any code (the "Named constants" contract) — keep it that way.
+  - **No character literals.** ca65's character mapping does not preserve the raw keyboard-byte values native CASM assigns to uppercase literals (`'T'` becomes `$D4`, not `$54`). Keep keyboard and screen-code operands as explicit hex bytes or named constants (`KEY_T = $54`, `SCREENCODE_VBAR = $5D`).
+  - **`@local` labels are shared (CASM Phase 14 WP87-90); anonymous `:+`/`:-` are NOT.** A `@name` label is a cheap local scoped to the nearest preceding non-`@` label in **both** assemblers — ca65's native cheap-local feature and CASM's own `@local`. **Every** routine-internal loop/skip/done target in DASH is a `@local` (DASH-MOD WP2 migrated all seven files); only routine entry points, cross-file symbols, and `ddata.s`'s labels stay global. Use `@LOOP`/`@DONE`/`@FAIL`-style names for any new internal target. Two constraints keep the two assemblers in agreement:
     - **No `=` equate may sit between a label and its `@locals`.** ca65 ends a cheap-local scope at *any* non-`@` symbol including an `=` equate; CASM ends it only at a `NAME:` label. DASH already declares every equate at the top of `dmain.s` before code (see "Equates must precede every use"), so within the executable sections the two rules coincide — but a new mid-code equate would silently split the scope differently under each assembler.
     - **Never reuse one `@name` within a single CASM scope.** CASM rejects a redefined `@local` in the same scope (`DUPLICATE LOCAL LABEL IN SCOPE`); ca65, whose scope may have been split by an `=`, might not. Keep each `@name` unique between one `NAME:` label and the next.
     Anonymous ca65 labels (`:`, `:+`, `:-`) have no CASM equivalent yet (deferred past Phase 14) — do not use them.
@@ -98,6 +103,12 @@ file — the old seven-file line (`CASM DMAIN.S DSCR.S DFMT.S DSYS.S DAPP.S
 DVMM.S DDATA.S /O:DASH.PRG`, 67 of the shell's 80-byte `CommandBuffer`) is no
 longer needed, freeing that headroom for future growth.
 
+Note: the CMake `command64_casm_utils_d64` target now also packages the
+built `dash.prg`, so `CASM DMAIN.S /O:DASH.PRG` on a freshly-built utils
+disk fails with `OUTPUT WRITE FAILED` (`fileCreateOutput` has no replace
+mode). For a byte-check run, assemble to a scratch name (`/O:DW.PRG`) and
+`COMP DW.PRG DASH.REF`.
+
 Native CASM requires an REU for assembly; the resulting DASH runtime does not.
 
 # Verification
@@ -105,5 +116,5 @@ Native CASM requires an REU for assembly; the resulting DASH runtime does not.
 - Output header/footer base is `$3400`; footer magic is `52 36` (`R6`).
 - `COMP DASH.PRG DASH.REF` matches byte-for-byte on the C64, and re-running CASM with no source change reproduces identical bytes.
 - Relocation entries cover only eligible program bytes: `.WORD` renderer pointers, absolute label operands, and `#>label` high bytes. Fixed targets produce **no** entries — `$1000`, `$FFE4`, screen/colour RAM (`$0400`-`$07FF`, `$D800`-`$DBFF`), and ZP `$70`-`$8F`. `#<label` low bytes are correctly excluded (`applyExtraction` clears `RELOCATABLE` for `<`).
-- Repeated page dispatch leaves the stack balanced: `dispatchPage` pushes 2 bytes, the renderer's `RTS` consumes them landing on `dispatchReturn`, whose `RTS` consumes the original caller return. Net delta zero.
-- The same artifact runs identically at `$3800`, `$5000`, and `$9000`, without an REU.
+- Repeated page dispatch leaves the stack balanced: `DISPATCHPAGE` pushes 2 bytes (`@RETURNMINUSONE`), the renderer's `RTS` consumes them landing on `@RETURN`, whose `RTS` consumes the original caller return. Net delta zero.
+- The same artifact runs identically at `$3800`, `$5000`, and `$9000`, without an REU — spot-checked live via `LOAD DASH <hex>` / `RUN <hex>` and the Applications page's `dash <hex>-....` load-range readout.
