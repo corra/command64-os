@@ -1,0 +1,28 @@
+# CASM Phase 14 WP89 trusted reference: casmloc7
+#
+# Independently hand-assembled from the casmloc7 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves a
+# @local (@LOOP) and a global (LOOP) whose spellings match apart from the
+# '@' are distinct symbols: JMP LOOP and JMP @LOOP resolve to different
+# absolute addresses.
+#
+# Source (.ORG $C000, fixed address):
+#   | .ORG $C000
+#   | LOOP:
+#   |     NOP
+#   | @LOOP:
+#   |     JMP LOOP
+#   |     JMP @LOOP
+#
+# Hand assembly:
+#   00 C0        - PRG load-address header
+#   EA           - LOOP NOP at $C000
+#   4C 00 C0     - @LOOP JMP LOOP at $C001 targeting $C000
+#   4C 01 C0     - JMP @LOOP at $C004 targeting $C001
+#
+# bytes: 9
+
+00 C0
+EA
+4C 00 C0
+4C 01 C0

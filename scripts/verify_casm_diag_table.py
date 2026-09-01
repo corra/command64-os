@@ -133,6 +133,10 @@ EXPECTED = {
     0x54: "ASSERTION FAILED",
     0x55: "STATEMENT COUNT OVERFLOW",
     0x56: "PASS 1/PASS 2 STATEMENT MISMATCH",
+    0x57: "LOCAL LABEL BEFORE ANY GLOBAL LABEL",
+    0x58: "DUPLICATE LOCAL LABEL IN SCOPE",
+    0x59: "UNDEFINED LOCAL LABEL",
+    0x5A: "LOCAL LABEL NOT ALLOWED IN CONSTANT",
 }
 
 # Two identifiers that are printed through the same "CASM: " + body + CR
@@ -221,10 +225,10 @@ def decode_id_to_body(mem, syms, consts):
 
     Since Finding C (task 42) that dispatch is one dense table, diagMsgLo /
     diagMsgHi, indexed by (id - CASM_DIAG_INIT_FAILED) for every id in
-    $01..CASM_DIAG_PROGRESS_LAST. (Before Finding C this walked six separate
-    range tables plus a nine-entry cmp/beq chain.)"""
+    $01..CASM_DIAG_PHASE14_WP86_LAST. (Before Finding C this walked six
+    separate range tables plus a nine-entry cmp/beq chain.)"""
     first_id = consts["CASM_DIAG_INIT_FAILED"]
-    last_id = consts["CASM_DIAG_PROGRESS_LAST"]
+    last_id = consts["CASM_DIAG_PHASE14_WP86_LAST"]
     lo, hi = syms["diagMsgLo"], syms["diagMsgHi"]
     bodies = {}
     for i in range(last_id - first_id + 1):

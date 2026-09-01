@@ -15,13 +15,16 @@ R6-relocatable PRG files.
 **Phase 14 (Local Labels) is underway**, approved 2026-09-01. Adds ca65
 `@name` cheap-local labels scoped to the nearest preceding global label
 (anonymous `:`/`:+`/`:-` labels are explicitly deferred to a later phase).
-WP86 (design freeze) and WP87 (lexer `@`-prefixed identifier scanning,
-`test_casm_lexer` fixtures, live `CASM LEXER: PASS`) are done and
-user-approved. WP88 (symbol-layer scope insert/find/lookup filtering, new
-dedicated `casm_phase14_test_d64` + `test_casm_scope` 12-case harness,
-live `CASM SCOPE: PASS`; a real `A`-clobber defect in `symbolsInsert`/
-`symbolsLookup` found live and fixed) is source-complete and
-build/live-verified, awaiting sign-off. WP89-92 remain (pass-driver wiring + production fixtures + scoped
+WP86 (design freeze), WP87 (lexer `@`-prefixed identifier scanning, live
+`CASM LEXER: PASS`), and WP88 (symbol-layer scope filtering, new
+dedicated `casm_phase14_test_d64` + `test_casm_scope` harness, live `CASM
+SCOPE: PASS`; a real `A`-clobber defect found live and fixed) are done
+and user-approved. WP89 (pass-driver wiring: `CasmCurrentScope` ordinal,
+`crpLabel` local stamping, four scoped diagnostics `$57-$5A`, 9 production
+fixtures -- 4 `FILES COMPARE OK` incl. a forward local ref, 5 scoped-
+diagnostic rejects; two more real defects found live and fixed) is
+source-complete and build/live-verified, awaiting sign-off. WP90-92
+remain (pass-driver wiring + production fixtures + scoped
 diagnostics, `/M` map rendering, DASH adoption, consolidated completion
 gate). Plan:
 `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.

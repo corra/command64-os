@@ -156,7 +156,7 @@ diagPrintMessage:
 ;
 ; Finding C (memory-optimization WP, task 42): one dense parallel table,
 ; diagMsgLo/Hi, holds every message pointer in identifier order
-; ($01 = CASM_DIAG_INIT_FAILED .. $56 = CASM_DIAG_PROGRESS_LAST). Dispatch
+; ($01 = CASM_DIAG_INIT_FAILED .. $5A = CASM_DIAG_PHASE14_WP86_LAST). Dispatch
 ; is: reject out-of-range -> unknown fallback; peel off the
 ; CASM_DIAG_ASSERTION_FAILED user-message echo; index the table; and skip
 ; the trailing diagPrintSourceContext call for exactly the
@@ -184,7 +184,7 @@ diagPrintFatal:
 
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PROGRESS_LAST + 1
+    cmp #CASM_DIAG_PHASE14_WP86_LAST + 1
     bcs dpfUnknown
 
     ; CASM_DIAG_ASSERTION_FAILED ($54) with a user-supplied .ASSERT message
@@ -1222,7 +1222,7 @@ diagDumpToken:
 .segment "RODATA"
 
 ; Finding C (memory-optimization WP, task 42): one dense message table in
-; identifier order -- $01 CASM_DIAG_INIT_FAILED .. $56 CASM_DIAG_PROGRESS_LAST.
+; identifier order -- $01 CASM_DIAG_INIT_FAILED .. $5A CASM_DIAG_PHASE14_WP86_LAST.
 ; Replaces diagMessageLo/Hi + diagListMessageLo/Hi + diagWp81/82/83MessageLo/Hi
 ; + diagProgressMessageLo/Hi. diagPrintFatal indexes it by
 ; (identifier - CASM_DIAG_INIT_FAILED). Order is fixed by the CASM_DIAG_*
@@ -1316,6 +1316,10 @@ diagMsgLo:
     .byte <msgAssertionFailed      ; $54
     .byte <msgProgressCounterOverflow ; $55
     .byte <msgProgressPassTotalMismatch ; $56
+    .byte <msgLocalWithoutScope     ; $57
+    .byte <msgDuplicateLocal        ; $58
+    .byte <msgUndefinedLocal        ; $59
+    .byte <msgLocalInConstant       ; $5A
 diagMsgLoEnd:
 
 diagMsgHi:
@@ -1405,10 +1409,14 @@ diagMsgHi:
     .byte >msgAssertionFailed      ; $54
     .byte >msgProgressCounterOverflow ; $55
     .byte >msgProgressPassTotalMismatch ; $56
+    .byte >msgLocalWithoutScope     ; $57
+    .byte >msgDuplicateLocal        ; $58
+    .byte >msgUndefinedLocal        ; $59
+    .byte >msgLocalInConstant       ; $5A
 diagMsgHiEnd:
 
-.assert diagMsgLoEnd - diagMsgLo = CASM_DIAG_PROGRESS_LAST, error, "CASM diagnostic message table (lo) length must equal the last diagnostic identifier"
-.assert diagMsgHiEnd - diagMsgHi = CASM_DIAG_PROGRESS_LAST, error, "CASM diagnostic message table (hi) length must equal the last diagnostic identifier"
+.assert diagMsgLoEnd - diagMsgLo = CASM_DIAG_PHASE14_WP86_LAST, error, "CASM diagnostic message table (lo) length must equal the last diagnostic identifier"
+.assert diagMsgHiEnd - diagMsgHi = CASM_DIAG_PHASE14_WP86_LAST, error, "CASM diagnostic message table (hi) length must equal the last diagnostic identifier"
 
 ; Finding B (memory-optimization WP, task 42): the "CASM: " that used to
 ; lead every one of the ~89 message strings below, and the trailing PETSCII
@@ -1603,6 +1611,15 @@ msgProgressCounterOverflow:
     .byte "STATEMENT COUNT OVERFLOW", 0
 msgProgressPassTotalMismatch:
     .byte "PASS 1/PASS 2 STATEMENT MISMATCH", 0
+; Phase 14 WP89: local-label (@name) diagnostics.
+msgLocalWithoutScope:
+    .byte "LOCAL LABEL BEFORE ANY GLOBAL LABEL", 0
+msgDuplicateLocal:
+    .byte "DUPLICATE LOCAL LABEL IN SCOPE", 0
+msgUndefinedLocal:
+    .byte "UNDEFINED LOCAL LABEL", 0
+msgLocalInConstant:
+    .byte "LOCAL LABEL NOT ALLOWED IN CONSTANT", 0
 ; The five listing-file I/O diagnostics ($3D-$41): the head of the
 ; CASM_DIAG_LOCLESS_FIRST..LAST locationless run (see common.inc).
 msgListingCreateFailed:

@@ -894,12 +894,10 @@ CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = $55
 CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = $56
 CASM_DIAG_PROGRESS_LAST = CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH
 
-; Phase 14 WP86: local-label (`@name`) diagnostics. Numbers reserved here;
-; wired into diagPrintFatal's dense message table (diagnostics.s) and
-; actually raised starting WP89 -- until then these identifiers exist but
-; no code path produces them, so the table's own length-pinning assert
-; (diagMsgLoEnd - diagMsgLo = CASM_DIAG_PROGRESS_LAST) is deliberately left
-; unchanged and does not yet cover this range. See
+; Phase 14: local-label (`@name`) diagnostics. Reserved in WP86; wired
+; into diagPrintFatal's dense message table (diagnostics.s) and raised by
+; the pass driver / parser in WP89 -- the table's length-pinning assert
+; now targets CASM_DIAG_PHASE14_WP86_LAST. See
 ; `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
 ; WP89: `@local:` defined before any global label has been seen in this pass.
 CASM_DIAG_LOCAL_WITHOUT_SCOPE = $57

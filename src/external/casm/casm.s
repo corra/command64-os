@@ -70,6 +70,10 @@
 .import CasmSymbolInsertRefExtract
 .import CasmSymbolInsertDefinedAtOffsetLo
 .import CasmSymbolInsertDefinedAtOffsetHi
+.import CasmSymbolInsertScopeLo
+.import CasmSymbolInsertScopeHi
+.import CasmSymbolLookupScopeLo
+.import CasmSymbolLookupScopeHi
 
 ; WP65: ppsConstant's own staged output (parser.s) for a just-parsed
 ; `identifier = expr` statement.
@@ -292,6 +296,15 @@ startPass1:
     bcs startFatalNear1
     lda #CASM_PASS_MODE_MEASURE
     sta CasmPassMode
+    ; WP89: no local-label scope is open until the first global label of
+    ; this pass. CASM_SYMBOL_CHAIN_END ($FFFF) is the "none yet" sentinel;
+    ; crpLabel bumps this on every global label, identically in both
+    ; passes (globals appear in the same order each pass), so a local's
+    ; owning-scope ordinal is stable across the Pass1->Pass2 boundary.
+    lda #<CASM_SYMBOL_CHAIN_END
+    sta CasmCurrentScopeLo
+    lda #>CASM_SYMBOL_CHAIN_END
+    sta CasmCurrentScopeHi
     ; Progress Increment 4: begin Pass 1 only after CasmPassMode is set to
     ; MEASURE, per the Hook Contract -- progressBeginPass cannot fail.
     lda #$FF                    ; Increment 5: force a name snapshot on the
@@ -326,6 +339,15 @@ startPass1Continue:
     ; every label and every constant's own name is in the symbol table --
     ; the one point in casm's own control flow both are simultaneously true
     ; without yet having rewound into Pass 2's real emission.
+    ; WP89: the constant-resolution sweep looks up only global/constant
+    ; names (Phase 14 forbids a local on a constant's RHS), so force the
+    ; lookup scope filter to "no scope" -- a matched global record is
+    ; never scope-checked, but this keeps the sweep from carrying the last
+    ; statement's stale scope value.
+    lda #<CASM_SYMBOL_CHAIN_END
+    sta CasmSymbolLookupScopeLo
+    lda #>CASM_SYMBOL_CHAIN_END
+    sta CasmSymbolLookupScopeHi
     jsr casmResolveConstants
     bcc startPass1ConstantsOk
     jmp startFatal
@@ -385,6 +407,11 @@ startListingCaptureDone:
                                  ; out of range from this check too
     lda #CASM_PASS_MODE_EMIT
     sta CasmPassMode
+    ; WP89: reset the scope ordinal for Pass 2 exactly as Pass 1 did.
+    lda #<CASM_SYMBOL_CHAIN_END
+    sta CasmCurrentScopeLo
+    lda #>CASM_SYMBOL_CHAIN_END
+    sta CasmCurrentScopeHi
     ; Progress Increment 4: begin Pass 2 only after CasmPassMode is set to
     ; EMIT. Resets the active counter/divider and flips the internal
     ; pass-2 flag; cannot fail.
@@ -565,6 +592,17 @@ casmRunPass:
     bcc crpBeginOk
     jmp crpFail
 crpBeginOk:
+    ; WP89: publish the current local-label scope for this statement's
+    ; operand expression, which parserParseStatement evaluates inline
+    ; (parseOperandSequence -> parserParseExpressionValue -> the
+    ; symbolsLookup resolver). CasmCurrentScope already reflects every
+    ; global label dispatched before this statement -- a label is always
+    ; its own statement, so a `@local` reference can never appear in the
+    ; same statement that opened its scope.
+    lda CasmCurrentScopeLo
+    sta CasmSymbolLookupScopeLo
+    lda CasmCurrentScopeHi
+    sta CasmSymbolLookupScopeHi
     jsr parserParseStatement
     bcc :+
     jmp crpFail
@@ -799,13 +837,26 @@ crpLabel:
     ; "nothing else to do for a label" skip just below) would let Pass 2
     ; silently disagree with Pass 1 whenever a label is the first statement.
     jsr emitMarkStarted
-    bcc :+
+    bcc @markOk
     jmp crpFail
-    :
-        lda CasmPassMode
+@markOk:
+    ; WP89: a `@name` label is a local scoped to the most recent global
+    ; label; anything else is a global label that opens a new scope.
+    lda CasmLabelName
+    cmp #CASM_PETSCII_AT
+    beq crpLabelLocal
+
+    ; Global label: bump the scope ordinal ($FFFF -> 0 -> 1 ...), the same
+    ; way in both passes (globals dispatch in identical order each pass),
+    ; so a local's owning-scope value is stable across the Pass1->Pass2
+    ; boundary without any record-index lookup.
+    inc CasmCurrentScopeLo
+    bne @scopeBumped
+    inc CasmCurrentScopeHi
+@scopeBumped:
+    lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
-    bne crpLabelCommit            ; EMIT: nothing else to do for a label
-                                   ; statement besides the commit below
+    bne crpLabelCommit            ; EMIT: symbol already inserted in Pass 1
     ldx #<CasmLabelName
     ldy #>CasmLabelName
     stx CasmPtr0Lo
@@ -816,9 +867,53 @@ crpLabel:
     ldx CasmPc
     ldy CasmPc + 1
     jsr symbolsInsert
-    bcc :+
+    bcc crpLabelCommit
     jmp crpFail
-    :
+
+crpLabelLocal:
+    ; A local label needs a scope already open (a preceding global label).
+    lda CasmCurrentScopeLo
+    cmp #<CASM_SYMBOL_CHAIN_END
+    bne @localScoped
+    lda CasmCurrentScopeHi
+    cmp #>CASM_SYMBOL_CHAIN_END
+    bne @localScoped
+    ; WP89: point the diagnostic at this label statement (CasmStmtLoc was
+    ; stamped for it by parserParseStatement), not at wherever the last
+    ; expression-operand parse left CasmDiagLoc.
+    jsr diagSetLocFromStmt
+    lda #CASM_DIAG_LOCAL_WITHOUT_SCOPE
+    sec
+    jmp crpFail
+@localScoped:
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_MEASURE
+    bne crpLabelCommit            ; EMIT: symbol already inserted in Pass 1
+    ldx #<CasmLabelName
+    ldy #>CasmLabelName
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    lda #(CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_LOCAL)
+    sta CasmSymbolInsertFlags
+    lda CasmCurrentScopeLo
+    sta CasmSymbolInsertScopeLo
+    lda CasmCurrentScopeHi
+    sta CasmSymbolInsertScopeHi
+    lda CasmLabelNameLen
+    ldx CasmPc
+    ldy CasmPc + 1
+    jsr symbolsInsert
+    bcc crpLabelCommit
+    pha                          ; symbolsInsert's diag code
+    jsr diagSetLocFromStmt        ; WP89: point at this label statement (clobbers A)
+    pla
+    cmp #CASM_DIAG_DUPLICATE_SYMBOL
+    bne @localPropagate
+    lda #CASM_DIAG_DUPLICATE_LOCAL
+@localPropagate:
+    sec
+    jmp crpFail
+
     crpLabelCommit:
     jsr crpListingCommit
     bcc :+

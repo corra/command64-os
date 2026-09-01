@@ -501,3 +501,29 @@ Phase 14 is complete only when **all** of:
   directory-entry ceiling live adding this WP's harness). Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase14-wp88-symbol-scope-
   support.md`. Awaiting user sign-off before WP89.
+- 2026-09-01: **WP88 approved by user.** WP88 (`c345de9c`) closed. WP89
+  created (`bb4e956b-ec93-4216-97b1-f1f29ee7e0f7`), depends on WP88,
+  started.
+- 2026-09-01: WP89 source-complete. `casm.s`: `CasmCurrentScope` as a
+  global-label ordinal (reset per pass, bumped by `crpLabel` identically
+  both passes); `crpLabel` splits global vs `@local`, stamps LOCAL+scope
+  on Pass-1 insert, raises `LOCAL_WITHOUT_SCOPE`/`DUPLICATE_LOCAL`;
+  `casmRunPass` publishes `CasmSymbolLookupScope` before each statement's
+  operand-expression eval. `parser.s`/`expr.s`: `LOCAL_IN_CONSTANT`
+  rejects `@` on either side of `=`; `CasmExprPrimaryWasLocal` flag lets
+  `pevUnresolved` raise `UNDEFINED_LOCAL`. `diagnostics.s` + the verify
+  script wired for codes `$57-$5A` (now "90 diagnostic identifiers");
+  `diagPrintFatal`'s runtime range check retargeted to
+  `CASM_DIAG_PHASE14_WP86_LAST`. Two real defects found live: stale
+  fatal-diagnostic location (fixed with `diagSetLocFromStmt` in
+  `crpLabel`) and the un-retargeted runtime range check (printed
+  `INTERNAL ERROR` for `$57`). 9 production fixtures on a rebuilt
+  `casm_phase14_test_d64` (4 accepted `FILES COMPARE OK`, 5 rejected with
+  correct scoped diagnostics + source locations, all live-verified on
+  `CASM V0.5.2.1399`). No-locals regression: `casmassert1` COMP OK on
+  1399. MAIN headroom 2245 bytes. NOTE: `c64-overlay-api` MCP was down
+  all session -- overlay test events fired via curl fallback from
+  mid-WP89 on (see walkthrough + `feedback-overlay-api-curl-fallback`).
+  Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-phase14-wp89-pass-driver-wiring.md`.
+  Awaiting user sign-off before WP90.

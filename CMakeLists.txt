@@ -1983,6 +1983,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
     casmfwdstale1 casmchain1
     casmres1 casmfill1 casmalign1 casmincbin1 casmassert1
+    casmloc1 casmloc2 casmloc3 casmloc7
     casmpg63 casmpg64 casmpg65 casmpg128 casmpgblank casmpgrt casmpginc
     casmpgfill casmpgincbin casmpgr6)
 set(CASM_REF_BINS "")
@@ -2712,6 +2713,60 @@ add_c64_disk_image(casm_phase14_test_d64
 )
 add_dependencies(casm_phase14_test_d64 casm_test_fixtures casm_reference_fixtures)
 
+# WP89: production @local-label fixtures -- four accepted cases
+# (COMP-verified against hand-derived tests/fixtures/casm/casmloc*.ref.hex)
+# plus five rejected-form cases proving WP89's scoped diagnostics through
+# the real production pass driver.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase14_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_phase14_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmloc1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc2.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc3.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc3.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc3.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc7.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc7.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc7.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc7.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocnoscope.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocnoscope.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocdup.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocdup.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocundef.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocundef.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocconstl.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocconstl.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocconstr.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocconstr.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMENT "Appending WP89 @local-label fixtures and trusted references to casm_phase14_test.d64"
+    VERBATIM
+)
+
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)
     set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
@@ -3262,6 +3317,7 @@ foreach(REF_NAME IN LISTS CASM_REF_NAMES)
        AND NOT REF_NAME STREQUAL "casmfwdstale1" AND NOT REF_NAME STREQUAL "casmchain1"
        AND NOT REF_NAME STREQUAL "casmres1" AND NOT REF_NAME STREQUAL "casmfill1" AND NOT REF_NAME STREQUAL "casmalign1"
        AND NOT REF_NAME STREQUAL "casmincbin1" AND NOT REF_NAME STREQUAL "casmassert1"
+       AND NOT REF_NAME MATCHES "^casmloc"
        AND NOT REF_NAME MATCHES "^casmpg")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)

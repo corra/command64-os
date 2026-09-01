@@ -24,6 +24,7 @@
 .export exprCheckedSub
 .export exprApplyAddend
 .export exprEvaluate
+.export CasmExprPrimaryWasLocal
 
 .segment "CODE"
 
@@ -83,6 +84,13 @@
     stx CasmExprResolverAddrLo
     sty CasmExprResolverAddrHi
     jsr exprInit
+
+    ; WP89: cleared here, set to 1 by the `identifier` arm below only when
+    ; that identifier primary's name starts with '@'. parser.s's
+    ; pevUnresolved reads it to pick CASM_DIAG_UNDEFINED_LOCAL vs the
+    ; generic CASM_DIAG_UNDEFINED_SYMBOL for an unresolved Pass-2 operand.
+    lda #0
+    sta CasmExprPrimaryWasLocal
 
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_LESS
@@ -300,6 +308,17 @@ identifier:
     sta CasmPtr0Lo
     lda #>CasmTokenText
     sta CasmPtr0Hi
+    ; WP89: note whether this identifier primary is a `@local` reference,
+    ; while CasmTokenText still holds its name. Overwrites any earlier
+    ; primary's verdict -- fine for the bounded grammar (one identifier
+    ; primary per operand; the addend is always numeric).
+    ldy #0
+    lda CasmTokenText
+    cmp #CASM_PETSCII_AT
+    bne :+
+    iny
+:
+    sty CasmExprPrimaryWasLocal
     ldx #<CasmExprResolverOutput
     ldy #>CasmExprResolverOutput
     lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
@@ -1465,6 +1484,12 @@ CasmExprQuotientHi:   .res 1
 CasmExprRemainderLo:  .res 1
 CasmExprRemainderHi:  .res 1
 CasmExprRemainderExt: .res 1
+
+; WP89: 1 when the most recent identifier primary evaluated was a `@local`
+; reference, else 0. Cleared at every exprEvaluate entry. Placed after the
+; resolver-address symbols so it cannot shift CasmExprResolverAddrLo's own
+; BSS offset (the .assert just below guards that).
+CasmExprPrimaryWasLocal: .res 1
 
 .assert CasmExprResultRecordEnd - CasmExprResultRecord = CASM_EXPR_REC_SIZE, error, "CASM expression result record size changed"
 .assert <CasmExprResolverAddrLo <> $FF, lderror, "CASM resolver callback pointer crosses an NMOS 6502 indirect-jump page"

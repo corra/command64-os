@@ -1,0 +1,23 @@
+# CASM Phase 14 WP89 trusted reference: casmloc1
+#
+# Independently hand-assembled from the casmloc1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves a
+# @local label resolves as a backward branch target within its scope.
+#
+# Source (.ORG $C000, fixed address):
+#   | .ORG $C000
+#   | MAIN:
+#   | @LOOP:
+#   |     NOP
+#   |     BNE @LOOP
+#
+# Hand assembly:
+#   00 C0    - PRG load-address header ($C000, little-endian)
+#   EA       - @LOOP NOP at $C000
+#   D0 FD    - BNE @LOOP at $C001; displacement $C000 - $C003 = -3 = $FD
+#
+# bytes: 5
+
+00 C0
+EA
+D0 FD

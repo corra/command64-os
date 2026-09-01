@@ -27,6 +27,7 @@
 .import CasmTokenStartOffsetHi
 .import exprEvaluate
 .import exprGetResult
+.import CasmExprPrimaryWasLocal
 .import exprParseNumeric
 .import exprParseAddend
 .import exprApplyAddend
@@ -629,9 +630,21 @@ ppsLabel:
     cmp #CASM_TOKEN_COLON
     beq @colonOk
     cmp #CASM_TOKEN_EQUALS
-    beq ppsConstant
+    beq @equalsSeen
     jsr diagSetLocFromToken     ; the token that should have been a colon
     lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+@equalsSeen:
+    ; WP89: a `@local` name may not be the LHS of a named-constant
+    ; definition (`@x = expr`). Phase 14 forbids locals anywhere in the
+    ; constant deferred-reference machinery -- see the plan's Research
+    ; item 7. CasmLabelName still holds the just-copied identifier.
+    lda CasmLabelName
+    cmp #CASM_PETSCII_AT
+    bne ppsConstant
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_LOCAL_IN_CONSTANT
     sec
     rts
 @colonOk:
@@ -805,6 +818,16 @@ ppsConstant:
     jmp @requireTerminator
 
 @identifier:
+    ; WP89: a `@local` name may not be a named-constant RHS operand
+    ; either (`y = @x`). CasmTokenText still holds the identifier here.
+    lda CasmTokenText
+    cmp #CASM_PETSCII_AT
+    bne @identifierNotLocal
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_LOCAL_IN_CONSTANT
+    sec
+    rts
+@identifierNotLocal:
     ; Capture length and start-offset while the token is still IDENTIFIER --
     ; the very next lexerNext overwrites CasmTokenText, exactly the hazard
     ; exprEvaluate's own identifier branch already documents (expr.s).
@@ -1361,6 +1384,18 @@ pevUnresolved:
     lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
     beq pevMeasureUnresolved
+    ; WP89: if the expression's identifier primary was a `@local` name,
+    ; report the scoped diagnostic instead of the generic one. The
+    ; bounded-expression grammar's addend is always numeric, so the single
+    ; identifier primary is the only symbol reference that can be
+    ; unresolved here; expr.s's own identifier: branch stamps the flag
+    ; while CasmTokenText still holds that name.
+    lda CasmExprPrimaryWasLocal
+    beq pevUnresolvedGlobal
+    lda #CASM_DIAG_UNDEFINED_LOCAL
+    sec
+    rts
+pevUnresolvedGlobal:
     lda #CASM_DIAG_UNDEFINED_SYMBOL
     sec
     rts
