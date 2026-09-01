@@ -1,7 +1,7 @@
 ---
 feature: dash-mod-wp4-event-loop-dispatch-refactor
 created: 2026-09-01
-status: source-complete, awaiting sign-off
+status: done (user-approved 2026-09-01)
 taskwarrior: task 53 (child of 94ec17b3)
 depends-on: DASH-MOD WP3 (computed constants + .assert invariants, done + user-approved 2026-09-01 -- brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md)
 ---
@@ -10,7 +10,7 @@ depends-on: DASH-MOD WP3 (computed constants + .assert invariants, done + user-a
 
 ## Status
 
-**Approved 2026-09-01; source-complete, awaiting sign-off.** Fourth WP of the DASH Modernization
+**Done -- user-approved 2026-09-01.** Fourth WP of the DASH Modernization
 increment. Parent: `brain/plans/2026-09-01-dash-modernization.md`. WP1-3
 done + approved. Branch: `feature/casm-phase14`.
 
@@ -361,3 +361,4 @@ Appended to the WP3 invariant block:
   multi-address matrix is WP6's user sign-off. Overlay `test`/`pass`
   fired.
 - 2026-09-01: **WP4 source-complete.** AGENTS.md updated (event-loop/key-dispatch entry; Dispatch Trampoline rewritten). Walkthrough written. Parent plan Progress + wiki tick. Awaiting user sign-off before WP5.
+- 2026-09-01: **WP4 closed -- user-approved.** Taskwarrior task 53 done.

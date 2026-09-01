@@ -327,4 +327,6 @@ the cross-file symbol surface).
   entries.** Manifest re-baselined (--cross-check MATCHES, no
   --allow-host-bytes). Full build + image green. Walkthrough:
   `brain/walkthroughs/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`.
-  Awaiting user sign-off before WP5.
+- 2026-09-01: **WP4 closed -- user-approved.** Taskwarrior task 53 done.
+  WP5 (frame / screen / renderer helper refactor) needs its own detailed
+  sub-plan; also byte-changing, runtime-re-verified.

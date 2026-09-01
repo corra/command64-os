@@ -57,7 +57,7 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       relocated base (nav / redraw / VMM test PASSED / clean exit). ca65
       == native CASM byte-for-byte. **First shipping-byte change since
       WP91: 4766->4713 B, 3238b786->08f8f7ce, 465->459 reloc entries.**
-      Manifest re-baselined. Source-complete, awaiting sign-off. Plan:
+      Manifest re-baselined. **Closed -- user-approved 2026-09-01.** Plan:
       `brain/plans/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`.
       Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`.
 - [ ] **WP5 - DASH frame / renderer helper refactor.**
