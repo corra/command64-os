@@ -330,3 +330,18 @@ the cross-file symbol surface).
 - 2026-09-01: **WP4 closed -- user-approved.** Taskwarrior task 53 done.
   WP5 (frame / screen / renderer helper refactor) needs its own detailed
   sub-plan; also byte-changing, runtime-re-verified.
+- 2026-09-01: WP5 detailed sub-plan
+  (`brain/plans/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`)
+  drafted, **approved**; Taskwarrior task 54. Scope: DRAWFRAME +
+  DAPPPRINTFLAGS + dsys.s DSYSLABEL + dead-PRINTAT removal; dvmm.s
+  survey-only.
+- 2026-09-01: **WP5 source-complete.** `DRAWFRAME` -> `COPYFRAMEROW`
+  (7 loops -> 1 helper), `DAPPPRINTFLAGS` -> table loop, `dsys.s`
+  `DSYSLABEL` (12 openers -> 1 helper), dead `PRINTAT` removed; `dvmm.s`
+  surveyed (findings recorded, deferred). Pixel-identical -- live at
+  `$3800`. ca65 == native CASM byte-for-byte. **4713 -> 4579 bytes
+  (net -134), sha256 08f8f7ce -> 4a49612e, 459 -> 443 reloc entries,
+  -30 global labels.** Manifest re-baselined. Full build + image green.
+  Walkthrough:
+  `brain/walkthroughs/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
+  Awaiting user sign-off before WP6.

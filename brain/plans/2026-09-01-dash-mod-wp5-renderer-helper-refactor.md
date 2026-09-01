@@ -1,7 +1,7 @@
 ---
 feature: dash-mod-wp5-renderer-helper-refactor
 created: 2026-09-01
-status: approved -- in progress
+status: source-complete, awaiting sign-off
 taskwarrior: task 54 (child of 94ec17b3)
 depends-on: DASH-MOD WP4 (event-loop / key-dispatch refactor, done + user-approved 2026-09-01 -- brain/walkthroughs/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md)
 ---
@@ -10,7 +10,7 @@ depends-on: DASH-MOD WP4 (event-loop / key-dispatch refactor, done + user-approv
 
 ## Status
 
-**Proposed, not yet approved.** Fifth WP of the DASH Modernization
+**Approved 2026-09-01; source-complete, awaiting sign-off.** Fifth WP of the DASH Modernization
 increment. Parent: `brain/plans/2026-09-01-dash-modernization.md`. WP1-4
 done + approved. Branch: `feature/casm-phase14`.
 
@@ -381,3 +381,16 @@ Each ends with: `check_casm_source_bytes.py` clean, `cmake --build build
   hashes, no `--allow-host-bytes`. `dash` (`4a49612e...`, == native),
   full `cmake --build build`, `image_d64` all green. **WP5 net: -134
   shipped bytes** (relocation entries 459 -> 443).
+- 2026-09-01: **Increment 8 complete -- agent runtime pass.** DASH run
+  from the shell at the `$3800` relocated base. Screen-RAM-verified:
+  frame borders + title + tab bar + status bar + version banner all
+  pixel-identical; System page every field (`DSYSLABEL`); F3 ->
+  Applications flag column `u---` (table `DAPPPRINTFLAGS`, identical);
+  F5 -> VMM Test `ready`; `T` -> `PASSED` (pattern 3/3); `R` redraw;
+  F1 -> System; `Q` -> clean exit to `c64[8]:>`, shell responsive.
+  Range/size/used-free numbers differ only because DASH is 134 B smaller
+  + live OS VMM state -- layout/format/glyphs byte-identical. Relocation
+  audit: `AGENTS.md` rules still hold, -16 entries all accounted for.
+  Overlay `test`/`pass` fired.
+- 2026-09-01: **WP5 source-complete.** AGENTS.md "Renderer helpers"
+  entry added. Walkthrough written. Awaiting user sign-off before WP6.
