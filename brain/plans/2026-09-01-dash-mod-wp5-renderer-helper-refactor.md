@@ -352,3 +352,32 @@ Each ends with: `check_casm_source_bytes.py` clean, `cmake --build build
   pass. Code 3712 -> 3669 (-43), reloc 461 -> 451 (-10), PRG 4642 ->
   **4579** (-63). **Cumulative vs pre-WP5: -134 PRG bytes** -- the whole
   WP is a clear net shrink (DRAWFRAME's local +9 absorbed).
+- 2026-09-01: **Increment 6 -- `dvmm.s` survey (no code change).**
+  Metrics: 8 `LDA #COL_CONTENT / LDY #<row> / JSR SCREENSETCURSOR`
+  cursor-openers; 19 `LDA #SCREEN_COLS / ... / JSR SCREENPUTSTRING`
+  string prints; 20 `CMP #VMMSTATE_* / #VMMFAIL_*` enum compares across
+  the status-word, fail-stage, and instruction-line ladders.
+  **Findings (recorded, not acted on -- user scope decision):**
+  1. A `DVMMLABEL` helper (A = row, X/Y = ptr -> cursor at
+     `COL_CONTENT,row` + print), mirroring `DSYSLABEL`, would collapse
+     the 8 openers -- a clean ~25-30 byte win.
+  2. The 3 enum -> string `CMP/BEQ/set-ptr/JMP` ladders (status: 6
+     states, stage: 6, instruction: 3) could each become a `.WORD`
+     pointer table indexed by the (contiguous 0..N) enum value with one
+     bounds check -- ~-80 bytes and much flatter, but it rewrites the
+     capability-gated display selection and is exactly the "delicate"
+     logic this WP was told to leave alone.
+  3. A `DVMMPUTLINE` (`LDA #SCREEN_COLS / JSR SCREENPUTSTRING`) tail
+     helper is byte-neutral (adds a JSR/RTS) -- clarity only, skip.
+  Recommend #1 + #2 as a small dedicated follow-up ("DASH-MOD WP5b" or a
+  post-WP6 item) rather than folding into WP5.
+- 2026-09-01: **Increment 7 complete -- native CASM + re-baseline.**
+  Fresh `command64_casm_utils_d64`, `CASM DMAIN.S /O:DW5.PRG` under VICE
+  -> `P1/P2 01659 STATEMENTS` (was 01719 pre-WP5), `04579 BYTES`,
+  `INPUT VALIDATED`. `COMP DW5.PRG DASH.REF` -> `FILES COMPARE OK`;
+  extracted `DW5.PRG` `cmp`-identical to `build/dash_ref.prg` (4579
+  bytes). `dash.ref.hex` **re-baselined**: 4713 -> 4579 bytes, sha256
+  `08f8f7ce...` -> `4a49612e...`, `--cross-check MATCHES`, fresh source
+  hashes, no `--allow-host-bytes`. `dash` (`4a49612e...`, == native),
+  full `cmake --build build`, `image_d64` all green. **WP5 net: -134
+  shipped bytes** (relocation entries 459 -> 443).
