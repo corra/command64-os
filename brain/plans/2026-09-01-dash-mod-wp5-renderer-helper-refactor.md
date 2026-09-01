@@ -330,3 +330,10 @@ Each ends with: `check_casm_source_bytes.py` clean, `cmake --build build
   code. This is a *local* increase; PRINTAT removal (inc4) and the
   DAPPPRINTFLAGS / DSYSLABEL collapses (inc3, inc5) are each net
   shrinks -- the WP total is measured at inc7 and reported at close.
+- 2026-09-01: **Increment 3 complete -- `dapp.s` `DAPPPRINTFLAGS`.** 4
+  inline U/R/V/S cells + 8 `DAPPF*` labels -> one loop over
+  `APPFLAGMASKS` / `APPFLAGCHARS` (ddata.s). ca65 `dash_ref` builds,
+  `reloc.py` clean, `.assert`s pass. Code 3780 -> 3749 (-31), reloc
+  467 -> 463 (-4), PRG 4722 -> **4683** (-39). Cumulative vs pre-WP5:
+  -30 PRG. (One `check_casm_source_bytes` catch: a lowercase word in the
+  new doc comment -- fixed.)
