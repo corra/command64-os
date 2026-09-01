@@ -344,4 +344,7 @@ the cross-file symbol surface).
   -30 global labels.** Manifest re-baselined. Full build + image green.
   Walkthrough:
   `brain/walkthroughs/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
-  Awaiting user sign-off before WP6.
+- 2026-09-01: **WP5 closed -- user-approved.** Taskwarrior task 54 done.
+  WP6 (consolidated gate + re-baseline + AGENTS.md rewrite + CHANGELOG +
+  DASH version bump + user runtime matrix) needs its own detailed
+  sub-plan; it closes the whole DASH Modernization increment.

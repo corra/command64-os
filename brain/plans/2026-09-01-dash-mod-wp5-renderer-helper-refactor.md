@@ -1,7 +1,7 @@
 ---
 feature: dash-mod-wp5-renderer-helper-refactor
 created: 2026-09-01
-status: source-complete, awaiting sign-off
+status: done (user-approved 2026-09-01)
 taskwarrior: task 54 (child of 94ec17b3)
 depends-on: DASH-MOD WP4 (event-loop / key-dispatch refactor, done + user-approved 2026-09-01 -- brain/walkthroughs/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md)
 ---
@@ -10,7 +10,7 @@ depends-on: DASH-MOD WP4 (event-loop / key-dispatch refactor, done + user-approv
 
 ## Status
 
-**Approved 2026-09-01; source-complete, awaiting sign-off.** Fifth WP of the DASH Modernization
+**Done -- user-approved 2026-09-01.** Fifth WP of the DASH Modernization
 increment. Parent: `brain/plans/2026-09-01-dash-modernization.md`. WP1-4
 done + approved. Branch: `feature/casm-phase14`.
 
@@ -394,3 +394,4 @@ Each ends with: `check_casm_source_bytes.py` clean, `cmake --build build
   Overlay `test`/`pass` fired.
 - 2026-09-01: **WP5 source-complete.** AGENTS.md "Renderer helpers"
   entry added. Walkthrough written. Awaiting user sign-off before WP6.
+- 2026-09-01: **WP5 closed -- user-approved.** Taskwarrior task 54 done.

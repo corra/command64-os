@@ -67,7 +67,7 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       identical, live-verified at `$3800`. ca65 == native CASM
       byte-for-byte. **4713->4579 B (net -134), 08f8f7ce->4a49612e,
       459->443 reloc, -30 labels.** Manifest re-baselined.
-      Source-complete, awaiting sign-off. Plan:
+      **Closed -- user-approved 2026-09-01.** Plan:
       `brain/plans/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
       Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
 - [ ] **WP6 - Consolidated gate + re-baseline.** ca65<->CASM byte
