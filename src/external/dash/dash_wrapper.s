@@ -57,3 +57,10 @@
 ; DOS service-bus call codes sit in the $40-$5F OS API band.
 .assert DOS_ALLOC_MEM    >= $40, error, "DOS_ALLOC_MEM band"
 .assert DOS_GET_APP_INFO <= $5F, error, "DOS_GET_APP_INFO band"
+
+; Event-loop key dispatch (DASH-MOD WP4).
+.assert PAGE_ROUTINE_ENTRY_SIZE = 2, error, "ASL A assumes entry size 2"
+.assert KEY_F1 + PAGECOUNT <= $88, error, "F-key page range overruns F7"
+.assert (KEY_T & KEY_CASE_MASK) = KEY_T, error, "KEY_T not in case-folded form"
+.assert (KEY_R & KEY_CASE_MASK) = KEY_R, error, "KEY_R not in case-folded form"
+.assert (KEY_Q & KEY_CASE_MASK) = KEY_Q, error, "KEY_Q not in case-folded form"
