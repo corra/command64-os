@@ -795,6 +795,18 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_scope")
+            # Phase 14 WP88: standalone symbol-layer scope harness, same
+            # narrow-link shape as casm_symbols above (symbols.s plus its
+            # own vmm_store.s/resources.s dependencies, no
+            # parser/pass-driver/diagnostics.s).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
         if(TEST_NAME STREQUAL "casm_map")
             # WP52: map.s plus the symbol table it reads through
             # symbolsReadByIndex. Does NOT link diagnostics.s -- this harness
@@ -1812,6 +1824,14 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_expr)
 # canonical home.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_pass1)
 
+# Phase 14 WP88: test.d64's directory is already at capacity (confirmed
+# live -- adding test_casm_scope tipped it over with "ERROR: Dir track
+# full" building this file's own EDLIN fixture appends). Moved to its own
+# dedicated casm_phase14_test_d64 below instead, per the per-phase-
+# test-images convention (brain/task.md's per-phase-test-images.md
+# workflow).
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_scope)
+
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
@@ -2674,6 +2694,23 @@ add_c64_disk_image(casm_progress_test_d64
     PRGS command64 casm comp test_casm_progress
 )
 add_dependencies(casm_progress_test_d64 casm_test_fixtures casm_reference_fixtures)
+
+# Phase 14: dedicated test disk, per the per-phase-test-images convention
+# (.agents/workflows/per-phase-test-images.md) -- test.d64 is already at
+# its 1541 directory-entry ceiling (confirmed live, WP88: adding
+# test_casm_scope alone tipped it into "ERROR: Dir track full"). Created
+# early (WP88) rather than deferred to WP89, since WP88's own
+# test_casm_scope harness already needed a home off test.d64.
+# Self-bootable (command64 + casm + comp) for later WP89 COMP-verified
+# production fixtures; carries test_casm_scope (this WP's 11-case
+# standalone symbol-layer scope harness) for now.
+add_c64_disk_image(casm_phase14_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp test_casm_scope
+)
+add_dependencies(casm_phase14_test_d64 casm_test_fixtures casm_reference_fixtures)
 
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)

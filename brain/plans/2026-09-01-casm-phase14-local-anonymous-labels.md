@@ -479,3 +479,25 @@ Phase 14 is complete only when **all** of:
   at a clean `c64[8]:>` return. Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase14-wp87-lexer-local-
   identifiers.md`. Awaiting user sign-off before WP88.
+- 2026-09-01: **WP87 approved by user.** Taskwarrior WP87 (`31728848`)
+  closed. WP88 created (`c345de9c-b450-4266-912d-e5c075f77cd5`), depends
+  on WP87, started.
+- 2026-09-01: WP88 source-complete. `symbolsInsert` stamps
+  `CASM_SYMBOL_REC_SCOPE_LO/HI` for LOCAL records; `symbolsFindChain`'s
+  `sfcMatch` scope-checks a candidate only when it carries the LOCAL
+  flag; `symbolsInsert`/`symbolsLookup` each copy their own
+  Insert/LookupScope into a shared `CasmSymScratchFilterScopeLo/Hi`
+  before calling the chain walker. Design simplified from WP86's
+  original "name-prefix mode dispatch" doc comment: unnecessary, since a
+  local's stored name already includes the literal `@`. **Found and
+  fixed a real live defect**: the scope-filter copy clobbered `A`
+  (nameLen) before `jsr symbolsFindChain` in both routines, missed by
+  static review and a clean build; caught only by the new
+  `test_casm_scope` harness's first live run (`CASM SCOPE: FAIL`, 2/12
+  cases), fixed with `pha`/`pla`, re-verified `PASS` 12/12, and the
+  pre-existing `test_casm_symbols` (Phase 6B/WP60) harness re-run live
+  to prove the fix didn't regress the unscoped call shape (`PASS`).
+  New dedicated `casm_phase14_test_d64` created (test.d64 hit its
+  directory-entry ceiling live adding this WP's harness). Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-phase14-wp88-symbol-scope-
+  support.md`. Awaiting user sign-off before WP89.

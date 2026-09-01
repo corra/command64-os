@@ -101,18 +101,36 @@ CasmSymScratchHeadHi:   .res 1
 CasmSymbolInsertScopeLo:      .res 1
 CasmSymbolInsertScopeHi:      .res 1
 
-; Phase 14 WP86: the scope filter symbolsFindChain/symbolsLookup (WP88)
-; consult for a `@`-led queried name -- the CURRENT scope, i.e. the record
-; index of the most recently committed global label. Not consulted for a
-; queried name that does not start with '@' (global lookups are always
-; scope-independent, unchanged from Phase 6B). Set by the pass driver
-; before each statement's expression evaluation, from its own
-; CasmCurrentScopeLo/Hi. Storage declared here in WP86; symbolsFindChain
-; does not read this yet -- that wiring is WP88.
+; Phase 14 WP86/WP88: the scope filter symbolsLookup consults -- the
+; CURRENT scope, i.e. the record index of the most recently committed
+; global label. Set by the pass driver before each statement's expression
+; evaluation, from its own CasmCurrentScopeLo/Hi.
+;
+; WP88 design note (simpler than WP86's original doc comment described):
+; no name-prefix mode dispatch is needed. A local's stored Name bytes
+; already include the literal '@' (the lexer's token text does, WP87), so
+; a local name and a global name of the "same" spelling are already
+; distinct records by name/length alone -- symbolsFindChain's existing
+; hash-and-compare never conflates them. The only thing name comparison
+; alone cannot resolve is two DIFFERENT locals sharing one name under two
+; different scopes (`@loop` under `main:` vs `@loop` under `draw:`), so the
+; scope check only needs to trigger when the CANDIDATE record itself
+; carries CASM_SYMBOL_FLAG_LOCAL -- checked once, on the matched record,
+; not on the query. A global lookup harmlessly sets this the same as a
+; local one; it is simply never consulted, since no matched global record
+; ever has the LOCAL flag set.
 .export CasmSymbolLookupScopeLo
 .export CasmSymbolLookupScopeHi
 CasmSymbolLookupScopeLo:      .res 1
 CasmSymbolLookupScopeHi:      .res 1
+
+; WP88: symbolsFindChain's own scope-filter operand, copied here from
+; CasmSymbolInsertScopeLo/Hi or CasmSymbolLookupScopeLo/Hi (whichever
+; public entry point is calling) immediately before the jsr, so the shared
+; private chain-walk helper has one uniform place to read it from
+; regardless of caller.
+CasmSymScratchFilterScopeLo: .res 1
+CasmSymScratchFilterScopeHi: .res 1
 
 CasmSymbolInsertFlags:        .res 1
 CasmSymbolInsertRefVmmLo:     .res 1
@@ -177,6 +195,17 @@ siFail:
 ; symbolsFindChain (private)
 ; Hash a name, then walk its bucket's collision chain looking for an exact
 ; case-sensitive match. Shared by symbolsInsert and symbolsLookup.
+;
+; WP88: an exact name/length match on a record with CASM_SYMBOL_FLAG_LOCAL
+; set is not yet a match -- it also requires CASM_SYMBOL_REC_SCOPE_LO/HI to
+; equal CasmSymScratchFilterScopeLo/Hi (set by the caller from its own
+; CasmSymbolInsertScopeLo/Hi or CasmSymbolLookupScopeLo/Hi immediately
+; before calling here). A scope mismatch continues the chain walk exactly
+; like a name-length mismatch (sfcAdvance), rather than returning "found".
+; A record without the LOCAL flag is never scope-checked (global symbols
+; are scope-independent, unchanged from Phase 6B) -- see symbols.s's
+; CasmSymbolLookupScopeLo/Hi doc comment for why name comparison alone
+; already keeps locals and globals from colliding.
 ;
 ; Discriminant (callers must check in this order):
 ;   C clear             -> not found (walked to CASM_SYMBOL_CHAIN_END); A = 0
@@ -291,6 +320,21 @@ sfcCmpLoop:
     jmp sfcCmpLoop
 
 sfcMatch:
+    ; WP88: a name/length match on a LOCAL record additionally requires its
+    ; SCOPE to equal the caller's filter scope. A mismatch is not a match --
+    ; fall through to sfcAdvance exactly like a name mismatch would, walking
+    ; on past this record without disturbing CasmVmmBuffer's role as the
+    ; "current record" sfcAdvance reads NEXT from.
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_FLAGS
+    and #CASM_SYMBOL_FLAG_LOCAL
+    beq sfcMatchOk           ; not a local record: scope-independent
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_SCOPE_LO
+    cmp CasmSymScratchFilterScopeLo
+    bne sfcAdvance
+    lda CasmVmmBuffer + CASM_SYMBOL_REC_SCOPE_HI
+    cmp CasmSymScratchFilterScopeHi
+    bne sfcAdvance
+sfcMatchOk:
     ldx CasmSymScratchCursorLo
     ldy CasmSymScratchCursorHi
     lda #1
@@ -325,22 +369,44 @@ sfcAdvance:
 ; already covers that case. WP76: CasmSymbolInsertDefinedAtOffsetLo/Hi is
 ; copied the same way, alongside the Ref* fields -- unlike them it stays
 ; meaningful for the constant's entire lifetime, not just pre-resolution.
+; WP88: when CasmSymbolInsertFlags has CASM_SYMBOL_FLAG_LOCAL set,
+; CasmSymbolInsertScopeLo/Hi is copied into the new record's
+; CASM_SYMBOL_REC_SCOPE_LO/HI, and "exact case-sensitive duplicate" below
+; means duplicate name AND duplicate scope -- symbolsFindChain's own
+; scope-aware matching (see its own doc comment) is what makes reusing a
+; local name under a different scope succeed rather than reject.
 ;
 ; Inputs:  CasmPtr0Lo/CasmPtr0Hi = namePtr; A = nameLen (1..31);
 ;          X/Y = value (Lo/Hi); CasmSymbolInsertFlags = record flags;
 ;          CasmSymbolInsertRef* = deferred-reference bookmark, meaningful
-;              only when CasmSymbolInsertFlags has CASM_SYMBOL_FLAG_CONSTANT set
+;              only when CasmSymbolInsertFlags has CASM_SYMBOL_FLAG_CONSTANT set;
+;          CasmSymbolInsertScopeLo/Hi = owning-scope record index, meaningful
+;              only when CasmSymbolInsertFlags has CASM_SYMBOL_FLAG_LOCAL set
 ; Outputs: C clear, X/Y = new record index (Lo/Hi)
-;          C set, A = CASM_DIAG_DUPLICATE_SYMBOL (exact case-sensitive name
-;              already DEFINED), CASM_DIAG_SYMBOL_TABLE_FULL (CasmSymbolCount
-;              already at CASM_SYMBOL_MAX), or CASM_DIAG_VMM_TRANSFER_FAILED
-;              (internal: a vmmWindowRead/vmmWindowWrite call failed)
+;          C set, A = CASM_DIAG_DUPLICATE_SYMBOL (exact case-sensitive name,
+;              and same scope for a local, already DEFINED),
+;              CASM_DIAG_SYMBOL_TABLE_FULL (CasmSymbolCount already at
+;              CASM_SYMBOL_MAX), or CASM_DIAG_VMM_TRANSFER_FAILED (internal:
+;              a vmmWindowRead/vmmWindowWrite call failed)
 ; Clobbers: A, X, Y, CasmSym* scratch, CasmVmmOffLo/OffHi, CasmIoLenLo/Hi,
 ;           CasmVmmBuffer, and OS API-defined volatile registers
 ; ---------------------------------------------------------------------------
 symbolsInsert:
     stx CasmSymScratchValLo
     sty CasmSymScratchValHi
+
+    ; WP88 fix: A holds the caller's nameLen on entry (symbolsFindChain's
+    ; own ABI reads it) -- stash it across this copy rather than clobbering
+    ; it outright. Missing this PHA/PLA the first time round corrupted
+    ; nameLen on every single symbolsInsert call (found live, not just for
+    ; local/scoped inserts): recorded as a real defect in this WP's
+    ; walkthrough, not smoothed over.
+    pha
+    lda CasmSymbolInsertScopeLo
+    sta CasmSymScratchFilterScopeLo
+    lda CasmSymbolInsertScopeHi
+    sta CasmSymScratchFilterScopeHi
+    pla
 
     jsr symbolsFindChain
     bcc siNotFound
@@ -414,6 +480,20 @@ siNameDone:
     lda CasmSymbolInsertDefinedAtOffsetHi
     sta CasmVmmBuffer + CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI
 siRefDone:
+
+    ; WP88: a LOCAL record's owning scope. Independent of the CONSTANT gate
+    ; above (LOCAL and CONSTANT are mutually exclusive, common.inc's own
+    ; CASM_SYMBOL_FLAG_LOCAL doc comment) -- checked separately rather than
+    ; folded into the same branch, so this stays correct even if that ever
+    ; changes.
+    lda CasmSymbolInsertFlags
+    and #CASM_SYMBOL_FLAG_LOCAL
+    beq siScopeDone
+    lda CasmSymbolInsertScopeLo
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_SCOPE_LO
+    lda CasmSymbolInsertScopeHi
+    sta CasmVmmBuffer + CASM_SYMBOL_REC_SCOPE_HI
+siScopeDone:
 
     ; Prepend: Next = the bucket's ORIGINAL head (captured by
     ; symbolsFindChain before it walked anything).
@@ -504,6 +584,15 @@ siCountDone:
 symbolsLookup:
     stx CasmPtr1Lo
     sty CasmPtr1Hi
+
+    ; WP88 fix: same A-stash-across-the-copy fix as symbolsInsert above --
+    ; see that routine's own comment.
+    pha
+    lda CasmSymbolLookupScopeLo
+    sta CasmSymScratchFilterScopeLo
+    lda CasmSymbolLookupScopeHi
+    sta CasmSymScratchFilterScopeHi
+    pla
 
     jsr symbolsFindChain
     bcc slNotFound
