@@ -156,7 +156,7 @@ diagPrintMessage:
 ;
 ; Finding C (memory-optimization WP, task 42): one dense parallel table,
 ; diagMsgLo/Hi, holds every message pointer in identifier order
-; ($01 = CASM_DIAG_INIT_FAILED .. $5A = CASM_DIAG_PHASE14_WP86_LAST). Dispatch
+; ($01 = CASM_DIAG_INIT_FAILED .. CASM_DIAG_LAST). Dispatch
 ; is: reject out-of-range -> unknown fallback; peel off the
 ; CASM_DIAG_ASSERTION_FAILED user-message echo; index the table; and skip
 ; the trailing diagPrintSourceContext call for exactly the
@@ -184,7 +184,7 @@ diagPrintFatal:
 
     cmp #CASM_DIAG_INIT_FAILED
     bcc dpfUnknown
-    cmp #CASM_DIAG_PHASE14_WP86_LAST + 1
+    cmp #CASM_DIAG_LAST + 1       ; single id-space bound (common.inc)
     bcs dpfUnknown
 
     ; CASM_DIAG_ASSERTION_FAILED ($54) with a user-supplied .ASSERT message
@@ -1222,13 +1222,15 @@ diagDumpToken:
 .segment "RODATA"
 
 ; Finding C (memory-optimization WP, task 42): one dense message table in
-; identifier order -- $01 CASM_DIAG_INIT_FAILED .. $5A CASM_DIAG_PHASE14_WP86_LAST.
+; identifier order -- $01 CASM_DIAG_INIT_FAILED .. CASM_DIAG_LAST.
 ; Replaces diagMessageLo/Hi + diagListMessageLo/Hi + diagWp81/82/83MessageLo/Hi
 ; + diagProgressMessageLo/Hi. diagPrintFatal indexes it by
 ; (identifier - CASM_DIAG_INIT_FAILED). Order is fixed by the CASM_DIAG_*
 ; numbering and the contiguity asserts in common.inc; the two asserts below
-; pin the table length to the last identifier so a new CASM_DIAG_* without a
-; matching entry here fails the build.
+; pin the table length to CASM_DIAG_LAST -- which is also exactly what
+; diagPrintFatal's runtime range check bounds against, so a new CASM_DIAG_*
+; without a matching entry here fails the build AND the runtime check can
+; never fall behind the table.
 diagMsgLo:
     .byte <msgInitFailed           ; $01
     .byte <msgRegistryFull         ; $02
@@ -1415,8 +1417,8 @@ diagMsgHi:
     .byte >msgLocalInConstant       ; $5A
 diagMsgHiEnd:
 
-.assert diagMsgLoEnd - diagMsgLo = CASM_DIAG_PHASE14_WP86_LAST, error, "CASM diagnostic message table (lo) length must equal the last diagnostic identifier"
-.assert diagMsgHiEnd - diagMsgHi = CASM_DIAG_PHASE14_WP86_LAST, error, "CASM diagnostic message table (hi) length must equal the last diagnostic identifier"
+.assert diagMsgLoEnd - diagMsgLo = CASM_DIAG_LAST, error, "CASM diagnostic message table (lo) length must equal CASM_DIAG_LAST"
+.assert diagMsgHiEnd - diagMsgHi = CASM_DIAG_LAST, error, "CASM diagnostic message table (hi) length must equal CASM_DIAG_LAST"
 
 ; Finding B (memory-optimization WP, task 42): the "CASM: " that used to
 ; lead every one of the ~89 message strings below, and the trailing PETSCII

@@ -23,8 +23,11 @@ and user-approved. WP89 (pass-driver wiring: `CasmCurrentScope` ordinal,
 `crpLabel` local stamping, four scoped diagnostics `$57-$5A`, 9 production
 fixtures -- 4 `FILES COMPARE OK` incl. a forward local ref, 5 scoped-
 diagnostic rejects; two more real defects found live and fixed) is
-source-complete and build/live-verified, awaiting sign-off. WP90-92
-remain (pass-driver wiring + production fixtures + scoped
+source-complete and build/live-verified, awaiting sign-off. A standalone
+diag-table hardening (single `CASM_DIAG_LAST` source of truth so the
+`diagPrintFatal` runtime range check and the verify script can no longer
+drift behind the message table -- the WP89 defect) landed alongside,
+build-verified. WP90-92 remain (pass-driver wiring + production fixtures + scoped
 diagnostics, `/M` map rendering, DASH adoption, consolidated completion
 gate). Plan:
 `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.

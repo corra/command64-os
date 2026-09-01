@@ -896,8 +896,8 @@ CASM_DIAG_PROGRESS_LAST = CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH
 
 ; Phase 14: local-label (`@name`) diagnostics. Reserved in WP86; wired
 ; into diagPrintFatal's dense message table (diagnostics.s) and raised by
-; the pass driver / parser in WP89 -- the table's length-pinning assert
-; now targets CASM_DIAG_PHASE14_WP86_LAST. See
+; the pass driver / parser in WP89. CASM_DIAG_LAST (below) is the one
+; symbol every id-space bound follows. See
 ; `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
 ; WP89: `@local:` defined before any global label has been seen in this pass.
 CASM_DIAG_LOCAL_WITHOUT_SCOPE = $57
@@ -912,6 +912,25 @@ CASM_DIAG_UNDEFINED_LOCAL = $59
 ; deferred-reference bookmark entirely (Research item 7).
 CASM_DIAG_LOCAL_IN_CONSTANT = $5A
 CASM_DIAG_PHASE14_WP86_LAST = CASM_DIAG_LOCAL_IN_CONSTANT
+
+; ---------------------------------------------------------------------------
+; The single source of truth for "highest valid CASM_DIAG_* identifier".
+;
+; EVERY site that bounds the diagnostic id space keys off THIS symbol, not
+; off whichever phase's own *_LAST alias happens to be current:
+;   - diagnostics.s diagPrintFatal's runtime range check (cmp #..._LAST + 1)
+;   - diagnostics.s's diagMsgLo/diagMsgHi table-length asserts
+;   - scripts/verify_casm_diag_table.py (last_id)
+;
+; A phase that adds diagnostics updates ONLY this one line (plus the
+; contiguity asserts for its own new codes). The table-length .assert in
+; diagnostics.s is build-breaking, so it is impossible to bump this without
+; also growing the message table to match -- which in turn keeps the
+; runtime range check and the verify script from ever silently drifting
+; behind the table again (the WP89 defect: diagPrintFatal still cut off at
+; $56 and printed INTERNAL ERROR for $57 even though the table, its assert,
+; and the verify script had all been updated).
+CASM_DIAG_LAST = CASM_DIAG_PHASE14_WP86_LAST
 
 CASM_DIAG_UNKNOWN        = $FF
 

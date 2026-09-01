@@ -527,3 +527,14 @@ Phase 14 is complete only when **all** of:
   Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase14-wp89-pass-driver-wiring.md`.
   Awaiting user sign-off before WP90.
+- 2026-09-01: **Standalone hardening** (Taskwarrior
+  `df92683b-8e68-4350-8e0e-b80ad7c80720`, not a Phase 14 WP), user-directed
+  after the WP89 review question. Collapsed the three hardcoded "highest
+  valid diagnostic id" sites (`diagPrintFatal` runtime range check, the
+  `diagMsgLo`/`diagMsgHi` length asserts, `verify_casm_diag_table.py`)
+  onto one `CASM_DIAG_LAST` symbol in `common.inc`. The build-breaking
+  table-length assert now pins the runtime check and the verify script to
+  the same value -- they can no longer drift behind the table (the WP89
+  defect). Deliberate-break test confirmed the assert fires. Assembled
+  logic byte-identical. Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-diag-table-single-source-of-truth.md`.

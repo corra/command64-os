@@ -225,10 +225,15 @@ def decode_id_to_body(mem, syms, consts):
 
     Since Finding C (task 42) that dispatch is one dense table, diagMsgLo /
     diagMsgHi, indexed by (id - CASM_DIAG_INIT_FAILED) for every id in
-    $01..CASM_DIAG_PHASE14_WP86_LAST. (Before Finding C this walked six
-    separate range tables plus a nine-entry cmp/beq chain.)"""
+    $01..CASM_DIAG_LAST. (Before Finding C this walked six separate range
+    tables plus a nine-entry cmp/beq chain.)
+
+    CASM_DIAG_LAST (common.inc) is the single id-space bound every site
+    follows -- this script, diagPrintFatal's runtime range check, and the
+    build-breaking table-length asserts -- so keying off it here means a
+    new diagnostic can never slip past this coverage check."""
     first_id = consts["CASM_DIAG_INIT_FAILED"]
-    last_id = consts["CASM_DIAG_PHASE14_WP86_LAST"]
+    last_id = consts["CASM_DIAG_LAST"]
     lo, hi = syms["diagMsgLo"], syms["diagMsgHi"]
     bodies = {}
     for i in range(last_id - first_id + 1):
