@@ -156,10 +156,15 @@ it lands later, these asserts can migrate into the shared source.
   both assemblers agree. Increment 1 assembles the whole constant block
   under both before any use-site edits; each later increment re-checks
   via byte identity.
-- **All constants are simple:** `NAME = <literal>` or
-  `NAME = <literal op literal>` (e.g. `1<<1`, `2*SCREEN_COLS`). No
-  forward references (the block is first in the file), no `@local` on a
-  constant RHS (forbidden -- `LOCAL_IN_CONSTANT`,
+- **Every constant RHS is a bare literal** (`NAME = 40`, `NAME = $D4`).
+  Native CASM's *named-constant-definition* parser does **not** accept an
+  operator in the RHS -- `SYS_VMMFLAG_ACTIVE = 1<<0` gave `EXPECTED
+  NEWLINE` at the `<` (found in inc8, 2026-09-01). Operators (`* + > <<`)
+  are fine at *instruction-operand* use sites (proven in inc2:
+  `#(2 * SCREEN_COLS)`, `#>COLOR_RAM`), just not in a `NAME = ...`
+  definition. So flag masks are written as `1`/`2`/`4`/`8`, not `1<<n`.
+  Also: no forward references (the block is first in the file), no
+  `@local` on a constant RHS (`LOCAL_IN_CONSTANT`,
   `reference-local-label-in-constant-precedent`), no mid-code `=`.
 - **`.assert` lives only in `dash_wrapper.s`** (ca65-only, see
   `## .ASSERT approach`). The shared seven sources get **no** `.ASSERT`
@@ -423,3 +428,49 @@ the pre-WP3 shipping-manifest transcription -> **byte-identical**.
   The `>` / `*` / `+` constant-expression forms are proven equal under
   both assemblers -- later increments (plain `= literal` constants) are
   lower risk and batch their native check into increment 8.
+- 2026-09-01: **Increments 3-7 complete (ca65 byte-identical each).**
+  Commits `casm: DASH-MOD WP3 inc3..inc7`.
+  - inc3 `dfmt.s`: `DEC_RADIX`, `PETSCII_SYMBOL_BASE`, `PETSCII_LOWER_BASE`;
+    `#$20`/band-bounds/`#10` at use sites. Nibble masks + shift counters
+    left as idiom.
+  - inc4 `dsys.s`: `SCREENCODE_DOT`, `COL_CONTENT`, `ROW_SYS_*` (11),
+    `SYS_STRUCT_VERSION/SIZE`, full `SYS_OFF_*` field map,
+    `SYS_VMMFLAG_ACTIVE/REU_PROBED`, `VIDEO_NTSC/PAL`. `#$5C`/`JSR $1000`
+    -> `#DOS_GET_SYSTEM_INFO`/`JSR OS_API`; every `SYSINFOBUF+N` ->
+    `SYSINFOBUF+SYS_OFF_*` (two-byte fields as `...+1`); rows/column/
+    maxlen/dot/video/flag literals named.
+  - inc5 `dapp.s`: `SCREENCODE_DASH`, `ROW_APP_HEADER/SLOT0`,
+    `COL_APP_RANGE/SIZE/FLAGS`, `APP_NAME_WIDTH`, `APP_STRUCT_VERSION/
+    SIZE`, `APP_MAX_SLOTS`, `APP_OFF_*`, `APP_FLAG_*`, `DOS_ERR_SLOT_EMPTY`.
+    `DAPPPRINTFLAGS` label structure untouched (WP5).
+  - inc6 `dvmm.s`: `ROW_VMM_*` (8), `VMM_BLOCK_COUNT`, `VMM_PATTERN_COUNT`,
+    `VMM_ALLOC_PARAGRAPHS`, `VMMSTATE_*` (6), `VMMFAIL_*` (6). Every
+    `VMMPAGESTATE`/`VMMFAILSTAGE` literal (read + write) named; DOS API
+    codes, alloc-size `#<>`, sys-record reuse, loop bounds, rows/column/
+    maxlen named. Pattern-index / parity literals and the `$66-$6C` OS
+    VMM-param ZP block left as-is (shared ABI).
+  - inc7 `dmain.s`/`ddata.s`: `DISPATCHPAGE` `CMP #3` -> `#PAGECOUNT`,
+    resets -> `#PAGE_SYS`; new `VMM_BLOCK_SIZE`. `SYSINFOBUF`/`APPBUF`/
+    `VMMBUFFER` `.RES` counts -> `SYS_STRUCT_SIZE`/`APP_STRUCT_SIZE`/
+    `VMM_BLOCK_SIZE`. Stale "no equates" comment fixed. One `check_casm_
+    source_bytes` catch fixed (lowercase `x` in a new comment).
+  All 7 CASM sources pass `check_casm_source_bytes`. ca65 `dash_ref`
+  byte-identical to `3238b786...` after every increment; all `.assert`
+  pass throughout.
+- 2026-09-01: **Increment 8 complete -- full native CASM + manifest.**
+  First native run hit `CASM: EXPECTED NEWLINE` on
+  `SYS_VMMFLAG_ACTIVE = 1<<0`: CASM's *named-constant-definition* parser
+  rejects an operator in the RHS (operators are fine at instruction-
+  operand use sites, per inc2). Fixed: all flag masks written as plain
+  `1`/`2`/`4`/`8`. Also converted two `EXITAPP` operands missed earlier
+  (`#$4C`/`JSR $1000` -> `#DOS_EXIT`/`JSR OS_API`). Re-ran: native CASM
+  `V0.5.2.1404` P1/P2 `01728 STATEMENTS`, `04766 BYTES`, `INPUT
+  VALIDATED` -- the `SYS_OFF_*+1` two-byte-field arithmetic, the enum
+  constants, and `.RES SYS_STRUCT_SIZE`/`.RES APP_STRUCT_SIZE`/`.RES
+  VMM_BLOCK_SIZE` all assemble clean. `COMP DW3.PRG DASH.REF` -> `FILES
+  COMPARE OK`; extracted `DW3.PRG` `cmp`-identical to `dash_ref.prg` and
+  the pre-WP3 bytes (3-way, all `3238b786...`). `dash.ref.hex`
+  regenerated: byte payload untouched (only provenance + 7
+  `source_sha256` lines), `--cross-check MATCHES`, no `--allow-host-bytes`.
+  `dash` (`3238b786...`), full `cmake --build build`, and `image_d64`
+  all green. Overlay `test`/`pass` fired.
