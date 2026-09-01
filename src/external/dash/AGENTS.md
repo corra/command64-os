@@ -73,19 +73,21 @@ DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a P
 - The ca65 `dash_ref` target is an **independent cross-check only** and must never be the source of manifest bytes. `build_dash_manifest.py` refuses its output unless `--allow-host-bytes` is passed explicitly.
 - The cross-check is non-circular: ca65 and CASM share no code and derive relocation entries by completely different means — `tools/reloc.py` diffs two links one page apart, while CASM classifies each operand as relocatable during emission. A defect in one cannot reproduce itself in the other.
 - **Stale-artifact protection (WP9)**: `dash.ref.hex` embeds one `# source_sha256: <name>=<hash>` line per source file, written by `build_dash_manifest.py`. The `dash` CMake target always passes `--source-dir` to `hex_manifest_to_bin.py`, which recomputes each file's hash and hard-fails the build on any mismatch, missing file, or a manifest with no recorded hashes at all — editing a source without regenerating the manifest is a build failure, not a silent stale ship.
-- **Current provenance**: `dash.ref.hex`'s shipping bytes come from native CASM
-  `0.2.8` build `1322` running under VICE 3.10 with a 16MB REU on a dedicated
-  CASM-only test disk, `dash_casm_test.d64` (2026-08-20) — following the same
-  dedicated-d64-per-app methodology BANNER's own migration established
-  (`brain/plans/2026-08-20-banner-casm-native-migration.md`). This run
-  carried a further Phase 12 syntax pass beyond WP71's named-constant-only
-  adoption (WP68 shift/arithmetic expressions, WP74 string literals for the
-  audited range). Host `--cross-check build/dash_ref.prg` confirmed all
-  4,766 bytes match the independent ca65 reference, and match the prior
-  shipping manifest byte-for-byte — the syntax pass changed nothing
-  observable. No `--allow-host-bytes` override was used. `dash` ships on
-  `image_d64` (production only, never `test.d64`) from these reviewed
-  native bytes.
+- **Current provenance** (DASH `0.2.0`, DASH-MOD WP6, 2026-09-01):
+  `dash.ref.hex`'s shipping bytes come from native CASM `0.5.2` build
+  `1404` under VICE 3.10 with a 16MB REU, assembled from the seven SEQ
+  sources on `command64_casm_utils.d64` (`CASM DMAIN.S /O:DW6.PRG`).
+  `COMP DW6.PRG DASH.REF` on the C64 -> `FILES COMPARE OK`; the extracted
+  `DW6.PRG` `cmp`-matches the independent ca65 `dash_ref.prg`
+  byte-for-byte. Host `build_dash_manifest.py --cross-check
+  build/dash_ref.prg` regenerated the manifest: **4579 bytes, sha256
+  `3b4d0693a6413e7e7d328f18276b6beae3d5cbecccbe7578cfe9a13504121984`**,
+  cross-check MATCHES, no `--allow-host-bytes`. The DASH Modernization
+  increment (WP1-6) brought DASH from `4766` bytes / sha256 `3238b786...`
+  to this state with no user-visible behaviour change (byte-preserved
+  WP2-3; behaviour-identical, live-verified WP4-5; version-string-only
+  WP6). `dash` ships on `image_d64` (production only, never `test.d64`)
+  from these reviewed native bytes.
 
 # Native Assembly Workflow
 

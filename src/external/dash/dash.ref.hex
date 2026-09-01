@@ -4,19 +4,19 @@
 # back to a binary at build time by scripts/hex_manifest_to_bin.py,
 # which contains no 6502 knowledge and no assembler of any kind.
 #
-# provenance:  native CASM 0.5.2 build 1404 under VICE 3.10 (16MB REU), command64_casm_utils.d64, 2026-09-01; DASH-MOD WP5 renderer helper refactor -- DRAWFRAME COPYFRAMEROW, DAPPPRINTFLAGS table loop, dead PRINTAT removed, dsys.s DSYSLABEL. Behaviour-preserving; ca65 dash_ref cross-check MATCHES
+# provenance:  native CASM 0.5.2 build 1404 under VICE 3.10 (16MB REU), command64_casm_utils.d64, 2026-09-01; DASH-MOD WP6 consolidated gate -- DASH 0.2.0 version bump (DASHVERSTR only). Final state of the DASH Modernization increment (WP1-6). ca65 dash_ref cross-check MATCHES
 # cross-check: MATCHES dash_ref.prg (4579 bytes) byte-for-byte
 # load addr:   $3400
 #
 # bytes: 4579
-# sha256: 4a49612e391800f93d32fac18e8dd2ad383764832b315246b7336286ff47a0c2
+# sha256: 3b4d0693a6413e7e7d328f18276b6beae3d5cbecccbe7578cfe9a13504121984
 # source_sha256: dmain.s=a8cab31077861497eb99d26c4e71cd232d3bed686f6d1f1c40dba511cc0a9834
 # source_sha256: dscr.s=eb813bf49e324991d8217a548bf38c07cbcd8f0333a60a67c5d8e91f006268b4
 # source_sha256: dfmt.s=bc8925de0748a7849485c6d6f71483347326b3204fa266c9d4418accbbc734a1
 # source_sha256: dsys.s=29992b8b486c0e35328ab072212d1924165468aa86ac3080313d9d38e12fb2d2
 # source_sha256: dapp.s=f5953f8da88a03ef47c48d1324e01d616a13ec34018d351568fa9f90da1affd5
 # source_sha256: dvmm.s=5144b367bc3888167e344921b5d03794c5300953ca770bff86b883c9f8c66948
-# source_sha256: ddata.s=170d0dd8f563ff59a07e9bfe0c2355db23d6b4b5aab5fae38ff7e5ca7373dd90
+# source_sha256: ddata.s=8c7a4498077ae76b2887ff607b349257ebc3a656564d46b7fea574c6d79df3d1
 
 00 34 D8 A9 00 8D EA 3D 20 44 34 AD EB 3D F0 08
 A9 00 8D EB 3D 20 66 34 20 E4 FF AA F0 ED E0 85
@@ -177,7 +177,7 @@ AD 3E 40 C9 02 D0 05 A9 03 8D 3E 40 60 A9 05 8D
 03 A9 AA 60 A9 55 60 8A 60 A2 00 20 A4 3D DD 55
 41 D0 05 E8 D0 F5 18 60 8D 46 40 BD 55 41 8D 47
 40 AD 48 40 8D 44 40 8E 45 40 38 60 00 00 F5 36
-E4 38 72 3A 04 01 13 08 20 16 30 2E 31 2E 34 00
+E4 38 72 3A 04 01 13 08 20 16 30 2E 32 2E 30 00
 00 00 00 00 00 30 31 32 33 34 35 36 37 38 39 01
 02 03 04 05 06 02 0B 1A 06 0C 08 5B 40 40 40 40
 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40 40

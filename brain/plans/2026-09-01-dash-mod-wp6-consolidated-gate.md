@@ -232,3 +232,17 @@ screenshot evidence in the walkthrough for each.
   Size 4579, unchanged. (Also corrected a stale WP5 doc figure: the
   post-WP5 reloc count is 451, not the "443" the WP5 inc6-7 commit
   mis-stated -- fixed in the WP5 walkthrough, parent plan, wiki, memory.)
+- 2026-09-01: **Increment 3 complete -- consolidated re-verify + re-baseline.**
+  (1) `check_casm_source_bytes` on all 7 -> clean. (2) Clean rebuild of
+  `dash_ref` (`rm`'d artifacts): 4579 bytes, 3669 code, **451 relocation
+  points**, all 21 `.assert`s pass (link succeeded), `reloc.py` clean.
+  (3) Native `CASM V0.5.2.1404` under VICE, fresh utils disk,
+  `CASM DMAIN.S /O:DW6.PRG` -> `P1/P2 01659`, `04579 BYTES`, `INPUT
+  VALIDATED`; `COMP DW6.PRG DASH.REF` -> `FILES COMPARE OK`; extracted
+  `DW6.PRG` `cmp`-identical to `build/dash_ref.prg`. (4) `dash.ref.hex`
+  re-baselined: **4579 bytes, sha256 `4a49612e...` -> `3b4d0693...`**,
+  `--cross-check MATCHES`, 7 source hashes fresh, no `--allow-host-bytes`;
+  `cmp -l` vs pre-WP6 = exactly the 2 version bytes. (5) `dash`
+  (`3b4d0693...`, == native), full `cmake --build build`, `image_d64`,
+  `test_image_d64` -> all clean. AGENTS.md "Current provenance" +
+  size/sha refreshed to the final state.
