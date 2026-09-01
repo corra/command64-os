@@ -246,3 +246,21 @@ screenshot evidence in the walkthrough for each.
   (`3b4d0693...`, == native), full `cmake --build build`, `image_d64`,
   `test_image_d64` -> all clean. AGENTS.md "Current provenance" +
   size/sha refreshed to the final state.
+- 2026-09-01: **Increment 4 complete -- user runtime matrix.** Agent
+  drove all three bases live under VICE (16MB REU); banner reads
+  `DASH v0.2.0` at every base.
+  - **$3800** (shell default): System page renders every field; F3 ->
+    Applications `dash 3800-4654 ... u---`; F5 -> VMM Test; `T` ->
+    `status: PASSED`; `R` -> redraw; F1 -> System; `Q` -> `c64[8]:>`.
+  - **$5000** (`LOAD DASH 5000` / `RUN 5000`): System renders; F3 ->
+    `dash 5000-5e54 ... u---`; F5 -> VMM Test; `T` -> `PASSED`; F1;
+    `Q` -> shell.
+  - **$9000** (`LOAD DASH 9000` / `RUN 9000`): System renders every
+    field; F3 -> `dash 9000-9e54 ... u---` (relocated correctly). The
+    agent's keyboard feed starved the paused-heavy VICE session and
+    couldn't drive the remaining keys cleanly (PC snapshots showed DASH
+    inside KERNAL `GETIN` with the sent key in X -- polling fine, just
+    not enough continuous run-time between queries). **User ran the
+    $9000 base manually and confirmed it is fine** (2026-09-01).
+  All three bases: correct render + relocation + navigation + VMM test +
+  exit. Overlay `test`/`pass` fired.
