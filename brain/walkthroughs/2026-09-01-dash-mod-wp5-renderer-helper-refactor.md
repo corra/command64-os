@@ -16,7 +16,7 @@ dead `PRINTAT` routine is removed -- every rendered screen
 | shipping sha256 | `08f8f7ce...` | `4a49612e...` |
 | PRG size | 4713 bytes | **4579 bytes** (-134) |
 | code bytes | 3787 | 3669 (-118) |
-| relocation entries | 459 | 443 (-16) |
+| relocation entries | 459 | 451 (-8) |
 | P1/P2 statements | 1719 | 1659 |
 
 ### Changes
@@ -138,7 +138,7 @@ pointers, absolute label operands and `#>label` high bytes get entries;
 `$1000` (`OS_API`), `$FFE4` (`KERNAL_GETIN`), screen/colour RAM and ZP
 `$70-$8F` do not. The new `COPYFRAMEROW` uses `(ptr),Y` (ZP indirect, no
 entry); `DAPPPRINTFLAGS` / the `dsys.s` openers use `#<label` (excluded)
-+ `#>label` (entry). Net -16 entries (459 -> 443), all accounted for by
++ `#>label` (entry). Net -8 entries (459 -> 451), all accounted for by
 the removed inline `LDA label,X` operands and `PRINTAT`.
 
 ## Build evidence

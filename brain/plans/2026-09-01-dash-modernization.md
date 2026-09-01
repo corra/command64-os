@@ -340,7 +340,7 @@ the cross-file symbol surface).
   `DSYSLABEL` (12 openers -> 1 helper), dead `PRINTAT` removed; `dvmm.s`
   surveyed (findings recorded, deferred). Pixel-identical -- live at
   `$3800`. ca65 == native CASM byte-for-byte. **4713 -> 4579 bytes
-  (net -134), sha256 08f8f7ce -> 4a49612e, 459 -> 443 reloc entries,
+  (net -134), sha256 08f8f7ce -> 4a49612e, 459 -> 451 reloc entries,
   -30 global labels.** Manifest re-baselined. Full build + image green.
   Walkthrough:
   `brain/walkthroughs/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
