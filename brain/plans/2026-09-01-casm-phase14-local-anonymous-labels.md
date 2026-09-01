@@ -591,3 +591,21 @@ Phase 14 is complete only when **all** of:
   (MCP still down). Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase14-wp90-map-local-rendering.md`.
   Awaiting user sign-off before WP91.
+- 2026-09-01: **WP90 approved by user.** WP90 (`f7010987`) closed. WP91
+  created (`af6a65ad-3d1a-42d4-9b1d-d0b26cc26c2a`), started.
+- 2026-09-01: WP91 source-complete. `dfmt.s`: `FORMATDEC16`/`PETTOSCREEN`/
+  `DIV10` adopt `@LOOP`/`@DONE`/`@SKIP` (5 global labels -> routine
+  `@locals`, all verified locally-referenced). DASH `AGENTS.md` gains a
+  "Dual-Assembler Subset" clause: `@local` shared with ca65, anon
+  `:+`/`:-` not; the no-mid-code-`=` and no-`@name`-reuse-per-scope
+  constraints. **Zero byte change proven three ways**: ca65 `dash_ref`
+  byte-identical (4766 B, sha `3238b786`) to the prior manifest; native
+  CASM under VICE (`0.5.2.1403`, REU) -> 4766 B, `COMP DASH.PRG DASH.REF`
+  -> `FILES COMPARE OK`; extracted native `dash.prg` `cmp`-identical to
+  both. `dash.ref.hex` regenerated via `build_dash_manifest.py
+  --cross-check` (same bytes, fresh source hashes, no `--allow-host-bytes`).
+  Folded in a WP89 build gap: `test_casm_include` stubs the expr
+  evaluator and lacked `CasmExprPrimaryWasLocal` -> added a 1-byte BSS
+  stub. Full `cmake --build build` green. Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-phase14-wp91-dash-adoption.md`.
+  Awaiting user sign-off before WP92.

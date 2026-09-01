@@ -30,8 +30,12 @@ drift behind the message table -- the WP89 defect) landed alongside,
 build-verified. WP90 (`/M` renders `@local` rows as `<owner>@<local>`;
 `mapValidateRecord` rebuilt per-field -- folding in a latent Phase 12
 fix where any constant defined past file offset 0 tripped `SYMBOL MAP
-INVALID` under `/M`; `test_casm_map` 25/25 live) is source-complete and
-build/live-verified, awaiting sign-off. WP91-92 remain (pass-driver wiring + production fixtures + scoped
+INVALID` under `/M`; `test_casm_map` 25/25 live) is done and
+user-approved. WP91 (DASH `dfmt.s` adopts `@LOOP`/`@DONE`/`@SKIP` in
+three routines; AGENTS.md dual-assembler clause; DASH output
+byte-identical under ca65 and native CASM, triple-verified; manifest
+regenerated; a WP89 `test_casm_include` build gap folded in) is
+source-complete and build/live-verified, awaiting sign-off. WP92 remains (pass-driver wiring + production fixtures + scoped
 diagnostics, `/M` map rendering, DASH adoption, consolidated completion
 gate). Plan:
 `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
