@@ -1,7 +1,7 @@
 ---
 feature: dash-mod-wp6-consolidated-gate
 created: 2026-09-01
-status: source-complete, awaiting sign-off
+status: done (user-approved 2026-09-01)
 taskwarrior: task 55 (child of 94ec17b3)
 depends-on: DASH-MOD WP2-WP5 (all done + user-approved 2026-09-01); DASH-MOD WP1 (CASM .ASSERT ca65 keyword, done)
 ---
@@ -10,7 +10,7 @@ depends-on: DASH-MOD WP2-WP5 (all done + user-approved 2026-09-01); DASH-MOD WP1
 
 ## Status
 
-**Approved 2026-09-01; source-complete, awaiting sign-off.** Sixth and final WP of the DASH
+**Done -- user-approved 2026-09-01. Closes the DASH Modernization increment.** Sixth and final WP of the DASH
 Modernization increment. Parent:
 `brain/plans/2026-09-01-dash-modernization.md`. WP1-5 done + approved.
 Branch: `feature/casm-phase14`.
@@ -269,3 +269,4 @@ screenshot evidence in the walkthrough for each.
   the reusable findings; walkthrough written; parent plan + wiki
   updated. WP6 source-complete; awaiting final sign-off to close the
   increment.
+- 2026-09-01: **WP6 closed -- user-approved. DASH Modernization increment complete.** Taskwarrior task 55 done; parent task 94ec17b3 done.

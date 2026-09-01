@@ -364,6 +364,9 @@ the cross-file symbol surface).
   green. Walkthrough:
   `brain/walkthroughs/2026-09-01-dash-mod-wp6-consolidated-gate.md`.
   Awaiting final sign-off to close the increment (parent task 94ec17b3).
+- 2026-09-01: **DASH Modernization increment CLOSED -- user-approved.**
+  All six WPs done; Taskwarrior task 94ec17b3 done. DASH ships at 0.2.0
+  (manifest 3b4d0693, 4579 bytes).
 
 ## Increment summary
 
