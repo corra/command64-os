@@ -4,18 +4,18 @@
 # back to a binary at build time by scripts/hex_manifest_to_bin.py,
 # which contains no 6502 knowledge and no assembler of any kind.
 #
-# provenance:  native CASM 0.5.2 build 1403 under VICE 3.10 (16MB REU), command64_casm_utils.d64, 2026-09-01; Phase 14 WP91 @local-label adoption in dfmt.s -- zero byte change vs prior shipping manifest and the ca65 dash_ref cross-check
+# provenance:  native CASM 0.5.2 build 1404 under VICE 3.10 (16MB REU), command64_casm_utils.d64, 2026-09-01; DASH-MOD WP2 full @local-label migration across dscr.s/dsys.s/dapp.s/dvmm.s/dmain.s -- zero byte change vs prior shipping manifest and the ca65 dash_ref cross-check
 # cross-check: MATCHES dash_ref.prg (4766 bytes) byte-for-byte
 # load addr:   $3400
 #
 # bytes: 4766
 # sha256: 3238b7863cc9b7ba7b07202c94dccb8dcbd1fd0fe4c578362f311b79757b814b
-# source_sha256: dmain.s=53d4b2771a27e93dbb01b5d6a95fe665938ea3bfa48f5e1e13cbc714099c5d4a
-# source_sha256: dscr.s=9ca73ea27f16149b393dfe8166d711dde9ca4addf5fbe61c92ad0b017bf5ff40
+# source_sha256: dmain.s=39427ffb95cc60c035c4f2062a4e6439ac05a39a866db518700b85f88cf2d4c4
+# source_sha256: dscr.s=9ae7830d11f2864af0251ee05588a57d925beec5314ce65ee1d46162bc7830cf
 # source_sha256: dfmt.s=a3ed4c80b1c4fd958c755d6ababf1f7037d287d15560b578105e8a2a754133ef
-# source_sha256: dsys.s=7ba6c799f7b62ab204b032f077d09e5e4e56a23c42624df8a18de3a17a055e71
-# source_sha256: dapp.s=a88988d2351e3db529472ac9adab238be275102fae94fe164c2cd0cb9254336a
-# source_sha256: dvmm.s=64141df29ebea3362104ad9215403521195da865866118bb40348eb569fb6659
+# source_sha256: dsys.s=7a57d744fbe97d5328b5c38536c4cbb7d5d1351c7d60de0105a60b360518dcd9
+# source_sha256: dapp.s=098577f0cce950b79a7ebe60a5ff7ad0f1abd26ca35e5f6b698e4532e4f44ff2
+# source_sha256: dvmm.s=b466ef2c9127c819eae29ee3542012cf7c0ecedaca9fcdfc136a814ad3cd3529
 # source_sha256: ddata.s=c05da3366424496c66cc9a37757ee7a0571fd736ce08726ff654b0104c6db8eb
 
 00 34 D8 A9 00 8D 91 3E A9 01 8D 92 3E AD 92 3E

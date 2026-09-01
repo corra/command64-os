@@ -268,3 +268,23 @@ the cross-file symbol surface).
   `cmake --build build` green. Walkthrough:
   `brain/walkthroughs/2026-09-01-dash-mod-wp1-casm-assert-ca65-keyword.md`.
   Awaiting user sign-off before WP2.
+- 2026-09-01: WP2 detailed sub-plan
+  (`brain/plans/2026-09-01-dash-mod-wp2-full-local-migration.md`)
+  **approved**; Taskwarrior WP2 task 51 (child of parent).
+- 2026-09-01: WP2 source-complete. 84 routine-local helper labels demoted
+  to `@local` across `dscr.s` (13), `dsys.s` (14), `dapp.s` (10),
+  `dvmm.s` (44), `dmain.s` (3 -- `DISPATCHPAGE` only). Five atomic
+  increments, each ca65 byte-identity-checked. DASH.PRG byte-identical to
+  the pre-increment shipping manifest (sha256 `3238b786`, 4766 bytes)
+  three ways: ca65 `dash_ref`; native `CASM V0.5.2.1404` under VICE
+  (`P1/P2 01621`, `04766 BYTES`, `INPUT VALIDATED`, `COMP` -> `FILES
+  COMPARE OK`); host `cmp` of the extracted native `dash.prg`.
+  `dash.ref.hex` regenerated -- same bytes/sha256, `--cross-check`
+  MATCHES, fresh source hashes for the 5 changed files, no
+  `--allow-host-bytes`. `DRAWFRAME` / `DAPPPRINTFLAGS` / dmain event-loop
+  label sets explicitly deferred to WP4/WP5. Full `cmake --build build` +
+  `image_d64` green. Walkthrough:
+  `brain/walkthroughs/2026-09-01-dash-mod-wp2-full-local-migration.md`.
+- 2026-09-01: **WP2 closed — user-approved.** Taskwarrior task 51 done.
+  WP3 (computed constants + `.ASSERT` invariants) needs its own detailed
+  sub-plan before implementation.

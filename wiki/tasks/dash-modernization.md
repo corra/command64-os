@@ -26,9 +26,17 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       awaiting sign-off. Plan: `brain/plans/2026-09-01-dash-mod-wp1-casm-
       assert-ca65-keyword.md`. Walkthrough: `brain/walkthroughs/2026-09-01-
       dash-mod-wp1-casm-assert-ca65-keyword.md`.
-- [ ] **WP2 - DASH full `@local` migration (output-preserving).** Every
-      routine-local helper label across all code files; byte-identical to
-      the pre-increment manifest.
+- [x] **WP2 - DASH full `@local` migration (output-preserving).** 84
+      routine-local helper labels demoted to `@local` across `dscr.s`
+      (13), `dsys.s` (14), `dapp.s` (10), `dvmm.s` (44), `dmain.s`
+      (3, `DISPATCHPAGE` only). Byte-identical to the pre-increment
+      manifest (sha256 `3238b786`, 4766 bytes) under ca65 `dash_ref` and
+      native `CASM V0.5.2.1404` (`FILES COMPARE OK`), triple-checked;
+      manifest regenerated, source hashes only. `DRAWFRAME` /
+      `DAPPPRINTFLAGS` / event-loop label sets deferred to WP4/WP5.
+      **Closed — user-approved 2026-09-01.** Plan: `brain/plans/2026-09-01-
+      dash-mod-wp2-full-local-migration.md`. Walkthrough: `brain/
+      walkthroughs/2026-09-01-dash-mod-wp2-full-local-migration.md`.
 - [ ] **WP3 - DASH computed constants + `.ASSERT` invariants.**
 - [ ] **WP4 - DASH event loop / key dispatch / page dispatch refactor.**
 - [ ] **WP5 - DASH frame / renderer helper refactor.**
