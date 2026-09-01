@@ -345,3 +345,10 @@ Each ends with: `check_casm_source_bytes.py` clean, `cmake --build build
   reloc 463 -> 461 (-2), PRG 4683 -> **4642** (-41). Cumulative vs
   pre-WP5: **-71 PRG**. (Another lowercase-comment `check_casm_source_
   bytes` catch -- fixed.)
+- 2026-09-01: **Increment 5 complete -- `dsys.s` `DSYSLABEL`.** The 12
+  identical `LDA #row / JSR DSYSSETROW / LDA #cols / LDX/LDY <label> /
+  JSR SCREENPUTSTRING` openers -> `LDA #row / LDX/LDY <label> /
+  JSR DSYSLABEL`. ca65 `dash_ref` builds, `reloc.py` clean, `.assert`s
+  pass. Code 3712 -> 3669 (-43), reloc 461 -> 451 (-10), PRG 4642 ->
+  **4579** (-63). **Cumulative vs pre-WP5: -134 PRG bytes** -- the whole
+  WP is a clear net shrink (DRAWFRAME's local +9 absorbed).
