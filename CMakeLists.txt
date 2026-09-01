@@ -954,7 +954,11 @@ if(Ca65_FOUND)
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1000")
+            # Phase 14 WP87: the new '@'-prefixed local-identifier cases
+            # (source tables + case routines) overflowed $1000 by 140
+            # measured bytes; $1100 (+256) is the smallest round-page fit,
+            # same convention as every other harness-growth bump above.
+            set(TEST_PRG_SIZE "1100")
         endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}

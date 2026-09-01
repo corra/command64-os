@@ -462,3 +462,20 @@ Phase 14 is complete only when **all** of:
   instructions this WP). Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase14-wp86-design-freeze.md`.
   Awaiting user sign-off before WP87.
+- 2026-09-01: **WP86 approved by user.** Taskwarrior WP86 (`5224c364`)
+  closed. WP87 created (`31728848-3018-4bd4-aae3-ac68f5d3eea0`), depends
+  on WP86, started.
+- 2026-09-01: WP87 source-complete. `lexer.s` `lnId`/dispatch accept a
+  leading `@` (legal only when immediately followed by an `isIdFirst`
+  byte; malformed forms report `CASM_DIAG_INVALID_SOURCE_BYTE`, the same
+  code a bare `@` already produced). Seven new `test_casm_lexer` cases
+  (4 malformed, 3 accepted), harness bumped `$1000` -> `$1100`
+  (measured +140 byte overflow, standard round-page-fit convention).
+  `casm.prg` +66 code bytes over WP86 baseline (23737 -> 23803), zero
+  diagnostic-table change (codes still unproduced). Live VICE: user
+  approved taking over the running instance (previously showing a Conway
+  demo); `casm_phase12_test_d64` rebuilt fresh, Command64 booted, `test_
+  casm_lexer` dispatched via the shell, `CASM LEXER: PASS` (26/26 cases)
+  at a clean `c64[8]:>` return. Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-phase14-wp87-lexer-local-
+  identifiers.md`. Awaiting user sign-off before WP88.

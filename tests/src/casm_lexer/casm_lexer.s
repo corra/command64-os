@@ -142,6 +142,20 @@ start:
     jsr reportCase
     jsr caseStringInvalidff
     jsr reportCase
+    jsr caseLocalIdentSimple
+    jsr reportCase
+    jsr caseLocalIdentLong
+    jsr reportCase
+    jsr caseLocalIdentUnderscoreDigit
+    jsr reportCase
+    jsr caseLocalIdentBareAt
+    jsr reportCase
+    jsr caseLocalIdentDoubleAt
+    jsr reportCase
+    jsr caseLocalIdentAtDigit
+    jsr reportCase
+    jsr caseLocalIdentAtNewline
+    jsr reportCase
 
     lda #$0D
     jsr KernalChROUT
@@ -455,6 +469,125 @@ stringCaseFail:
     rts
 
 ; ---------------------------------------------------------------------------
+; Phase 14 WP87: '@'-prefixed local-identifier cases. Reuses the generic
+; "string mode" sourceNextByte mechanism (modes >= 6 index stringSourceLo/
+; Hi/Size by mode-6) -- it already does exactly what these cases need: a
+; fixed byte buffer, $0D mapped to CASM_SOURCE_NEWLINE, EOF once exhausted.
+; Modes 12-15 are the malformed forms (routed through the shared
+; stringCaseDiagnostic helper, same as the WP69/existing string cases);
+; modes 16-18 are the accepted forms, checked explicitly like caseStringRaw.
+; Placed after stringCaseInit/stringCaseFail (rather than the other
+; standalone cases above them) so every branch to stringCaseFail below --
+; both these new cases' own and the pre-existing string cases' -- stays
+; within 6502 branch range as this harness grows.
+; ---------------------------------------------------------------------------
+caseLocalIdentBareAt:
+    lda #12
+    ldx #CASM_DIAG_INVALID_SOURCE_BYTE
+    jmp stringCaseDiagnostic
+
+caseLocalIdentDoubleAt:
+    lda #13
+    ldx #CASM_DIAG_INVALID_SOURCE_BYTE
+    jmp stringCaseDiagnostic
+
+caseLocalIdentAtDigit:
+    lda #14
+    ldx #CASM_DIAG_INVALID_SOURCE_BYTE
+    jmp stringCaseDiagnostic
+
+caseLocalIdentAtNewline:
+    lda #15
+    ldx #CASM_DIAG_INVALID_SOURCE_BYTE
+    jmp stringCaseDiagnostic
+
+; "@A" -- shortest legal form, IDENTIFIER length 2, text "@A", then EOF.
+; Every failure branches to this case's own local @fail trampoline (rather
+; than jumping the full distance to the shared stringCaseFail directly) so
+; branch offsets stay small and stable as this harness grows -- same
+; precedent lexer.s itself uses throughout (bcc/bcs to a near label that
+; jmp's onward).
+caseLocalIdentSimple:
+    lda #16
+    jsr stringCaseInit
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_IDENTIFIER
+    bne @fail
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #2
+    bne @fail
+    lda CasmTokenText
+    cmp #CASM_PETSCII_AT
+    bne @fail
+    lda CasmTokenText + 1
+    cmp #$41                    ; 'A'
+    bne @fail
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_EOF
+    bne @fail
+    clc
+    rts
+@fail:
+    jmp stringCaseFail
+
+; "@LOOP2" -- multi-byte name, full-text compare.
+caseLocalIdentLong:
+    lda #17
+    jsr stringCaseInit
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_IDENTIFIER
+    bne @fail
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #6
+    bne @fail
+    ldx #5
+@loop:
+    lda CasmTokenText, x
+    cmp localIdLongExpected, x
+    bne @fail
+    dex
+    bpl @loop
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_EOF
+    bne @fail
+    clc
+    rts
+@fail:
+    jmp stringCaseFail
+
+; "@X1_Y" -- proves digit and underscore continuation bytes after the first
+; identifier-first byte following '@'.
+caseLocalIdentUnderscoreDigit:
+    lda #18
+    jsr stringCaseInit
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_IDENTIFIER
+    bne @fail
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    cmp #5
+    bne @fail
+    ldx #4
+@loop:
+    lda CasmTokenText, x
+    cmp localIdUnderscoreDigitExpected, x
+    bne @fail
+    dex
+    bpl @loop
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_EOF
+    bne @fail
+    clc
+    rts
+@fail:
+    jmp stringCaseFail
+
+; ---------------------------------------------------------------------------
 ; sourceNextByte (stub)
 ; Returns CASM_PETSCII_UPPER_A once per remaining byte in BytesRemaining,
 ; then CASM_SOURCE_EOF. Matches source.s's real CASM_SOURCE_BYTE/EOF
@@ -665,14 +798,33 @@ stringUntermSource: .byte CASM_PETSCII_QUOTE, $41
 stringNewlineSource: .byte CASM_PETSCII_QUOTE, $41, $0D
 stringInvalid7fSource: .byte CASM_PETSCII_QUOTE, $7F, CASM_PETSCII_QUOTE
 stringInvalidffSource: .byte CASM_PETSCII_QUOTE, $FF, CASM_PETSCII_QUOTE
+
+; Phase 14 WP87: local-identifier sources, indices 6-12 (modes 12-18).
+localIdBareAtSource:      .byte CASM_PETSCII_AT                  ; "@" then EOF
+localIdDoubleAtSource:    .byte CASM_PETSCII_AT, CASM_PETSCII_AT ; "@@"
+localIdAtDigitSource:     .byte CASM_PETSCII_AT, $31             ; "@1"
+localIdAtNewlineSource:   .byte CASM_PETSCII_AT, $0D             ; "@" then newline
+localIdSimpleSource:      .byte CASM_PETSCII_AT, $41             ; "@A"
+localIdLongSource:        .byte CASM_PETSCII_AT, $4C, $4F, $4F, $50, $32 ; "@LOOP2"
+localIdLongExpected:      .byte CASM_PETSCII_AT, $4C, $4F, $4F, $50, $32
+localIdUnderscoreDigitSource:   .byte CASM_PETSCII_AT, $58, $31, $5F, $59 ; "@X1_Y"
+localIdUnderscoreDigitExpected: .byte CASM_PETSCII_AT, $58, $31, $5F, $59
+
 stringSourceLo:
     .byte <stringEmptySource, <stringRawSource, <stringUntermSource
     .byte <stringNewlineSource, <stringInvalid7fSource, <stringInvalidffSource
+    .byte <localIdBareAtSource, <localIdDoubleAtSource, <localIdAtDigitSource
+    .byte <localIdAtNewlineSource, <localIdSimpleSource, <localIdLongSource
+    .byte <localIdUnderscoreDigitSource
 stringSourceHi:
     .byte >stringEmptySource, >stringRawSource, >stringUntermSource
     .byte >stringNewlineSource, >stringInvalid7fSource, >stringInvalidffSource
+    .byte >localIdBareAtSource, >localIdDoubleAtSource, >localIdAtDigitSource
+    .byte >localIdAtNewlineSource, >localIdSimpleSource, >localIdLongSource
+    .byte >localIdUnderscoreDigitSource
 stringSourceSize:
     .byte 2, 7, 2, 3, 3, 3
+    .byte 1, 2, 2, 2, 2, 6, 5
 
 passMsg:
     .byte "CASM LEXER: PASS", PetCr, 0
