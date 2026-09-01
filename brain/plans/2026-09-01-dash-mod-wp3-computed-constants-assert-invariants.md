@@ -1,7 +1,7 @@
 ---
 feature: dash-mod-wp3-computed-constants-assert-invariants
 created: 2026-09-01
-status: approved -- in progress
+status: source-complete, awaiting sign-off
 taskwarrior: task 52 (child of 94ec17b3)
 depends-on: DASH-MOD WP2 (full @local migration, done + user-approved 2026-09-01 -- brain/walkthroughs/2026-09-01-dash-mod-wp2-full-local-migration.md); DASH-MOD WP1 (CASM .ASSERT ca65 action keyword)
 ---
@@ -10,11 +10,13 @@ depends-on: DASH-MOD WP2 (full @local migration, done + user-approved 2026-09-01
 
 ## Status
 
-**Proposed, not yet approved.** Third WP of the DASH Modernization
-increment. Parent: `brain/plans/2026-09-01-dash-modernization.md`. WP1 and
-WP2 done + approved. Branch: `feature/casm-phase14`. Baseline: DASH
-shipping manifest sha256 `3238b786...`, 4766 bytes (unchanged since Phase
-14 WP91; WP2 was a byte-preserving rename).
+**Approved 2026-09-01; source-complete, awaiting sign-off.** Third WP of
+the DASH Modernization increment. Parent:
+`brain/plans/2026-09-01-dash-modernization.md`. WP1 and WP2 done +
+approved. Branch: `feature/casm-phase14`. Baseline: DASH shipping
+manifest sha256 `3238b786...`, 4766 bytes (unchanged since Phase 14
+WP91; WP2 was a byte-preserving rename). Walkthrough:
+`brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
 
 ## Objective
 
@@ -474,3 +476,8 @@ the pre-WP3 shipping-manifest transcription -> **byte-identical**.
   `source_sha256` lines), `--cross-check MATCHES`, no `--allow-host-bytes`.
   `dash` (`3238b786...`), full `cmake --build build`, and `image_d64`
   all green. Overlay `test`/`pass` fired.
+- 2026-09-01: **WP3 source-complete.** AGENTS.md updated (ZP-map
+  `.assert` note; "Expressions are bounded" -> constant-def RHS must be a
+  bare literal; `.ASSERT` -> equality/range invariants are ca65-only).
+  Walkthrough written. Parent plan Progress + `wiki/tasks/
+  dash-modernization.md` synced. Awaiting user sign-off before WP4.

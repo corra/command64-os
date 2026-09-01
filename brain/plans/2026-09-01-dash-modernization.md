@@ -288,3 +288,23 @@ the cross-file symbol surface).
 - 2026-09-01: **WP2 closed — user-approved.** Taskwarrior task 51 done.
   WP3 (computed constants + `.ASSERT` invariants) needs its own detailed
   sub-plan before implementation.
+- 2026-09-01: WP3 detailed sub-plan
+  (`brain/plans/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`)
+  drafted, revised, **approved**; Taskwarrior task 52. Scoping: broad
+  constant adoption, all in `dmain.s` prologue, R6 assert dropped.
+  Blocking finding mid-plan — CASM has no comparison operator, so the
+  `.assert` invariants moved to `dash_wrapper.s` (ca65-only); CASM side
+  covered by the byte cross-check.
+- 2026-09-01: **WP3 source-complete.** ~110 named constants across all 7
+  DASH sources + 16 ca65-only structural `.assert`s in `dash_wrapper.s`.
+  8 atomic increments, ca65 byte-identity per step. DASH.PRG
+  byte-identical to the pre-WP3 shipping manifest (`3238b786`, 4766
+  bytes) three ways: ca65 `dash_ref`; native `CASM V0.5.2.1404`
+  (`P1/P2 01728`, `INPUT VALIDATED`, `COMP` -> `FILES COMPARE OK`); host
+  `cmp` of the extracted native prg. `dash.ref.hex` regenerated —
+  payload untouched, hashes only, `--cross-check MATCHES`. Two
+  dual-assembler findings recorded in AGENTS.md (no comparison operator;
+  constant-def RHS must be a bare literal). Full `cmake --build build` +
+  `image_d64` green. Walkthrough:
+  `brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
+  Awaiting user sign-off before WP4.

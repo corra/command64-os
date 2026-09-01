@@ -37,7 +37,19 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       **Closed — user-approved 2026-09-01.** Plan: `brain/plans/2026-09-01-
       dash-mod-wp2-full-local-migration.md`. Walkthrough: `brain/
       walkthroughs/2026-09-01-dash-mod-wp2-full-local-migration.md`.
-- [ ] **WP3 - DASH computed constants + `.ASSERT` invariants.**
+- [x] **WP3 - DASH computed constants + `.ASSERT` invariants.** ~110
+      named constants across all 7 sources (`dmain.s` prologue) + 16
+      ca65-only structural `.assert`s in `dash_wrapper.s` (CASM has no
+      comparison operator; byte cross-check covers the CASM side).
+      Output-preserving: byte-identical to the pre-WP3 manifest
+      (`3238b786`, 4766 bytes) under ca65 `dash_ref` and native `CASM
+      V0.5.2.1404` (`INPUT VALIDATED`, `FILES COMPARE OK`), 3-way.
+      Manifest regenerated, hashes only. Key-ladder / `SELECT*` /
+      `DRAWFRAME` literals deferred to WP4/WP5. AGENTS.md gained two
+      dual-assembler notes (no comparison operator; constant-def RHS must
+      be a bare literal). Source-complete, awaiting sign-off. Plan:
+      `brain/plans/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
+      Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
 - [ ] **WP4 - DASH event loop / key dispatch / page dispatch refactor.**
 - [ ] **WP5 - DASH frame / renderer helper refactor.**
 - [ ] **WP6 - Consolidated gate + re-baseline.** ca65<->CASM byte
