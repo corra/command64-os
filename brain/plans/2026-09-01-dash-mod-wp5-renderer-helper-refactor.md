@@ -337,3 +337,11 @@ Each ends with: `check_casm_source_bytes.py` clean, `cmake --build build
   467 -> 463 (-4), PRG 4722 -> **4683** (-39). Cumulative vs pre-WP5:
   -30 PRG. (One `check_casm_source_bytes` catch: a lowercase word in the
   new doc comment -- fixed.)
+- 2026-09-01: **Increment 4 complete -- `dfmt.s` remove dead `PRINTAT`.**
+  Grep-confirmed no `JSR PRINTAT` anywhere and not in `PAGEROUTINETABLE`;
+  only reference was a `dsys.s` comment (left, reworded to past tense in
+  spirit -- it already reads "THE OLD ... PRINTAT"). Routine + 4 labels
+  (`_PANOCARRY`/`_PACOPYLOOP`/`_PADONE`) gone. Code 3749 -> 3712 (-37),
+  reloc 463 -> 461 (-2), PRG 4683 -> **4642** (-41). Cumulative vs
+  pre-WP5: **-71 PRG**. (Another lowercase-comment `check_casm_source_
+  bytes` catch -- fixed.)
