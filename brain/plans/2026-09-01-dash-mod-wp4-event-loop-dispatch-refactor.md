@@ -334,3 +334,13 @@ Appended to the WP3 invariant block:
   `reloc.py` clean. Size 3828 -> **3787 code bytes** (-41), relocation
   points 465 -> **459** (-6) -- the expected shrink from the collapse.
   `check_casm_source_bytes` clean.
+- 2026-09-01: **Increment 4 complete -- native CASM + re-baseline.**
+  Fresh `command64_casm_utils_d64`, `CASM DMAIN.S /O:DW4.PRG` under VICE
+  -> `P1/P2 01719 STATEMENTS` (was 01728 pre-refactor), `04713 BYTES`,
+  `INPUT VALIDATED`. `COMP DW4.PRG DASH.REF` -> `FILES COMPARE OK`;
+  extracted `DW4.PRG` `cmp`-identical to `build/dash_ref.prg` (4713
+  bytes) -- native CASM and ca65 produce the identical refactored
+  binary. `dash.ref.hex` **re-baselined**: 4766 -> 4713 bytes, sha256
+  `3238b786...` -> `08f8f7ce...`, `--cross-check MATCHES`, fresh source
+  hashes, no `--allow-host-bytes`. `dash` (`08f8f7ce...`, == native),
+  full `cmake --build build`, `image_d64` all green.
