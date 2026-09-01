@@ -344,3 +344,19 @@ Appended to the WP3 invariant block:
   `3238b786...` -> `08f8f7ce...`, `--cross-check MATCHES`, fresh source
   hashes, no `--allow-host-bytes`. `dash` (`08f8f7ce...`, == native),
   full `cmake --build build`, `image_d64` all green.
+- 2026-09-01: **Increment 5 complete -- agent runtime pass.** DASH run
+  from the Command64 shell (`dash`), which loads it at **$3800**
+  (USER RANGE `$3800-$BFFF`) -- i.e. relocated from its `$3400` build
+  base, so this is a relocated-base run. Verified via screen-RAM decode:
+  System page renders every field (os ver / device / video / user range /
+  protected / vmm / page size / totals / used-free / app slots); F3 ->
+  Applications page (header + slot 0 = DASH itself, `dash 3800-46ca ...
+  u---`); F5 -> VMM Test page (`status: ready`); `T` -> test runs ->
+  `status: PASSED`, `pattern: 3 / 3`, `allocation seg: $02 bank: $00`;
+  `R` -> redraw (page persists); F1 -> System page; lowercase `r`
+  (`$72`) -> case-folds -> redraw; lowercase `t` (`$74`) on the System
+  page -> **ignored** (T is VMM-page-only); `Q` (`$51`) -> clean exit to
+  `c64[8]:>`, shell responsive (`flush` -> `DR 8 STATUS: 00, OK`). Every
+  binding behaves exactly as pre-refactor. The `$3400`/`$5000`/`$9000`
+  multi-address matrix is WP6's user sign-off. Overlay `test`/`pass`
+  fired.
