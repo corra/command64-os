@@ -59,7 +59,6 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
 - **Utilities**
   - [External FORMAT Utility](tasks/format.md)
   - [CASM Phase 10 - Symbol Map and Listing](tasks/casm-phase10-symbol-map-listing.md) - Approved governing plan; WP50-WP55 remain pending and separately gated.
-  - [CASM Progress and Processing Indication](tasks/casm-progress-indication.md) - Optional deferred feature outside the CASM master-plan phases, with mandatory design and implementation reviews.
 - **Shell Semantics**
   - [External Application Return Codes](tasks/external-app-return-codes.md)
   - [Shell HELP Advertises Commands That Cannot Dispatch](tasks/shell-command-alias-discrepancy.md) - Bug: `RENAME`, `ERASE`, and `APPS` are advertised but absent from `tableCmd`.
@@ -77,6 +76,7 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
 - [LABEL Interactive Prompt](tasks/label-interactive-prompt.md)
 - [Memory-Safe Loading (Pre-flight Validation)](tasks/memory-safe-loading.md)
 - [MORE Command](tasks/more-command.md)
+- [CASM Progress and Processing Indication](tasks/casm-progress-indication.md) - Optional feature completed outside the CASM master-plan phases; user-approved after design, implementation, and runtime reviews.
 - [Phase 6A: App Manager](tasks/phase-6a-app-manager.md)
 - [Phase 6B: Binary Relocator](tasks/phase-6b-binary-relocator.md)
 - [VMM Block I/O Kernel Primitives](tasks/vmm-block-io.md)

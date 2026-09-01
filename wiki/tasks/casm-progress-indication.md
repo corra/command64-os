@@ -1,9 +1,9 @@
 # CASM Progress and Processing Indication
 
-Status: [/]
+Status: [x]
 Type: Optional Feature
-Classification: Active, incrementally approved
-Taskwarrior: 33 (`1acb36e3-2c0e-4f24-998b-279b2578bee4`)
+Classification: Complete, user-approved 2026-08-31
+Taskwarrior: completed (`1acb36e3-2c0e-4f24-998b-279b2578bee4`)
 Plan: `brain/plans/2026-07-29-casm-feature-progress-indication.md`
 
 ## Goal
@@ -108,12 +108,12 @@ renumber Phase 10, Symbol Map and Listing.
       design/ABI review gate.
 - [x] Complete and approve the pre-implementation design/ABI review.
 - [x] Freeze exact screen layout, storage, diagnostics, and register/flag ABI.
-- [ ] Implement only in separately approved atomic increments.
-- [ ] Complete automated build, artifact, functional, cleanup, and performance
+- [x] Implement only in separately approved atomic increments.
+- [x] Complete automated build, artifact, functional, cleanup, and performance
       verification.
-- [ ] Complete the full implementation review before runtime acceptance or
+- [x] Complete the full implementation review before runtime acceptance or
       merge.
-- [ ] Obtain user runtime confirmation and explicit completion approval.
+- [x] Obtain user runtime confirmation and explicit completion approval.
 
 ## Performance Limits
 

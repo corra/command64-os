@@ -4,8 +4,8 @@ CASM is command64's native 6502/6510 assembler: a ca65/ld65 external
 application (`src/external/casm/`) that runs *on* the C64 and assembles
 6502 source into a runnable PRG. This page documents its internal
 architecture, module ABIs, data records, and diagnostic contract for anyone
-extending CASM itself. For end-user command-line usage, see the (not yet
-written) user manual; for the OS services CASM builds on, see
+extending CASM itself. For end-user command-line usage, see the
+[CASM Utility Manual](casm-utility.md); for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
 > **Status: Phase 13 + progress indication + memory optimization complete
@@ -76,8 +76,9 @@ flowchart TD
     state["state.s — source/lexer/token BSS records (leaf)"]
     map["map.s — /M deterministic symbol map"]
     listing["listing.s — /L capture + .LST serialization"]
+    progress["progress.s — bounded transient/persistent progress display"]
 
-    casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc & map & listing
+    casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc & map & listing & progress
     include --> vmm & source
     emit --> parser & opcodes & fileio & lexer & reloc
     map --> symbols
@@ -93,6 +94,9 @@ flowchart TD
     vmm --> resources
     resources --> diagnostics & vmm
     diagnostics --> state & cli
+    diagnostics --> progress
+    source --> progress
+    emit --> progress
 ```
 
 Runtime data flow per source statement:
@@ -1141,6 +1145,109 @@ every fatal exit uniformly, regardless of how far initialization got or
 which options were active. See [§1](#1-architecture) for the full call
 sequence and `brain/plans/2026-07-29-casm-phase10-wp54-production-integration.md`
 for the increment-by-increment implementation record.
+
+## 17A. Progress Indication (`progress.s`)
+
+`progress.s` owns the complete progress-display state and rendering protocol.
+It allocates ordinary BSS only, adds no zero-page storage, and owns no file,
+VMM, parser, emitter, diagnostic, timer, or keyboard resource. It imports
+nothing from `diagnostics.s`, `listing.s`, or `map.s`; the only reverse edge is
+`diagnostics.s` importing `progressClearTransient` so every fatal diagnostic
+can erase a live status row before printing.
+
+### 17A.1 Screen protocol
+
+Every transient renderer emits exactly 34 characters on a 40-column screen and
+no carriage return. If a transient field is already visible, rendering first
+emits 34 cursor-left characters. Clearing performs the same rewind, writes 34
+spaces, rewinds again, and clears the visible flag. The first render after a
+persistent line does not rewind.
+
+The three transient layouts are:
+
+```text
+P1: D03 F07 FILENAME L00128 T00412
+LOAD F00ROOT.S  00256
+P2: INCBIN 00256
+```
+
+Production pads the last two rows with spaces to 34 characters. The pass
+status budget is `5 + 2 + 1 + 1 + 2 + 1 + 8 + 1 + 1 + 5 + 1 + 1 + 5 = 34`.
+`LOAD` uses a 21-character payload plus 13 spaces; directive progress uses a
+16-character payload plus 18 spaces. `progressPrintDec` renders unsigned
+16-bit values as fixed-width, zero-padded two- or five-digit decimal fields.
+
+Persistent output ends in `PetCr` and therefore advances normally:
+
+```text
+P1: START
+P1: DONE 00412 STATEMENTS
+P2: START
+P2: DONE 00412 STATEMENTS
+WRITE: PROGRAM.PRG
+DONE: P1 00412, P2 00412, 16384 BYTES
+```
+
+`WRITE:` is emitted by the orchestrator and is not restricted to the transient
+field's eight-character filename display.
+
+### 17A.2 State and hooks
+
+`CasmProgFlags` uses bit 0 for visible, bit 1 for Pass 2, and bit 2 for
+suspended. `progressInit` clears all state before any fallible setup so an
+early diagnostic cannot mistake uninitialized BSS for a visible row.
+
+| Routine | Contract |
+| --- | --- |
+| `progressBeginPass` | Takes pass number in A; resets active total and mod-64 divider, selects P1/P2, and prints `START`. |
+| `progressStatement` | Increments the 16-bit dispatched-statement total; returns A=1/C=0 at exact multiples of 64, A=0/C=0 otherwise, or the overflow diagnostic in A/C=1 before wrap. Preserves X/Y. |
+| `progressRenderTransient` | Reads caller-staged depth, file id, line, and eight-byte filename plus the active total; renders unless suspended. |
+| `progressCompletePass` | Clears the transient field, latches the Pass 1 total when applicable, and prints the pass `DONE` line. |
+| `progressSourceLoadBytes` | Takes the caller-authoritative cumulative committed source bytes in A/X and renders the transient `LOAD` row. |
+| `progressBeginDirective` | Takes the directive subtype in A and resets the directive snapshot. |
+| `progressDirectiveBytes` | Takes caller-authoritative cumulative accepted bytes in A/X and renders the active pass/directive row. |
+| `progressAccumulateOutputBytes` | Adds A/X to the 16-bit final-summary byte accumulator; performs no rendering. |
+| `progressCheckPassTotals` | Compares active Pass 2 total with latched Pass 1 total; returns C=1 and mismatch diagnostic in A when unequal. |
+| `progressClearTransient` | Idempotently erases a visible transient field. Clobbers A/X/Y. |
+| `progressSuspend` | Idempotently clears and sets suspended for `/L` and `/M` screen ownership. |
+| `progressFinalSummary` | Clears any transient field and prints the final persistent `DONE:` summary. |
+
+The caller stages `CasmProgArgDepth`, `CasmProgArgFileId`,
+`CasmProgArgLineLo/Hi`, and exactly eight bytes in `CasmProgArgNameBuf`
+immediately before rendering. The bounded filename buffer avoids adding the
+zero-page pointer that `(zp),Y` traversal of an arbitrary caller string would
+require. During included-file traversal `CasmSourceFileId` remains the
+top-level id (`F00` in the verified single-root case), while
+`CasmFrameCatalogIndex[depth-1]` supplies the active included filename. Thus
+the displayed `F` field is not a unique include-catalog id; depth and filename
+are the authoritative visible include identity.
+
+### 17A.3 Counting, cadence, and failure behavior
+
+`casmRunPass` calls `progressStatement` once for each dispatched label, named
+constant, instruction, or directive, including `.ORG` and `.INCLUDE`. Blank
+and comment-only lines, parser newline results, and EOF are excluded. Ordinary
+redraws occur at totals 64, 128, 192, and so on; a file/depth transition forces
+the next dispatched statement to render without waiting for that throttle.
+
+Source loading reports the cumulative cursor after each block has committed to
+VMM, normally at 256-byte intervals and after a final short block. `.RES`,
+`.FILL`, and `.ALIGN` report after each complete 256-byte emission chunk and a
+final short chunk; `.INCBIN` reports after each accepted input block. No
+zero-byte operation emits a directive row. Progress hooks run only after the
+authoritative operation succeeds, so display state cannot take precedence over
+an assembler, file, VMM, or emitter failure.
+
+`diagPrintFatal` always calls `progressClearTransient`. Statement overflow is
+`CASM_DIAG_PROGRESS_COUNTER_OVERFLOW` (`$55`, `CASM: STATEMENT COUNT OVERFLOW`);
+unequal pass totals are `CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH` (`$56`, `CASM:
+PASS 1/PASS 2 STATEMENT MISMATCH`). Pass-total agreement supplements rather
+than replaces include-event replay and final-PC agreement checks.
+
+The final output-byte accumulator is 16-bit. A PRG larger than 65,535 bytes is
+written correctly, but `DONE:` displays its size modulo 65536. Progress is
+always enabled; there is no `/Q`, percentage, ETA, elapsed time, polling, or
+cancellation contract.
 
 ## 18. Coverage: What Works Today
 

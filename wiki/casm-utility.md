@@ -88,27 +88,83 @@ are matched case-insensitively (`/o:out.prg` works the same as `/O:OUT.PRG`).
 
 ### Progress Display
 
-While CASM works it keeps you informed. A single **transient status line**
-is redrawn in place (it never scrolls) showing the active pass, the
-include depth, the physical-file id, the first eight characters of the
-file name, the current source line, and a running statement count. It
-updates every 64 statements and immediately whenever an `.INCLUDE` file is
-entered or left.
+CASM's progress display is always enabled. It uses a 34-character transient
+field within the C64's 40-column row. The field is rewritten in place without
+a carriage return, so repeated updates do not scroll the screen. The remaining
+six columns are unused.
 
-Between those, CASM prints **persistent** milestone lines:
+During either assembly pass, the transient line has this exact layout:
 
-- `P1: START` … `P1: DONE nnnnn STATEMENTS` (and `P2:` for the second pass);
-- `LOAD F...` while a top-level source or an `.INCLUDE` file streams in;
-- a bounded byte-count line during a long `.RES`, `.FILL`, `.ALIGN`, or
-  `.INCBIN`;
-- `WRITE: <name>` as the output PRG is finalized;
-- `DONE: P1 nnnnn, P2 nnnnn, nnnnn BYTES` — both passes' statement totals
-  and the final PRG size — immediately before `CASM: INPUT VALIDATED`.
+```text
+P1: D03 F07 FILENAME L00128 T00412
+```
 
-The status line is cleared before any error message, and is suspended
-while `/M` or `/L` output is printed, so it never overwrites a diagnostic,
-the symbol map, or a listing. The **assembled output bytes are identical**
-whether or not the display appears — it is purely informational.
+`P2:` replaces `P1:` during Pass 2. The fields are:
+
+| Field | Meaning |
+| --- | --- |
+| `D03` | Include depth, zero-padded to two digits. Top-level source is depth `00`. |
+| `F07` | Numeric top-level source identity, zero-padded to two digits. During included-file traversal this can remain the parent/root id; use `D` and the filename to identify the active include. |
+| `FILENAME` | First eight filename characters, truncated or space-padded to exactly eight. |
+| `L00128` | Physical line number within that file, zero-padded to five digits. |
+| `T00412` | Statements dispatched so far in the active pass, zero-padded to five digits. |
+
+The statement total includes labels, named constants, instructions, and every
+directive, including `.ORG` and `.INCLUDE`. Blank lines, comment-only lines,
+newlines, and end-of-file do not count. The ordinary pass display updates at
+exact totals 64, 128, 192, and so on. A source-file or include-depth change
+forces an update on the next dispatched statement, including include entry,
+return, and top-level root changes.
+
+Source loading and long byte-producing directives temporarily use the same
+transient field:
+
+```text
+LOAD F00ROOT.S  00256
+P1: RES    00256
+P1: FILL   00256
+P1: ALIGN  00256
+P2: INCBIN 00256
+```
+
+The `LOAD` layout has no separators between its two-digit file id, eight-byte
+filename field, and five-digit cumulative byte count. Loading updates after
+each successfully committed input block, normally every 256 bytes, and after
+a final short block. The directive line reports cumulative successfully
+accepted bytes after each complete block and after a final short block where
+applicable; a zero-byte operation produces no directive update.
+
+Major transitions are persistent lines ending in a carriage return:
+
+```text
+P1: START
+P1: DONE 00412 STATEMENTS
+P2: START
+P2: DONE 00412 STATEMENTS
+WRITE: PROGRAM.PRG
+DONE: P1 00412, P2 00412, 16384 BYTES
+CASM: INPUT VALIDATED
+```
+
+`WRITE:` prints the full output filename. Each pass starts with its statement
+counter reset. Pass 1's final total is retained and compared with Pass 2; a
+counter that would exceed 65535 reports `CASM: STATEMENT COUNT OVERFLOW`, and
+unequal pass totals report `CASM: PASS 1/PASS 2 STATEMENT MISMATCH` before a
+`P2: DONE` line can be printed.
+
+The transient field is erased before pass-completion lines and every fatal
+diagnostic. It is also cleared and suspended before `/L` listing serialization
+or `/M` map output, so it cannot overwrite their output. Progress owns no file,
+VMM, timer, keyboard, parser, or emitter resource, and the **assembled output
+bytes are identical** regardless of the display.
+
+All displayed counters are unsigned 16-bit values. The final `DONE:` byte
+field therefore wraps modulo 65536 for an output PRG larger than 65,535 bytes;
+this is a display limitation only and does not truncate or otherwise change the
+written file. The included-file numeric `F` field is likewise not a unique
+catalog id, although include depth and filename remain accurate. CASM currently
+has no quiet option, percentage, ETA, elapsed-time display, keypress polling,
+or cancellation.
 
 ## Language Reference
 

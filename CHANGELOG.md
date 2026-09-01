@@ -15,12 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   active pass, include depth, physical-file id, the first eight characters
   of the file name, the current source line, and a running statement
   count, redrawn on a 64-statement throttle and immediately on every
-  include frame push/pop. Persistent lines mark the milestones: `P1:
-  START` / `P1: DONE nnnnn STATEMENTS` (and `P2:` likewise), `LOAD F...`
-  while a source or `.INCLUDE` file streams in, bounded byte-cadence lines
-  during long `.RES`/`.FILL`/`.ALIGN`/`.INCBIN` runs, `WRITE: <name>` as
+  include frame push/pop. Persistent lines mark `P1: START` / `P1: DONE
+  nnnnn STATEMENTS` (and `P2:` likewise), `WRITE: <name>` as
   the output PRG is finalized, and a `DONE: P1 nnnnn, P2 nnnnn, nnnnn
-  BYTES` summary immediately before the existing `CASM: INPUT VALIDATED`.
+  BYTES` summary immediately before the existing `CASM: INPUT VALIDATED`;
+  `LOAD F...` and bounded `.RES`/`.FILL`/`.ALIGN`/`.INCBIN` byte counters
+  temporarily reuse the transient field.
   The transient line never scrolls, is cleared before any fatal
   diagnostic, and is suspended around `/M` and `/L` output. Assembled
   output is byte-identical with or without the display. Two internal
