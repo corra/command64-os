@@ -50,7 +50,16 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       be a bare literal). **Closed — user-approved 2026-09-01.** Plan:
       `brain/plans/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
       Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp3-computed-constants-assert-invariants.md`.
-- [ ] **WP4 - DASH event loop / key dispatch / page dispatch refactor.**
+- [x] **WP4 - DASH event loop / key dispatch / page dispatch refactor.**
+      `dmain.s`: MARKREDRAW helper; F1/F3/F5 -> computed page select
+      (SELECTSYS/APP/VMM collapsed); T/R/Q double-compares -> `AND #$DF`
+      case-fold. Behaviour-preserving, live-verified at the $3800
+      relocated base (nav / redraw / VMM test PASSED / clean exit). ca65
+      == native CASM byte-for-byte. **First shipping-byte change since
+      WP91: 4766->4713 B, 3238b786->08f8f7ce, 465->459 reloc entries.**
+      Manifest re-baselined. Source-complete, awaiting sign-off. Plan:
+      `brain/plans/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`.
+      Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`.
 - [ ] **WP5 - DASH frame / renderer helper refactor.**
 - [ ] **WP6 - Consolidated gate + re-baseline.** ca65<->CASM byte
       identity, manifest regen, user runtime sign-off, relocation audit,

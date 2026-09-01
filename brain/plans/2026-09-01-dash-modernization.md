@@ -312,3 +312,19 @@ the cross-file symbol surface).
   WP4 (event loop / key dispatch / page dispatch refactor) needs its own
   detailed sub-plan before implementation; it is the first WP that
   changes shipped bytes, so runtime re-verification resumes there.
+- 2026-09-01: WP4 detailed sub-plan
+  (`brain/plans/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`)
+  drafted, **approved**; Taskwarrior task 53. Scoping: computed dispatch
+  (no jump table), agent runtime pass at WP4 + user matrix at WP6, tidy
+  DISPATCHPAGE.
+- 2026-09-01: **WP4 source-complete.** `dmain.s` event loop refactored:
+  MARKREDRAW helper, F1/F3/F5 -> computed page select (SELECTSYS/APP/VMM
+  collapsed), T/R/Q case-fold (AND #$DF). Behaviour-preserving --
+  live-verified at the $3800 relocated base (all 3 pages, F-key nav, R
+  redraw, T -> VMM test PASSED, t ignored off-page, Q clean exit). ca65
+  == native CASM byte-for-byte. **First shipping-byte change since WP91:
+  4766 -> 4713 bytes, sha256 3238b786 -> 08f8f7ce, 465 -> 459 reloc
+  entries.** Manifest re-baselined (--cross-check MATCHES, no
+  --allow-host-bytes). Full build + image green. Walkthrough:
+  `brain/walkthroughs/2026-09-01-dash-mod-wp4-event-loop-dispatch-refactor.md`.
+  Awaiting user sign-off before WP5.
