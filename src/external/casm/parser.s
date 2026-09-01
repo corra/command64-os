@@ -19,6 +19,7 @@
 .import lexerNext
 .import lexerScanIncludeOperand
 .import lexerScanIncbinOperand
+.import compareTokenText
 .import CasmStringLength
 .import CasmStringBuffer
 .import CasmTokenRecord
@@ -517,14 +518,41 @@ ppsAssert:
     beq @haveComma
     jmp @requireTerminator
 @haveComma:
-    jsr lexerNext                ; consume ',', fetch the message token
+    jsr lexerNext                ; consume ',', fetch next token
     bcc @ok2
     rts
 @ok2:
+    ; DASH-MOD WP1: after the first comma the grammar accepts either the
+    ; CASM-legacy message STRING directly, or the ca65-required action
+    ; keyword (ERROR/WARNING/LDERROR/LDWARNING) optionally followed by
+    ; `, STRING`. The keyword carries no semantics in CASM -- every form
+    ; is evaluated at pass time and is fatal on a false result -- so it is
+    ; matched, consumed, and discarded.
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_STRING
     beq @haveMessage
-    jsr diagSetLocFromToken     ; the token that should have been a string
+    cmp #CASM_TOKEN_IDENTIFIER
+    bne @assertArgError
+    jsr ppsAssertMatchAction     ; C clear if CasmTokenText is an action keyword
+    bcs @assertArgError
+    jsr lexerNext                ; consume the action keyword
+    bcc @afterAction
+    rts
+@afterAction:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_COMMA
+    beq @actionThenMessage
+    jmp @requireTerminator
+@actionThenMessage:
+    jsr lexerNext                ; consume ',', fetch the message token
+    bcc @ok2b
+    rts
+@ok2b:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_STRING
+    beq @haveMessage
+@assertArgError:
+    jsr diagSetLocFromToken     ; the token that should have been STRING or an action keyword
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
@@ -567,6 +595,41 @@ ppsAssert:
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; ppsAssertMatchAction (DASH-MOD WP1, private)
+; Is the current IDENTIFIER token one of ca65's `.assert` action keywords?
+; Case-folded, matching ca65's own case-insensitivity. The keyword is
+; discarded on a match -- CASM assigns no meaning to which one it is.
+;
+; Inputs:  current token is an IDENTIFIER (CasmTokenText/CasmTokenRecord)
+; Outputs: C clear on a match; C set otherwise
+; Clobbers: A, X, Y, CasmPtr0, CasmLexerScratch0 (via compareTokenText)
+; ---------------------------------------------------------------------------
+; Only four keywords -- unrolled rather than a table, since compareTokenText
+; clobbers X and a table index would need stashing across each call.
+ppsAssertMatchAction:
+    ldx #<ppsAssertKwError
+    ldy #>ppsAssertKwError
+    jsr compareTokenText
+    bcc @match
+    ldx #<ppsAssertKwWarning
+    ldy #>ppsAssertKwWarning
+    jsr compareTokenText
+    bcc @match
+    ldx #<ppsAssertKwLdError
+    ldy #>ppsAssertKwLdError
+    jsr compareTokenText
+    bcc @match
+    ldx #<ppsAssertKwLdWarning
+    ldy #>ppsAssertKwLdWarning
+    jsr compareTokenText
+    bcc @match
+    sec
+    rts
+@match:
     clc
     rts
 
@@ -1405,3 +1468,13 @@ pevMeasureUnresolved:
     sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     clc
     rts
+
+.segment "RODATA"
+
+; DASH-MOD WP1: ca65 `.assert` action keywords, matched case-insensitively
+; by ppsAssertMatchAction and then discarded (CASM assigns them no
+; meaning -- see ppsAssert). Null-terminated for compareTokenText.
+ppsAssertKwError:     .byte "ERROR", 0
+ppsAssertKwWarning:   .byte "WARNING", 0
+ppsAssertKwLdError:   .byte "LDERROR", 0
+ppsAssertKwLdWarning: .byte "LDWARNING", 0

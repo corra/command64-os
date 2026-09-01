@@ -60,6 +60,9 @@
 .export lexerGetToken
 .export lexerScanIncludeOperand
 .export lexerScanIncbinOperand
+; DASH-MOD WP1: parser.s's ppsAssert matches the optional ca65-style
+; `.ASSERT` action keyword (ERROR/WARNING/LDERROR/LDWARNING) with this.
+.export compareTokenText
 .export CasmTokenStartOffsetLo
 .export CasmTokenStartOffsetHi
 .export CasmStringLength

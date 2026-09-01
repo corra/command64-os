@@ -1987,6 +1987,44 @@ file(WRITE "${OUTPUT_DIR}/casmassertfwd.seq"
     "COUNT = 5\n"
 )
 
+# DASH-MOD WP1: the optional ca65-style action keyword
+# (ERROR/WARNING/LDERROR/LDWARNING) before the optional message. CASM
+# parses and discards it -- every form is pass-time-evaluated and fatal on
+# a false result. All accepted cases live-verified for INPUT VALIDATED
+# (assert emits no bytes, no .ref); rejected cases for their diagnostic.
+file(WRITE "${OUTPUT_DIR}/casmakw1.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1, ERROR\n"
+    ".BYTE \$AA\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmakw2.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1, ERROR, \"OK MSG\"\n"
+    ".BYTE \$AA\n"
+)
+# Action present AND the assertion fails -- the message must still thread
+# through and be echoed (ASSERTION FAILED: BOOM).
+file(WRITE "${OUTPUT_DIR}/casmakw3.seq"
+    ".ASSERT 0, ERROR, \"BOOM\"\n"
+)
+# WARNING is treated identically to ERROR -- a false result is still fatal.
+file(WRITE "${OUTPUT_DIR}/casmakw4.seq"
+    ".ASSERT 0, WARNING\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmakw5.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1, LDERROR, \"X\"\n"
+    ".BYTE \$AA\n"
+)
+# A non-keyword identifier where an action keyword or STRING was expected.
+file(WRITE "${OUTPUT_DIR}/casmakwbad.seq"
+    ".ASSERT 1, BOGUS\n"
+)
+# An action keyword followed by a non-STRING where the message must be.
+file(WRITE "${OUTPUT_DIR}/casmakwbad2.seq"
+    ".ASSERT 1, ERROR, 5\n"
+)
+
 # ---------------------------------------------------------------------------
 # CASM progress-indication Increment 8 verification fixtures.
 #

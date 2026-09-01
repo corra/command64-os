@@ -2684,6 +2684,34 @@ add_custom_command(
     VERBATIM
 )
 
+# DASH-MOD WP1: ca65-style `.ASSERT` action-keyword fixtures.
+add_custom_command(
+    TARGET casm_phase13_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmakw1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw3.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw4.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw4.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw5.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw5.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakwbad.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakwbad.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakwbad2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakwbad2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending DASH-MOD WP1 .ASSERT action-keyword fixtures to casm_phase13_test.d64"
+    VERBATIM
+)
+
 # 6c-ter. CASM progress-indication feature's own dedicated test disk,
 # created for Increment 8 (automated verification) per
 # .agents/workflows/per-phase-test-images.md rather than consuming test.d64
