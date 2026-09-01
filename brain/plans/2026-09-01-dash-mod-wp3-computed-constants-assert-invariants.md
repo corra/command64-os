@@ -257,8 +257,11 @@ the pre-WP3 shipping-manifest transcription -> **byte-identical**.
    (Scratch output name, not `DASH.PRG`: the CMake
    `command64_casm_utils_d64` target now packages `build/dash.prg`, so
    `/O:DASH.PRG` fails with `OUTPUT WRITE FAILED` -- `fileCreateOutput`
-   has no replace mode, `project-casm-filecreateoutput-no-replace`.)
-   Front-loads the assert + constant-cross-check risk. If a `.assert`
+   has no replace mode, `project-casm-filecreateoutput-no-replace`.
+   `DW3.PRG` from a prior increment's run also collides, and the CMake
+   disk target does **not** reliably rebuild on a bare `--build` -- `rm
+   build/command64_casm_utils.d64` before rebuilding for each native
+   check.) Front-loads the assert + constant-cross-check risk. If a `.assert`
    fires, see Stop Conditions. File-specific constants (per-row Y
    indices, column indices, struct offsets, VMM enums) are added in
    their own file's increment below, alongside their first use, so each
@@ -402,4 +405,21 @@ the pre-WP3 shipping-manifest transcription -> **byte-identical**.
   home. (b) `command64_casm_utils_d64` packages `build/dash.prg`, so
   `/O:DASH.PRG` gives `CASM: OUTPUT WRITE FAILED` (clean error, not a
   hang -- `project-casm-filecreateoutput-no-replace` "hang" note may be
-  stale); switched the cross-check runs to `/O:DW3.PRG`.
+  stale); switched the cross-check runs to `/O:DW3.PRG`. (c) the CMake
+  disk target does not rebuild on a bare `--build`; `rm` the `.d64`
+  first before each native check.
+- 2026-09-01: **Increment 2 (`dscr.s`) complete.** New constants:
+  `COLORRAM_DELTA_HI`, `SCREENCODE_SPACE`, `SCREENCODE_VBAR`,
+  `TEXT_COLOR`, `ACTIVE_TAB_COLOR` (dmain.s prologue). dscr.s use sites:
+  `#$20`/`#$0E`/`#$01`/`#$5D` glyph+color literals, `#40`/`#25` cursor
+  bounds -> `#SCREEN_COLS`/`#SCREEN_ROWS`, `#$D4` -> `#COLORRAM_DELTA_HI`,
+  `#3` tab count -> `#PAGECOUNT`, `#2*40` -> `#(2 * SCREEN_COLS)`, `#$D8`
+  -> `#>COLOR_RAM`. Left raw: `$0400`/`$D800` screen/color RAM base
+  addresses and `DRAWFRAME`'s `$0400+N*40` row math (WP5 collapses those
+  loops), `#$04` screen-base-high in `COMPUTEROWADDR`. ca65 `dash_ref`
+  byte-identical (`3238b786...`), all `.assert` pass. Native CASM
+  `P1/P2 01643`, `04766 BYTES`, `INPUT VALIDATED`; `COMP DW3.PRG
+  DASH.REF` -> `FILES COMPARE OK`; extracted DW3.PRG 3-way byte-identical.
+  The `>` / `*` / `+` constant-expression forms are proven equal under
+  both assemblers -- later increments (plain `= literal` constants) are
+  lower risk and batch their native check into increment 8.
