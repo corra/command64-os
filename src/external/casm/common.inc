@@ -894,6 +894,27 @@ CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = $55
 CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = $56
 CASM_DIAG_PROGRESS_LAST = CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH
 
+; Phase 14 WP86: local-label (`@name`) diagnostics. Numbers reserved here;
+; wired into diagPrintFatal's dense message table (diagnostics.s) and
+; actually raised starting WP89 -- until then these identifiers exist but
+; no code path produces them, so the table's own length-pinning assert
+; (diagMsgLoEnd - diagMsgLo = CASM_DIAG_PROGRESS_LAST) is deliberately left
+; unchanged and does not yet cover this range. See
+; `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
+; WP89: `@local:` defined before any global label has been seen in this pass.
+CASM_DIAG_LOCAL_WITHOUT_SCOPE = $57
+; WP89: `@local:` redefined within the same owning scope (distinct from the
+; existing CASM_DIAG_DUPLICATE_SYMBOL $2C, which does not name the scope).
+CASM_DIAG_DUPLICATE_LOCAL = $58
+; WP89: `@local` referenced but never defined within the current scope
+; (distinct from CASM_DIAG_UNDEFINED_SYMBOL $2D for the same reason).
+CASM_DIAG_UNDEFINED_LOCAL = $59
+; WP89: a `@local` name used on either side of a named-constant definition
+; (`@x = expr` or `y = @x`) -- Phase 14 forbids locals in the constant
+; deferred-reference bookmark entirely (Research item 7).
+CASM_DIAG_LOCAL_IN_CONSTANT = $5A
+CASM_DIAG_PHASE14_WP86_LAST = CASM_DIAG_LOCAL_IN_CONSTANT
+
 CASM_DIAG_UNKNOWN        = $FF
 
 .assert CASM_DIAG_PHASE2_LAST = $13, error, "CASM Phase 2 diagnostic range changed"
@@ -973,6 +994,11 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_PROGRESS_COUNTER_OVERFLOW = CASM_DIAG_PHASE13_WP83_LAST + 1, error, "CASM progress diagnostics must follow WP83"
 .assert CASM_DIAG_PROGRESS_PASS_TOTAL_MISMATCH = CASM_DIAG_PROGRESS_COUNTER_OVERFLOW + 1, error, "CASM progress diagnostics must remain contiguous"
 .assert CASM_DIAG_PROGRESS_LAST = $56, error, "CASM progress diagnostic range changed"
+.assert CASM_DIAG_LOCAL_WITHOUT_SCOPE = CASM_DIAG_PROGRESS_LAST + 1, error, "CASM Phase 14 diagnostics must follow the progress diagnostics"
+.assert CASM_DIAG_DUPLICATE_LOCAL = CASM_DIAG_LOCAL_WITHOUT_SCOPE + 1, error, "CASM Phase 14 diagnostics must remain contiguous"
+.assert CASM_DIAG_UNDEFINED_LOCAL = CASM_DIAG_DUPLICATE_LOCAL + 1, error, "CASM Phase 14 diagnostics must remain contiguous"
+.assert CASM_DIAG_LOCAL_IN_CONSTANT = CASM_DIAG_UNDEFINED_LOCAL + 1, error, "CASM Phase 14 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE14_WP86_LAST = $5A, error, "CASM WP86 diagnostic range changed"
 
 ; The contiguous run of *locationless* fatal diagnostics: diagPrintFatal
 ; (diagnostics.s, unified-table dispatch -- memory-optimization WP task 42,
@@ -1269,6 +1295,17 @@ CASM_SYMBOL_FLAG_RESOLVED      = %00000100
 ; the way today's label-only code does. See WP65's Increment 8.
 CASM_SYMBOL_FLAG_LABEL_DERIVED = %00001000
 
+; Phase 14 WP86: the record describes a `@local` label, scoped to the
+; global label whose record index is held in CASM_SYMBOL_REC_SCOPE_LO/HI.
+; Every local also carries CASM_SYMBOL_FLAG_LABEL_DERIVED and
+; CASM_SYMBOL_FLAG_DEFINED (a local is a label). Mutually exclusive with
+; CASM_SYMBOL_FLAG_CONSTANT: Phase 14 forbids a local on either side of a
+; named-constant definition, so no local record ever carries the REF_*
+; bookmark. symbolsFindChain (WP88) adds SCOPE to its match predicate for
+; records with this bit set. See
+; `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
+CASM_SYMBOL_FLAG_LOCAL         = %00010000
+
 ; ---------------------------------------------------------------------------
 ; Phase 12 WP65 symbol record extension (deferred-constant reference bookmark)
 ; ---------------------------------------------------------------------------
@@ -1320,6 +1357,24 @@ CASM_SYMBOL_REC_REF_EXTRACT   = 43  ; CASM_EXTRACTION_FULL/LO/HI, applied to the
 CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO = 44
 CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI = 45
 
+; ---------------------------------------------------------------------------
+; Phase 14 WP86 symbol record extension (@local label owning scope)
+; ---------------------------------------------------------------------------
+;
+; Meaningful only when CASM_SYMBOL_FLAG_LOCAL is set: the record index of
+; the global label that opened this local's scope -- the most recent
+; non-local label the Pass 1/Pass 2 driver (casm.s, CasmCurrentScopeLo/Hi)
+; had committed at the point this local was inserted. Two locals sharing a
+; name but a different SCOPE are distinct records (a local under `main:`
+; and a local of the same name under `draw:` never collide); a wrong-scope
+; lookup misses even though the name matches. Written by symbolsInsert only
+; when CASM_SYMBOL_FLAG_LOCAL is set in CasmSymbolInsertFlags, copied from
+; CasmSymbolInsertScopeLo/Hi; left at the record's zero-fill for every
+; other caller. See
+; `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
+CASM_SYMBOL_REC_SCOPE_LO = 46
+CASM_SYMBOL_REC_SCOPE_HI = 47
+
 ; Bounded capacity: 512 records x 64 bytes = 32768 bytes, one vmmStoreAlloc
 ; call, well under CASM_VMM_ALLOC_MAX_BYTES. 128 hash buckets (a power of
 ; two, masked with $7F -- no division needed).
@@ -1364,6 +1419,11 @@ CASM_EXPR_PAREN_MAX_DEPTH = 8
 .assert CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO = CASM_SYMBOL_REC_REF_EXTRACT + 1, error, "CASM symbol record defined-at offset changed"
 .assert CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI = CASM_SYMBOL_REC_DEFINED_AT_OFFSET_LO + 1, error, "CASM symbol record defined-at offsets changed"
 .assert CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI < CASM_SYMBOL_REC_SIZE, error, "CASM symbol record defined-at bookmark overflows record"
+.assert CASM_SYMBOL_REC_SCOPE_LO = CASM_SYMBOL_REC_DEFINED_AT_OFFSET_HI + 1, error, "CASM symbol record scope offset changed"
+.assert CASM_SYMBOL_REC_SCOPE_HI = CASM_SYMBOL_REC_SCOPE_LO + 1, error, "CASM symbol record scope offsets changed"
+.assert CASM_SYMBOL_REC_SCOPE_HI < CASM_SYMBOL_REC_SIZE, error, "CASM symbol record scope field overflows record"
+.assert (CASM_SYMBOL_FLAG_LOCAL & CASM_SYMBOL_FLAG_LABEL_DERIVED) = 0, error, "CASM symbol LOCAL flag overlaps LABEL_DERIVED"
+.assert (CASM_SYMBOL_FLAG_LOCAL & (CASM_SYMBOL_FLAG_DEFINED | CASM_SYMBOL_FLAG_CONSTANT | CASM_SYMBOL_FLAG_RESOLVED)) = 0, error, "CASM symbol LOCAL flag overlaps a low flag bit"
 .assert CASM_SYMBOL_REC_SIZE = 64, error, "CASM symbol record size changed"
 .assert CASM_SYMBOL_REC_SIZE = CASM_VMM_BUFFER_SIZE, error, "CASM symbol record must fit one VMM transfer exactly"
 .assert CASM_SYMBOL_BUCKET_COUNT = CASM_SYMBOL_BUCKET_MASK + 1, error, "CASM symbol bucket count/mask mismatch"

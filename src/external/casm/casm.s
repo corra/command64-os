@@ -1747,6 +1747,20 @@ CrcValueHi:        .res 1
 CrcLabelDerived:   .res 1
 CrcBitmap:         .res 64
 
+; Phase 14 WP86: the record index of the most recently committed global
+; label -- the scope every subsequent `@local` definition/reference
+; belongs to until the next global label. CASM_SYMBOL_CHAIN_END ($FFFF)
+; means "no scope open yet" (no global label seen so far in this pass).
+; Reset to that sentinel at the start of every pass (Pass 1 and Pass 2
+; independently, so a mid-file scope reopens identically in both). crpLabel
+; (WP89) sets it on every successful global-label commit; it is not yet
+; read or written anywhere -- that wiring is WP89. Copied into
+; CasmSymbolInsertScopeLo/Hi (symbols.s) before a local's symbolsInsert
+; call, and into CasmSymbolLookupScopeLo/Hi before each statement's
+; expression evaluation.
+CasmCurrentScopeLo: .res 1
+CasmCurrentScopeHi: .res 1
+
 .segment "RODATA"
 
 CrcBitMaskTable: .byte 1, 2, 4, 8, 16, 32, 64, 128

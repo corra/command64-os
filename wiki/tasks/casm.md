@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
 Status: [/]
-Taskwarrior: Phase 12 parent (`c547c74f-5080-4f2e-b086-e4e2273b5336`)
-Plan: `brain/plans/2026-08-13-casm-phase12-constants-expanded-expressions.md`
+Taskwarrior: Phase 14 parent (`4cf10e7c-9365-46cf-94e1-5e4bd8d44635`)
+Plan: `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`
 
 ## Goal
 
@@ -11,6 +11,18 @@ documented 6502/6510 source on the C64 and emits static or Command 64
 R6-relocatable PRG files.
 
 ## Current Milestone
+
+**Phase 14 (Local Labels) is underway**, approved 2026-09-01. Adds ca65
+`@name` cheap-local labels scoped to the nearest preceding global label
+(anonymous `:`/`:+`/`:-` labels are explicitly deferred to a later phase).
+WP86 (design freeze: new symbol-record scope field, LOCAL flag, four new
+diagnostic identifiers, no behavior change) is source-complete and
+build-verified, awaiting sign-off. WP87-92 remain (lexer, symbol-layer
+scope filtering, pass-driver wiring + production fixtures, `/M` map
+rendering, DASH adoption, consolidated completion gate). Plan:
+`brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`. WP86
+walkthrough:
+`brain/walkthroughs/2026-09-01-casm-phase14-wp86-design-freeze.md`.
 
 **The optional progress and processing indication feature is complete**,
 user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`. It is

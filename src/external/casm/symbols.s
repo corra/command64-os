@@ -88,6 +88,32 @@ CasmSymScratchHeadHi:   .res 1
 .export CasmSymbolInsertRefExtract
 .export CasmSymbolInsertDefinedAtOffsetLo
 .export CasmSymbolInsertDefinedAtOffsetHi
+
+; Phase 14 WP86: the local's owning-scope record index, read by
+; symbolsInsert (WP88) only when CasmSymbolInsertFlags has
+; CASM_SYMBOL_FLAG_LOCAL set, and copied into the new record's
+; CASM_SYMBOL_REC_SCOPE_LO/HI (see common.inc). Storage declared here in
+; WP86; symbolsInsert does not read these yet -- that wiring is WP88. The
+; pass driver (casm.s) sets them from its own CasmCurrentScopeLo/Hi
+; immediately before every local-label symbolsInsert call.
+.export CasmSymbolInsertScopeLo
+.export CasmSymbolInsertScopeHi
+CasmSymbolInsertScopeLo:      .res 1
+CasmSymbolInsertScopeHi:      .res 1
+
+; Phase 14 WP86: the scope filter symbolsFindChain/symbolsLookup (WP88)
+; consult for a `@`-led queried name -- the CURRENT scope, i.e. the record
+; index of the most recently committed global label. Not consulted for a
+; queried name that does not start with '@' (global lookups are always
+; scope-independent, unchanged from Phase 6B). Set by the pass driver
+; before each statement's expression evaluation, from its own
+; CasmCurrentScopeLo/Hi. Storage declared here in WP86; symbolsFindChain
+; does not read this yet -- that wiring is WP88.
+.export CasmSymbolLookupScopeLo
+.export CasmSymbolLookupScopeHi
+CasmSymbolLookupScopeLo:      .res 1
+CasmSymbolLookupScopeHi:      .res 1
+
 CasmSymbolInsertFlags:        .res 1
 CasmSymbolInsertRefVmmLo:     .res 1
 CasmSymbolInsertRefVmmHi:     .res 1
