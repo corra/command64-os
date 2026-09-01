@@ -221,6 +221,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **DASH Modernization** (DASH `0.1.4` -> `0.2.0`, DASH-MOD WP1-6,
+  2026-09-01): DASH's seven dual-assembler sources were rebased onto the
+  modern shared CASM/ca65 feature set with **no user-visible behaviour
+  change** — same screens, same keys, same output, same relocation
+  contract. Shipping size fell `4766 -> 4579` bytes; ~30 global labels
+  removed; the manifest sha256 moved `3238b786... -> 08f8f7ce... ->
+  4a49612e... -> 3b4d0693...` across the byte-changing WPs. Work:
+  - **WP1** — CASM `.ASSERT` gained the ca65 action-keyword form
+    (`.ASSERT cond, ERROR[, "msg"]`) so the same spelling assembles under
+    both toolchains.
+  - **WP2** — every routine-internal helper label (~90) demoted to a
+    `@local` cheap local across all seven files; byte-identical output.
+  - **WP3** — ~110 magic numbers replaced by named constants in
+    `dmain.s`'s prologue (page model, screen geometry, `SYS_OFF_*` /
+    `APP_OFF_*` record maps, `VMMSTATE_*` / `VMMFAIL_*` enums, `DOS_*`
+    API codes, `KEY_*` / `ROW_*` / `COL_*`); 16 structural `.assert`
+    invariants added in the ca65-only `dash_wrapper.s` (CASM has no
+    comparison operator). Byte-identical output.
+  - **WP4** — `dmain.s` event loop / key dispatch: the 10-branch key
+    ladder became an F-key range check computing the page index directly
+    plus one `AND #$DF` case-fold for `T`/`R`/`Q`; `SELECTSYS/APP/VMM`
+    collapsed; `MARKREDRAW` helper. First shipping-byte change since
+    Phase 14 WP91; behaviour-identical, live-verified.
+  - **WP5** — renderer helpers: `DRAWFRAME`'s 7 near-identical row-copy
+    loops -> one `COPYFRAMEROW`; `DAPPPRINTFLAGS`'s 4 flag cells -> a
+    table loop; `dsys.s`'s 12 row openers -> a `DSYSLABEL` helper; the
+    dead `PRINTAT` routine removed. Pixel-identical, live-verified.
+  - **WP6** — consolidated gate: fresh ca65<->CASM byte-identity + native
+    CASM under VICE, manifest re-baselined, relocation audit, version
+    bump, `AGENTS.md` consolidation, user runtime matrix at `$3800` /
+    `$5000` / `$9000`.
+  Plans/walkthroughs: `brain/plans/2026-09-01-dash-mod-wp*.md` +
+  `brain/walkthroughs/2026-09-01-dash-mod-wp*.md`; parent
+  `brain/plans/2026-09-01-dash-modernization.md`.
 - **CASM memory optimization** (optional, size-only WP, CASM `0.5.0` ->
   `0.5.1`): recovered **2,068 bytes** of CASM's MAIN envelope with no
   change to assembled output, progress display, or diagnostic behavior.

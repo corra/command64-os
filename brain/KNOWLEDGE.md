@@ -2146,7 +2146,53 @@ runs, not one clean pass.
   just a DASH one-off: WP9 shipped `dash.prg` from the `dash_ref` ca65
   cross-check (`--allow-host-bytes`) with a truthful `# provenance:` line,
   user-approved as sufficient for now rather than blocking on a native-CASM-
-  on-hardware run.
+  on-hardware run. (Superseded: the manifest has carried real
+  native-CASM-on-hardware provenance since Phase 12 WP71.)
+
+**DASH Modernization (DASH `0.1.4` -> `0.2.0`, DASH-MOD WP1-6, closed
+2026-09-01, `feature/casm-phase14`).** DASH's seven sources were rebased
+onto the modern shared CASM/ca65 feature set with **no user-visible
+behaviour change** and byte-for-byte ca65<->CASM identity at every step.
+`4766 -> 4579` bytes; manifest sha256 `3238b786... -> 3b4d0693...`. Key
+outcomes and reusable findings:
+
+- **`@local` everywhere (WP2).** Every routine-internal helper label is a
+  cheap local. The eligibility rule: a label is `@local`-safe iff every
+  reference is a branch/jump within its own routine's `NAME:`-to-`NAME:`
+  span; a mis-localized cross-routine label fails to assemble (it cannot
+  silently produce wrong bytes), and byte-identity vs the manifest is the
+  backstop.
+- **Named constants (WP3), and two CASM expression-grammar limits.**
+  ~110 constants in `dmain.s`'s prologue. **(a)** A CASM named-constant
+  definition's RHS must be a **bare literal** — `NAME = 1<<0` gives
+  `EXPECTED NEWLINE`; operators (`* + > <<`) are fine at instruction
+  operands, just not in a `NAME = ...` line. **(b)** CASM's expression
+  grammar has **no comparison operator** (only `+ - | ^ & << >> * /`), so
+  a native-CASM `.ASSERT` is nonzero-truthiness only. DASH's structural
+  invariants (`PAGECOUNT = 3`, the ZP map, the API `$40-$5F` band, the
+  `PAGEROUTINETABLE` size) therefore live in `dash_wrapper.s` — the
+  ca65-only wrapper, with real operators — checked on every `dash_ref`
+  build; the ca65<->CASM byte cross-check covers the CASM side. Both are
+  now documented in `src/external/dash/AGENTS.md`.
+- **Behaviour-preserving refactors (WP4/WP5).** WP4 replaced the key
+  ladder with an F-key range check (`page = key - KEY_F1`) + one
+  `AND #$DF` case-fold for the `T`/`R`/`Q` shifted-charset variants
+  (fold uniqueness proven: `b & $DF == $54` iff `b in {$54,$74}`). WP5
+  collapsed `DRAWFRAME`'s 7 row loops into `COPYFRAMEROW` (via the
+  existing `COMPUTEROWADDR`), `DAPPPRINTFLAGS`'s 4 cells into a table
+  loop, `dsys.s`'s 12 row openers into `DSYSLABEL`, and removed the dead
+  `PRINTAT`. Each byte-changing WP re-ran a full ca65<->CASM +
+  native-CASM-under-VICE + runtime pass and re-baselined the manifest
+  once at its close.
+- **`dvmm.s` deferred (WP5 scope decision).** A `DVMMLABEL` opener helper
+  and `.WORD` enum->string tables for its 3 state/stage ladders are clean
+  wins (~-100 bytes, flatter) but touch capability-gated display logic;
+  recorded as a "WP5b"/post-increment follow-up.
+- **Consolidated gate (WP6).** Fresh together re-verification, version
+  bump, `AGENTS.md` consolidation, relocation audit, user runtime matrix
+  at `$3800` / `$5000` / `$9000` (`LOAD DASH <hex>` / `RUN <hex>`, the
+  WP84 precedent). This is the baseline Phase 14 WP92's gate re-verifies
+  against.
 
 ### CASM Phase 10 Symbol Map/Listing Contract (WP50-55, closed 2026-08-08)
 

@@ -1,6 +1,6 @@
 # DASH Modernization
 
-Status: [/]
+Status: [x] -- all six WPs closed 2026-09-01
 Taskwarrior: parent `94ec17b3-3d55-4ea6-a720-a1c51dec1e9d`
 Plan: `brain/plans/2026-09-01-dash-modernization.md`
 
@@ -70,7 +70,16 @@ Runs now, before Phase 14 WP92 (user decision 2026-09-01); on
       **Closed -- user-approved 2026-09-01.** Plan:
       `brain/plans/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
       Walkthrough: `brain/walkthroughs/2026-09-01-dash-mod-wp5-renderer-helper-refactor.md`.
-- [ ] **WP6 - Consolidated gate + re-baseline.** ca65<->CASM byte
+- [x] **WP6 - Consolidated gate + re-baseline.** DASH `0.1.4` -> `0.2.0`.
+      Consolidated fresh ca65<->CASM + native-CASM re-verify; manifest
+      re-baselined `4a49612e -> 3b4d0693` (4579 B, --cross-check MATCHES,
+      no --allow-host-bytes); relocation audit (451, accounted for);
+      AGENTS.md consolidated; CHANGELOG + KNOWLEDGE.md; runtime matrix at
+      $3800/$5000/$9000 ($9000 user-confirmed). Source-complete, awaiting
+      final sign-off. Plan:
+      `brain/plans/2026-09-01-dash-mod-wp6-consolidated-gate.md`.
+      Walkthrough:
+      `brain/walkthroughs/2026-09-01-dash-mod-wp6-consolidated-gate.md`. ca65<->CASM byte
       identity, manifest regen, user runtime sign-off, relocation audit,
       AGENTS.md rewrite, CHANGELOG, DASH version bump.
 

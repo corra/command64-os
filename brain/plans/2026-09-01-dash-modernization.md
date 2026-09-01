@@ -1,7 +1,7 @@
 ---
 feature: dash-modernization
 created: 2026-09-01
-status: proposed
+status: done -- all six WPs closed 2026-09-01
 taskwarrior: 94ec17b3-3d55-4ea6-a720-a1c51dec1e9d (parent); sub-WP UUIDs created on each sub-plan's approval
 depends-on: CASM Phase 14 WP91 (DASH @local seed, done -- brain/walkthroughs/2026-09-01-casm-phase14-wp91-dash-adoption.md)
 ---
@@ -348,3 +348,29 @@ the cross-file symbol surface).
   WP6 (consolidated gate + re-baseline + AGENTS.md rewrite + CHANGELOG +
   DASH version bump + user runtime matrix) needs its own detailed
   sub-plan; it closes the whole DASH Modernization increment.
+- 2026-09-01: WP6 detailed sub-plan
+  (`brain/plans/2026-09-01-dash-mod-wp6-consolidated-gate.md`) drafted,
+  **approved**; Taskwarrior task 55. Scope: DASH -> `0.2.0`; AGENTS.md
+  consolidate (no info loss).
+- 2026-09-01: **WP6 source-complete -- increment closing.** DASH
+  `0.1.4` -> `0.2.0` (DASHVERSTR, 2 bytes). Consolidated fresh
+  ca65<->CASM byte-identity + native CASM under VICE + manifest
+  re-baseline: **4a49612e -> 3b4d0693**, 4579 bytes, `--cross-check
+  MATCHES`, no `--allow-host-bytes`. Relocation audit: 451 entries,
+  fully accounted for. AGENTS.md consolidated; CHANGELOG "DASH
+  Modernization" block; KNOWLEDGE.md closing note. User runtime matrix
+  at $3800 / $5000 / $9000 -- render + relocation + nav + VMM test +
+  exit; $9000 user-confirmed manually. Full build + image + test_image
+  green. Walkthrough:
+  `brain/walkthroughs/2026-09-01-dash-mod-wp6-consolidated-gate.md`.
+  Awaiting final sign-off to close the increment (parent task 94ec17b3).
+
+## Increment summary
+
+DASH `0.1.4` -> **`0.2.0`**. `4766 -> 4579` bytes (-187). Manifest sha256
+`3238b786... -> 3b4d0693...`. ~30 global labels removed; every routine
+constant-driven and `.assert`-guarded and helper-backed. **No
+user-visible behaviour change** -- byte-identical (WP2-3) or
+behaviour-identical and live-verified (WP4-5) at every step; ca65 ==
+native CASM byte-for-byte throughout. Deferred: `dvmm.s` `DVMMLABEL` +
+enum->string tables (a "WP5b"/post-increment follow-up).
