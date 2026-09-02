@@ -716,3 +716,12 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   `scripts/casm_r6_verify.py`. Build green, all shipping bytes unchanged,
   differential still matches. WP6 (consolidated verification + completion
   gate) is the last WP. Awaiting user closure approval for WP5.
+- 2026-09-02: **WP5 closed, user-approved; merged to `main` (`57303bd`).**
+  Carries the WP4 audit correction. `dash_ref` `EXCLUDE_FROM_ALL` +
+  utility-disk decoupled + `--allow-host-bytes` removed + source policy
+  relaxed to "differential guidance" (ca65 differential kept as a standing
+  release check). New `scripts/casm_r6_verify.py`. On `main` now:
+  BANNER manifest `CANONICAL-INDEPENDENT`; DASH manifest bytes
+  `NATIVE-OBSERVATION` + `CANONICAL-INDEPENDENT` R6 ledger; all 67 fixture
+  refs `CANONICAL-INDEPENDENT`. Only **WP6** (consolidated verification +
+  completion gate) remains.
