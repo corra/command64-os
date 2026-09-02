@@ -628,3 +628,17 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   explicit user resumption. No WP planning, task activation, workflow, fixture,
   build, source, documentation, or tracker changes are authorized by this
   approval alone.
+- 2026-09-02: Phase 15 confirmed fully closed and merged to `main`
+  (user-approved 2026-09-02, CASM 0.6.1 build 1417, commits `d534977`/`338d43f`
+  + manual/AGENTS doc-sync `78d0d68`). The blocking dependency is satisfied.
+  User resumed the transition and directed a WP1 sub-plan draft. Baseline
+  made clean-committed at `dfe5596` (doc-only housekeeping: this plan, the
+  diagnostic plan, the native-viability review). WP1 sub-plan drafted at
+  `brain/plans/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`
+  (status `proposed`). Scope clarified for the record: the transition does
+  NOT remove ca65/ld65 as the host build toolchain — `casm`, `debug`, and all
+  non-CASM-native apps keep ca65; only DASH's *required* `dash_ref` gate is
+  relaxed (WP5, after WP4). `casm-diagnostic-always-name-file` will run
+  concurrently with docs-only WP1 and must merge to `main` before WP2's
+  inventory freeze (it collides with WP2/WP3 fixture work, not WP1). No
+  Taskwarrior/tracker activation yet — pending WP1 sub-plan approval.
