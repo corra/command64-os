@@ -1,6 +1,6 @@
 # CASM Native Assembler
 
-Status: [/]
+Status: [x]
 Taskwarrior: Phase 15 parent (project `casm.phase15`, task `41`)
 Plan: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`
 
@@ -12,8 +12,8 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-**Phase 15 (Conditional Assembly) gate is GREEN**, awaiting phase
-sign-off (branch `feature/casm-phase15`, CASM `0.6.1` build `1417`).
+**Phase 15 (Conditional Assembly) is fully closed** (WP93-99,
+user-approved 2026-09-02, CASM `0.6.1` build `1417`, merged to `main`).
 Added `.if`/`.elseif`/`.else`/`.endif` + `.ifdef`/`.ifndef` with
 truthiness conditions only (no comparison operators -- a documented ca65
 divergence; `.ASSERT`'s Phase 13 limitation applies), bounded 16-deep

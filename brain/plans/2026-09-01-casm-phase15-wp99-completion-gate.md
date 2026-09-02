@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp99-completion-gate
 created: 2026-09-02
-status: gate GREEN, docs done, committed -- awaiting phase sign-off
+status: COMPLETE -- Phase 15 user-approved + closed 2026-09-02 (commit ff6adb8)
 taskwarrior: 43 (project casm.phase15), parent 41 (Phase 15)
 depends-on: WP93 (37bd4c8), WP94 (fb21ff9), WP95 (ecbd717),
   WP96 (e28dd7d, 6eb2815), WP97 (59c1066), WP98 (37a12c5)
