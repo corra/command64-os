@@ -92,7 +92,12 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       hashes and reviewer annotations; `casmexprn` promoted (`UNCLEAR` eliminated);
       all 67 `.ref` binaries byte-identical across a full serial build. Sub-plan + walkthrough
       `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
-- [ ] WP4 native-application canonical records (DASH, BANNER)
+- [x] WP4 native-application canonical records (DASH, BANNER) -- **closed,
+      user-approved 2026-09-02**. BANNER and DASH independent derivation records
+      established (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md`
+      and `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`);
+      both manifests promoted to `CANONICAL-INDEPENDENT`. Sub-plan + walkthrough
+      `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp4-native-app-canonical-records.md`.
 - [ ] WP5 DASH differential + source-policy transition
 - [ ] WP6 consolidated verification + completion gate
 

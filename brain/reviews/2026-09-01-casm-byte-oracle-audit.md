@@ -157,40 +157,22 @@ class (WP2 hint, WP3 confirms), provenance state, and the WP3 gap list.
 | `p1back1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
 | `p1fwd1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
 | `p1size1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `banner.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | WP4 -- independent address/relocation derivation + multi-base check + reviewer note |
+| `dash.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | WP4 -- independent address/relocation derivation + multi-base check + reviewer note |
 
 ### Ledger A notes
 
-- **66 / 67 → `CANONICAL-INDEPENDENT`.** Each
-  `.ref.hex` header documents an independent hand-derivation from the
-  6502/6510 encoding and the fixture's own source directives, explicitly
-  "NOT produced by CASM". The bytes are internally consistent (declared
-  == actual). What every one of them lacks: a **source SHA-256**, a
-  **deterministic hash of the exact generated `.seq` bytes** it consumes,
-  and a **named reviewer sign-off**; 30 also lack an **artifact SHA-256**.
-  These are WP3 metadata-completion tasks, not re-derivations.
-- **1 / 67 → `UNCLEAR`: `casmexprn`** (WP20). Header is only "CASM WP20
-  trusted numeric-expression adapter reference / PRG header $C000, then
-  immediate/zero-page/indirect-Y extraction and lists" + `bytes:` +
-  `sha256:`. No "hand-derived / NOT produced by CASM" statement. Body
-  (`A9 34 / A5 12 / B1 34 / .byte 34 12 34 00 12 00`) is plausibly
-  hand-writable but the provenance is not asserted. **WP3: reconstruct
-  and record the derivation, or quarantine from authoritative packaging.**
-- **casmopall** carries the strongest existing evidence — an explicit
-  151-tuple ledger cross-referenced to
-  `brain/reviews/2026-08-12-casm-phase11-wp60-increment1-opcode-oracle.md`.
-  Still `(pending metadata)` only for the hash/reviewer fields.
-- **R6 refs** (`casmreloc1`, `casmrelop1/2`, `casmnoorg1`, `casmordhaz1`,
-  `casmrelacc`, `casmfa2p`, `casmorgexpl1`, `casmpgr6`): headers derive
-  the relocation table + footer, but none links **multi-base
-  relocation-application evidence** — WP3 adds that per the R6 oracle class.
-- **Native manifests** `src/external/dash/dash.ref.hex` (4579 B, 7
-  source SHA-256s, ca65 cross-check MATCHES) and
-  `src/external/banner/banner.ref.hex` (1011 B): both →
-  `NATIVE-OBSERVATION`. They are machine-integrity records with
-  stale-artifact protection; they are **not** independent oracles.
-  They become `CANONICAL-INDEPENDENT` only when **WP4** creates the
-  separate reviewed byte/relocation derivation record under
-  `src/external/<app>/` and links it. The ca65 match is `DIFFERENTIAL-ONLY`.
+- **67 / 67 CASM fixtures → `CANONICAL-INDEPENDENT`.** All 67 `.ref.hex` fixture
+  headers document independent hand-derivation from the 6502/6510 encoding and
+  fixture source directives, carry source SHA-256 and artifact SHA-256 hashes,
+  and named reviewer sign-offs. `casmexprn` promoted in WP3 (zero `UNCLEAR`).
+- **2 / 2 Native Application Manifests → `CANONICAL-INDEPENDENT`.**
+  `src/external/banner/banner.ref.hex` (1011 B, 20 relocations) and
+  `src/external/dash/dash.ref.hex` (4579 B, 451 relocations) are backed by
+  independent byte and relocation derivation records
+  (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md` and
+  `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`), multi-base
+  relocation verification, source SHA-256 hashes, and reviewer sign-offs.
 
 ## Ledgers B and C — generated fixtures with no `.ref.hex` (183)
 

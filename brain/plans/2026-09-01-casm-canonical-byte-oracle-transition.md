@@ -675,3 +675,12 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   `casm_oracle_inventory --check` green. Sub-plan and walkthrough
   `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
   Taskwarrior task `80484a2b` completed. Next: WP4 (Native-Application Canonical Records).
+- 2026-09-02: **WP4 closed, user-approved.** BANNER and DASH independent
+  derivation records established (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md`
+  and `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`);
+  both application manifests promoted to `CANONICAL-INDEPENDENT` in
+  `brain/reviews/2026-09-01-casm-byte-oracle-audit.md`; multi-base relocation
+  verified; `casm_oracle_inventory --check` passes across all 67 fixtures + 2
+  manifests (69/69). Sub-plan and walkthrough
+  `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp4-native-app-canonical-records.md`.
+  Taskwarrior task 42 completed. Next: WP5 (DASH Differential & Source-Policy Transition).
