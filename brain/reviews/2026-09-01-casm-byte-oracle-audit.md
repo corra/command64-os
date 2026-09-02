@@ -7,11 +7,20 @@
 > an annotated byte derivation, and a user reviewer sign-off line. **Zero
 > `UNCLEAR`** — `casmexprn` re-derived (Batch 2). Every `.ref` binary is
 > byte-identical to its pre-WP3 form (only `#` header lines were added /
-> rewritten). The 2 native manifests (`dash`, `banner`) remain
-> `NATIVE-OBSERVATION` pending **WP4** derivation records. Sections below
-> retain the WP2 classification text where it is still the record of how a
-> state was reached; the WP3 batch records are:
+> rewritten). Sections below retain the WP2 classification text where it is
+> still the record of how a state was reached; the WP3 batch records are:
 > `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch{1a,1bcde,2,3,4,5}-*.md`.
+>
+> **WP4 (native-app records) — completed then audit-corrected 2026-09-02.**
+> `banner.ref.hex` → `CANONICAL-INDEPENDENT` (full address ledger + 20-entry
+> relocation table verified against the body). `dash.ref.hex` → bytes
+> **`NATIVE-OBSERVATION`** (reviewed native run + ca65 `DIFFERENTIAL-ONLY`;
+> a full byte derivation of 3,669 bytes across 7 files is not practical and
+> the original WP4 claim was withdrawn) with a `CANONICAL-INDEPENDENT`
+> 451-entry R6 relocation ledger. New tool: `scripts/casm_r6_verify.py`.
+> The ca65 `dash_ref` differential is kept as a standing release check
+> (WP5). Records:
+> `brain/reviews/2026-09-02-casm-byte-oracle-wp4-{dash,banner}-derivation.md`.
 
 Governing plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`
 Workflow: `.agents/workflows/canonical-byte-oracles.md`
@@ -157,8 +166,8 @@ class (WP2 hint, WP3 confirms), provenance state, and the WP3 gap list.
 | `p1back1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
 | `p1fwd1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
 | `p1size1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
-| `banner.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | WP4 -- independent address/relocation derivation + multi-base check + reviewer note |
-| `dash.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | WP4 -- independent address/relocation derivation + multi-base check + reviewer note |
+| `banner.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | WP4 -- full address ledger + 20-entry relocation table verified vs body (`casm_r6_verify.py` PASS) + multi-base + reviewer |
+| `dash.ref.hex` | Native Manifest (R6 PRG) | **`NATIVE-OBSERVATION`** (bytes) + `CANONICAL-INDEPENDENT` R6 relocation ledger | WP4 audit-corrected 2026-09-02 -- 3669 code bytes are reviewed native run + ca65 `DIFFERENTIAL-ONLY`; 451-entry R6 table independently derived (`casm_r6_verify.py` PASS) |
 
 ### Ledger A notes
 
@@ -166,13 +175,29 @@ class (WP2 hint, WP3 confirms), provenance state, and the WP3 gap list.
   headers document independent hand-derivation from the 6502/6510 encoding and
   fixture source directives, carry source SHA-256 and artifact SHA-256 hashes,
   and named reviewer sign-offs. `casmexprn` promoted in WP3 (zero `UNCLEAR`).
-- **2 / 2 Native Application Manifests → `CANONICAL-INDEPENDENT`.**
-  `src/external/banner/banner.ref.hex` (1011 B, 20 relocations) and
-  `src/external/dash/dash.ref.hex` (4579 B, 451 relocations) are backed by
-  independent byte and relocation derivation records
-  (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md` and
-  `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`), multi-base
-  relocation verification, source SHA-256 hashes, and reviewer sign-offs.
+- **BANNER manifest → `CANONICAL-INDEPENDENT`.**
+  `src/external/banner/banner.ref.hex` (1011 B, 20 relocations) — a full
+  independent address ledger and a 20-entry relocation table verified
+  entry-for-entry against the manifest body (`scripts/casm_r6_verify.py` →
+  `R6 VERIFY: PASS`); source SHA-256; reviewer sign-off.
+  `brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md`.
+- **DASH manifest → `NATIVE-OBSERVATION` (bytes), `CANONICAL-INDEPENDENT`
+  R6 relocation ledger.** A byte-by-byte independent derivation of DASH's
+  3,669 code/data bytes (7 files, ~50 routines) is not practical and was
+  not done — the original WP4 claim to the contrary was withdrawn
+  2026-09-02. DASH's byte provenance is a **reviewed native CASM run**
+  (`CASM 0.5.2` b1404) corroborated by the **ca65 `dash_ref` differential**
+  (`DIFFERENTIAL-ONLY`, byte-identical `3b4d0693…`, re-confirmed
+  2026-09-02) plus the `source_sha256` stale-artifact guard and DASH-MOD
+  runtime evidence at `$3800`/`$5000`/`$9000`. The **451-entry R6
+  relocation table + footer** ARE independently derived and verified
+  (`scripts/casm_r6_verify.py src/external/dash/dash.ref.hex` →
+  `R6 VERIFY: PASS`: every entry in-image, strictly ascending, unique;
+  multi-base application consistent).
+  `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`.
+  Because `dash.ref.hex` is not fully `CANONICAL-INDEPENDENT`, the ca65
+  `dash_ref` differential is retained as a **standing release-verification
+  check** while DASH source stays in the shared subset (WP5).
 
 ## Ledgers B and C — generated fixtures with no `.ref.hex` (183)
 
@@ -269,8 +294,8 @@ metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
 | deterministic replay | — | `casm_reloc` determinism cases; `project-casm-phase11-wp61` | determinism-only, correctly non-oracle |
 | progress indication (byte-identical output) | `casmpg63/64/65/128`,`casmpgblank`,`casmpgfill`,`casmpgincbin`,`casmpgrt`,`casmpgr6` (pending) | `casm_progress` | — |
 | overlay events | — | `casm_event` | `NOT-APPLICABLE` |
-| **DASH** native app | `dash.ref.hex` (`NATIVE-OBSERVATION`) | runtime `$3800`/`$5000`/`$9000` | **independent derivation record → WP4** |
-| **BANNER** native app | `banner.ref.hex` (`NATIVE-OBSERVATION`) | — | **independent derivation record + runtime evidence → WP4** |
+| **DASH** native app | `dash.ref.hex` — bytes `NATIVE-OBSERVATION` (reviewed native run + ca65 `DIFFERENTIAL-ONLY`); R6 relocation ledger `CANONICAL-INDEPENDENT` | runtime `$3800`/`$5000`/`$9000` (DASH-MOD) | WP4 (audit-corrected 2026-09-02): full byte derivation not practical; ca65 differential retained as standing release check (WP5) |
+| **BANNER** native app | `banner.ref.hex` `CANONICAL-INDEPENDENT` | multi-base `casm_r6_verify.py` PASS | WP4 — full address ledger + 20-entry table verified vs body |
 
 **No axis is uncovered.** Every axis has at least a structural harness;
 every axis that *should* have a byte oracle has one at

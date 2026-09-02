@@ -1,7 +1,7 @@
 # command64 OS DASH Utility Manual
 
 **File Name:** `dash.prg` (packaged on disk as `dash`)
-**Version:** `DASH V0.1.4`
+**Version:** `DASH V0.2.0`
 **Origin:** Relocatable R6 binary, implicit base `$3400`
 **Supported Hardware:** Any command64 OS machine. The System and Applications
 pages work with or without a REU. The VMM Test page requires a REU to run;
@@ -78,8 +78,8 @@ COMP DASH.PRG DASH.REF
 ```
 
 Everything needed lives on `command64_casm_utils.d64` (`casm.prg`,
-`comp.prg`, the seven sources as SEQ files, and a ca65 cross-check reference
-as `dash.ref`). Because the OS loads external commands from
+`comp.prg`, the seven sources as SEQ files, and the reviewed shipping
+artifact as `dash.ref`). Because the OS loads external commands from
 `CurrentDevice`, switching to that drive first means no `9:` prefix is
 needed on the command itself. **Native CASM assembly requires a REU** — the
 resulting DASH runtime does not.
@@ -95,24 +95,22 @@ separate:
 - **Reviewed/shipping artifact** — `src/external/dash/dash.ref.hex`, a
   human-reviewed hex manifest transcribed from a candidate via
   `scripts/build_dash_manifest.py`, which `scripts/hex_manifest_to_bin.py`
-  turns back into the actual `dash.prg` CMake packages at build time. Editing
-  a source file without regenerating this manifest is caught, not silent:
-  the manifest embeds a `source_sha256` line per file, and the build hard-fails
-  if any of the seven sources' hashes no longer match.
+  turns back into the actual `dash.prg` CMake packages at build time.
+  Editing a source file without regenerating this manifest is caught, not
+  silent: the manifest embeds a `source_sha256` line per file, and the
+  build hard-fails if any of the seven sources' hashes no longer match.
 
-**Current provenance:** the shipping manifest's bytes come from a real
-native CASM `0.2.8` build `1322` run under VICE on a dedicated CASM-only
-test disk (`dash_casm_test.d64`), 2026-08-20 — not a ca65 stand-in. This
-run also carried a further Phase 12 syntax pass beyond WP71's initial
-named-constant adoption: WP68 shift/arithmetic expressions for bitmasks
-and screen-row offsets (`AND #1<<0`, `$0400+1*40`), and WP74 string
-literals for the audited `$20`-`$3F` punctuation/digit range. The
-resulting bytes are confirmed byte-identical to both the independent
-`dash_ref` ca65 cross-check build and the prior shipping manifest,
-proving the syntax pass changed nothing observable. The `dash_ref`
-cross-check remains independent by construction: ca65 and CASM share no
-code and derive relocation entries by completely different means, so a
-defect in one cannot reproduce itself in the other.
+**Provenance** (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`):
+DASH's 4,579 bytes come from a real native CASM `0.5.2` build `1404` run
+under VICE with a 16 MB REU (`CASM DMAIN.S /O:DW6.PRG`), 2026-09-01 — not a
+ca65 stand-in. A byte-by-byte independent derivation of 3,669 code/data
+bytes across seven files is not practical, so the code bytes are **reviewed
+native observation** corroborated by the ca65 `dash_ref` differential build
+(byte-identical, `3b4d0693a641…`) which the release process runs while DASH
+stays in the shared source subset. The **451-entry R6 relocation table**
+*is* independently derived and verified
+(`scripts/casm_r6_verify.py src/external/dash/dash.ref.hex`), as is
+BANNER's full manifest.
 
 ## System Page (F1)
 

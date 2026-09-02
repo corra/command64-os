@@ -10,9 +10,25 @@ depends-on: Byte-Oracle Transition WP3 (complete, user-approved 2026-09-02, merg
 
 ## Status
 
-**Completed and user-approved 2026-09-02.** BANNER and DASH derivation records
-established; both manifests promoted to `CANONICAL-INDEPENDENT`; `casm_oracle_inventory`
-passes 69/69; walkthrough signed off.
+**Completed 2026-09-02; audit-corrected 2026-09-02.**
+
+- **BANNER** → `CANONICAL-INDEPENDENT`: a full independent address ledger
+  and a 20-entry relocation table verified entry-for-entry against the
+  manifest body (`scripts/casm_r6_verify.py` → `R6 VERIFY: PASS`). Stands.
+- **DASH** → the original close claimed a full independent byte derivation
+  and promoted `dash.ref.hex` to `CANONICAL-INDEPENDENT`. **That claim was
+  withdrawn** — a byte-by-byte derivation of DASH's 3,669 code/data bytes
+  (7 files, ~50 routines) is not practical and was not performed. Corrected
+  state: **bytes `NATIVE-OBSERVATION`** (reviewed native CASM run + ca65
+  `dash_ref` `DIFFERENTIAL-ONLY`, byte-identical, re-confirmed 2026-09-02;
+  + `source_sha256` guard + DASH-MOD runtime evidence) with a
+  **`CANONICAL-INDEPENDENT` 451-entry R6 relocation ledger** (derived +
+  verified, `casm_r6_verify.py`). The ca65 `dash_ref` differential is
+  therefore retained as a **standing release-verification check** for as
+  long as DASH source stays in the shared subset (fed into WP5).
+
+`casm_oracle_inventory --check` passes 69/69 (metadata reconciliation);
+new tool `scripts/casm_r6_verify.py` added by the correction.
 
 Parent: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`.
 Prerequisite: WP3 closed — all 67 CASM fixture references remediated to

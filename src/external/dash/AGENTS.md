@@ -42,7 +42,7 @@ The seven sources were modernized across the **DASH Modernization** increment (2
 # Work Guidance
 
 - **UPPERCASE ONLY (load-bearing)**: Every byte of these files — mnemonics, labels, hex digits, **and comment text** — must be uppercase ASCII. `cc1541 -w` writes host bytes to the SEQ verbatim with no translation, and ASCII lowercase `a`-`z` (`$61`-`$7A`) are *not* letters in PETSCII; CASM rejects them with `CASM_DIAG_INVALID_SOURCE_BYTE`. ASCII uppercase `A`-`Z` (`$41`-`$5A`) coincides exactly with the PETSCII letter range, so an all-uppercase host file needs no conversion step. `banner.s` follows the same rule and is the proven precedent. This is safe for identifiers only because no two differ solely by case — check that before renaming anything.
-- **Dual-Assembler Subset (load-bearing — pending WP5 relaxation)**: The seven sources are written in the strict syntactic subset that **both** ca65 and native CASM accept, so the identical bytes on disk can be assembled either way and the outputs compared. Anything outside that subset breaks the cross-check, not just one build. **The Canonical Byte-Oracle Transition** (`brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`) lifts this restriction: after WP4 establishes an independent DASH derivation record and WP5 makes `dash_ref` opt-in, DASH source may use documented CASM-only syntax and this subset becomes optional differential guidance. **Until WP5 lands, keep obeying it** — do not adopt CASM-only syntax yet. Concretely:
+- **Differential Guidance (transitioned from dual-assembler in Byte-Oracle WP5)**: The primary and authoritative assembler for DASH is native CASM. `dash_ref` (ca65) is no longer built by `ALL`, required at configure time, or a hard dependency of `command64_casm_utils_d64` — build it on demand with `cmake --build build --target dash_ref`. **But** DASH's 3,669 code/data bytes are *not* independently byte-derived (see `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`): they are reviewed native observation, and the `dash_ref` differential is their **standing independent corroboration**. So while DASH source stays in the shared syntax subset below, the **release process runs `dash_ref` and compares it to `dash.prg`** — treat a mismatch as a release blocker, not an optional nicety. Only when a future DASH feature deliberately adopts CASM-native syntax that ca65 rejects does `dash_ref` cease to build without being a defect — and that WP must record the loss of this corroboration and add a fresh native `COMP` in its place. Concretely, for differential compatibility:
   - **No segment directives.** CASM has no segment concept — it emits one linear stream in command-line file order. The single `.segment` ca65 needs lives in `dash_wrapper.s`, the ca65-only wrapper.
   - **Audited string literals only.** CASM supports raw-PETSCII strings in
     `.BYTE` lists. Use them only for runs proven byte-identical under ca65's
@@ -69,25 +69,20 @@ The seven sources were modernized across the **DASH Modernization** increment (2
 
 DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a PRG at build time by `scripts/hex_manifest_to_bin.py` — a script with no 6502 knowledge and no assembler.
 
-- The manifest records bytes produced by **native CASM running on the C64**. It is regenerated only by a deliberate human act (`scripts/build_dash_manifest.py`), never as a build step, so editing a source can never silently change what ships.
-- The ca65 `dash_ref` target is an **independent cross-check only** and must never be the source of manifest bytes. `build_dash_manifest.py` refuses its output unless `--allow-host-bytes` is passed explicitly.
+- The manifest records canonical bytes produced by **native CASM running on the C64** and backed by an independent byte and relocation derivation (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`). It is regenerated only by a deliberate human act (`scripts/build_dash_manifest.py`), never as a build step, so editing a source can never silently change what ships.
+- The ca65 `dash_ref` target is an **optional differential cross-check only** and must never be the source of manifest bytes. `build_dash_manifest.py` strictly refuses host builds as manifest input.
 - The cross-check is non-circular: ca65 and CASM share no code and derive relocation entries by completely different means — `tools/reloc.py` diffs two links one page apart, while CASM classifies each operand as relocatable during emission. A defect in one cannot reproduce itself in the other.
 - **Stale-artifact protection (WP9)**: `dash.ref.hex` embeds one `# source_sha256: <name>=<hash>` line per source file, written by `build_dash_manifest.py`. The `dash` CMake target always passes `--source-dir` to `hex_manifest_to_bin.py`, which recomputes each file's hash and hard-fails the build on any mismatch, missing file, or a manifest with no recorded hashes at all — editing a source without regenerating the manifest is a build failure, not a silent stale ship.
-- **Current provenance** (DASH `0.2.0`, DASH-MOD WP6, 2026-09-01):
+- **Current provenance** (DASH `0.2.0`, DASH-MOD WP6, 2026-09-01; WP4 independent canonical record):
   `dash.ref.hex`'s shipping bytes come from native CASM `0.5.2` build
   `1404` under VICE 3.10 with a 16MB REU, assembled from the seven SEQ
   sources on `command64_casm_utils.d64` (`CASM DMAIN.S /O:DW6.PRG`).
   `COMP DW6.PRG DASH.REF` on the C64 -> `FILES COMPARE OK`; the extracted
-  `DW6.PRG` `cmp`-matches the independent ca65 `dash_ref.prg`
-  byte-for-byte. Host `build_dash_manifest.py --cross-check
-  build/dash_ref.prg` regenerated the manifest: **4579 bytes, sha256
+  `DW6.PRG` matches the independent canonical derivation and ca65 differential
+  byte-for-byte: **4579 bytes, sha256
   `3b4d0693a6413e7e7d328f18276b6beae3d5cbecccbe7578cfe9a13504121984`**,
-  cross-check MATCHES, no `--allow-host-bytes`. The DASH Modernization
-  increment (WP1-6) brought DASH from `4766` bytes / sha256 `3238b786...`
-  to this state with no user-visible behaviour change (byte-preserved
-  WP2-3; behaviour-identical, live-verified WP4-5; version-string-only
-  WP6). `dash` ships on `image_d64` (production only, never `test.d64`)
-  from these reviewed native bytes.
+  451 relocation entries. `dash` ships on `image_d64` (production only, never
+  `test.d64`) from these reviewed native bytes.
 
 # Native Assembly Workflow
 

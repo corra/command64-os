@@ -684,3 +684,25 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   manifests (69/69). Sub-plan and walkthrough
   `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp4-native-app-canonical-records.md`.
   Taskwarrior task 42 completed. Next: WP5 (DASH Differential & Source-Policy Transition).
+- 2026-09-02: **WP4 audit correction.** Review of the WP4 DASH derivation
+  record found it claimed a full independent byte derivation it did not
+  perform (no relocation table listed, circular "ground truth" section,
+  a factual ZP-range error) and promoted `dash.ref.hex` to
+  `CANONICAL-INDEPENDENT` unjustifiably. Corrected:
+  - `dash.ref.hex` bytes → `NATIVE-OBSERVATION` (reviewed native CASM run +
+    ca65 `dash_ref` `DIFFERENTIAL-ONLY`, byte-identical, re-confirmed); its
+    **451-entry R6 relocation table + footer** are independently derived
+    and verified (`CANONICAL-INDEPENDENT`).
+  - `banner.ref.hex` re-verified and **stands `CANONICAL-INDEPENDENT`**
+    (small enough for a real full ledger; 20-entry table matches the body).
+  - New reusable tool `scripts/casm_r6_verify.py` (assembler-independent R6
+    footer/table verification + multi-base check); run on DASH, BANNER, and
+    the WP3 R6 fixtures.
+  - Because DASH bytes are not `CANONICAL-INDEPENDENT`, the ca65 `dash_ref`
+    differential is **retained as a standing release-verification check**
+    while DASH source stays in the shared subset. WP5's mechanical
+    decoupling (off `ALL`, off configure-gate, off the utility-disk hard
+    dependency) is unaffected, but WP5 docs must not describe DASH's on-disk
+    `dash.ref` as a "canonical oracle".
+  - Records/register/plans updated; `dash.ref.hex` header reworded. Build
+    green, all 67 fixture `.ref` + both manifest `.prg` byte-unchanged.

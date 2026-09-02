@@ -115,6 +115,14 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
   **Closed, user-approved 2026-09-02** (full matrix waived by the user).
   Merged to `main`. Byte-Oracle Transition WP2 is now unblocked.
 
+- [ ] **Follow-up (disclosed in Byte-Oracle WP3, not yet planned):**
+  `CASM: OUTPUT WRITE FAILED` (a file-service failure, e.g. `72, DISK FULL`)
+  prints a source location (`IN FILE … AT LINE …`). A non-located
+  diagnostic arguably should stay bare like CLI/internal errors. Audit
+  whether `CASM_DIAG_OUTPUT_WRITE_FAILED`'s raise site should clear
+  `CasmDiagLocValid`. Candidate: fold into the diagnostic lineage above.
+  (Pre-existing or 0.6.2-surfaced — not investigated.)
+
 **Phase 12 is complete**, user-approved 2026-08-20 at CASM `0.3.0` build
 `1324` (WP64-76, including WP71's full DASH adoption and WP76's
 corrective forward-reference Pass 1/2 width-agreement fix). Final
