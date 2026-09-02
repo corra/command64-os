@@ -245,3 +245,14 @@ CASM source, or DASH source is touched.
   have 264-445 blocks. Three scoping decisions confirmed (create
   `casm_oracle_test.d64`; user runs the harness matrix; fresh DASH `COMP`
   under 0.6.2). Awaiting approval.
+- 2026-09-02: **Increments 1-2 done.** Survey: of 67 refs, **45 already
+  live on a room-having disk** (phase12: 6, phase13: 5, phase14: 4,
+  phase15: 15 incl. casmifL1/M1/defguard, progress: 10, opcode: 3
+  incl. casmfa2p/casmopall/casmreloc1, phase12: casmfwdstale1) and **22
+  need `casm_oracle_test.d64`** (the test.d64 residents + casmbig1). The
+  4 "??NONE" in the raw survey were cc1541 case-fold/truncation
+  false-negatives (`casmifl1.ref`, `casmifm1.ref`, `casmifdefguard.r`).
+  `casm_oracle_test_d64` target added (CMakeLists tail; overlay-wrapped;
+  not in IMAGE_PRG_TARGETS): self-bootable command64+casm+comp + 22
+  ref/source pairs, **53 dir entries, 308 blocks free**. Configure clean;
+  no-change rebuild stable; `casm_oracle_inventory --check` green (69/69).

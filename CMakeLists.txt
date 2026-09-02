@@ -3636,3 +3636,179 @@ add_custom_target(release
     DEPENDS image_d64 test_image_d64 command64_casm_utils_d64
     COMMENT "Packaging command64 OS v${OS_VERSION} release archives"
 )
+
+# ---------------------------------------------------------------------------
+# casm_oracle_test_d64 -- Byte-Oracle Transition WP6 consolidated-verification
+# disk. test.d64's directory track is full (145/144 entries) and
+# casm_overflow_test.d64 has 4 free blocks, so the 22 fixture references that
+# live only on those two disks cannot be live-re-COMP'd by re-assembly.
+# This self-bootable image (command64 + casm + comp) carries those 22
+# ref/source pairs so the WP6 gate can COMP all 67 references against fresh
+# native CASM 0.6.2 output. Dev/verification image only -- not in
+# IMAGE_PRG_TARGETS. See per-phase-test-images.md; the POST_BUILD cc1541
+# steps are wrapped for overlay events per overlay-build-events.md.
+# ---------------------------------------------------------------------------
+add_c64_disk_image(casm_oracle_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp
+)
+add_dependencies(casm_oracle_test_d64 casm_test_fixtures casm_reference_fixtures)
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_oracle_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_oracle_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "brback1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/brback1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "brback1.ref" -T PRG
+        -w "${CASM_REF_DIR}/brback1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "brfwd1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/brfwd1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "brfwd1.ref" -T PRG
+        -w "${CASM_REF_DIR}/brfwd1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcase1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmcase1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmcase1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmcase1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmemit1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmemit1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmemit1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmemit1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmexprn.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmexprn.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmexprn.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmexprn.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmhello.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmhello.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmhello.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmhello.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmaxid1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmaxid1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmaxid1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmmaxid1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmodes.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmodes.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmodes.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmmodes.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmnoorg1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmnoorg1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmnoorg1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmnoorg1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmnum2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmnum2.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmnum2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmnum2.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmordhaz1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmordhaz1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmordhaz1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmordhaz1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmorg1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmorg1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmorg1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmorg1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmorgexpl1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmorgexpl1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmorgexpl1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmorgexpl1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmrelop1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmrelop1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmrelop1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmrelop1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmrelop2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmrelop2.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmrelop2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmrelop2.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "p1back1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1back1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "p1back1.ref" -T PRG
+        -w "${CASM_REF_DIR}/p1back1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "p1fwd1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1fwd1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "p1fwd1.ref" -T PRG
+        -w "${CASM_REF_DIR}/p1fwd1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "p1size1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/p1size1.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "p1size1.ref" -T PRG
+        -w "${CASM_REF_DIR}/p1size1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfa.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmfa.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfb.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmfb.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmf1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmmf1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfc.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmfc.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfd.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmfd.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmf2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmmf2.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfe.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmfe.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmff.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmff.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmfg.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmfg.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmf3.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmmf3.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmbiga.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmbiga.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmbigb.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmbigb.seq"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmbig1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmbig1.ref"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMENT "Appending WP6 consolidated-verification ref/source pairs to casm_oracle_test.d64"
+    VERBATIM
+)
