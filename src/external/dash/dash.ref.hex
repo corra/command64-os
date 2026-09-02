@@ -17,6 +17,8 @@
 # source_sha256: dapp.s=f5953f8da88a03ef47c48d1324e01d616a13ec34018d351568fa9f90da1affd5
 # source_sha256: dvmm.s=5144b367bc3888167e344921b5d03794c5300953ca770bff86b883c9f8c66948
 # source_sha256: ddata.s=8c7a4498077ae76b2887ff607b349257ebc3a656564d46b7fea574c6d79df3d1
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP4 -- brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md).
 
 00 34 D8 A9 00 8D EA 3D 20 44 34 AD EB 3D F0 08
 A9 00 8D EB 3D 20 66 34 20 E4 FF AA F0 ED E0 85

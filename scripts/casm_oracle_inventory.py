@@ -108,7 +108,7 @@ def parse_ref_hex(path: Path) -> dict:
         "manifest_sha256": sha256_bytes(path.read_bytes()),
         "body_parsed": body_ok,
         "mentions_not_from_casm": bool(
-            re.search(r"NOT (produced|assembled) by CASM|hand-derived|hand-assembled|independently",
+            re.search(r"NOT (produced|assembled) by CASM|hand-derived|hand-assembled|independent",
                       " ".join(header_lines), re.I)
         ),
     }
@@ -199,20 +199,22 @@ def main() -> int:
             problems.append(f"{e['name']}: declared sha256 {e['declared_sha256'][:12]}.. "
                             f"!= actual {e['actual_sha256'][:12]}..")
 
-    # --- WP3: declared source_sha256 entries must match the actual source ---
+    # --- WP3/WP4: declared source_sha256 entries must match the actual source ---
     # generated .seq fixtures live in <build>/casm_test_fixtures/; checked-in
-    # .dat payloads (.INCBIN assets) live in tests/fixtures/casm/.
-    for e in entries:
+    # .dat payloads (.INCBIN assets) live in tests/fixtures/casm/; native app
+    # sources live alongside the manifest in src/external/<app>/.
+    for e in entries + manifests:
         for src_name, want in e["source_sha256"].items():
             candidates = []
             if build_dir:
                 candidates.append(build_dir / "casm_test_fixtures" / src_name)
             candidates.append(FIXTURE_DIR / src_name)
+            candidates.append(e["path"].parent / src_name)
             found = next((c for c in candidates if c.is_file()), None)
             if found is None:
                 if build_dir:  # only an error when we actually had somewhere to look
                     problems.append(f"{e['name']}: source_sha256 names {src_name} "
-                                    f"but no such generated .seq or fixture asset")
+                                    f"but no such generated .seq or fixture/app asset")
                 continue
             got = sha256_bytes(found.read_bytes())
             if got != want:
@@ -239,13 +241,14 @@ def main() -> int:
                   f"| {'y' if e['mentions_not_from_casm'] else 'N'} "
                   f"| {'; '.join(find_packaging_steps(e['name'], cmake_text))[:60]} |")
 
+    all_refs = entries + manifests
     print(f"\n# summary: {len(disk_files)} .ref.hex on disk, "
           f"{len(ref_names)} in CASM_REF_NAMES, {len(tracked)} tracked, "
           f"{len(manifests)} native manifests", file=sys.stderr)
-    print(f"# with declared sha256: {sum(1 for e in entries if e['declared_sha256'])}/"
-          f"{len(entries)}; "
+    print(f"# with declared sha256: {sum(1 for e in all_refs if e['declared_sha256'])}/"
+          f"{len(all_refs)}; "
           f"header claims independent derivation: "
-          f"{sum(1 for e in entries if e['mentions_not_from_casm'])}/{len(entries)}", file=sys.stderr)
+          f"{sum(1 for e in all_refs if e['mentions_not_from_casm'])}/{len(all_refs)}", file=sys.stderr)
 
     if problems:
         print(f"\n# RECONCILIATION FAILURES ({len(problems)}):", file=sys.stderr)

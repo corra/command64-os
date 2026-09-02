@@ -11,6 +11,8 @@
 # bytes: 1011
 # sha256: b43415c1d61901f4c1794817c09a96bcac34b1ea3c8f10d3eb5c42d1cc62f78f
 # source_sha256: banner.s=a9b751afb79cf15fe91a1310cd3461cf834451c8827cf1624cce3d6afbd42cbe
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP4 -- brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md).
 
 00 34 20 13 34 90 06 20 C3 35 4C 0E 34 20 6E 34
 A9 4C 20 00 10 A4 63 B9 3C 03 F0 44 C9 20 F0 04
