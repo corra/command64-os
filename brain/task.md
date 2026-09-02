@@ -4005,7 +4005,7 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       rows); DOX sweep across 6 workflows + 5 AGENTS.md; no-change rebuild
       verified identical.
 - [ ] WP2 complete fixture inventory + provenance audit (not started;
-      must begin from a commit that includes `casm-diagnostic-always-name-file`)
+      casm-diagnostic-always-name-file merged to main; ready to plan)
 - [ ] WP3 fixture oracle remediation (not started)
 - [ ] WP4 native-application canonical records (DASH, BANNER) (not started)
 - [ ] WP5 DASH differential + source-policy transition (not started)
@@ -4016,7 +4016,7 @@ Related: `casm-diagnostic-always-name-file`
 — Taskwarrior `86170ef8`, branch `feature/casm-diag-always-name-file` off
 `main` `a3d3999`. Increments 1-5 done, **CASM `0.6.2` build 1419**;
 `diagnostics.s` `CasmSourceCount` name gate removed, live-verified.
-Awaiting user's full `test_casm_*` matrix + close approval, then merge to
-`main` (required before WP2's inventory freeze). Deferred CASM defects
+**Closed, user-approved 2026-09-02** (matrix waived). Merged to `main`;
+Byte-Oracle Transition WP2 unblocked. Deferred CASM defects
 tasks #39 (phantom EOF on 1-byte source) and #33 (VMM/apptable lifecycle)
 remain disclosed-and-deferred; the audit will encounter #39.

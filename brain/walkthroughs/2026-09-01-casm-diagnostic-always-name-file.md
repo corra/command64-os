@@ -123,9 +123,9 @@ Stop-condition check: `CASM` with no args → `CASM: SOURCE FILE REQUIRED`
 | non-located diagnostics stay bare | ✅ `SOURCE FILE REQUIRED` |
 | `wiki`/`docs` mirrors `cmp`-identical | ✅ (`sync_docs`) |
 | `release/docs` `cmp`-identical | ⚠️ N/A — stale 0.3.0 snapshot, PackRelease-regenerated (documented) |
-| full `test_casm_*` consolidated matrix, one fresh sweep | ⏳ **user to run** (project precedent) |
-| trackers synchronized | ⏳ pending close |
-| explicit user approval | ⏳ pending |
+| full `test_casm_*` consolidated matrix, one fresh sweep | ⏭️ **waived by the user at close** — "I don't think a full test harness run is necessary in this case" (3-instruction gate deletion, 6 fixtures + bare-diagnostic verified live, byte-stable rebuild, full clean build of all 32 harnesses) |
+| trackers synchronized | ✅ |
+| explicit user approval | ✅ 2026-09-02 |
 
 ## Files changed
 

@@ -1,8 +1,8 @@
 ---
 feature: casm-diagnostic-always-name-file
 created: 2026-09-01
-status: in-progress
-taskwarrior: 86170ef8-0d91-44eb-9330-6f921a76eaee
+status: complete
+taskwarrior: 86170ef8-0d91-44eb-9330-6f921a76eaee (done)
 depends-on: none (branches off main)
 ---
 
@@ -280,8 +280,16 @@ Complete only when **all** of:
 - 2026-09-01: User approved the plan. Status set to `approved-not-started`;
   implementation, branch creation, and task activation remain pending an
   explicit start instruction.
-- 2026-09-02: **Increment 5 (verification + version) — mostly complete;
-  full-matrix live sweep left for the user (project precedent).**
+- 2026-09-02: **CLOSED — user-approved.** User approved close and
+  explicitly waived the full `test_casm_*` consolidated matrix sweep for
+  this change ("I don't think a full test harness run is necessary in this
+  case"), given the delta is a 3-instruction gate deletion already
+  live-verified on 6 fixtures + the non-located bare-diagnostic check, with
+  a byte-stable no-change rebuild and a full clean build of all 32
+  harnesses. Merged to `main`; Taskwarrior `86170ef8` closed; memory
+  updated. CASM `0.6.2` build 1419.
+- 2026-09-02: **Increment 5 (verification + version) — implementation
+  complete; full-matrix live sweep waived by the user at close.**
   - `src/external/casm/casm.s` `VERSION_STAGE "1"` -> `"2"` → CASM
     **`0.6.2`**. `BUILD_CASM` `1418` -> `1419` (content-hash gated; the
     version-string edit is the only source delta and it is same-length, so
