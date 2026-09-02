@@ -2033,6 +2033,24 @@ foreach(REF_NAME IN LISTS CASM_REF_NAMES)
 endforeach()
 add_custom_target(casm_reference_fixtures DEPENDS ${CASM_REF_BINS})
 
+# casm_oracle_inventory -- Byte-Oracle Transition WP2 reconciliation gate.
+# Read-only: verifies CASM_REF_NAMES == on-disk .ref.hex == git-tracked,
+# every ref has a packaging step, and every .ref.hex's declared byte
+# count / sha256 match its own hex body. NON-GATING: not in ALL, not a
+# dependency of any image or release target -- run it explicitly
+# (`cmake --build build --target casm_oracle_inventory`) or in CI as a
+# drift check. It shells out only to a Python script that reads files and
+# never invokes an assembler/compiler/linker/packer, so per
+# .agents/workflows/overlay-build-events.md it needs no build_event_wrapper.
+add_custom_target(casm_oracle_inventory
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/casm_oracle_inventory.py"
+        "--build-dir" "${CMAKE_BINARY_DIR}" "--check"
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    COMMENT "Reconciling the CASM byte-oracle audit register (WP2, non-gating)"
+    VERBATIM
+)
+
 add_c64_disk_image(image_d64
     OUTPUT_FILE "${CMAKE_BINARY_DIR}/image.d64"
     DISK_LABEL "${DISK_NAME}"

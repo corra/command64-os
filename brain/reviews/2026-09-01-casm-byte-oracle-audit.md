@@ -1,19 +1,44 @@
 # CASM Byte-Oracle Audit Register
 
 > [!NOTE]
-> **Schema + seed rows only (WP1).** The full inventory and provenance
-> classification of every `tests/fixtures/casm/*.ref.hex` and every
-> CASM-native application manifest is **WP2** work. WP1 defines the
-> register format and classifies five representative references by hand to
-> prove the schema is workable. Do not treat the absence of a reference
-> here as a provenance finding — WP2 has not run.
+> **WP2 register — provenance classification complete; remediation is WP3.**
+> Every `tests/fixtures/casm/*.ref.hex` (67) and every CASM-native manifest
+> (2) is classified below with exactly one provenance state, plus the three
+> ledgers, the 32-harness map, the feature-to-evidence matrix, and the WP3
+> worklist. **No reference has been re-derived, rewritten, or repackaged**
+> — that is WP3. A provisional `CANONICAL-INDEPENDENT (pending metadata)`
+> means the derivation claim is present and non-circular but source-hash /
+> generated-`.seq` hash / named-reviewer evidence is missing.
 
 Governing plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`
 Workflow: `.agents/workflows/canonical-byte-oracles.md`
 WP1 sub-plan: `brain/plans/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`
+WP2 sub-plan: `brain/plans/2026-09-02-casm-byte-oracle-wp2-fixture-inventory-provenance-audit.md`
 
-Baseline commit for WP2 inventory: TBD — the commit that includes both
-Phase 15 closure and `casm-diagnostic-always-name-file`.
+Baseline commit for the WP2 inventory: `b3193853` on branch
+`feature/casm-byte-oracle-wp2` (worktree clean in every oracle-relevant
+path; includes Phase 15 closure, CASM 0.6.2, and Byte-Oracle WP1).
+
+## Reconciliation (`scripts/casm_oracle_inventory.py --check`)
+
+- `CASM_REF_NAMES` = **67** = on-disk `*.ref.hex` = **67** = git-tracked =
+  **67**. Zero orphans in either direction.
+- Every `.ref.hex`'s declared `bytes:` and `sha256:` **match its own hex
+  body** — 0 mismatches across all 67 + 2 manifests.
+- Every reference has at least one packaging step (the generic
+  `CASM_REF_NAMES` loop and/or a per-phase `POST_BUILD` append).
+- 37/67 declare a `sha256:`; 30 declare only `bytes:`.
+- 66/67 headers explicitly claim independent derivation
+  ("hand-derived" / "NOT produced by CASM" / "independently ..."). The one
+  exception is `casmexprn` (see Ledger A).
+- 244 generated `.seq` fixture sources exist (build-time only, none
+  checked in); 61 pair 1:1 with a ref by name, 6 refs are multi-root /
+  multi-file (`casmmf1/2/3`, `casmpgrt`→`casmpgrta/b`, `casmpginc`→chain,
+  `casmbig1`→`casmbiga/casmbigb`).
+
+The `casm_oracle_inventory` CMake target (non-gating) re-runs this check;
+`--markdown` emits the mechanical field data (declared vs actual bytes/hash,
+generated-`.seq` hash, packaging trace) that backs Ledger A row-by-row.
 
 ## Provenance states
 
@@ -52,27 +77,262 @@ Each row records:
 | 19 | Historical evidence paths | prior review docs |
 | 20 | Re-audit trigger | what change forces re-classification |
 
-## Coverage matrix skeleton (WP2 fills the cells)
+## Ledger A — fixed-byte artifacts (67 refs + 2 manifests)
 
-Feature axis — every row needs at least one `CANONICAL-INDEPENDENT` or an
-approved deferred-gap note:
+Every row: full mechanical field data (declared vs actual bytes/SHA-256,
+generated-`.seq` hash, `CASM_REF_NAMES` membership, packaging trace) is
+produced live by `python3 scripts/casm_oracle_inventory.py --markdown` and
+is not duplicated here. This table is the classification layer: oracle
+class (WP2 hint, WP3 confirms), provenance state, and the WP3 gap list.
 
-- All 151 documented opcode / addressing-mode tuples
-- Branch displacement (forward / backward / range boundary)
-- Named constants and expressions (operators, parens, `*`, width rules)
-- Directives: `.ORG` / `.BYTE` / `.WORD` / `.RES` / `.FILL` / `.ALIGN` / `.INCBIN` / `.ASSERT`
-- Conditional assembly: taken branch, skipped branch (zero bytes), `.IFDEF`/`.IFNDEF`, nesting, Pass 1 == Pass 2
-- Local labels (`@name` scope)
-- Multi-file / `.INCLUDE` (nested, re-inclusion, traceback)
-- Static PRG output framing
-- R6 relocatable output (table, footer, multi-base application)
-- Listing (`/L`) output
-- Symbol map (`/M`) output
-- Diagnostics (every located + non-located diagnostic id)
-- Deterministic replay (repeated runs identical)
-- Production native applications (DASH, BANNER)
+| ref | class (hint) | provenance state | missing evidence |
+| --- | --- | --- | --- |
+| `brback1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `brfwd1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmalign1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmarith2` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmarith3` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmarithfwd` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmassert1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmbig1` | Repetitive/large (6002 B) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmcase1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmchain1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmchar1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmelif` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmemit1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmexprn` | Static PRG | `UNCLEAR` | **no derivation statement**, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmfa2p` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmfill1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmfwdstale1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmhello` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmif0` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmif1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifL1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifM1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifdef0` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifdef1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifdeffwd` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifdefguard` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifelse` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifndef1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifnest` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifp1p2` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmifskip` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmincbin1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmloc1` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmloc2` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmloc3` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmloc7` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmmaxid1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmmf1` | Static (multi-root) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmmf2` | Static (multi-root) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmmf3` | Static (multi-root) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmmodes` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmnoorg1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmnum2` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmopall` | Static (151-tuple opcode ledger) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmordhaz1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmorg1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmorgexpl1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpg128` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpg63` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpg64` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpg65` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpgblank` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpgfill` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpginc` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpgincbin` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpgr6` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmpgrt` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmrelacc` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmreloc1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmrelop1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmrelop2` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmres1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmstring1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `casmzpconst1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
+| `p1back1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `p1fwd1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `p1size1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
 
-## Seed classifications (WP1 gate — five representative references)
+### Ledger A notes
+
+- **66 / 67 → `CANONICAL-INDEPENDENT (pending metadata)`.** Each
+  `.ref.hex` header documents an independent hand-derivation from the
+  6502/6510 encoding and the fixture's own source directives, explicitly
+  "NOT produced by CASM". The bytes are internally consistent (declared
+  == actual). What every one of them lacks: a **source SHA-256**, a
+  **deterministic hash of the exact generated `.seq` bytes** it consumes,
+  and a **named reviewer sign-off**; 30 also lack an **artifact SHA-256**.
+  These are WP3 metadata-completion tasks, not re-derivations.
+- **1 / 67 → `UNCLEAR`: `casmexprn`** (WP20). Header is only "CASM WP20
+  trusted numeric-expression adapter reference / PRG header $C000, then
+  immediate/zero-page/indirect-Y extraction and lists" + `bytes:` +
+  `sha256:`. No "hand-derived / NOT produced by CASM" statement. Body
+  (`A9 34 / A5 12 / B1 34 / .byte 34 12 34 00 12 00`) is plausibly
+  hand-writable but the provenance is not asserted. **WP3: reconstruct
+  and record the derivation, or quarantine from authoritative packaging.**
+- **casmopall** carries the strongest existing evidence — an explicit
+  151-tuple ledger cross-referenced to
+  `brain/reviews/2026-08-12-casm-phase11-wp60-increment1-opcode-oracle.md`.
+  Still `(pending metadata)` only for the hash/reviewer fields.
+- **R6 refs** (`casmreloc1`, `casmrelop1/2`, `casmnoorg1`, `casmordhaz1`,
+  `casmrelacc`, `casmfa2p`, `casmorgexpl1`, `casmpgr6`): headers derive
+  the relocation table + footer, but none links **multi-base
+  relocation-application evidence** — WP3 adds that per the R6 oracle class.
+- **Native manifests** `src/external/dash/dash.ref.hex` (4579 B, 7
+  source SHA-256s, ca65 cross-check MATCHES) and
+  `src/external/banner/banner.ref.hex` (1011 B): both →
+  `NATIVE-OBSERVATION`. They are machine-integrity records with
+  stale-artifact protection; they are **not** independent oracles.
+  They become `CANONICAL-INDEPENDENT` only when **WP4** creates the
+  separate reviewed byte/relocation derivation record under
+  `src/external/<app>/` and links it. The ca65 match is `DIFFERENTIAL-ONLY`.
+
+## Ledgers B and C — generated fixtures with no `.ref.hex` (183)
+
+All 183 generated `.seq` fixtures that are **not** in `CASM_REF_NAMES`.
+Every one is `NOT-APPLICABLE` for a fixed-byte oracle. The sub-tag
+(reject / structural / stream-boundary / support-file) is a WP2 hint
+derived from the generator + packaging comments; WP6's coverage check
+confirms the reject cases assert an exact diagnostic identity and the
+structural cases assert PC/count/determinism. **None is or claims to be
+a byte oracle** (confirmed: none has a `.ref.hex`; the `comm -23` of the
+244 generated names against the 67 ref names is exactly this set).
+
+- **Ledger C — reject / diagnostic-only (~56 + name-inferred):** assert a
+  diagnostic id + location, no committed output. Includes the
+  `casmnumerr{d,h,b}`, `casmerr1-5`, `casmorg{2,3,4,5}`, `casmbadb`,
+  `casm{div,align}zero`, `casm{end,else}no*`, `casmchar{inval,unterm,bare}`,
+  `casmakwbad{,2}`, `casmassertfwd`, `casmstr{inval,unterm}`,
+  `casmincbin{badname,miss}`, `casmloc{dup,undef,noscope,constl,constr}`,
+  `casm{if,id,mf}` reject families, `p1{dup,undef}1`, etc.
+- **Ledger B — accepted, structural assertion (~93):** a native run whose
+  success is asserted by PC / symbol count / determinism / listing shape,
+  with no frozen `.ref`. Includes the stream-boundary set (`casm256`,
+  `casmshort`, `casmmulti`, `casmsplit`, `casmvmm65/128`, `casmln255/256`,
+  `casmclip`), whitespace/comment set (`casmblank`, `casmcmnt`,
+  `casmcr/crlf`, `casmctrl`), `casmconst1/3`, `casmcuraddr1/2`,
+  `casmparen1`, `casmassert{fail,msg}`, `casmakw3/4`, `casmlc0*`,
+  `casmmaploc`, `casmwp11`, `p1label1`, etc.
+- **Support-files (~34):** child `.INCLUDE` payloads / multi-root
+  companions not independently dispatched (`casmfrc1-3`, `casmfrp1-4`,
+  `casmidc1/2`, `casmic1-4`, `casmip1-4`, `casmiddc1/2`, `casmiduc1/2`,
+  `casmcat1-5`, `casmmfa-g`, `casmbiga/b`, `casmpgrta/b`,
+  `casmpginc{b,c}`, `casmareloc*`, `casmlc7{c,g}`, `casmsrc1`). Their
+  disposition follows their parent harness scenario.
+
+> The reject/structural boundary is fuzzy for a handful of the ~93
+> structural entries (some `casmakw*`, `casmconst*`, `casmlc0*` could be
+> reclassified reject). This does not affect any provenance state — all
+> are `NOT-APPLICABLE` — and WP6's feature-matrix pass resolves it where
+> it matters for coverage. The full name list is reproducible from
+> `comm -23 <(all generated .seq) <(CASM_REF_NAMES)`.
+
+## Harness map — 32 `tests/src/casm_*` (all structural / `NOT-APPLICABLE`)
+
+None of the 32 produces a PRG that is `COMP`'d against a `.ref`; each is
+an in-memory unit / structural harness that links CASM modules and
+asserts `PASS`/`FAIL` on internal behavior. No fabricated PRG oracle is
+assigned to any of them.
+
+| harness | evidence kind |
+| --- | --- |
+| casm_opcodes | structural — 151-tuple matcher table (pairs with `casmopall` in Ledger A) |
+| casm_bounds / casm_expr / casm_directives | structural — operand range, expression eval, directive parse |
+| casm_cond / casm_scope | structural — conditional nesting state machine; `@local` scope filter |
+| casm_pass1 / casm_passcheck / casm_spanread / casm_spancommit | structural — Pass 1 / two-pass agreement / span read head |
+| casm_reloc / casm_freloc | structural — relocation classification; reloc fault injection |
+| casm_include / casm_catalog / casm_frame / casm_finc | structural — include catalog, frame stack, traceback |
+| casm_listing / casm_listcap / casm_listwrite / casm_flist / casm_flmeta | structural — listing contract, capacity, write, metadata |
+| casm_map | structural — symbol map record layout |
+| casm_symbols / casm_faultsymbols | structural — symbol table; symbol fault injection |
+| casm_vmm / casm_faultvmm | structural — VMM store; VMM fault injection |
+| casm_faultinject / casm_faultsource / casm_cliderive / casm_lexer / casm_progress / casm_event | structural — OS_API fault vector, source-state faults, CLI derivation, lexer, progress line, overlay events |
+
+
+## Feature-to-evidence matrix (WP2)
+
+Every documented feature axis, its covering Ledger-A fixture(s) and/or
+structural harness, and whether a `CANONICAL-INDEPENDENT` byte oracle
+backs it. "pending" = the covering ref is `CANONICAL-INDEPENDENT (pending
+metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
+
+| feature axis | byte oracle (Ledger A) | structural harness | gap |
+| --- | --- | --- | --- |
+| 151 opcode / addressing-mode tuples | `casmopall` (pending) | `casm_opcodes` | — |
+| branch displacement fwd/back/range | `brfwd1`,`brback1`; range: `casmbrn*`/`casmbrp*` (Ledger C) | `casm_bounds` | range boundary has no byte oracle (reject-only) — acceptable, no output |
+| named constants + expressions (ops, parens, `*`, width) | `casmnum2`,`casmarith2/3`,`casmarithfwd`,`casmchain1`,`casmzpconst1`,`casmrelacc` (pending) | `casm_expr` | — |
+| `.ORG` / explicit / absent | `casmorg1`,`casmorgexpl1`,`casmnoorg1` (pending) | `casm_directives` | — |
+| `.BYTE` / `.WORD` | `casmemit1`,`casmhello`,`casmmodes` (pending) | `casm_directives` | — |
+| `.RES` / `.FILL` / `.ALIGN` | `casmres1`,`casmfill1`,`casmalign1` (pending) | `casm_directives` | — |
+| `.INCBIN` | `casmincbin1` (pending) | `casm_directives` | — |
+| `.ASSERT` | `casmassert1` (pending) | — | assert emits no bytes; structural only — acceptable |
+| character / string literals | `casmchar1`,`casmstring1` (pending) | `casm_lexer` | — |
+| conditional: taken / skipped(0 bytes) / `.IFDEF` / `.IFNDEF` / nesting / P1==P2 | `casmif0/1`,`casmifelse`,`casmelif`,`casmifnest`,`casmifskip`,`casmifdef0/1`,`casmifndef1`,`casmifdeffwd`,`casmifdefguard`,`casmifp1p2` (pending) | `casm_cond` | — |
+| conditional `/L` blank-address / `/M` non-leak | `casmifL1`,`casmifM1` (pending) | `casm_listing`,`casm_map` | — |
+| `@name` local-label scope | `casmloc1/2/3/7` (pending) | `casm_scope` | — |
+| multi-file (2/3 CLI roots) | `casmmf1/2/3` (pending) | `casm_include` | — |
+| `.INCLUDE` nested / re-inclusion / traceback | `casmpginc`,`casmfwdstale1` (pending) | `casm_frame`,`casm_catalog`,`casm_finc` | traceback text: structural + the CASM 0.6.2 diag change; no byte oracle needed |
+| static PRG framing | `casmhello`,`casmemit1`,`casmcase1`,`casmmaxid1`,`p1*` (pending) | `casm_passcheck` | — |
+| R6 output (table, footer) | `casmreloc1`,`casmrelop1/2`,`casmordhaz1`,`casmfa2p`,`casmpgr6` (pending) | `casm_reloc` | **multi-base relocation-application evidence not linked** → WP3 |
+| R6 large / repetitive | `casmbig1` (pending) | — | seed+formula not recorded as a reviewed repetition rule → WP3 |
+| listing `/L` output | `casmifL1` (pending); `casmpg*` (pending) | `casm_listing`,`casm_listcap`,`casm_listwrite`,`casm_flist`,`casm_flmeta` | listing text is contractual — WP3 confirms a canonical layout row exists |
+| symbol map `/M` output | `casmifM1` (pending) | `casm_map`,`casm_flmeta` | map text is contractual — WP3 confirms canonical layout |
+| diagnostics — located ids | — | `casm_bounds`,`casm_directives`,`casm_expr`,`casm_frame`,`casm_finc`,`casm_faultsource` + Ledger C | `NOT-APPLICABLE` by design (no output); WP6 confirms each id is exercised |
+| diagnostics — non-located ids | — | `casm_faultinject`,`casm_faultsymbols`,`casm_faultvmm` | `NOT-APPLICABLE` |
+| deterministic replay | — | `casm_reloc` determinism cases; `project-casm-phase11-wp61` | determinism-only, correctly non-oracle |
+| progress indication (byte-identical output) | `casmpg63/64/65/128`,`casmpgblank`,`casmpgfill`,`casmpgincbin`,`casmpgrt`,`casmpgr6` (pending) | `casm_progress` | — |
+| overlay events | — | `casm_event` | `NOT-APPLICABLE` |
+| **DASH** native app | `dash.ref.hex` (`NATIVE-OBSERVATION`) | runtime `$3800`/`$5000`/`$9000` | **independent derivation record → WP4** |
+| **BANNER** native app | `banner.ref.hex` (`NATIVE-OBSERVATION`) | — | **independent derivation record + runtime evidence → WP4** |
+
+**No axis is uncovered.** Every axis has at least a structural harness;
+every axis that *should* have a byte oracle has one at
+`CANONICAL-INDEPENDENT (pending metadata)` or better, except the two
+native-app axes (WP4) and `casmexprn`'s expression-adapter contribution
+(`UNCLEAR` → WP3). The gaps column is the input to the WP3 worklist below.
+
+## WP3 remediation worklist (for user approval — WP2 gate)
+
+Batched by oracle class, in the order the WP3 sub-plan should take them:
+
+1. **Metadata completion — all 66 `CANONICAL-INDEPENDENT (pending
+   metadata)` refs.** Add: source SHA-256(s), a deterministic hash of the
+   exact generated `.seq` bytes (via `casm_oracle_inventory`), and a named
+   reviewer sign-off line. Add artifact SHA-256 to the 30 that lack it.
+   Mechanical + review; no byte changes. Sub-batches: static · expressions/
+   directives · conditionals · `@local` · progress-path.
+2. **`casmexprn` (`UNCLEAR`).** Reconstruct the byte derivation from the
+   6502 encoding + the fixture source; add the full derivation statement +
+   metadata; or, if it duplicates `casmnum2`/`casmarith*` coverage,
+   quarantine it from authoritative packaging with a note.
+3. **R6 class — multi-base relocation-application evidence.** For each R6
+   ref, record a reviewed relocation-eligibility ledger and a live
+   verification of the applied relocations at ≥2 load bases; link it.
+4. **`casmbig1` — reviewed repetition rule.** Record the seed bytes +
+   count/range formula and an assembler-independent expansion; boundary
+   spot-checks; whole-file hash.
+5. **Listing / map canonical layout.** Confirm (or create) a canonical
+   text/record-layout reference for `/L` and `/M` output, or record why
+   the focused structural harness is the right assertion.
+6. **Native-app derivation records → WP4** (not WP3): DASH and BANNER
+   independent byte/relocation derivation + reviewer sign-off, bound to
+   their manifests.
+
+Ledgers B and C need **no remediation** — they are `NOT-APPLICABLE`; WP6's
+consolidated pass confirms each reject case asserts an exact diagnostic
+identity.
+
+
+
+---
+
+## Appendix — WP1 seed classifications & schema-validation (historical)
+
+_Retained from the WP1 gate; superseded by the full Ledger A above but
+kept as the worked-example calibration of the schema._
+
 
 ### 1. `tests/fixtures/casm/casmhello.ref.hex` — Static PRG
 
@@ -212,3 +472,4 @@ missing. Observations fed back into the WP1 contract:
   correctness in a linked WP4 derivation record) maps onto the schema
   without embedding review metadata in the manifest — the WP1
   recommendation holds.
+

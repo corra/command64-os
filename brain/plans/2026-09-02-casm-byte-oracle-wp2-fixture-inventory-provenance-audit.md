@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp2-fixture-inventory-provenance-audit
 created: 2026-09-02
-status: proposed
-taskwarrior: TBD (created on approval)
+status: complete
+taskwarrior: d3e4435b-f47f-4da8-8e53-dbecd513a64c (WP2, done); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: Byte-Oracle Transition WP1 (complete, user-approved 2026-09-02); casm-diagnostic-always-name-file merged to main (78e43c7)
 ---
 
@@ -10,11 +10,10 @@ depends-on: Byte-Oracle Transition WP1 (complete, user-approved 2026-09-02); cas
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-09-02 for user review, per the
-per-work-package plan-approval requirement
-(`.agents/workflows/phased-implementation-planning.md`). No implementation,
-task activation, or register content is authorized until this plan is
-approved.
+**Complete; register + WP3 worklist user-approved 2026-09-02.** All 9
+increments done; walkthrough
+`brain/walkthroughs/2026-09-02-casm-byte-oracle-wp2-fixture-inventory-provenance-audit.md`.
+Merged to `main`; Taskwarrior `d3e4435b` closed. WP3 is next.
 
 Parent plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`.
 Prerequisite: WP1 closed (contract + workflow
@@ -291,6 +290,76 @@ CASM source is touched in WP2.
 
 ## Progress
 
+- 2026-09-02: **Increments 4-8 (the register) done.**
+  `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` filled from the WP1
+  schema:
+  - **Ledger A — 67 refs + 2 manifests, one provenance state each:**
+    **66 → `CANONICAL-INDEPENDENT (pending metadata)`** (independent
+    hand-derivation claimed + non-circular + bytes internally consistent;
+    every one missing source SHA-256 + generated-`.seq` hash + reviewer,
+    30 also missing artifact SHA-256). **1 → `UNCLEAR`: `casmexprn`**
+    (WP20 — no derivation statement at all). **2 manifests →
+    `NATIVE-OBSERVATION`** (dash, banner — become CANONICAL-INDEPENDENT
+    only via WP4 derivation records; ca65 match is `DIFFERENTIAL-ONLY`).
+  - **Ledgers B + C — 183 generated `.seq` with no `.ref.hex`:** all
+    `NOT-APPLICABLE`. Sub-bucketed (WP2 hint): ~56 reject/diagnostic, ~93
+    accepted-structural, ~34 include/multi-root support-files. Confirmed
+    none has or claims a byte oracle (the set is exactly
+    `comm -23 <generated 244> <CASM_REF_NAMES 67>`).
+  - **Harness map — 32 `tests/src/casm_*`:** every one is an in-memory
+    unit / structural harness; none `COMP`s a PRG against a `.ref`; no
+    fabricated oracle assigned.
+  - **Feature-to-evidence matrix:** every documented axis covered by a
+    Ledger-A ref and/or a structural harness. **No axis uncovered.** Gaps:
+    R6 multi-base relocation-application evidence not linked; `casmbig1`
+    repetition rule not recorded; `casmexprn` UNCLEAR; DASH/BANNER
+    independent derivation records (WP4).
+  - **WP3 remediation worklist:** 6 batches — (1) metadata completion for
+    the 66 pending refs, (2) `casmexprn` re-derive-or-quarantine, (3) R6
+    multi-base evidence, (4) `casmbig1` repetition rule, (5) listing/map
+    canonical-layout confirmation, (6) native-app records → WP4.
+- 2026-09-02: **Increment 3 (inventory script + CMake target) done.**
+  `scripts/casm_oracle_inventory.py` + non-gating `casm_oracle_inventory`
+  target (not in `ALL`, no image/release dependency, no overlay wrapper —
+  reads files only). Reconciliation **OK** on the clean tree:
+  - `CASM_REF_NAMES` == on-disk == git-tracked == **67**; every ref has a
+    packaging step; **every `.ref.hex`'s declared `bytes:` and `sha256:`
+    match its own hex body** (0 mismatches across all 67 + 2 manifests).
+  - 37/67 refs declare a `sha256:`; 30 declare only `bytes:`.
+  - **66/67 headers explicitly claim independent derivation**
+    ("hand-derived" / "NOT produced by CASM" / "independently ...").
+  - **Finding (for WP3): `casmexprn.ref.hex` (WP20) has no
+    independent-derivation statement** — header is just "trusted
+    numeric-expression adapter reference" + `bytes:`/`sha256:`. Bytes are
+    plausibly hand-writable (`A9 34 / A5 12 / B1 34` + `.byte` lists) but
+    the provenance claim is absent. Provisional lean: `UNCLEAR` pending a
+    WP3 derivation statement, or `CANONICAL-INDEPENDENT (pending metadata)`
+    if the derivation is reconstructed and confirmed non-circular.
+  - `.agents/workflows/canonical-byte-oracles.md` gained an "Inventory
+    reconciliation" section pointing at the script + its prohibition.
+- 2026-09-02: **Increment 1 (baseline re-survey) done.** Baseline commit
+  `b3193853` on branch `feature/casm-byte-oracle-wp2` (Taskwarrior WP2
+  `d3e4435b`, project `casm.byteoracle`, parent `75cfa082`). Worktree
+  clean in every oracle-relevant path. Exact reconciliation:
+  `CASM_REF_NAMES` (67) == `tests/fixtures/casm/*.ref.hex` on disk (67) ==
+  tracked (67), **zero** orphans either direction. 32 `tests/src/casm_*`
+  harnesses. 2 native manifests. 244 generated `.seq` (build-time only).
+- 2026-09-02: **Increment 2 (tracker reconciliation) done.**
+  - `wiki/tasks/casm.md` "Current Milestone": replaced the stale Phase 15
+    "WP99 committed, awaiting sign-off then merge" tail and the ~30-line
+    Phase 14 "WP89 awaiting sign-off / WP92 resumes from Increment 4"
+    narrative with concise closed-status summaries (Phase 15 closed+merged
+    at 0.6.1 b1417; Phase 14 closed at 0.6.0 b1405). Added the CASM 0.6.2
+    diagnostic patch and the Byte-Oracle WP1-closed / WP2-in-progress
+    status.
+  - Taskwarrior `#43` (Phase 14 `test_casm_flmeta` stale-fixture fix):
+    disposition confirmed **resolved** — the harness-only fix landed at
+    `8da90f45`, `brain/task.md:3933` already records it "user-approved and
+    closed", the WP92 walkthrough exists, and the numeric TW id has since
+    been recycled. Historical loose end, not a live disagreement.
+  - No *material* disagreement remains between the governing plan,
+    `brain/task.md`, `wiki/tasks/casm.md`, and Taskwarrior about fixture
+    or phase state. Inventory freeze is clear to proceed.
 - 2026-09-02: Plan drafted. Survey confirmed 67 `.ref.hex` (all tracked,
   all in `CASM_REF_NAMES`), 244 generated `.seq`, 32 harnesses, ~47
   packaging steps across 13 images, 2 native manifests. Three scoping
@@ -298,3 +367,8 @@ CASM source is touched in WP2.
   feature matrix with `GAP` markers; `CANONICAL-INDEPENDENT (pending
   metadata)` as the provisional state for sound-but-unhashed refs).
   Awaiting approval.
+- 2026-09-02: **Increment 9 / CLOSED — register + WP3 worklist user-approved.**
+  Merged `feature/casm-byte-oracle-wp2` to `main`; Taskwarrior `d3e4435b`
+  closed; trackers + memory synced. WP3 (fixture oracle remediation) is the
+  next work package; its first batch is metadata completion for the 66
+  `CANONICAL-INDEPENDENT (pending metadata)` refs.
