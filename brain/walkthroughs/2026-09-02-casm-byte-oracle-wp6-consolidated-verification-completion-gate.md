@@ -102,7 +102,7 @@ ids/locations; no `.ref` exists for these by design.)
 
 ### G. User-supplied — full `test_casm_*` harness matrix (32 harnesses)
 
-**[Pending the user's session — to be folded in here.]**
+**User-run 2026-09-02: full `test_casm_*` matrix PASS.**
 
 ## Notes / issues
 
@@ -144,5 +144,5 @@ ids/locations; no `.ref` exists for these by design.)
 | no authoritative expected bytes derive from CASM or ca65 output | ✅ |
 | DASH `NATIVE-OBSERVATION` carve-out + standing ca65 check documented | ✅ |
 | audit register / governing plan / KNOWLEDGE / CHANGELOG / MEMORY / memory / DOX / trackers / mirrors synchronised | ✅ |
-| user's full `test_casm_*` harness matrix | ⏳ pending user session |
-| **user explicitly approves closing the whole transition** | ⏳ pending |
+| user's full `test_casm_*` harness matrix | ✅ user-run, PASS (2026-09-02) |
+| **user explicitly approves closing the whole transition** | ✅ 2026-09-02 |

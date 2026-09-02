@@ -740,3 +740,6 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   `.agents/workflows/canonical-byte-oracles.md` + skill. Walkthrough
   `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp6-consolidated-verification-completion-gate.md`.
   Awaiting the user's explicit sign-off to close the whole transition.
+- 2026-09-02: **User signed off. TRANSITION CLOSED.** WP6 (incl. the full
+  harness matrix, user-run PASS) approved; merged to `main`. The Canonical
+  Byte-Oracle Transition is complete.
