@@ -15,10 +15,14 @@ bounded expression evaluator, source-file inclusion via `.INCLUDE`, and
 produces relocatable output by default so the same PRG can run at any load
 address the OS chooses.
 
-> **CASM Phase 12 is complete** (labels/expressions/multi-file/relocation/
-> include processing/symbol map/listing output/named constants/the
-> current-address symbol/parenthesized precedence/arithmetic and bitwise
-> operators/character literals/string literals all shipped). Everything
+> **CASM Phase 14 is complete** (CASM `0.6.0`). Through Phase 12:
+> labels/expressions/multi-file/relocation/include processing/symbol
+> map/listing output/named constants/the current-address
+> symbol/parenthesized precedence/arithmetic and bitwise
+> operators/character literals/string literals. Phase 13 added the
+> data-construction directives (`.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/
+> `.ASSERT`); Phase 14 added `@name` local labels (see
+> [Local Labels](#local-labels-name)). Everything
 > documented below as supported is real and has been verified end-to-end,
 > including in production via [DASH](dash-utility.md), which assembles
 > through a seven-file `.INCLUDE` chain and uses named constants, operator
@@ -264,6 +268,55 @@ UNSUPPORTED` at the second `+`.
 
 > Prefer **lowercase** constant names, per the identifier convention above
 > — `screenw`, not `SCREENW`.
+
+### Local Labels (`@name`)
+
+An identifier prefixed with `@` is a **local label** — the ca65 "cheap
+local" spelling. It is defined with `@name:` and referenced as `@name`
+anywhere an ordinary label is valid (a branch or absolute operand, a
+`.BYTE`/`.WORD` operand, a `.ASSERT` expression):
+
+```asm
+delay:  ldx #$00
+@loop:  dex
+        bne @loop        ; @loop is the one just above
+        rts
+draw:   ldy #$28
+@loop:  dey              ; a *different* @loop -- new scope
+        bne @loop
+        rts
+```
+
+A local label's **scope** opens at the nearest preceding ordinary
+(non-`@`) label and closes at the next ordinary label, or end of file.
+Within one scope a local name must be unique; across scopes the same
+`@name` is free to reuse, and a local may shadow an ordinary label of
+the same spelling (the `@`-prefixed reference always resolves to the
+local). Forward references work exactly as for ordinary labels — `bne
+@done` before `@done:` is fine — because both passes re-establish the
+same scope in lockstep.
+
+Diagnostics:
+
+| Condition | Message |
+| --- | --- |
+| `@name:` before any ordinary label | `CASM: LOCAL LABEL BEFORE ANY GLOBAL LABEL` |
+| the same `@name:` twice in one scope | `CASM: DUPLICATE LOCAL LABEL IN SCOPE` |
+| `@name` referenced but never defined in its scope | `CASM: UNDEFINED LOCAL LABEL` |
+| `@` on either side of a named constant's `=` | `CASM: LOCAL LABEL NOT ALLOWED IN CONSTANT` |
+
+The undefined/duplicate messages name the owning ordinary label. In the
+`/M` symbol map a local prints qualified as `<owner>@<local>` (e.g.
+`DELAY@LOOP`), in definition order, truncated to fit the row.
+
+> **Divergence from ca65 / Turbo Macro Pro.** The `@name` *spelling* is
+> ca65-compatible, but CASM forbids a local label on either side of a
+> named constant's `=` (`@x = 1` and `y = @x` are both rejected).
+> ca65 and Turbo Macro Pro (and ACME, 64tass, KickAssembler, DASM) all
+> allow it. This is a deliberate implementation-simplicity choice in CASM
+> 0.6; a TMP/ca65 source that assigns a local label into a constant will
+> not port cleanly. Anonymous labels (`:` / `:+` / `:-`) are not
+> supported at all — they are planned as a later, separate feature.
 
 ### The Current-Address Symbol (`*`)
 
@@ -702,6 +755,10 @@ thing — see the [Programmer's Reference §18](casm-programmers-reference.md#18
 for status and rationale:
 
 - **`.STATIC` / `.RELOC` directives** — use `/S` plus `.ORG` instead.
+- **Anonymous labels** (`:` definition, `:+` / `:-` / `:++` references) —
+  not supported; planned as a later, separate feature.
+  [Named local labels](#local-labels-name) (`@name`) *are* supported as of
+  Phase 14, but must not appear on either side of a named constant's `=`.
 - **A named constant's own definition** (`NAME = expr`) does not accept the
   full expression grammar above — only a single symbol/literal/`*` with an
   optional `±NUMBER` addend.

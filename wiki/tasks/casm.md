@@ -35,11 +35,23 @@ user-approved. WP91 (DASH `dfmt.s` adopts `@LOOP`/`@DONE`/`@SKIP` in
 three routines; AGENTS.md dual-assembler clause; DASH output
 byte-identical under ca65 and native CASM, triple-verified; manifest
 regenerated; a WP89 `test_casm_include` build gap folded in) is
-source-complete and build/live-verified, awaiting sign-off. WP92 remains (pass-driver wiring + production fixtures + scoped
-diagnostics, `/M` map rendering, DASH adoption, consolidated completion
-gate). Plan:
-`brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
-Walkthroughs: `brain/walkthroughs/2026-09-01-casm-phase14-wp8{6,7,8}-*.md`.
+user-approved. WP91 (DASH `@local` adoption) user-approved 2026-09-01.
+WP92 (consolidated completion gate) is **closed, user-approved
+2026-09-01** -- CASM Phase 14 is fully closed at `0.6.0` build `1405`.
+The fresh sweep found 30/31 `test_casm_*`
+harnesses PASS and all 11 Phase 14 production fixtures matching, but
+`test_casm_flmeta` case 6 (`resolveMaxIncludedName`) deterministically
+FAILED. **Root-caused as a stale test fixture, not a product bug** (task
+43-b, `8da90f45`): the memory-optimization WP's Finding D dropped the
+include-filename cap 63 -> 32 and re-pinned the sibling fixtures but
+missed `casm_flmeta.s`'s bare-literal `#66` expectation. Harness-only
+fix; `test_casm_flmeta`/`flist`/`listwrite`/`cliderive` re-verified PASS
+live; awaiting user sign-off to close task 43, after which WP92 resumes
+from its Increment 4 (no-locals byte-identity, DASH hash, `0.6.0`
+version bump, docs, walkthrough). Plans:
+`brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`,
+`brain/plans/2026-09-01-casm-phase14-wp92-consolidated-completion.md`.
+Walkthroughs: `brain/walkthroughs/2026-09-01-casm-phase14-wp8{6,7,8,9},wp9{0,1}-*.md`.
 
 **The optional progress and processing indication feature is complete**,
 user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`. It is

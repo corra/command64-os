@@ -3906,6 +3906,37 @@ and WP80 complete; WP79 explicitly deferred, not abandoned.
 
 **CASM Phase 13 is fully closed** (WP81-85, `0.4.0` build `1349`).
 
+# CASM Phase 14 (Local Labels)
+
+Taskwarrior parent `4cf10e7c-9365-46cf-94e1-5e4bd8d44635`. Plan
+`brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
+
+- [x] WP86 design freeze (storage/diag constants); WP87 lexer
+      `@`-prefixed identifier scanning (`CASM LEXER: PASS`); WP88
+      symbol-layer scope filtering + `test_casm_scope` (`CASM SCOPE:
+      PASS`; found+fixed an `A`-clobber defect live); WP89 pass-driver
+      wiring + four scoped diagnostics `$57-$5A` + 9 production fixtures;
+      WP90 `/M` `<owner>@<local>` rendering (+ latent Phase-10
+      constant-map fix); WP91 DASH `dfmt.s` `@local` adoption
+      (byte-identical, triple-verified). All user-approved.
+- [x] WP92 consolidated completion gate, **user-approved 2026-09-01**.
+      Fresh 31-harness live-VICE sweep + all 11 Phase 14 production
+      fixtures re-verified together; no-locals byte-identity
+      (`casmchain1`/`casmres1`/`casmassert1` COMP-exact); DASH manifest
+      `3b4d0693` re-confirmed; CASM promoted `0.5.2` -> `0.6.0` build
+      `1405`, banner live-verified; MAIN within `$7400` (1,902 B
+      headroom); docs (`casm-utility.md` + reference + wiki mirrors +
+      `Home.md`), `CHANGELOG.md`, `KNOWLEDGE.md`, memory all synced.
+      The sweep found one regression (`test_casm_flmeta` case 6),
+      **root-caused as a stale test fixture** (memory-opt Finding D cap
+      63->32 missed `casm_flmeta.s`'s bare `#66`), harness-only fix under
+      Taskwarrior 43 (`8da90f45`), user-approved and closed. Plans:
+      `brain/plans/2026-09-01-casm-phase14-wp92-consolidated-completion.md`,
+      `brain/plans/2026-09-01-casm-flmeta-maxincluded-regression.md`.
+
+**CASM Phase 14 is fully closed** (WP86-92, user-approved 2026-09-01,
+`0.6.0` build `1405`).
+
 # Shell: `dir /p` Paged Directory Listing
 
 - [x] `dir /p` paging (project `command64.shell`, Taskwarrior task 44,

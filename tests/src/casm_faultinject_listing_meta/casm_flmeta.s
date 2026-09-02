@@ -300,9 +300,9 @@ rriFail:
 
 resolveMaxIncludedName:
     jsr prepareResolveInclude
-    lda #<includeName63
+    lda #<includeNameCap
     sta IncludeNameLo
-    lda #>includeName63
+    lda #>includeNameCap
     sta IncludeNameHi
     lda #CASM_DEVICE_MAX
     sta IncludeDevice
@@ -310,7 +310,7 @@ resolveMaxIncludedName:
     sta TestFileId
     ldx #<resolvedMaxIncluded
     ldy #>resolvedMaxIncluded
-    lda #66
+    lda #35
     jmp checkResolveText
 
 resetOwnedState:
@@ -629,8 +629,15 @@ resolved11: .byte "11:I"
 rootIdentityName: .byte "ROOT-IDENTITY-NAME", 0
 headerName31: .byte "1234567890123456789012345678901", 0
 headerName32: .byte "12345678901234567890123456789012", 0
-includeName63: .byte "123456789012345678901234567890123456789012345678901234567890123", 0
-resolvedMaxIncluded: .byte "11:123456789012345678901234567890123456789012345678901234567890123"
+; Finding D (memory-optimization WP, task 42, 2026-08-31): the include
+; filename cap dropped 63 -> 32. This case exercises listingResolveFilename's
+; success path at the new maximum -- a 32-char include name under device 11
+; resolves to "11:" + 32 chars = 35 bytes. (Sibling re-pins landed in
+; casm_include validCap / casm_cliderive cderboundary1; this one was missed
+; until the Phase 14 WP92 sweep -- see brain/plans/2026-09-01-casm-flmeta-
+; maxincluded-regression.md.)
+includeNameCap: .byte "12345678901234567890123456789012", 0
+resolvedMaxIncluded: .byte "11:12345678901234567890123456789012"
 passMsg: .byte "CASM FAULT META: PASS", PetCr, 0
 failMsg: .byte "CASM FAULT META: FAIL", PetCr, 0
 

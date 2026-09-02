@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM `@name` local labels (Phase 14, WP86-92)** (CASM `0.5.x` ->
+  `0.6.0`): named local labels in the ca65 "cheap local" spelling. `@name:`
+  defines a label; `@name` references it in any expression position an
+  ordinary label is legal (branch/absolute operand, `.BYTE`/`.WORD`
+  operand, `.ASSERT`). A local's scope opens at the nearest preceding
+  ordinary (non-`@`) label and closes at the next one, or end of file; the
+  same `@name` is a distinct symbol per scope and may shadow an ordinary
+  label of the same spelling. Forward references resolve in Pass 2 exactly
+  as for ordinary labels. The `/M` symbol map renders a local qualified as
+  `<owner>@<local>`. Four new diagnostics (`$57-$5A`): `LOCAL LABEL BEFORE
+  ANY GLOBAL LABEL`, `DUPLICATE LOCAL LABEL IN SCOPE`, `UNDEFINED LOCAL
+  LABEL`, `LOCAL LABEL NOT ALLOWED IN CONSTANT`. Stored in the existing
+  64-byte symbol record (one spare flag bit + two reserved padding
+  bytes) — no new zero page, no VMM change, MAIN still `$7400`.
+  **Divergence from ca65 / Turbo Macro Pro:** CASM rejects a local label
+  on either side of a named constant's `=` (an implementation-simplicity
+  choice). **Anonymous labels** (`:` / `:+` / `:-`) are explicitly
+  deferred to a later phase. Purely additive — a source with no `@` token
+  assembles byte-identically to pre-Phase-14; DASH's `dfmt.s` adopted
+  `@local` in three routines with byte-identical output, triple-verified.
+  Completed and user-approved 2026-09-01; CASM advanced from `0.5.2` to
+  `0.6.0`.
 - **CASM progress and processing indication** (optional feature, CASM
   `0.4.0` -> `0.5.0`): CASM now shows what it is doing while it assembles.
   During each pass a single in-place transient status line reports the
@@ -78,6 +100,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`test_casm_flmeta` stale max-include-name fixture** (test-only,
+  Taskwarrior 43-b): the memory-optimization WP's Finding D dropped the
+  CASM include-filename cap 63 -> 32 and re-pinned the `casm_include` /
+  `casm_cliderive` boundary fixtures, but `casm_flmeta.s`'s
+  `resolveMaxIncludedName` case hardcoded the old 63/66 values as bare
+  `.byte` literals + `lda #66` (no `CASM_*` symbol, so no build assert
+  guarded it) and was not re-run live. It surfaced deterministically in
+  the CASM Phase 14 WP92 consolidated sweep. Fix is harness-only
+  (`includeNameCap` 32 chars, resolved length 35); CASM product
+  behaviour was already correct. Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-flmeta-maxincluded-regression.md`.
 - **CASM garbled banner on an early fatal exit** (CASM `0.5.1` -> `0.5.2`,
   Taskwarrior 43): a diagnostic raised before Pass 1 -- CLI/file/lexer-init
   failures such as `FILENAME TOO LONG`, `CANNOT OPEN INPUT`, `UNKNOWN

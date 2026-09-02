@@ -609,3 +609,25 @@ Phase 14 is complete only when **all** of:
   stub. Full `cmake --build build` green. Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase14-wp91-dash-adoption.md`.
   Awaiting user sign-off before WP92.
+- 2026-09-01: **WP91 approved by user** (confirmed this session; the DASH
+  Modernization WP1-6 increment had already landed on top of WP91 on
+  `feature/casm-phase14` in the interim -- see
+  `project-dash-modernization-complete`). WP92 (Phase 14 consolidated
+  completion gate) activated. Per user direction WP92 gets its own
+  dedicated plan file mirroring Phase 13 WP85:
+  `brain/plans/2026-09-01-casm-phase14-wp92-consolidated-completion.md`
+  (drafted for approval; no doc/version changes until approved).
+- 2026-09-01: **WP92 approved and started; then PAUSED.** Increment 1
+  (rebuild/roster/envelope) and Increment 3 (all 11 Phase 14 production
+  fixtures re-verified, matching WP89/WP90) done; Increment 2 sweep found
+  **30/31 `test_casm_*` harnesses PASS but `test_casm_flmeta` case 6
+  (`resolveMaxIncludedName`, a listing/include max-length filename-
+  resolution path -- unrelated to local labels) deterministically
+  FAILS**. It was green at the 2026-08-24 progress-feature gate, so the
+  regression landed after that (memory-opt WP / progclear fix / Phase 14
+  WPs / diag hardening are the candidates). Per WP92's Stop Conditions:
+  halted, disclosed, deferred to its own approved task -- **task 43
+  (`8da90f45`),
+  `brain/plans/2026-09-01-casm-flmeta-maxincluded-regression.md`**. WP92
+  (task 42) set to depend on task 43. No version bump / no doc change
+  made. WP92 resumes from its Increment 4 once task 43 closes.
