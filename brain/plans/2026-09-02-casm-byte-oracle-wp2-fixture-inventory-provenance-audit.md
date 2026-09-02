@@ -291,6 +291,34 @@ CASM source is touched in WP2.
 
 ## Progress
 
+- 2026-09-02: **Increments 4-8 (the register) done.**
+  `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` filled from the WP1
+  schema:
+  - **Ledger A — 67 refs + 2 manifests, one provenance state each:**
+    **66 → `CANONICAL-INDEPENDENT (pending metadata)`** (independent
+    hand-derivation claimed + non-circular + bytes internally consistent;
+    every one missing source SHA-256 + generated-`.seq` hash + reviewer,
+    30 also missing artifact SHA-256). **1 → `UNCLEAR`: `casmexprn`**
+    (WP20 — no derivation statement at all). **2 manifests →
+    `NATIVE-OBSERVATION`** (dash, banner — become CANONICAL-INDEPENDENT
+    only via WP4 derivation records; ca65 match is `DIFFERENTIAL-ONLY`).
+  - **Ledgers B + C — 183 generated `.seq` with no `.ref.hex`:** all
+    `NOT-APPLICABLE`. Sub-bucketed (WP2 hint): ~56 reject/diagnostic, ~93
+    accepted-structural, ~34 include/multi-root support-files. Confirmed
+    none has or claims a byte oracle (the set is exactly
+    `comm -23 <generated 244> <CASM_REF_NAMES 67>`).
+  - **Harness map — 32 `tests/src/casm_*`:** every one is an in-memory
+    unit / structural harness; none `COMP`s a PRG against a `.ref`; no
+    fabricated oracle assigned.
+  - **Feature-to-evidence matrix:** every documented axis covered by a
+    Ledger-A ref and/or a structural harness. **No axis uncovered.** Gaps:
+    R6 multi-base relocation-application evidence not linked; `casmbig1`
+    repetition rule not recorded; `casmexprn` UNCLEAR; DASH/BANNER
+    independent derivation records (WP4).
+  - **WP3 remediation worklist:** 6 batches — (1) metadata completion for
+    the 66 pending refs, (2) `casmexprn` re-derive-or-quarantine, (3) R6
+    multi-base evidence, (4) `casmbig1` repetition rule, (5) listing/map
+    canonical-layout confirmation, (6) native-app records → WP4.
 - 2026-09-02: **Increment 3 (inventory script + CMake target) done.**
   `scripts/casm_oracle_inventory.py` + non-gating `casm_oracle_inventory`
   target (not in `ALL`, no image/release dependency, no overlay wrapper —
