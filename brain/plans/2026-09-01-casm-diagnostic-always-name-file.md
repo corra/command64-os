@@ -1,0 +1,282 @@
+---
+feature: casm-diagnostic-always-name-file
+created: 2026-09-01
+status: approved-not-started
+taskwarrior: TBD (created on approval)
+depends-on: none (branches off main)
+---
+
+# Plan: CASM — Always Name the Source File in a Located Diagnostic
+
+## Status
+
+**Approved 2026-09-01; not started.** The user approved this plan, satisfying
+the per-work-package plan gate in
+`.agents/workflows/phased-implementation-planning.md`. Implementation, branch
+creation, and task activation remain pending an explicit start instruction so
+this work does not interfere with concurrent CASM/DASH development.
+
+Standalone hardening task — **not** a numbered CASM Phase or Work Package
+(same category as the 2026-08-31 "diag-table single-source-of-truth" task).
+It branches off `main`, not off `feature/casm-phase14`.
+
+Parent/master plan: `brain/plans/2026-07-16-casm-assembler-implementation-plan.md`
+(§18 diagnostics, Phase 11 hardening lineage).
+
+## Objective
+
+Make **every** source-position CASM diagnostic name the physical file the
+error is in. Today the renderer prints an `IN FILE <name>` line only when
+`CasmSourceCount > 1` **or** the location is inside an `.INCLUDE`d frame
+(`src/external/casm/diagnostics.s` ~line 866-880, the WP35/WP48 gate). A
+build with a single top-level source — **including a single root that
+`.INCLUDE`s other files** — omits the filename on any diagnostic whose
+location resolves to that root, so:
+
+- a root-file error in an include build prints no filename while errors in
+  the *included* files do — the output is internally inconsistent, and the
+  root-file diagnostic reads as context-free;
+- pasted or scrolled-back diagnostic text from a single-file assemble is not
+  self-describing.
+
+**Delivers:** the `IN FILE <name>` line on every diagnostic that has a valid
+recorded source location (`CasmDiagLocValid != 0`), regardless of
+`CasmSourceCount` or include depth.
+
+**Does NOT deliver / explicitly excluded:**
+
+- Any change to diagnostics that have *no* source location — CLI parse
+  errors, file-service errors, internal-state errors stay bare. "The file
+  where the error is" only has meaning when a location was stamped.
+- No new CLI flag. The behavior is unconditional (user decision 2026-09-01).
+- No change to the `AT LINE / COL / OFFSET / BYTE` trailer, the line echo,
+  the caret, or the `INCLUDED FROM` traceback format.
+- No change to how `CasmDiagLocFileId` provenance is *computed* — unless
+  Increment 1 uncovers a genuine stamping bug (see Scoping Decision 3 /
+  Stop Conditions).
+- Not folded into Phase 14; ships on its own patch release.
+
+## Scoping Decisions (user-confirmed 2026-09-01)
+
+1. **Behavior: always print**, for any diagnostic with a valid location,
+   single-source case included. Non-located diagnostics stay bare.
+2. **Sequencing: standalone task off `main` now.** Own branch, own patch
+   version bump. `feature/casm-phase14` inherits this change on its next
+   merge/rebase from `main`; the only expected conflict is `VERSION` /
+   `BUILD_CASM` and the diagnostic fixtures' expected-output comments, both
+   mechanical.
+3. **Motivating gap: a located diagnostic that is NOT single-source yet
+   still shows no filename.** The plan's first increment must reproduce and
+   characterize this precisely and decide whether it is (a) purely the
+   root-in-an-include-build suppression described above — fixed by the
+   always-print change — or (b) a provenance-stamping bug where an
+   include-frame location is recorded with a root (bit-7-clear)
+   `CasmDiagLocFileId`. If (b), the fix for the stamping bug is in scope for
+   this task; if it turns out larger than a localized stamp correction,
+   Stop and disclose.
+
+## Background — current mechanism (as-built)
+
+- `diagnostics.s` keeps a `CasmDiagLoc*` record. Raise sites stamp it via
+  `diagSetLocFromLookahead` / `diagSetLocFromLookaheadPos` /
+  `diagSetLocFromToken` / `diagSetLocFromStmt`. **All four** set
+  `CasmDiagLocFileId` (from `CasmLookaheadFileId` or `CasmStmtLocFileId`)
+  and `CasmDiagLocValid`.
+- `diagPrintSourceContext` self-gates on `CasmDiagLocValid`; then:
+
+  ```
+  lda CasmDiagLocFileId
+  bmi @printFileName        ; bit 7 set = include frame -> always name it
+  lda CasmSourceCount
+  cmp #2
+  bcc @skipFileName         ; root id AND < 2 CLI sources -> NAME SUPPRESSED
+  @printFileName:
+  ldx #<msgInFile ...       ; "IN FILE "
+  lda CasmDiagLocFileId
+  jsr diagPrintIncludeIdentity   ; root: cliSourceSlotLo/Hi,x ; frame: includeCatalogRead
+  ...
+  @skipFileName:
+  ldx #<msgAtLine ...       ; "AT LINE "
+  ```
+
+- `diagPrintIncludeIdentity` already resolves a root id (bit 7 clear) to
+  `cliSourceSlotLo/Hi, x` — for the single root that is slot 0, a
+  ready-to-print name. **The renderer already has everything it needs**;
+  the change is deleting the `CasmSourceCount` gate so `@printFileName`
+  runs whenever a location is valid.
+- Fatal path: `diagPrintFatal` tail-calls `diagPrintSourceContext` for the
+  id ranges that carry a location; bare ids are unaffected and must stay
+  bare.
+
+## Technical Design
+
+### Code change (`diagnostics.s`)
+
+Replace the gate at ~866-870:
+
+```
+    lda CasmDiagLocFileId
+    bmi @printFileName
+    lda CasmSourceCount
+    cmp #2
+    bcc @skipFileName
+@printFileName:
+```
+
+with an unconditional fall-through to the name print (drop the
+`CasmSourceCount` load/compare/branch and the now-unused `@printFileName`
+label if the assembler flags it; keep `@skipFileName` only if another path
+still targets it — audit first). Net effect: whenever `CasmDiagLocValid` is
+set, `IN FILE <name>` is emitted. `diagnostics.s` shrinks by a few bytes;
+no MAIN-envelope risk, but confirm the `$7400` figure is unchanged.
+
+`CasmSourceCount` import in `diagnostics.s` becomes unused **only if** no
+other routine in the file references it — grep before removing the
+`.import` (currently line 50). Leaving an unused import is harmless; a
+dangling one is not.
+
+Update the WP35/WP48 comment block (lines ~1736-1737, `msgInFile`) and the
+`diagPrintSourceContext` header comment to state the new unconditional
+behavior and note the old `CasmSourceCount > 1` rule as historical.
+
+### If Increment 1 finds a provenance bug (Scoping Decision 3b)
+
+Likely locus: the token record's `CASM_TOKEN_REC_FILE_ID` (consumed by
+`diagStampStmtLoc` -> `CasmStmtLocFileId` -> `diagSetLocFromStmt`) or
+`CasmLookaheadFileId`, not carrying the frame-flagged id while a child
+frame is active. Fix is a localized stamp correction at the source/lexer
+provenance write, plus a regression fixture. If the mis-stamp turns out to
+be systemic (multiple layers, or Pass 1/Pass 2 disagreement on file id),
+**Stop** and bring findings back for a separate plan.
+
+## Atomic Increments
+
+1. **Characterize the gap (no code change).** On a scratch branch off
+   `main`, build (or hand-write) five `.seq`/multi-file fixtures and run
+   each live under VICE against current CASM (`0.5.2` b1392), capturing the
+   exact on-screen diagnostic block:
+   - (a) single CLI root, no include, lexer error;
+   - (b) single CLI root that `.INCLUDE`s a file, error **in the root**;
+   - (c) same, error **in the included file**;
+   - (d) two CLI sources, error in the second;
+   - (e) nested include (root -> A -> B), error in B.
+   Record for each: is `IN FILE` present, and is the named file **correct**.
+   Conclude whether the motivating gap is 3a (suppression only) or 3b
+   (provenance mis-stamp). Write findings into this plan's Progress log
+   before touching production code.
+2. **Remove the suppression gate** in `diagnostics.s` per Technical Design.
+   If Increment 1 found a 3b provenance bug within a localized stamp, fix it
+   here too. Native build clean: `casm` target, `image_d64`,
+   `casm_phase13_test_d64` (or whichever diag fixtures live where),
+   `test_image_d64`. Re-run Increment 1's five fixtures live: (a) now names
+   the root; (b)-(e) unchanged except any that were wrong are now right.
+3. **Regenerate expected outputs.** Update every affected
+   expected-diagnostic comment in `cmake/GenerateCasmTestFixtures.cmake`
+   (the WP15 source-context block ~line 184+, WP35 `casmmfdiag*`, WP48
+   included-source fixtures, WP69 char-literal diag fixtures, any Phase
+   11/12/13 fixture whose documented expectation shows an `AT LINE` with no
+   preceding `IN FILE`). Audit host harnesses under `tests/src/casm_*` for
+   any that string-compare full diagnostic **text** (most compare
+   diagnostic **codes** — `casm_faultinject*` — and are unaffected; confirm
+   `casm_directives`, `casm_bounds`, `casm_expr`, `casm_opcodes`,
+   `casm_include`, `casm_frame` explicitly). Rebuild all test images.
+4. **Documentation.** `wiki/casm-programmers-reference.md` §18 filename
+   bullet + §18.1 example, `wiki/casm-utility.md` error-output section
+   (~line 675-686), and the `docs/` and `release/docs/` mirrors of both —
+   verify byte-identical with `cmp` after editing. `CHANGELOG.md` Unreleased
+   -> Changed. Note the change in `wiki/tasks/casm.md`.
+5. **Consolidated live verification + version.** Fresh together: every
+   `test_casm_*` harness across its disks + the full diagnostic fixture set
+   + a no-change rebuild (`casm.prg` byte-stable across two builds) + a
+   deliberate error injected into one `src/external/dash/` source assembled
+   natively, confirming the DASH filename now appears. `VERSION` ->
+   `0.5.3` (patch; diagnostic-text improvement, no grammar/output-binary
+   change), `BUILD_CASM` auto-increments. Walkthrough in
+   `brain/walkthroughs/2026-09-01-casm-diagnostic-always-name-file.md` with
+   COMP transcripts / VICE screenshots. Overlay `test` events per
+   `feedback-fire-overlay-events-for-tests` (curl fallback if the
+   `c64-overlay-api` MCP is still down).
+
+## Expected Files
+
+| File | Planned action |
+| --- | --- |
+| `brain/plans/2026-09-01-casm-diagnostic-always-name-file.md` | Create (this file); append Progress |
+| `src/external/casm/diagnostics.s` | Modify — remove `CasmSourceCount` suppression gate; update comments; drop unused `.import` iff truly unused |
+| `src/external/casm/source.s` or `lexer.s` | Modify **only if** Increment 1 finds a localized provenance mis-stamp |
+| `cmake/GenerateCasmTestFixtures.cmake` | Modify — regenerate affected expected-diagnostic comments; possibly add a 3b regression fixture |
+| `tests/src/casm_*/` | Modify — only harnesses that compare full diagnostic *text* (audit; expected: none or few) |
+| `wiki/casm-programmers-reference.md`, `wiki/casm-utility.md` | Modify — §18 / error-output docs |
+| `docs/casm-programmers-reference.md`, `docs/casm-utility.md` | Modify — mirror, `cmp`-verified |
+| `release/docs/casm-programmers-reference.md`, `release/docs/casm-utility.md` | Modify — mirror, `cmp`-verified |
+| `VERSION` | Modify — `0.5.3` |
+| `CHANGELOG.md` | Modify — Unreleased → Changed |
+| `wiki/tasks/casm.md` | Modify — note the task |
+| `brain/walkthroughs/2026-09-01-casm-diagnostic-always-name-file.md` | Create (at completion) |
+| memory `MEMORY.md` + reference file | Create — supersede the "prints when CasmSourceCount > 1" detail |
+
+## Stop Conditions
+
+Halt and get renewed direction if:
+
+- Increment 1 shows the motivating gap is a **systemic** provenance
+  mis-stamp (multiple layers, or Pass 1 vs Pass 2 file-id disagreement),
+  not a localized stamp fix — that becomes its own plan;
+- any `test_casm_*` harness fails for a reason other than a now-expected
+  added `IN FILE` line, or a no-change rebuild alters `casm.prg`;
+- CASM MAIN cannot stay within its approved `$7400` envelope (this change
+  should *shrink* the binary — an increase means something else is wrong);
+- a fatal or internal-error diagnostic that should stay bare starts
+  emitting an `IN FILE` line (would mean a location is being stamped where
+  it should not be — investigate the raise site, do not paper over it);
+- the `docs/` or `release/docs/` mirror cannot be made `cmp`-identical to
+  the `wiki/` source;
+- the affected-fixture list turns out materially larger than Increment 3
+  anticipates (suggesting the diagnostic format is depended on somewhere
+  undocumented) — reassess scope before mass-editing.
+
+## Documentation, Task, and DOX Updates
+
+- **At activation (on approval):** create the Taskwarrior task
+  (`task` CLI, per `feedback-taskwarrior-mcp-fallback`); branch
+  `feature/casm-diag-always-name-file` off `main`; add a one-line row to
+  `wiki/tasks/casm.md` under a standalone-tasks heading with status `[/]`.
+- **Per increment:** append this plan's Progress log.
+- **At completion:** `wiki/` + `docs/` + `release/docs/` doc edits,
+  `CHANGELOG.md`, `VERSION`, `wiki/tasks/casm.md` closeout line,
+  `brain/KNOWLEDGE.md` one-line note if it tracks diagnostic behavior,
+  memory (`reference-casm-diagnostic-always-names-file`, superseding the
+  "prints only when CasmSourceCount > 1" wording in any existing memory or
+  the §18 doc). DOX pass on `src/external/casm/AGENTS.md` and
+  `wiki/AGENTS.md` — expected no ownership/contract change, this is a
+  behavior refinement.
+
+## Completion Gate
+
+Complete only when **all** of:
+
+- Increments 1-5 done; Increment 1's characterization recorded in Progress;
+- the always-print change verified live for the single-root case (with and
+  without includes) and confirmed non-regressive for multi-source and
+  nested-include cases;
+- every affected diagnostic fixture's documented expectation updated and
+  live-re-verified together in one fresh sweep (not per-increment
+  citations), recorded in `brain/walkthroughs/`;
+- a deliberate DASH-source error assembled natively shows the correct
+  filename;
+- no-change rebuild proves `casm.prg` byte-stable; CASM within `$7400`;
+  both link configs pass; build-number check passes;
+- `wiki` / `docs` / `release/docs` manual copies `cmp`-identical;
+- trackers synchronized (Taskwarrior, `brain/task.md`, `wiki/tasks/casm.md`,
+  `CHANGELOG.md`, `VERSION` at `0.5.3`, memory);
+- **explicit user approval** to close. No self-declared completion.
+
+## Progress
+
+- 2026-09-01: Plan drafted for review. Scoping decisions 1-3 captured from
+  the user (always-print; standalone off `main`; motivating gap is a
+  non-single-source located diagnostic still missing its filename — to be
+  characterized in Increment 1 as suppression-only vs provenance bug).
+- 2026-09-01: User approved the plan. Status set to `approved-not-started`;
+  implementation, branch creation, and task activation remain pending an
+  explicit start instruction.
