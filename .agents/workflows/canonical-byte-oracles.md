@@ -226,6 +226,17 @@ never reads `opcodes.s`, disassembles a `.ref`, or decides a byte is
 correct. Run it (or wire it into CI) as a drift check whenever fixtures or
 packaging change; it assigns no provenance state.
 
+`scripts/casm_r6_verify.py <file>` is the companion tool for the **R6 PRG**
+oracle class: given a `.ref.hex` body or a raw `.prg`, it parses the R6
+footer (base / count / `"R6"` magic), checks every relocation-table offset
+points at an in-image high byte, confirms the offsets are strictly
+ascending and unique, and applies the relocation at several load bases to
+show the result stays in range. Assembler-independent (reads only the
+bytes + the R6 format). It verifies the *relocation structure*, not the
+code bytes — a `R6 VERIFY: PASS` supports the `CANONICAL-INDEPENDENT` R6
+ledger portion of an oracle, and a derivation record should cite its
+output. Used for every R6 fixture and both native-app manifests.
+
 ## Lifecycle
 
 - A WP that adds or changes expected bytes scopes its oracle impact in its

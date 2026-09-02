@@ -4013,10 +4013,23 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       WP3 worklist. New non-gating `casm_oracle_inventory` target.
       Plan + walkthrough
       `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp2-fixture-inventory-provenance-audit.md`.
-- [ ] WP3 fixture oracle remediation (ready to plan — first batch:
-      metadata completion for the 66 `pending metadata` refs)
-- [ ] WP4 native-application canonical records (DASH, BANNER) (not started)
-- [ ] WP5 DASH differential + source-policy transition (not started)
+- [x] WP3 fixture oracle remediation — **closed, user-approved 2026-09-02**,
+      merged `61da1a8`. All 67 fixture `.ref.hex` → `CANONICAL-INDEPENDENT`
+      (`casmexprn` promoted, zero `UNCLEAR`); source/artifact hashes +
+      reviewer lines; every `.ref` binary byte-unchanged;
+      `scripts/casm_oracle_inventory.py` `source_sha256` verification added.
+- [x] WP4 native-application canonical records — **closed, then
+      audit-corrected 2026-09-02** (merged `b39459c`; correction on
+      `feature/casm-byte-oracle-wp5`). BANNER → `CANONICAL-INDEPENDENT`.
+      **DASH → bytes `NATIVE-OBSERVATION`** (the original full-byte-derivation
+      claim was withdrawn) + `CANONICAL-INDEPENDENT` 451-entry R6 ledger.
+      New tool `scripts/casm_r6_verify.py`.
+- [/] WP5 DASH differential + source-policy transition — implementation
+      complete on `feature/casm-byte-oracle-wp5` (incl. the WP4 correction):
+      `dash_ref` `EXCLUDE_FROM_ALL`, utility disk decoupled,
+      `--allow-host-bytes` removed, source policy relaxed with the ca65
+      differential kept as a standing release check. Build green, shipping
+      bytes unchanged. Awaiting user closure approval; not yet merged.
 - [ ] WP6 consolidated verification + completion gate (not started)
 
 Related: `casm-diagnostic-always-name-file`

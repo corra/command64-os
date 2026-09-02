@@ -13,8 +13,9 @@ An MS-DOS style operating system for the Commodore 64.
   native CASM assembler source code files for the `DASH` dashboard (`dmain.s`,
   `dscr.s`, `dfmt.s`, `dsys.s`, `dapp.s`, `dvmm.s`, and `ddata.s`), `BANNER`'s
   own source (`banner.s`) alongside its compiled `banner.prg`, and the
-  `casm.prg`, `edlin.prg`, and `comp.prg` utilities, plus `dash.ref` to
-  verify the build.
+  `casm.prg`, `edlin.prg`, and `comp.prg` utilities, plus `dash.ref` — the
+  reviewed DASH reference binary — so you can `CASM DMAIN.S /O:DASH.PRG`
+  and then `COMP DASH.PRG DASH.REF` to check your own assembly against it.
 - **`docs/`** — reference documentation. Start with `docs/user-manual.md`;
   see `docs/casm-utility.md` for the full CASM language reference (syntax,
   directives, expressions, limits), `docs/dash-utility.md`,

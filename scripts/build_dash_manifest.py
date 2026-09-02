@@ -21,12 +21,10 @@
 # PROVENANCE IS RECORDED, NOT ASSUMED
 # -----------------------------------
 # The caller must state where the bytes came from via --provenance. The ca65
-# 'dash_ref' target is an INDEPENDENT CROSS-CHECK ONLY: it exists so a native
-# run can be verified byte-for-byte (on the C64 with COMP, or here with
-# --cross-check), and its output must never become the shipped bytes. Passing a
-# path that looks like the ca65 build is refused unless --allow-host-bytes is
-# given explicitly, so the misrepresentation has to be a typed, visible choice
-# rather than an accident.
+# 'dash_ref' target is an OPTIONAL DIFFERENTIAL CROSS-CHECK ONLY: it exists so a
+# native run can be verified byte-for-byte (on the C64 with COMP, or here with
+# --cross-check), and its output must never become the shipped bytes.
+# Passing the ca65 build path directly as the manifest input is strictly refused.
 
 import argparse
 import hashlib
@@ -61,8 +59,8 @@ def main(argv=None):
                          "command64_casm_utils.d64 after a native CASM run")
     ap.add_argument("--provenance", required=True,
                     help="how these bytes were produced -- recorded verbatim "
-                         "in the manifest header (e.g. \"native CASM 0.1.48 "
-                         "build 1191 on command64_casm_utils.d64, 2026-07-27\")")
+                         "in the manifest header (e.g. \"native CASM 0.5.2 "
+                         "build 1404 on command64_casm_utils.d64, 2026-09-01\")")
     ap.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST,
                     help="manifest to write (default: %(default)s)")
     ap.add_argument("--source-dir", type=Path, default=DEFAULT_SOURCE_DIR,
@@ -70,24 +68,20 @@ def main(argv=None):
                          "into the manifest's source_sha256 entries "
                          "(default: %(default)s)")
     ap.add_argument("--cross-check", type=Path, metavar="REF",
-                    help="also compare PRG byte-for-byte against REF (normally "
-                         "build/dash_ref.prg, the independent ca65 build) and "
+                    help="also compare PRG byte-for-byte against REF (optional "
+                         "differential build, e.g. build/dash_ref.prg) and "
                          "record the result in the manifest header")
-    ap.add_argument("--allow-host-bytes", action="store_true",
-                    help="permit transcribing the ca65 build itself; this "
-                         "ships host-assembled bytes as DASH and violates the "
-                         "WP4 artifact contract")
     args = ap.parse_args(argv)
 
     if not args.prg.is_file():
         fail(f"{args.prg}: not a file")
 
-    # Refuse the specific mistake this whole script exists to prevent.
-    if args.prg.resolve() == CA65_REFERENCE.resolve() and not args.allow_host_bytes:
-        fail(f"{args.prg} is the ca65 cross-check build, not native CASM "
+    # Refuse transcribing the host ca65 build as shipping bytes.
+    if args.prg.resolve() == CA65_REFERENCE.resolve():
+        fail(f"{args.prg} is the ca65 differential build, not native CASM "
              f"output.\n  The manifest must record bytes produced by CASM "
-             f"running on the C64.\n  Use --cross-check to compare against it "
-             f"instead, or --allow-host-bytes to override deliberately.")
+             f"running on the C64 or an independent canonical derivation.\n  "
+             f"Use --cross-check to record a differential comparison instead.")
 
     data = args.prg.read_bytes()
     if len(data) < 2:

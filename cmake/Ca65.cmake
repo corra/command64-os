@@ -60,7 +60,7 @@
 # build resolves the identical operand ca65-side, without renaming any
 # checked-in source file.
 function(add_ca65_app TARGET_NAME ENTRY_FILE SOURCES_VAR DEFAULT_VERSION PRG_SIZE_HEX)
-    cmake_parse_arguments(CA65APP "" "BASE_HEX" "EXTRA_INCLUDE_DIRS;EXTRA_DEFINES" ${ARGN})
+    cmake_parse_arguments(CA65APP "EXCLUDE_FROM_ALL" "BASE_HEX" "EXTRA_INCLUDE_DIRS;EXTRA_DEFINES" ${ARGN})
 
     # CODE_ALIGN stays positional so the existing 6-arg call sites need no
     # change; it is simply whatever positional argument survives keyword parsing.
@@ -277,6 +277,10 @@ SEGMENTS {
         VERBATIM
     )
 
-    add_custom_target(${TARGET_NAME} ALL DEPENDS "${OUTPUT_PRG}")
+    if(CA65APP_EXCLUDE_FROM_ALL)
+        add_custom_target(${TARGET_NAME} DEPENDS "${OUTPUT_PRG}")
+    else()
+        add_custom_target(${TARGET_NAME} ALL DEPENDS "${OUTPUT_PRG}")
+    endif()
     set_target_properties(${TARGET_NAME} PROPERTIES C64_PRG_PATH "${OUTPUT_PRG}")
 endfunction()

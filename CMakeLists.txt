@@ -476,7 +476,8 @@ if(Ca65_FOUND)
         )
     endforeach()
     add_ca65_app(dash_ref "${DASH_ENTRY}" DASH_SRCS 1000 "1000" BASE_HEX "3400"
-        EXTRA_INCLUDE_DIRS "${DASH_REF_SHIM_DIR}")
+        EXTRA_INCLUDE_DIRS "${DASH_REF_SHIM_DIR}"
+        EXCLUDE_FROM_ALL)
 else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for DASH_REF target")
 endif()
@@ -2164,15 +2165,13 @@ foreach(DASH_SEQ IN LISTS DASH_SEQ_SOURCES)
     )
 endforeach()
 
-# The ca65 reference build, shipped as DASH.REF so the native run can be
-# verified on the C64 itself with "COMP DASH.PRG DASH.REF".
-#
-# This is a genuinely non-circular check, the same principle as CASM's
-# hand-derived trusted-reference fixtures: ca65 and CASM share no code, and
-# they derive relocation entries by completely different means -- tools/reloc.py
-# diffs two links one page apart, while CASM classifies each operand as
-# relocatable during emission. A defect in one cannot reproduce itself in the
-# other. The reference is EVIDENCE for the manifest review, never its source.
+# The reviewed shipping artifact (DASH_BIN, transcribed from the
+# human-reviewed dash.ref.hex manifest), shipped as DASH.REF on the utility
+# disk so a native run can be checked on the C64 with
+# "COMP DASH.PRG DASH.REF". This is native-observation provenance for the
+# code bytes (see brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md),
+# not an independently-derived oracle; the ca65 dash_ref differential is the
+# standing independent corroboration and is run by the release process.
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)
     set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
@@ -2181,12 +2180,12 @@ endif()
 add_custom_command(
     TARGET command64_casm_utils_d64 POST_BUILD
     COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "dash.ref" -T PRG
-        -w "${CMAKE_BINARY_DIR}/dash_ref.prg"
+        -w "${DASH_BIN}"
         "${CMAKE_BINARY_DIR}/command64_casm_utils.d64"
-    COMMENT "Appending ca65 cross-check reference dash.ref to command64_casm_utils.d64"
+    COMMENT "Appending reviewed shipping artifact dash.ref to command64_casm_utils.d64"
     VERBATIM
 )
-add_dependencies(command64_casm_utils_d64 dash_ref)
+add_dependencies(command64_casm_utils_d64 dash)
 
 
 # Large-source CASM fixtures whose raw .seq text does not fit on test.d64

@@ -60,15 +60,17 @@ streaming-setup config, not something other clones/forks need.
 `CMakeLists.txt` ~line 1145, and the `casm_reference_fixtures` target's
 per-name loop) is deliberately **not** wrapped: it's not a compiler/linker
 invocation — it transcribes an already-reviewed hex manifest to a binary.
-DASH's shipped `dash.prg` comes from that transcription of the reviewed
-native manifest, not from ca65; the `dash_ref` ca65 target is an optional
-differential check (non-authoritative — see
-`.agents/workflows/canonical-byte-oracles.md`), and while it still builds
-it is where the DASH-source `add_ca65_app` compile/link overlay events
-fire. The byte-oracle transition makes `dash_ref` opt-in and non-gating
-(WP5); if it stops building after intentional CASM-only syntax adoption,
-no DASH build events are lost that belong to the shipped artifact. Same
-"not a build tool" reasoning covers
+DASH's shipped `dash.prg` (production `image.d64`) and `dash.ref` (utility
+`command64_casm_utils.d64`) both come from that transcription of the
+reviewed native manifest, not from ca65. As of Byte-Oracle WP5 the
+`dash_ref` ca65 target is `EXCLUDE_FROM_ALL` — a normal `cmake --build
+build` never invokes it, so no DASH `add_ca65_app` compile/link overlay
+events fire during ordinary builds. `dash_ref` is still built on demand
+(`--target dash_ref`) and by the release process as DASH's standing
+differential corroboration (see
+`.agents/workflows/canonical-byte-oracles.md` and
+`src/external/dash/AGENTS.md`); those explicit invocations still emit the
+wrapped `add_ca65_app` events. Same "not a build tool" reasoning covers
 `cmake/IncrementBuildNumber.cmake`, `cmake/GenerateCasmTestFixtures.cmake`,
 the `sync_docs` target (`cmake -E copy`), `pacman_autotile` (a pure Python
 maze generator), and `check_casm_source_bytes.py`'s `PRE_BUILD` verification

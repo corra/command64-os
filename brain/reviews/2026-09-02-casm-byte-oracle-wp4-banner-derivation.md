@@ -7,6 +7,22 @@
 **Binary SHA-256:** `b43415c1d61901f4c1794817c09a96bcac34b1ea3c8f10d3eb5c42d1cc62f78f`  
 **Classification:** `CANONICAL-INDEPENDENT`
 
+> **Reviewed 2026-09-02 (WP4 audit).** BANNER is small enough (963 code/data
+> bytes, one source file) for a genuine independent ledger. Section 1's
+> address ledger and Section 2's 20-entry relocation table were both
+> re-verified against the manifest bytes: the 20 claimed offsets
+> (`02 07 0A 0D 21 24 34 4F 6C 7C 85 A7 AA DF EB F2 126 1C6 1C9 1DB`) and
+> the target high byte at each (`$34`/`$35`/`$36`/`$37`) **exactly match**
+> the real R6 table parsed from `banner.ref.hex` — confirmed by
+> `scripts/casm_r6_verify.py src/external/banner/banner.ref.hex` →
+> `R6 VERIFY: PASS` (all 20 entries in-image, ascending, unique;
+> multi-base at `$3800`/`$5000`/`$9000` all consistent). Classification
+> `CANONICAL-INDEPENDENT` stands. The prose notes below are cleaned up:
+> "PARSE_ARGS `$340E`" (the `(alias) / $3413` hedging was wrong — `$340E`
+> is the entry, `$3413` a mid-routine label; the relocated byte is `$34`
+> either way); the `FONT5X6_DATA` row is **52 glyphs × 6 bytes = 312
+> bytes** at `$3609..$3740`; `EXIT` is a label inside `START` at `$3409`.
+
 ---
 
 ## 1. Segment & Address Ledger
