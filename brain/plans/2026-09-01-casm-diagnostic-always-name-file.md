@@ -280,6 +280,39 @@ Complete only when **all** of:
 - 2026-09-01: User approved the plan. Status set to `approved-not-started`;
   implementation, branch creation, and task activation remain pending an
   explicit start instruction.
+- 2026-09-02: **Increment 5 (verification + version) — mostly complete;
+  full-matrix live sweep left for the user (project precedent).**
+  - `src/external/casm/casm.s` `VERSION_STAGE "1"` -> `"2"` → CASM
+    **`0.6.2`**. `BUILD_CASM` `1418` -> `1419` (content-hash gated; the
+    version-string edit is the only source delta and it is same-length, so
+    `casm.prg` code bytes stayed 25,853).
+  - Doc version headers bumped to `0.6.2` build 1419
+    (`wiki/casm-utility.md:4`, `wiki/casm-programmers-reference.md:11` +
+    `:207`); `docs/` re-synced (`cmp`-identical).
+  - **No-change rebuild:** `casm.prg` SHA-256 `e5e871ba…` identical across
+    two consecutive `cmake --build build` runs; `BUILD_CASM` did not move
+    (source hash `d0937c11…` stable). Full build clean — `casm`,
+    `image_d64`, `test_image_d64`, all CASM test images.
+  - **Link/envelope:** ld65 links at `$3800` and `$3900`; 25,853 code
+    bytes / 4,228 relocation points, within the `$7400` MAIN envelope
+    (the change is a net deletion). Diag-table verify: 97 ids OK.
+  - **Live — DASH source error** (`dashdiag_test.d64` = rebuilt
+    `casm_phase15_test.d64` + a truncated real `dscr.s` head + `.ORG` +
+    `LDA #300`; CASM `0.6.2` b1419 under VICE 3.10):
+    banner `CASM V0.6.2.1419`; diagnostic
+    `CASM: OPERAND OUT OF RANGE   IN FILE dscr.s` /
+    `AT LINE 8, COL 5 (OFFSET 4)` / `lda #300` / caret. **A real DASH
+    filename is named** ✓. Overlay `test`/`pass` fired. VICE left healthy,
+    `test.d64` re-attached.
+  - **Deferred to the user (established pattern — see brain/task.md's
+    "User ran the full consolidated matrix" entries for WP49/55/60/75):**
+    the full `test_casm_*` harness sweep across all disks. No fixture
+    expectation changed (Increment 3), and the behavior delta is a
+    3-instruction gate deletion already live-verified on 6 fixtures
+    ((a)-(e) + the DASH case) plus the non-located bare-diagnostic check,
+    so the matrix is a regression backstop rather than a change-specific
+    check. Walkthrough written; awaiting the user's consolidated run +
+    explicit close approval.
 - 2026-09-02: **Increment 4 (documentation) COMPLETE.**
   - `wiki/casm-utility.md` "Reading a diagnostic": rewrote the `IN FILE`
     description as unconditional and updated the example block to show the

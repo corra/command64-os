@@ -8,7 +8,9 @@ extending CASM itself. For end-user command-line usage, see the
 [CASM Utility Manual](casm-utility.md); for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 15 complete (version 0.6.1, build 1417).** Phases 14 and 15
+> **Status: Phase 15 complete; version `0.6.2`, build 1419** (`0.6.2` is a
+> post-Phase-15 patch — every located diagnostic now names its file).
+> Phases 14 and 15
 > followed the base described below: Phase 14 (WP86-92) added `@name` local
 > labels, closing at `0.6.0`; Phase 15 (WP93-99) added conditional assembly
 > (`.IF` / `.ELSEIF` / `.ELSE` / `.ENDIF` / `.IFDEF` / `.IFNDEF`), closing at
@@ -204,7 +206,7 @@ consistently in both passes.
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.6.1`).
+  `casm.s` (currently `0.6.2`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 

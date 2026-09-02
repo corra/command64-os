@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.6.1` (build 1417)
+**Version:** `0.6.2` (build 1419)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
