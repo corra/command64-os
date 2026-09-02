@@ -915,13 +915,14 @@ lines listed with a blank address column.
 
 ### Reading a diagnostic
 
-A diagnostic that concerns a specific place in the source prints two extra
-lines under the message: a location and the offending line with a caret
-(preceded by an `IN FILE` line whenever more than one top-level source file
-was given, so an error inside an `.INCLUDE`d file names it):
+A diagnostic that concerns a specific place in the source prints extra
+lines under the message: an `IN FILE` line naming the file the error is
+in, a location line, and the offending line with a caret. An error inside
+an `.INCLUDE`d file also lists the `INCLUDED FROM` chain back to the root.
 
 ```text
 CASM: INVALID SOURCE BYTE
+IN FILE MAIN.S
 AT LINE 2, COL 9 (OFFSET 8) BYTE $40
   LDA #$0A@,X
           ^

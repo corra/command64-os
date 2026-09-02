@@ -1443,8 +1443,8 @@ print the message line alone — they have no meaningful source position.
 
 ### 18.1 Source-context contract
 
-A source-position diagnostic prints its location beneath its message; with
-more than one top-level source, an `IN FILE` line precedes it:
+A source-position diagnostic prints its location beneath its message,
+always preceded by an `IN FILE` line naming the file the location is in:
 
 ```text
 IN FILE MACROS.S
@@ -1472,9 +1472,12 @@ confirmed the same `BYTE` suffix live. How this is produced:
 
 - **Filename.** The stamped record carries `CasmDiagLocFileId`, which indexes
   `cli.s`'s exported `cliSourceSlotLo/Hi` table directly to get a
-  ready-to-print name. The `IN FILE` line is emitted only when
-  `CasmSourceCount > 1`, keeping single-file diagnostic text byte-identical
-  to every earlier phase's.
+  ready-to-print name. The `IN FILE` line is emitted for every diagnostic
+  that has a valid stamped location, regardless of source count or include
+  depth. (Releases through CASM 0.6.1 suppressed it for a single-root,
+  no-include build; that `CasmSourceCount > 1` gate was removed so
+  root-file and included-file diagnostics are consistent and pasted
+  single-file output is self-describing.)
 
 - **Line text.** The lexer drives the source in byte mode, so `CasmIoBuffer`
   is a block window, not a line window, and cannot recover the line after a
