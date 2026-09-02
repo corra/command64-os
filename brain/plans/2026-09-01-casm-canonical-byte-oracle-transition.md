@@ -628,6 +628,20 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   explicit user resumption. No WP planning, task activation, workflow, fixture,
   build, source, documentation, or tracker changes are authorized by this
   approval alone.
+- 2026-09-02: **WP1 closed, user-approved.** Docs/governance only.
+  Delivered `.agents/workflows/canonical-byte-oracles.md`, its Claude
+  skill, and `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` (20-field
+  register schema + coverage-matrix skeleton + 5 hand classifications:
+  casmhello, casmifskip, casmpgr6, casmnumerrd, dash.ref.hex). DOX sweep
+  across 6 workflows + root/external/casm/dash/tests AGENTS.md removed
+  ca65-as-authority wording; DASH "Dual-Assembler Subset" annotated
+  "pending WP5", not removed; CMake wording left historical. No-change
+  rebuild verified `command64_casm_utils.d64` + `test.d64` byte-identical.
+  Sub-plan + walkthrough
+  `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`.
+  Next: `casm-diagnostic-always-name-file` runs on
+  `feature/casm-diag-always-name-file` and must merge to `main` before WP2
+  planning begins.
 - 2026-09-02: Phase 15 confirmed fully closed and merged to `main`
   (user-approved 2026-09-02, CASM 0.6.1 build 1417, commits `d534977`/`338d43f`
   + manual/AGENTS doc-sync `78d0d68`). The blocking dependency is satisfied.

@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Canonical Byte-Oracle governance (transition WP1)** — no functional or
+  build change. New `.agents/workflows/canonical-byte-oracles.md` and its
+  skill make independently derived, peer-reviewed bytes the authoritative
+  oracle for CASM fixture output and CASM-native application manifests;
+  ca65 is documented as an optional differential check, not an authority.
+  ca65/ld65 remains the host build toolchain for `casm`, `debug`, and
+  non-CASM-native apps. New audit-register schema at
+  `brain/reviews/2026-09-01-casm-byte-oracle-audit.md`.
+
 - **CASM conditional assembly (Phase 15, WP93-99)** (CASM `0.6.0` ->
   `0.6.1`): six new directives — `.IF expr` / `.ELSEIF expr` / `.ELSE` /
   `.ENDIF` and `.IFDEF name` / `.IFNDEF name`. `.IF`/`.ELSEIF` test

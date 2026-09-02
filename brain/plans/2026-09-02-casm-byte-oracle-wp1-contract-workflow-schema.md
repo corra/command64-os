@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp1-contract-workflow-schema
 created: 2026-09-02
-status: approved-in-progress
-taskwarrior: 154368e9-1fa8-4b48-b7bd-c02f2029f00f (WP1); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
+status: complete
+taskwarrior: 154368e9-1fa8-4b48-b7bd-c02f2029f00f (WP1, done); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: CASM Phase 15 closure (complete, user-approved 2026-09-02, merged to main dfe5596 baseline)
 ---
 
@@ -10,9 +10,11 @@ depends-on: CASM Phase 15 closure (complete, user-approved 2026-09-02, merged to
 
 ## Status
 
-**Approved 2026-09-02; in progress.** User approved this WP1 sub-plan.
-Taskwarrior parent `75cfa082` + WP1 child `154368e9` created and WP1
-started. Implementation proceeds per the Atomic Increments below.
+**Complete; user-approved 2026-09-02.** All 8 increments done, walkthrough
+`brain/walkthroughs/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`
+written, no-change rebuild verified identical, contract signed off.
+Taskwarrior `154368e9` done. WP2 is blocked until
+`casm-diagnostic-always-name-file` merges to `main`.
 
 Parent plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`
 (governing plan, `amended-approved-deferred`; user resumed the transition

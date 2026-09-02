@@ -3995,12 +3995,15 @@ the authoritative oracle for CASM fixture output and CASM-native apps
 ca65/ld65 as the host build toolchain -- `casm`, `debug`, and non-native
 apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
 
-- [/] WP1 contract, workflow, skill, audit-register schema
-      (Taskwarrior `154368e9-1fa8-4b48-b7bd-c02f2029f00f`). Sub-plan
+- [x] WP1 contract, workflow, skill, audit-register schema
+      (Taskwarrior `154368e9-1fa8-4b48-b7bd-c02f2029f00f`, done). Sub-plan
       `brain/plans/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`,
-      **user-approved 2026-09-02**, in progress. Docs-only: no fixture,
-      manifest, build, or CASM-source changes. Increment 1 (read-only ca65
-      wording survey) complete.
+      walkthrough `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`.
+      **Closed, user-approved 2026-09-02.** Docs-only. Created
+      `.agents/workflows/canonical-byte-oracles.md` + skill +
+      `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` (schema + 5 seed
+      rows); DOX sweep across 6 workflows + 5 AGENTS.md; no-change rebuild
+      verified identical.
 - [ ] WP2 complete fixture inventory + provenance audit (not started;
       must begin from a commit that includes `casm-diagnostic-always-name-file`)
 - [ ] WP3 fixture oracle remediation (not started)

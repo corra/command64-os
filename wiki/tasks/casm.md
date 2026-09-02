@@ -94,9 +94,12 @@ BANNER); ca65 becomes an optional differential check. Does **not** remove
 ca65/ld65 as the host build toolchain -- `casm`, `debug`, and non-native
 apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
 
-- [/] WP1 contract, workflow, skill, audit-register schema -- sub-plan
-      `brain/plans/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`,
-      user-approved 2026-09-02, in progress (docs-only).
+- [x] WP1 contract, workflow, skill, audit-register schema -- **closed,
+      user-approved 2026-09-02** (docs-only). Created
+      `.agents/workflows/canonical-byte-oracles.md`, its skill, and
+      `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` (schema + 5 seed
+      classifications). Sub-plan + walkthrough
+      `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`.
 - [ ] WP2 fixture inventory + provenance audit
 - [ ] WP3 fixture oracle remediation
 - [ ] WP4 native-application canonical records (DASH, BANNER)
