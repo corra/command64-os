@@ -3956,8 +3956,8 @@ identity. Anonymous labels stay deferred. Version target `0.6.1`.
 - [x] WP95 conditional-nesting stack + suppression scanner (`cond.s`) + `test_casm_cond` (`ecbd717`), **user-approved 2026-09-01**
 - [x] WP96 `.if`/`.elseif`/`.else`/`.endif` pass-driver wiring + truthiness + `casm_phase15_test_d64` (`e28dd7d`, `6eb2815`), **user-approved 2026-09-01**
 - [x] WP97 `.ifdef`/`.ifndef` pass-driver wiring (`59c1066`), **user-approved 2026-09-02**. MAIN headroom 499->360 B, no envelope grow.
-- [/] WP98 `/L` suppressed-line rendering (ca65-style blank address) + `/M` non-leak + regression + DASH survey. Implemented, live-verified (`CASM V0.6.0.1416`); MAIN headroom 360->327 B, no grow. Awaiting sign-off.
-- [ ] WP99 consolidated completion gate, docs, `0.6.1`, walkthrough
+- [x] WP98 `/L` suppressed-line rendering (ca65-style blank address) + `/M` non-leak + regression + DASH survey (`37a12c5`), **user-approved 2026-09-02**. MAIN headroom 360->327 B, no grow.
+- [/] WP99 consolidated completion gate, docs, `0.6.1`, walkthrough
 
 # Shell: `dir /p` Paged Directory Listing
 
