@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp2-fixture-inventory-provenance-audit
 created: 2026-09-02
-status: proposed
-taskwarrior: TBD (created on approval)
+status: approved-in-progress
+taskwarrior: d3e4435b-f47f-4da8-8e53-dbecd513a64c (WP2); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: Byte-Oracle Transition WP1 (complete, user-approved 2026-09-02); casm-diagnostic-always-name-file merged to main (78e43c7)
 ---
 
@@ -291,6 +291,29 @@ CASM source is touched in WP2.
 
 ## Progress
 
+- 2026-09-02: **Increment 1 (baseline re-survey) done.** Baseline commit
+  `b3193853` on branch `feature/casm-byte-oracle-wp2` (Taskwarrior WP2
+  `d3e4435b`, project `casm.byteoracle`, parent `75cfa082`). Worktree
+  clean in every oracle-relevant path. Exact reconciliation:
+  `CASM_REF_NAMES` (67) == `tests/fixtures/casm/*.ref.hex` on disk (67) ==
+  tracked (67), **zero** orphans either direction. 32 `tests/src/casm_*`
+  harnesses. 2 native manifests. 244 generated `.seq` (build-time only).
+- 2026-09-02: **Increment 2 (tracker reconciliation) done.**
+  - `wiki/tasks/casm.md` "Current Milestone": replaced the stale Phase 15
+    "WP99 committed, awaiting sign-off then merge" tail and the ~30-line
+    Phase 14 "WP89 awaiting sign-off / WP92 resumes from Increment 4"
+    narrative with concise closed-status summaries (Phase 15 closed+merged
+    at 0.6.1 b1417; Phase 14 closed at 0.6.0 b1405). Added the CASM 0.6.2
+    diagnostic patch and the Byte-Oracle WP1-closed / WP2-in-progress
+    status.
+  - Taskwarrior `#43` (Phase 14 `test_casm_flmeta` stale-fixture fix):
+    disposition confirmed **resolved** — the harness-only fix landed at
+    `8da90f45`, `brain/task.md:3933` already records it "user-approved and
+    closed", the WP92 walkthrough exists, and the numeric TW id has since
+    been recycled. Historical loose end, not a live disagreement.
+  - No *material* disagreement remains between the governing plan,
+    `brain/task.md`, `wiki/tasks/casm.md`, and Taskwarrior about fixture
+    or phase state. Inventory freeze is clear to proceed.
 - 2026-09-02: Plan drafted. Survey confirmed 67 `.ref.hex` (all tracked,
   all in `CASM_REF_NAMES`), 244 generated `.seq`, 32 harnesses, ~47
   packaging steps across 13 images, 2 native manifests. Three scoping

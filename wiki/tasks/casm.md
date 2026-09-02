@@ -21,56 +21,38 @@ nesting / 512 total sites, suppressed branches that parse nothing /
 allocate no symbols / emit no bytes, and Pass 1 == Pass 2 branch
 identity via a 512-bit Pass-1 decision bitmap replayed in Pass 2. `/L`
 lists a skipped line with a blank address column; `/M` sees no
-skipped-block symbol. Anonymous labels stay deferred. WP93-98
-user-approved and closed; WP99 (0.6.1 + docs + consolidated gate)
-committed, awaiting sign-off then merge to `main`.
+skipped-block symbol. Anonymous labels stay deferred. WP93-99 all
+user-approved and closed; merged to `main`.
 Plan: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`;
 per-WP sub-plans + walkthroughs
 `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp9{3..9}-*.md`.
 
+**CASM `0.6.2` build 1419** (standalone patch, user-approved 2026-09-02,
+merged to `main`): every located diagnostic now prints `IN FILE <name>`
+regardless of source count / include depth (the `CasmSourceCount < 2`
+suppression gate is gone); non-located diagnostics unchanged. Plan +
+walkthrough
+`brain/{plans,walkthroughs}/2026-09-01-casm-diagnostic-always-name-file.md`.
+
+**Byte-Oracle Transition** (governing plan
+`brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`):
+**WP1 closed** (user-approved 2026-09-02) — contract + workflow
+`.agents/workflows/canonical-byte-oracles.md` + skill + audit-register
+schema. **WP2 in progress** (fixture inventory + provenance audit),
+branch `feature/casm-byte-oracle-wp2`, plan
+`brain/plans/2026-09-02-casm-byte-oracle-wp2-fixture-inventory-provenance-audit.md`.
+
 ---
 
 **Phase 14 (Local Labels) is fully closed** (WP86-92, user-approved
-2026-09-01, CASM `0.6.0` build `1405`). Added ca65
-`@name` cheap-local labels scoped to the nearest preceding global label
-(anonymous `:`/`:+`/`:-` labels are explicitly deferred to a later phase).
-WP86 (design freeze), WP87 (lexer `@`-prefixed identifier scanning, live
-`CASM LEXER: PASS`), and WP88 (symbol-layer scope filtering, new
-dedicated `casm_phase14_test_d64` + `test_casm_scope` harness, live `CASM
-SCOPE: PASS`; a real `A`-clobber defect found live and fixed) are done
-and user-approved. WP89 (pass-driver wiring: `CasmCurrentScope` ordinal,
-`crpLabel` local stamping, four scoped diagnostics `$57-$5A`, 9 production
-fixtures -- 4 `FILES COMPARE OK` incl. a forward local ref, 5 scoped-
-diagnostic rejects; two more real defects found live and fixed) is
-source-complete and build/live-verified, awaiting sign-off. A standalone
-diag-table hardening (single `CASM_DIAG_LAST` source of truth so the
-`diagPrintFatal` runtime range check and the verify script can no longer
-drift behind the message table -- the WP89 defect) landed alongside,
-build-verified. WP90 (`/M` renders `@local` rows as `<owner>@<local>`;
-`mapValidateRecord` rebuilt per-field -- folding in a latent Phase 12
-fix where any constant defined past file offset 0 tripped `SYMBOL MAP
-INVALID` under `/M`; `test_casm_map` 25/25 live) is done and
-user-approved. WP91 (DASH `dfmt.s` adopts `@LOOP`/`@DONE`/`@SKIP` in
-three routines; AGENTS.md dual-assembler clause; DASH output
-byte-identical under ca65 and native CASM, triple-verified; manifest
-regenerated; a WP89 `test_casm_include` build gap folded in) is
-user-approved. WP91 (DASH `@local` adoption) user-approved 2026-09-01.
-WP92 (consolidated completion gate) is **closed, user-approved
-2026-09-01** -- CASM Phase 14 is fully closed at `0.6.0` build `1405`.
-The fresh sweep found 30/31 `test_casm_*`
-harnesses PASS and all 11 Phase 14 production fixtures matching, but
-`test_casm_flmeta` case 6 (`resolveMaxIncludedName`) deterministically
-FAILED. **Root-caused as a stale test fixture, not a product bug** (task
-43-b, `8da90f45`): the memory-optimization WP's Finding D dropped the
-include-filename cap 63 -> 32 and re-pinned the sibling fixtures but
-missed `casm_flmeta.s`'s bare-literal `#66` expectation. Harness-only
-fix; `test_casm_flmeta`/`flist`/`listwrite`/`cliderive` re-verified PASS
-live; awaiting user sign-off to close task 43, after which WP92 resumes
-from its Increment 4 (no-locals byte-identity, DASH hash, `0.6.0`
-version bump, docs, walkthrough). Plans:
-`brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`,
-`brain/plans/2026-09-01-casm-phase14-wp92-consolidated-completion.md`.
-Walkthroughs: `brain/walkthroughs/2026-09-01-casm-phase14-wp8{6,7,8,9},wp9{0,1}-*.md`.
+2026-09-01, CASM `0.6.0` build `1405`). Added ca65 `@name` cheap-local
+labels scoped to the nearest preceding global label (anonymous
+`:`/`:+`/`:-` labels deferred to a later phase). WP92's consolidated
+sweep root-caused a `test_casm_flmeta` failure to a stale fixture (Finding
+D's include-filename cap 63 -> 32 left `casm_flmeta.s`'s bare-literal
+`#66` un-repinned; harness-only fix `8da90f45`, task 43). Plans
+`brain/plans/2026-09-01-casm-phase14-{local-anonymous-labels,wp92-consolidated-completion}.md`;
+walkthroughs `brain/walkthroughs/2026-09-01-casm-phase14-wp8{6,7,8,9},wp9{0,1}-*.md`.
 
 **The optional progress and processing indication feature is complete**,
 user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build `1380`. It is
