@@ -1,0 +1,34 @@
+# CASM Phase 14 WP89 trusted reference: casmloc2
+#
+# Independently hand-assembled from the casmloc2 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves the
+# same local name (@X) under two different global labels is two distinct
+# symbols, each branch resolving within its own scope to a different
+# displacement (-4 and -2).
+#
+# Source (.ORG $C000, fixed address):
+#   | .ORG $C000
+#   | AA:
+#   | @X:
+#   |     NOP
+#   |     NOP
+#   |     BNE @X
+#   | BB:
+#   |     NOP
+#   | @X:
+#   |     BNE @X
+#
+# Hand assembly:
+#   00 C0    - PRG load-address header
+#   EA       - @X under AA NOP at $C000
+#   EA       - NOP at $C001
+#   D0 FC    - BNE @X(AA) at $C002; $C000 - $C004 = -4 = $FC
+#   EA       - NOP at $C004
+#   D0 FE    - @X under BB BNE at $C005; $C005 - $C007 = -2 = $FE
+#
+# bytes: 9
+
+00 C0
+EA EA D0 FC
+EA
+D0 FE

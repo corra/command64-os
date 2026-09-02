@@ -19,6 +19,7 @@
 .import lexerNext
 .import lexerScanIncludeOperand
 .import lexerScanIncbinOperand
+.import compareTokenText
 .import CasmStringLength
 .import CasmStringBuffer
 .import CasmTokenRecord
@@ -27,6 +28,7 @@
 .import CasmTokenStartOffsetHi
 .import exprEvaluate
 .import exprGetResult
+.import CasmExprPrimaryWasLocal
 .import exprParseNumeric
 .import exprParseAddend
 .import exprApplyAddend
@@ -516,14 +518,41 @@ ppsAssert:
     beq @haveComma
     jmp @requireTerminator
 @haveComma:
-    jsr lexerNext                ; consume ',', fetch the message token
+    jsr lexerNext                ; consume ',', fetch next token
     bcc @ok2
     rts
 @ok2:
+    ; DASH-MOD WP1: after the first comma the grammar accepts either the
+    ; CASM-legacy message STRING directly, or the ca65-required action
+    ; keyword (ERROR/WARNING/LDERROR/LDWARNING) optionally followed by
+    ; `, STRING`. The keyword carries no semantics in CASM -- every form
+    ; is evaluated at pass time and is fatal on a false result -- so it is
+    ; matched, consumed, and discarded.
     lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
     cmp #CASM_TOKEN_STRING
     beq @haveMessage
-    jsr diagSetLocFromToken     ; the token that should have been a string
+    cmp #CASM_TOKEN_IDENTIFIER
+    bne @assertArgError
+    jsr ppsAssertMatchAction     ; C clear if CasmTokenText is an action keyword
+    bcs @assertArgError
+    jsr lexerNext                ; consume the action keyword
+    bcc @afterAction
+    rts
+@afterAction:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_COMMA
+    beq @actionThenMessage
+    jmp @requireTerminator
+@actionThenMessage:
+    jsr lexerNext                ; consume ',', fetch the message token
+    bcc @ok2b
+    rts
+@ok2b:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_STRING
+    beq @haveMessage
+@assertArgError:
+    jsr diagSetLocFromToken     ; the token that should have been STRING or an action keyword
     lda #CASM_DIAG_SYNTAX_ERROR
     sec
     rts
@@ -566,6 +595,41 @@ ppsAssert:
     lda #CASM_OPKIND_IMPLIED
     sta CasmParserStmt + CASM_PARSER_STMT_OPKIND
     lda CasmParserStmt + CASM_PARSER_STMT_TYPE
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; ppsAssertMatchAction (DASH-MOD WP1, private)
+; Is the current IDENTIFIER token one of ca65's `.assert` action keywords?
+; Case-folded, matching ca65's own case-insensitivity. The keyword is
+; discarded on a match -- CASM assigns no meaning to which one it is.
+;
+; Inputs:  current token is an IDENTIFIER (CasmTokenText/CasmTokenRecord)
+; Outputs: C clear on a match; C set otherwise
+; Clobbers: A, X, Y, CasmPtr0, CasmLexerScratch0 (via compareTokenText)
+; ---------------------------------------------------------------------------
+; Only four keywords -- unrolled rather than a table, since compareTokenText
+; clobbers X and a table index would need stashing across each call.
+ppsAssertMatchAction:
+    ldx #<ppsAssertKwError
+    ldy #>ppsAssertKwError
+    jsr compareTokenText
+    bcc @match
+    ldx #<ppsAssertKwWarning
+    ldy #>ppsAssertKwWarning
+    jsr compareTokenText
+    bcc @match
+    ldx #<ppsAssertKwLdError
+    ldy #>ppsAssertKwLdError
+    jsr compareTokenText
+    bcc @match
+    ldx #<ppsAssertKwLdWarning
+    ldy #>ppsAssertKwLdWarning
+    jsr compareTokenText
+    bcc @match
+    sec
+    rts
+@match:
     clc
     rts
 
@@ -629,9 +693,21 @@ ppsLabel:
     cmp #CASM_TOKEN_COLON
     beq @colonOk
     cmp #CASM_TOKEN_EQUALS
-    beq ppsConstant
+    beq @equalsSeen
     jsr diagSetLocFromToken     ; the token that should have been a colon
     lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+@equalsSeen:
+    ; WP89: a `@local` name may not be the LHS of a named-constant
+    ; definition (`@x = expr`). Phase 14 forbids locals anywhere in the
+    ; constant deferred-reference machinery -- see the plan's Research
+    ; item 7. CasmLabelName still holds the just-copied identifier.
+    lda CasmLabelName
+    cmp #CASM_PETSCII_AT
+    bne ppsConstant
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_LOCAL_IN_CONSTANT
     sec
     rts
 @colonOk:
@@ -805,6 +881,16 @@ ppsConstant:
     jmp @requireTerminator
 
 @identifier:
+    ; WP89: a `@local` name may not be a named-constant RHS operand
+    ; either (`y = @x`). CasmTokenText still holds the identifier here.
+    lda CasmTokenText
+    cmp #CASM_PETSCII_AT
+    bne @identifierNotLocal
+    jsr diagSetLocFromToken
+    lda #CASM_DIAG_LOCAL_IN_CONSTANT
+    sec
+    rts
+@identifierNotLocal:
     ; Capture length and start-offset while the token is still IDENTIFIER --
     ; the very next lexerNext overwrites CasmTokenText, exactly the hazard
     ; exprEvaluate's own identifier branch already documents (expr.s).
@@ -1361,6 +1447,18 @@ pevUnresolved:
     lda CasmPassMode
     cmp #CASM_PASS_MODE_MEASURE
     beq pevMeasureUnresolved
+    ; WP89: if the expression's identifier primary was a `@local` name,
+    ; report the scoped diagnostic instead of the generic one. The
+    ; bounded-expression grammar's addend is always numeric, so the single
+    ; identifier primary is the only symbol reference that can be
+    ; unresolved here; expr.s's own identifier: branch stamps the flag
+    ; while CasmTokenText still holds that name.
+    lda CasmExprPrimaryWasLocal
+    beq pevUnresolvedGlobal
+    lda #CASM_DIAG_UNDEFINED_LOCAL
+    sec
+    rts
+pevUnresolvedGlobal:
     lda #CASM_DIAG_UNDEFINED_SYMBOL
     sec
     rts
@@ -1370,3 +1468,13 @@ pevMeasureUnresolved:
     sta CasmParserStmt + CASM_PARSER_STMT_VAL_HI
     clc
     rts
+
+.segment "RODATA"
+
+; DASH-MOD WP1: ca65 `.assert` action keywords, matched case-insensitively
+; by ppsAssertMatchAction and then discarded (CASM assigns them no
+; meaning -- see ppsAssert). Null-terminated for compareTokenText.
+ppsAssertKwError:     .byte "ERROR", 0
+ppsAssertKwWarning:   .byte "WARNING", 0
+ppsAssertKwLdError:   .byte "LDERROR", 0
+ppsAssertKwLdWarning: .byte "LDWARNING", 0

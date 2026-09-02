@@ -32,7 +32,7 @@ Status reflects each spec's own checkbox state (`[ ]` pending, `[/]` in-progress
 
 ### In Progress
 
-- [CASM Native Assembler](tasks/casm.md) - Phase 9 (`.INCLUDE` processing) complete; Phase 10 (symbol map/listing, WP50-55) contract reconciliation in progress.
+- [CASM Native Assembler](tasks/casm.md) - Phase 14 complete (CASM `0.6.0`): `@name` local labels, on top of Phases 9-13 (`.INCLUDE`, symbol map/listing, expressions/constants/literals, data-construction directives).
 - [EDLIN Port](tasks/edlin-port.md) - Porting MS-DOS EDLIN to command64 OS.
 - [DEBUG ca65/ld65 Migration](tasks/debug-ca65-migration.md) - Migrating the DEBUG utility off KickAssembler.
 - [Phase 5 Multi-Device Support](tasks/phase-5-multi-device.md) - Switching between/interacting with devices 8-11.

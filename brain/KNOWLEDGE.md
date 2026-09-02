@@ -2146,7 +2146,53 @@ runs, not one clean pass.
   just a DASH one-off: WP9 shipped `dash.prg` from the `dash_ref` ca65
   cross-check (`--allow-host-bytes`) with a truthful `# provenance:` line,
   user-approved as sufficient for now rather than blocking on a native-CASM-
-  on-hardware run.
+  on-hardware run. (Superseded: the manifest has carried real
+  native-CASM-on-hardware provenance since Phase 12 WP71.)
+
+**DASH Modernization (DASH `0.1.4` -> `0.2.0`, DASH-MOD WP1-6, closed
+2026-09-01, `feature/casm-phase14`).** DASH's seven sources were rebased
+onto the modern shared CASM/ca65 feature set with **no user-visible
+behaviour change** and byte-for-byte ca65<->CASM identity at every step.
+`4766 -> 4579` bytes; manifest sha256 `3238b786... -> 3b4d0693...`. Key
+outcomes and reusable findings:
+
+- **`@local` everywhere (WP2).** Every routine-internal helper label is a
+  cheap local. The eligibility rule: a label is `@local`-safe iff every
+  reference is a branch/jump within its own routine's `NAME:`-to-`NAME:`
+  span; a mis-localized cross-routine label fails to assemble (it cannot
+  silently produce wrong bytes), and byte-identity vs the manifest is the
+  backstop.
+- **Named constants (WP3), and two CASM expression-grammar limits.**
+  ~110 constants in `dmain.s`'s prologue. **(a)** A CASM named-constant
+  definition's RHS must be a **bare literal** — `NAME = 1<<0` gives
+  `EXPECTED NEWLINE`; operators (`* + > <<`) are fine at instruction
+  operands, just not in a `NAME = ...` line. **(b)** CASM's expression
+  grammar has **no comparison operator** (only `+ - | ^ & << >> * /`), so
+  a native-CASM `.ASSERT` is nonzero-truthiness only. DASH's structural
+  invariants (`PAGECOUNT = 3`, the ZP map, the API `$40-$5F` band, the
+  `PAGEROUTINETABLE` size) therefore live in `dash_wrapper.s` — the
+  ca65-only wrapper, with real operators — checked on every `dash_ref`
+  build; the ca65<->CASM byte cross-check covers the CASM side. Both are
+  now documented in `src/external/dash/AGENTS.md`.
+- **Behaviour-preserving refactors (WP4/WP5).** WP4 replaced the key
+  ladder with an F-key range check (`page = key - KEY_F1`) + one
+  `AND #$DF` case-fold for the `T`/`R`/`Q` shifted-charset variants
+  (fold uniqueness proven: `b & $DF == $54` iff `b in {$54,$74}`). WP5
+  collapsed `DRAWFRAME`'s 7 row loops into `COPYFRAMEROW` (via the
+  existing `COMPUTEROWADDR`), `DAPPPRINTFLAGS`'s 4 cells into a table
+  loop, `dsys.s`'s 12 row openers into `DSYSLABEL`, and removed the dead
+  `PRINTAT`. Each byte-changing WP re-ran a full ca65<->CASM +
+  native-CASM-under-VICE + runtime pass and re-baselined the manifest
+  once at its close.
+- **`dvmm.s` deferred (WP5 scope decision).** A `DVMMLABEL` opener helper
+  and `.WORD` enum->string tables for its 3 state/stage ladders are clean
+  wins (~-100 bytes, flatter) but touch capability-gated display logic;
+  recorded as a "WP5b"/post-increment follow-up.
+- **Consolidated gate (WP6).** Fresh together re-verification, version
+  bump, `AGENTS.md` consolidation, relocation audit, user runtime matrix
+  at `$3800` / `$5000` / `$9000` (`LOAD DASH <hex>` / `RUN <hex>`, the
+  WP84 precedent). This is the baseline Phase 14 WP92's gate re-verifies
+  against.
 
 ### CASM Phase 10 Symbol Map/Listing Contract (WP50-55, closed 2026-08-08)
 
@@ -3421,6 +3467,64 @@ block (with `diagClearLoc` / `listingStateInit`). Plan
 Parent plan `brain/plans/2026-08-24-casm-memory-optimization.md`;
 walkthrough `brain/walkthroughs/2026-08-24-casm-memory-optimization.md`;
 Taskwarrior 42.
+
+## CASM Phase 14 Complete (WP86-92, closed 2026-09-01 at `0.6.0` build `1405`)
+
+Phase 14 ("Local Labels") added **`@name` local labels** in ca65's "cheap
+local" spelling: `@name:` defines, `@name` references, scoped to the
+nearest preceding ordinary (non-`@`) label and closed by the next one or
+EOF. The same `@name` is a distinct symbol per scope, may shadow an
+ordinary label, and forward-resolves in Pass 2 like any label. Stored in
+the **existing 64-byte symbol record** — flag bit `CASM_SYMBOL_FLAG_LOCAL`
+(`%00010000`) plus a 2-byte owning-scope ordinal in reserved offsets
+46-47 — so no new zero page, no VMM allocation change, MAIN still `$7400`
+(1,902 bytes headroom at close). A source with no `@` token assembles
+byte-identically to pre-Phase-14 (proven: `casmchain1`/`casmres1`/
+`casmassert1` COMP-exact; DASH `dfmt.s` adopted `@local` in three routines
+with byte-identical `dash.ref.hex` `3b4d0693`).
+
+**Explicitly deferred:** anonymous labels (`:` / `:+` / `:-`) — a
+materially different mechanism (lexer token, ring buffer, positional
+cross-pass identity), planned as its own later phase.
+
+**Known ca65 / Turbo Macro Pro divergence** (Research item 7, WP92 docs):
+CASM rejects a local label on either side of a named constant's `=` (`@x
+= 1` and `y = @x` both → `LOCAL LABEL NOT ALLOWED IN CONSTANT`). ca65 and
+TMP (and ACME/64tass/KickAssembler/DASM) all allow it. This is an
+implementation-simplicity choice — keeping the constant deferred-resolution
+sweep from needing per-bookmark scope — not an industry norm; revisit at
+the anonymous-label phase or first real TMP/ca65 import friction.
+
+Real defects found live during the phase (each fixed): WP88 — a
+scope-filter copy clobbered `A` (nameLen) before `symbolsFindChain`
+(caught only by the new `test_casm_scope` harness's first run, not static
+review or a clean build); WP89 — a stale fatal-diagnostic location and an
+un-retargeted `diagPrintFatal` runtime range check; WP90 — `/M` on any
+named constant defined past file offset 0 tripped `SYMBOL MAP INVALID`
+(latent since Phase 10, `/M` never tested with constants). A standalone
+diag-table hardening (single `CASM_DIAG_LAST` source of truth) landed
+alongside WP89 so the runtime range check and verify script can no longer
+drift behind the message table.
+
+**WP92 consolidated gate:** a fresh 31-harness live-VICE sweep + all 11
+Phase 14 production fixtures re-verified together found one regression —
+`test_casm_flmeta` case 6 `resolveMaxIncludedName` — root-caused as a
+**stale test fixture**, not a product bug: the memory-optimization WP's
+Finding D dropped the include-filename cap 63→32 and re-pinned the
+`casm_include` / `casm_cliderive` boundary fixtures but missed
+`casm_flmeta.s`'s bare-literal `#66` expectation (no `CASM_*` symbol → no
+build assert; not re-run live). Harness-only fix, separately approved as
+Taskwarrior 43. **Lesson** (`feedback-capacity-const-change-unguarded-
+literals`): when a capacity constant changes, grep `tests/src` for the
+*old numeric value*, not just the symbol, and re-run **every** harness on
+that path live — a "representative subset / same path" verification
+shortcut hides a frozen-literal fixture.
+
+Parent plan `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`;
+WP92 plan `brain/plans/2026-09-01-casm-phase14-wp92-consolidated-completion.md`;
+per-WP walkthroughs `brain/walkthroughs/2026-09-01-casm-phase14-wp8{6..9},wp9{0,1}-*.md`
++ `...-wp92-*` + `...-flmeta-maxincluded-regression.md`. Taskwarrior
+parent `4cf10e7c`, WP92 `56711c7e`, regression `8da90f45`.
 
 ## C64 Platform Constraints Discovered
 

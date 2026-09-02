@@ -60,6 +60,7 @@
 .export emitMarkStarted
 .export CasmPassMode
 .export CasmRelocatableMode
+.export CasmExprPrimaryWasLocal
 
 CASE_SCRIPT_LO   = 0
 CASE_SCRIPT_HI   = 1
@@ -88,6 +89,9 @@ ExpectedCol:         .res 1
 FailCount:           .res 1
 CasmPassMode:        .res 1
 CasmRelocatableMode: .res 1
+; WP89: parser.s's pevUnresolved reads this expr.s flag; this harness
+; stubs the expression evaluator (above) and never reaches pevUnresolved.
+CasmExprPrimaryWasLocal: .res 1
 
 .segment "CODE"
 

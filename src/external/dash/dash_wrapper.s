@@ -20,3 +20,47 @@
 
 .segment "CODE"
 .include "dmain.s"
+
+; --- DASH-MOD WP3: STRUCTURAL INVARIANTS (ca65-only) ---
+;
+; CASM's expression grammar has no equality/comparison operator (only
+; + - | ^ & << >> * /), so it cannot express these. They live here, in
+; the ca65-only wrapper, and are checked on every dash_ref build. The
+; CASM side is covered transitively: CASM's DASH.PRG is byte-compared
+; against this ca65 build, so any constant that diverged would surface
+; as a byte mismatch. A real CASM comparison operator is a separately
+; planned future item; if it lands, these can move into dmain.s.
+;
+; .assert emits no bytes. A false condition aborts the link with `error`.
+
+; ZP scratch map ($70-$8F) is contiguous with no gaps and no overlapping
+; two-byte pairs -- the packing DASH's AGENTS.md documents by hand.
+.assert CURRENTROW    = DISPATCHVECTOR + 2, error, "ZP: CURRENTROW"
+.assert SCREENDESTPTR = CURRENTROW    + 1, error, "ZP: SCREENDESTPTR"
+.assert STRINGSRCPTR  = SCREENDESTPTR + 2, error, "ZP: STRINGSRCPTR"
+.assert CURRENTCOL    = STRINGSRCPTR  + 2, error, "ZP: CURRENTCOL"
+.assert FMTWORK       = CURRENTCOL    + 1, error, "ZP: FMTWORK"
+.assert DIV10REM      = FMTWORK       + 2, error, "ZP: DIV10REM"
+.assert COLORPTR      = DIV10REM      + 1, error, "ZP: COLORPTR"
+.assert CHARSTASH     = COLORPTR      + 2, error, "ZP: CHARSTASH"
+.assert MAXLEN        = CHARSTASH     + 1, error, "ZP: MAXLEN"
+.assert SRCIDX        = MAXLEN        + 1, error, "ZP: SRCIDX"
+.assert DISPATCHVECTOR >= $70, error, "ZP: below scratch range"
+.assert SRCIDX        <= $8F, error, "ZP: above scratch range"
+
+; Page model.
+.assert PAGECOUNT = 3, error, "PAGECOUNT != 3"
+.assert (PAGEROUTINETABLE_END - PAGEROUTINETABLE) / 2 = PAGECOUNT, error, "PAGEROUTINETABLE size != PAGECOUNT"
+.assert PAGE_SYS = 0, error, "PAGE_SYS"
+.assert PAGE_VMM = PAGECOUNT - 1, error, "PAGE_VMM"
+
+; DOS service-bus call codes sit in the $40-$5F OS API band.
+.assert DOS_ALLOC_MEM    >= $40, error, "DOS_ALLOC_MEM band"
+.assert DOS_GET_APP_INFO <= $5F, error, "DOS_GET_APP_INFO band"
+
+; Event-loop key dispatch (DASH-MOD WP4).
+.assert PAGE_ROUTINE_ENTRY_SIZE = 2, error, "ASL A assumes entry size 2"
+.assert KEY_F1 + PAGECOUNT <= $88, error, "F-key page range overruns F7"
+.assert (KEY_T & KEY_CASE_MASK) = KEY_T, error, "KEY_T not in case-folded form"
+.assert (KEY_R & KEY_CASE_MASK) = KEY_R, error, "KEY_R not in case-folded form"
+.assert (KEY_Q & KEY_CASE_MASK) = KEY_Q, error, "KEY_Q not in case-folded form"

@@ -1987,6 +1987,44 @@ file(WRITE "${OUTPUT_DIR}/casmassertfwd.seq"
     "COUNT = 5\n"
 )
 
+# DASH-MOD WP1: the optional ca65-style action keyword
+# (ERROR/WARNING/LDERROR/LDWARNING) before the optional message. CASM
+# parses and discards it -- every form is pass-time-evaluated and fatal on
+# a false result. All accepted cases live-verified for INPUT VALIDATED
+# (assert emits no bytes, no .ref); rejected cases for their diagnostic.
+file(WRITE "${OUTPUT_DIR}/casmakw1.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1, ERROR\n"
+    ".BYTE \$AA\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmakw2.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1, ERROR, \"OK MSG\"\n"
+    ".BYTE \$AA\n"
+)
+# Action present AND the assertion fails -- the message must still thread
+# through and be echoed (ASSERTION FAILED: BOOM).
+file(WRITE "${OUTPUT_DIR}/casmakw3.seq"
+    ".ASSERT 0, ERROR, \"BOOM\"\n"
+)
+# WARNING is treated identically to ERROR -- a false result is still fatal.
+file(WRITE "${OUTPUT_DIR}/casmakw4.seq"
+    ".ASSERT 0, WARNING\n"
+)
+file(WRITE "${OUTPUT_DIR}/casmakw5.seq"
+    ".ORG \$C000\n"
+    ".ASSERT 1, LDERROR, \"X\"\n"
+    ".BYTE \$AA\n"
+)
+# A non-keyword identifier where an action keyword or STRING was expected.
+file(WRITE "${OUTPUT_DIR}/casmakwbad.seq"
+    ".ASSERT 1, BOGUS\n"
+)
+# An action keyword followed by a non-STRING where the message must be.
+file(WRITE "${OUTPUT_DIR}/casmakwbad2.seq"
+    ".ASSERT 1, ERROR, 5\n"
+)
+
 # ---------------------------------------------------------------------------
 # CASM progress-indication Increment 8 verification fixtures.
 #
@@ -2107,4 +2145,158 @@ file(WRITE "${OUTPUT_DIR}/casmpgbad.seq"
     ".ORG \$C000\n"
     "${CASM_PGBAD_BODY}"
     "BNE \$D000\n"
+)
+
+# ---------------------------------------------------------------------------
+# CASM Phase 14 WP89: production @local-label fixtures. Four accepted cases
+# (COMP-verified against hand-derived tests/fixtures/casm/casmloc*.ref.hex)
+# plus five rejected-form cases proving WP89's scoped diagnostics through
+# the real production parser/pass-driver pipeline. All on
+# casm_phase14_test_d64. All-uppercase ASCII, cc1541 -w verbatim, matching
+# every prior CASM fixture's own convention.
+# ---------------------------------------------------------------------------
+
+# casmloc1: a @local as a backward branch target inside one scope.
+#   .ORG $C000 / MAIN: / @LOOP: NOP / BNE @LOOP
+#   00 C0        header
+#   EA           @LOOP: NOP   ($C000)
+#   D0 FD        BNE @LOOP     ($C001; $C000 - $C003 = -3)
+file(WRITE "${OUTPUT_DIR}/casmloc1.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "@LOOP:\n"
+    "    NOP\n"
+    "    BNE @LOOP\n"
+)
+
+# casmloc2: the SAME local name (@X) reused as a branch target under two
+# different global labels, resolving to two different addresses.
+#   .ORG $C000
+#   AA: / @X: NOP / NOP / BNE @X        ; @X(AA) at $C000
+#   BB: / NOP / @X: BNE @X              ; @X(BB) at $C005
+#   00 C0   header
+#   EA EA D0 FC    @X(AA)=$C000; BNE at $C002; $C000 - $C004 = -4
+#   EA             NOP at $C004
+#   D0 FE          @X(BB)=$C005; BNE at $C005; $C005 - $C007 = -2
+file(WRITE "${OUTPUT_DIR}/casmloc2.seq"
+    ".ORG \$C000\n"
+    "AA:\n"
+    "@X:\n"
+    "    NOP\n"
+    "    NOP\n"
+    "    BNE @X\n"
+    "BB:\n"
+    "    NOP\n"
+    "@X:\n"
+    "    BNE @X\n"
+)
+
+# casmloc3: a forward @local reference (branch to a @local defined later in
+# the same scope), resolved in Pass 2.
+#   .ORG $C000 / MAIN: / BNE @DONE / NOP / @DONE: NOP
+#   00 C0   header
+#   D0 01   BNE @DONE ($C000); @DONE at $C003; $C003 - $C002 = +1
+#   EA      NOP ($C002)
+#   EA      @DONE: NOP ($C003)
+file(WRITE "${OUTPUT_DIR}/casmloc3.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "    BNE @DONE\n"
+    "    NOP\n"
+    "@DONE:\n"
+    "    NOP\n"
+)
+
+# casmloc7: a @local whose name matches a global's (only by the '@' they
+# already differ) -- a reference to each resolves to its own distinct
+# target, proving no cross-confusion.
+#   .ORG $C000 / LOOP: NOP / @LOOP: JMP LOOP / JMP @LOOP
+#   00 C0        header
+#   EA           LOOP: NOP        ($C000)
+#   4C 00 C0     @LOOP: JMP LOOP  ($C001 -> $C000)
+#   4C 01 C0     JMP @LOOP        ($C004 -> $C001)
+file(WRITE "${OUTPUT_DIR}/casmloc7.seq"
+    ".ORG \$C000\n"
+    "LOOP:\n"
+    "    NOP\n"
+    "@LOOP:\n"
+    "    JMP LOOP\n"
+    "    JMP @LOOP\n"
+)
+
+# casmlocnoscope: a @local defined before any global label -> WP89
+# CASM_DIAG_LOCAL_WITHOUT_SCOPE ($57). No .ref (failure case).
+file(WRITE "${OUTPUT_DIR}/casmlocnoscope.seq"
+    ".ORG \$C000\n"
+    "@X:\n"
+    "    NOP\n"
+)
+
+# casmlocdup: two @X definitions in the same scope -> CASM_DIAG_DUPLICATE_
+# LOCAL ($58). No .ref.
+file(WRITE "${OUTPUT_DIR}/casmlocdup.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "@X:\n"
+    "    NOP\n"
+    "@X:\n"
+    "    NOP\n"
+)
+
+# casmlocundef: a @X reference with no @X ever defined in the scope ->
+# CASM_DIAG_UNDEFINED_LOCAL ($59) at Pass 2. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmlocundef.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "    JMP @MISSING\n"
+)
+
+# casmlocconstl: a @local name on a named-constant LHS -> CASM_DIAG_LOCAL_
+# IN_CONSTANT ($5A). No .ref.
+file(WRITE "${OUTPUT_DIR}/casmlocconstl.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "@X = 1\n"
+)
+
+# casmlocconstr: a @local name as a named-constant RHS operand ->
+# CASM_DIAG_LOCAL_IN_CONSTANT ($5A). No .ref.
+file(WRITE "${OUTPUT_DIR}/casmlocconstr.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "@X:\n"
+    "    NOP\n"
+    "Y1 = @X\n"
+)
+
+# ---------------------------------------------------------------------------
+# CASM Phase 14 WP90: /M symbol-map production fixtures. Assembled twice
+# each (no options / with /M / with /L) into distinct /O: names, so native
+# COMP proves /M and /L leave the PRG byte-identical. The /M screen output
+# is the real assertion (@local rows render as "<owner>@<local>"; a
+# resolved constant no longer trips SYMBOL MAP INVALID) -- checked live.
+# ---------------------------------------------------------------------------
+
+# casmmaploc: two global scopes, one @local under each. /M renders
+# "MAIN@LOOP" and "DRAW@DONE".
+file(WRITE "${OUTPUT_DIR}/casmmaploc.seq"
+    ".ORG \$C000\n"
+    "MAIN:\n"
+    "@LOOP:\n"
+    "    NOP\n"
+    "    BNE @LOOP\n"
+    "DRAW:\n"
+    "@DONE:\n"
+    "    NOP\n"
+    "    RTS\n"
+)
+
+# casmmapconst: a named constant defined past file offset 0. WP90 folded
+# in the fix for map.s rejecting any such constant as SYMBOL MAP INVALID
+# (a latent Phase 12 regression). /M must show "START" and "FOO".
+file(WRITE "${OUTPUT_DIR}/casmmapconst.seq"
+    ".ORG \$C000\n"
+    "START:\n"
+    "FOO = 5\n"
+    "    LDA #FOO\n"
 )

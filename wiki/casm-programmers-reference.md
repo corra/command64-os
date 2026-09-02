@@ -1251,8 +1251,13 @@ cancellation contract.
 
 ## 18. Coverage: What Works Today
 
-As of build 1266 / v0.2.2 (Phase 9 complete; Phase 10 complete; Phase 11
-complete):
+> This section's per-item detail is written against build 1266 / v0.2.2
+> (Phase 9-11). Phases 12-14 have since shipped: named constants, `*`,
+> parenthesised/operator expressions, character and string literals
+> (Phase 12); `.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/`.ASSERT` (Phase 13);
+> `@name` local labels (Phase 14, CASM `0.6.0` — summarised below). The
+> [CASM Utility Manual](casm-utility.md#language-reference) is the
+> authoritative reference for the current user-facing language surface.
 
 **Works:**
 
@@ -1284,12 +1289,35 @@ complete):
   [§17](#17-symbol-map--listing-output-phase-10-complete). Both may be
   combined; either, both, or neither may be requested per assembly.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (72 distinct `CASM_DIAG_*` codes —
-  [§19](#19-diagnostic-reference)).
+  diagnostic per failure (72 distinct `CASM_DIAG_*` codes at v0.2.2;
+  more since — [§19](#19-diagnostic-reference)).
+- **`@name` local labels** (Phase 14, CASM `0.6.0`): ca65 "cheap local"
+  spelling. `@name:` defines, `@name` references, in any expression
+  position an ordinary label is legal. Scope opens at the nearest
+  preceding non-`@` label and closes at the next one (or EOF); the same
+  `@name` is distinct per scope and may shadow an ordinary label. Purely
+  additive — a source with no `@` token assembles byte-identically to
+  pre-Phase-14. Stored in the existing 64-byte symbol record: flag bit
+  `CASM_SYMBOL_FLAG_LOCAL` (`%00010000`) + a 2-byte owning-scope ordinal
+  in reserved offsets 46-47; `symbolsFindChain` scope-filters LOCAL
+  candidates, keyed off the leading `@` in the queried name.
+  `casm.s`'s `CasmCurrentScope` (a per-pass global-label ordinal, bumped
+  identically in both passes) is published to `CasmSymbolLookupScope`
+  before each statement's operand evaluation. Diagnostics `$57-$5A`
+  (`LOCAL_WITHOUT_SCOPE`, `DUPLICATE_LOCAL`, `UNDEFINED_LOCAL`,
+  `LOCAL_IN_CONSTANT`). `/M` renders a local as `<owner>@<local>`.
+  **Divergence:** a local label is rejected on either side of a named
+  constant's `=` (an implementation-simplicity choice; ca65 and Turbo
+  Macro Pro both allow it). Anonymous labels (`:` / `:+` / `:-`) remain
+  unimplemented — a later separate phase.
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
 rather than being silently accepted):
 
+- **Anonymous labels** (`:` definition, `:+` / `:-` references) —
+  deferred to a later phase; distinct mechanism from `@name` locals
+  (lexer token handling + a ring buffer + positional Pass1/Pass2
+  identity matching).
 - **`.STATIC` / `.RELOC` directives** — `CASM_DIAG_NOT_IMPLEMENTED`; use
   `/S` and `.ORG` instead.
 - **Combined sources over 64K** — `sourceLoad`'s checked total overflows at

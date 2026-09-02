@@ -795,6 +795,18 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_scope")
+            # Phase 14 WP88: standalone symbol-layer scope harness, same
+            # narrow-link shape as casm_symbols above (symbols.s plus its
+            # own vmm_store.s/resources.s dependencies, no
+            # parser/pass-driver/diagnostics.s).
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/symbols.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "1000")
+        endif()
         if(TEST_NAME STREQUAL "casm_map")
             # WP52: map.s plus the symbol table it reads through
             # symbolsReadByIndex. Does NOT link diagnostics.s -- this harness
@@ -808,7 +820,11 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/vmm_store.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/resources.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1400")
+            # Phase 14 WP90: the two new @local/constant validation cases
+            # (maplocalqualified1, mapconstdefinedat1) overflowed $1400 by
+            # 299 measured bytes; $1600 (+512) is the smallest round-page
+            # fit that clears it with headroom.
+            set(TEST_PRG_SIZE "1600")
         endif()
         if(TEST_NAME STREQUAL "casm_spanread")
             # WP53 increment 2: source.s plus the modules it needs to reach a
@@ -954,7 +970,11 @@ if(Ca65_FOUND)
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
                 "${CMAKE_SOURCE_DIR}/src/external/casm/lexer.s"
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
-            set(TEST_PRG_SIZE "1000")
+            # Phase 14 WP87: the new '@'-prefixed local-identifier cases
+            # (source tables + case routines) overflowed $1000 by 140
+            # measured bytes; $1100 (+256) is the smallest round-page fit,
+            # same convention as every other harness-growth bump above.
+            set(TEST_PRG_SIZE "1100")
         endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}
@@ -1808,6 +1828,14 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_expr)
 # canonical home.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_pass1)
 
+# Phase 14 WP88: test.d64's directory is already at capacity (confirmed
+# live -- adding test_casm_scope tipped it over with "ERROR: Dir track
+# full" building this file's own EDLIN fixture appends). Moved to its own
+# dedicated casm_phase14_test_d64 below instead, per the per-phase-
+# test-images convention (brain/task.md's per-phase-test-images.md
+# workflow).
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_scope)
+
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
@@ -1959,6 +1987,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmarith2 casmarithfwd casmarith3 casmchar1 casmstring1 casmrelacc casmzpconst1
     casmfwdstale1 casmchain1
     casmres1 casmfill1 casmalign1 casmincbin1 casmassert1
+    casmloc1 casmloc2 casmloc3 casmloc7
     casmpg63 casmpg64 casmpg65 casmpg128 casmpgblank casmpgrt casmpginc
     casmpgfill casmpgincbin casmpgr6)
 set(CASM_REF_BINS "")
@@ -2655,6 +2684,34 @@ add_custom_command(
     VERBATIM
 )
 
+# DASH-MOD WP1: ca65-style `.ASSERT` action-keyword fixtures.
+add_custom_command(
+    TARGET casm_phase13_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmakw1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw3.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw4.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw4.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakw5.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakw5.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakwbad.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakwbad.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmakwbad2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmakwbad2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase13_test.d64"
+    COMMENT "Appending DASH-MOD WP1 .ASSERT action-keyword fixtures to casm_phase13_test.d64"
+    VERBATIM
+)
+
 # 6c-ter. CASM progress-indication feature's own dedicated test disk,
 # created for Increment 8 (automated verification) per
 # .agents/workflows/per-phase-test-images.md rather than consuming test.d64
@@ -2670,6 +2727,83 @@ add_c64_disk_image(casm_progress_test_d64
     PRGS command64 casm comp test_casm_progress
 )
 add_dependencies(casm_progress_test_d64 casm_test_fixtures casm_reference_fixtures)
+
+# Phase 14: dedicated test disk, per the per-phase-test-images convention
+# (.agents/workflows/per-phase-test-images.md) -- test.d64 is already at
+# its 1541 directory-entry ceiling (confirmed live, WP88: adding
+# test_casm_scope alone tipped it into "ERROR: Dir track full"). Created
+# early (WP88) rather than deferred to WP89, since WP88's own
+# test_casm_scope harness already needed a home off test.d64.
+# Self-bootable (command64 + casm + comp) for later WP89 COMP-verified
+# production fixtures; carries test_casm_scope (this WP's 11-case
+# standalone symbol-layer scope harness) for now.
+add_c64_disk_image(casm_phase14_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp test_casm_scope
+)
+add_dependencies(casm_phase14_test_d64 casm_test_fixtures casm_reference_fixtures)
+
+# WP89: production @local-label fixtures -- four accepted cases
+# (COMP-verified against hand-derived tests/fixtures/casm/casmloc*.ref.hex)
+# plus five rejected-form cases proving WP89's scoped diagnostics through
+# the real production pass driver.
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase14_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET casm_phase14_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmloc1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc1.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc1.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc2.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc2.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc3.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc3.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc3.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc3.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc7.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmloc7.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmloc7.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmloc7.ref"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocnoscope.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocnoscope.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocdup.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocdup.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocundef.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocundef.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocconstl.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocconstl.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmlocconstr.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmlocconstr.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmaploc.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmaploc.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmmapconst.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmmapconst.seq"
+        "${CMAKE_BINARY_DIR}/casm_phase14_test.d64"
+    COMMENT "Appending WP89/WP90 @local-label + /M fixtures and trusted references to casm_phase14_test.d64"
+    VERBATIM
+)
 
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)
@@ -3221,6 +3355,7 @@ foreach(REF_NAME IN LISTS CASM_REF_NAMES)
        AND NOT REF_NAME STREQUAL "casmfwdstale1" AND NOT REF_NAME STREQUAL "casmchain1"
        AND NOT REF_NAME STREQUAL "casmres1" AND NOT REF_NAME STREQUAL "casmfill1" AND NOT REF_NAME STREQUAL "casmalign1"
        AND NOT REF_NAME STREQUAL "casmincbin1" AND NOT REF_NAME STREQUAL "casmassert1"
+       AND NOT REF_NAME MATCHES "^casmloc"
        AND NOT REF_NAME MATCHES "^casmpg")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)

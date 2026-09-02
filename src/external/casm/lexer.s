@@ -60,6 +60,9 @@
 .export lexerGetToken
 .export lexerScanIncludeOperand
 .export lexerScanIncbinOperand
+; DASH-MOD WP1: parser.s's ppsAssert matches the optional ca65-style
+; `.ASSERT` action keyword (ERROR/WARNING/LDERROR/LDWARNING) with this.
+.export compareTokenText
 .export CasmTokenStartOffsetLo
 .export CasmTokenStartOffsetHi
 .export CasmStringLength
@@ -197,6 +200,13 @@ lnSkip:
     ; Check if it's an identifier first character (A-Z, a-z, _)
     jsr isIdFirst
     bcc lnIdJmp
+
+    ; Phase 14 WP87: '@' also enters lnId -- it is the one identifier-first
+    ; byte lnId itself must validate further (a local label needs a real
+    ; identifier-first byte right after the '@'), so it is dispatched here
+    ; rather than accepted by isIdFirst.
+    cmp #CASM_PETSCII_AT
+    beq lnIdJmp
 
     ; None of the above: invalid source byte! The lookahead still holds the
     ; offending byte and its provenance; the live source cursor has already
@@ -1264,8 +1274,50 @@ lnMalformedNum:
     lda #CASM_DIAG_MALFORMED_NUMBER
     jmp lnFailWithA
 
+; Phase 14 WP87: a leading '@' (CASM_PETSCII_AT) starts a local-label
+; identifier -- legal ONLY when immediately followed by an isIdFirst byte
+; (A-Z, a-z, or '_'; never a digit, another '@', whitespace, a line
+; terminator, or EOF). lnId is entered on '@' the same way it is entered on
+; any other isIdFirst byte (see the dispatch below); it is the one case
+; that needs a second byte of lookahead before it can accept, since '@' is
+; not itself a valid identifier body -- unlike every other accepted first
+; byte, which is always self-sufficient. A malformed form (bare '@', '@@',
+; '@1', '@' at EOF/newline) is reported at the OFFENDING byte (the one
+; after '@', or the '@' itself if that's exhausted) as
+; CASM_DIAG_INVALID_SOURCE_BYTE -- the same diagnostic '@' alone already
+; produced before this WP (it fell through every dispatch case to the
+; catch-all invalid-byte path); no new diagnostic identifier is spent on
+; this. See `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`.
 lnId:
     jsr lexerTokenReset
+    lda CasmLookaheadByte
+    cmp #CASM_PETSCII_AT
+    beq @idAt
+    jmp @idLoop
+@idAt:
+    lda CasmLookaheadByte
+    jsr lexerTokenAppend        ; append '@' itself
+    bcc @idAtOk1
+    jmp lnTokenTooLong
+@idAtOk1:
+    jsr lexerConsume
+    jsr lexerFill
+    bcc @idAtOk2
+    jmp lnFail
+@idAtOk2:
+    lda CasmLookaheadResult
+    cmp #CASM_SOURCE_EOF
+    beq @idLocalMalformed
+    cmp #CASM_SOURCE_NEWLINE
+    beq @idLocalMalformed
+    lda CasmLookaheadByte
+    jsr isIdFirst
+    bcs @idLocalMalformed       ; next byte is not a legal identifier start
+    jmp @idLoop                 ; validated -- @idLoop appends it normally
+@idLocalMalformed:
+    jsr diagSetLocFromLookahead
+    lda #CASM_DIAG_INVALID_SOURCE_BYTE
+    jmp lnFailWithA
 @idLoop:
     lda CasmLookaheadByte
     jsr lexerTokenAppend

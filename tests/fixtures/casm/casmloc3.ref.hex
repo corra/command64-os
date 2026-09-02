@@ -1,0 +1,27 @@
+# CASM Phase 14 WP89 trusted reference: casmloc3
+#
+# Independently hand-assembled from the casmloc3 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Proves a
+# forward @local reference (branch to a @local defined later in the same
+# scope) resolves in Pass 2 to the correct displacement.
+#
+# Source (.ORG $C000, fixed address):
+#   | .ORG $C000
+#   | MAIN:
+#   |     BNE @DONE
+#   |     NOP
+#   | @DONE:
+#   |     NOP
+#
+# Hand assembly:
+#   00 C0    - PRG load-address header
+#   D0 01    - BNE @DONE at $C000; @DONE at $C003; $C003 - $C002 = +1 = $01
+#   EA       - NOP at $C002
+#   EA       - @DONE NOP at $C003
+#
+# bytes: 6
+
+00 C0
+D0 01
+EA
+EA

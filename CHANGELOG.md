@@ -9,6 +9,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM `@name` local labels (Phase 14, WP86-92)** (CASM `0.5.x` ->
+  `0.6.0`): named local labels in the ca65 "cheap local" spelling. `@name:`
+  defines a label; `@name` references it in any expression position an
+  ordinary label is legal (branch/absolute operand, `.BYTE`/`.WORD`
+  operand, `.ASSERT`). A local's scope opens at the nearest preceding
+  ordinary (non-`@`) label and closes at the next one, or end of file; the
+  same `@name` is a distinct symbol per scope and may shadow an ordinary
+  label of the same spelling. Forward references resolve in Pass 2 exactly
+  as for ordinary labels. The `/M` symbol map renders a local qualified as
+  `<owner>@<local>`. Four new diagnostics (`$57-$5A`): `LOCAL LABEL BEFORE
+  ANY GLOBAL LABEL`, `DUPLICATE LOCAL LABEL IN SCOPE`, `UNDEFINED LOCAL
+  LABEL`, `LOCAL LABEL NOT ALLOWED IN CONSTANT`. Stored in the existing
+  64-byte symbol record (one spare flag bit + two reserved padding
+  bytes) — no new zero page, no VMM change, MAIN still `$7400`.
+  **Divergence from ca65 / Turbo Macro Pro:** CASM rejects a local label
+  on either side of a named constant's `=` (an implementation-simplicity
+  choice). **Anonymous labels** (`:` / `:+` / `:-`) are explicitly
+  deferred to a later phase. Purely additive — a source with no `@` token
+  assembles byte-identically to pre-Phase-14; DASH's `dfmt.s` adopted
+  `@local` in three routines with byte-identical output, triple-verified.
+  Completed and user-approved 2026-09-01; CASM advanced from `0.5.2` to
+  `0.6.0`.
 - **CASM progress and processing indication** (optional feature, CASM
   `0.4.0` -> `0.5.0`): CASM now shows what it is doing while it assembles.
   During each pass a single in-place transient status line reports the
@@ -78,6 +100,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`test_casm_flmeta` stale max-include-name fixture** (test-only,
+  Taskwarrior 43-b): the memory-optimization WP's Finding D dropped the
+  CASM include-filename cap 63 -> 32 and re-pinned the `casm_include` /
+  `casm_cliderive` boundary fixtures, but `casm_flmeta.s`'s
+  `resolveMaxIncludedName` case hardcoded the old 63/66 values as bare
+  `.byte` literals + `lda #66` (no `CASM_*` symbol, so no build assert
+  guarded it) and was not re-run live. It surfaced deterministically in
+  the CASM Phase 14 WP92 consolidated sweep. Fix is harness-only
+  (`includeNameCap` 32 chars, resolved length 35); CASM product
+  behaviour was already correct. Walkthrough:
+  `brain/walkthroughs/2026-09-01-casm-flmeta-maxincluded-regression.md`.
 - **CASM garbled banner on an early fatal exit** (CASM `0.5.1` -> `0.5.2`,
   Taskwarrior 43): a diagnostic raised before Pass 1 -- CLI/file/lexer-init
   failures such as `FILENAME TOO LONG`, `CANNOT OPEN INPUT`, `UNKNOWN
@@ -221,6 +254,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **DASH Modernization** (DASH `0.1.4` -> `0.2.0`, DASH-MOD WP1-6,
+  2026-09-01): DASH's seven dual-assembler sources were rebased onto the
+  modern shared CASM/ca65 feature set with **no user-visible behaviour
+  change** — same screens, same keys, same output, same relocation
+  contract. Shipping size fell `4766 -> 4579` bytes; ~30 global labels
+  removed; the manifest sha256 moved `3238b786... -> 08f8f7ce... ->
+  4a49612e... -> 3b4d0693...` across the byte-changing WPs. Work:
+  - **WP1** — CASM `.ASSERT` gained the ca65 action-keyword form
+    (`.ASSERT cond, ERROR[, "msg"]`) so the same spelling assembles under
+    both toolchains.
+  - **WP2** — every routine-internal helper label (~90) demoted to a
+    `@local` cheap local across all seven files; byte-identical output.
+  - **WP3** — ~110 magic numbers replaced by named constants in
+    `dmain.s`'s prologue (page model, screen geometry, `SYS_OFF_*` /
+    `APP_OFF_*` record maps, `VMMSTATE_*` / `VMMFAIL_*` enums, `DOS_*`
+    API codes, `KEY_*` / `ROW_*` / `COL_*`); 16 structural `.assert`
+    invariants added in the ca65-only `dash_wrapper.s` (CASM has no
+    comparison operator). Byte-identical output.
+  - **WP4** — `dmain.s` event loop / key dispatch: the 10-branch key
+    ladder became an F-key range check computing the page index directly
+    plus one `AND #$DF` case-fold for `T`/`R`/`Q`; `SELECTSYS/APP/VMM`
+    collapsed; `MARKREDRAW` helper. First shipping-byte change since
+    Phase 14 WP91; behaviour-identical, live-verified.
+  - **WP5** — renderer helpers: `DRAWFRAME`'s 7 near-identical row-copy
+    loops -> one `COPYFRAMEROW`; `DAPPPRINTFLAGS`'s 4 flag cells -> a
+    table loop; `dsys.s`'s 12 row openers -> a `DSYSLABEL` helper; the
+    dead `PRINTAT` routine removed. Pixel-identical, live-verified.
+  - **WP6** — consolidated gate: fresh ca65<->CASM byte-identity + native
+    CASM under VICE, manifest re-baselined, relocation audit, version
+    bump, `AGENTS.md` consolidation, user runtime matrix at `$3800` /
+    `$5000` / `$9000`.
+  Plans/walkthroughs: `brain/plans/2026-09-01-dash-mod-wp*.md` +
+  `brain/walkthroughs/2026-09-01-dash-mod-wp*.md`; parent
+  `brain/plans/2026-09-01-dash-modernization.md`.
 - **CASM memory optimization** (optional, size-only WP, CASM `0.5.0` ->
   `0.5.1`): recovered **2,068 bytes** of CASM's MAIN envelope with no
   change to assembled output, progress display, or diagnostic behavior.
