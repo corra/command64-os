@@ -130,8 +130,33 @@
 .import CasmStmtLocLineLo
 .import CasmStmtLocLineHi
 .import CasmStmtLocColumn
+.import CasmStmtLocFileId
 .import cliSourceSlotLo
 .import cliSourceSlotHi
+
+; Phase 15 WP96: conditional-assembly pass-driver wiring.
+.import condCurrentlyEmitting
+.import condTopParentEmitting
+.import condOpenIf
+.import condElseif
+.import condElse
+.import condEndif
+.import condAtEof
+.import condSiteDecision
+.import CasmCondDepth
+.import CasmCondBranchTaken
+.import CasmCondOpenLocLineLo
+.import CasmCondOpenLocLineHi
+.import CasmCondOpenLocColumn
+.import CasmCondOpenLocFileId
+.import CasmCondOpenLineLo
+.import CasmCondOpenLineHi
+.import CasmCondOpenColumn
+.import CasmCondOpenFileId
+.import parserEvalConditionExpr
+.import lexerNext
+.import CasmTokenRecord
+.import diagStampStmtLoc
 
 .import CasmOutputName
 .import fileCreateOutput
@@ -599,6 +624,32 @@ casmRunPass:
     bcc crpBeginOk
     jmp crpFail
 crpBeginOk:
+    ; Phase 15 WP96: if a `.IF`/`.ELSEIF`/`.ELSE` has suppressed the
+    ; current branch, do NOT run the full parser -- it would evaluate a
+    ; suppressed `.RES`/`.ASSERT` operand or a dangling symbol reference.
+    ; crpScanSuppressed consumes one physical line with lexerNext only,
+    ; acting on cond.s for a conditional directive and discarding
+    ; everything else.
+    jsr condCurrentlyEmitting
+    bne crpEmitting
+    jsr crpScanSuppressed
+    bcc :+
+    pha                          ; diagSetLocFromStmt clobbers A (the diag code)
+    jsr diagSetLocFromStmt        ; scanner stamped CasmStmtLoc at the directive
+    pla
+    sec
+    jmp crpFail
+    :
+    cmp #1
+    bne @scanContinue            ; not EOF -- continue the pass loop
+    jmp crpDone                  ; scanner hit EOF -- crpDone runs condAtEof
+@scanContinue:
+    jsr crpListingCommit         ; a suppressed line still ends a physical line
+    bcc :+
+    jmp crpFail
+    :
+    jmp casmRunPass
+crpEmitting:
     ; WP89: publish the current local-label scope for this statement's
     ; operand expression, which parserParseStatement evaluates inline
     ; (parseOperandSequence -> parserParseExpressionValue -> the
@@ -1081,7 +1132,7 @@ crpInsn:
 crpDir:
     lda CasmParserStmt + CASM_PARSER_STMT_SUBTYPE
     cmp #CASM_DIRECTIVE_INCLUDE
-    bne crpEmitDir
+    bne crpDirNotInclude
     ; crpInclude commits the parent's own line itself, before pushing the
     ; child frame -- see its header comment.
     jsr crpInclude
@@ -1089,6 +1140,33 @@ crpDir:
     jmp crpFail
     :
         jmp casmRunPass
+crpDirNotInclude:
+    ; Phase 15 WP96: conditional directives ($0C-$11) in an emitting
+    ; branch. crpCond* consume the operand + terminator and act on cond.s;
+    ; they emit nothing.
+    cmp #CASM_DIRECTIVE_IF
+    bcc crpEmitDir
+    cmp #CASM_DIRECTIVE_IFNDEF + 1
+    bcs crpEmitDir
+    cmp #CASM_DIRECTIVE_IF
+    beq crpCondIfJmp
+    cmp #CASM_DIRECTIVE_ELSEIF
+    beq crpCondElseifJmp
+    cmp #CASM_DIRECTIVE_ELSE
+    beq crpCondElseJmp
+    cmp #CASM_DIRECTIVE_ENDIF
+    beq crpCondEndifJmp
+    ; IFDEF/IFNDEF: not wired until WP97.
+    lda #CASM_DIAG_NOT_IMPLEMENTED
+    jmp crpFail
+crpCondIfJmp:
+    jmp crpCondIf
+crpCondElseifJmp:
+    jmp crpCondElseif
+crpCondElseJmp:
+    jmp crpCondElse
+crpCondEndifJmp:
+    jmp crpCondEndif
 crpEmitDir:
     jsr emitDirective
     bcc :+
@@ -1101,6 +1179,18 @@ crpEmitDir:
         jmp casmRunPass
 
 crpDone:
+    ; Phase 15 WP96: end of source with an `.IF` still open is
+    ; CASM: UNTERMINATED .IF (the open `.IF`'s location is left in cond.s's
+    ; CasmCondOpenLine* by condOpenIf). Reached from both the emitting EOF
+    ; path and crpScanSuppressed's own EOF signal.
+    jsr condAtEof
+    bcc :+
+    jsr crpCondStampOpenLoc      ; point the diagnostic at the open `.IF`
+    jsr diagSetLocFromStmt
+    lda #CASM_DIAG_UNTERMINATED_CONDITIONAL
+    sec
+    jmp crpFail
+    :
     ; EOF: commit any pending final (unterminated) physical line. This adds
     ; no record of its own for EOF -- listingCommitLine only ever appends a
     ; record for a real physical line sourceTakeCompletedLine reports as
@@ -1115,6 +1205,273 @@ crpDone:
     rts
 crpFail:
     rts                          ; C already set, A = CASM_DIAG_*
+
+; ===========================================================================
+; Phase 15 WP96: conditional-assembly pass-driver support
+; ===========================================================================
+
+; ---------------------------------------------------------------------------
+; crpScanSuppressed (private)
+; Consume exactly one physical source line while the current branch is
+; suppressed. Uses lexerNext directly -- NEVER the full parser -- so a
+; suppressed `.RES undefined` / `lda notdefined` line reaches no evaluator.
+; Recognises only the six conditional directives (as the line's first
+; token) and acts on cond.s; every other line is discarded.
+;
+; Out: C clear + A = 0 -> continue the pass loop (line consumed).
+;      C clear + A = 1 -> end of source reached (caller runs crpDone).
+;      C set   + A = CASM_DIAG_* -> a cond.s structural error; CasmStmtLoc
+;                     is already stamped at the offending directive.
+; Clobbers: A, X, Y and the lexer's volatile state.
+; ---------------------------------------------------------------------------
+crpScanSuppressed:
+    jsr lexerNext
+    bcc @tok
+    rts
+@tok:
+    cmp #CASM_TOKEN_EOF
+    bne @notEof
+    lda #1
+    clc
+    rts
+@notEof:
+    cmp #CASM_TOKEN_NEWLINE
+    bne @notNl
+    lda #0
+    clc
+    rts
+@notNl:
+    cmp #CASM_TOKEN_DIRECTIVE
+    bne @drain
+    lda CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
+    cmp #CASM_DIRECTIVE_IF
+    bcc @drain
+    cmp #CASM_DIRECTIVE_IFNDEF + 1
+    bcs @drain
+    ; A conditional directive. Stamp its location for any diagnostic, then
+    ; dispatch. All paths finish by consuming the rest of the line.
+    jsr diagStampStmtLoc
+    lda CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
+    cmp #CASM_DIRECTIVE_ENDIF
+    beq @endif
+    cmp #CASM_DIRECTIVE_ELSE
+    beq @else
+    cmp #CASM_DIRECTIVE_ELSEIF
+    beq @elseif
+    ; IF / IFDEF / IFNDEF nested inside a suppressed level: a purely
+    ; structural push (decision 0), no operand evaluation.
+    jsr crpCondStageOpenLoc
+    lda #0
+    jsr condOpenIf
+    bcs @condErr
+    jmp @drain
+@endif:
+    jsr condEndif
+    bcs @condErr
+    jmp @drain
+@else:
+    jsr condElse
+    bcs @condErr
+    jmp @drain
+@elseif:
+    jsr crpCondApplyElseif       ; consumes the operand itself
+    bcs @condErr
+    lda #0
+    clc
+    rts
+@condErr:
+    rts                          ; C set, A = diag, CasmStmtLoc stamped
+@drain:
+    jsr crpCondDrainLine         ; A = 0 (NEWLINE) or 1 (EOF) -- pass it up
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; crpCondDrainLine (private)
+; Consume tokens with lexerNext until a NEWLINE (A = 0 on return) or EOF
+; (A = 1). The terminating token is consumed for NEWLINE, buffered for EOF
+; -- matching parserParseStatement's own post-statement lexer state.
+; Clobbers: A, X, Y, lexer state.
+; ---------------------------------------------------------------------------
+crpCondDrainLine:
+    jsr lexerNext
+    bcs @err
+    cmp #CASM_TOKEN_NEWLINE
+    beq @nl
+    cmp #CASM_TOKEN_EOF
+    bne crpCondDrainLine
+    lda #1
+    clc
+    rts
+@nl:
+    lda #0
+    clc
+    rts
+@err:
+    rts
+
+; ---------------------------------------------------------------------------
+; crpCondRequireTerminator (private)
+; The current token (CasmTokenRecord) must be NEWLINE or EOF.
+; Out: C clear on OK; C set + A = CASM_DIAG_SYNTAX_ERROR otherwise.
+; ---------------------------------------------------------------------------
+crpCondRequireTerminator:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_NEWLINE
+    beq @ok
+    cmp #CASM_TOKEN_EOF
+    beq @ok
+    lda #CASM_DIAG_SYNTAX_ERROR
+    sec
+    rts
+@ok:
+    clc
+    rts
+
+; ---------------------------------------------------------------------------
+; crpCondSiteDecision (private)
+; A = freshly-computed decision. Calls condSiteDecision with the pass
+; number derived from CasmPassMode. Returns condSiteDecision's A/C.
+; ---------------------------------------------------------------------------
+crpCondSiteDecision:
+    pha
+    ldx #1
+    lda CasmPassMode
+    cmp #CASM_PASS_MODE_EMIT
+    bne :+
+    ldx #2
+    :
+    pla
+    jmp condSiteDecision
+
+; ---------------------------------------------------------------------------
+; crpCondStageOpenLoc / crpCondStampOpenLoc (private)
+; Stage: copy CasmStmtLoc* -> cond.s's CasmCondOpenLoc* (the push inputs).
+; Stamp: copy the open `.IF`'s stored location (CasmCondOpenLine*[depth-1])
+;        back into CasmStmtLoc* for the UNTERMINATED diagnostic.
+; ---------------------------------------------------------------------------
+crpCondStageOpenLoc:
+    lda CasmStmtLocLineLo
+    sta CasmCondOpenLocLineLo
+    lda CasmStmtLocLineHi
+    sta CasmCondOpenLocLineHi
+    lda CasmStmtLocColumn
+    sta CasmCondOpenLocColumn
+    lda CasmStmtLocFileId
+    sta CasmCondOpenLocFileId
+    rts
+crpCondStampOpenLoc:
+    ldx CasmCondDepth
+    lda CasmCondOpenLineLo - 1, x
+    sta CasmStmtLocLineLo
+    lda CasmCondOpenLineHi - 1, x
+    sta CasmStmtLocLineHi
+    lda CasmCondOpenColumn - 1, x
+    sta CasmStmtLocColumn
+    lda CasmCondOpenFileId - 1, x
+    sta CasmStmtLocFileId
+    rts
+
+; ---------------------------------------------------------------------------
+; crpCondApplyElseif (private)
+; Shared `.ELSEIF` handling for the emitting path and the suppressed-line
+; scanner. On entry the `.ELSEIF` DIRECTIVE token is current. Consumes the
+; operand line and calls condElseif with the right decision:
+;   - depth 0, parent not emitting, or a branch already taken -> the
+;     `.ELSEIF` can never re-enable emitting: drain the operand without
+;     evaluating (it may reference not-yet-defined names), condElseif(0).
+;   - otherwise -> evaluate the operand (must resolve in-pass),
+;     condSiteDecision, condElseif(truthy).
+; Out: C/A from condElseif or a propagated eval error. CasmStmtLoc stamped
+;      by the caller (scanner) or the parser (emitting path).
+; ---------------------------------------------------------------------------
+crpCondApplyElseif:
+    lda CasmCondDepth
+    beq @noEval
+    jsr condTopParentEmitting
+    beq @noEval
+    ldx CasmCondDepth
+    lda CasmCondBranchTaken - 1, x
+    bne @noEval
+    jsr parserEvalConditionExpr  ; consumes .ELSEIF + operand; A = truthy
+    bcs @err
+    pha
+    jsr crpCondRequireTerminator
+    bcc @termOk
+    pla
+    rts
+@termOk:
+    pla
+    jsr crpCondSiteDecision
+    bcs @err
+    jmp condElseif               ; A = effective decision
+@noEval:
+    jsr crpCondDrainLine         ; consume the .ELSEIF operand line
+    lda #0
+    jmp condElseif               ; returns WITHOUT_IF / ELSE_AFTER_ELSE / OK
+@err:
+    rts
+
+; ---------------------------------------------------------------------------
+; crpCondIf / crpCondElseif / crpCondElse / crpCondEndif (private)
+; The emitting-branch handlers, reached from crpDir. Each consumes the
+; directive's operand + terminator, acts on cond.s, commits the listing
+; line, and loops. Errors stamp CasmStmtLoc (already set by the parser for
+; this statement) and go to crpFail.
+; ---------------------------------------------------------------------------
+crpCondIf:
+    jsr parserEvalConditionExpr  ; consumes .IF + operand; A = truthy
+    bcs crpCondFail
+    pha
+    jsr crpCondRequireTerminator
+    bcc @termOk
+    pla
+    jmp crpCondFail
+@termOk:
+    pla
+    jsr crpCondSiteDecision      ; A -> effective decision
+    bcs crpCondFail
+    pha
+    jsr crpCondStageOpenLoc
+    pla
+    jsr condOpenIf               ; A = effective; push
+    bcs crpCondFail
+    jmp crpCondCommitLoop
+
+crpCondElseif:
+    jsr crpCondApplyElseif
+    bcs crpCondFail
+    jmp crpCondCommitLoop
+
+crpCondElse:
+    jsr lexerNext                ; consume the .ELSE directive token
+    bcs crpCondFailNoLoc
+    jsr crpCondRequireTerminator
+    bcs crpCondFail
+    jsr condElse
+    bcs crpCondFail
+    jmp crpCondCommitLoop
+
+crpCondEndif:
+    jsr lexerNext                ; consume the .ENDIF directive token
+    bcs crpCondFailNoLoc
+    jsr crpCondRequireTerminator
+    bcs crpCondFail
+    jsr condEndif
+    bcs crpCondFail
+    jmp crpCondCommitLoop
+
+crpCondCommitLoop:
+    jsr crpListingCommit
+    bcs crpCondFailNoLoc
+    jmp casmRunPass
+crpCondFail:
+    pha                          ; diagSetLocFromStmt clobbers A (the diag code)
+    jsr diagSetLocFromStmt       ; conditional diagnostics point at the stmt
+    pla
+    sec
+crpCondFailNoLoc:
+    jmp crpFail
 
 ; ---------------------------------------------------------------------------
 ; crpListingBegin / crpListingCommit (private, WP51 increment 5)

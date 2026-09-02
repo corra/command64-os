@@ -488,3 +488,22 @@ Phase 15 is complete only when **all** of:
   walkthrough
   `brain/walkthroughs/2026-09-01-casm-phase15-wp95-cond-state-machine.md`.
   Awaiting sign-off before WP96.
+- 2026-09-01: **WP95 closed (user-approved), committed `ecbd717`.**
+  WP96 sub-plan drafted
+  (`brain/plans/2026-09-01-casm-phase15-wp96-pass-driver-wiring.md`) --
+  proposes reshaping the WP96/97 boundary to "truthiness family
+  (`.if`/`.elseif`/`.else`/`.endif`) then symbol family
+  (`.ifdef`/`.ifndef`)" rather than "3 then elseif+2". Awaiting approval.
+- 2026-09-01: **WP96 approved (incl. reshape) + implemented.**
+  `.if`/`.elseif`/`.else`/`.endif` working end to end: `parser.s`
+  `parserEvalConditionExpr` + conditional-subtype routing; `casm.s`
+  `crpScanSuppressed` structural scanner + `crpCond*` handlers +
+  `casmRunPass` gate + `crpDone` `condAtEof`. New `casm_phase15_test.d64`
+  (10 fixtures, `test_casm_cond` rehomed). Live: **6/6 accepted fixtures
+  COMP OK** (incl. `casmifskip` -- a skipped branch with un-assemblable
+  source), **4/4 rejected fixtures** with correct diagnostics + carets,
+  `test_casm_cond` PASS, `casmassert1` regression byte-identical. All 32
+  harnesses build. **MAIN headroom 1,000 -> 499 B** (WP97 envelope risk).
+  Sub-plan / walkthrough:
+  `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp96-pass-driver-wiring.md`.
+  `BUILD_CASM` 1413. Awaiting sign-off before WP97.

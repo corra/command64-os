@@ -1263,7 +1263,10 @@ if(Ca65_FOUND)
             # (unused by this harness's own include-focused coverage)
             # overflowed $1800 by 54 measured bytes; $1900 (+256) is the
             # smallest round-page fit. User-approved 2026-08-21.
-            set(TEST_PRG_SIZE "1900")
+            # Phase 15 WP96: parser.s's new parserEvalConditionExpr + the
+            # lexer's six conditional keywords (unused here) overflowed
+            # $1900 by 53 measured bytes; $1A00 (+256) is the next fit.
+            set(TEST_PRG_SIZE "1A00")
         endif()
         if(TEST_NAME STREQUAL "casm_catalog")
             # WP45: include.s plus every module sourceAppendFile transitively
@@ -1850,8 +1853,8 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_pass1)
 # workflow).
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_scope)
 
-# Phase 15 WP95: same full-directory reason -- test_casm_cond lives on
-# casm_include_test_d64 (and, from WP96, casm_phase15_test_d64), not test.d64.
+# Phase 15: same full-directory reason -- test_casm_cond lives on
+# casm_phase15_test_d64, not test.d64.
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_cond)
 
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
@@ -2006,6 +2009,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmfwdstale1 casmchain1
     casmres1 casmfill1 casmalign1 casmincbin1 casmassert1
     casmloc1 casmloc2 casmloc3 casmloc7
+    casmif1 casmif0 casmifskip casmifelse casmelif casmifnest
     casmpg63 casmpg64 casmpg65 casmpg128 casmpgblank casmpgrt casmpginc
     casmpgfill casmpgincbin casmpgr6)
 set(CASM_REF_BINS "")
@@ -2263,10 +2267,7 @@ add_c64_disk_image(casm_include_test_d64
     # casm_overflow_test_d64 (self-contained, deliberately no fixture files
     # -- see its own header comment), which ran 1 block short for
     # casmcat5.seq after this WP's casm/test_casm_include envelope growth.
-    # Phase 15 WP95: test_casm_cond (the cond.s state-machine unit harness)
-    # placed here for now -- WP96 creates casm_phase15_test_d64 and may
-    # rehome it there alongside the production fixtures.
-    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym test_casm_finc test_casm_opcodes test_casm_event test_casm_directives test_casm_cond
+    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym test_casm_finc test_casm_opcodes test_casm_event test_casm_directives
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
 
@@ -2826,6 +2827,67 @@ add_custom_command(
     VERBATIM
 )
 
+# ---------------------------------------------------------------------------
+# CASM Phase 15 (Conditional Assembly) dedicated test disk, per the
+# per-phase-test-images convention. Self-bootable; carries test_casm_cond
+# (the WP95 cond.s state-machine unit harness, moved here from
+# casm_include_test_d64) plus the WP96 .if/.elseif/.else/.endif production
+# fixtures.
+# ---------------------------------------------------------------------------
+add_c64_disk_image(casm_phase15_test_d64
+    OUTPUT_FILE "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    DISK_LABEL "${DISK_NAME}"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 casm comp test_casm_cond
+)
+add_dependencies(casm_phase15_test_d64 casm_test_fixtures casm_reference_fixtures)
+
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "casm_phase15_test_d64" "--error" "--")
+endif()
+
+# WP96 conditional-assembly fixtures: six accepted (COMP against a
+# hand-derived .ref.hex) + four rejected-diagnostic cases.
+add_custom_command(
+    TARGET casm_phase15_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "casmif1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmif1.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmif1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmif1.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmif0.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmif0.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmif0.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmif0.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifskip.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifskip.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifskip.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifskip.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifelse.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifelse.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifelse.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifelse.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmelif.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmelif.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmelif.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmelif.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifnest.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifnest.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifnest.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifnest.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmiffwd.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmiffwd.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifnoend.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifnoend.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmendnoif.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmendnoif.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmelseelse.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmelseelse.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMENT "Appending WP96 conditional-assembly fixtures and trusted references to casm_phase15_test.d64"
+    VERBATIM
+)
+
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)
     set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
@@ -3377,6 +3439,7 @@ foreach(REF_NAME IN LISTS CASM_REF_NAMES)
        AND NOT REF_NAME STREQUAL "casmres1" AND NOT REF_NAME STREQUAL "casmfill1" AND NOT REF_NAME STREQUAL "casmalign1"
        AND NOT REF_NAME STREQUAL "casmincbin1" AND NOT REF_NAME STREQUAL "casmassert1"
        AND NOT REF_NAME MATCHES "^casmloc"
+       AND NOT REF_NAME MATCHES "^casmif" AND NOT REF_NAME MATCHES "^casmel"
        AND NOT REF_NAME MATCHES "^casmpg")
         set(WRAPPER_CC1541 "")
         if(C64_THEME_DIR)

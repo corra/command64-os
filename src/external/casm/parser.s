@@ -52,6 +52,7 @@
 .export CasmParserStmt
 .export parserParseStatement
 .export parserParseExpressionValue
+.export parserEvalConditionExpr
 .export CasmLabelName
 .export CasmLabelNameLen
 .export CasmIncludeFilename
@@ -281,6 +282,15 @@ ppsMnemonic:
     beq ppsIncbinDispatch
     cmp #CASM_DIRECTIVE_ASSERT
     beq ppsAssertDispatch
+    ; Phase 15 WP96: the six conditional-assembly directives. The parser
+    ; only classifies them and leaves any operand tokens in the lexer
+    ; stream -- casm.s's crpDir / crpScanSuppressed own every conditional
+    ; semantic (they need the pass number and cond.s). Same "defer the
+    ; operands" shape as .BYTE/.WORD.
+    cmp #CASM_DIRECTIVE_IF
+    bcc ppsGrammar                 ; subtype < IF: not a conditional
+    cmp #CASM_DIRECTIVE_IFNDEF + 1
+    bcc ppsDeferOperands          ; IF..IFNDEF inclusive
 ppsGrammar:
     jmp parseOperandSequence
 ppsFillDirectiveDispatch:
@@ -334,6 +344,60 @@ ppsIncbin:
     rts
 
 ppsFail:
+    rts
+
+; ---------------------------------------------------------------------------
+; parserEvalConditionExpr (Phase 15 WP96)
+; Evaluate an `.IF` / `.ELSEIF` condition expression. The current token on
+; entry is the conditional DIRECTIVE itself (as left by parserParseStatement's
+; own lexerNext, exactly like ppsFillDirective's entry state) -- OR, when
+; called from casm.s's suppressed-line scanner, the token is the `.ELSEIF`
+; DIRECTIVE that the scanner's own lexerNext just delivered. Either way this
+; routine consumes the directive token, evaluates the operand with the full
+; expression grammar, and leaves the terminator token current for the caller
+; to check.
+;
+; Like `.RES`/`.ALIGN`/`.ASSERT`, the condition must fully resolve in this
+; pass -- a forward or otherwise-unresolved reference is a hard error, so
+; Pass 1 and Pass 2 evaluate the identical value and take the identical
+; branch.
+;
+; Outputs:  success: C clear, A = truthiness (1 if the resolved value is
+;                    nonzero, 0 if zero); terminator token current.
+;           failure: C set, A = CASM_DIAG_CONDITIONAL_OPERAND_UNRESOLVED or
+;                    a propagated expression diagnostic.
+; Clobbers: A, X, Y, CasmParserStmt.Val*/Flags, CasmPtr0Lo/Hi, the
+;           expression module's private result record.
+; ---------------------------------------------------------------------------
+parserEvalConditionExpr:
+    jsr lexerNext                 ; consume the DIRECTIVE, fetch operand token
+    bcc @haveToken
+    rts
+@haveToken:
+    jsr parserParseExpressionValue
+    bcc @haveExpr
+    rts
+@haveExpr:
+    jsr exprGetResult
+    stx CasmPtr0Lo
+    sty CasmPtr0Hi
+    ldy #CASM_EXPR_FLAGS
+    lda (CasmPtr0Lo), y
+    and #CASM_EXPR_FLAG_RESOLVED
+    bne @resolved
+    lda #CASM_DIAG_CONDITIONAL_OPERAND_UNRESOLVED
+    sec
+    rts
+@resolved:
+    lda CasmParserStmt + CASM_PARSER_STMT_VAL_LO
+    ora CasmParserStmt + CASM_PARSER_STMT_VAL_HI
+    beq @false
+    lda #1
+    clc
+    rts
+@false:
+    lda #0
+    clc
     rts
 
 ; ---------------------------------------------------------------------------

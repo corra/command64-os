@@ -2300,3 +2300,123 @@ file(WRITE "${OUTPUT_DIR}/casmmapconst.seq"
     "FOO = 5\n"
     "    LDA #FOO\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP96: conditional-assembly production fixtures. All static
+# (.ORG $C000) so no relocation is involved. Accepted cases carry a
+# hand-derived .ref.hex in tests/fixtures/casm/; rejected cases have none.
+# ---------------------------------------------------------------------------
+
+# casmif1: .IF 1 body is assembled. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmif1.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmif0: .IF 0 body is omitted -- output identical to it being absent.
+# -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmif0.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifskip: a skipped .IF 0 body holds source that would not assemble on
+# its own (a .RES with no value, a reference to an undefined symbol). The
+# structural scanner never evaluates it. -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifskip.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    LDA UNDEFINEDXYZ\n"
+    "    .WORD NOTASYMBOL\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifelse: .IF 0 / .ELSE -- the else body assembles. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifelse.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ELSE\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmelif: .IF 0 / .ELSEIF 0 / .ELSEIF 1 / .ELSE -- only the third arm's
+# three NOPs. -> 00 C0 EA EA EA
+file(WRITE "${OUTPUT_DIR}/casmelif.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ELSEIF 0\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ELSEIF 1\n"
+    "    NOP\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ELSE\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifnest: .IF 1 / .IF 0 / .ENDIF / .ENDIF and the mirror. Only the
+# reachable NOPs. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifnest.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    NOP\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".IF 0\n"
+    ".IF 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".ENDIF\n"
+)
+
+# casmiffwd: .IF on a constant defined later -> CASM: .IF CONDITION NOT
+# RESOLVED at line 2. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmiffwd.seq"
+    ".ORG \$C000\n"
+    ".IF LATER\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "LATER = 1\n"
+)
+
+# casmifnoend: .IF 1 with no .ENDIF -> CASM: UNTERMINATED .IF at line 2.
+# No .ref.
+file(WRITE "${OUTPUT_DIR}/casmifnoend.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    NOP\n"
+)
+
+# casmendnoif: .ENDIF with no open .IF -> CASM: .ELSE/.ELSEIF/.ENDIF
+# WITHOUT .IF at line 3. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmendnoif.seq"
+    ".ORG \$C000\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmelseelse: a second .ELSE at the same level -> CASM: .ELSEIF/.ELSE
+# AFTER .ELSE at line 4. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmelseelse.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    ".ELSE\n"
+    ".ELSE\n"
+    ".ENDIF\n"
+)

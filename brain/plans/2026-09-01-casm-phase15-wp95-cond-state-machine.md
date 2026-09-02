@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp95-cond-state-machine
 created: 2026-09-01
-status: implemented, awaiting user sign-off
+status: complete (user-approved 2026-09-01, committed ecbd717)
 taskwarrior: 1ed564ea-7b62-4eaa-b385-b9451935af95 (WP95), parent
   0678049c-7d67-4b9a-9305-14efb2353ae1 (Phase 15)
 depends-on: WP93 (design freeze, committed 37bd4c8), WP94 (lexer keywords,
