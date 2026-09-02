@@ -9,13 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **Canonical Byte-Oracle governance (transition WP1)** — no functional or
-  build change. New `.agents/workflows/canonical-byte-oracles.md` and its
-  skill make independently derived, peer-reviewed bytes the authoritative
-  oracle for CASM fixture output and CASM-native application manifests;
-  ca65 is documented as an optional differential check, not an authority.
-  ca65/ld65 remains the host build toolchain for `casm`, `debug`, and
-  non-CASM-native apps. New audit-register schema at
+- **Canonical Byte-Oracle Transition (WP1–WP6, closed 2026-09-02)** — no
+  change to any shipping byte (`dash.prg` `3b4d0693…`, `banner.prg`
+  `b43415c1…`, all 67 CASM fixture `.ref` binaries unchanged). New
+  `.agents/workflows/canonical-byte-oracles.md` + skill: the expected bytes
+  for a CASM fixture reference or a CASM-native application manifest are
+  derived independently (6502/6510 encoding + CASM semantics + PRG/R6
+  framing), peer-reviewed, and only then compared against native CASM —
+  never taken from CASM output or ca65. All 67 `tests/fixtures/casm/*.ref.hex`
+  now carry source/artifact hashes + an annotated derivation + a reviewer
+  line and are classified `CANONICAL-INDEPENDENT`; BANNER's manifest is
+  `CANONICAL-INDEPENDENT`; DASH's manifest bytes are `NATIVE-OBSERVATION`
+  (a full byte derivation of a 7-file program is impractical) with an
+  independently-verified R6 relocation ledger. New tools
+  `scripts/casm_oracle_inventory.py` (+ non-gating `casm_oracle_inventory`
+  target) and `scripts/casm_r6_verify.py`; new verification disk
+  `casm_oracle_test.d64`. Audit register:
   `brain/reviews/2026-09-01-casm-byte-oracle-audit.md`.
 
 - **CASM conditional assembly (Phase 15, WP93-99)** (CASM `0.6.0` ->
@@ -304,6 +313,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   bytes, build 1128).
 
 ### Changed
+
+- **DASH `dash_ref` ca65 build is now opt-in** (Byte-Oracle Transition
+  WP5): `dash_ref` is `EXCLUDE_FROM_ALL` — a normal `cmake --build build`
+  no longer assembles DASH with ca65. Build it on demand
+  (`--target dash_ref`); the release process still runs it as DASH's
+  standing differential corroboration. `command64_casm_utils.d64` now
+  packages `dash.ref` from the reviewed manifest transcription rather than
+  the ca65 output, and `scripts/build_dash_manifest.py` no longer accepts
+  `--allow-host-bytes`. DASH's "Dual-Assembler Subset" source rule became
+  "Differential Guidance". No change to `dash.prg`'s bytes.
 
 - **CASM diagnostics always name the source file** (CASM `0.6.1` ->
   `0.6.2`): every diagnostic that has a recorded source location now prints

@@ -3590,6 +3590,53 @@ Parent plan `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`;
 per-WP sub-plans + walkthroughs `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp9{3..9}-*.md`.
 Taskwarrior parent `41` (project `casm.phase15`).
 
+## Canonical Byte-Oracle Transition Complete (WP1-WP6, closed 2026-09-02)
+
+**Policy — `.agents/workflows/canonical-byte-oracles.md` is the authority.**
+The expected bytes for any CASM fixture reference or CASM-native application
+manifest are derived **independently** — from the documented NMOS 6502/6510
+encoding, CASM's documented semantics, and the Command 64 PRG / R6 framing —
+peer-reviewed (the user is the independent reviewer, per the WP60
+precedent), and only then compared against native CASM. They are **never**
+taken from CASM output, `src/external/casm/opcodes.s`, a prior CASM-derived
+reference, or a ca65 binary used as the answer. Five provenance states:
+`CANONICAL-INDEPENDENT` (the only authoritative one), `DIFFERENTIAL-ONLY`
+(ca65), `NATIVE-OBSERVATION` (CASM-produced / shipped bytes),
+`UNCLEAR` (blocks completion), `NOT-APPLICABLE` (reject / structural).
+
+**ca65/ld65 is unchanged as the host build toolchain** for `casm` itself,
+`debug`, and every non-CASM-native app. What the transition changed:
+
+- All **67** `tests/fixtures/casm/*.ref.hex` → `CANONICAL-INDEPENDENT`
+  (each carries `# sha256:`, `# source_sha256:` per source, an annotated
+  derivation, and a user reviewer line; **`.ref` bodies unchanged** — only
+  `#` comments added). Live-`COMP`-verified under CASM 0.6.2.
+- **BANNER** manifest → `CANONICAL-INDEPENDENT` (small enough for a full
+  independent address + relocation ledger).
+- **DASH** manifest → bytes **`NATIVE-OBSERVATION`** (a byte-by-byte
+  derivation of 3,669 bytes across 7 files is not practical) — reviewed
+  native run + ca65 `dash_ref` differential corroboration + `source_sha256`
+  guard — with an independently-verified **`CANONICAL-INDEPENDENT`
+  451-entry R6 relocation ledger**. Because DASH's bytes are not canonical,
+  the ca65 `dash_ref` differential is a **standing release-verification
+  check** (a mismatch is a blocker) while DASH source stays in the shared
+  ca65/CASM subset.
+- `dash_ref` (ca65) is `EXCLUDE_FROM_ALL` — ordinary `cmake --build build`
+  never invokes it; build it on demand / in the release process.
+  `scripts/build_dash_manifest.py` no longer has `--allow-host-bytes`.
+- Tools: `scripts/casm_oracle_inventory.py` (`--check`, non-gating CMake
+  target `casm_oracle_inventory` — reconciles `CASM_REF_NAMES` == on-disk
+  == tracked and every declared hash) and `scripts/casm_r6_verify.py`
+  (assembler-independent R6 footer/table verification + multi-base check).
+- New verification disk `casm_oracle_test.d64` (self-bootable; `test.d64`'s
+  directory track is full at 145/144 entries).
+
+Register: `brain/reviews/2026-09-01-casm-byte-oracle-audit.md`. Governing
+plan `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`;
+per-WP sub-plans/walkthroughs
+`brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp{1..6}-*.md`.
+Taskwarrior parent `75cfa082` (project `casm.byteoracle`).
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

@@ -1,7 +1,7 @@
 ---
 feature: casm-byte-oracle-wp6-consolidated-verification-completion-gate
 created: 2026-09-02
-status: approved-in-progress
+status: complete
 taskwarrior: 3e65fd38-07f8-4981-b662-57c9ef1c24dc; parent 75cfa082
 depends-on: Byte-Oracle Transition WP1-WP5 (all complete + merged to main; WP5 merge 57303bd)
 ---

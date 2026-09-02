@@ -11,6 +11,21 @@
 - `brain/EXTERNAL.md`: External program status and priority
 - `brain/task.md`: Granular task list
 
+## Current State (2026-09-02)
+
+- **CASM `0.6.2` build 1419.** Phase 15 (conditional assembly) closed at
+  `0.6.1`; a standalone diagnostic patch (`0.6.2`) makes every located
+  diagnostic name its file.
+- **Canonical Byte-Oracle Transition (WP1-WP6) closed 2026-09-02** (pending
+  the user's transition-level sign-off). All 67 `tests/fixtures/casm/*.ref.hex`
+  → `CANONICAL-INDEPENDENT` (`.ref` bytes unchanged, `#` metadata + reviewer
+  lines added); BANNER manifest `CANONICAL-INDEPENDENT`; DASH manifest bytes
+  `NATIVE-OBSERVATION` + independently-verified R6 ledger; `dash_ref` ca65
+  now `EXCLUDE_FROM_ALL`. Authority: `.agents/workflows/canonical-byte-oracles.md`.
+  Tools `scripts/casm_oracle_inventory.py`, `scripts/casm_r6_verify.py`. New
+  disk `casm_oracle_test.d64`. See `brain/KNOWLEDGE.md` and memory
+  `project-casm-byte-oracle-transition-complete`.
+
 ## Current State (2026-08-12)
 
 - **CASM Phase 11 WP61 complete at `0.2.2.1266`** (no version bump -- no
