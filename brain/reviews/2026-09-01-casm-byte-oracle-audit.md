@@ -11,6 +11,16 @@
 > still the record of how a state was reached; the WP3 batch records are:
 > `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch{1a,1bcde,2,3,4,5}-*.md`.
 >
+> **WP6 (consolidated verification) COMPLETE 2026-09-02.** All oracle
+> classes + both native apps live-`COMP`-verified under CASM 0.6.2.1419
+> (`FILES COMPARE OK`), incl. a fresh native DASH (4579 B) and BANNER
+> (1011 B) assembly. `casm_r6_verify.py` PASS on all 7 R6 fixtures + both
+> manifests. Determinism: every build artifact byte-identical across two
+> builds. `casm_oracle_inventory --check` green (69/69). New
+> `casm_oracle_test.d64` (test.d64 was directory-full). The transition is
+> closed pending user sign-off. Walkthrough:
+> `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp6-consolidated-verification-completion-gate.md`.
+>
 > **WP4 (native-app records) — completed then audit-corrected 2026-09-02.**
 > `banner.ref.hex` → `CANONICAL-INDEPENDENT` (full address ledger + 20-entry
 > relocation table verified against the body). `dash.ref.hex` → bytes
@@ -205,7 +215,7 @@ All 183 generated `.seq` fixtures that are **not** in `CASM_REF_NAMES`.
 Every one is `NOT-APPLICABLE` for a fixed-byte oracle. The sub-tag
 (reject / structural / stream-boundary / support-file) is a WP2 hint
 derived from the generator + packaging comments; WP6's coverage check
-confirms the reject cases assert an exact diagnostic identity and the
+confirmed the reject cases assert an exact diagnostic identity and the
 structural cases assert PC/count/determinism. **None is or claims to be
 a byte oracle** (confirmed: none has a `.ref.hex`; the `comm -23` of the
 244 generated names against the 67 ref names is exactly this set).
@@ -289,7 +299,7 @@ metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
 | R6 large / repetitive | `casmbig1` (pending) | — | seed+formula not recorded as a reviewed repetition rule → WP3 |
 | listing `/L` output | `casmifL1` (pending); `casmpg*` (pending) | `casm_listing`,`casm_listcap`,`casm_listwrite`,`casm_flist`,`casm_flmeta` | listing text is contractual — WP3 confirms a canonical layout row exists |
 | symbol map `/M` output | `casmifM1` (pending) | `casm_map`,`casm_flmeta` | map text is contractual — WP3 confirms canonical layout |
-| diagnostics — located ids | — | `casm_bounds`,`casm_directives`,`casm_expr`,`casm_frame`,`casm_finc`,`casm_faultsource` + Ledger C | `NOT-APPLICABLE` by design (no output); WP6 confirms each id is exercised |
+| diagnostics — located ids | — | `casm_bounds`,`casm_directives`,`casm_expr`,`casm_frame`,`casm_finc`,`casm_faultsource` + Ledger C | `NOT-APPLICABLE` by design (no output); WP6 confirmed via the diagnostic sample + the user's harness matrix |
 | diagnostics — non-located ids | — | `casm_faultinject`,`casm_faultsymbols`,`casm_faultvmm` | `NOT-APPLICABLE` |
 | deterministic replay | — | `casm_reloc` determinism cases; `project-casm-phase11-wp61` | determinism-only, correctly non-oracle |
 | progress indication (byte-identical output) | `casmpg63/64/65/128`,`casmpgblank`,`casmpgfill`,`casmpgincbin`,`casmpgrt`,`casmpgr6` (pending) | `casm_progress` | — |
@@ -323,8 +333,9 @@ Outcome per batch:
 5. **Listing / map (batch 5)** — ✅ no new reference; `/L` `/M` output is
    pinned field-by-field by `test_casm_flist` (+ WP59 contract matrix),
    `test_casm_flmeta`, `test_casm_map` + a determinism witness.
-6. **Native-app records → WP4** — still open (DASH, BANNER stay
-   `NATIVE-OBSERVATION`).
+6. **Native-app records → WP4 (done, audit-corrected).** BANNER
+   `CANONICAL-INDEPENDENT`; DASH bytes `NATIVE-OBSERVATION` +
+   `CANONICAL-INDEPENDENT` R6 ledger; ca65 differential a standing check.
 
 Original worklist as approved at the WP2 gate (batched by oracle class):
 
@@ -352,8 +363,8 @@ Original worklist as approved at the WP2 gate (batched by oracle class):
    their manifests.
 
 Ledgers B and C need **no remediation** — they are `NOT-APPLICABLE`; WP6's
-consolidated pass confirms each reject case asserts an exact diagnostic
-identity.
+consolidated pass + the user's harness matrix confirmed the reject cases
+assert an exact diagnostic identity.
 
 
 

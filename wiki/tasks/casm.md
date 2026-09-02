@@ -112,7 +112,7 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       opt-in `dash_ref` still MATCHES `dash.prg`. Plan + walkthrough
       `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp5-dash-differential-source-policy.md`.
       Awaiting user closure approval; not yet merged.
-- [ ] WP6 consolidated verification + completion gate
+- [x] WP6 consolidated verification + completion gate -- **done 2026-09-02** (pending user transition sign-off). Every oracle class + DASH + BANNER live-`COMP` under CASM `0.6.2.1419` = `FILES COMPARE OK`; `casm_r6_verify` PASS on all R6 refs + both manifests; determinism proven; `casm_oracle_inventory --check` green. New `casm_oracle_test.d64` (`test.d64` dir full). Plan + walkthrough `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp6-consolidated-verification-completion-gate.md`.
 
 ### Standalone: always name the source file in a located diagnostic
 

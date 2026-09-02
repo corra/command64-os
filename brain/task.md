@@ -4030,7 +4030,7 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       `--allow-host-bytes` removed, source policy relaxed with the ca65
       differential kept as a standing release check. Build green, shipping
       bytes unchanged. Awaiting user closure approval; not yet merged.
-- [ ] WP6 consolidated verification + completion gate (not started)
+- [x] WP6 consolidated verification + completion gate -- **done 2026-09-02**, pending user transition-level sign-off. All oracle classes + DASH + BANNER live-COMP under CASM 0.6.2.1419; casm_r6_verify PASS on all R6 + manifests; full determinism; casm_oracle_inventory --check green. New casm_oracle_test.d64. Plan + walkthrough brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp6-*.md.
 
 Related: `casm-diagnostic-always-name-file`
 (`brain/{plans,walkthroughs}/2026-09-01-casm-diagnostic-always-name-file.md`)

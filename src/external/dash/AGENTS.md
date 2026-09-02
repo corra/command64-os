@@ -73,7 +73,7 @@ DASH ships from a **reviewed hex manifest** (`dash.ref.hex`), transcribed to a P
 - The ca65 `dash_ref` target is an **optional differential cross-check only** and must never be the source of manifest bytes. `build_dash_manifest.py` strictly refuses host builds as manifest input.
 - The cross-check is non-circular: ca65 and CASM share no code and derive relocation entries by completely different means — `tools/reloc.py` diffs two links one page apart, while CASM classifies each operand as relocatable during emission. A defect in one cannot reproduce itself in the other.
 - **Stale-artifact protection (WP9)**: `dash.ref.hex` embeds one `# source_sha256: <name>=<hash>` line per source file, written by `build_dash_manifest.py`. The `dash` CMake target always passes `--source-dir` to `hex_manifest_to_bin.py`, which recomputes each file's hash and hard-fails the build on any mismatch, missing file, or a manifest with no recorded hashes at all — editing a source without regenerating the manifest is a build failure, not a silent stale ship.
-- **Current provenance** (DASH `0.2.0`, DASH-MOD WP6, 2026-09-01; WP4 independent canonical record):
+- **Current provenance** (DASH `0.2.0`, DASH-MOD WP6, 2026-09-01; WP4: independent R6 relocation ledger; code bytes are native-observation, see brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md):
   `dash.ref.hex`'s shipping bytes come from native CASM `0.5.2` build
   `1404` under VICE 3.10 with a 16MB REU, assembled from the seven SEQ
   sources on `command64_casm_utils.d64` (`CASM DMAIN.S /O:DW6.PRG`).

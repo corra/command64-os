@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp6-consolidated-verification-completion-gate
 created: 2026-09-02
-status: proposed
-taskwarrior: TBD (created on approval)
+status: complete-approved
+taskwarrior: 3e65fd38-07f8-4981-b662-57c9ef1c24dc; parent 75cfa082
 depends-on: Byte-Oracle Transition WP1-WP5 (all complete + merged to main; WP5 merge 57303bd)
 ---
 
@@ -245,3 +245,38 @@ CASM source, or DASH source is touched.
   have 264-445 blocks. Three scoping decisions confirmed (create
   `casm_oracle_test.d64`; user runs the harness matrix; fresh DASH `COMP`
   under 0.6.2). Awaiting approval.
+- 2026-09-02: **Increments 1-2 done.** Survey: of 67 refs, **45 already
+  live on a room-having disk** (phase12: 6, phase13: 5, phase14: 4,
+  phase15: 15 incl. casmifL1/M1/defguard, progress: 10, opcode: 3
+  incl. casmfa2p/casmopall/casmreloc1, phase12: casmfwdstale1) and **22
+  need `casm_oracle_test.d64`** (the test.d64 residents + casmbig1). The
+  4 "??NONE" in the raw survey were cc1541 case-fold/truncation
+  false-negatives (`casmifl1.ref`, `casmifm1.ref`, `casmifdefguard.r`).
+  `casm_oracle_test_d64` target added (CMakeLists tail; overlay-wrapped;
+  not in IMAGE_PRG_TARGETS): self-bootable command64+casm+comp + 22
+  ref/source pairs, **53 dir entries, 308 blocks free**. Configure clean;
+  no-change rebuild stable; `casm_oracle_inventory --check` green (69/69).
+- 2026-09-02: **Consolidated live verification done** (Increments 3-5).
+  All under **CASM 0.6.2.1419**, `COMP` -> `FILES COMPARE OK` for:
+  brback1, casmhello, casmexprn, casmnoorg1, casmorg1, casmmf1, casmbig1
+  (6002 B), casmmodes, casmnum2 on `casm_oracle_test.d64`; casmif1,
+  casmifp1p2 on `casm_phase15_test.d64`; **fresh native DASH** (`CASM
+  DMAIN.S`, 1659 statements, 4579 B, two-drive image.d64 + utility disk,
+  REU) and **fresh native BANNER** (`CASM BANNER.S`, 385 statements,
+  1011 B) -- both **FILES COMPARE OK**, closing the WP4 "0.5.2 b1404 is
+  stale" gap. Coverage: every oracle class (static/directives/branch/
+  opcode/`<>` operators/R6/multi-root/repetitive/conditional) + both
+  native apps. Host-side: `casm_r6_verify.py` **PASS** on all 7 R6
+  fixtures + dash.ref + banner.ref; **determinism** -- every build
+  artifact (all `.d64`, `dash.prg`, `banner.prg`, all 67 `casm_refs/*.ref`)
+  byte-identical across two consecutive `cmake --build build`;
+  `casm_oracle_inventory --check` green (69/69); default build creates
+  **no** `dash_ref.prg`; explicit `--target dash_ref` builds and
+  `cmp`-matches `dash.prg`. One VICE crash mid-sweep (recovered via one
+  restart); the `$93` clear-screen control code caused two phantom
+  `BAD COMMAND` errors before switching to the native `cls` command.
+  The ~46 fixtures not individually re-COMP'd here are the same oracle
+  classes, their `.ref` binaries are byte-identical to their original
+  phase-walkthrough `COMP`-verified form (hash-checked across the
+  session's rebuilds), and no CASM output-affecting source changed since
+  Phase 15.

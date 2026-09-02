@@ -1,7 +1,7 @@
 ---
 feature: casm-canonical-byte-oracle-transition
 created: 2026-09-01
-status: amended-approved-deferred
+status: complete
 taskwarrior: TBD (created only after explicit resumption and WP1 approval)
 depends-on: CASM Phase 15 completion and sign-off, or an explicitly approved clean pause at a committed Phase 15 boundary with overlapping work suspended
 ---
@@ -725,3 +725,21 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   `NATIVE-OBSERVATION` + `CANONICAL-INDEPENDENT` R6 ledger; all 67 fixture
   refs `CANONICAL-INDEPENDENT`. Only **WP6** (consolidated verification +
   completion gate) remains.
+- 2026-09-02: **TRANSITION COMPLETE (WP6 closed).** Consolidated
+  verification passed: every oracle class + DASH + BANNER live-`COMP`'d
+  under CASM 0.6.2.1419 (`FILES COMPARE OK`), `casm_r6_verify` PASS on all
+  R6 refs + manifests, full determinism, `casm_oracle_inventory --check`
+  green (69/69), default build instantiates no `dash_ref`. Final state:
+  **67/67 CASM fixture refs `CANONICAL-INDEPENDENT`; BANNER manifest
+  `CANONICAL-INDEPENDENT`; DASH manifest bytes `NATIVE-OBSERVATION` +
+  `CANONICAL-INDEPENDENT` R6 ledger** with the ca65 `dash_ref` differential
+  retained as a standing release check. No authoritative expected bytes
+  derive from CASM output or ca65 output. Tools:
+  `scripts/casm_oracle_inventory.py`, `scripts/casm_r6_verify.py`. New
+  disk `casm_oracle_test.d64`. Governing workflow
+  `.agents/workflows/canonical-byte-oracles.md` + skill. Walkthrough
+  `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp6-consolidated-verification-completion-gate.md`.
+  Awaiting the user's explicit sign-off to close the whole transition.
+- 2026-09-02: **User signed off. TRANSITION CLOSED.** WP6 (incl. the full
+  harness matrix, user-run PASS) approved; merged to `main`. The Canonical
+  Byte-Oracle Transition is complete.
