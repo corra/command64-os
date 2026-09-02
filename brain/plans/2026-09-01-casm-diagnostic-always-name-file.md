@@ -280,6 +280,36 @@ Complete only when **all** of:
 - 2026-09-01: User approved the plan. Status set to `approved-not-started`;
   implementation, branch creation, and task activation remain pending an
   explicit start instruction.
+- 2026-09-02: **Increment 1 (characterize the gap) COMPLETE — no code
+  change.** Built 10 all-uppercase `.seq` fixtures
+  (`.../scratchpad/diagfix/`) into a scratch disk (copy of
+  `casm_phase15_test.d64` + `cc1541 -f "<name>.s" -T SEQ -w`), ran all
+  five cases live under VICE 3.10 against CASM `0.6.1` build `1417`
+  (Command64 OS `0.4.1` b2680), screen-RAM decoded. All use the same
+  located diagnostic `CASM: OPERAND OUT OF RANGE` from `LDA #300`
+  (immediate 8-bit overflow — a properly *located* diagnostic, which is
+  what the gate test needs; the plan's assumed "lexer error" was not
+  required).
+
+  | Case | Source shape | `IN FILE`? | Named file | Assessment |
+  | --- | --- | --- | --- | --- |
+  | (a) | single root, no include, error in root | **NO** | — | suppressed: `CasmSourceCount==1`, root (bit-7-clear) id |
+  | (b) | single root that `.INCLUDE`s `DIAGBI.S`, error **in root** (line 3) | **NO** | — | suppressed: same gate; file id is the root's and **correct**, just gated out |
+  | (c) | single root, error in `.INCLUDE`d `DIAGCI.S` | YES | `diagci.s` ✓ | frame id (bit 7 set) → `bmi @printFileName`; `INCLUDED FROM diagcr.s LINE 2 COLUMN 1` ✓ |
+  | (d) | two CLI roots, error in 2nd (`diagd2.s`) | YES | `diagd2.s` ✓ | `CasmSourceCount==2` → gate passes; no `INCLUDED FROM` (siblings) |
+  | (e) | nested `diager.s`→`diagea.s`→`diageb.s`, error in B | YES | `diageb.s` ✓ | frame id; both `INCLUDED FROM` lines correct, innermost-to-root |
+
+  **Verdict: the motivating gap is 3a (suppression only), NOT 3b
+  (provenance mis-stamp).** In (a) and (b) the stamped `CasmDiagLocFileId`
+  is the root's and is *correct* — the error genuinely is in the root. The
+  name is withheld purely by `lda CasmSourceCount / cmp #2 / bcc
+  @skipFileName` at `diagnostics.s:868-870`. Removing that gate (Increment
+  2's Technical Design, unchanged) fixes (a) and (b) and leaves (c)/(d)/(e)
+  untouched. **No provenance-stamping bug — Scoping Decision 3b path and
+  its "systemic mis-stamp" stop condition do not apply.** No stop
+  condition triggered. Overlay `test`/`pass` event fired via curl
+  (`127.0.0.1:8000`). VICE left healthy with `test.d64` re-attached on
+  unit 8.
 - 2026-09-02: **Activated by explicit user start instruction** after
   Byte-Oracle Transition WP1 closed. Branch
   `feature/casm-diag-always-name-file` cut from `main` `a3d3999` and
