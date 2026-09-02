@@ -106,10 +106,19 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
 - [ ] WP5 DASH differential + source-policy transition
 - [ ] WP6 consolidated verification + completion gate
 
-Standalone task `casm-diagnostic-always-name-file`
-(`brain/plans/2026-09-01-casm-diagnostic-always-name-file.md`,
-`approved-not-started`): runs concurrently with docs-only WP1, merges to
-`main` before WP2's inventory freeze.
+### Standalone: always name the source file in a located diagnostic
+
+- [x] `casm-diagnostic-always-name-file` (Taskwarrior `86170ef8`, project
+  `casm.standalone`; branch `feature/casm-diag-always-name-file` off
+  `main` `a3d3999`; plan + walkthrough
+  `brain/{plans,walkthroughs}/2026-09-01-casm-diagnostic-always-name-file.md`).
+  Removed the `CasmSourceCount > 1` suppression gate in `diagnostics.s` so
+  every diagnostic with a valid source location prints `IN FILE <name>`.
+  **CASM `0.6.1` -> `0.6.2` build 1419.** Increments 1-5 complete and
+  live-verified (5 characterization fixtures + a real DASH-source error +
+  non-located bare-diagnostic check; no-change rebuild byte-stable).
+  **Closed, user-approved 2026-09-02** (full matrix waived by the user).
+  Merged to `main`. Byte-Oracle Transition WP2 is now unblocked.
 
 **Phase 12 is complete**, user-approved 2026-08-20 at CASM `0.3.0` build
 `1324` (WP64-76, including WP71's full DASH adoption and WP76's

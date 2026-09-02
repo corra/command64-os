@@ -305,6 +305,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CASM diagnostics always name the source file** (CASM `0.6.1` ->
+  `0.6.2`): every diagnostic that has a recorded source location now prints
+  an `IN FILE <name>` line, regardless of how many top-level sources were
+  given or include depth. Previously the name was suppressed for a
+  single-root, no-include assemble, making a root-file diagnostic in an
+  `.INCLUDE` build inconsistent with the included-file diagnostics around
+  it and pasted single-file diagnostic text non-self-describing.
+  Diagnostics with no source position (CLI/option errors, file-service
+  errors, internal errors) are unchanged and still print the message line
+  alone. No change to assembled output, the `AT LINE/COL/OFFSET/BYTE`
+  trailer, the caret, or the `INCLUDED FROM` traceback.
+
 - **DASH Modernization** (DASH `0.1.4` -> `0.2.0`, DASH-MOD WP1-6,
   2026-09-01): DASH's seven dual-assembler sources were rebased onto the
   modern shared CASM/ca65 feature set with **no user-visible behaviour

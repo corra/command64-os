@@ -8,7 +8,9 @@ extending CASM itself. For end-user command-line usage, see the
 [CASM Utility Manual](casm-utility.md); for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 15 complete (version 0.6.1, build 1417).** Phases 14 and 15
+> **Status: Phase 15 complete; version `0.6.2`, build 1419** (`0.6.2` is a
+> post-Phase-15 patch — every located diagnostic now names its file).
+> Phases 14 and 15
 > followed the base described below: Phase 14 (WP86-92) added `@name` local
 > labels, closing at `0.6.0`; Phase 15 (WP93-99) added conditional assembly
 > (`.IF` / `.ELSEIF` / `.ELSE` / `.ENDIF` / `.IFDEF` / `.IFNDEF`), closing at
@@ -204,7 +206,7 @@ consistently in both passes.
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.6.1`).
+  `casm.s` (currently `0.6.2`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 
@@ -1443,8 +1445,8 @@ print the message line alone — they have no meaningful source position.
 
 ### 18.1 Source-context contract
 
-A source-position diagnostic prints its location beneath its message; with
-more than one top-level source, an `IN FILE` line precedes it:
+A source-position diagnostic prints its location beneath its message,
+always preceded by an `IN FILE` line naming the file the location is in:
 
 ```text
 IN FILE MACROS.S
@@ -1472,9 +1474,12 @@ confirmed the same `BYTE` suffix live. How this is produced:
 
 - **Filename.** The stamped record carries `CasmDiagLocFileId`, which indexes
   `cli.s`'s exported `cliSourceSlotLo/Hi` table directly to get a
-  ready-to-print name. The `IN FILE` line is emitted only when
-  `CasmSourceCount > 1`, keeping single-file diagnostic text byte-identical
-  to every earlier phase's.
+  ready-to-print name. The `IN FILE` line is emitted for every diagnostic
+  that has a valid stamped location, regardless of source count or include
+  depth. (Releases through CASM 0.6.1 suppressed it for a single-root,
+  no-include build; that `CasmSourceCount > 1` gate was removed so
+  root-file and included-file diagnostics are consistent and pasted
+  single-file output is self-describing.)
 
 - **Line text.** The lexer drives the source in byte mode, so `CasmIoBuffer`
   is a block window, not a line window, and cannot recover the line after a
