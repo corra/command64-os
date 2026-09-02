@@ -89,7 +89,7 @@ The `src/external/casm` directory owns CASM, a native Command 64
   implemented, and closed 2026-08-08 at CASM `0.2.0` build `1260` — `/M` and
   `/L` are both fully implemented and production-active (see the durable
   Phase 10 architecture notes below). Phase 11 (base-release hardening,
-  WP56-WP61) followed that: closed 2026-08-12 at CASM `0.2.2` build `1266`
+  WP56-63) followed that: closed 2026-08-12 at CASM `0.2.2` build `1266`
   (see the Phase 11 notes below). The optional **progress and processing
   indication** feature (`progress.s`, outside the numbered phases) is
   **complete** — user-approved 2026-08-31 at CASM `0.4.0` -> `0.5.0` build
@@ -100,6 +100,39 @@ The `src/external/casm` directory owns CASM, a native Command 64
   label/constant/mnemonic AND directive statements (`.ORG` included), not
   blank/comment lines; redraw throttle is mod-64. Assembled output is
   byte-identical with or without the display.
+- **As-built since the progress feature (all complete and user-approved):**
+  - **Phase 12** (WP64-76, closed `0.3.0` build 1324): named constants,
+    current-address `*`, parentheses/precedence, the full
+    arithmetic/bitwise/shift/unary operator set, character literals, `.BYTE`
+    string literals; DASH adopted all of them.
+  - **Phase 13** (WP81-85, closed `0.4.0` build 1349): data directives
+    `.RES` / `.FILL` / `.ALIGN` / `.INCBIN` / `.ASSERT` (`emit.s`
+    `emitRes`/`emitFill`/`emitAlign`; `parser.s`
+    `ppsFillDirective`/`ppsIncbin`/`ppsAssert`). Counts/boundaries and the
+    `.ASSERT` expression must fully resolve in-pass -- a forward reference is
+    a hard diagnostic, not a Pass-1 placeholder. `.RES`/`.FILL`/`.ALIGN`
+    padding never touches the relocation table.
+  - **Memory-optimization pass** (task 42, `0.5.1`): recovered ~2 KB of
+    `MAIN` across five findings, zero behavior change, envelope unchanged at
+    `$7400`.
+  - **Phase 14** (WP86-92, closed `0.6.0`): `@name` local labels -- flag bit
+    `CASM_SYMBOL_FLAG_LOCAL` + a 2-byte owning-scope ordinal in the symbol
+    record's reserved padding; `symbolsFindChain` scope-filters LOCAL
+    candidates keyed off the leading `@`. Rejected on either side of a named
+    constant's `=` (a documented ca65 / Turbo Macro Pro divergence).
+  - **Phase 15** (WP93-99, closed `0.6.1` build 1417): conditional assembly.
+    New module **`cond.s`** -- a 16-deep stack plus a 512-bit Pass-1 decision
+    bitmap replayed by index in Pass 2 (the `.INCLUDE`
+    catalogLoad->catalogLookup discipline). `casm.s` calls `condResetForPass`
+    per pass and owns the suppressed-line scanner (`crpScanSuppressed`,
+    `lexerNext`-only, recognises only the six conditional keywords).
+    `.IF`/`.ELSEIF` are truthiness-only (no comparison operators) and must
+    resolve in-pass.
+  - **DASH-MOD WP1**: `.ASSERT` gained the ca65 action-keyword form
+    (`.ASSERT expr, ERROR|WARNING|LDERROR|LDWARNING [, "msg"]`); CASM parses
+    and discards the keyword.
+  - Diagnostic id space is now `$01`-`$61` (`CASM_DIAG_LAST`); every
+    range-bound `.assert` in `common.inc` derives from that one symbol.
 - Progress directive cadence keeps its own ordinary-BSS snapshot only:
   `progressBeginDirective` takes the directive subtype in A and resets the
   cumulative count; `progressDirectiveBytes` takes caller-authoritative
@@ -234,14 +267,14 @@ The `src/external/casm` directory owns CASM, a native Command 64
   to a `0.2.x` minor-version series (Phase 10's completion promotion,
   `0.1.56` -> `0.2.0`) before `VERSION_STAGE` ever reached `9` under `0.1.x` —
   the stage component reset to a fresh single-digit count under the new
-  minor version, and CASM is now at `0.2.2` with the one-byte representation
-  still sufficient. The underlying constraint is not retired, only
-  unreached: it re-applies verbatim to the next analogous threshold, i.e.
-  before any work package may be completed that would advance
-  `VERSION_STAGE` to `9` under the current `0.2.x` series (a stage value of
-  `0.2.9`). Watch for it again as Phase 12 and later work packages accumulate
-  stage increments within `0.2.x` (or whatever minor series is current at
-  the time).
+  minor version. **Status (2026-09-02): still unreached.** Each subsequent
+  phase took its own minor bump at its completion gate (`0.3.0` Phase 12,
+  `0.4.0` Phase 13, `0.5.0` the progress feature, `0.6.0` Phase 14, `0.6.1`
+  Phase 15), so the stage component has never climbed past low single
+  digits and the one-byte `VERSION_STAGE` is still sufficient. The
+  underlying constraint is not retired, only unreached: it re-applies
+  verbatim before any work package may be completed that would advance
+  `VERSION_STAGE` to `9` under whatever minor series is current at the time.
 - CASM assembly-source SEQ fixtures (`tests/fixtures/casm/*`,
   `cmake/GenerateCasmTestFixtures.cmake` output) carry an explicit `.s` suffix
   in their on-disk PETSCII name when written to a D64 image (e.g.

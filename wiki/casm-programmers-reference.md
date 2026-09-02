@@ -8,8 +8,16 @@ extending CASM itself. For end-user command-line usage, see the
 [CASM Utility Manual](casm-utility.md); for the OS services CASM builds on, see
 [api-reference.md](api-reference.md) and [programmers-reference.md](programmers-reference.md).
 
-> **Status: Phase 13 + progress indication + memory optimization complete
-> (version 0.5.1).** Phase 13 (WP81-85) added the data-construction directives
+> **Status: Phase 15 complete (version 0.6.1, build 1417).** Phases 14 and 15
+> followed the base described below: Phase 14 (WP86-92) added `@name` local
+> labels, closing at `0.6.0`; Phase 15 (WP93-99) added conditional assembly
+> (`.IF` / `.ELSEIF` / `.ELSE` / `.ENDIF` / `.IFDEF` / `.IFNDEF`), closing at
+> `0.6.1` — both are summarised in [§18](#18-coverage-what-works-today) and
+> documented for end users in the
+> [CASM Utility Manual](casm-utility.md#language-reference). The rest of this
+> status note is the historical build-up and remains accurate for the base.
+>
+> Phase 13 (WP81-85) added the data-construction directives
 > `.RES` / `.FILL` / `.ALIGN` / `.INCBIN` / `.ASSERT` and closed at `0.4.0`
 > build `1349`. The optional **progress and processing indication** feature
 > (`progress.s`, outside the numbered phases) then added the in-place
@@ -77,8 +85,9 @@ flowchart TD
     map["map.s — /M deterministic symbol map"]
     listing["listing.s — /L capture + .LST serialization"]
     progress["progress.s — bounded transient/persistent progress display"]
+    cond["cond.s — conditional-assembly stack + Pass-1/Pass-2 decision bitmap"]
 
-    casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc & map & listing & progress
+    casm --> resources & cli & fileio & source & diagnostics & lexer & parser & opcodes & emit & symbols & reloc & map & listing & progress & cond
     include --> vmm & source
     emit --> parser & opcodes & fileio & lexer & reloc
     map --> symbols
@@ -162,20 +171,40 @@ allowed on a catalog miss); Pass 2 replays the identical result through
 `includeCatalogLookup`, a separate entry point structurally incapable of
 touching the filesystem — see [§16](#16-include-processing-phase-9-complete).
 
+The conditional-assembly directives (`.IF`/`.ELSEIF`/`.ELSE`/`.ENDIF`/
+`.IFDEF`/`.IFNDEF`, Phase 15) are also driver-intercepted before
+`emitDirective`: `casmRunPass` calls `condResetForPass` at the top of each
+pass, `cond.s` maintains a 16-deep stack whose emit-state is
+`emitting = parentEmitting AND NOT priorBranchTaken AND thisDecision`, and a
+suppressed region is consumed by a `lexerNext`-only scanner
+(`crpScanSuppressed`) that recognises only the six conditional keywords — so
+a suppressed `.RES` or `lda undefined` never reaches the evaluator. Pass 1
+records each conditional site's decision in a 512-bit bitmap
+(`CasmCondDecisionBitmap`); Pass 2 replays by site index rather than
+re-evaluating, so the two passes cannot diverge (the same
+catalogLoad→catalogLookup discipline `.INCLUDE` uses). `.IF`/`.ELSEIF`
+conditions test **truthiness only** (non-zero = true) — there are no
+comparison operators — and must resolve in the pass that reads them
+(`$5F`). `.IFDEF`/`.IFNDEF` test definedness in Pass-1 traversal order,
+consistently in both passes.
+
 ## 2. Build & Toolchain
 
 - Built with ca65/ld65 via the `add_ca65_app` CMake helper (`src/external/AGENTS.md`), not KickAssembler.
 - Entry file: `casm.s`. Shared declarations: `common.inc`. Includes
   `include/ca65/command64.inc` for OS API/KERNAL symbols and
   `build_casm.inc` (CMake-generated) for `BUILD_NUMBER`.
-- Current `MAIN` link envelope: `$4000`, raised repeatedly as phases landed
-  (`$1000` → `$2000` → `$2800` → … → `$3A00` → `$3E00` → `$4000`); every
-  raise is a recorded, user-approved step in `wiki/tasks/casm.md`.
+- Current `MAIN` link envelope: `$7400` (`CMakeLists.txt`, `add_ca65_app casm
+  … 1000 "7400"`), raised repeatedly as phases landed (`$1000` → `$2000` →
+  `$2800` → … → `$4000` → … → `$7400`); every raise is a recorded,
+  user-approved step in `wiki/tasks/casm.md`. The post-Phase-12
+  memory-optimization pass recovered ~2 KB of `MAIN` without moving the
+  envelope.
 - Zero page: application-private range `$70-$8F` (32 bytes), declared once in
   `common.inc` and shared across translation units via `.exportzp`/`.importzp`
   where cross-file sharing is needed (`external/AGENTS.md` §Local Contracts).
 - Version banner: `CASM V<major>.<minor>.<stage>.<build>`, defined in
-  `casm.s` (currently `0.2.2`).
+  `casm.s` (currently `0.6.1`).
 
 ## 3. Zero-Page Contract (`common.inc`)
 
@@ -1252,12 +1281,13 @@ cancellation contract.
 ## 18. Coverage: What Works Today
 
 > This section's per-item detail is written against build 1266 / v0.2.2
-> (Phase 9-11). Phases 12-14 have since shipped: named constants, `*`,
+> (Phase 9-11). Phases 12-15 have since shipped: named constants, `*`,
 > parenthesised/operator expressions, character and string literals
-> (Phase 12); `.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/`.ASSERT` (Phase 13);
-> `@name` local labels (Phase 14, CASM `0.6.0` — summarised below);
-> conditional assembly `.IF`/`.ELSEIF`/`.ELSE`/`.ENDIF`/`.IFDEF`/`.IFNDEF`
-> (Phase 15, CASM `0.6.1` — summarised below). The
+> (Phase 12); `.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/`.ASSERT` (Phase 13,
+> CASM `0.4.0` — summarised below); `@name` local labels (Phase 14, CASM
+> `0.6.0` — summarised below); conditional assembly
+> `.IF`/`.ELSEIF`/`.ELSE`/`.ENDIF`/`.IFDEF`/`.IFNDEF` (Phase 15, CASM
+> `0.6.1` — summarised below). The
 > [CASM Utility Manual](casm-utility.md#language-reference) is the
 > authoritative reference for the current user-facing language surface.
 
@@ -1271,6 +1301,18 @@ cancellation contract.
   end-to-end assembled artifact compared byte-for-byte against an
   independently-authored reference.
 - `.ORG`, `.BYTE`, `.WORD` directives.
+- **Data directives** (Phase 13): `.RES count[, value]` (filler bytes,
+  `$00` default), `.FILL count, value` (value required), `.ALIGN
+  boundary[, value]` (pad `CasmPc` to a multiple of *boundary*), `.INCBIN
+  "file"` (raw file bytes, verbatim, pass-to-pass identity/length checked),
+  `.ASSERT expr[, [action,] "message"]` (zero-emission truthiness check —
+  0 aborts the assembly; the ca65 action keyword is parsed and discarded).
+  `.RES`/`.FILL`/`.ALIGN` counts/boundaries and the `.ASSERT` expression
+  must fully resolve in-pass — a forward reference is a hard diagnostic,
+  not a Pass-1 placeholder (`emit.s` `emitRes`/`emitFill`/`emitAlign`,
+  `parser.s` `ppsFillDirective`/`ppsIncbin`/`ppsAssert`). `.RES`/`.FILL`/
+  `.ALIGN` padding never touches the relocation table — it is inert filler,
+  structurally identical to `.BYTE $00`.
 - **Labels and forward references** via a real two-pass assembly over a
   512-entry, VMM-backed symbol table.
 - **Bounded expressions**: `<`/`>` extraction, one symbol or literal, and a
@@ -1291,8 +1333,8 @@ cancellation contract.
   [§17](#17-symbol-map--listing-output-phase-10-complete). Both may be
   combined; either, both, or neither may be requested per assembly.
 - Full syntax/range/mode/branch-distance validation with a specific
-  diagnostic per failure (72 distinct `CASM_DIAG_*` codes at v0.2.2;
-  more since — [§19](#19-diagnostic-reference)).
+  diagnostic per failure (`$01`-`$61`, 97 distinct `CASM_DIAG_*` codes as of
+  `0.6.1` — [§19](#19-diagnostic-reference)).
 - **`@name` local labels** (Phase 14, CASM `0.6.0`): ca65 "cheap local"
   spelling. `@name:` defines, `@name` references, in any expression
   position an ordinary label is legal. Scope opens at the nearest
@@ -1538,6 +1580,29 @@ The echo buffers cost 512 bytes of BSS. Design and rationale:
 | `$48` | `CHAR_INVALID_BYTE` | CHARACTER LITERAL INVALID BYTE | ✓ | `lexer.s` (`lnChar`: content byte outside the printable-PETSCII range) *(Phase 12/WP69 range ends here)* |
 | `$49` | `STRING_UNTERMINATED` | STRING UNTERMINATED | ✓ | `lexer.s` (`lnString`: newline or EOF before closing `"`) |
 | `$4A` | `STRING_INVALID_BYTE` | STRING INVALID BYTE | ✓ | `lexer.s` (`lnString`: content byte outside printable PETSCII) *(Phase 12/WP74 range ends here)* |
+| `$4B` | `RES_FILL_ALIGN_UNRESOLVED` | OPERAND NOT RESOLVED | ✓ | `parser.s` (`ppsFillDirective`: `.RES`/`.FILL`/`.ALIGN` count/boundary/value not fully resolved in this pass) |
+| `$4C` | `FILL_VALUE_REQUIRED` | .FILL REQUIRES A VALUE | ✓ | `parser.s` (`.FILL` with no second operand — unlike `.RES`/`.ALIGN`, `.FILL` has no default) |
+| `$4D` | `VALUE_OUT_OF_RANGE` | VALUE OUT OF RANGE | ✓ | `parser.s` (`.RES`/`.FILL`/`.ALIGN` fill value resolved outside 0-255) |
+| `$4E` | `ALIGN_BOUNDARY_ZERO` | ALIGN BOUNDARY ZERO | ✓ | `parser.s` (`.ALIGN` boundary resolved to 0) *(Phase 13/WP81 range ends here)* |
+| `$4F` | `INCBIN_FILENAME_EXPECTED` | INCBIN FILENAME EXPECTED | ✓ | `lexer.s` (`lexerScanIncbinOperand`: no opening quote after `.INCBIN`) |
+| `$50` | `INVALID_INCBIN_FILENAME` | INVALID INCBIN FILENAME | ✓ | `lexer.s` (empty payload or a disallowed byte in the filename) |
+| `$51` | `INCBIN_FILENAME_TOO_LONG` | INCBIN FILENAME TOO LONG | ✓ | `lexer.s` (filename payload > 32 bytes) *(Phase 13/WP82 range ends here)* |
+| `$52` | `ASSERT_UNRESOLVED` | ASSERT OPERAND NOT RESOLVED | ✓ | `parser.s` (`ppsAssert`: `.ASSERT` expression not fully resolved in this pass) |
+| `$53` | `ASSERT_MESSAGE_TOO_LONG` | ASSERT MESSAGE TOO LONG | ✓ | `parser.s` (`.ASSERT` message payload > 63 bytes) |
+| `$54` | `ASSERTION_FAILED` | ASSERTION FAILED (`: message` appended when one is given) | ✓ | `emit.s` (`.ASSERT` expression resolved to 0) *(Phase 13/WP83 range ends here)* |
+| `$55` | `PROGRESS_COUNTER_OVERFLOW` | STATEMENT COUNT OVERFLOW |  | `progress.s`/`casm.s` (per-pass statement counter would wrap — a deterministic-replay guard, distinct from `$2F`) |
+| `$56` | `PROGRESS_PASS_TOTAL_MISMATCH` | PASS 1/PASS 2 STATEMENT MISMATCH |  | `casm.s` (Pass 1 and Pass 2 disagree on the total statement count) *(progress-feature range ends here)* |
+| `$57` | `LOCAL_WITHOUT_SCOPE` | LOCAL LABEL BEFORE ANY GLOBAL LABEL | ✓ | `casm.s` (`crpLabel`: `@name:` defined before any ordinary label in this pass) |
+| `$58` | `DUPLICATE_LOCAL` | DUPLICATE LOCAL LABEL IN SCOPE | ✓ | `casm.s`/`symbols.s` (`@name:` redefined within one owning scope — names the scope, unlike `$2C`) |
+| `$59` | `UNDEFINED_LOCAL` | UNDEFINED LOCAL LABEL | ✓ | `expr.s`/`parser.s` (`@name` referenced but never defined in the current scope, Pass 2 — names the scope, unlike `$2D`) |
+| `$5A` | `LOCAL_IN_CONSTANT` | LOCAL LABEL NOT ALLOWED IN CONSTANT | ✓ | `parser.s` (a `@local` name on either side of a named constant's `=`) *(Phase 14/WP86 range ends here)* |
+| `$5B` | `CONDITIONAL_WITHOUT_IF` | .ELSE/.ELSEIF/.ENDIF WITHOUT .IF | ✓ | `cond.s` (`.ELSE`/`.ELSEIF`/`.ENDIF` with no open `.IF` at this nesting level) |
+| `$5C` | `UNTERMINATED_CONDITIONAL` | UNTERMINATED .IF | ✓ | `casm.s` (EOF with an `.IF`/`.IFDEF`/`.IFNDEF` still open; the location points at the open `.IF`) |
+| `$5D` | `CONDITIONAL_ELSE_AFTER_ELSE` | .ELSEIF/.ELSE AFTER .ELSE | ✓ | `cond.s` (`.ELSEIF` or a second `.ELSE` after `.ELSE` at one level) |
+| `$5E` | `CONDITIONAL_NESTING_OVERFLOW` | CONDITIONAL NESTING TOO DEEP | ✓ | `cond.s` (nesting deeper than `CASM_COND_MAX_DEPTH` = 16) |
+| `$5F` | `CONDITIONAL_OPERAND_UNRESOLVED` | .IF CONDITION NOT RESOLVED | ✓ | `parser.s` (`parserEvalConditionExpr`: an `.IF`/`.ELSEIF` condition did not fully resolve in the pass that parsed it) |
+| `$60` | `IFDEF_EXPECTS_NAME` | .IFDEF/.IFNDEF EXPECTS A NAME | ✓ | `casm.s` (`.IFDEF`/`.IFNDEF` operand is not a single bare identifier) |
+| `$61` | `CONDITIONAL_SITE_OVERFLOW` | TOO MANY CONDITIONALS | ✓ | `cond.s` (more than `CASM_COND_MAX_SITES` = 512 conditional evaluations in one pass — the Pass-1 decision bitmap is full) *(Phase 15/WP93 range ends here)* |
 | `$FF` | `UNKNOWN` | INTERNAL ERROR |  | fallback for `$00`/out-of-range values |
 
 See [§17](#17-symbol-map--listing-output-phase-10-complete) for the map/
