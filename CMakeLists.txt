@@ -3654,7 +3654,7 @@ add_c64_disk_image(casm_oracle_test_d64
     DISK_ID "${DISK_ID}"
     PRGS command64 casm comp
 )
-add_dependencies(casm_oracle_test_d64 casm_test_fixtures casm_reference_fixtures)
+add_dependencies(casm_oracle_test_d64 casm_test_fixtures casm_reference_fixtures banner)
 set(WRAPPER_CC1541 "")
 if(C64_THEME_DIR)
     set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
@@ -3809,6 +3809,12 @@ add_custom_command(
     COMMAND "${CC1541_EXECUTABLE}" -f "casmbig1.ref" -T PRG
         -w "${CASM_REF_DIR}/casmbig1.ref"
         "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
-    COMMENT "Appending WP6 consolidated-verification ref/source pairs to casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "banner.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/banner/banner.s"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "banner.ref" -T PRG
+        -w "${BANNER_BIN}"
+        "${CMAKE_BINARY_DIR}/casm_oracle_test.d64"
+    COMMENT "Appending WP6 consolidated-verification ref/source pairs (incl. DASH-source banner + banner.ref) to casm_oracle_test.d64"
     VERBATIM
 )
