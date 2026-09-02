@@ -3952,11 +3952,11 @@ identity. Anonymous labels stay deferred. Version target `0.6.1`.
       Pass1/Pass2 determinism, nesting depth, diag codes `$5B`+,
       constants + `.assert`s, no behaviour. Sub-plan
       `brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md`.
-- [ ] WP94 lexer conditional directive tokens
-- [ ] WP95 conditional-nesting stack + suppression scanner (`cond.s`) + `test_casm_cond`
-- [ ] WP96 `.if`/`.else`/`.endif` pass-driver wiring + truthiness + `casm_phase15_test_d64`
-- [ ] WP97 `.elseif` chain + `.ifdef`/`.ifndef`
-- [ ] WP98 `/M` `/L` interaction + no-conditionals regression + DASH survey
+- [x] WP94 lexer conditional directive tokens (`fb21ff9`), **user-approved 2026-09-01**
+- [x] WP95 conditional-nesting stack + suppression scanner (`cond.s`) + `test_casm_cond` (`ecbd717`), **user-approved 2026-09-01**
+- [x] WP96 `.if`/`.elseif`/`.else`/`.endif` pass-driver wiring + truthiness + `casm_phase15_test_d64` (`e28dd7d`, `6eb2815`), **user-approved 2026-09-01**
+- [x] WP97 `.ifdef`/`.ifndef` pass-driver wiring (`59c1066`), **user-approved 2026-09-02**. MAIN headroom 499->360 B, no envelope grow.
+- [/] WP98 `/L` suppressed-line rendering (ca65-style blank address) + `/M` non-leak + regression + DASH survey. Implemented, live-verified (`CASM V0.6.0.1416`); MAIN headroom 360->327 B, no grow. Awaiting sign-off.
 - [ ] WP99 consolidated completion gate, docs, `0.6.1`, walkthrough
 
 # Shell: `dir /p` Paged Directory Listing

@@ -33,6 +33,7 @@
 .import listingFileInit
 .import listingBeginLine
 .import listingCommitLine
+.import CasmListingLineSuppressed
 .import listingCaptureInit
 .import listingCaptureFinalize
 .import listingWriteFile
@@ -621,6 +622,11 @@ startFatalNear:
 ;            symbol/listing volatile state
 ; ---------------------------------------------------------------------------
 casmRunPass:
+    ; Phase 15 WP98: default this line to "not suppressed"; only the
+    ; crpScanSuppressed path below raises it, and listingCommitLine reads
+    ; it once per physical line.
+    lda #0
+    sta CasmListingLineSuppressed
     jsr crpListingBegin
     bcc crpBeginOk
     jmp crpFail
@@ -1246,12 +1252,12 @@ crpScanSuppressed:
     rts
 @notNl:
     cmp #CASM_TOKEN_DIRECTIVE
-    bne @drain
+    bne @contentLine
     lda CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
     cmp #CASM_DIRECTIVE_IF
-    bcc @drain
+    bcc @contentLine
     cmp #CASM_DIRECTIVE_IFNDEF + 1
-    bcs @drain
+    bcs @contentLine
     ; A conditional directive. Stamp its location for any diagnostic, then
     ; dispatch. All paths finish by consuming the rest of the line.
     jsr diagStampStmtLoc
@@ -1285,6 +1291,13 @@ crpScanSuppressed:
     rts
 @condErr:
     rts                          ; C set, A = diag, CasmStmtLoc stamped
+@contentLine:
+    ; Phase 15 WP98: a non-conditional line discarded inside an off
+    ; branch. Mark it so /L renders it with a blank address column. The
+    ; six conditional directives (handled above) fall through to @drain
+    ; without this and render as ordinary empty-byte rows.
+    lda #1
+    sta CasmListingLineSuppressed
 @drain:
     jsr crpCondDrainLine         ; A = 0 (NEWLINE) or 1 (EOF) -- pass it up
     clc

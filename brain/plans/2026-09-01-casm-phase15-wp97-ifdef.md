@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp97-ifdef
 created: 2026-09-02
-status: implemented, awaiting user sign-off
+status: COMPLETE — user-approved 2026-09-02 (commit 59c1066)
 taskwarrior: 56f9cd17-0aae-4f53-819e-e8b6dd2ad47e (WP97), parent
   0678049c-7d67-4b9a-9305-14efb2353ae1 (Phase 15)
 depends-on: WP93 (37bd4c8), WP94 (fb21ff9), WP95 (ecbd717), WP96 (e28dd7d)
@@ -203,3 +203,5 @@ Already handled by WP96's `crpScanSuppressed` (`condOpenIf(0)` for any
   Walkthrough
   `brain/walkthroughs/2026-09-01-casm-phase15-wp97-ifdef.md`.
   Awaiting sign-off before WP98.
+- 2026-09-02: **User-approved. WP97 CLOSED.** Taskwarrior WP97 done;
+  `brain/task.md` synced. Proceeding to WP98 sub-plan.

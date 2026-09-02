@@ -523,3 +523,13 @@ Phase 15 is complete only when **all** of:
   1415. Sub-plan / walkthrough
   `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp97-ifdef.md`.
   Awaiting sign-off before WP98.
+- 2026-09-02: **WP97 CLOSED (user-approved).** WP98 implemented +
+  live-verified: `/L` renders a suppressed content line with a blank
+  address column (ca65-style; new `CASM_LISTING_META_FLAG_SUPPRESSED`
+  bit) -- `casmifL1` proves lines 3-4 blank, directive/real lines
+  normal, `FILES COMPARE OK`; `casmifM1` proves `/M` never lists a
+  suppressed-branch symbol; `TEST_CASM_COND` green; DASH surveyed -> no
+  adoption, byte-identical. `BUILD_CASM` 1416, MAIN headroom 327 B (no
+  grow). Walkthrough
+  `brain/walkthroughs/2026-09-01-casm-phase15-wp98-listing-regression-dash.md`.
+  Awaiting sign-off before WP99.

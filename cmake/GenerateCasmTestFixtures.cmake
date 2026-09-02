@@ -2498,3 +2498,36 @@ file(WRITE "${OUTPUT_DIR}/casmifdefguard.seq"
     "    NOP\n"
     ".ENDIF\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP98: /L suppressed-line rendering + /M non-leak fixtures.
+# The PRG is COMP'd against a hand-derived .ref.hex as usual, but the real
+# WP98 assertion for each is the /L listing / /M map output, checked live
+# (mirroring the WP90 /M-fixture precedent -- there is no on-disk .LST/.MAP
+# reference-comparison mechanism).
+# ---------------------------------------------------------------------------
+
+# casmifL1: a .IF 0 body of two content lines then a trailing NOP. /L must
+# render lines 3-4 (the suppressed body) with a blank address column; the
+# .IF 0 / .ENDIF directive lines and the trailing NOP render normally.
+# PRG -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifL1.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    LDA \$1234\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifM1: a .IF 0 body defining SKIPPED, then REAL = 1 and LDA #REAL. /M
+# must list REAL but never SKIPPED -- a suppressed branch allocates no
+# symbol. PRG -> 00 C0 A9 01
+file(WRITE "${OUTPUT_DIR}/casmifM1.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "SKIPPED = 1\n"
+    ".ENDIF\n"
+    "REAL = 1\n"
+    "    LDA #REAL\n"
+)

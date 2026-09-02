@@ -1567,7 +1567,7 @@ CASM_PHASE1_MAIN_SIZE = $1000
 ; ABI" section). 4,096 records x 16 bytes = 65,536 bytes = exactly one
 ; CASM_VMM_ALLOC_MAX_BYTES allocation.
 CASM_LISTING_META_FILEID       = 0   ; 1 byte: packed physical file identity
-CASM_LISTING_META_FLAGS        = 1   ; 1 byte: bit 0 = FINAL_UNTERMINATED, rest reserved zero
+CASM_LISTING_META_FLAGS        = 1   ; 1 byte: bit 0 = FINAL_UNTERMINATED, bit 1 = SUPPRESSED (Phase 15 WP98), rest reserved zero
 CASM_LISTING_META_LINE_LO      = 2
 CASM_LISTING_META_LINE_HI      = 3   ; one-based physical line number
 CASM_LISTING_META_OFF_LO       = 4
@@ -1584,6 +1584,13 @@ CASM_LISTING_META_RESERVED1    = 14  ; 2 bytes, zero-filled
 CASM_LISTING_META_REC_SIZE     = 16
 
 CASM_LISTING_META_FLAG_FINAL_UNTERMINATED = %00000001
+; Phase 15 WP98: set on a content line discarded by crpScanSuppressed
+; (inside an off conditional branch). The /L writer renders such a line
+; with a blank address column and no object bytes. The six conditional
+; directives themselves never carry this bit.
+CASM_LISTING_META_FLAG_SUPPRESSED         = %00000010
+; Every bit a valid metadata record's FLAGS field may carry.
+CASM_LISTING_META_FLAG_VALID_MASK = CASM_LISTING_META_FLAG_FINAL_UNTERMINATED | CASM_LISTING_META_FLAG_SUPPRESSED
 
 ; Bounded capacity: 4,096 physical-line occurrences, one vmmStoreAlloc call.
 CASM_LISTING_META_MAX = 4096
