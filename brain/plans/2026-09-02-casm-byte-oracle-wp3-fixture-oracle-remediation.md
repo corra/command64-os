@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp3-fixture-oracle-remediation
 created: 2026-09-02
-status: proposed
-taskwarrior: TBD (created on approval)
+status: completed-approved
+taskwarrior: 80484a2b-20f6-40d7-9d45-da1072381d61 (WP3); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: Byte-Oracle Transition WP2 (complete, user-approved 2026-09-02, merged a04c8bb)
 ---
 
@@ -10,10 +10,9 @@ depends-on: Byte-Oracle Transition WP2 (complete, user-approved 2026-09-02, merg
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-09-02 per
-`.agents/workflows/phased-implementation-planning.md`. No implementation,
-task activation, `.ref.hex` edit, or derivation record is authorized until
-this plan is approved.
+**Completed and user-approved 2026-09-02.** All 67 fixture references
+remediated to `CANONICAL-INDEPENDENT`; zero `UNCLEAR`; all `.ref` binaries
+byte-identical; walkthrough signed off.
 
 Parent: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`.
 Prerequisite: WP2 closed — audit register
@@ -239,8 +238,87 @@ CASM source, `hex_manifest_to_bin.py`, or native-app manifest is touched.
 
 ## Progress
 
+- 2026-09-02: **Increment 1 (extend `casm_oracle_inventory.py`) done.**
+  Added a `source_sha256` verification pass — for any ref declaring
+  `# source_sha256: <seqname>=<hash>`, the script checks the hash against
+  the current generated `.seq` and fails on drift. Still non-gating.
+  **Design correction:** WP3 Scoping Decision 2 assumed `hex_manifest_to_bin.py`
+  "ignores `#` lines" — it does **not**; it is a strict parser that
+  rejects any unrecognized `# word:` directive. So the generated-`.seq`
+  hash is recorded as `# source_sha256:` (already an accepted repeatable
+  directive, same as the native-app manifests) rather than a new
+  `# seq_sha256:` key, and the reviewer line will be plain prose
+  (`# Reviewed: ...`) not a `# key:` directive. No `hex_manifest_to_bin.py`
+  change — the zero-code-change intent holds.
+- 2026-09-02: **Increment 2 / Batch 1a (static PRGs) — metadata added,
+  derivation frozen for review.** 16 refs (`brback1`, `brfwd1`,
+  `casmhello`, `casmemit1`, `casmmodes`, `casmnum2`, `casmorg1`,
+  `casmcase1`, `casmmaxid1`, `casmopall`, `casmmf1/2/3`, `p1back1`,
+  `p1fwd1`, `p1size1`) each gained `# source_sha256:` line(s). **All 67
+  `.ref` binaries byte-identical** before/after
+  `casm_reference_fixtures` + `test_image_d64` rebuild;
+  `casm_oracle_inventory --check` green with the new verification.
+  `casmnum2` (previously a one-line note) fully derived;
+  `casmopall`/`casmmf*`/`casmhello` etc. header ledgers re-checked against
+  the 6502 encoding. Record:
+  `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1a-static-derivations.md`
+  — **frozen for user review**; on sign-off the reviewer line is added and
+  the 16 rows flip to `CANONICAL-INDEPENDENT`.
 - 2026-09-02: Plan drafted. WP2 register is the input: 66 refs
   `CANONICAL-INDEPENDENT (pending metadata)`, 1 `UNCLEAR` (`casmexprn`), 2
   manifests `NATIVE-OBSERVATION` (WP4). Three scoping decisions confirmed
   (user-as-reviewer per WP60 precedent; metadata in the `.ref.hex` header;
   re-derive `casmexprn`). Awaiting approval.
+- 2026-09-02: **Batch 1a signed off (user-approved); Batches 1b-1e metadata
+  added + derivation record frozen.**
+  - 1a: reviewer prose line added to all 16 headers; Ledger-A rows ->
+    `CANONICAL-INDEPENDENT`. (`# Reviewed:` was rejected by
+    `hex_manifest_to_bin.py` as a directive; switched to a leading-word-safe
+    prose line.)
+  - 1b-1e: 40 refs gained `# source_sha256:` (incl. `.dat` payloads for
+    `casmincbin1`/`casmpgincbin`); the 30 without `# sha256:` gained it ->
+    66/67 declare sha256. **All 67 `.ref` binaries byte-identical** across a
+    full `cmake --build build`; `casm_oracle_inventory --check` green
+    (source_sha256 now also verified against fixture `.dat` assets, not
+    just generated `.seq`).
+  - The 14 conditional refs (previously terse "Hand-derived from the
+    fixture source") are **fully derived** in the record — per-ref `.IF`
+    branch-selection -> byte mapping. The 1b/1d/1e refs' existing
+    in-header ledgers were re-checked against the 6502 encoding + directive
+    semantics + hash-pinned sources; no correction needed.
+  - Record: `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md`
+    -- **frozen for user review**. On sign-off, 40 reviewer lines added,
+    40 Ledger-A rows -> `CANONICAL-INDEPENDENT`. Remaining: `casmexprn`
+    (B2), R6 class (B3), `casmbig1` (B4).
+- 2026-09-02: **Batches 1b-1e signed off (user-approved); Batches 2-5
+  frozen for review.**
+  - 1b-1e: 40 reviewer lines added; Ledger-A rows -> `CANONICAL-INDEPENDENT`.
+  - Batch 2 (`casmexprn`): header rewritten with a full `<`/`>` operand-
+    operator derivation (the old one-line note was wrong -- described a
+    different fixture) + `source_sha256`; body byte-identical
+    (`325b48c2...`). Record
+    `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch2-casmexprn.md`.
+  - Batch 3 (R6): the "9-member R6 class" is really **7 R6 + 2 static**
+    (`casmfa2p`, `casmorgexpl1` have no footer -- WP2 hint corrected).
+    All 9 got `source_sha256`. R6 footer layout + per-ref eligibility
+    ledger re-checked; a **multi-base application check** (inline
+    assembler-independent relocator, `+1` page) reproduces the by-hand
+    "assembled at $3500" bytes for all 7. Record
+    `...-batch3-r6-relocation.md`.
+  - Batch 4 (`casmbig1`): repetition rule `00 C0 + EA*6000` -> 6002 B,
+    sha `7288e489...`, reproduced by a 2-line independent expansion;
+    boundary spot-checks incl. the file-join at offset 3002. Record
+    `...-batch4-casmbig1.md`.
+  - Batch 5 (`/L` `/M`): **no new reference.** `/L`/`/M` output is
+    contractual text pinned field-by-field by `test_casm_flist` (+ WP59
+    contract matrix), `test_casm_flmeta`, `test_casm_map` + a determinism
+    witness -- not PRG-identity inference. Rationale recorded
+    `...-batch5-listing-map.md`.
+  - **67/67 refs declare sha256; 67/67 claim independent derivation; all
+    67 `.ref` binaries byte-identical** across a full serial build;
+    `casm_oracle_inventory --check` green.
+- 2026-09-02: **WP3 closed, user-approved.** All 67 `tests/fixtures/casm/*.ref.hex`
+  references brought to `CANONICAL-INDEPENDENT`. `casmexprn` promoted (`UNCLEAR`
+  eliminated). Walkthrough signed off in
+  `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
+  Taskwarrior task `80484a2b` completed. Next: WP4 (Native-Application Canonical Records).

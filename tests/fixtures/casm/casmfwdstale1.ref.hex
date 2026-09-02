@@ -15,6 +15,10 @@
 #
 # 2-byte PRG header + 52-byte payload.
 # bytes: 54
+# sha256: 5f1e212f5731bae3a1972428439129fb69bd343d664dc7bae180fd600fb9f0ab
+# source_sha256: casmfwdstale1.seq=63901dbf60041c23942c2d88acea6be7926ca7a1596e9886657b73826585c8fa
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 A2 00

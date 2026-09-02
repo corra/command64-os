@@ -1,6 +1,27 @@
-# CASM WP20 trusted numeric-expression adapter reference: casmexprn
-# PRG header $C000, then immediate/zero-page/indirect-Y extraction and lists.
+# CASM WP20 trusted reference: casmexprn
+#
+# Independently hand-derived from the casmexprn fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM. Exercises the
+# `<` (low-byte) and `>` (high-byte) operand operators in every operand
+# position -- immediate, bare (address), indirect-indexed, .BYTE list,
+# .WORD list -- and the addressing-mode selection that follows from the
+# operator's result width.
+#
+# Source (.ORG $C000):
+#   .ORG $C000            -> 00 C0   PRG load-address header (little-endian)
+#   LDA #<$1234           -> A9 34   immediate; <$1234 = low byte = $34
+#   LDA >$1234            -> A5 12   >$1234 = high byte = $12; no '#', value
+#                                    < 256 -> zero-page addressing -> LDA $12
+#   LDA (<$1234),Y        -> B1 34   (<$1234),Y = ($34),Y -> (indirect),Y
+#   .BYTE <$1234, >$1234  -> 34 12   one byte each: $34, $12
+#   .WORD <$1234, >$1234  -> 34 00 12 00   .WORD $0034, $0012 little-endian
+#
 # bytes: 14
 # sha256: 325b48c21115fa9ac006a6aabfeecee08171a5d93b6746e701007bbb97e612b9
-00 C0 A9 34 A5 12 B1 34
+# source_sha256: casmexprn.seq=3ae1d05bd1022cc4bd266dbeaedd4838fbe33ef50fb6943dcbb81d4971ed6bd5
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batch 2 -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch2-casmexprn.md).
+
+00 C0
+A9 34 A5 12 B1 34
 34 12 34 00 12 00

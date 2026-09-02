@@ -39,6 +39,10 @@
 #   0F 00 00 40        .WORD $000F, $4000
 #
 # bytes: 14
+# sha256: aaef9bfd7a6d0128750122114741663f49996536f18614dbcf27b2cb6492076f
+# source_sha256: casmarith3.seq=2209dbc65594d774202799ad022da25da6b824dcb0317d4375e676e2ffa10884
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 A9 05

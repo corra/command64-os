@@ -668,3 +668,10 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   declared byte-count/sha256 against its own body. WP3 (fixture oracle
   remediation) is next; batch 1 is metadata completion (source + `.seq`
   hashes + reviewer) for the 66 pending refs — no byte changes.
+- 2026-09-02: **WP3 closed, user-approved.** All 67 `tests/fixtures/casm/*.ref.hex`
+  fixtures brought to `CANONICAL-INDEPENDENT` with full source/artifact hashes
+  and reviewer annotations; `casmexprn` promoted (`UNCLEAR` eliminated); all
+  67 `.ref` binaries byte-identical across a full serial build;
+  `casm_oracle_inventory --check` green. Sub-plan and walkthrough
+  `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
+  Taskwarrior task `80484a2b` completed. Next: WP4 (Native-Application Canonical Records).

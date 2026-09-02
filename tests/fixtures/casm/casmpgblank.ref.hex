@@ -13,5 +13,8 @@
 #
 # bytes: 7
 # sha256: 1274476ec547750c9f672fc95e99c3e846e7e707a1e1c601f858dbb3201752ca
+# source_sha256: casmpgblank.seq=c8d40c08d0590dfd595bc06c5fd2725a3c607579aa10cd49b9f0847ec5226c1c
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0 EA EA EA EA EA

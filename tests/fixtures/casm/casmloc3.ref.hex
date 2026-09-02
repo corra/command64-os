@@ -20,6 +20,10 @@
 #   EA       - @DONE NOP at $C003
 #
 # bytes: 6
+# sha256: 3eb5d77d4b0c02866ee2dcb2e61cdb95a984b7a658c013b5953e22a1dd24ccc2
+# source_sha256: casmloc3.seq=f43e93ff7c195e611ba84ccdaf1afba214660c9f39b7cedbf50cb0b31f5484aa
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 D0 01

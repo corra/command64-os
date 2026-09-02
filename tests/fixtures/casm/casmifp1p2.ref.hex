@@ -7,6 +7,10 @@
 # $C004 (LDA abs 3 bytes at $C000, NOP at $C003, DATA at $C004, RTS).
 #
 # bytes: 7
+# sha256: 5b105ba2a24ba017b0f2db3259428c94eb3203789c9ac726df1a4c998eaa0485
+# source_sha256: casmifp1p2.seq=056c092165fd890abf38b5a7f9b365f270b70a064bc04e66e7b3ec5d98259d51
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 AD 04 C0 EA 60

@@ -24,6 +24,10 @@
 #   48 49     .BYTE $48, $49   ('H', 'I')
 #
 # bytes: 6
+# sha256: d577678cfdb724abb98567175953319106cb2577c3ba1158334b52faad87935a
+# source_sha256: casmchar1.seq=fc8784bbaf7b3b205b2cebaf303a84952b1e2bb0c47576b8e7b99c5ea540ef13
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 A9 41

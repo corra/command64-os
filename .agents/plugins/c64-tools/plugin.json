@@ -1,0 +1,4 @@
+{
+  "name": "c64-tools",
+  "description": "C64 development tools plugin including VICE MCP and C64 Overlay API MCP servers"
+}

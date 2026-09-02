@@ -1,14 +1,17 @@
 # CASM Byte-Oracle Audit Register
 
 > [!NOTE]
-> **WP2 register — provenance classification complete; remediation is WP3.**
-> Every `tests/fixtures/casm/*.ref.hex` (67) and every CASM-native manifest
-> (2) is classified below with exactly one provenance state, plus the three
-> ledgers, the 32-harness map, the feature-to-evidence matrix, and the WP3
-> worklist. **No reference has been re-derived, rewritten, or repackaged**
-> — that is WP3. A provisional `CANONICAL-INDEPENDENT (pending metadata)`
-> means the derivation claim is present and non-circular but source-hash /
-> generated-`.seq` hash / named-reviewer evidence is missing.
+> **WP3 complete (user-approved 2026-09-02).** All **67 / 67**
+> `tests/fixtures/casm/*.ref.hex` are now `CANONICAL-INDEPENDENT`: each
+> carries `# sha256:`, `# source_sha256:` for every source `.seq`/`.dat`,
+> an annotated byte derivation, and a user reviewer sign-off line. **Zero
+> `UNCLEAR`** — `casmexprn` re-derived (Batch 2). Every `.ref` binary is
+> byte-identical to its pre-WP3 form (only `#` header lines were added /
+> rewritten). The 2 native manifests (`dash`, `banner`) remain
+> `NATIVE-OBSERVATION` pending **WP4** derivation records. Sections below
+> retain the WP2 classification text where it is still the record of how a
+> state was reached; the WP3 batch records are:
+> `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch{1a,1bcde,2,3,4,5}-*.md`.
 
 Governing plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`
 Workflow: `.agents/workflows/canonical-byte-oracles.md`
@@ -87,77 +90,77 @@ class (WP2 hint, WP3 confirms), provenance state, and the WP3 gap list.
 
 | ref | class (hint) | provenance state | missing evidence |
 | --- | --- | --- | --- |
-| `brback1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `brfwd1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmalign1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmarith2` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmarith3` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmarithfwd` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmassert1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmbig1` | Repetitive/large (6002 B) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmcase1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmchain1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmchar1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmelif` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmemit1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmexprn` | Static PRG | `UNCLEAR` | **no derivation statement**, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmfa2p` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmfill1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmfwdstale1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmhello` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmif0` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmif1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifL1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifM1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifdef0` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifdef1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifdeffwd` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifdefguard` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifelse` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifndef1` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifnest` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifp1p2` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmifskip` | Static (conditional) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmincbin1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmloc1` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmloc2` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmloc3` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmloc7` | Static (@local) | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmmaxid1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmmf1` | Static (multi-root) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmmf2` | Static (multi-root) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmmf3` | Static (multi-root) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmmodes` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmnoorg1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmnum2` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmopall` | Static (151-tuple opcode ledger) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmordhaz1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmorg1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmorgexpl1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpg128` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpg63` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpg64` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpg65` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpgblank` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpgfill` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpginc` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpgincbin` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpgr6` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmpgrt` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmrelacc` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmreloc1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmrelop1` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmrelop2` | R6 PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmres1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmstring1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `casmzpconst1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no artifact SHA-256, no source SHA-256, no generated-.seq hash, no reviewer |
-| `p1back1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `p1fwd1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
-| `p1size1` | Static PRG | `CANONICAL-INDEPENDENT (pending metadata)` | no source SHA-256, no generated-.seq hash, no reviewer |
+| `brback1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `brfwd1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmalign1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmarith2` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmarith3` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmarithfwd` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmassert1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmbig1` | Repetitive/large (6002 B) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmcase1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmchain1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmchar1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmelif` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmemit1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmexprn` | Static (`<`/`>` operators) | `CANONICAL-INDEPENDENT` | WP3 batch 2 -- header re-derived, source_sha256 + reviewer added; body byte-identical |
+| `casmfa2p` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmfill1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmfwdstale1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmhello` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmif0` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmif1` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifL1` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifM1` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifdef0` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifdef1` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifdeffwd` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifdefguard` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifelse` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifndef1` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifnest` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifp1p2` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmifskip` | Static (conditional) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmincbin1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmloc1` | Static (@local) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmloc2` | Static (@local) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmloc3` | Static (@local) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmloc7` | Static (@local) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmmaxid1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmmf1` | Static (multi-root) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmmf2` | Static (multi-root) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmmf3` | Static (multi-root) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmmodes` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmnoorg1` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmnum2` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmopall` | Static (151-tuple opcode ledger) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmordhaz1` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmorg1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmorgexpl1` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpg128` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpg63` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpg64` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpg65` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpgblank` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpgfill` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpginc` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpgincbin` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpgr6` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmpgrt` | Static/R6 (progress-path) | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmrelacc` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmreloc1` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmrelop1` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmrelop2` | R6 PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmres1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmstring1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `casmzpconst1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `p1back1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `p1fwd1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
+| `p1size1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
 
 ### Ledger A notes
 
-- **66 / 67 → `CANONICAL-INDEPENDENT (pending metadata)`.** Each
+- **66 / 67 → `CANONICAL-INDEPENDENT`.** Each
   `.ref.hex` header documents an independent hand-derivation from the
   6502/6510 encoding and the fixture's own source directives, explicitly
   "NOT produced by CASM". The bytes are internally consistent (declared
@@ -289,13 +292,34 @@ metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
 
 **No axis is uncovered.** Every axis has at least a structural harness;
 every axis that *should* have a byte oracle has one at
-`CANONICAL-INDEPENDENT (pending metadata)` or better, except the two
+`CANONICAL-INDEPENDENT` or better, except the two
 native-app axes (WP4) and `casmexprn`'s expression-adapter contribution
 (`UNCLEAR` → WP3). The gaps column is the input to the WP3 worklist below.
 
-## WP3 remediation worklist (for user approval — WP2 gate)
+## WP3 remediation worklist — **DONE (user-approved 2026-09-02)**
 
-Batched by oracle class, in the order the WP3 sub-plan should take them:
+Outcome per batch:
+
+1. **Metadata completion (56 refs, batches 1a–1e)** — ✅ `# sha256:` +
+   `# source_sha256:` + reviewer line on all; every `.ref` byte-identical;
+   `casm_oracle_inventory --check` verifies `source_sha256` against the
+   live `.seq`/`.dat`.
+2. **`casmexprn` (batch 2)** — ✅ re-derived (`<`/`>` operators), promoted
+   `UNCLEAR` → `CANONICAL-INDEPENDENT`; body byte-identical. Coverage kept.
+3. **R6 class (batch 3)** — ✅ 7 R6 refs got a re-checked eligibility
+   ledger + a multi-base application check (assembler-independent
+   relocator reproduces the `+1`-page bytes); `casmfa2p` / `casmorgexpl1`
+   reclassified **static** (no footer).
+4. **`casmbig1` (batch 4)** — ✅ repetition rule `00 C0 + EA×6000`
+   (6002 B, `7288e489…`) reproduced by a 2-line independent expansion +
+   boundary spot-checks.
+5. **Listing / map (batch 5)** — ✅ no new reference; `/L` `/M` output is
+   pinned field-by-field by `test_casm_flist` (+ WP59 contract matrix),
+   `test_casm_flmeta`, `test_casm_map` + a determinism witness.
+6. **Native-app records → WP4** — still open (DASH, BANNER stay
+   `NATIVE-OBSERVATION`).
+
+Original worklist as approved at the WP2 gate (batched by oracle class):
 
 1. **Metadata completion — all 66 `CANONICAL-INDEPENDENT (pending
    metadata)` refs.** Add: source SHA-256(s), a deterministic hash of the

@@ -20,6 +20,9 @@
 #
 # bytes: 20
 # sha256: 3fa0fd916fb95148537c613500b61bb87f2c74e377a976c0ed9582960fa450f8
+# source_sha256: casmemit1.seq=198f6b33652fefad5f74943ec496723eb8c779eb0383cab1f1015bc4844d9313
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batch 1a -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1a-static-derivations.md).
 
 00 C0
 A9 01

@@ -29,6 +29,11 @@
 #   DE AD BE EF  .INCBIN "CASMINCBIN1.DAT" (verbatim file contents)
 #
 # bytes: 6
+# sha256: 6130236c271623e324eed61863bb4ef03f464db2821fd1922aad44f2945d1aa1
+# source_sha256: casmincbin1.seq=fed89c832c068e0064bd1fa241299a6995804e37bc5fcd105a6c944aba2b7c3d
+# source_sha256: casmincbin1.dat=5f78c33274e43fa9de5659265c1d917e25c03722dcb0b8d27db8d5feaa813953
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 DE AD BE EF
