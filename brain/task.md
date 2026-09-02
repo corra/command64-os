@@ -4012,8 +4012,10 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
 - [ ] WP6 consolidated verification + completion gate (not started)
 
 Related: `casm-diagnostic-always-name-file`
-(`brain/plans/2026-09-01-casm-diagnostic-always-name-file.md`,
-`approved-not-started`) will run concurrently with docs-only WP1 and must
-merge to `main` before WP2's inventory freeze. Deferred CASM defects
+(`brain/plans/2026-09-01-casm-diagnostic-always-name-file.md`) — **started
+2026-09-02**, Taskwarrior `86170ef8`, branch
+`feature/casm-diag-always-name-file` off `main` `a3d3999`. Must merge to
+`main` before WP2's inventory freeze. Version bump target `0.6.1` ->
+`0.6.2`. Deferred CASM defects
 tasks #39 (phantom EOF on 1-byte source) and #33 (VMM/apptable lifecycle)
 remain disclosed-and-deferred; the audit will encounter #39.

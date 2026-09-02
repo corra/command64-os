@@ -1,8 +1,8 @@
 ---
 feature: casm-diagnostic-always-name-file
 created: 2026-09-01
-status: approved-not-started
-taskwarrior: TBD (created on approval)
+status: in-progress
+taskwarrior: 86170ef8-0d91-44eb-9330-6f921a76eaee
 depends-on: none (branches off main)
 ---
 
@@ -280,3 +280,20 @@ Complete only when **all** of:
 - 2026-09-01: User approved the plan. Status set to `approved-not-started`;
   implementation, branch creation, and task activation remain pending an
   explicit start instruction.
+- 2026-09-02: **Activated by explicit user start instruction** after
+  Byte-Oracle Transition WP1 closed. Branch
+  `feature/casm-diag-always-name-file` cut from `main` `a3d3999` and
+  rebased on it; Taskwarrior `86170ef8` (project `casm.standalone`)
+  created and started; row added to `wiki/tasks/casm.md`. Runs concurrently
+  with docs-only byte-oracle work and **must merge to `main` before
+  Byte-Oracle WP2's inventory freeze**.
+  **Version drift found (mechanical, anticipated by Scoping Decision 2):**
+  the plan predates CASM Phases 14-15. CASM is now `0.6.1` build `1417`
+  (not `0.5.2` b1392). The Increment 5 version bump target becomes
+  **`0.6.2`** (patch on the current `0.6.x` series), not `0.5.3`;
+  `BUILD_CASM` already at 1417. Increment 1's live baseline runs against
+  `0.6.1` b1417. The gate code at `diagnostics.s:866-871` still matches
+  the Technical Design exactly (`bmi @printFileName` / `lda CasmSourceCount`
+  / `cmp #2` / `bcc @skipFileName`); only the version numbers moved.
+  `.import CasmSourceCount` is at `diagnostics.s:50`, `msgInFile` at
+  `1767`, the WP35/WP48 comment at `1765`.
