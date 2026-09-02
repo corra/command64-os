@@ -656,3 +656,15 @@ approved in its WP plan. Any new CMake helper/custom target invokes the
   concurrently with docs-only WP1 and must merge to `main` before WP2's
   inventory freeze (it collides with WP2/WP3 fixture work, not WP1). No
   Taskwarrior/tracker activation yet — pending WP1 sub-plan approval.
+- 2026-09-02: **WP2 closed, user-approved.** Register + WP3 worklist
+  approved; merged to `main` (`a04c8bb`). Read-and-classify only.
+  `brain/reviews/2026-09-01-casm-byte-oracle-audit.md`: Ledger A 67 refs +
+  2 manifests (66 `CANONICAL-INDEPENDENT (pending metadata)`, 1 `UNCLEAR`
+  `casmexprn`, 2 `NATIVE-OBSERVATION`); Ledgers B/C 183 no-ref fixtures all
+  `NOT-APPLICABLE`; 32-harness structural map; feature-to-evidence matrix
+  with no uncovered axis; 6-batch WP3 worklist. New non-gating
+  `scripts/casm_oracle_inventory.py` + `casm_oracle_inventory` target
+  reconciles `CASM_REF_NAMES` == on-disk == tracked == 67 and every
+  declared byte-count/sha256 against its own body. WP3 (fixture oracle
+  remediation) is next; batch 1 is metadata completion (source + `.seq`
+  hashes + reviewer) for the 66 pending refs — no byte changes.
