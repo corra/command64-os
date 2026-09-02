@@ -3948,10 +3948,11 @@ conditions only (no comparison operators); suppressed branches parse
 nothing, allocate no symbols, emit no bytes; Pass 1 == Pass 2 branch
 identity. Anonymous labels stay deferred. Version target `0.6.1`.
 
-- [/] WP93 design freeze (`ef34f19f`) -- suppression mechanism, `.ifdef`
+- [x] WP93 design freeze (`ef34f19f`) -- suppression mechanism, `.ifdef`
       Pass1/Pass2 determinism, nesting depth, diag codes `$5B`+,
       constants + `.assert`s, no behaviour. Sub-plan
       `brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md`.
+      **User-approved with the rest of Phase 15 (2026-09-02).**
 - [x] WP94 lexer conditional directive tokens (`fb21ff9`), **user-approved 2026-09-01**
 - [x] WP95 conditional-nesting stack + suppression scanner (`cond.s`) + `test_casm_cond` (`ecbd717`), **user-approved 2026-09-01**
 - [x] WP96 `.if`/`.elseif`/`.else`/`.endif` pass-driver wiring + truthiness + `casm_phase15_test_d64` (`e28dd7d`, `6eb2815`), **user-approved 2026-09-01**
@@ -3977,3 +3978,39 @@ identity. Anonymous labels stay deferred. Version target `0.6.1`.
       completed through the CLI (current ID 43). Full detail:
       `brain/plans/2026-08-21-dir-p-paging.md` and
       `brain/walkthroughs/2026-08-21-dir-p-paging.md`.
+
+
+# CASM Canonical Byte-Oracle Transition
+
+Taskwarrior parent `75cfa082-af8a-4783-8cd3-eb743f3040b7` (project
+`casm.byteoracle`). Governing plan
+`brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`
+(`amended-approved-deferred`; user resumed 2026-09-02 after Phase 15
+closed). Six work packages (WP1-WP6), each with its own approved sub-plan
+and completion walkthrough.
+
+Intent: independently hand-derived + peer-reviewed canonical bytes become
+the authoritative oracle for CASM fixture output and CASM-native apps
+(DASH, BANNER); ca65 demoted to optional differential. Does **not** remove
+ca65/ld65 as the host build toolchain -- `casm`, `debug`, and non-native
+apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
+
+- [/] WP1 contract, workflow, skill, audit-register schema
+      (Taskwarrior `154368e9-1fa8-4b48-b7bd-c02f2029f00f`). Sub-plan
+      `brain/plans/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`,
+      **user-approved 2026-09-02**, in progress. Docs-only: no fixture,
+      manifest, build, or CASM-source changes. Increment 1 (read-only ca65
+      wording survey) complete.
+- [ ] WP2 complete fixture inventory + provenance audit (not started;
+      must begin from a commit that includes `casm-diagnostic-always-name-file`)
+- [ ] WP3 fixture oracle remediation (not started)
+- [ ] WP4 native-application canonical records (DASH, BANNER) (not started)
+- [ ] WP5 DASH differential + source-policy transition (not started)
+- [ ] WP6 consolidated verification + completion gate (not started)
+
+Related: `casm-diagnostic-always-name-file`
+(`brain/plans/2026-09-01-casm-diagnostic-always-name-file.md`,
+`approved-not-started`) will run concurrently with docs-only WP1 and must
+merge to `main` before WP2's inventory freeze. Deferred CASM defects
+tasks #39 (phantom EOF on 1-byte source) and #33 (VMM/apptable lifecycle)
+remain disclosed-and-deferred; the audit will encounter #39.

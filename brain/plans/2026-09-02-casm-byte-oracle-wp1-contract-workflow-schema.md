@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp1-contract-workflow-schema
 created: 2026-09-02
-status: proposed
-taskwarrior: TBD (created on approval)
+status: approved-in-progress
+taskwarrior: 154368e9-1fa8-4b48-b7bd-c02f2029f00f (WP1); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: CASM Phase 15 closure (complete, user-approved 2026-09-02, merged to main dfe5596 baseline)
 ---
 
@@ -10,10 +10,9 @@ depends-on: CASM Phase 15 closure (complete, user-approved 2026-09-02, merged to
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-09-02 for user review, per this
-project's per-work-package-plan-approval requirement
-(`.agents/workflows/phased-implementation-planning.md`). No implementation is
-authorized until this plan is approved.
+**Approved 2026-09-02; in progress.** User approved this WP1 sub-plan.
+Taskwarrior parent `75cfa082` + WP1 child `154368e9` created and WP1
+started. Implementation proceeds per the Atomic Increments below.
 
 Parent plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`
 (governing plan, `amended-approved-deferred`; user resumed the transition
@@ -360,6 +359,56 @@ is treated as historical and left in place until WP2/WP3.
 
 ## Progress
 
+- 2026-09-02: **Increment 2 (tracker reconciliation) done.** Taskwarrior
+  parent `75cfa082` + WP1 child `154368e9` created, WP1 started. Fixed
+  `brain/task.md` WP93 `[/]`->`[x]` (Phase 15 closed). Added the
+  Canonical Byte-Oracle Transition section to `brain/task.md` and
+  `wiki/tasks/casm.md` (WP1 active, WP2-6 pending, diagnostic task
+  concurrent, #39/#33 deferred). **Deferred to WP2:** `wiki/tasks/casm.md`
+  lines ~40-73 still carry stale Phase 14 "awaiting sign-off" / "WP92
+  resumes" prose that contradicts the closed-at-0.6.0 reality — a
+  ~15-line historical-narrative rewrite, better done in WP2's tracker-sync
+  step alongside the full fixture-universe freeze than piecemeal here.
+  Taskwarrior task #43 (Phase 14 flmeta harness fix) shows pending — its
+  closure is a Phase 14 loose end, not transition state; noted, not
+  actioned.
+- 2026-09-02: **Increment 1 (read-only survey) complete.** Findings:
+  - **Workflows with NO ca65-authority wording** (cross-references only in
+    WP1): `vice-mcp-testing.md`, `per-phase-test-images.md`,
+    `phased-implementation-planning.md`, `documentation-maintenance.md`,
+    `artifact-tracking.md` (its "canonical" refers only to the brain copy).
+  - **`.agents/workflows/overlay-build-events.md:62`** — "DASH's real build
+    events already fire from the `dash_ref`" — the one sentence WP1 corrects
+    (lines 59, 139 are related DASH/native-assembly context, factual, leave).
+  - **`src/external/AGENTS.md`** lines 54-55, 69, 73-74 — ca65 cross-check
+    assumed as a normal provenance path for CASM-native apps; `--cross-check`
+    / `--allow-host-bytes` machinery referenced. WP1 replaces with the
+    canonical-oracle model; DASH/BANNER specifics stay deferred to WP4/WP5.
+  - **`src/external/casm/AGENTS.md`** line 253 ("CASM and ca65 cross-checks
+    … stop and obtain [approval]") needs softening to "optional differential";
+    line 13 (build CASM with ca65/ld65) is the protected build contract —
+    untouched. Lines 51/122/131/138 are language-divergence notes — leave.
+  - **`src/external/dash/AGENTS.md`** — the concentrated load-bearing text:
+    lines 16/37/54-64 ("Dual-Assembler Subset"), 73-74 (`--allow-host-bytes`
+    refusal), 73/81-85 (`dash_ref` "independent cross-check"), 94 (utility
+    disk ships `dash.ref`). WP1 only *annotates* the Subset section as
+    "pending WP5 relaxation, do not remove yet"; full rewrite is WP4/WP5.
+  - **`tests/AGENTS.md`** lines 23-27 — ca65 as primary test target is
+    factual; WP1 adds the authoritative-fixture provenance/review rule.
+  - **`src/external/banner/`** has `banner.ref.hex` + `BUILD_BANNER` but
+    **no `AGENTS.md`** — noted for WP4 (BANNER derivation record).
+  - **CMake wording** (`CMakeLists.txt`, `cmake/GenerateCasmTestFixtures.cmake`)
+    — ~30 "trusted reference" / "hand-derived … never from CASM" comments,
+    already consistent with the canonical-independent model. Per governing
+    plan, treated as historical; **untouched in WP1**. `CMakeLists.txt:1664`
+    (`dash_ref` "INDEPENDENT cross-check only") aligned already; WP5 owns it.
+  - **Flag for WP2:** `GenerateCasmTestFixtures.cmake:1077` describes a
+    fixture verified "CASM-vs-CASM rather than against a hand-derived .ref"
+    — a `NATIVE-OBSERVATION` candidate. All 67 on-disk `*.ref.hex` names
+    appear somewhere in `CMakeLists.txt`; the 63-vs-67 delta with
+    `CASM_REF_NAMES` is because ~4 refs are packaged through separate
+    per-phase append targets, not the main list — WP2 must trace every
+    packaging path.
 - 2026-09-02: Plan drafted. Baseline confirmed clean-committed at `dfe5596`
   after Phase 15 closure (CASM 0.6.1). Governing plan resumed by user.
   Scoping decisions confirmed: resume now; commit housekeeping first (done);

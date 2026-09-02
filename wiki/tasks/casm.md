@@ -84,6 +84,30 @@ review (three doc/robustness findings fixed) and a fresh consolidated
 See the "Optional Feature - Progress and Processing Indication" section
 below and `wiki/tasks/casm-progress-indication.md`.
 
+**Canonical Byte-Oracle Transition is active** (resumed 2026-09-02 after
+Phase 15 closed). Taskwarrior parent `75cfa082` (project
+`casm.byteoracle`); governing plan
+`brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`. Makes
+independently hand-derived + peer-reviewed canonical bytes the
+authoritative oracle for CASM fixture output and CASM-native apps (DASH,
+BANNER); ca65 becomes an optional differential check. Does **not** remove
+ca65/ld65 as the host build toolchain -- `casm`, `debug`, and non-native
+apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
+
+- [/] WP1 contract, workflow, skill, audit-register schema -- sub-plan
+      `brain/plans/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`,
+      user-approved 2026-09-02, in progress (docs-only).
+- [ ] WP2 fixture inventory + provenance audit
+- [ ] WP3 fixture oracle remediation
+- [ ] WP4 native-application canonical records (DASH, BANNER)
+- [ ] WP5 DASH differential + source-policy transition
+- [ ] WP6 consolidated verification + completion gate
+
+Standalone task `casm-diagnostic-always-name-file`
+(`brain/plans/2026-09-01-casm-diagnostic-always-name-file.md`,
+`approved-not-started`): runs concurrently with docs-only WP1, merges to
+`main` before WP2's inventory freeze.
+
 **Phase 12 is complete**, user-approved 2026-08-20 at CASM `0.3.0` build
 `1324` (WP64-76, including WP71's full DASH adoption and WP76's
 corrective forward-reference Pass 1/2 width-agreement fix). Final
