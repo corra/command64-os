@@ -16,6 +16,8 @@
 #   AA           .BYTE $AA (.ASSERT contributed no bytes)
 #
 # bytes: 3
+# sha256: 0ff11afe3959e835e9c509f926eaa5abe3d3f8d6e26678b93e1cb71f262bd072
+# source_sha256: casmassert1.seq=ea663e3c8e54ee5c2edb1dcc343c128bc0994f01cd184fd80dfc8b6851fb39aa
 
 00 C0
 AA

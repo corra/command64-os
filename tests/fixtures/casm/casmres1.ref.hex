@@ -17,6 +17,8 @@
 #   00 00        .RES 2 (default fill value 0)
 #
 # bytes: 7
+# sha256: 00c9044c597d5c6e301095091c99f1ff254aa20aa391ea9b6b201c7131eafb0b
+# source_sha256: casmres1.seq=146c0206a92fbc1158570d1767996c7600402d7c9aaf6143be80e8770d0bdc56
 
 00 C0
 AA AA AA

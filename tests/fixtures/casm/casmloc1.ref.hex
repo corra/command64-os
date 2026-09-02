@@ -17,6 +17,8 @@
 #   D0 FD    - BNE @LOOP at $C001; displacement $C000 - $C003 = -3 = $FD
 #
 # bytes: 5
+# sha256: ac3d9faad3f4c5b3b4567d8c7307d25e8ed12359c64400bdf66619731fc2354c
+# source_sha256: casmloc1.seq=6f26ee9d704ebfc0e594dfe23816d2f779a93b16477713b9a9f27929e1c26f3c
 
 00 C0
 EA

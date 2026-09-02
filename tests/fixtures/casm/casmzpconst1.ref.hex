@@ -20,6 +20,8 @@
 #   85 71        STA $71   (zero-page, 2 bytes -- NOT 8D 71 00 absolute)
 #
 # bytes: 6
+# sha256: d31bc5e4c23e08c9af8c69034c689347293766fd2df1c77bb14157a2a306d821
+# source_sha256: casmzpconst1.seq=6750352d5923dbe6fb018c9862c9c9ba6cae9852b2b254be62c567fc947d14b6
 
 00 C0
 85 70

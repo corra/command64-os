@@ -15,6 +15,8 @@
 #   40 40 40 40  .FILL 4,$40
 #
 # bytes: 6
+# sha256: e1885b459f93dd8b704e00d2f3d2083609a5bc25ae64f4c0650dfb2d3ee57bd3
+# source_sha256: casmfill1.seq=dc8736a4d2a57ee3493c159d27798e9d699215b3b1fb784aef5c63ebfcaf9457
 
 00 C0
 40 40 40 40

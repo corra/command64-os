@@ -22,5 +22,8 @@
 #
 # bytes: 9
 # sha256: 0b076077ef8b77f705a6d0d3430751de1b288182ad78814fb607222ac430cafd
+# source_sha256: casmpginca.seq=34534b198c66d6571e15f45ff6e13486ef4417a7cc4803b6238955b4121bbc1a
+# source_sha256: casmpgincb.seq=fb79c505c99ecf4f966c9dc08068bd18944d2e410e9f38c969c7769265eeee76
+# source_sha256: casmpgincc.seq=e5951c08cd41bd1cd633739871a91e012cbc9b920872075af9f5f57a660b8de9
 
 00 C0 EA EA EA EA EA EA EA

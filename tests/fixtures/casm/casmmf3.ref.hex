@@ -28,6 +28,8 @@
 # source_sha256: casmmfe.seq=5afc854ac4ba4ffb9a375d1b8a27ca2bff309a169023c40eb5b748e6d27c0129
 # source_sha256: casmmff.seq=cd948b10e5afd25ef1af9b761f3d3e18b31887f84598423498499aa80e44685c
 # source_sha256: casmmfg.seq=1a14912497d1e1d3abfec56d9e09d732e63d329ad40adabcfbe3750f0c87c225
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batch 1a -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1a-static-derivations.md).
 
 00 C0
 4C 03 C0

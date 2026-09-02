@@ -24,6 +24,8 @@
 #   48 49     .BYTE $48, $49   ('H', 'I')
 #
 # bytes: 6
+# sha256: d577678cfdb724abb98567175953319106cb2577c3ba1158334b52faad87935a
+# source_sha256: casmchar1.seq=fc8784bbaf7b3b205b2cebaf303a84952b1e2bb0c47576b8e7b99c5ea540ef13
 
 00 C0
 A9 41

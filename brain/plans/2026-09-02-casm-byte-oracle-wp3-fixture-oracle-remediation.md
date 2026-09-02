@@ -270,3 +270,24 @@ CASM source, `hex_manifest_to_bin.py`, or native-app manifest is touched.
   manifests `NATIVE-OBSERVATION` (WP4). Three scoping decisions confirmed
   (user-as-reviewer per WP60 precedent; metadata in the `.ref.hex` header;
   re-derive `casmexprn`). Awaiting approval.
+- 2026-09-02: **Batch 1a signed off (user-approved); Batches 1b-1e metadata
+  added + derivation record frozen.**
+  - 1a: reviewer prose line added to all 16 headers; Ledger-A rows ->
+    `CANONICAL-INDEPENDENT`. (`# Reviewed:` was rejected by
+    `hex_manifest_to_bin.py` as a directive; switched to a leading-word-safe
+    prose line.)
+  - 1b-1e: 40 refs gained `# source_sha256:` (incl. `.dat` payloads for
+    `casmincbin1`/`casmpgincbin`); the 30 without `# sha256:` gained it ->
+    66/67 declare sha256. **All 67 `.ref` binaries byte-identical** across a
+    full `cmake --build build`; `casm_oracle_inventory --check` green
+    (source_sha256 now also verified against fixture `.dat` assets, not
+    just generated `.seq`).
+  - The 14 conditional refs (previously terse "Hand-derived from the
+    fixture source") are **fully derived** in the record — per-ref `.IF`
+    branch-selection -> byte mapping. The 1b/1d/1e refs' existing
+    in-header ledgers were re-checked against the 6502 encoding + directive
+    semantics + hash-pinned sources; no correction needed.
+  - Record: `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md`
+    -- **frozen for user review**. On sign-off, 40 reviewer lines added,
+    40 Ledger-A rows -> `CANONICAL-INDEPENDENT`. Remaining: `casmexprn`
+    (B2), R6 class (B3), `casmbig1` (B4).

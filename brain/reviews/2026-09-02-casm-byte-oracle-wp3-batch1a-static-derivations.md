@@ -92,8 +92,15 @@ little-endian `.WORD` emission; not circular (no CASM output consulted).
 
 ## Reviewer sign-off
 
-On user approval of this record, `# Reviewed: independent derivation
-approved by the user 2026-09-02 (WP3 batch 1a).` is added to each of the
-16 `.ref.hex` headers (prose form — not a `# key:` directive — so
-`hex_manifest_to_bin.py` accepts it), and the 16 Ledger-A rows flip
-`CANONICAL-INDEPENDENT (pending metadata)` → `CANONICAL-INDEPENDENT`.
+**User-approved 2026-09-02.** Each of the 16 `.ref.hex` headers now
+carries the two-line prose note
+
+```
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batch 1a -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1a-static-derivations.md).
+```
+
+(prose, not a `# key:` directive — verified `hex_manifest_to_bin.py`
+accepts it and all 67 `.ref` binaries stay byte-identical). The 16
+Ledger-A rows are updated `CANONICAL-INDEPENDENT (pending metadata)` →
+`CANONICAL-INDEPENDENT`.

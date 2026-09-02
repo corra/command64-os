@@ -21,6 +21,8 @@
 #   4C 01 C0     - JMP @LOOP at $C004 targeting $C001
 #
 # bytes: 9
+# sha256: b44707866f1e79373848db45aac33723522052ad61c1bde8afb57035366b99eb
+# source_sha256: casmloc7.seq=9e91b99b67d50847c941c368c4ae2fec5d8b4a5c657b2dda6ab5facbd4bd84f3
 
 00 C0
 EA

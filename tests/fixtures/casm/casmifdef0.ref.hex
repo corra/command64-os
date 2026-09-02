@@ -4,6 +4,8 @@
 # cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
 #
 # bytes: 3
+# sha256: eb77902d71ed3640afbdddec1fe2baf070aa5881ed417e121ae36bfee3a0eab7
+# source_sha256: casmifdef0.seq=b5a4445d871b10356af05c8c899397cf708df88833f505a3d1d5f7e630f7f11f
 
 00 C0
 EA
