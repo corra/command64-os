@@ -1,7 +1,7 @@
 ---
 feature: casm-byte-oracle-wp5-dash-differential-source-policy
 created: 2026-09-02
-status: approved-in-progress
+status: complete
 taskwarrior: TBD (created on approval)
 depends-on: Byte-Oracle Transition WP4 (complete, user-approved 2026-09-02, merged b39459c)
 ---
@@ -10,7 +10,8 @@ depends-on: Byte-Oracle Transition WP4 (complete, user-approved 2026-09-02, merg
 
 ## Status
 
-**Approved, in progress** (per front matter). Drafted 2026-09-02.
+**Complete; user-approved 2026-09-02.** Merged to `main`. Includes the
+WP4 audit correction (DASH manifest bytes -> `NATIVE-OBSERVATION`).
 
 Parent: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`.
 Prerequisite: WP4 closed then **audit-corrected 2026-09-02** — BANNER's

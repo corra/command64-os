@@ -101,7 +101,7 @@ in a default build**.
 | default build + opt-in `dash_ref` verified; differential still matches | ✅ |
 | `dash.prg` / `banner.prg` / all 67 fixture `.ref` byte-unchanged | ✅ |
 | WP4 audit correction folded in (DASH → `NATIVE-OBSERVATION`) | ✅ |
-| **user approves closure** | ⏳ pending |
+| **user approves closure** | ✅ 2026-09-02 |
 
 ## Files changed (WP5 + folded-in WP4 audit correction)
 
