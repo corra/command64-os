@@ -48,6 +48,7 @@
 .import exitFatal
 
 .import lexerInit
+.import condResetForPass
 .import parserParseStatement
 .import CasmParserStmt
 .import CasmLabelName
@@ -305,6 +306,9 @@ startPass1:
     sta CasmCurrentScopeLo
     lda #>CASM_SYMBOL_CHAIN_END
     sta CasmCurrentScopeHi
+    ; Phase 15 WP95: no `.IF` is open at the start of a pass; the site
+    ; counter restarts so Pass 2 replays Pass 1's decisions by index.
+    jsr condResetForPass
     ; Progress Increment 4: begin Pass 1 only after CasmPassMode is set to
     ; MEASURE, per the Hook Contract -- progressBeginPass cannot fail.
     lda #$FF                    ; Increment 5: force a name snapshot on the
@@ -412,6 +416,9 @@ startListingCaptureDone:
     sta CasmCurrentScopeLo
     lda #>CASM_SYMBOL_CHAIN_END
     sta CasmCurrentScopeHi
+    ; Phase 15 WP95: reset the conditional stack + site counter for Pass 2
+    ; exactly as Pass 1 did.
+    jsr condResetForPass
     ; Progress Increment 4: begin Pass 2 only after CasmPassMode is set to
     ; EMIT. Resets the active counter/divider and flips the internal
     ; pass-2 flag; cannot fail.

@@ -807,6 +807,16 @@ if(Ca65_FOUND)
                 "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
             set(TEST_PRG_SIZE "1000")
         endif()
+        if(TEST_NAME STREQUAL "casm_cond")
+            # Phase 15 WP95: standalone conditional-nesting state-machine
+            # harness. cond.s has zero dependencies beyond common.inc --
+            # no VMM, no OS API, no other casm module -- so this is the
+            # narrowest link of any casm harness.
+            list(APPEND TMP_CA65_SRCS_${TEST_NAME}
+                "${CMAKE_SOURCE_DIR}/src/external/casm/cond.s"
+                "${CMAKE_SOURCE_DIR}/src/external/casm/common.inc")
+            set(TEST_PRG_SIZE "0800")
+        endif()
         if(TEST_NAME STREQUAL "casm_map")
             # WP52: map.s plus the symbol table it reads through
             # symbolsReadByIndex. Does NOT link diagnostics.s -- this harness
@@ -1840,6 +1850,10 @@ list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_pass1)
 # workflow).
 list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_scope)
 
+# Phase 15 WP95: same full-directory reason -- test_casm_cond lives on
+# casm_include_test_d64 (and, from WP96, casm_phase15_test_d64), not test.d64.
+list(REMOVE_ITEM TEST_IMAGE_PRG_TARGETS test_casm_cond)
+
 set(CASM_TEST_FIXTURE_DIR "${CMAKE_BINARY_DIR}/casm_test_fixtures")
 set(CASM_TEST_FIXTURES
     "${CASM_TEST_FIXTURE_DIR}/casmshort.seq"
@@ -2249,7 +2263,10 @@ add_c64_disk_image(casm_include_test_d64
     # casm_overflow_test_d64 (self-contained, deliberately no fixture files
     # -- see its own header comment), which ran 1 block short for
     # casmcat5.seq after this WP's casm/test_casm_include envelope growth.
-    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym test_casm_finc test_casm_opcodes test_casm_event test_casm_directives
+    # Phase 15 WP95: test_casm_cond (the cond.s state-machine unit harness)
+    # placed here for now -- WP96 creates casm_phase15_test_d64 and may
+    # rehome it there alongside the production fixtures.
+    PRGS command64 casm comp test_casm_freloc test_casm_bounds test_casm_cliderive test_casm_lexer test_casm_fsym test_casm_finc test_casm_opcodes test_casm_event test_casm_directives test_casm_cond
 )
 add_dependencies(casm_include_test_d64 casm_test_fixtures)
 

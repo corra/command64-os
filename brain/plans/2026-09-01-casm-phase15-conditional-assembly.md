@@ -472,3 +472,19 @@ Phase 15 is complete only when **all** of:
   `casm_include_test.d64`, `test_casm_lexer` -> `CASM LEXER: PASS`
   (26 cases).** casm CODE +96 B / RODATA +40 B; MAIN headroom 1,373 B.
   `BUILD_CASM` -> 1410. Awaiting sign-off before WP95.
+- 2026-09-01: **WP94 closed (user-approved), committed `fb21ff9`.**
+- 2026-09-01: **WP95 implemented.** `cond.s` state machine -- nine
+  routines (reset / openIf / elseif / else / endif / currentlyEmitting /
+  topParentEmitting / atEof / siteDecision) implementing the D3/D4
+  frozen design: emit-state = `parentEmitting AND (NOT priorTaken) AND
+  decision`, and the Pass-1-record / Pass-2-replay 64-byte decision
+  bitmap. `casm.s` gets one `jsr condResetForPass` per pass, nothing
+  else. New `test_casm_cond` unit harness (15 cases, narrowest link of
+  any casm harness) -> live **`CASM COND: PASS`**; `casmassert1` COMP OK
+  on `0.6.0.1411` proves the `casm.s` change is byte-neutral. All 32
+  `test_casm_*` targets build. MAIN headroom 1,373 -> 1,000 B (watch
+  item for WP96-99). Sub-plan
+  `brain/plans/2026-09-01-casm-phase15-wp95-cond-state-machine.md`;
+  walkthrough
+  `brain/walkthroughs/2026-09-01-casm-phase15-wp95-cond-state-machine.md`.
+  Awaiting sign-off before WP96.

@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp93-design-freeze
 created: 2026-09-01
-status: implemented, awaiting user sign-off
+status: complete
 taskwarrior: ef34f19f-a0a5-4b3f-872c-6ac1ee842f3e (WP93), parent
   0678049c-7d67-4b9a-9305-14efb2353ae1 (Phase 15)
 depends-on: CASM Phase 15 plan approved
@@ -274,3 +274,7 @@ then require end-of-line.
   Walkthrough:
   `brain/walkthroughs/2026-09-01-casm-phase15-wp93-design-freeze.md`.
   Awaiting user sign-off before WP94.
+- 2026-09-01: **WP93 approved + closed by user.** Committed `37bd4c8`.
+  Taskwarrior WP93 (`ef34f19f`) done. WP94 (`43d508a0`) created.
+- 2026-09-01: **WP94 approved + closed by user.** Committed `fb21ff9`.
+  WP95 (`1ed564ea`) created.
