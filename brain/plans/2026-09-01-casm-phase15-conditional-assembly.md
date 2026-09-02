@@ -457,3 +457,18 @@ Phase 15 is complete only when **all** of:
   1,902 -> 1,509 B. Walkthrough
   `brain/walkthroughs/2026-09-01-casm-phase15-wp93-design-freeze.md`.
   Awaiting sign-off before WP94.
+- 2026-09-01: **WP93 closed (user-approved), committed `37bd4c8`.**
+- 2026-09-01: **WP94 implemented.** `lexer.s` `lnDirective` recognises
+  `.if`/`.elseif`/`.else`/`.endif`/`.ifdef`/`.ifndef` -> the D1 subtypes
+  (six new `compareTokenText` blocks appended to the linear recognition
+  chain before the `CASM_DIRECTIVE_UNKNOWN` tail; `compareTokenText` is
+  exact-length + case-folded so `.IF` never shadows `.IFDEF`). Six
+  keyword strings added. `test_casm_lexer`: new shared `dirCaseCheck`
+  helper + eight cases (six accepted keywords -> correct subtype; `.IFF`
+  and `.ENDI` -> `CASM_DIRECTIVE_UNKNOWN`), source rows 13-20 (string
+  modes 19-26). Harness envelope `$1100` -> `$1200` (+228 measured
+  overflow, next round-page fit, WP87 precedent). No parser/pass wiring.
+  Build clean, all 31 `test_casm_*` targets build. **Live VICE:
+  `casm_include_test.d64`, `test_casm_lexer` -> `CASM LEXER: PASS`
+  (26 cases).** casm CODE +96 B / RODATA +40 B; MAIN headroom 1,373 B.
+  `BUILD_CASM` -> 1410. Awaiting sign-off before WP95.

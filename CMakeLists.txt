@@ -974,7 +974,11 @@ if(Ca65_FOUND)
             # (source tables + case routines) overflowed $1000 by 140
             # measured bytes; $1100 (+256) is the smallest round-page fit,
             # same convention as every other harness-growth bump above.
-            set(TEST_PRG_SIZE "1100")
+            # Phase 15 WP94: the eight conditional-directive keyword cases
+            # (dirCaseCheck + eight case routines + eight source rows)
+            # overflowed $1100 by 228 measured bytes; $1200 (+256) is the
+            # next round-page fit.
+            set(TEST_PRG_SIZE "1200")
         endif()
         if(TEST_NAME STREQUAL "casm_pass1")
             list(APPEND TMP_CA65_SRCS_${TEST_NAME}

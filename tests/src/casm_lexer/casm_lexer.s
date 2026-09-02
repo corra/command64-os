@@ -156,6 +156,22 @@ start:
     jsr reportCase
     jsr caseLocalIdentAtNewline
     jsr reportCase
+    jsr caseDirIf
+    jsr reportCase
+    jsr caseDirElseif
+    jsr reportCase
+    jsr caseDirElse
+    jsr reportCase
+    jsr caseDirEndif
+    jsr reportCase
+    jsr caseDirIfdef
+    jsr reportCase
+    jsr caseDirIfndef
+    jsr reportCase
+    jsr caseDirIfBad
+    jsr reportCase
+    jsr caseDirEndBad
+    jsr reportCase
 
     lda #$0D
     jsr KernalChROUT
@@ -588,6 +604,68 @@ caseLocalIdentUnderscoreDigit:
     jmp stringCaseFail
 
 ; ---------------------------------------------------------------------------
+; Phase 15 WP94: conditional-assembly directive keyword recognition.
+; Each case feeds ".KEYWORD" then EOF (string modes 19-26 -> stringSource*
+; indices 13-20) and asserts lexerNext yields CASM_TOKEN_DIRECTIVE with the
+; expected CASM_DIRECTIVE_* subtype. The two "bad" cases (".IFF", ".ENDI")
+; assert CASM_DIRECTIVE_UNKNOWN -- compareTokenText is exact-length, so a
+; near-miss keyword falls through to the UNKNOWN tail exactly like any
+; other unrecognised ".name".
+; ---------------------------------------------------------------------------
+dirCaseCheck:
+    ; A = string mode, X = expected CASM_DIRECTIVE_* subtype.
+    stx ExpectedIndex
+    jsr stringCaseInit
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_DIRECTIVE
+    bne @fail
+    lda CasmTokenRecord + CASM_TOKEN_REC_SUBTYPE
+    cmp ExpectedIndex
+    bne @fail
+    jsr lexerNext
+    bcs @fail
+    cmp #CASM_TOKEN_EOF
+    bne @fail
+    clc
+    rts
+@fail:
+    jmp stringCaseFail
+
+caseDirIf:
+    lda #19
+    ldx #CASM_DIRECTIVE_IF
+    jmp dirCaseCheck
+caseDirElseif:
+    lda #20
+    ldx #CASM_DIRECTIVE_ELSEIF
+    jmp dirCaseCheck
+caseDirElse:
+    lda #21
+    ldx #CASM_DIRECTIVE_ELSE
+    jmp dirCaseCheck
+caseDirEndif:
+    lda #22
+    ldx #CASM_DIRECTIVE_ENDIF
+    jmp dirCaseCheck
+caseDirIfdef:
+    lda #23
+    ldx #CASM_DIRECTIVE_IFDEF
+    jmp dirCaseCheck
+caseDirIfndef:
+    lda #24
+    ldx #CASM_DIRECTIVE_IFNDEF
+    jmp dirCaseCheck
+caseDirIfBad:
+    lda #25
+    ldx #CASM_DIRECTIVE_UNKNOWN
+    jmp dirCaseCheck
+caseDirEndBad:
+    lda #26
+    ldx #CASM_DIRECTIVE_UNKNOWN
+    jmp dirCaseCheck
+
+; ---------------------------------------------------------------------------
 ; sourceNextByte (stub)
 ; Returns CASM_PETSCII_UPPER_A once per remaining byte in BytesRemaining,
 ; then CASM_SOURCE_EOF. Matches source.s's real CASM_SOURCE_BYTE/EOF
@@ -810,21 +888,36 @@ localIdLongExpected:      .byte CASM_PETSCII_AT, $4C, $4F, $4F, $50, $32
 localIdUnderscoreDigitSource:   .byte CASM_PETSCII_AT, $58, $31, $5F, $59 ; "@X1_Y"
 localIdUnderscoreDigitExpected: .byte CASM_PETSCII_AT, $58, $31, $5F, $59
 
+; Phase 15 WP94: conditional directive keyword sources (string modes 19-26).
+dirIfSrc:      .byte $2E, $49, $46                           ; ".IF"
+dirElseifSrc:  .byte $2E, $45, $4C, $53, $45, $49, $46       ; ".ELSEIF"
+dirElseSrc:    .byte $2E, $45, $4C, $53, $45                 ; ".ELSE"
+dirEndifSrc:   .byte $2E, $45, $4E, $44, $49, $46            ; ".ENDIF"
+dirIfdefSrc:   .byte $2E, $49, $46, $44, $45, $46            ; ".IFDEF"
+dirIfndefSrc:  .byte $2E, $49, $46, $4E, $44, $45, $46       ; ".IFNDEF"
+dirIfBadSrc:   .byte $2E, $49, $46, $46                      ; ".IFF"  -> UNKNOWN
+dirEndBadSrc:  .byte $2E, $45, $4E, $44, $49                 ; ".ENDI" -> UNKNOWN
+
 stringSourceLo:
     .byte <stringEmptySource, <stringRawSource, <stringUntermSource
     .byte <stringNewlineSource, <stringInvalid7fSource, <stringInvalidffSource
     .byte <localIdBareAtSource, <localIdDoubleAtSource, <localIdAtDigitSource
     .byte <localIdAtNewlineSource, <localIdSimpleSource, <localIdLongSource
     .byte <localIdUnderscoreDigitSource
+    .byte <dirIfSrc, <dirElseifSrc, <dirElseSrc, <dirEndifSrc
+    .byte <dirIfdefSrc, <dirIfndefSrc, <dirIfBadSrc, <dirEndBadSrc
 stringSourceHi:
     .byte >stringEmptySource, >stringRawSource, >stringUntermSource
     .byte >stringNewlineSource, >stringInvalid7fSource, >stringInvalidffSource
     .byte >localIdBareAtSource, >localIdDoubleAtSource, >localIdAtDigitSource
     .byte >localIdAtNewlineSource, >localIdSimpleSource, >localIdLongSource
     .byte >localIdUnderscoreDigitSource
+    .byte >dirIfSrc, >dirElseifSrc, >dirElseSrc, >dirEndifSrc
+    .byte >dirIfdefSrc, >dirIfndefSrc, >dirIfBadSrc, >dirEndBadSrc
 stringSourceSize:
     .byte 2, 7, 2, 3, 3, 3
     .byte 1, 2, 2, 2, 2, 6, 5
+    .byte 3, 7, 5, 6, 6, 7, 4, 5
 
 passMsg:
     .byte "CASM LEXER: PASS", PetCr, 0

@@ -988,6 +988,54 @@ lnDirective:
     ldx #CASM_DIRECTIVE_ASSERT
     jmp lexerEmitWithSubtype
 @notAssert:
+    ldx #<dirIfStr
+    ldy #>dirIfStr
+    jsr compareTokenText
+    bcs @notIf
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_IF
+    jmp lexerEmitWithSubtype
+@notIf:
+    ldx #<dirElseifStr
+    ldy #>dirElseifStr
+    jsr compareTokenText
+    bcs @notElseif
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_ELSEIF
+    jmp lexerEmitWithSubtype
+@notElseif:
+    ldx #<dirElseStr
+    ldy #>dirElseStr
+    jsr compareTokenText
+    bcs @notElse
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_ELSE
+    jmp lexerEmitWithSubtype
+@notElse:
+    ldx #<dirEndifStr
+    ldy #>dirEndifStr
+    jsr compareTokenText
+    bcs @notEndif
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_ENDIF
+    jmp lexerEmitWithSubtype
+@notEndif:
+    ldx #<dirIfdefStr
+    ldy #>dirIfdefStr
+    jsr compareTokenText
+    bcs @notIfdef
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_IFDEF
+    jmp lexerEmitWithSubtype
+@notIfdef:
+    ldx #<dirIfndefStr
+    ldy #>dirIfndefStr
+    jsr compareTokenText
+    bcs @notIfndef
+    lda #CASM_TOKEN_DIRECTIVE
+    ldx #CASM_DIRECTIVE_IFNDEF
+    jmp lexerEmitWithSubtype
+@notIfndef:
     lda #CASM_TOKEN_DIRECTIVE
     ldx #CASM_DIRECTIVE_UNKNOWN
     jmp lexerEmitWithSubtype
@@ -1603,6 +1651,15 @@ dirFillStr:     .byte ".FILL", 0
 dirAlignStr:    .byte ".ALIGN", 0
 dirIncbinStr:   .byte ".INCBIN", 0
 dirAssertStr:   .byte ".ASSERT", 0
+; Phase 15 WP94: conditional-assembly directive keywords. compareTokenText
+; is exact-length + case-folded, so `.IF` never matches `.IFDEF`/`.IFNDEF`
+; and the recognition order below does not matter.
+dirIfStr:       .byte ".IF", 0
+dirElseifStr:   .byte ".ELSEIF", 0
+dirElseStr:     .byte ".ELSE", 0
+dirEndifStr:    .byte ".ENDIF", 0
+dirIfdefStr:    .byte ".IFDEF", 0
+dirIfndefStr:   .byte ".IFNDEF", 0
 
 mnemonicTable:
     .byte "ADC", "AND", "ASL", "BCC", "BCS", "BEQ", "BIT", "BMI"
