@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp96-pass-driver-wiring
 created: 2026-09-01
-status: implemented, awaiting user sign-off
+status: complete (user-approved 2026-09-01, committed e28dd7d; "grow if needed" for the WP97 envelope)
 taskwarrior: e841c04b-94aa-4fb3-bc7b-9285d022e5f5 (WP96), parent
   0678049c-7d67-4b9a-9305-14efb2353ae1 (Phase 15)
 depends-on: WP93 (37bd4c8), WP94 (fb21ff9), WP95 (ecbd717)

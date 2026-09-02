@@ -507,3 +507,9 @@ Phase 15 is complete only when **all** of:
   Sub-plan / walkthrough:
   `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp96-pass-driver-wiring.md`.
   `BUILD_CASM` 1413. Awaiting sign-off before WP97.
+- 2026-09-01: **WP96 closed (user-approved), committed `e28dd7d`.** User
+  authorised "grow if needed" for the MAIN envelope in WP97. WP97 sub-plan
+  drafted (`brain/plans/2026-09-01-casm-phase15-wp97-ifdef.md`) -- key
+  simplification: WP95's decision bitmap already guarantees Pass1==Pass2
+  for `.ifdef`, so no `DEFINED_AT_OFFSET` compare is needed. Awaiting
+  approval. User also authorised subagent use for the remaining WPs.
