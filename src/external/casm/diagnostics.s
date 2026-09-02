@@ -47,7 +47,6 @@
 ; harnesses that link the real diagnostics.s already carry stand-in copies
 ; of these three names, as a side effect of WP34's own sourceLoad fix --
 ; confirmed by tracing, not assumed.
-.import CasmSourceCount
 .import cliSourceSlotLo
 .import cliSourceSlotHi
 
@@ -860,15 +859,14 @@ diagPrintSourceContext:
     stx CasmDiagTraceDepth
 @traceDepthReady:
 
-    ; WP48: an included-file location always names its physical file. Preserve
-    ; WP35's existing gate for roots so a single-root, no-include diagnostic
-    ; remains byte-identical to prior releases.
-    lda CasmDiagLocFileId
-    bmi @printFileName
-    lda CasmSourceCount
-    cmp #2
-    bcc @skipFileName
-@printFileName:
+    ; Every diagnostic that has a valid recorded source location names its
+    ; physical file. Prior releases (WP35/WP48) suppressed the name for a
+    ; single-root, no-include build via a `CasmSourceCount < 2` gate here;
+    ; the gate was removed 2026-09-02 so root-file diagnostics are no longer
+    ; internally inconsistent with included-file ones and pasted single-file
+    ; output is self-describing. Non-located diagnostics still gate out at
+    ; the `CasmDiagLocValid` check above and stay bare.
+    ; See brain/plans/2026-09-01-casm-diagnostic-always-name-file.md.
     ldx #<msgInFile
     ldy #>msgInFile
     jsr diagPrintString
@@ -877,7 +875,6 @@ diagPrintSourceContext:
     ldx #<msgCR
     ldy #>msgCR
     jsr diagPrintString
-@skipFileName:
     ldx #<msgAtLine
     ldy #>msgAtLine
     jsr diagPrintString
@@ -1762,8 +1759,9 @@ msgLocColPrefix:  .byte " C:", 0
 msgCR:            .byte PetCr, 0
 
 ; WP15 source context strings.
-; WP35/WP48: root names print when CasmSourceCount > 1; included-file names
-; always print. Traceback strings follow the same identity renderer.
+; Every located diagnostic names its physical file (2026-09-02; the old
+; WP35/WP48 `CasmSourceCount > 1` gate for roots was removed). Traceback
+; strings follow the same identity renderer.
 msgInFile:       .byte "IN FILE ", 0
 msgIncludedFrom: .byte "INCLUDED FROM ", 0
 msgLinePrefix:   .byte " LINE ", 0

@@ -280,6 +280,42 @@ Complete only when **all** of:
 - 2026-09-01: User approved the plan. Status set to `approved-not-started`;
   implementation, branch creation, and task activation remain pending an
   explicit start instruction.
+- 2026-09-02: **Increment 2 (remove the suppression gate) COMPLETE.**
+  `src/external/casm/diagnostics.s`: deleted the
+  `lda CasmDiagLocFileId / bmi @printFileName / lda CasmSourceCount /
+  cmp #2 / bcc @skipFileName` gate and the now-unreferenced
+  `@printFileName:` / `@skipFileName:` labels; the name-print block now
+  falls through unconditionally once `CasmDiagLocValid` is set. Removed the
+  now-unused `.import CasmSourceCount` (grep confirmed it was the sole
+  reference). Updated the `diagPrintSourceContext` header/inline comment
+  and the `msgInFile` comment to state the unconditional behavior with the
+  old gate noted as historical. Increment 1's Scoping-Decision-3b path was
+  ruled out, so no provenance-stamp fix was needed here.
+
+  Build: `cmake --build build --target casm` clean — ld65 links at both
+  `$3800` and `$3900`, `reloc.py` reports 25,853 code bytes / 4,228
+  relocation points (well within the `$7400` MAIN envelope; the change is a
+  pure deletion so the binary shrank), diag-table verify "all 97
+  diagnostic identifiers + 2 extras render exactly the frozen text".
+  `BUILD_CASM` auto-incremented `1417` -> `1418`. Rebuilt `image_d64`,
+  `test_image_d64`, `casm_phase15_test_d64`.
+
+  Live re-verification (fresh scratch disk = rebuilt `casm_phase15_test.d64`
+  + the 10 Increment-1 fixtures; CASM `0.6.1` b`1418` under VICE 3.10):
+
+  | Case | Before (Inc 1) | After (Inc 2) |
+  | --- | --- | --- |
+  | (a) single root, no include | no `IN FILE` | **`IN FILE diaga.s`** ✓ |
+  | (b) root error in an `.INCLUDE` build | no `IN FILE` | **`IN FILE diagbr.s`** ✓ (no `INCLUDED FROM` — correct) |
+  | (c) error in `.INCLUDE`d file | `IN FILE diagci.s` + traceback | unchanged ✓ |
+  | (d) two CLI roots, error in 2nd | `IN FILE diagd2.s` | unchanged ✓ |
+  | (e) nested include, error in B | `IN FILE diageb.s` + 2 tracebacks | unchanged ✓ |
+
+  Stop-condition check: `CASM` with no args still prints
+  `CASM: SOURCE FILE REQUIRED` **bare, no `IN FILE`** — the
+  `CasmDiagLocValid` self-gate keeps non-located (CLI/file/internal)
+  diagnostics unchanged. Overlay `test`/`pass` event fired. VICE left
+  healthy, `test.d64` re-attached on unit 8.
 - 2026-09-02: **Increment 1 (characterize the gap) COMPLETE — no code
   change.** Built 10 all-uppercase `.seq` fixtures
   (`.../scratchpad/diagfix/`) into a scratch disk (copy of
