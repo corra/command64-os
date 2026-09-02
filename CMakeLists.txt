@@ -2010,6 +2010,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmres1 casmfill1 casmalign1 casmincbin1 casmassert1
     casmloc1 casmloc2 casmloc3 casmloc7
     casmif1 casmif0 casmifskip casmifelse casmelif casmifnest
+    casmifdef1 casmifdef0 casmifndef1 casmifdeffwd casmifdefguard
     casmpg63 casmpg64 casmpg65 casmpg128 casmpgblank casmpgrt casmpginc
     casmpgfill casmpgincbin casmpgr6)
 set(CASM_REF_BINS "")
@@ -2884,7 +2885,29 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmendnoif.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmelseelse.s" -T SEQ
         -w "${CASM_TEST_FIXTURE_DIR}/casmelseelse.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
-    COMMENT "Appending WP96 conditional-assembly fixtures and trusted references to casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdef1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifdef1.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdef1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifdef1.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdef0.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifdef0.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdef0.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifdef0.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifndef1.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifndef1.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifndef1.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifndef1.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdeffwd.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifdeffwd.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdeffwd.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifdeffwd.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdefname.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifdefname.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdefguard.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifdefguard.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifdefguard.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifdefguard.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMENT "Appending WP96/WP97 conditional-assembly fixtures and trusted references to casm_phase15_test.d64"
     VERBATIM
 )
 

@@ -513,3 +513,13 @@ Phase 15 is complete only when **all** of:
   simplification: WP95's decision bitmap already guarantees Pass1==Pass2
   for `.ifdef`, so no `DEFINED_AT_OFFSET` compare is needed. Awaiting
   approval. User also authorised subagent use for the remaining WPs.
+- 2026-09-02: **WP97 approved + implemented (subagent scaffolded the
+  fixtures).** `.ifdef`/`.ifndef` working: `casm.s` `crpCondIfdef`/
+  `crpCondIfndef`; the WP95 decision bitmap makes a forward `.ifdef`
+  read as not-defined identically in both passes (no `DEFINED_AT_OFFSET`
+  compare). Live: `casmifdeffwd` + `casmifdefguard` prove P1 == P2;
+  5/6 fixtures COMP OK + `EXPECTS A NAME` diagnostic + `test_casm_cond`
+  PASS. MAIN headroom 499 -> 360 B, still within `$7400`. `BUILD_CASM`
+  1415. Sub-plan / walkthrough
+  `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp97-ifdef.md`.
+  Awaiting sign-off before WP98.

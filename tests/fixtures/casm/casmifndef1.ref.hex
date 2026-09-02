@@ -1,0 +1,9 @@
+# CASM Phase 15 WP97 trusted reference: casmifndef1
+#
+# Hand-derived from the fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+#
+# bytes: 3
+
+00 C0
+EA

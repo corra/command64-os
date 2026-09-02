@@ -2420,3 +2420,81 @@ file(WRITE "${OUTPUT_DIR}/casmelseelse.seq"
     ".ELSE\n"
     ".ENDIF\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP97: .ifdef/.ifndef conditional-assembly fixtures. All
+# static (.ORG $C000). Accepted cases carry a hand-derived .ref.hex in
+# tests/fixtures/casm/; the rejected case (casmifdefname) has none.
+# ---------------------------------------------------------------------------
+
+# casmifdef1: FOO defined textually above -> .IFDEF body taken. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifdef1.seq"
+    ".ORG \$C000\n"
+    "FOO = 1\n"
+    ".IFDEF FOO\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifdef0: BAR never defined -> .IFDEF body skipped. -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifdef0.seq"
+    ".ORG \$C000\n"
+    ".IFDEF BAR\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifndef1: BAZ undefined -> first .IFNDEF body (1 NOP) taken; FOO defined
+# -> second .IFNDEF body (2 NOP) skipped. -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifndef1.seq"
+    ".ORG \$C000\n"
+    "FOO = 1\n"
+    ".IFNDEF BAZ\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".IFNDEF FOO\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifdeffwd: first .IFDEF LATER precedes the definition -> NOT defined in
+# either pass, body skipped; second .IFDEF LATER follows it -> 2-NOP body
+# taken. Sharp Pass1==Pass2 test. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifdeffwd.seq"
+    ".ORG \$C000\n"
+    ".IFDEF LATER\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "LATER = 1\n"
+    ".IFDEF LATER\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifdefname: .IFDEF operand is a number, not an identifier ->
+# CASM: .IFDEF/.IFNDEF EXPECTS A NAME. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmifdefname.seq"
+    ".ORG \$C000\n"
+    ".IFDEF 5\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifdefguard: define-once guard pattern twice back-to-back. First block:
+# GUARD undefined -> defined + 1 NOP. Second block: GUARD defined -> skipped.
+# -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifdefguard.seq"
+    ".ORG \$C000\n"
+    ".IFNDEF GUARD\n"
+    "GUARD = 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".IFNDEF GUARD\n"
+    "GUARD = 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)

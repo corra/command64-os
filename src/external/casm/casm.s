@@ -156,6 +156,7 @@
 .import parserEvalConditionExpr
 .import lexerNext
 .import CasmTokenRecord
+.import CasmTokenText
 .import diagStampStmtLoc
 
 .import CasmOutputName
@@ -1156,9 +1157,10 @@ crpDirNotInclude:
     beq crpCondElseJmp
     cmp #CASM_DIRECTIVE_ENDIF
     beq crpCondEndifJmp
-    ; IFDEF/IFNDEF: not wired until WP97.
-    lda #CASM_DIAG_NOT_IMPLEMENTED
-    jmp crpFail
+    cmp #CASM_DIRECTIVE_IFDEF
+    beq crpCondIfdefJmp
+    ; the only remaining subtype in [IF..IFNDEF] is IFNDEF
+    jmp crpCondIfndef
 crpCondIfJmp:
     jmp crpCondIf
 crpCondElseifJmp:
@@ -1167,6 +1169,8 @@ crpCondElseJmp:
     jmp crpCondElse
 crpCondEndifJmp:
     jmp crpCondEndif
+crpCondIfdefJmp:
+    jmp crpCondIfdef
 crpEmitDir:
     jsr emitDirective
     bcc :+
@@ -1472,6 +1476,80 @@ crpCondFail:
     sec
 crpCondFailNoLoc:
     jmp crpFail
+
+; ---------------------------------------------------------------------------
+; crpCondIfdef / crpCondIfndef (private, WP97)
+; `.IFDEF NAME` / `.IFNDEF NAME` in an emitting branch. NAME must be a bare
+; identifier (a leading `@` -> IFDEF_EXPECTS_NAME; scoped-local existence
+; testing is out of Phase 15 scope). "Defined" = a symbol-table hit right
+; now, in this pass. Cross-pass consistency for a forward `.IFDEF` (Pass 1
+; misses, Pass 2 hits) is handled entirely by condSiteDecision's Pass-1-
+; record / Pass-2-replay bitmap -- no DEFINED_AT_OFFSET compare needed.
+; Placed after crpCondFail so its own near branches to the shared fail
+; tails stay in 6502 range.
+; ---------------------------------------------------------------------------
+crpCondIfdef:
+    lda #0                       ; want-absent = 0 (branch taken when defined)
+    beq crpCondIfdefBody
+crpCondIfndef:
+    lda #1                       ; want-absent = 1 (branch taken when NOT defined)
+crpCondIfdefBody:
+    sta condWantAbsent
+    jsr lexerNext                ; consume the directive, fetch the operand
+    bcc @haveTok
+    jmp crpCondFailNoLoc
+@haveTok:
+    lda CasmTokenRecord + CASM_TOKEN_REC_TYPE
+    cmp #CASM_TOKEN_IDENTIFIER
+    beq @haveName
+@expectName:
+    lda #CASM_DIAG_IFDEF_EXPECTS_NAME
+    jmp crpCondFail
+@haveName:
+    lda CasmTokenText            ; a `@local` reference is not a plain symbol name
+    cmp #CASM_PETSCII_AT
+    beq @expectName
+    ; bare global name -> the scope filter is inert, but publish a valid scope.
+    lda CasmCurrentScopeLo
+    sta CasmSymbolLookupScopeLo
+    lda CasmCurrentScopeHi
+    sta CasmSymbolLookupScopeHi
+    lda #<CasmTokenText
+    sta CasmPtr0Lo
+    lda #>CasmTokenText
+    sta CasmPtr0Hi
+    lda CasmTokenRecord + CASM_TOKEN_REC_LENGTH
+    ldx #<condIfdefView
+    ldy #>condIfdefView
+    jsr symbolsLookup
+    bcc @looked
+    jmp crpCondFailNoLoc         ; C set only on a real VMM failure
+@looked:
+    lda condIfdefView + CASM_RESOLVE_FLAGS
+    and #CASM_EXPR_FLAG_RESOLVED
+    beq @notDefined
+    lda #1                       ; A = 1: NAME is defined
+@notDefined:                     ; A = 0 here on the fall-through
+    eor condWantAbsent           ; .IFNDEF inverts the "defined" verdict
+    and #1
+    sta condWantAbsent           ; reuse the byte to carry the raw decision
+    jsr lexerNext                ; fetch the terminator
+    bcc @haveTerm
+    jmp crpCondFailNoLoc
+@haveTerm:
+    jsr crpCondRequireTerminator
+    bcs @toFail
+    lda condWantAbsent
+    jsr crpCondSiteDecision      ; A -> effective decision (Pass 2 replays)
+    bcs @toFail
+    pha
+    jsr crpCondStageOpenLoc
+    pla
+    jsr condOpenIf
+    bcs @toFail
+    jmp crpCondCommitLoop
+@toFail:
+    jmp crpCondFail
 
 ; ---------------------------------------------------------------------------
 ; crpListingBegin / crpListingCommit (private, WP51 increment 5)
@@ -2205,6 +2283,12 @@ CrcValueLo:        .res 1
 CrcValueHi:        .res 1
 CrcLabelDerived:   .res 1
 CrcBitmap:         .res 64
+
+; Phase 15 WP97: crpCondIfdef/crpCondIfndef scratch. condWantAbsent starts
+; as the .IFNDEF-vs-.IFDEF flag and is then reused to carry the raw
+; branch decision into crpCondSiteDecision.
+condWantAbsent:    .res 1
+condIfdefView:     .res CASM_RESOLVE_SIZE
 
 ; Phase 14 WP86: the record index of the most recently committed global
 ; label -- the scope every subsequent `@local` definition/reference
