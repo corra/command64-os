@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp98-listing-regression-dash
 created: 2026-09-02
-status: proposed, not yet approved
+status: implemented + live-verified, committed 37a12c5, awaiting sign-off
 taskwarrior: (to be created under parent 0678049c — Phase 15)
 depends-on: WP93 (37bd4c8), WP94 (fb21ff9), WP95 (ecbd717),
   WP96 (e28dd7d, 6eb2815), WP97 (59c1066)

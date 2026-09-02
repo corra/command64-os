@@ -25,6 +25,11 @@ status: in-progress
   `wiki/tasks/casm.md` and `wiki/tasks/casm-progress-indication.md`.
 - No numbered CASM phases remain on the active roadmap; further work is
   optional-feature or hardening scope.
+- Phase 12 and Phase 13 shipping one minor version later than this plan
+  originally targeted, plus the optional progress-indication feature's own
+  `0.5.0`, pushed every future phase's (14+) target version two minor
+  versions later than drafted; see `## Version Target Reconciliation
+  (2026-08-31)` below for the corrected numbers.
 
 Authoritative Phase 12 work-package map:
 
@@ -41,7 +46,7 @@ Authoritative Phase 12 work-package map:
 | 72 | Named-constant zero-page width correction | Complete |
 | 73 | Forward-label resolver-state/pass-agreement correction | Complete |
 | 74 | `.BYTE` string literals | Complete |
-| 75 | Consolidated verification and `0.3.0` completion gate | Pending |
+| 75 | Consolidated verification and `0.3.0` completion gate | Complete |
 
 ## Goal and Rationale
 
@@ -452,9 +457,9 @@ This gate completes the CASM 0.2 developer-usability release.
 Gate: the user performs the manual runtime walkthrough and decides whether the
 base release is done. The task is not marked done without that confirmation.
 
-## Active Native Release Phase
+## Completed Native Release Phases
 
-### Phase 12: Constants and Expanded Expressions (target CASM 0.3) — Active
+### Phase 12: Constants and Expanded Expressions (CASM 0.3) — Complete
 
 - Named constant definitions.
 - Current-address symbol.
@@ -475,11 +480,9 @@ Corrective WP72/WP73 were discovered by WP71's required DASH dogfooding and are
 part of the completed Phase 12 work, not optional follow-ups. The governing plan
 and authoritative WP map above supersede earlier provisional numbering.
 
-## Future Native Release Phases
+### Phase 13: Data Construction Directives (planned CASM 0.3, shipped CASM 0.4) — Complete
 
-### Phase 13: Data Construction Directives (CASM 0.3)
-
-Potential directives:
+Planned directives (all implemented):
 
 ```text
 .res count[, value]
@@ -498,14 +501,50 @@ Potential directives:
 - `.align` produces identical Pass 1 and Pass 2 sizes.
 - `.incbin` records and verifies native file identity/length between passes.
 
-### Phase 14: Local and Anonymous Labels (CASM 0.4)
+Closed at `0.4.0` build `1349`, one minor version later than this plan
+originally targeted: Phase 12 itself consumed `0.3.0` at its own completion
+gate (rather than landing inside it), pushing Phase 13's release to the next
+minor version. See `## Version Target Reconciliation (2026-08-31)` below for
+the full renumbering this caused to the remaining future phases.
+
+## Version Target Reconciliation (2026-08-31)
+
+This plan originally paired each future phase with a specific minor version
+under the assumption that phases would consume minor versions in strict
+numeric order with no non-phase releases between them. Two scope changes
+broke that assumption, and every future-phase version target below is
+corrected accordingly:
+
+- Phase 12 (Constants and Expanded Expressions) was originally expected to
+  land alongside Phase 13 inside one `0.3` release. Instead Phase 12 closed
+  its own completion gate at `0.3.0` build `1324`, so Phase 13 (Data
+  Construction Directives) shipped one minor version later than planned, at
+  `0.4.0` build `1349`, not the `0.3` this plan originally listed.
+- The optional progress-and-processing-indication feature
+  (`brain/plans/2026-07-29-casm-feature-progress-indication.md`) is explicitly
+  **not** a numbered phase in this plan, but it still consumed a real minor
+  version at its own completion gate: CASM was promoted `0.4.0` -> `0.5.0`.
+  That leaves no unused `0.5` for a future phase.
+
+Consequently every phase target from Phase 14 onward is shifted two minor
+versions later than originally drafted: Phase 14/15 now target `0.6` (was
+`0.4`), Phase 16 now targets `0.7` (was `0.5`), and Phase 17's "Post-0.5"
+framing is now "Post-0.7". Phase 18 (separate project) and Phase 19 (`1.0`
+stabilization) are unaffected because they were never pinned to a specific
+pre-1.0 minor version. Future non-phase optional features remain free to
+consume additional minor versions before Phase 14 begins; if one does, this
+reconciliation must be repeated rather than silently left stale.
+
+## Future Native Release Phases
+
+### Phase 14: Local and Anonymous Labels (CASM 0.6)
 
 - Local labels scoped to the preceding global label.
 - Optional anonymous forward/backward labels.
 - Stable internal identities assigned in Pass 1.
 - Scoped diagnostics and optional local-symbol map output.
 
-### Phase 15: Conditional Assembly (CASM 0.4)
+### Phase 15: Conditional Assembly (CASM 0.6)
 
 - `.if`, `.elseif`, `.else`, and `.endif`.
 - Bounded nesting and deterministic Pass 1 evaluation.
@@ -516,7 +555,7 @@ Conditional assembly precedes macros because it validates controlled source
 suppression without parameter substitution, recursive expansion, or generated
 label scopes.
 
-### Phase 16: Macros and Repetition (CASM 0.5)
+### Phase 16: Macros and Repetition (CASM 0.7)
 
 - Macro definitions and parameters.
 - Macro-local labels.
@@ -525,7 +564,7 @@ label scopes.
 - VMM-backed expansion records rather than an unbounded base-RAM expansion.
 - Diagnostics report invocation and definition locations.
 
-### Phase 17: Multiple Segments (Post-0.5 Investigation)
+### Phase 17: Multiple Segments (Post-0.7 Investigation)
 
 - Named segment records with origin, size, fill policy, and relocation set.
 - Overlap and address-space validation.
@@ -581,6 +620,68 @@ Before 1.0:
 - Confirm repeated native assembly is deterministic.
 - Assemble a representative multi-file Command 64 application using CASM.
 - Complete a full resource, memory-clobber, and error-path audit.
+
+### Phase 20: Undocumented (Illegal) 6510 Opcodes — Review Item (post-1.0, not committed)
+
+**Status: review item only.** This phase is a placeholder for a decision the
+project has not made. No implementation is authorized by its presence here; it
+requires its own separately approved plan and completion gate before any source
+change, exactly like a numbered phase. Recorded 2026-09-01 at user request to
+capture the analysis rather than lose it.
+
+**Value proposition (audience-specific):**
+
+- High value for demoscene / sizecoding / music-driver / fastloader work and
+  for importing existing real-world C64 source (cracks, trainers, demos, SID
+  players commonly use illegal opcodes). ca65 (`--cpu 6502x`) and Turbo Macro
+  Pro both assemble them; CASM being the odd tool out is a source-portability
+  friction point, the same theme as the local-label-in-constant divergence
+  (Phase 14 Research item 7).
+- Low-to-zero value for greenfield Command 64 application code (DASH, EDLIN,
+  user programs), which is CASM's actual target audience and is not
+  cycle-critical.
+
+**Only the stable subset is a candidate.** The 6510's undocumented opcodes
+split into a stable subset — reliable on every real C64/C64C and every accurate
+emulator — and an unstable group whose result depends on page-crossing and
+target-address high bytes and varies by chip revision.
+
+- Stable subset (candidate): `LAX`, `SAX`, `SBX`/`AXS`, `DCP`, `ISC`/`ISB`,
+  `SLO`, `RLA`, `SRE`, `RRA`, `ANC`, `ALR`/`ASR`, `ARR`, and the multi-byte
+  `NOP` forms (`$04`/`$0C`/`$14`/…).
+- Unstable group (must be hard-refused, never emitted): `SHA`/`AHX`,
+  `SHX`/`SHY`, `TAS`, `LAS`. `JAM`/`KIL`/`HLT` are refused as well.
+
+**Costs specific to CASM:**
+
+- **MAIN envelope.** The stable subset adds ~20 mnemonics plus many
+  addressing-mode rows to `opcodes.s` and the mode matcher. CASM MAIN is pinned
+  at `$7400` with limited headroom; envelope pressure is the binding constraint
+  and a Stop Condition.
+- **Trusted-reference burden.** Every opcode's bytes must be hand-derived from
+  the 6502/6510 spec, never from a table (`project-casm-trusted-reference-rule`
+  memory). Illegal opcodes have contradictory naming across sources
+  (`ALR`/`ASR`, `SBX`/`AXS`, `ISC`/`ISB`/`INS`) and messier documentation —
+  more fixtures, higher chance of enshrining a wrong byte.
+- **Relocation audit.** Every new absolute-mode illegal opcode
+  (`LAX abs,Y`, `DCP abs,X`, `SAX abs`, …) must be checked against the R6
+  high-byte recording logic in `emit.s` / `reloc.s`.
+
+**Proposed shape if ever approved:**
+
+- Stable subset only; unstable group and `JAM` hard-refused with a clear
+  diagnostic.
+- Opt-in, never default: a `.setcpu "6510x"` preamble directive or a `/X`
+  command-line flag, so default output stays portable to documented-only
+  targets and a source with no opt-in assembles byte-identically to today.
+- Sequenced after macros (Phase 16) and conditional assembly (Phase 15), which
+  close larger source-portability gaps for less envelope cost.
+- Its own hand-derived `.ref` fixture per opcode/mode, a DASH no-regression
+  sweep, and a CASM/ca65 (`--cpu 6502x`) cross-check.
+
+**Gate:** the user approves a dedicated plan, or explicitly declines and this
+review item is closed as "will not do". Until then CASM emits documented
+opcodes only.
 
 ## High-Risk Feature Analysis
 
@@ -648,7 +749,11 @@ base symbol records.
 - Host execution of CASM.
 - Host-side assembly, linking, or R6 post-processing in the CASM user workflow.
 - Replacement of ca65/ld65 in the repository build.
-- 65C02, 65816, or undocumented opcode support.
+- 65C02 or 65816 support.
+- Undocumented (illegal) 6510 opcode support **in the base and numbered
+  language phases**. Moved 2026-09-01 from "out of scope" to a post-1.0
+  review item — see `### Phase 20` — but remains unimplemented and
+  uncommitted until a dedicated plan is approved.
 - Source-level debugger integration.
 - Link-time optimization.
 - IDE language server integration.
@@ -746,3 +851,27 @@ rather than silently waiving real-application dogfooding.
   `0.3.0` completion gate. Added the mandatory per-feature DASH-adoption rule
   and corrected stale Phase 7, listing, module-boundary, testing, and Phase 13
   string assumptions.
+- 2026-08-31: Corrected stale phase/version bookkeeping this file had not
+  caught up to. WP75 marked Complete (was still shown Pending) after Phase 12
+  closed at `0.3.0` build `1324`; Phase 12's header changed from "target CASM
+  0.3 — Active" to "CASM 0.3 — Complete". Phase 13 (Data Construction
+  Directives) moved out of "Future Native Release Phases" into the completed
+  phases, marked Complete, and its version corrected from the originally
+  planned `0.3` to the actually shipped `0.4.0` build `1349`. Added a new
+  "Version Target Reconciliation" section explaining why: Phase 12 consuming
+  its own `0.3` completion gate, plus the optional (non-phase) progress and
+  processing indication feature consuming `0.5.0` at its own completion gate,
+  together push every remaining future phase's target two minor versions
+  later than originally drafted (Phase 14/15 `0.4` -> `0.6`, Phase 16 `0.5` ->
+  `0.7`, Phase 17 "Post-0.5" -> "Post-0.7"). Phases 18-19 are unaffected. This
+  entry does not activate, reorder, or reopen any phase; it only corrects
+  version labels to match already-approved completion gates recorded
+  elsewhere (`wiki/tasks/casm.md`, `CHANGELOG.md`).
+- 2026-09-01: Added `### Phase 20: Undocumented (Illegal) 6510 Opcodes` as a
+  post-1.0 **review item** at user request — value-proposition analysis,
+  stable-vs-unstable opcode split, CASM-specific costs (MAIN envelope,
+  trusted-reference burden, relocation audit), and a proposed opt-in shape
+  (`.setcpu "6510x"` / `/X`, stable subset only, sequenced after Phases
+  15-16). Not committed work; needs its own approved plan and gate. Split the
+  "Explicitly Deferred or Out of Scope" bullet so 65C02/65816 stay fully out
+  of scope while illegal opcodes now point at Phase 20.
