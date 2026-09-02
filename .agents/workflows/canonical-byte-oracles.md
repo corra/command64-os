@@ -214,6 +214,18 @@ provenance today `NATIVE-OBSERVATION` (shipped native bytes) — becomes
 `src/external/dash/` is linked and signed off; artifact SHA-256
 `3b4d0693...`, 451 relocation entries, runtime verified `$3800`/`$5000`/`$9000`.
 
+## Inventory reconciliation
+
+`scripts/casm_oracle_inventory.py` (CMake target `casm_oracle_inventory`,
+non-gating) enumerates every `*.ref.hex`, cross-checks each manifest's
+declared byte count / SHA-256 against its own hex body, hashes the exact
+generated `.seq` source bytes, traces packaging, and asserts
+`CASM_REF_NAMES` == on-disk == git-tracked with a packaging step for every
+reference. It inspects metadata, hashes, and relationships **only** — it
+never reads `opcodes.s`, disassembles a `.ref`, or decides a byte is
+correct. Run it (or wire it into CI) as a drift check whenever fixtures or
+packaging change; it assigns no provenance state.
+
 ## Lifecycle
 
 - A WP that adds or changes expected bytes scopes its oracle impact in its

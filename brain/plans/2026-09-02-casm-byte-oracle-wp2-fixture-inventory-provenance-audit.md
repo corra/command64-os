@@ -291,6 +291,25 @@ CASM source is touched in WP2.
 
 ## Progress
 
+- 2026-09-02: **Increment 3 (inventory script + CMake target) done.**
+  `scripts/casm_oracle_inventory.py` + non-gating `casm_oracle_inventory`
+  target (not in `ALL`, no image/release dependency, no overlay wrapper —
+  reads files only). Reconciliation **OK** on the clean tree:
+  - `CASM_REF_NAMES` == on-disk == git-tracked == **67**; every ref has a
+    packaging step; **every `.ref.hex`'s declared `bytes:` and `sha256:`
+    match its own hex body** (0 mismatches across all 67 + 2 manifests).
+  - 37/67 refs declare a `sha256:`; 30 declare only `bytes:`.
+  - **66/67 headers explicitly claim independent derivation**
+    ("hand-derived" / "NOT produced by CASM" / "independently ...").
+  - **Finding (for WP3): `casmexprn.ref.hex` (WP20) has no
+    independent-derivation statement** — header is just "trusted
+    numeric-expression adapter reference" + `bytes:`/`sha256:`. Bytes are
+    plausibly hand-writable (`A9 34 / A5 12 / B1 34` + `.byte` lists) but
+    the provenance claim is absent. Provisional lean: `UNCLEAR` pending a
+    WP3 derivation statement, or `CANONICAL-INDEPENDENT (pending metadata)`
+    if the derivation is reconstructed and confirmed non-circular.
+  - `.agents/workflows/canonical-byte-oracles.md` gained an "Inventory
+    reconciliation" section pointing at the script + its prohibition.
 - 2026-09-02: **Increment 1 (baseline re-survey) done.** Baseline commit
   `b3193853` on branch `feature/casm-byte-oracle-wp2` (Taskwarrior WP2
   `d3e4435b`, project `casm.byteoracle`, parent `75cfa082`). Worktree
