@@ -103,7 +103,7 @@ Ledgers B/C need no remediation.
 | feature-to-evidence matrix complete, gaps flagged | ✅ |
 | WP3 worklist batched by oracle class | ✅ |
 | trackers synchronized | ✅ |
-| **user approves the register + WP3 worklist** | ⏳ pending |
+| **user approves the register + WP3 worklist** | ✅ 2026-09-02 |
 
 ## Files changed
 

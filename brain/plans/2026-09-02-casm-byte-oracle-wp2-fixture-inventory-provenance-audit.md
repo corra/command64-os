@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp2-fixture-inventory-provenance-audit
 created: 2026-09-02
-status: approved-in-progress
-taskwarrior: d3e4435b-f47f-4da8-8e53-dbecd513a64c (WP2); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
+status: complete
+taskwarrior: d3e4435b-f47f-4da8-8e53-dbecd513a64c (WP2, done); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: Byte-Oracle Transition WP1 (complete, user-approved 2026-09-02); casm-diagnostic-always-name-file merged to main (78e43c7)
 ---
 
@@ -10,11 +10,10 @@ depends-on: Byte-Oracle Transition WP1 (complete, user-approved 2026-09-02); cas
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-09-02 for user review, per the
-per-work-package plan-approval requirement
-(`.agents/workflows/phased-implementation-planning.md`). No implementation,
-task activation, or register content is authorized until this plan is
-approved.
+**Complete; register + WP3 worklist user-approved 2026-09-02.** All 9
+increments done; walkthrough
+`brain/walkthroughs/2026-09-02-casm-byte-oracle-wp2-fixture-inventory-provenance-audit.md`.
+Merged to `main`; Taskwarrior `d3e4435b` closed. WP3 is next.
 
 Parent plan: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`.
 Prerequisite: WP1 closed (contract + workflow
@@ -368,3 +367,8 @@ CASM source is touched in WP2.
   feature matrix with `GAP` markers; `CANONICAL-INDEPENDENT (pending
   metadata)` as the provisional state for sound-but-unhashed refs).
   Awaiting approval.
+- 2026-09-02: **Increment 9 / CLOSED — register + WP3 worklist user-approved.**
+  Merged `feature/casm-byte-oracle-wp2` to `main`; Taskwarrior `d3e4435b`
+  closed; trackers + memory synced. WP3 (fixture oracle remediation) is the
+  next work package; its first batch is metadata completion for the 66
+  `CANONICAL-INDEPENDENT (pending metadata)` refs.
