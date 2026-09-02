@@ -12,7 +12,22 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-**Phase 14 (Local Labels) is underway**, approved 2026-09-01. Adds ca65
+**Phase 15 (Conditional Assembly) is underway**, approved 2026-09-01
+(branch `feature/casm-phase15` off `main` `1b3597b`, CASM `0.6.0` build
+`1405` baseline). Adds `.if`/`.elseif`/`.else`/`.endif` + `.ifdef`/
+`.ifndef` with truthiness conditions only (no comparison operators --
+`.ASSERT`'s Phase 13 limitation applies), bounded 16-deep nesting,
+suppressed branches that parse nothing / allocate no symbols / emit no
+bytes, and Pass 1 == Pass 2 branch identity (a 64-byte Pass-1 decision
+bitmap replayed in Pass 2). Anonymous labels stay deferred. Version
+target `0.6.1`. WP93 (design freeze) sub-plan drafted, awaiting approval.
+Plans: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`,
+`brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md`.
+
+---
+
+**Phase 14 (Local Labels) is fully closed** (WP86-92, user-approved
+2026-09-01, CASM `0.6.0` build `1405`). Added ca65
 `@name` cheap-local labels scoped to the nearest preceding global label
 (anonymous `:`/`:+`/`:-` labels are explicitly deferred to a later phase).
 WP86 (design freeze), WP87 (lexer `@`-prefixed identifier scanning, live

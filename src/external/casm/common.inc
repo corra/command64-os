@@ -333,6 +333,22 @@ CASM_INCLUDE_MAX_DEPTH = 16
 
 .assert CASM_INCLUDE_MAX_DEPTH = 16, error, "CASM include max nesting depth changed"
 
+; Phase 15 WP93 conditional-assembly limits (cond.s). See
+; `brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md` (D3, D4).
+; Depth 0 = no open `.IF`; depths 1..CASM_COND_MAX_DEPTH index the
+; per-level parallel arrays in cond.s. Matched to CASM_INCLUDE_MAX_DEPTH.
+CASM_COND_MAX_DEPTH = 16
+; Every `.IF`/`.ELSEIF`/`.IFDEF`/`.IFNDEF` evaluated while its enclosing
+; level is emitting records one bit (taken / not-taken) in cond.s's
+; per-pass CasmCondDecisionBitmap; Pass 2 replays those bits rather than
+; re-evaluating. 512 sites = 64 bytes of MAIN BSS.
+CASM_COND_MAX_SITES = 512
+CASM_COND_BITMAP_BYTES = CASM_COND_MAX_SITES / 8
+
+.assert CASM_COND_MAX_DEPTH = 16, error, "CASM conditional max nesting depth changed"
+.assert CASM_COND_MAX_SITES = 512, error, "CASM conditional site limit changed"
+.assert CASM_COND_BITMAP_BYTES = 64, error, "CASM conditional decision bitmap size changed"
+
 .assert CASM_INCLUDE_PHYS_REC_DEVICE = CASM_INCLUDE_PHYS_REC_FLAG + 1, error, "CASM include physical record device offset changed"
 .assert CASM_INCLUDE_PHYS_REC_NAMELEN = CASM_INCLUDE_PHYS_REC_DEVICE + 1, error, "CASM include physical record namelen offset changed"
 .assert CASM_INCLUDE_PHYS_REC_RESERVED0 = CASM_INCLUDE_PHYS_REC_NAMELEN + 1, error, "CASM include physical record reserved offset changed"
@@ -601,7 +617,15 @@ CASM_DIRECTIVE_FILL    = $08
 CASM_DIRECTIVE_ALIGN   = $09
 CASM_DIRECTIVE_INCBIN  = $0A
 CASM_DIRECTIVE_ASSERT  = $0B
-CASM_DIRECTIVE_COUNT   = $0C
+; Phase 15 WP93: conditional-assembly directives, contiguous after ASSERT.
+; See brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md (D1).
+CASM_DIRECTIVE_IF      = $0C
+CASM_DIRECTIVE_ELSEIF  = $0D
+CASM_DIRECTIVE_ELSE    = $0E
+CASM_DIRECTIVE_ENDIF   = $0F
+CASM_DIRECTIVE_IFDEF   = $10
+CASM_DIRECTIVE_IFNDEF  = $11
+CASM_DIRECTIVE_COUNT   = $12
 
 CASM_REGISTER_A     = $00
 CASM_REGISTER_X     = $01
@@ -677,7 +701,13 @@ CASM_DIAG_FILEID_ID_MASK    = $7F
 .assert CASM_STRING_BUFFER_SIZE = 255, error, "CASM string buffer bound changed"
 .assert CASM_MNEMONIC_COUNT = CASM_MNEMONIC_LAST - CASM_MNEMONIC_FIRST + 1, error, "CASM mnemonic subtype range changed"
 .assert CASM_MNEMONIC_COUNT = 56, error, "CASM mnemonic count changed"
-.assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_ASSERT + 1, error, "CASM directive subtype range changed"
+.assert CASM_DIRECTIVE_IF = CASM_DIRECTIVE_ASSERT + 1, error, "CASM Phase 15 directive subtypes must remain contiguous"
+.assert CASM_DIRECTIVE_ELSEIF = CASM_DIRECTIVE_IF + 1, error, "CASM Phase 15 directive subtypes must remain contiguous"
+.assert CASM_DIRECTIVE_ELSE = CASM_DIRECTIVE_ELSEIF + 1, error, "CASM Phase 15 directive subtypes must remain contiguous"
+.assert CASM_DIRECTIVE_ENDIF = CASM_DIRECTIVE_ELSE + 1, error, "CASM Phase 15 directive subtypes must remain contiguous"
+.assert CASM_DIRECTIVE_IFDEF = CASM_DIRECTIVE_ENDIF + 1, error, "CASM Phase 15 directive subtypes must remain contiguous"
+.assert CASM_DIRECTIVE_IFNDEF = CASM_DIRECTIVE_IFDEF + 1, error, "CASM Phase 15 directive subtypes must remain contiguous"
+.assert CASM_DIRECTIVE_COUNT = CASM_DIRECTIVE_IFNDEF + 1, error, "CASM directive subtype range changed"
 .assert CASM_REGISTER_COUNT = CASM_REGISTER_Y + 1, error, "CASM register subtype range changed"
 .assert CASM_NUMBER_COUNT = CASM_NUMBER_BINARY + 1, error, "CASM number subtype range changed"
 .assert CASM_TOKEN_REC_SUBTYPE = CASM_TOKEN_REC_TYPE + 1, error, "CASM token subtype offset changed"
@@ -913,6 +943,30 @@ CASM_DIAG_UNDEFINED_LOCAL = $59
 CASM_DIAG_LOCAL_IN_CONSTANT = $5A
 CASM_DIAG_PHASE14_WP86_LAST = CASM_DIAG_LOCAL_IN_CONSTANT
 
+; Phase 15 WP93: conditional-assembly diagnostics. Reserved here; wired
+; into diagPrintFatal's dense message table (diagnostics.s) in this WP,
+; raised by cond.s / the pass driver / the parser in WP95-97. See
+; `brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md` (D5).
+; `.ELSE`/`.ELSEIF`/`.ENDIF` with no open `.IF` at this nesting level.
+CASM_DIAG_CONDITIONAL_WITHOUT_IF = $5B
+; End of source reached with an `.IF`/`.IFDEF`/`.IFNDEF` still open.
+CASM_DIAG_UNTERMINATED_CONDITIONAL = $5C
+; `.ELSEIF` or a second `.ELSE` after `.ELSE` at the same nesting level.
+CASM_DIAG_CONDITIONAL_ELSE_AFTER_ELSE = $5D
+; Conditional nesting deeper than CASM_COND_MAX_DEPTH.
+CASM_DIAG_CONDITIONAL_NESTING_OVERFLOW = $5E
+; An `.IF`/`.ELSEIF` condition expression did not fully resolve in the
+; pass that parsed it (forward/unresolved reference) -- the WP81
+; `.RES`/`.ALIGN` strict-operand convention, reused so Pass 1 and Pass 2
+; take the identical branch.
+CASM_DIAG_CONDITIONAL_OPERAND_UNRESOLVED = $5F
+; `.IFDEF`/`.IFNDEF` operand is not a single bare identifier.
+CASM_DIAG_IFDEF_EXPECTS_NAME = $60
+; More than CASM_COND_MAX_SITES conditional evaluations in one pass --
+; the Pass-1 decision bitmap (replayed in Pass 2) is full.
+CASM_DIAG_CONDITIONAL_SITE_OVERFLOW = $61
+CASM_DIAG_PHASE15_WP93_LAST = CASM_DIAG_CONDITIONAL_SITE_OVERFLOW
+
 ; ---------------------------------------------------------------------------
 ; The single source of truth for "highest valid CASM_DIAG_* identifier".
 ;
@@ -930,7 +984,7 @@ CASM_DIAG_PHASE14_WP86_LAST = CASM_DIAG_LOCAL_IN_CONSTANT
 ; behind the table again (the WP89 defect: diagPrintFatal still cut off at
 ; $56 and printed INTERNAL ERROR for $57 even though the table, its assert,
 ; and the verify script had all been updated).
-CASM_DIAG_LAST = CASM_DIAG_PHASE14_WP86_LAST
+CASM_DIAG_LAST = CASM_DIAG_PHASE15_WP93_LAST
 
 CASM_DIAG_UNKNOWN        = $FF
 
@@ -1016,6 +1070,14 @@ CASM_DIAG_UNKNOWN        = $FF
 .assert CASM_DIAG_UNDEFINED_LOCAL = CASM_DIAG_DUPLICATE_LOCAL + 1, error, "CASM Phase 14 diagnostics must remain contiguous"
 .assert CASM_DIAG_LOCAL_IN_CONSTANT = CASM_DIAG_UNDEFINED_LOCAL + 1, error, "CASM Phase 14 diagnostics must remain contiguous"
 .assert CASM_DIAG_PHASE14_WP86_LAST = $5A, error, "CASM WP86 diagnostic range changed"
+.assert CASM_DIAG_CONDITIONAL_WITHOUT_IF = CASM_DIAG_PHASE14_WP86_LAST + 1, error, "CASM Phase 15 diagnostics must follow Phase 14"
+.assert CASM_DIAG_UNTERMINATED_CONDITIONAL = CASM_DIAG_CONDITIONAL_WITHOUT_IF + 1, error, "CASM Phase 15 diagnostics must remain contiguous"
+.assert CASM_DIAG_CONDITIONAL_ELSE_AFTER_ELSE = CASM_DIAG_UNTERMINATED_CONDITIONAL + 1, error, "CASM Phase 15 diagnostics must remain contiguous"
+.assert CASM_DIAG_CONDITIONAL_NESTING_OVERFLOW = CASM_DIAG_CONDITIONAL_ELSE_AFTER_ELSE + 1, error, "CASM Phase 15 diagnostics must remain contiguous"
+.assert CASM_DIAG_CONDITIONAL_OPERAND_UNRESOLVED = CASM_DIAG_CONDITIONAL_NESTING_OVERFLOW + 1, error, "CASM Phase 15 diagnostics must remain contiguous"
+.assert CASM_DIAG_IFDEF_EXPECTS_NAME = CASM_DIAG_CONDITIONAL_OPERAND_UNRESOLVED + 1, error, "CASM Phase 15 diagnostics must remain contiguous"
+.assert CASM_DIAG_CONDITIONAL_SITE_OVERFLOW = CASM_DIAG_IFDEF_EXPECTS_NAME + 1, error, "CASM Phase 15 diagnostics must remain contiguous"
+.assert CASM_DIAG_PHASE15_WP93_LAST = $61, error, "CASM WP93 diagnostic range changed"
 
 ; The contiguous run of *locationless* fatal diagnostics: diagPrintFatal
 ; (diagnostics.s, unified-table dispatch -- memory-optimization WP task 42,

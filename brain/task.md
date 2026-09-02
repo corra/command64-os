@@ -3937,6 +3937,28 @@ Taskwarrior parent `4cf10e7c-9365-46cf-94e1-5e4bd8d44635`. Plan
 **CASM Phase 14 is fully closed** (WP86-92, user-approved 2026-09-01,
 `0.6.0` build `1405`).
 
+# CASM Phase 15 (Conditional Assembly)
+
+Taskwarrior parent `0678049c-7d67-4b9a-9305-14efb2353ae1`. Plan
+`brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`. Branch
+`feature/casm-phase15` off `main` `1b3597b`. Approved 2026-09-01.
+
+Scope: `.if`/`.elseif`/`.else`/`.endif` + `.ifdef`/`.ifndef`; truthiness
+conditions only (no comparison operators); suppressed branches parse
+nothing, allocate no symbols, emit no bytes; Pass 1 == Pass 2 branch
+identity. Anonymous labels stay deferred. Version target `0.6.1`.
+
+- [/] WP93 design freeze (`ef34f19f`) -- suppression mechanism, `.ifdef`
+      Pass1/Pass2 determinism, nesting depth, diag codes `$5B`+,
+      constants + `.assert`s, no behaviour. Sub-plan
+      `brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md`.
+- [ ] WP94 lexer conditional directive tokens
+- [ ] WP95 conditional-nesting stack + suppression scanner (`cond.s`) + `test_casm_cond`
+- [ ] WP96 `.if`/`.else`/`.endif` pass-driver wiring + truthiness + `casm_phase15_test_d64`
+- [ ] WP97 `.elseif` chain + `.ifdef`/`.ifndef`
+- [ ] WP98 `/M` `/L` interaction + no-conditionals regression + DASH survey
+- [ ] WP99 consolidated completion gate, docs, `0.6.1`, walkthrough
+
 # Shell: `dir /p` Paged Directory Listing
 
 - [x] `dir /p` paging (project `command64.shell`, Taskwarrior task 44,
