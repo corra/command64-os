@@ -82,8 +82,16 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` (schema + 5 seed
       classifications). Sub-plan + walkthrough
       `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp1-contract-workflow-schema.md`.
-- [ ] WP2 fixture inventory + provenance audit
-- [ ] WP3 fixture oracle remediation
+- [x] WP2 fixture inventory + provenance audit -- **closed, user-approved
+      2026-09-02** (merged a04c8bb). Audit register with 67 `.ref.hex` fixtures +
+      2 native application manifests + 183 no-ref fixtures (Ledgers B/C) + 6-batch
+      worklist. Created `scripts/casm_oracle_inventory.py`. Sub-plan + walkthrough
+      `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp2-fixture-inventory-provenance-audit.md`.
+- [x] WP3 fixture oracle remediation -- **closed, user-approved 2026-09-02**.
+      All 67 `.ref.hex` fixtures brought to `CANONICAL-INDEPENDENT` with full source/artifact
+      hashes and reviewer annotations; `casmexprn` promoted (`UNCLEAR` eliminated);
+      all 67 `.ref` binaries byte-identical across a full serial build. Sub-plan + walkthrough
+      `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
 - [ ] WP4 native-application canonical records (DASH, BANNER)
 - [ ] WP5 DASH differential + source-policy transition
 - [ ] WP6 consolidated verification + completion gate

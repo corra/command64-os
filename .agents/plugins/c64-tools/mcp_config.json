@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "c64": {
+      "serverUrl": "http://127.0.0.1:7000/mcp"
+    },
+    "c64-overlay-api": {
+      "serverUrl": "http://127.0.0.1:8000/openapi.json"
+    }
+  }
+}

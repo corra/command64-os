@@ -1,7 +1,7 @@
 ---
 feature: casm-byte-oracle-wp3-fixture-oracle-remediation
 created: 2026-09-02
-status: approved-in-progress
+status: completed-approved
 taskwarrior: 80484a2b-20f6-40d7-9d45-da1072381d61 (WP3); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: Byte-Oracle Transition WP2 (complete, user-approved 2026-09-02, merged a04c8bb)
 ---
@@ -10,10 +10,9 @@ depends-on: Byte-Oracle Transition WP2 (complete, user-approved 2026-09-02, merg
 
 ## Status
 
-**Proposed, not yet approved.** Drafted 2026-09-02 per
-`.agents/workflows/phased-implementation-planning.md`. No implementation,
-task activation, `.ref.hex` edit, or derivation record is authorized until
-this plan is approved.
+**Completed and user-approved 2026-09-02.** All 67 fixture references
+remediated to `CANONICAL-INDEPENDENT`; zero `UNCLEAR`; all `.ref` binaries
+byte-identical; walkthrough signed off.
 
 Parent: `brain/plans/2026-09-01-casm-canonical-byte-oracle-transition.md`.
 Prerequisite: WP2 closed — audit register
@@ -317,7 +316,9 @@ CASM source, `hex_manifest_to_bin.py`, or native-app manifest is touched.
     `...-batch5-listing-map.md`.
   - **67/67 refs declare sha256; 67/67 claim independent derivation; all
     67 `.ref` binaries byte-identical** across a full serial build;
-    `casm_oracle_inventory --check` green. Remaining before close: user
-    sign-off on Batches 2-5, then add the 10 reviewer lines, then the
-    **consolidated live VICE run** (COMP the changed refs + casmexprn +
-    casmbig1 + `casmreloc1` aptRelocate run) and WP3 gate.
+    `casm_oracle_inventory --check` green.
+- 2026-09-02: **WP3 closed, user-approved.** All 67 `tests/fixtures/casm/*.ref.hex`
+  references brought to `CANONICAL-INDEPENDENT`. `casmexprn` promoted (`UNCLEAR`
+  eliminated). Walkthrough signed off in
+  `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
+  Taskwarrior task `80484a2b` completed. Next: WP4 (Native-Application Canonical Records).

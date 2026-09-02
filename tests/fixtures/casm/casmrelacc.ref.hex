@@ -51,6 +51,8 @@
 # bytes: 19
 # sha256: ddc2d61d50544ce458be4f3e85f27f5ca3224f8d3d2aac94a90132b285d22889
 # source_sha256: casmrelacc.seq=c2e1660da6a0f301de5dff80827f7d4ef8d267b4e8a5af49387b12421cc47471
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batch 3 -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch3-r6-relocation.md).
 
 00 34
 4C 03 34
