@@ -1255,7 +1255,9 @@ cancellation contract.
 > (Phase 9-11). Phases 12-14 have since shipped: named constants, `*`,
 > parenthesised/operator expressions, character and string literals
 > (Phase 12); `.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/`.ASSERT` (Phase 13);
-> `@name` local labels (Phase 14, CASM `0.6.0` — summarised below). The
+> `@name` local labels (Phase 14, CASM `0.6.0` — summarised below);
+> conditional assembly `.IF`/`.ELSEIF`/`.ELSE`/`.ENDIF`/`.IFDEF`/`.IFNDEF`
+> (Phase 15, CASM `0.6.1` — summarised below). The
 > [CASM Utility Manual](casm-utility.md#language-reference) is the
 > authoritative reference for the current user-facing language surface.
 
@@ -1310,6 +1312,33 @@ cancellation contract.
   constant's `=` (an implementation-simplicity choice; ca65 and Turbo
   Macro Pro both allow it). Anonymous labels (`:` / `:+` / `:-`) remain
   unimplemented — a later separate phase.
+- **Conditional assembly** (Phase 15, CASM `0.6.1`): `.IF expr` /
+  `.ELSEIF expr` / `.ELSE` / `.ENDIF` and `.IFDEF name` / `.IFNDEF name`.
+  `.IF`/`.ELSEIF` test **truthiness only** (non-zero = true) — no
+  comparison operators, a documented ca65 divergence; compute a 0/1
+  constant instead. A non-selected block is not parsed (may hold
+  non-assemblable text), defines no symbols, and emits nothing; a later
+  reference to a label seen only in a skipped block is `UNDEFINED
+  SYMBOL`. `.IF`/`.ELSEIF` conditions must resolve in-pass — a forward
+  reference in the condition is `CONDITIONAL_OPERAND_UNRESOLVED` (the
+  `.RES` precedent). `.IFDEF`/`.IFNDEF` test definedness in Pass 1
+  traversal order (a later-defined name reads as "not defined",
+  consistently in both passes — matches ca65). Branch determinism:
+  Pass 1 records each conditional site's decision in a 512-bit bitmap
+  (`CasmCondDecisionBitmap`), Pass 2 replays by index rather than
+  re-evaluating (the `.INCLUDE` catalogLoad→catalogLookup pattern), so
+  the two passes cannot diverge. `cond.s`: a 16-deep stack; emit-state
+  `emitting = parentEmitting AND NOT priorBranchTaken AND decision`. A
+  suppressed line is handled by a `lexerNext`-only scanner
+  (`crpScanSuppressed`) that recognises only the six conditional
+  keywords — so a suppressed `.RES`/`lda undefined` never reaches the
+  evaluator. Limits: 16 nesting levels
+  (`CONDITIONAL_NESTING_OVERFLOW` / `NESTING TOO DEEP`), 512 total sites
+  (`CONDITIONAL_SITE_OVERFLOW` / `TOO MANY CONDITIONALS`). Diagnostics
+  `$5B-$61`. Purely additive — a source with no conditional directive
+  assembles byte-identically to pre-Phase-15. `/L` lists a skipped line
+  with a blank address column (`CASM_LISTING_META_FLAG_SUPPRESSED`);
+  `/M` sees no skipped-block symbol.
 
 **Not yet implemented** (each fails with a specific, non-silent diagnostic
 rather than being silently accepted):
@@ -1320,6 +1349,10 @@ rather than being silently accepted):
   identity matching).
 - **`.STATIC` / `.RELOC` directives** — `CASM_DIAG_NOT_IMPLEMENTED`; use
   `/S` and `.ORG` instead.
+- **Comparison operators in `.IF` / `.ASSERT`** (`=`, `<>`, `<`, `>`,
+  `<=`, `>=`) — `.IF` is truthiness-only and `.ASSERT` takes a bare
+  expression; the lexer has no comparison-operator tokens. Compute a 0/1
+  value with the supported operators. A documented ca65 divergence.
 - **Combined sources over 64K** — `sourceLoad`'s checked total overflows at
   65,536 bytes (`CASM_DIAG_SOURCE_OFFSET_OVERFLOW`).
 - **Multiplicative or parenthesized expression arithmetic** —

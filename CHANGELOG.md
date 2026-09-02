@@ -9,6 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **CASM conditional assembly (Phase 15, WP93-99)** (CASM `0.6.0` ->
+  `0.6.1`): six new directives — `.IF expr` / `.ELSEIF expr` / `.ELSE` /
+  `.ENDIF` and `.IFDEF name` / `.IFNDEF name`. `.IF`/`.ELSEIF` test
+  **truthiness only** (any non-zero value is true) — there are **no
+  comparison operators** (`=`, `<`, `>`, …), a deliberate divergence
+  from ca65; compute a 0/1 constant with the supported expression
+  operators instead. A block that is not selected is skipped entirely —
+  its text is not parsed (it may contain source that would not assemble
+  on its own), it defines no labels or constants, and a later reference
+  to a label seen only in a skipped block is `UNDEFINED SYMBOL`.
+  `.IF`/`.ELSEIF` conditions must resolve within the pass that reads
+  them — a forward reference in the condition is `.IF CONDITION NOT
+  RESOLVED`. `.IFDEF`/`.IFNDEF` take a bare name and test definedness in
+  Pass 1 traversal order — a name defined later in the file reads as
+  "not defined", consistently in both passes (matches ca65); the classic
+  use is a define-once include guard. Pass 1 records each conditional
+  site's decision in a 512-entry bitmap and Pass 2 replays it by index,
+  so the two passes can never take different branches. Nesting is capped
+  at 16 levels (`CONDITIONAL NESTING TOO DEEP`) and 512 total sites
+  (`TOO MANY CONDITIONALS`); structural misuse gives `.ELSE/.ELSEIF/.ENDIF
+  WITHOUT .IF`, `.ELSEIF/.ELSE AFTER .ELSE`, `UNTERMINATED .IF`, or
+  `.IFDEF/.IFNDEF EXPECTS A NAME` (seven new diagnostics, `$5B-$61`).
+  With `/L`, a source line inside a skipped block lists with its text
+  but a **blank address column** and no object bytes (the `.IF`/`.ENDIF`
+  directive lines list normally); with `/M`, a skipped block contributes
+  no symbols. Purely additive — a source with no conditional directive
+  assembles byte-identically to pre-Phase-15; MAIN still `$7400`. DASH
+  surveyed for adoption — none (single-target app, no build-time
+  configuration seams), `dash.ref.hex` byte-identical. Completed and
+  user-approved 2026-09-02; CASM advanced from `0.6.0` to `0.6.1`.
 - **CASM `@name` local labels (Phase 14, WP86-92)** (CASM `0.5.x` ->
   `0.6.0`): named local labels in the ca65 "cheap local" spelling. `@name:`
   defines a label; `@name` references it in any expression position an

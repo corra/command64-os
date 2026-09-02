@@ -1,0 +1,12 @@
+# CASM Phase 15 WP99 trusted reference: casmifp1p2
+#
+# Hand-derived from the casmifp1p2 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+#
+# .IF 1 taken in both passes. LDA DATA is a forward reference resolved to
+# $C004 (LDA abs 3 bytes at $C000, NOP at $C003, DATA at $C004, RTS).
+#
+# bytes: 7
+
+00 C0
+AD 04 C0 EA 60

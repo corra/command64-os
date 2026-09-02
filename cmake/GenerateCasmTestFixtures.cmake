@@ -2300,3 +2300,271 @@ file(WRITE "${OUTPUT_DIR}/casmmapconst.seq"
     "FOO = 5\n"
     "    LDA #FOO\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP96: conditional-assembly production fixtures. All static
+# (.ORG $C000) so no relocation is involved. Accepted cases carry a
+# hand-derived .ref.hex in tests/fixtures/casm/; rejected cases have none.
+# ---------------------------------------------------------------------------
+
+# casmif1: .IF 1 body is assembled. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmif1.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmif0: .IF 0 body is omitted -- output identical to it being absent.
+# -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmif0.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifskip: a skipped .IF 0 body holds source that would not assemble on
+# its own (a .RES with no value, a reference to an undefined symbol). The
+# structural scanner never evaluates it. -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifskip.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    LDA UNDEFINEDXYZ\n"
+    "    .WORD NOTASYMBOL\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifelse: .IF 0 / .ELSE -- the else body assembles. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifelse.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ELSE\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmelif: .IF 0 / .ELSEIF 0 / .ELSEIF 1 / .ELSE -- only the third arm's
+# three NOPs. -> 00 C0 EA EA EA
+file(WRITE "${OUTPUT_DIR}/casmelif.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ELSEIF 0\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ELSEIF 1\n"
+    "    NOP\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ELSE\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifnest: .IF 1 / .IF 0 / .ENDIF / .ENDIF and the mirror. Only the
+# reachable NOPs. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifnest.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    NOP\n"
+    ".IF 0\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".IF 0\n"
+    ".IF 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".ENDIF\n"
+)
+
+# casmiffwd: .IF on a constant defined later -> CASM: .IF CONDITION NOT
+# RESOLVED at line 2. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmiffwd.seq"
+    ".ORG \$C000\n"
+    ".IF LATER\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "LATER = 1\n"
+)
+
+# casmifnoend: .IF 1 with no .ENDIF -> CASM: UNTERMINATED .IF at line 2.
+# No .ref.
+file(WRITE "${OUTPUT_DIR}/casmifnoend.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    NOP\n"
+)
+
+# casmendnoif: .ENDIF with no open .IF -> CASM: .ELSE/.ELSEIF/.ENDIF
+# WITHOUT .IF at line 3. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmendnoif.seq"
+    ".ORG \$C000\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmelseelse: a second .ELSE at the same level -> CASM: .ELSEIF/.ELSE
+# AFTER .ELSE at line 4. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmelseelse.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    ".ELSE\n"
+    ".ELSE\n"
+    ".ENDIF\n"
+)
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP97: .ifdef/.ifndef conditional-assembly fixtures. All
+# static (.ORG $C000). Accepted cases carry a hand-derived .ref.hex in
+# tests/fixtures/casm/; the rejected case (casmifdefname) has none.
+# ---------------------------------------------------------------------------
+
+# casmifdef1: FOO defined textually above -> .IFDEF body taken. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifdef1.seq"
+    ".ORG \$C000\n"
+    "FOO = 1\n"
+    ".IFDEF FOO\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifdef0: BAR never defined -> .IFDEF body skipped. -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifdef0.seq"
+    ".ORG \$C000\n"
+    ".IFDEF BAR\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifndef1: BAZ undefined -> first .IFNDEF body (1 NOP) taken; FOO defined
+# -> second .IFNDEF body (2 NOP) skipped. -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifndef1.seq"
+    ".ORG \$C000\n"
+    "FOO = 1\n"
+    ".IFNDEF BAZ\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".IFNDEF FOO\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifdeffwd: first .IFDEF LATER precedes the definition -> NOT defined in
+# either pass, body skipped; second .IFDEF LATER follows it -> 2-NOP body
+# taken. Sharp Pass1==Pass2 test. -> 00 C0 EA EA
+file(WRITE "${OUTPUT_DIR}/casmifdeffwd.seq"
+    ".ORG \$C000\n"
+    ".IFDEF LATER\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "LATER = 1\n"
+    ".IFDEF LATER\n"
+    "    NOP\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifdefname: .IFDEF operand is a number, not an identifier ->
+# CASM: .IFDEF/.IFNDEF EXPECTS A NAME. No .ref.
+file(WRITE "${OUTPUT_DIR}/casmifdefname.seq"
+    ".ORG \$C000\n"
+    ".IFDEF 5\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# casmifdefguard: define-once guard pattern twice back-to-back. First block:
+# GUARD undefined -> defined + 1 NOP. Second block: GUARD defined -> skipped.
+# -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifdefguard.seq"
+    ".ORG \$C000\n"
+    ".IFNDEF GUARD\n"
+    "GUARD = 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    ".IFNDEF GUARD\n"
+    "GUARD = 1\n"
+    "    NOP\n"
+    ".ENDIF\n"
+)
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP98: /L suppressed-line rendering + /M non-leak fixtures.
+# The PRG is COMP'd against a hand-derived .ref.hex as usual, but the real
+# WP98 assertion for each is the /L listing / /M map output, checked live
+# (mirroring the WP90 /M-fixture precedent -- there is no on-disk .LST/.MAP
+# reference-comparison mechanism).
+# ---------------------------------------------------------------------------
+
+# casmifL1: a .IF 0 body of two content lines then a trailing NOP. /L must
+# render lines 3-4 (the suppressed body) with a blank address column; the
+# .IF 0 / .ENDIF directive lines and the trailing NOP render normally.
+# PRG -> 00 C0 EA
+file(WRITE "${OUTPUT_DIR}/casmifL1.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "    LDA \$1234\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    NOP\n"
+)
+
+# casmifM1: a .IF 0 body defining SKIPPED, then REAL = 1 and LDA #REAL. /M
+# must list REAL but never SKIPPED -- a suppressed branch allocates no
+# symbol. PRG -> 00 C0 A9 01
+file(WRITE "${OUTPUT_DIR}/casmifM1.seq"
+    ".ORG \$C000\n"
+    ".IF 0\n"
+    "SKIPPED = 1\n"
+    ".ENDIF\n"
+    "REAL = 1\n"
+    "    LDA #REAL\n"
+)
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP99: two fixtures deferred from WP96's regression sweep.
+# ---------------------------------------------------------------------------
+
+# casmifsym: a label defined only inside a taken .IF is usable after the
+# .ENDIF (GOOD); a label defined only inside a *skipped* .IF is genuinely
+# absent -- a later reference is a fatal CASM: UNDEFINED SYMBOL (BAD). The
+# fatal stop happens at the second JMP, after GOOD has already resolved,
+# so the one fixture proves both halves. No .ref (diagnostic case).
+file(WRITE "${OUTPUT_DIR}/casmifsym.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "GOOD:\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    JMP GOOD\n"
+    ".IF 0\n"
+    "BAD:\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    JMP BAD\n"
+)
+
+# casmifp1p2: a forward reference (DATA, defined after the .ENDIF) used
+# inside a taken .IF 1 body -- Pass 1 measures it as a placeholder, Pass 2
+# emits the resolved $C005. Both passes take branch 1; no PASS 1/PASS 2
+# mismatch. PRG -> 00 C0 AD 05 C0 EA 60
+file(WRITE "${OUTPUT_DIR}/casmifp1p2.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    LDA DATA\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "DATA:\n"
+    "    RTS\n"
+)

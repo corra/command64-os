@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
-Status: [/]
-Taskwarrior: Phase 14 parent (`4cf10e7c-9365-46cf-94e1-5e4bd8d44635`)
-Plan: `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`
+Status: [x]
+Taskwarrior: Phase 15 parent (project `casm.phase15`, task `41`)
+Plan: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`
 
 ## Goal
 
@@ -12,7 +12,26 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-**Phase 14 (Local Labels) is underway**, approved 2026-09-01. Adds ca65
+**Phase 15 (Conditional Assembly) is fully closed** (WP93-99,
+user-approved 2026-09-02, CASM `0.6.1` build `1417`, merged to `main`).
+Added `.if`/`.elseif`/`.else`/`.endif` + `.ifdef`/`.ifndef` with
+truthiness conditions only (no comparison operators -- a documented ca65
+divergence; `.ASSERT`'s Phase 13 limitation applies), bounded 16-deep
+nesting / 512 total sites, suppressed branches that parse nothing /
+allocate no symbols / emit no bytes, and Pass 1 == Pass 2 branch
+identity via a 512-bit Pass-1 decision bitmap replayed in Pass 2. `/L`
+lists a skipped line with a blank address column; `/M` sees no
+skipped-block symbol. Anonymous labels stay deferred. WP93-98
+user-approved and closed; WP99 (0.6.1 + docs + consolidated gate)
+committed, awaiting sign-off then merge to `main`.
+Plan: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`;
+per-WP sub-plans + walkthroughs
+`brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp9{3..9}-*.md`.
+
+---
+
+**Phase 14 (Local Labels) is fully closed** (WP86-92, user-approved
+2026-09-01, CASM `0.6.0` build `1405`). Added ca65
 `@name` cheap-local labels scoped to the nearest preceding global label
 (anonymous `:`/`:+`/`:-` labels are explicitly deferred to a later phase).
 WP86 (design freeze), WP87 (lexer `@`-prefixed identifier scanning, live

@@ -1,0 +1,9 @@
+# CASM Phase 15 WP96 trusted reference: casmifskip
+#
+# Hand-derived from the casmifskip fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+#
+# bytes: 3
+
+00 C0
+EA

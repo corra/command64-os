@@ -1,0 +1,14 @@
+# CASM Phase 15 WP98 trusted reference: casmifL1
+#
+# Hand-derived from the casmifL1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+#
+# .IF 0 suppresses its two-line body; only the trailing NOP is emitted.
+# The /L listing of this same fixture is the actual WP98 assertion
+# (suppressed body lines render with a blank address column) and is
+# checked live, not by file COMP.
+#
+# bytes: 3
+
+00 C0
+EA

@@ -84,6 +84,7 @@
 .export listingBeginLine
 .export listingMirrorByte
 .export listingCommitLine
+.export CasmListingLineSuppressed
 .export listingCaptureFinalize
 .export listingFileInit
 .export listingCreate
@@ -271,6 +272,14 @@ CasmListingTxnPcHi:         .res 1
 CasmListingTxnByteCursorLo: .res 1
 CasmListingTxnByteCursorHi: .res 1
 CasmListingTxnFullFlag:     .res 1
+
+; Phase 15 WP98: casm.s sets this to 1 immediately before the
+; crpListingCommit call on the crpScanSuppressed path (a content line
+; discarded inside an off conditional branch); 0 everywhere else.
+; listingCommitLine folds it into the metadata record's SUPPRESSED bit
+; and clears it. The /L writer then renders that line with a blank
+; address column.
+CasmListingLineSuppressed:  .res 1
 
 ; Metadata record fields, staged by the caller before listingMetaAppend.
 ; Reserved0/Reserved1 are not staged here at all -- listingMetaAppend always
@@ -793,6 +802,13 @@ lclRealLine:
 lclFlagsNotFinal:
     lda #0
 lclFlagsReady:
+    ; Phase 15 WP98: fold in the suppressed-content-line bit. casm.s
+    ; raises CasmListingLineSuppressed only for a line crpScanSuppressed
+    ; discarded inside an off conditional branch.
+    ldx CasmListingLineSuppressed
+    beq lclFlagsStore
+    ora #CASM_LISTING_META_FLAG_SUPPRESSED
+lclFlagsStore:
     sta CasmListingPendingFlags
 
     lda CasmSourceCompletedFileId
@@ -1345,7 +1361,8 @@ laKeepPrimary:
 ;
 ; Checks, each raising CASM_DIAG_LISTING_REPLAY_MISMATCH on its own
 ; disagreement:
-;   - FLAGS has no bit set outside CASM_LISTING_META_FLAG_FINAL_UNTERMINATED
+;   - FLAGS has no bit set outside CASM_LISTING_META_FLAG_VALID_MASK
+;     (FINAL_UNTERMINATED | SUPPRESSED)
 ;   - RESERVED0 and both RESERVED1 bytes are zero
 ;   - OFF_LO/HI + LEN does not overflow 16 bits (a self-contained bound;
 ;     whether the span actually lies within the loaded source is proven
@@ -1376,10 +1393,10 @@ laKeepPrimary:
 ; Clobbers:  A, X, Y and listingResolveFilename's own clobbers
 ; ---------------------------------------------------------------------------
 listingValidateRecord:
-    ; Clears bit 0 (CASM_LISTING_META_FLAG_FINAL_UNTERMINATED); any bit
+    ; Masks off the known bits (FINAL_UNTERMINATED, SUPPRESSED); any bit
     ; still set afterward is unknown.
     lda CasmVmmBuffer + CASM_LISTING_META_FLAGS
-    and #%11111110
+    and #<~CASM_LISTING_META_FLAG_VALID_MASK
     bne lvrMismatch
 
     lda CasmVmmBuffer + CASM_LISTING_META_RESERVED0
@@ -2175,10 +2192,21 @@ lwEmitDetailRows:
     jsr lwPutDec5
     lda #CASM_PETSCII_SPACE
     jsr lwPutChar
+    ; Phase 15 WP98: a SUPPRESSED content line (inside an off conditional
+    ; branch) renders with a blank address column -- no PC, and its byte
+    ; count is already 0 so lwEmitByteGroupRow emits an all-spaces group.
+    lda CasmListCurrentRecord + CASM_LISTING_META_FLAGS
+    and #CASM_LISTING_META_FLAG_SUPPRESSED
+    bne lwedrPrimarySuppressed
     lda CasmListRunPcHi
     jsr lwPutHexByte
     lda CasmListRunPcLo
     jsr lwPutHexByte
+    jmp lwedrPrimaryBytes
+lwedrPrimarySuppressed:
+    lda #(CASM_LISTING_ROW_ADDR_WIDTH - 1)
+    jsr lwPutSpaces
+lwedrPrimaryBytes:
     jsr lwEmitByteGroupRow
     bcs lwedrFail
     lda #CASM_PETSCII_SPACE

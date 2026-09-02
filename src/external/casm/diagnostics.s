@@ -1322,6 +1322,13 @@ diagMsgLo:
     .byte <msgDuplicateLocal        ; $58
     .byte <msgUndefinedLocal        ; $59
     .byte <msgLocalInConstant       ; $5A
+    .byte <msgConditionalWithoutIf  ; $5B
+    .byte <msgUnterminatedConditional ; $5C
+    .byte <msgConditionalElseAfterElse ; $5D
+    .byte <msgConditionalNestingOverflow ; $5E
+    .byte <msgConditionalOperandUnresolved ; $5F
+    .byte <msgIfdefExpectsName      ; $60
+    .byte <msgConditionalSiteOverflow ; $61
 diagMsgLoEnd:
 
 diagMsgHi:
@@ -1415,6 +1422,13 @@ diagMsgHi:
     .byte >msgDuplicateLocal        ; $58
     .byte >msgUndefinedLocal        ; $59
     .byte >msgLocalInConstant       ; $5A
+    .byte >msgConditionalWithoutIf  ; $5B
+    .byte >msgUnterminatedConditional ; $5C
+    .byte >msgConditionalElseAfterElse ; $5D
+    .byte >msgConditionalNestingOverflow ; $5E
+    .byte >msgConditionalOperandUnresolved ; $5F
+    .byte >msgIfdefExpectsName      ; $60
+    .byte >msgConditionalSiteOverflow ; $61
 diagMsgHiEnd:
 
 .assert diagMsgLoEnd - diagMsgLo = CASM_DIAG_LAST, error, "CASM diagnostic message table (lo) length must equal CASM_DIAG_LAST"
@@ -1622,6 +1636,21 @@ msgUndefinedLocal:
     .byte "UNDEFINED LOCAL LABEL", 0
 msgLocalInConstant:
     .byte "LOCAL LABEL NOT ALLOWED IN CONSTANT", 0
+; Phase 15 WP93: conditional-assembly diagnostics ($5B-$61).
+msgConditionalWithoutIf:
+    .byte ".ELSE/.ELSEIF/.ENDIF WITHOUT .IF", 0
+msgUnterminatedConditional:
+    .byte "UNTERMINATED .IF", 0
+msgConditionalElseAfterElse:
+    .byte ".ELSEIF/.ELSE AFTER .ELSE", 0
+msgConditionalNestingOverflow:
+    .byte "CONDITIONAL NESTING TOO DEEP", 0
+msgConditionalOperandUnresolved:
+    .byte ".IF CONDITION NOT RESOLVED", 0
+msgIfdefExpectsName:
+    .byte ".IFDEF/.IFNDEF EXPECTS A NAME", 0
+msgConditionalSiteOverflow:
+    .byte "TOO MANY CONDITIONALS", 0
 ; The five listing-file I/O diagnostics ($3D-$41): the head of the
 ; CASM_DIAG_LOCLESS_FIRST..LAST locationless run (see common.inc).
 msgListingCreateFailed:

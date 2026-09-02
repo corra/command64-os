@@ -1,0 +1,14 @@
+# CASM Phase 15 WP98 trusted reference: casmifM1
+#
+# Hand-derived from the casmifM1 fixture source in
+# cmake/GenerateCasmTestFixtures.cmake. NOT produced by CASM.
+#
+# .IF 0 suppresses the SKIPPED constant; REAL = 1 resolves and LDA #REAL
+# emits A9 01. The /M symbol map of this same fixture is the actual WP98
+# assertion (the map lists REAL but never SKIPPED -- a suppressed branch
+# allocates no symbol) and is checked live.
+#
+# bytes: 4
+
+00 C0
+A9 01

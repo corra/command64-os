@@ -3526,6 +3526,70 @@ per-WP walkthroughs `brain/walkthroughs/2026-09-01-casm-phase14-wp8{6..9},wp9{0,
 + `...-wp92-*` + `...-flmeta-maxincluded-regression.md`. Taskwarrior
 parent `4cf10e7c`, WP92 `56711c7e`, regression `8da90f45`.
 
+## CASM Phase 15 Complete (WP93-99, closed 2026-09-02 at `0.6.1` build `~1418`)
+
+Phase 15 ("Conditional Assembly") added six directives — `.IF` / `.ELSEIF`
+/ `.ELSE` / `.ENDIF` and `.IFDEF` / `.IFNDEF` — with **truthiness-only**
+conditions (no comparison operators; a documented ca65 divergence).
+Purely additive: a source with no conditional directive assembles
+byte-identically to pre-Phase-15; MAIN stayed `$7400` throughout
+(headroom 1902 B at Phase 14 close → 327 B at WP98, never a grow).
+
+**Design (WP93 freeze).** Two mechanisms make Pass 1 == Pass 2
+guaranteed:
+
+1. *Structural scan of a suppressed branch* — when a branch is off,
+   `casmRunPass` calls `crpScanSuppressed` (a `lexerNext`-only line
+   scanner that recognises ONLY the six conditional keywords) instead of
+   the full parser, so a suppressed `.RES undefined` / `lda notdefined`
+   never reaches the evaluator or the symbol table.
+2. *Decision bitmap* — `cond.s` keeps a 512-bit `CasmCondDecisionBitmap`;
+   Pass 1 records each conditional site's decision bit
+   (`condSiteDecision`), Pass 2 replays by site index rather than
+   re-evaluating (the `.INCLUDE` catalogLoad→catalogLookup pattern).
+   This is *why* a forward `.IFDEF FOO` reads consistently as "not
+   defined" in both passes with **no `DEFINED_AT_OFFSET` comparison** —
+   a deliberate WP97 simplification over the phase plan's sketch.
+
+`.IF` / `.ELSEIF` conditions must resolve in-pass — a forward reference
+is `CASM_DIAG_CONDITIONAL_OPERAND_UNRESOLVED` (the `.RES` precedent).
+`.IFDEF` / `.IFNDEF` take a bare name (`.IFDEF 5` / `.IFDEF @local` →
+`IFDEF_EXPECTS_NAME`). `cond.s`: a 16-deep stack, emit formula
+`emitting = parentEmitting AND (NOT priorBranchTaken) AND decision`;
+`cond.s` never parses or evaluates — callers hand it a 1/0 decision.
+Diagnostics `$5B-$61` (`CONDITIONAL_WITHOUT_IF`,
+`UNTERMINATED_CONDITIONAL`, `CONDITIONAL_ELSE_AFTER_ELSE`,
+`CONDITIONAL_NESTING_OVERFLOW`, `CONDITIONAL_OPERAND_UNRESOLVED`,
+`IFDEF_EXPECTS_NAME`, `CONDITIONAL_SITE_OVERFLOW`); `CASM_DIAG_LAST`
+re-pinned; `verify_casm_diag_table.py` extended.
+
+**WP-by-WP.** WP93 design freeze + storage (`cond.s`, `common.inc`
+constants, diag codes) `37bd4c8`. WP94 six lexer keywords `fb21ff9`.
+WP95 `cond.s` state-machine routines + `test_casm_cond` (15-case unit
+harness, narrowest link) `ecbd717`. WP96 `.if/.elseif/.else/.endif`
+pass-driver wiring + truthiness (`parserEvalConditionExpr`) +
+`casm_phase15_test.d64` `e28dd7d`/`6eb2815`. WP97 `.ifdef/.ifndef`
+pass-driver wiring `59c1066` (found the bitmap already solves forward
+`.ifdef` — no offset compare). WP98 `/L` renders a suppressed content
+line with a **blank address column** (new
+`CASM_LISTING_META_FLAG_SUPPRESSED`, spare bit 1 of the metadata FLAGS
+byte — no record-size change; only content lines the scanner discards
+get it, never the six conditional directives) + `/M` non-leak proof +
+DASH survey (no adoption) `37a12c5`. WP99 consolidated gate + docs +
+`0.6.1`.
+
+**WP99 consolidated gate:** fresh full `test_casm_*` sweep + the entire
+Phase 15 fixture matrix on `casm_phase15_test.d64` re-verified together
+(`casmif{1,0,skip,else,nest}`, `casmelif`, `casmif{noend,endnoif,elseelse}`,
+`casmiffwd`, `casmifdef{1,0}`, `casmifndef1`, `casmifdeffwd`,
+`casmifdefguard`, `casmifdefname`, `casmifL1`, `casmifM1`, `casmifsym`,
+`casmifp1p2`, `test_casm_cond`) + no-`.if` regression witnesses. DASH
+`dash.ref.hex` byte-identical.
+
+Parent plan `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`;
+per-WP sub-plans + walkthroughs `brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp9{3..9}-*.md`.
+Taskwarrior parent `41` (project `casm.phase15`).
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
