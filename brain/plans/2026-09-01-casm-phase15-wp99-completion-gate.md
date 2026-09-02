@@ -1,7 +1,7 @@
 ---
 feature: casm-phase15-wp99-completion-gate
 created: 2026-09-02
-status: proposed, not yet approved
+status: gate GREEN, docs done, committed -- awaiting phase sign-off
 taskwarrior: 43 (project casm.phase15), parent 41 (Phase 15)
 depends-on: WP93 (37bd4c8), WP94 (fb21ff9), WP95 (ecbd717),
   WP96 (e28dd7d, 6eb2815), WP97 (59c1066), WP98 (37a12c5)
@@ -191,4 +191,21 @@ Listing Output`). Content:
 ## Progress
 
 - 2026-09-02: Plan drafted. WP98 closed (user-approved, 37a12c5).
-  Awaiting approval to run the gate.
+- 2026-09-02: **Gate run. GREEN.** `casmifsym` + `casmifp1p2` fixtures
+  added; `casm.s` → `VERSION_STAGE "1"` (CASM 0.6.1). Fresh
+  `rm -rf build` + full build clean (74 targets); `verify_casm_diag_table.py`
+  green (97 ids); `ld65 -m` MAIN within `$7400`, headroom 327 B
+  (identical to WP98 — version string same length, zero code delta);
+  no committed `.ref`/`.d64` changed. `BUILD_CASM` 1417.
+  **Live VICE (`CASM V0.6.1.1417`):** `TEST_CASM_COND` PASS; `casmif1`
+  / `casmif0` / `casmifskip` / `casmelif` / `casmifnest` /
+  `casmifdefguard` / `casmifp1p2` all `FILES COMPARE OK` with P1 == P2;
+  `casmifsym` → `GOOD` resolves, `JMP BAD` → `UNDEFINED SYMBOL` line 11;
+  `casmiffwd` → `.IF CONDITION NOT RESOLVED`; `casmelseelse` →
+  `.ELSEIF/.ELSE AFTER .ELSE`; `casmifL1` `/L` → suppressed lines blank
+  address; regression `casmassert1` / `casmincbin1` (no `.if`)
+  `FILES COMPARE OK`. FLUSH clean before/after; overlay `test/pass`
+  fired. Docs (utility Conditional Assembly section + Example 5 +
+  programmer's reference + wiki mirrors + Home + tasks + CHANGELOG +
+  KNOWLEDGE) all updated. Walkthrough written. Committed. Awaiting
+  phase sign-off; merge to `main` is a separate step.

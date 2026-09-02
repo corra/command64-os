@@ -1,8 +1,8 @@
 # CASM Native Assembler
 
 Status: [/]
-Taskwarrior: Phase 14 parent (`4cf10e7c-9365-46cf-94e1-5e4bd8d44635`)
-Plan: `brain/plans/2026-09-01-casm-phase14-local-anonymous-labels.md`
+Taskwarrior: Phase 15 parent (project `casm.phase15`, task `41`)
+Plan: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`
 
 ## Goal
 
@@ -12,17 +12,21 @@ R6-relocatable PRG files.
 
 ## Current Milestone
 
-**Phase 15 (Conditional Assembly) is underway**, approved 2026-09-01
-(branch `feature/casm-phase15` off `main` `1b3597b`, CASM `0.6.0` build
-`1405` baseline). Adds `.if`/`.elseif`/`.else`/`.endif` + `.ifdef`/
-`.ifndef` with truthiness conditions only (no comparison operators --
-`.ASSERT`'s Phase 13 limitation applies), bounded 16-deep nesting,
-suppressed branches that parse nothing / allocate no symbols / emit no
-bytes, and Pass 1 == Pass 2 branch identity (a 64-byte Pass-1 decision
-bitmap replayed in Pass 2). Anonymous labels stay deferred. Version
-target `0.6.1`. WP93 (design freeze) sub-plan drafted, awaiting approval.
-Plans: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`,
-`brain/plans/2026-09-01-casm-phase15-wp93-design-freeze.md`.
+**Phase 15 (Conditional Assembly) gate is GREEN**, awaiting phase
+sign-off (branch `feature/casm-phase15`, CASM `0.6.1` build `1417`).
+Added `.if`/`.elseif`/`.else`/`.endif` + `.ifdef`/`.ifndef` with
+truthiness conditions only (no comparison operators -- a documented ca65
+divergence; `.ASSERT`'s Phase 13 limitation applies), bounded 16-deep
+nesting / 512 total sites, suppressed branches that parse nothing /
+allocate no symbols / emit no bytes, and Pass 1 == Pass 2 branch
+identity via a 512-bit Pass-1 decision bitmap replayed in Pass 2. `/L`
+lists a skipped line with a blank address column; `/M` sees no
+skipped-block symbol. Anonymous labels stay deferred. WP93-98
+user-approved and closed; WP99 (0.6.1 + docs + consolidated gate)
+committed, awaiting sign-off then merge to `main`.
+Plan: `brain/plans/2026-09-01-casm-phase15-conditional-assembly.md`;
+per-WP sub-plans + walkthroughs
+`brain/{plans,walkthroughs}/2026-09-01-casm-phase15-wp9{3..9}-*.md`.
 
 ---
 

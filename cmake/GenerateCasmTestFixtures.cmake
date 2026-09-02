@@ -2531,3 +2531,40 @@ file(WRITE "${OUTPUT_DIR}/casmifM1.seq"
     "REAL = 1\n"
     "    LDA #REAL\n"
 )
+
+# ---------------------------------------------------------------------------
+# CASM Phase 15 WP99: two fixtures deferred from WP96's regression sweep.
+# ---------------------------------------------------------------------------
+
+# casmifsym: a label defined only inside a taken .IF is usable after the
+# .ENDIF (GOOD); a label defined only inside a *skipped* .IF is genuinely
+# absent -- a later reference is a fatal CASM: UNDEFINED SYMBOL (BAD). The
+# fatal stop happens at the second JMP, after GOOD has already resolved,
+# so the one fixture proves both halves. No .ref (diagnostic case).
+file(WRITE "${OUTPUT_DIR}/casmifsym.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "GOOD:\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    JMP GOOD\n"
+    ".IF 0\n"
+    "BAD:\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "    JMP BAD\n"
+)
+
+# casmifp1p2: a forward reference (DATA, defined after the .ENDIF) used
+# inside a taken .IF 1 body -- Pass 1 measures it as a placeholder, Pass 2
+# emits the resolved $C005. Both passes take branch 1; no PASS 1/PASS 2
+# mismatch. PRG -> 00 C0 AD 05 C0 EA 60
+file(WRITE "${OUTPUT_DIR}/casmifp1p2.seq"
+    ".ORG \$C000\n"
+    ".IF 1\n"
+    "    LDA DATA\n"
+    "    NOP\n"
+    ".ENDIF\n"
+    "DATA:\n"
+    "    RTS\n"
+)

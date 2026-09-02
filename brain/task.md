@@ -3957,7 +3957,7 @@ identity. Anonymous labels stay deferred. Version target `0.6.1`.
 - [x] WP96 `.if`/`.elseif`/`.else`/`.endif` pass-driver wiring + truthiness + `casm_phase15_test_d64` (`e28dd7d`, `6eb2815`), **user-approved 2026-09-01**
 - [x] WP97 `.ifdef`/`.ifndef` pass-driver wiring (`59c1066`), **user-approved 2026-09-02**. MAIN headroom 499->360 B, no envelope grow.
 - [x] WP98 `/L` suppressed-line rendering (ca65-style blank address) + `/M` non-leak + regression + DASH survey (`37a12c5`), **user-approved 2026-09-02**. MAIN headroom 360->327 B, no grow.
-- [/] WP99 consolidated completion gate, docs, `0.6.1`, walkthrough
+- [/] WP99 consolidated completion gate, docs, `0.6.1`, walkthrough. Gate GREEN on fresh `CASM 0.6.1` build `1417`: full conditional matrix + regression witnesses live-verified, all docs/wiki/CHANGELOG/KNOWLEDGE reconciled, committed. Awaiting phase sign-off; then merge to `main`.
 
 # Shell: `dir /p` Paged Directory Listing
 

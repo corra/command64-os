@@ -533,3 +533,19 @@ Phase 15 is complete only when **all** of:
   grow). Walkthrough
   `brain/walkthroughs/2026-09-01-casm-phase15-wp98-listing-regression-dash.md`.
   Awaiting sign-off before WP99.
+- 2026-09-02: **WP98 CLOSED (user-approved, 37a12c5). WP99 gate run --
+  GREEN.** CASM `0.6.0` -> `0.6.1` build `1417` (version bump only, zero
+  code delta -- BSS end `$AAB9` identical to WP98, 327 B headroom).
+  Fresh full build clean (74 targets); `verify_casm_diag_table.py` green
+  (97 ids incl. `$5B-$61`). `casmifsym` + `casmifp1p2` fixtures added.
+  Live VICE (`CASM V0.6.1.1417`): `test_casm_cond` PASS; the full
+  conditional matrix (`casmif1/0/skip/else/elif/nest/defguard/p1p2` COMP
+  + P1==P2; `casmifsym` UNDEFINED SYMBOL on skipped-branch label;
+  `casmiffwd` .IF NOT RESOLVED; `casmelseelse` AFTER .ELSE; `casmifL1`
+  /L blank address) + no-`.if` regression witnesses `casmassert1` /
+  `casmincbin1` COMP OK. Docs: `docs/casm-utility.md` Conditional
+  Assembly section + Example 5, programmer's reference, wiki mirrors,
+  Home, tasks, CHANGELOG, KNOWLEDGE. Walkthrough
+  `brain/walkthroughs/2026-09-01-casm-phase15-wp99-completion-gate.md`.
+  Memory `project-casm-phase15-complete`. Committed. **Awaiting explicit
+  phase sign-off; merge to `main` is a separate step.**

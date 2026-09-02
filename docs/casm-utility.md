@@ -552,6 +552,73 @@ Rules:
 See [DASH](dash-utility.md) for a real, shipping seven-file program built
 entirely through one `.INCLUDE` chain from a single entry file.
 
+### Conditional Assembly
+
+Six directives include or exclude a block of source depending on a
+condition evaluated at assembly time (Phase 15):
+
+```asm
+.IF expr          ; assemble the following block iff expr is non-zero
+.ELSEIF expr      ; ...otherwise try this block iff its expr is non-zero
+.ELSE             ; ...otherwise assemble this block
+.ENDIF            ; end of the conditional
+
+.IFDEF name       ; assemble the block iff `name` is a defined symbol
+.IFNDEF name      ; assemble the block iff `name` is NOT defined
+```
+
+`.IF` / `.ELSEIF` take an **expression**, and the test is pure
+truthiness: any non-zero value is true, zero is false. There are **no
+comparison operators** — `.IF A = B`, `.IF X < 4` and the like are *not*
+supported (a deliberate divergence from ca65). When you need a
+comparison, compute a 0/1 constant with the operators that
+[expressions](#expressions-and-operators) do have and test that:
+
+```asm
+BIG = (SIZE - 1) >> 7      ; 1 when SIZE > 128, else 0
+.IF BIG
+    ; ... large-buffer path
+.ENDIF
+```
+
+`.IFDEF` / `.IFNDEF` take a **bare name** (`.IFDEF 5` or `.IFDEF @local`
+is `CASM: .IFDEF/.IFNDEF EXPECTS A NAME`). The name is tested against
+every symbol defined *up to that point in the first pass* — a symbol
+defined later in the file reads as **not defined**, consistently in both
+passes (this matches ca65's traversal-order `.ifdef`). The classic use
+is a define-once guard:
+
+```asm
+.IFNDEF DID_CONSTANTS
+DID_CONSTANTS = 1
+SCREEN = $0400
+COLOR  = $D800
+.ENDIF
+```
+
+Rules:
+
+- A block that is **not** selected is skipped entirely — its text is not
+  even parsed. It may contain source that would not assemble on its own;
+  it defines **no labels and no constants**. A later reference to a
+  label that appears only inside a skipped block is `CASM: UNDEFINED
+  SYMBOL`.
+- `.IF` / `.ELSEIF` conditions must resolve within the pass that reads
+  them — a **forward reference** in the condition (a symbol defined later
+  in the file) is `CASM: .IF CONDITION NOT RESOLVED`. (`.IFDEF` has no
+  such restriction; an undefined name simply reads as "not defined".)
+- Conditionals nest up to **16** levels deep (`CASM: CONDITIONAL NESTING
+  TOO DEEP` beyond that) and a single assembly may contain up to **512**
+  of them in total (`CASM: TOO MANY CONDITIONALS`).
+- Structural errors: `.ELSE` / `.ELSEIF` / `.ENDIF` with no open `.IF` is
+  `CASM: .ELSE/.ELSEIF/.ENDIF WITHOUT .IF`; a second `.ELSE` (or an
+  `.ELSEIF` after `.ELSE`) is `CASM: .ELSEIF/.ELSE AFTER .ELSE`; reaching
+  end of source with an `.IF` still open is `CASM: UNTERMINATED .IF`.
+- With `/L`, a source line inside a skipped block is listed with its
+  text but a **blank address column** and no object bytes; the
+  `.IF`/`.ENDIF` directive lines themselves list normally. With `/M`, a
+  skipped block contributes no symbols to the map.
+
 ## Map and Listing Output (`/M`, `/L`)
 
 Both options run only after a successful assembly, in a fixed order: PRG
@@ -721,6 +788,35 @@ for the complete list):
 | `.INCLUDE FOO.S` *(missing quotes)* | `CASM: INCLUDE FILENAME EXPECTED` |
 | A word CASM doesn't recognize where a statement should start | `CASM: SYNTAX ERROR` |
 
+### Example 5: Conditional Assembly
+
+```asm
+.ORG $C000
+
+DEBUG = 1
+
+        LDA #$00
+        STA $D020
+.IF DEBUG
+        LDA #$02          ; only assembled when DEBUG is non-zero
+        STA $D020
+.ENDIF
+        RTS
+
+.IFNDEF PALETTE_DONE
+PALETTE_DONE = 1
+BLACK  = $00
+RED    = $02
+.ENDIF
+```
+
+With `DEBUG = 1` the `.IF DEBUG` block is assembled (five extra bytes);
+change it to `DEBUG = 0` and those two instructions vanish from the
+output with no other edit. The `.IFNDEF PALETTE_DONE` guard assembles its
+body the first time and would skip it on any later repeat (e.g. if this
+file were `.INCLUDE`d twice). Assemble with `/L` to see the skipped
+lines listed with a blank address column.
+
 ### Reading a diagnostic
 
 A diagnostic that concerns a specific place in the source prints two extra
@@ -755,6 +851,10 @@ thing — see the [Programmer's Reference §18](casm-programmers-reference.md#18
 for status and rationale:
 
 - **`.STATIC` / `.RELOC` directives** — use `/S` plus `.ORG` instead.
+- **Comparison operators in `.IF` / `.ASSERT`** (`=`, `<>`, `<`, `>`,
+  `<=`, `>=`) — `.IF` tests truthiness only; `.ASSERT` takes a single
+  expression. Compute a 0/1 value with the supported operators instead.
+  A divergence from ca65.
 - **Anonymous labels** (`:` definition, `:+` / `:-` / `:++` references) —
   not supported; planned as a later, separate feature.
   [Named local labels](#local-labels-name) (`@name`) *are* supported as of

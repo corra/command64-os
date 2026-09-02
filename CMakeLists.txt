@@ -2011,7 +2011,7 @@ set(CASM_REF_NAMES casmemit1 casmhello casmmodes casmnum2 casmexprn
     casmloc1 casmloc2 casmloc3 casmloc7
     casmif1 casmif0 casmifskip casmifelse casmelif casmifnest
     casmifdef1 casmifdef0 casmifndef1 casmifdeffwd casmifdefguard
-    casmifL1 casmifM1
+    casmifL1 casmifM1 casmifp1p2
     casmpg63 casmpg64 casmpg65 casmpg128 casmpgblank casmpgrt casmpginc
     casmpgfill casmpgincbin casmpgr6)
 set(CASM_REF_BINS "")
@@ -2916,7 +2916,13 @@ add_custom_command(
         -w "${CASM_TEST_FIXTURE_DIR}/casmifM1.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
     COMMAND "${CC1541_EXECUTABLE}" -f "casmifm1.ref" -T PRG
         -w "${CASM_REF_DIR}/casmifM1.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
-    COMMENT "Appending WP96/WP97/WP98 conditional-assembly fixtures and trusted references to casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifsym.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifsym.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifp1p2.s" -T SEQ
+        -w "${CASM_TEST_FIXTURE_DIR}/casmifp1p2.seq" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMAND "${CC1541_EXECUTABLE}" -f "casmifp1p2.ref" -T PRG
+        -w "${CASM_REF_DIR}/casmifp1p2.ref" "${CMAKE_BINARY_DIR}/casm_phase15_test.d64"
+    COMMENT "Appending WP96/WP97/WP98/WP99 conditional-assembly fixtures and trusted references to casm_phase15_test.d64"
     VERBATIM
 )
 
