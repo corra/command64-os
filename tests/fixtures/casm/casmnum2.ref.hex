@@ -3,6 +3,7 @@
 # Hand-derived little-endian words at .ORG $C000.
 # bytes: 24
 # sha256: 0849f714d73fa213b5ee72c623094ef866f759b259c4d2f45f96c1f14971259b
+# source_sha256: casmnum2.seq=4f4c102c12f90c52f3270a248efa8e70250f526a08ccd77c6332a43149cac00b
 
 00 C0
 19 00 1A 00 FF 00 00 01 99 19 9A 19 FF FF

@@ -1,8 +1,8 @@
 ---
 feature: casm-byte-oracle-wp3-fixture-oracle-remediation
 created: 2026-09-02
-status: proposed
-taskwarrior: TBD (created on approval)
+status: approved-in-progress
+taskwarrior: 80484a2b-20f6-40d7-9d45-da1072381d61 (WP3); parent 75cfa082-af8a-4783-8cd3-eb743f3040b7
 depends-on: Byte-Oracle Transition WP2 (complete, user-approved 2026-09-02, merged a04c8bb)
 ---
 
@@ -239,6 +239,32 @@ CASM source, `hex_manifest_to_bin.py`, or native-app manifest is touched.
 
 ## Progress
 
+- 2026-09-02: **Increment 1 (extend `casm_oracle_inventory.py`) done.**
+  Added a `source_sha256` verification pass — for any ref declaring
+  `# source_sha256: <seqname>=<hash>`, the script checks the hash against
+  the current generated `.seq` and fails on drift. Still non-gating.
+  **Design correction:** WP3 Scoping Decision 2 assumed `hex_manifest_to_bin.py`
+  "ignores `#` lines" — it does **not**; it is a strict parser that
+  rejects any unrecognized `# word:` directive. So the generated-`.seq`
+  hash is recorded as `# source_sha256:` (already an accepted repeatable
+  directive, same as the native-app manifests) rather than a new
+  `# seq_sha256:` key, and the reviewer line will be plain prose
+  (`# Reviewed: ...`) not a `# key:` directive. No `hex_manifest_to_bin.py`
+  change — the zero-code-change intent holds.
+- 2026-09-02: **Increment 2 / Batch 1a (static PRGs) — metadata added,
+  derivation frozen for review.** 16 refs (`brback1`, `brfwd1`,
+  `casmhello`, `casmemit1`, `casmmodes`, `casmnum2`, `casmorg1`,
+  `casmcase1`, `casmmaxid1`, `casmopall`, `casmmf1/2/3`, `p1back1`,
+  `p1fwd1`, `p1size1`) each gained `# source_sha256:` line(s). **All 67
+  `.ref` binaries byte-identical** before/after
+  `casm_reference_fixtures` + `test_image_d64` rebuild;
+  `casm_oracle_inventory --check` green with the new verification.
+  `casmnum2` (previously a one-line note) fully derived;
+  `casmopall`/`casmmf*`/`casmhello` etc. header ledgers re-checked against
+  the 6502 encoding. Record:
+  `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1a-static-derivations.md`
+  — **frozen for user review**; on sign-off the reviewer line is added and
+  the 16 rows flip to `CANONICAL-INDEPENDENT`.
 - 2026-09-02: Plan drafted. WP2 register is the input: 66 refs
   `CANONICAL-INDEPENDENT (pending metadata)`, 1 `UNCLEAR` (`casmexprn`), 2
   manifests `NATIVE-OBSERVATION` (WP4). Three scoping decisions confirmed

@@ -199,6 +199,20 @@ def main() -> int:
             problems.append(f"{e['name']}: declared sha256 {e['declared_sha256'][:12]}.. "
                             f"!= actual {e['actual_sha256'][:12]}..")
 
+    # --- WP3: declared source_sha256 entries must match the generated .seq ---
+    for e in entries:
+        for src_name, want in e["source_sha256"].items():
+            seq = (build_dir / "casm_test_fixtures" / src_name) if build_dir else None
+            if seq is None:
+                continue  # no build tree; skip silently
+            if not seq.is_file():
+                problems.append(f"{e['name']}: source_sha256 names {src_name} "
+                                f"but no such generated .seq")
+            elif sha256_bytes(seq.read_bytes()) != want:
+                problems.append(f"{e['name']}: source_sha256 for {src_name} "
+                                f"{want[:12]}.. != current generated .seq "
+                                f"{sha256_bytes(seq.read_bytes())[:12]}.. (stale fixture source)")
+
     for e in entries:
         if not find_packaging_steps(e["name"], cmake_text):
             problems.append(f"{e['name']}: no packaging step found in CMakeLists.txt")
