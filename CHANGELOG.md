@@ -232,6 +232,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **CASM manuals synced to `0.6.1`**: The CASM Utility Manual and Programmer's
+  Reference (`wiki/` + `docs/` mirrors) had drifted behind several shipped
+  releases. Corrected the version/status stamps (`0.3.0`/`0.2.2` -> `0.6.1`
+  build 1417) and the stale `$4000` `MAIN` envelope (-> `$7400`); added a
+  user-facing **Data Directives** section documenting `.RES` / `.FILL` /
+  `.ALIGN` / `.INCBIN` / `.ASSERT` (Phase 13, shipped `0.4.0` but previously
+  undocumented beyond a mention), including the `.ASSERT` ca65 action-keyword
+  form; added the missing `$4B`-`$61` rows (23 diagnostics: Phase 13, the
+  progress feature, Phase 14 local labels, Phase 15 conditionals) to the
+  Programmer's Reference §19 diagnostic table; added the `cond.s` module to
+  the architecture overview; refreshed `src/external/casm/AGENTS.md`'s
+  as-built narrative through Phase 15 and the memory-optimization pass.
 - **CASM master-plan reconciliation**: Updated the native-assembler master plan
   from its stale Phase 11 proposal state to current CASM `0.2.7.1319` truth,
   recorded the authoritative Phase 12 WP64-WP75 map, corrected the as-built

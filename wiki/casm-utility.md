@@ -1,7 +1,7 @@
 # command64 OS CASM Utility Manual
 
 **File Name:** `casm.prg`
-**Version:** `0.3.0` (build 1324)
+**Version:** `0.6.1` (build 1417)
 **Target Address:** `UserProgStart` (currently `$3800`, Standard User Program Space)
 **Toolchain:** ca65/ld65 (see [CASM Programmer's Reference](casm-programmers-reference.md) for internals)
 
@@ -15,23 +15,25 @@ bounded expression evaluator, source-file inclusion via `.INCLUDE`, and
 produces relocatable output by default so the same PRG can run at any load
 address the OS chooses.
 
-> **CASM Phase 14 is complete** (CASM `0.6.0`). Through Phase 12:
+> **CASM Phase 15 is complete** (CASM `0.6.1`). Through Phase 12:
 > labels/expressions/multi-file/relocation/include processing/symbol
 > map/listing output/named constants/the current-address
 > symbol/parenthesized precedence/arithmetic and bitwise
 > operators/character literals/string literals. Phase 13 added the
-> data-construction directives (`.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/
-> `.ASSERT`); Phase 14 added `@name` local labels (see
-> [Local Labels](#local-labels-name)). Everything
+> data directives (`.RES`/`.FILL`/`.ALIGN`/`.INCBIN`/`.ASSERT` — see
+> [Data Directives](#data-directives)); Phase 14 added `@name` local labels
+> (see [Local Labels](#local-labels-name)); Phase 15 added conditional
+> assembly (`.IF`/`.ELSEIF`/`.ELSE`/`.ENDIF`/`.IFDEF`/`.IFNDEF` — see
+> [Conditional Assembly](#conditional-assembly)). Everything
 > documented below as supported is real and has been verified end-to-end,
 > including in production via [DASH](dash-utility.md), which assembles
 > through a seven-file `.INCLUDE` chain and uses named constants, operator
-> expressions, and string literals throughout its own source. A
-> consolidated hardening pass has since exhaustively re-verified this
-> behavior — every opcode/addressing-mode combination, every Phase 12
-> syntax form together in one session, boundary conditions, and
-> re-assembly determinism — rather than adding anything new for you to
-> use. See [Not Yet Supported](#not-yet-supported) for the remaining gaps.
+> expressions, string literals, `.RES` buffers, and `@local` labels
+> throughout its own source. A consolidated hardening pass has also
+> exhaustively re-verified the base behavior — every opcode/addressing-mode
+> combination, every Phase 12 syntax form together in one session, boundary
+> conditions, and re-assembly determinism. See
+> [Not Yet Supported](#not-yet-supported) for the remaining gaps.
 
 ## Command Syntax
 
@@ -497,10 +499,104 @@ bytes ahead of the next instruction.
 | `.BYTE` | `.BYTE $01, "OK", 0` | Emits one or more comma-separated byte expressions, character literals, or verbatim PETSCII strings at the current address. Numeric values must fit 8 bits; strings may be empty and add no implicit terminator. |
 | `.WORD` | `.WORD $1234, $ABCD` | Emits one or more comma-separated 16-bit values, little-endian, at the current address. |
 | `.INCLUDE` | `.INCLUDE "SUBS.S"` | Splices another source file in at this point, as if its text appeared here. See [Splitting Source Across Files](#splitting-source-across-files). |
+| `.RES` | `.RES 16` / `.RES 16, $FF` | Emits *count* filler bytes (`$00` unless a second value is given). See [Data Directives](#data-directives). |
+| `.FILL` | `.FILL 40, $20` | Emits *count* bytes of *value* — the value is required. See [Data Directives](#data-directives). |
+| `.ALIGN` | `.ALIGN 256` / `.ALIGN 256, $EA` | Pads with filler bytes until the address is a multiple of *boundary*. See [Data Directives](#data-directives). |
+| `.INCBIN` | `.INCBIN "DATA.BIN"` | Emits the raw bytes of another file verbatim at the current address. See [Data Directives](#data-directives). |
+| `.ASSERT` | `.ASSERT END - START, "empty region"` | Compile-time check — fails assembly if the expression resolves to 0. Emits nothing. See [Data Directives](#data-directives). |
+
+The six conditional-assembly directives — `.IF`, `.ELSEIF`, `.ELSE`,
+`.ENDIF`, `.IFDEF`, `.IFNDEF` — are covered in
+[Conditional Assembly](#conditional-assembly).
 
 `.STATIC` and `.RELOC` are recognized by name but not yet implemented —
 using either exits with `CASM: FEATURE NOT IMPLEMENTED`. Use `/S` with an
 explicit `.ORG` for static output instead (see below).
+
+### Data Directives
+
+Five directives construct or check data rather than encoding instructions.
+
+#### `.RES count[, value]` — reserve filler
+
+Emits *count* bytes. Each byte is *value* if given, otherwise `$00`:
+
+```asm
+BUFFER: .RES 256          ; 256 zero bytes
+PADDING: .RES 4, $EA       ; 4 bytes of $EA (NOP)
+```
+
+Unlike ca65's `.res`, CASM has no zero-cost "advance the program counter
+without emitting" mode — a CASM PRG is one contiguous stream, so `.RES`
+writes real filler bytes into the output. *count* may be any 16-bit value;
+*value* must be 0-255.
+
+#### `.FILL count, value` — repeated byte
+
+Emits *count* copies of *value*. Both operands are required — `.FILL` has no
+default fill byte (that is the one grammatical difference from `.RES`):
+
+```asm
+SCREENROW: .FILL 40, $20   ; a blank 40-column screen-code row
+```
+
+#### `.ALIGN boundary[, value]` — pad to a boundary
+
+Emits just enough filler bytes (again `$00`, or *value*) to make the current
+address a multiple of *boundary*:
+
+```asm
+        .ALIGN 256          ; next byte starts on a page boundary
+TABLE:  .WORD ENTRY0, ENTRY1
+```
+
+*boundary* must be non-zero. When the address is already aligned, `.ALIGN`
+emits nothing.
+
+#### `.INCBIN "file"` — include a binary file
+
+Splices the raw bytes of *file* into the output at the current address, with
+no interpretation. The filename follows the same rules as `.INCLUDE`
+(quoted, up to 32 bytes, inherits the current device unless prefixed):
+
+```asm
+SPRITES: .INCBIN "SPRITEDATA"
+```
+
+A missing file is `CASM: CANNOT OPEN INPUT`; the file's identity and length
+are checked to be the same in both passes.
+
+#### `.ASSERT expr[, [action,] "message"]` — compile-time check
+
+Evaluates *expr* and, if it resolves to **0**, aborts the assembly with a
+fatal diagnostic. Any non-zero result passes silently. It emits no bytes.
+
+```asm
+        .ASSERT ENABLE_SOUND               ; fail the build if the flag is 0
+        .ASSERT TABLE_END - TABLE_START    ; fail if the table came out empty
+```
+
+`.ASSERT` tests **truthiness only** — there are no comparison operators, so
+it cannot express `expr <= limit` or `a = b` directly (a documented ca65
+divergence — see [Not Yet Supported](#not-yet-supported)). It is useful for
+"this must be non-zero" and, via subtraction, "these two must differ"
+invariants. Compute a 0/1 value with the supported arithmetic/bitwise
+operators for anything more.
+
+Like `.RES`/`.FILL`/`.ALIGN` counts and `.IF` conditions, an `.ASSERT`
+expression **must fully resolve in the pass that reads it** — a forward
+reference is `CASM: ASSERT OPERAND NOT RESOLVED`, not a deferred check.
+
+Without a message, a failure prints `CASM: ASSERTION FAILED`; with one, it
+prints `CASM: ASSERTION FAILED: <message>` (message up to 63 bytes). For
+source shared with ca65, an optional ca65 action keyword (`ERROR`,
+`WARNING`, `LDERROR`, `LDWARNING`) is accepted between the expression and
+the message and then ignored — CASM treats every `.ASSERT` as a pass-time
+hard failure regardless:
+
+```asm
+        .ASSERT READY, ERROR, "not ready"   ; keyword parsed and discarded by CASM
+```
 
 ### Relocation
 
