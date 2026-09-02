@@ -359,6 +359,46 @@ is treated as historical and left in place until WP2/WP3.
 
 ## Progress
 
+- 2026-09-02: **Increments 3-8 done; contract ready for user sign-off.**
+  - Inc 3: `.agents/workflows/canonical-byte-oracles.md` authored (authority
+    hierarchy, 7 oracle classes, 5 provenance states, prohibited circular
+    sources, acceptable sources, mandatory peer-review metadata + live
+    evidence capture list, generated-repetition rule, mismatch stop
+    conditions, native-app manifest model, one worked example row per
+    class, lifecycle, skill pointer).
+  - Inc 4: `.claude/skills/canonical-byte-oracles/SKILL.md` authored — thin
+    trigger + 7-step checklist, no unique policy.
+  - Inc 5: DOX sweep — minimal edits to
+    `phased-implementation-planning.md` (oracle-impact bullet),
+    `vice-mcp-testing.md` (canonical-oracle `COMP` evidence cross-ref),
+    `per-phase-test-images.md` (`casm_oracle_test.d64` placement line),
+    `artifact-tracking.md` (derivation-record + audit-register lifecycle),
+    `documentation-maintenance.md` (new §5 mirrored provenance docs),
+    `overlay-build-events.md` (corrected the "DASH build events fire from
+    `dash_ref`" sentence), root `AGENTS.md` (project-wide oracle Do/Don't),
+    `src/external/AGENTS.md` (CASM-native app = documented CASM syntax, not
+    a ca65 intersection; manifest = machine-integrity record + linked
+    derivation), `src/external/casm/AGENTS.md` (fixture/oracle contract;
+    softened the "re-run ca65 cross-checks" DASH-adoption clause),
+    `src/external/dash/AGENTS.md` (Dual-Assembler Subset **annotated**
+    "pending WP5 relaxation, keep obeying it" — not removed),
+    `tests/AGENTS.md` (authoritative-fixture provenance rule). CMake
+    "trusted reference" wording left untouched per governing plan.
+  - Inc 6+7: `brain/reviews/2026-09-01-casm-byte-oracle-audit.md` created —
+    20-field schema, provenance-state table, coverage-matrix skeleton, and
+    **five hand classifications**: `casmhello` (Static, CANONICAL-INDEPENDENT
+    pending metadata), `casmifskip` (conditional/suppression, exact source
+    quoted + PC-non-advance rationale, CANONICAL-INDEPENDENT pending
+    metadata), `casmpgr6` (R6, one relocation entry, pending multi-base
+    evidence link), `casmnumerrd` (diagnostic rejection, NOT-APPLICABLE, no
+    `.ref` and none should exist), `dash.ref.hex` (native manifest,
+    NATIVE-OBSERVATION today → CANONICAL-INDEPENDENT after WP4 derivation
+    record). Schema validated against all five without a dead field.
+  - Inc 8: no-change rebuild — `cmake --build build` clean;
+    `command64_casm_utils.d64` SHA-256 `355807c5…` and `test.d64`
+    `3d9e0ecb…` **byte-identical before and after** (docs-only changes are
+    build-inert, as expected). Walkthrough written. **Awaiting user
+    sign-off on the contract before WP2 planning.**
 - 2026-09-02: **Increment 2 (tracker reconciliation) done.** Taskwarrior
   parent `75cfa082` + WP1 child `154368e9` created, WP1 started. Fixed
   `brain/task.md` WP93 `[/]`->`[x]` (Phase 15 closed). Added the

@@ -140,6 +140,17 @@ part of the source for *Command 64 OS* and should only be refered to in the cont
       `vice_keyboard_petscii` — see "User Preferences" below for why.
     + Don't: **NEVER** Use a web based emulator as a fall back.
     + Do: **ALWAYS**  Ask user to perform tests when an MCP server is unavailable.
+2.
+    + Do: Derive the expected bytes for any CASM fixture reference
+      (`*.ref.hex`), R6 relocation oracle, or CASM-native application
+      manifest **independently** — from the documented 6502/6510 encoding,
+      CASM's documented semantics, and PRG/R6 framing — then peer-review it
+      and compare against native CASM. Full contract:
+      `.agents/workflows/canonical-byte-oracles.md`.
+    + Don't: Take expected bytes from CASM output, `opcodes.s`, a prior
+      CASM-derived reference, or a second assembler (ca65). ca65/ld65
+      remains the host build toolchain for `casm`, `debug`, and non-native
+      apps; it is not an authority on correct bytes.
 
 `codebase-memory-mcp` is installed and **MUST BE** prefered as the first-line
 option for searching the codebase. Do not waste tokens unnecesarily by `find`ing and

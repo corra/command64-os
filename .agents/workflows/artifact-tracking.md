@@ -99,6 +99,23 @@ Code reviews produce their own artifact type stored in `brain/reviews/`:
 3. **Implement fixes** → follow normal plan → implement → verify cycle
 4. **Update the review artifact** with remediation status
 
+### Byte-oracle derivation records and audit registers
+
+Byte-oracle work (`.agents/workflows/canonical-byte-oracles.md`) produces
+two more tracked artifact kinds, both in `brain/reviews/`:
+
+- an **audit register** enumerating every `*.ref.hex` / native manifest,
+  its provenance state, and its remediation disposition; and
+- per-reference **derivation records** (annotated byte derivation +
+  independent reviewer sign-off) — for a CASM-native application these
+  live under `src/external/<app>/` and are linked by path from the
+  shipping manifest.
+
+These follow the same lifecycle as a code review: written before the
+`.ref`/manifest is treated as authoritative, updated when the reference is
+re-derived, and cited from the Phase/WP walkthrough that carries the live
+`COMP` evidence and user sign-off.
+
 ## Quality Bar
 
 - **Plans are written before code.** They are the "why" and "what" — not a post-hoc rationalization.

@@ -13,6 +13,14 @@ The purpose of the `tests` directory is to contain regression tests and manual i
 - All modifications to test code must not break existing test coverage.
 - Test environments and manual/automated test procedures must be safe (e.g. avoiding memory segment collisions with resident utilities like DEBUG or the Shell, or clobbering system-critical zero-page locations) unless they are explicitly intended to be unsafe (destructively testing boundaries).
 - Agent-driven VICE tests must follow `.agents/workflows/vice-mcp-testing.md`.
+- An authoritative CASM fixture reference (`tests/fixtures/casm/*.ref.hex`
+  packaged for a native `COMP`) must be independently derived and
+  peer-reviewed per `.agents/workflows/canonical-byte-oracles.md`, and
+  carry exactly one provenance state in the audit register
+  (`brain/reviews/2026-09-01-casm-byte-oracle-audit.md`). Expected bytes
+  are never transcribed from CASM output, `opcodes.s`, or ca65. A
+  CASM-vs-CASM comparison or a ca65 differential is useful evidence but is
+  not an authoritative oracle.
 - Command64 must be booted and identified by first-line text `Command 64-DOS Version`
   before a test application is launched by name from its shell.
 - A normal return is proven by a shell prompt matching `c64[<device>]:>`; the decimal

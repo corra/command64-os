@@ -59,8 +59,16 @@ streaming-setup config, not something other clones/forks need.
 `hex_manifest_to_bin.py` (the `dash` target's manifest-transcription step,
 `CMakeLists.txt` ~line 1145, and the `casm_reference_fixtures` target's
 per-name loop) is deliberately **not** wrapped: it's not a compiler/linker
-invocation, and DASH's real build events already fire from the `dash_ref`
-target's `add_ca65_app` call. Same reasoning covers
+invocation — it transcribes an already-reviewed hex manifest to a binary.
+DASH's shipped `dash.prg` comes from that transcription of the reviewed
+native manifest, not from ca65; the `dash_ref` ca65 target is an optional
+differential check (non-authoritative — see
+`.agents/workflows/canonical-byte-oracles.md`), and while it still builds
+it is where the DASH-source `add_ca65_app` compile/link overlay events
+fire. The byte-oracle transition makes `dash_ref` opt-in and non-gating
+(WP5); if it stops building after intentional CASM-only syntax adoption,
+no DASH build events are lost that belong to the shipped artifact. Same
+"not a build tool" reasoning covers
 `cmake/IncrementBuildNumber.cmake`, `cmake/GenerateCasmTestFixtures.cmake`,
 the `sync_docs` target (`cmake -E copy`), `pacman_autotile` (a pure Python
 maze generator), and `check_casm_source_bytes.py`'s `PRE_BUILD` verification

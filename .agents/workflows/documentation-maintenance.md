@@ -46,6 +46,20 @@ Whenever a new feature is added to the shell or a build is performed:
 1. Ensure `src/command64/shell.asm` reflects the correct `BUILD_NUMBER`.
 2. Synchronize the `Version` line in `brain/MEMORY.md`.
 
+### 5. Byte-oracle / provenance documentation
+
+When a WP changes how a CASM fixture or a CASM-native application's bytes
+are derived, reviewed, or verified (per
+`.agents/workflows/canonical-byte-oracles.md`):
+
+1. Update the user-facing provenance text in the owning utility manual
+   (`wiki/casm-utility.md`, `wiki/dash-utility.md`, `wiki/banner-utility.md`,
+   or the relevant programmer's reference) **in the same WP**.
+2. Mirror the change byte-identically into the `docs/` and, where it
+   exists, `release/docs/` copy — verify with `cmp` after editing.
+3. Do not describe ca65 as the source of authoritative bytes; a ca65
+   differential check is optional and labelled non-authoritative.
+
 ## Verification
 
 Before declaring a task "Done", perform a **Documentation Audit**:

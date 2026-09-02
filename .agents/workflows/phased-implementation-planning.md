@@ -60,6 +60,14 @@ plan should also call for a dedicated Phase test `.d64` image — see
 `per-phase-test-images.md` — rather than adding fixtures to `test.d64`
 or a prior Phase's image.
 
+If a Work Package adds or changes expected assembled bytes — a
+`*.ref.hex`, an R6 relocation oracle, a CASM-native application manifest —
+its plan must scope the oracle impact and name the resulting provenance
+state for each affected reference, per
+`.agents/workflows/canonical-byte-oracles.md`. Expected bytes are derived
+independently and peer-reviewed; they are never taken from CASM output or
+a second assembler.
+
 ## Scoping decisions need to be explicit, not assumed
 
 When a plan has to make a judgment call the user hasn't already settled

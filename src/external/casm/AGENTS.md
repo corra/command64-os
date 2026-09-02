@@ -249,10 +249,20 @@ The `src/external/casm` directory owns CASM, a native Command 64
   completion gate.
 - Every CASM language or feature addition must include a DASH adoption
   increment: audit `src/external/dash/` for applicable uses, perform a
-  byte-equivalent DASH rewrite when the feature applies, and re-run both native
-  CASM and ca65 cross-checks. If safe adoption is impossible, stop and obtain
-  explicit user direction rather than silently declaring the feature complete
-  without real-application dogfooding.
+  byte-equivalent DASH rewrite when the feature applies, and re-verify DASH
+  output against its independent derivation record and native CASM (an
+  optional ca65 differential is supporting evidence only). If safe adoption
+  is impossible, stop and obtain explicit user direction rather than
+  silently declaring the feature complete without real-application
+  dogfooding.
+- A CASM fixture reference (`tests/fixtures/casm/*.ref.hex`) or R6
+  relocation oracle packaged for a native `COMP` must be independently
+  derived and peer-reviewed per
+  `.agents/workflows/canonical-byte-oracles.md` — never transcribed from
+  CASM output or `opcodes.s`. It carries one provenance state in the audit
+  register (`brain/reviews/2026-09-01-casm-byte-oracle-audit.md`); only
+  `CANONICAL-INDEPENDENT` is authoritative. A ca65 differential is
+  optional and non-authoritative.
 - Completing a CASM work package increments the stage component of the current
   `major.minor.stage` version while preserving the current major and minor
   components. The new stage is recorded only after verification and explicit

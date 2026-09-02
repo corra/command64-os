@@ -246,6 +246,16 @@ shell-return evidence, checkpoint IDs, recovery attempts, and final classificati
 When the MCP is unavailable, do not use a web emulator. Ask the user to perform the same
 workflow in a supported local VICE instance and report the evidence.
 
+When the assertion is a byte comparison against a CASM reference or a CASM-native
+application manifest (a `COMP` of assembled output against a `*.ref`), the evidence this
+run must capture is defined by `.agents/workflows/canonical-byte-oracles.md`: the exact
+`COMP` invocation and its disk/device, `FILES COMPARE OK` or the first differing offset
+with surrounding bytes, the CASM version and build number, and — for an R6 oracle — the
+relocation entry count, footer bytes, and a second run at a different load base. The
+reference itself must already be `CANONICAL-INDEPENDENT` in the audit register before it
+is treated as authoritative; native output matching a `NATIVE-OBSERVATION` reference
+proves only reproducibility.
+
 ## Controlled canary
 
 Use this exact canary when validating an agent or MCP configuration change. It has not yet

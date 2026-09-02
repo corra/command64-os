@@ -14,6 +14,7 @@ The purpose of the `src/external` directory is to contain external user space ap
 - A persistent build number file `BUILD_<APPNAME_UPPER>` containing the current build number must be maintained in the application's own `src/external/<appname>/` directory.
 - App-private zero-page scratch allocations may use `$70-$8F`. Collisions between separately loaded apps are acceptable only because external apps are not concurrently resident; document any new allocation in the app source and avoid clobbering OS-owned zero-page locations.
 - ca65 multi-file apps that share zero-page symbols across object-file boundaries must use `.exportzp` and `.importzp`; plain `.export`/`.import` treats the symbol as absolute and can emit incorrect three-byte absolute instructions.
+- For a CASM-native app, the checked-in `<app>.ref.hex` manifest is a machine-integrity record; correctness is proven by an independent, peer-reviewed byte/relocation derivation record under `src/external/<app>/`, per `.agents/workflows/canonical-byte-oracles.md`. A ca65 differential check is optional and non-authoritative. ca65/ld65 stays required for `casm` itself, `debug`, and every non-CASM-native app.
 
 # Work Guidance
 
@@ -50,10 +51,11 @@ Proven twice now — BANNER (`brain/plans/2026-08-20-banner-casm-native-migratio
 and DASH's own further Phase 12 syntax pass — for an app that is assembled
 only by the real native CASM assembler, never by a host toolchain:
 
-1. **Source Setup**: Write the app entirely in CASM-safe syntax (see
-   `src/external/dash/AGENTS.md`'s "Dual-Assembler Subset" for the stricter
-   rules that still apply if the app *also* needs a ca65 cross-check;
-   drop those if it doesn't, as BANNER does). All uppercase ASCII —
+1. **Source Setup**: Write the app in documented CASM syntax — a
+   CASM-native app is **not** restricted to a ca65 intersection. (A ca65
+   cross-check is optional differential evidence only; if an app keeps one,
+   `src/external/dash/AGENTS.md`'s "Dual-Assembler Subset" lists the extra
+   rules that shared source then obeys.) All uppercase ASCII —
    `scripts/check_casm_source_bytes.py` enforces this at packaging time,
    including inside comments and character/string literals, because
    `cc1541 -w` copies host bytes verbatim with no PETSCII translation.
@@ -63,18 +65,27 @@ only by the real native CASM assembler, never by a host toolchain:
 3. **Live Assembly**: Boot the disk in VICE, dispatch
    `CASM <ENTRY>.S /O:<NAME>`, per `.agents/workflows/vice-mcp-testing.md`.
    Confirm `CASM: INPUT VALIDATED` and functionally exercise the app.
-4. **Extract and Review**: Detach the disk cleanly (flushes VICE's
-   write-behind cache), extract the assembled PRG with `cc1541 -X`, and
-   review its bytes — against a same-base prior assembly, an independent
-   ca65 cross-check build, or both, whichever the app's own provenance
-   model calls for.
+4. **Derive and Review**: Detach the disk cleanly (flushes VICE's
+   write-behind cache), extract the assembled PRG with `cc1541 -X`. The
+   correctness oracle is an **independent byte/relocation derivation** —
+   load address, program extent, relocation eligibility and exclusions,
+   ordered relocation offsets/count, footer, byte count, hashes — worked
+   out from the 6502/6510 encoding, CASM semantics, and the R6 format, and
+   reconciled by a second reviewer against the extracted PRG. Record it
+   under `src/external/<app>/` per
+   `.agents/workflows/canonical-byte-oracles.md`. A ca65 cross-check, if
+   the app keeps one, and a same-base prior assembly are supporting
+   evidence, not the derivation source.
 5. **Capture the Manifest**: Transcribe the reviewed PRG into a checked-in
    hex manifest via a `scripts/build_<app>_manifest.py` script (a small
-   twin of `scripts/build_dash_manifest.py` — drop its `--cross-check`/
-   `--allow-host-bytes` machinery if the app has no host toolchain to
-   guard against at all, as `scripts/build_banner_manifest.py` does).
-   Regenerating the manifest is always a deliberate, reviewed act, never
-   a build step.
+   twin of `scripts/build_dash_manifest.py` — drop its `--cross-check`
+   machinery if the app has no ca65 check, as
+   `scripts/build_banner_manifest.py` does; `--allow-host-bytes` is not an
+   acceptable normal provenance path). The manifest is a machine-integrity
+   record (byte count, artifact hash, source hash) bound to the separate
+   derivation record from step 4 — it is the shipped artifact and
+   stale-artifact guard, not proof of its own correctness. Regenerating it
+   is always a deliberate, reviewed act, never a build step.
 6. **CMake Target**: Add an `add_custom_command`/`add_custom_target` pair
    that runs `scripts/hex_manifest_to_bin.py` against the manifest at
    build time (mirroring the `dash`/`banner` targets in `CMakeLists.txt`)

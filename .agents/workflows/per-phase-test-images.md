@@ -33,6 +33,12 @@ This does not apply to:
   `phased-implementation-planning`, those don't need this ceremony
   either).
 
+A byte-oracle remediation effort (see
+`.agents/workflows/canonical-byte-oracles.md`) adds a dedicated image
+(`casm_oracle_test.d64`) only if it introduces on-disk fixtures that
+cannot safely fit an existing current-effort image; re-derivation of an
+existing fixture's reference does not need a new image.
+
 ## How to create one
 
 Follow the `casm_phase12_test_d64` target in `CMakeLists.txt` (around
