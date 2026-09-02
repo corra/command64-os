@@ -6,6 +6,8 @@
 # bytes: 4
 # sha256: 9c1732b04982c3c6c7bf50363207e0c1742260c56b2faa4f428abbe0ec6be10b
 # source_sha256: casmifdef1.seq=d25c9ce9d0114c86a826b6a88a879bd4f7e1ae3d6e7d5050c1cc20cda796f71c
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0
 EA EA

@@ -25,5 +25,7 @@
 # source_sha256: casmpginca.seq=34534b198c66d6571e15f45ff6e13486ef4417a7cc4803b6238955b4121bbc1a
 # source_sha256: casmpgincb.seq=fb79c505c99ecf4f966c9dc08068bd18944d2e410e9f38c969c7769265eeee76
 # source_sha256: casmpgincc.seq=e5951c08cd41bd1cd633739871a91e012cbc9b920872075af9f5f57a660b8de9
+# Independent byte derivation reviewed and approved by the user 2026-09-02
+#   (WP3 batches 1b-1e -- brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch1bcde-derivations.md).
 
 00 C0 EA EA EA EA EA EA EA

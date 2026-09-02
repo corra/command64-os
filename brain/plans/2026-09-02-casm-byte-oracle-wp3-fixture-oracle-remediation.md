@@ -291,3 +291,33 @@ CASM source, `hex_manifest_to_bin.py`, or native-app manifest is touched.
     -- **frozen for user review**. On sign-off, 40 reviewer lines added,
     40 Ledger-A rows -> `CANONICAL-INDEPENDENT`. Remaining: `casmexprn`
     (B2), R6 class (B3), `casmbig1` (B4).
+- 2026-09-02: **Batches 1b-1e signed off (user-approved); Batches 2-5
+  frozen for review.**
+  - 1b-1e: 40 reviewer lines added; Ledger-A rows -> `CANONICAL-INDEPENDENT`.
+  - Batch 2 (`casmexprn`): header rewritten with a full `<`/`>` operand-
+    operator derivation (the old one-line note was wrong -- described a
+    different fixture) + `source_sha256`; body byte-identical
+    (`325b48c2...`). Record
+    `brain/reviews/2026-09-02-casm-byte-oracle-wp3-batch2-casmexprn.md`.
+  - Batch 3 (R6): the "9-member R6 class" is really **7 R6 + 2 static**
+    (`casmfa2p`, `casmorgexpl1` have no footer -- WP2 hint corrected).
+    All 9 got `source_sha256`. R6 footer layout + per-ref eligibility
+    ledger re-checked; a **multi-base application check** (inline
+    assembler-independent relocator, `+1` page) reproduces the by-hand
+    "assembled at $3500" bytes for all 7. Record
+    `...-batch3-r6-relocation.md`.
+  - Batch 4 (`casmbig1`): repetition rule `00 C0 + EA*6000` -> 6002 B,
+    sha `7288e489...`, reproduced by a 2-line independent expansion;
+    boundary spot-checks incl. the file-join at offset 3002. Record
+    `...-batch4-casmbig1.md`.
+  - Batch 5 (`/L` `/M`): **no new reference.** `/L`/`/M` output is
+    contractual text pinned field-by-field by `test_casm_flist` (+ WP59
+    contract matrix), `test_casm_flmeta`, `test_casm_map` + a determinism
+    witness -- not PRG-identity inference. Rationale recorded
+    `...-batch5-listing-map.md`.
+  - **67/67 refs declare sha256; 67/67 claim independent derivation; all
+    67 `.ref` binaries byte-identical** across a full serial build;
+    `casm_oracle_inventory --check` green. Remaining before close: user
+    sign-off on Batches 2-5, then add the 10 reviewer lines, then the
+    **consolidated live VICE run** (COMP the changed refs + casmexprn +
+    casmbig1 + `casmreloc1` aptRelocate run) and WP3 gate.
