@@ -36,7 +36,7 @@ below) but not its mechanical scope.
 
 Decouple DASH from mandatory ca65 build and release gating:
 1. Make the host-side `dash_ref` ca65 target explicitly opt-in and non-gating (`EXCLUDE_FROM_ALL`).
-2. Decouple `command64_casm_utils_d64` and production image builds from `dash_ref`. On `command64_casm_utils.d64`, package `dash.ref` from the reviewed native canonical artifact (`dash.prg`) rather than requiring a ca65 build.
+2. Decouple `command64_casm_utils_d64` and production image builds from `dash_ref`. On `command64_casm_utils.d64`, package `dash.ref` from `${DASH_BIN}` (the reviewed shipping artifact) rather than requiring a ca65 build.
 3. Update `scripts/build_dash_manifest.py` to remove `--allow-host-bytes` and treat `--cross-check` as optional, labelled differential evidence.
 4. Update `src/external/dash/AGENTS.md` to transition the "Dual-Assembler Subset" from a load-bearing requirement into "Optional Differential Guidance".
 5. Reconcile user-facing and workflow documentation (`wiki/dash-utility.md`, `docs/dash-utility.md`, `release/docs/dash-utility.md`, `.agents/workflows/overlay-build-events.md`).
@@ -61,7 +61,7 @@ Does **not** deliver: any gratuitous source rewrites of DASH (DASH sources remai
   - Provide a standalone opt-in target (e.g. `dash_diff_check`) or keep `dash_ref` for differential verification.
 - `scripts/build_dash_manifest.py`:
   - Remove `--allow-host-bytes` option and logic.
-  - Update comments and docstrings to reflect canonical oracle policy.
+  - Update comments and docstrings to reflect the reviewed-shipping-artifact + standing-differential policy.
 - `src/external/dash/AGENTS.md`:
   - Replace "Dual-Assembler Subset (load-bearing — pending WP5 relaxation)" with "Optional Differential Guidance".
   - Clarify that DASH source authority is native CASM.
@@ -146,3 +146,21 @@ Does **not** deliver: any gratuitous source rewrites of DASH (DASH sources remai
   - `wiki/dash-utility.md`, `docs/dash-utility.md`, `release/docs/dash-utility.md`: Updated to DASH 0.2.0 and canonical derivation / provenance.
   - `casm_oracle_inventory --check` verified green (69/69).
   - Walkthrough created at `brain/walkthroughs/2026-09-02-casm-byte-oracle-wp5-dash-differential-source-policy.md`. Awaiting user sign-off.
+- 2026-09-02: Mechanical changes (Gemini): `dash_ref` `EXCLUDE_FROM_ALL`,
+  utility disk packages `${DASH_BIN}`, `--allow-host-bytes` removed,
+  `dash/AGENTS.md` + `dash-utility.md` reworded.
+- 2026-09-02: **WP4 audit correction folded in.** DASH manifest bytes ->
+  `NATIVE-OBSERVATION` (full byte derivation not practical); ca65 `dash_ref`
+  differential retained as a **standing release-verification check** (not
+  "optional"). Reworded the "canonical oracle" language in `dash/AGENTS.md`,
+  `dash-utility.md` (x3), `CMakeLists.txt` comments, this plan's Scoping
+  Decision 2, and the WP5 walkthrough. Added
+  `.agents/workflows/overlay-build-events.md` `EXCLUDE_FROM_ALL` update and
+  `packaging/RELEASE_README.md` clarification (both were WP5 scope, not yet
+  done). New tool `scripts/casm_r6_verify.py`. Resolved the governing-plan
+  "dash.prg vs dash.ref" question: image.d64 carries `dash`, the utility
+  disk carries `dash.ref` + sources -- two roles, byte-identical.
+  Verified: full build green, `dash_ref` opt-in still MATCHES `dash.prg`,
+  all 67 fixture `.ref` + both manifest `.prg` byte-unchanged,
+  `casm_oracle_inventory --check` green, `casm_r6_verify` PASS on DASH +
+  BANNER. Walkthrough updated. Awaiting user closure approval.

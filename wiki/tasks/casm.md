@@ -92,13 +92,26 @@ apps keep ca65; only DASH's required `dash_ref` gate is relaxed (WP5).
       hashes and reviewer annotations; `casmexprn` promoted (`UNCLEAR` eliminated);
       all 67 `.ref` binaries byte-identical across a full serial build. Sub-plan + walkthrough
       `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp3-fixture-oracle-remediation.md`.
-- [x] WP4 native-application canonical records (DASH, BANNER) -- **closed,
-      user-approved 2026-09-02**. BANNER and DASH independent derivation records
-      established (`brain/reviews/2026-09-02-casm-byte-oracle-wp4-banner-derivation.md`
-      and `brain/reviews/2026-09-02-casm-byte-oracle-wp4-dash-derivation.md`);
-      both manifests promoted to `CANONICAL-INDEPENDENT`. Sub-plan + walkthrough
-      `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp4-native-app-canonical-records.md`.
-- [ ] WP5 DASH differential + source-policy transition
+- [x] WP4 native-application canonical records -- **closed 2026-09-02, then
+      audit-corrected 2026-09-02.** BANNER → `CANONICAL-INDEPENDENT` (full
+      ledger + 20-entry table verified vs body).
+      **DASH → bytes `NATIVE-OBSERVATION`** (the original close claimed a
+      full byte derivation of 3,669 bytes that was not done -- claim
+      withdrawn) with a `CANONICAL-INDEPENDENT` 451-entry R6 relocation
+      ledger. New tool `scripts/casm_r6_verify.py`. Records
+      `brain/reviews/2026-09-02-casm-byte-oracle-wp4-{dash,banner}-derivation.md`.
+- [/] WP5 DASH differential + source-policy transition -- implementation
+      complete on `feature/casm-byte-oracle-wp5` (incl. the WP4 correction).
+      `dash_ref` `EXCLUDE_FROM_ALL` (default build never invokes ca65 for
+      DASH); utility disk packages `dash.ref` from `${DASH_BIN}`;
+      `--allow-host-bytes` removed; "Dual-Assembler Subset" → "Differential
+      Guidance" -- **but** the ca65 `dash_ref` differential is kept as a
+      standing release-verification check while DASH stays in the shared
+      subset (DASH bytes being `NATIVE-OBSERVATION`, not canonical). Build
+      green; `dash.prg`/`banner.prg` + all 67 fixture `.ref` byte-unchanged;
+      opt-in `dash_ref` still MATCHES `dash.prg`. Plan + walkthrough
+      `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp5-dash-differential-source-policy.md`.
+      Awaiting user closure approval; not yet merged.
 - [ ] WP6 consolidated verification + completion gate
 
 ### Standalone: always name the source file in a located diagnostic
