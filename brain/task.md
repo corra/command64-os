@@ -4158,9 +4158,51 @@ Taskwarrior UUID `1c11e31a-be94-49b2-bc49-d511f7bef45d`.
       this checklist, walkthrough
 - [x] Reviewer sign-off + completion-gate approval — user 2026-09-02; FORMAT CASM-native CLOSED, format.ref.hex CANONICAL-INDEPENDENT
 
+## CONWAY (Stage 4, first multi-module) — Taskwarrior task 44 (project `conway`)
+
+Plan/walkthrough `brain/{plans,walkthroughs}/2026-09-03-conway-casm-native-migration.md`.
+Taskwarrior UUID `ec0342bc-650e-4f17-9650-772e21a037eb`. Work on `main`.
+
+- [x] Increment 1 — loader R6 confirmation; frozen ca65 baseline
+      (`build/conway.prg`, 182 R6 entries, grid `$4200`/`$4600`); inline
+      constant block; native image order + `$3400..$44BF` prediction;
+      functional matrix M1–M13; `scripts/gen_conway_version.py` +
+      `CONWAY_VERSION` `0.4.1`, `BUILD_CONWAY` → `1063`
+- [x] Increment 2 — `conway_main.s`→`conway.s`, `conway_grid.s`→`conwaygrid.s`;
+      ca65 machinery stripped, `@local`, uppercase, `.INCLUDE` chain;
+      `gen_conway_menu.py` (screen-code `.BYTE`), `check_conway_layout.py`
+      (replaces ~23 `.assert`s); `common.inc`/`build_conway.inc` deleted
+- [x] Increment 3 — live VICE: `CASM: INPUT VALIDATED` (1143 stmts, 4660 B);
+      image `$3400..$44BF` **0-diff** vs independent ca65 `$3400` build of
+      the 4 sources; `casm_r6_verify` PASS (182 entries == ca65 baseline)
+      at 3 bases, grids page-aligned. 3 source fixes: 12-byte `.BYTE` line
+      wrap (`SOURCE LOCATION OVERFLOW`); `conway_grid.s`→`conwaygrid.s`
+      (`_` = `$A4` on disk vs `$5F` in source); text-length constants
+      moved inline (`.INCLUDE`d constant → spurious R6, 186→182).
+      `conway-derivation.md` written. Live menu/preset/sim/exit OK
+- [x] Increment 4 — `scripts/build_conway_manifest.py`, `conway.ref.hex`
+      (round-trips byte-identical); live `COMP CNW.PRG CONWAY.REF` →
+      `FILES COMPARE OK`; `casm_oracle_inventory` NATIVE_MANIFESTS += conway
+      (reconciliation OK); audit-register rows
+- [x] Increment 5 — CMake: `add_ca65_app(conway …)` + globs removed;
+      manifest `conway` target + `conway_generated_src` +
+      `command64_conway_test_d64` (PRE_BUILD both check scripts) added;
+      `set(CONWAY_TARGET conway)` preserved
+- [x] Increment 6 — fresh `cmake -B build` + full build clean (0/0);
+      `conway.prg` == manifest; image carries conway; no-change rebuild
+      identical; stale-source gate fires on a `conway.s` edit
+- [x] Increment 7 — `wiki/conway-utility.md` (+ `docs/` sync), CHANGELOG,
+      KNOWLEDGE.md, audit register, this checklist, walkthrough;
+      consolidated functional matrix M1–M13 re-verified on the
+      manifest-derived build
+- [x] Reviewer sign-off + completion-gate approval — user 2026-09-03; CONWAY CASM-native CLOSED, conway.ref.hex CANONICAL-INDEPENDENT
+
 ## CASM defect (task 42) — `.INCLUDE`d constant zero-page selection
 
 Discovered during LABEL Increment 3. A zero-page-valued named constant
 defined in an `.INCLUDE`d file assembles to 3-byte absolute; inline
-definitions correctly select zero page. Blocks a shared `.INCLUDE` of ZP
-constants for later migrations. Not fixed under the LABEL plan.
+definitions correctly select zero page. **CONWAY (2026-09-03) found a
+second symptom:** any `.INCLUDE`d named constant (not just ZP) makes every
+referencing operand emit a spurious R6 relocation entry, immediates
+included. Fix both ways: keep all constants inline. Blocks a shared
+`.INCLUDE` of constants for later migrations. Not fixed under any app plan.
