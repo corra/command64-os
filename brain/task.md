@@ -4129,6 +4129,35 @@ Plan `brain/plans/2026-09-02-comp-casm-native-migration.md`; task spec
       2026-09-02. COMP CASM-native migration CLOSED; ca65 retired, ships from
       `src/external/comp/comp.ref.hex` (CANONICAL-INDEPENDENT).
 
+## FORMAT (Stage 3, PETSCII-command case) — project `format`
+
+Plan/walkthrough `brain/{plans,walkthroughs}/2026-09-02-format-casm-native-migration.md`.
+Taskwarrior UUID `1c11e31a-be94-49b2-bc49-d511f7bef45d`.
+
+- [x] Increment 1 — loader re-confirm; inline constant block; `LITNCOLON`/
+      `LITCOMMA` frozen ($4E); `gen_format_version.py` + `FORMAT_VERSION`
+- [x] Increment 2 — `format.s` → native CASM (inline constants, `@local`,
+      `.RES`, uppercase-ASCII message strings, char literals w/ `#$3A` for
+      the illegal `'9'+1`); `common.inc`/`build_format.inc` deleted
+- [x] Increment 3 — live VICE: `CASM: INPUT VALIDATED` (615 stmts, 1865 B);
+      **0-diff** vs independent ca65 `$3400` reference; **old ca65 build
+      formats correctly** (Decision 2 corrected — `$CE` is accepted by the
+      1541, not a bug); messages now render lowercase (Decision 1, direction
+      corrected — uppercase-ASCII source → lowercase screen); end-to-end
+      scratch-disk format under VICE succeeded
+- [x] Increment 4 — `format-derivation.md` (159-entry R6 reconciled),
+      `scripts/build_format_manifest.py`, `format.ref.hex`; live
+      `COMP FMT.PRG FORMAT.REF` → `FILES COMPARE OK`
+- [x] Increment 5 — CMake: ca65 target removed; manifest `format` target +
+      `command64_format_test_d64` + `format_version_src` added;
+      `format.ref.hex` added to `casm_oracle_inventory` NATIVE_MANIFESTS
+- [x] Increment 6 — fresh `cmake -B build` + full build clean; no-change
+      rebuild identical; stale-source gate fires; 5 native manifests OK
+- [x] Increment 7 — `wiki/format-utility.md` (+ `docs/` via sync),
+      `wiki/tasks/format.md`, CHANGELOG, KNOWLEDGE.md, audit register row,
+      this checklist, walkthrough
+- [x] Reviewer sign-off + completion-gate approval — user 2026-09-02; FORMAT CASM-native CLOSED, format.ref.hex CANONICAL-INDEPENDENT
+
 ## CASM defect (task 42) — `.INCLUDE`d constant zero-page selection
 
 Discovered during LABEL Increment 3. A zero-page-valued named constant

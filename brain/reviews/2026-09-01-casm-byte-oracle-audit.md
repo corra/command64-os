@@ -99,7 +99,7 @@ Each row records:
 | 19 | Historical evidence paths | prior review docs |
 | 20 | Re-audit trigger | what change forces re-classification |
 
-## Ledger A — fixed-byte artifacts (67 refs + 4 manifests: banner, dash, label, comp)
+## Ledger A — fixed-byte artifacts (67 refs + 5 manifests: banner, dash, label, comp, format)
 
 Every row: full mechanical field data (declared vs actual bytes/SHA-256,
 generated-`.seq` hash, `CASM_REF_NAMES` membership, packaging trace) is
@@ -310,6 +310,7 @@ metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
 | **BANNER** native app | `banner.ref.hex` `CANONICAL-INDEPENDENT` | multi-base `casm_r6_verify.py` PASS | WP4 — full address ledger + 20-entry table verified vs body |
 | **LABEL** native app | `label.ref.hex` `CANONICAL-INDEPENDENT` — code/data via same-base ca65 differential (843/844 image bytes identical, 1 intentional banner byte `$3706`); 52-entry R6 ledger independently reconciled; reviewer sign-off 2026-09-02 | live `COMP LABEL.PRG LABEL.REF` → `FILES COMPARE OK` (CASM 0.6.2 b1419); `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000` | 2026-09-02 CASM-native migration; derivation `src/external/label/label-derivation.md` |
 | **COMP** native app | `comp.ref.hex` `CANONICAL-INDEPENDENT` — full 1098-byte image (683 code + 207 msg + 208 emitted `.RES` zero-fill) + 122-byte / 61-entry R6 table + footer hand-derived and byte-exact to native CASM 0.6.2 b1419; reviewer sign-off 2026-09-02 (Increment 3 gate) | native assembly on `command64_comp_test.d64` → 1228 B byte-identical to derivation; `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000` | 2026-09-02 CASM-native migration; derivation `src/external/comp/comp-derivation.md`; first program with an explicit true-BSS-to-emitted-storage disposition |
+| **FORMAT** native app | `format.ref.hex` `CANONICAL-INDEPENDENT` (reviewer sign-off 2026-09-02) — 1539-byte image **0-diff** vs an independent same-base ca65 build of a messages-forced-to-explicit-unshifted-hex transform of `format.s`; 159-entry R6 ledger (131 abs operands + 28 `#>` high bytes) independently reconciled; 3 enumerated design changes (msg case, `:N:` `$CE`→`$4E`, banner `V`→`v`) | live `COMP FMT.PRG FORMAT.REF` → `FILES COMPARE OK` (CASM 0.6.2 b1419); `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000`; end-to-end scratch-disk format verified | 2026-09-02 CASM-native migration; derivation `src/external/format/format-derivation.md` |
 
 **No axis is uncovered.** Every axis has at least a structural harness;
 every axis that *should* have a byte oracle has one at
