@@ -9,6 +9,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **LABEL → CASM-native (2026-09-02)** — the first external-application
+  migration from the CASM-native viability review
+  (`brain/reviews/2026-09-01-external-applications-casm-native-viability.md`).
+  `LABEL`'s ca65/ld65 build is retired; `label.prg` now ships from a
+  reviewed hex manifest (`src/external/label/label.ref.hex`, transcribed by
+  `scripts/hex_manifest_to_bin.py`), the BANNER/DASH model. Source
+  (`label.s`) converted to native CASM syntax — inline named constants
+  (`command64.inc`/`common.inc` dropped), `@local` labels, native
+  string/character literals, `.RES`; version banner is generated at build
+  time (`scripts/gen_label_version.py` → `labelver.s`) from a new
+  `LABEL_VERSION` file + `BUILD_LABEL`, and now renders `LABEL v0.4.0.1047`
+  (lowercase `v`, matching `DEBUG`'s format). Behaviour is otherwise
+  unchanged: the assembled image is byte-identical to an independent
+  same-base ca65 reference except that one intentional banner byte, R6
+  relocation verified at `$3800`/`$5000`/`$9000`, and live
+  `COMP LABEL.PRG LABEL.REF` → `FILES COMPARE OK`. New:
+  `scripts/build_label_manifest.py`, `src/external/label/label-derivation.md`
+  (independent byte + 52-entry R6 derivation), `command64_label_test_d64`
+  disk target. Found + filed separately (Taskwarrior 42): CASM 0.6.2 emits
+  3-byte absolute addressing for a zero-page-valued named constant defined
+  in an `.INCLUDE`d file — constants must stay inline.
 - **Canonical Byte-Oracle Transition (WP1–WP6, closed 2026-09-02)** — no
   change to any shipping byte (`dash.prg` `3b4d0693…`, `banner.prg`
   `b43415c1…`, all 67 CASM fixture `.ref` binaries unchanged). New

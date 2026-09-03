@@ -39,6 +39,7 @@ CMAKELISTS = REPO / "CMakeLists.txt"
 NATIVE_MANIFESTS = [
     REPO / "src" / "external" / "dash" / "dash.ref.hex",
     REPO / "src" / "external" / "banner" / "banner.ref.hex",
+    REPO / "src" / "external" / "label" / "label.ref.hex",
 ]
 
 

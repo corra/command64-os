@@ -306,6 +306,7 @@ metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
 | overlay events | — | `casm_event` | `NOT-APPLICABLE` |
 | **DASH** native app | `dash.ref.hex` — bytes `NATIVE-OBSERVATION` (reviewed native run + ca65 `DIFFERENTIAL-ONLY`); R6 relocation ledger `CANONICAL-INDEPENDENT` | runtime `$3800`/`$5000`/`$9000` (DASH-MOD) | WP4 (audit-corrected 2026-09-02): full byte derivation not practical; ca65 differential retained as standing release check (WP5) |
 | **BANNER** native app | `banner.ref.hex` `CANONICAL-INDEPENDENT` | multi-base `casm_r6_verify.py` PASS | WP4 — full address ledger + 20-entry table verified vs body |
+| **LABEL** native app | `label.ref.hex` `CANONICAL-INDEPENDENT` — code/data via same-base ca65 differential (843/844 image bytes identical, 1 intentional banner byte `$3706`); 52-entry R6 ledger independently reconciled; reviewer sign-off 2026-09-02 | live `COMP LABEL.PRG LABEL.REF` → `FILES COMPARE OK` (CASM 0.6.2 b1419); `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000` | 2026-09-02 CASM-native migration; derivation `src/external/label/label-derivation.md` |
 
 **No axis is uncovered.** Every axis has at least a structural harness;
 every axis that *should* have a byte oracle has one at

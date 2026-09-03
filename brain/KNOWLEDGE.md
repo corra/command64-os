@@ -3637,6 +3637,47 @@ per-WP sub-plans/walkthroughs
 `brain/{plans,walkthroughs}/2026-09-02-casm-byte-oracle-wp{1..6}-*.md`.
 Taskwarrior parent `75cfa082` (project `casm.byteoracle`).
 
+## LABEL → CASM-native (2026-09-02, first external-app migration)
+
+First app migrated per
+`brain/reviews/2026-09-01-external-applications-casm-native-viability.md`
+(Stage 1 pilot). Plan/walkthrough
+`brain/{plans,walkthroughs}/2026-09-02-label-casm-native-migration.md`;
+Taskwarrior task 41 (project `label`).
+
+- **ca65 retired for LABEL.** `label.prg` ships from
+  `src/external/label/label.ref.hex` via `scripts/hex_manifest_to_bin.py`
+  (BANNER/DASH model). No `add_ca65_app(label …)`, no `label_ref`
+  differential. `scripts/build_label_manifest.py` regenerates the manifest
+  (deliberate reviewed act); `command64_label_test_d64` is the native-
+  assembly disk.
+- **Source** (`label.s`): self-contained native CASM — constants inline
+  (`command64.inc` + `common.inc` dropped), `@local` routine-internal
+  labels, native string/char literals for messages, `.RES` buffers,
+  `VOL_NAME_LEN±1` bounded-expr addends. Drive-command protocol strings
+  kept as explicit reviewed hex.
+- **Versioning**: new `LABEL_VERSION` file (`0.4.0`, app-owned, hand-
+  bumped — *not* the repo `VERSION`) + `BUILD_LABEL` feed
+  `scripts/gen_label_version.py`, which emits `labelver.s` (build product,
+  `${CMAKE_BINARY_DIR}`) at build time. Banner now renders
+  `LABEL v0.4.0.1047` — app name shifted PETSCII (uppercase glyph),
+  lowercase `v`, digits — matching `DEBUG`'s `DEBUG v0.5.0.1128`. The old
+  ca65 build rendered `V` uppercase via an unintended `-t c64` charmap
+  shift; this is the *only* intended byte change.
+- **Oracle** (`src/external/label/label-derivation.md`,
+  `CANONICAL-INDEPENDENT` pending reviewer sign-off): code/data bytes
+  corroborated by a same-base (`$3400`) ca65 build of the pre-migration
+  source — **843/844 image bytes identical**, the 1 diff is the banner
+  `V`→`v`. R6 ledger independently derived: 52 entries (45 absolute
+  operands + 7 `#>label` high bytes; 0 for `$1000`/`$FFxx`/`$039E`/`$033C`
+  or `#<` low bytes), `casm_r6_verify.py` PASS at `$3800`/`$5000`/`$9000`.
+  Live `COMP LABEL.PRG LABEL.REF` → `FILES COMPARE OK` (CASM 0.6.2 b1419).
+- **CASM defect found** (Taskwarrior 42, not fixed here): a zero-page-
+  valued named constant defined in an `.INCLUDE`d file assembles to
+  3-byte absolute, not zero page — WP72's ZP selection only applies to
+  inline definitions. Blocks a shared `.INCLUDE` of ZP constants for the
+  next migrations; keep app constants inline (BANNER/DASH precedent).
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |
