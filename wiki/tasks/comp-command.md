@@ -1,6 +1,6 @@
 # COMP Command
 
-Status: [/]
+Status: [x] Shipped; CASM-native since 2026-09-02 (see comp-casm-native-migration.md)
 Taskwarrior: 24
 
 ## Goal
@@ -35,7 +35,9 @@ streams and reports byte-level differences.
 - [x] Implement hex offset/byte output.
 - [x] Build `image_d64` successfully.
 - [x] Build `test_image_d64` successfully.
-- [ ] Complete manual C64/VICE verification.
+- [x] Complete manual C64/VICE verification — done 2026-09-02 as the
+      12-scenario functional matrix of the CASM-native migration (Increment 5,
+      `brain/reviews/2026-09-02-comp-casm-native-increment5-functional-verification.md`).
 - [x] Update docs and task status.
 
 ## Manual Verification

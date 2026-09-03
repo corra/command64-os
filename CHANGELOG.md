@@ -9,6 +9,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **COMP → CASM-native (2026-09-02)** — second external-application migration
+  from the CASM-native viability review
+  (`brain/reviews/2026-09-01-external-applications-casm-native-viability.md`),
+  and the first with an explicit **true-BSS → emitted-storage** disposition.
+  `COMP`'s ca65/ld65 build is retired; `comp.prg` now ships from a reviewed
+  hex manifest (`src/external/comp/comp.ref.hex`, transcribed by
+  `scripts/hex_manifest_to_bin.py`), the BANNER/LABEL/DASH model. Source
+  (`comp.s`) converted to native CASM syntax — inline named constants
+  (`common.inc` dropped), `@local` labels, `.RES` storage. The two 40-byte
+  filename buffers and two 64-byte chunk buffers were unemitted ld65 BSS;
+  they are now **208 bytes of emitted zero-fill** inside the image (file
+  grows, runtime memory ceiling unchanged). No version banner (COMP never
+  had one); the manifest binds `comp.s` + the frozen `BUILD_COMP`. Behaviour
+  is otherwise **unchanged**: the 1228-byte R6 image is byte-identical to an
+  independent hand derivation
+  (`src/external/comp/comp-derivation.md`, `CANONICAL-INDEPENDENT`), R6
+  relocation verified at `$3800`/`$5000`/`$9000`, and a live 12-scenario
+  functional matrix (identical / 1-mismatch / >10-mismatch / size-asymmetry
+  both ways / missing-file / bad-args / slash-option / raw-PRG load-address /
+  assemble `CASMHELLO.SEQ` then `COMP` its PRG against the trusted `.REF` →
+  `FILES COMPARE OK`) all as expected.
+  New: `scripts/build_comp_manifest.py`, `scripts/gen_comp_func_fixtures.py`,
+  `command64_comp_test_d64` (native-assembly disk), `command64_comp_func_test_d64`
+  (functional matrix). Two byte-neutral conversion fixes caught by native
+  assembly: bare `LSR` → `LSR A` (CASM needs the explicit accumulator
+  operand); `@local` labels referenced across a global-label scope boundary
+  → promoted to global. The known cross-device stream-invalidation defect
+  (`wiki/tasks/comp-cross-device-regression.md`) is unchanged — not fixed,
+  not worsened — and stays open.
 - **LABEL → CASM-native (2026-09-02)** — the first external-application
   migration from the CASM-native viability review
   (`brain/reviews/2026-09-01-external-applications-casm-native-viability.md`).
