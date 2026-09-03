@@ -3743,6 +3743,41 @@ Taskwarrior task 42 (project `comp`). Six user-gated increments.
   (`wiki/tasks/comp-cross-device-regression.md`) is unchanged and stays
   open.
 
+## FORMAT → CASM-native (2026-09-02, third external-app migration)
+
+Plan/walkthrough
+`brain/{plans,walkthroughs}/2026-09-02-format-casm-native-migration.md`;
+Taskwarrior project `format`.
+
+- **ca65 retired for FORMAT.** `format.prg` ships from
+  `src/external/format/format.ref.hex` via `hex_manifest_to_bin.py`. New:
+  `scripts/{build_format_manifest,gen_format_version}.py`,
+  `src/external/format/{FORMAT_VERSION,format-derivation.md,format.ref.hex}`,
+  `command64_format_test_d64`. `common.inc`/`build_format.inc` deleted;
+  `BUILD_FORMAT` trimmed to `1013`.
+- **Source**: constants inline; `@local` labels; `.RES` (BSS was already
+  emitted); char literals for comparisons — **but CASM char literals take
+  no addend** (`'9'+1` illegal → `#$3A`; `#(X+1)` → `#X+1` no parens).
+- **Message case flips uppercase → lowercase.** Old ca65 build wrote the
+  message text as uppercase-ASCII which `-t c64` shifted to `$C1-$DA`
+  (renders uppercase). CASM emits unshifted `$41-$5A`; KERNAL CHROUT maps
+  those to screen `$01-$1A` which display **lowercase**. So you get
+  lowercase on-screen text from **uppercase-ASCII source** (the CHROUT
+  case inversion — see `reference-casm-lowercase-in-string-literals`). The
+  banner keeps `FORMAT` as shifted PETSCII (uppercase glyph),
+  `FORMAT v0.1.0.1013` DEBUG format.
+- **`:N:` command byte `$CE` → `$4E`.** `litNColon: .byte ":N:"` shifted
+  the `N` under ca65. **Not a bug fix** — verified live that the 1541
+  (VICE) accepts `$CE` and the old build formats disks correctly. It is a
+  canonical-byte cleanup (explicit reviewed protocol byte).
+- **Oracle** (`format-derivation.md`, `CANONICAL-INDEPENDENT` pending
+  reviewer sign-off): CASM image is **0-diff** vs a ca65 `$3400` build of a
+  mechanically messages-forced-to-explicit-unshifted-hex transform of
+  `format.s` (all 1539 image bytes). R6: 131 absolute operands + 28 `#>`
+  high-byte immediates = 159 entries, `casm_r6_verify.py` PASS
+  `$3800`/`$5000`/`$9000`. Live `COMP FMT.PRG FORMAT.REF` → `FILES COMPARE
+  OK`; end-to-end scratch-disk format under VICE succeeded.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

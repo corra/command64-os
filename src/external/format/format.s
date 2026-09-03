@@ -1,763 +1,801 @@
-; src/external/format/format.s
-; SPDX-License-Identifier: MIT
-; Copyright (c) 2026 Command64 project contributors
+; SRC/EXTERNAL/FORMAT/FORMAT.S
+; SPDX-LICENSE-IDENTIFIER: MIT
+; COPYRIGHT (C) 2026 COMMAND64 PROJECT CONTRIBUTORS
 ;
-; FORMAT: low-level-formats a 1541 floppy by sending CBM DOS's native
-; N:name,id (NEW) command to the target drive's command channel via the
-; DOS_SEND_COMMAND kernel primitive ($58, include/ca65/command64.inc).
-; The drive firmware owns the actual format logic entirely -- this app
-; only builds/validates the command string, guards the destructive
-; operation behind a two-step confirmation, sends it, and reports the
-; drive's real status response. See wiki/tasks/format.md.
+; FORMAT: LOW-LEVEL-FORMATS A 1541 FLOPPY BY SENDING CBM DOS'S NATIVE
+; N:NAME,ID (NEW) COMMAND TO THE TARGET DRIVE'S COMMAND CHANNEL VIA THE
+; DOS_SEND_COMMAND OS API PRIMITIVE ($58). THE DRIVE FIRMWARE OWNS THE
+; ACTUAL FORMAT LOGIC -- THIS APP ONLY BUILDS/VALIDATES THE COMMAND STRING,
+; GUARDS THE DESTRUCTIVE OPERATION BEHIND A TWO-STEP CONFIRMATION, SENDS IT,
+; AND REPORTS THE DRIVE'S REAL STATUS RESPONSE. SEE WIKI/TASKS/FORMAT.MD.
 ;
-; Invocation: FORMAT <dev>:<name>,<id>  (e.g. FORMAT 8:MYDISK,01)
-; With no/incomplete arguments, falls back to interactive prompts for
-; device, name, and ID in turn (each reprompts on invalid input). A CLI
-; argument that structurally parses (has a comma) but fails validation
-; (bad length/charset/device range) is a hard error -- CLI mode does not
-; fall back to interactive prompting, only fully-missing/malformed
-; arguments (no comma found at all) do.
-
-.include "command64.inc"
-.include "common.inc"
-
-.define VERSION_MAJOR "0"
-.define VERSION_MINOR "1"
-.define VERSION_STAGE "0"
-.include "build_format.inc"
-
-.import __MAIN_START__
-
-.segment "HEADER"
-    .word __MAIN_START__
-
-.segment "CODE"
-
-; ---------------------------------------------------------------------------
-; Entry point
-; ---------------------------------------------------------------------------
-start:
-    ldx #<verMsg
-    ldy #>verMsg
-    jsr printStr
-
-    ; --- Parse CLI args: skip our own name token, then optional spaces ---
-    ldy ParsePos
-pcSkipToken:
-    lda CommandBuffer, y
-    beq pcNoArgsNear
-    iny
-    cmp #' '
-    bne pcSkipToken
-
-pcSkipSpaces:
-    lda CommandBuffer, y
-    cmp #' '
-    bne pcEndSpaces
-    iny
-    jmp pcSkipSpaces
-pcEndSpaces:
-    cmp #0
-    bne pcContinue1
-pcNoArgsNear:
-    jmp pcNoArgs
-
-pcContinue1:
-    ; Build a pointer to CommandBuffer+y so DOS_PARSE_PREFIX can strip an
-    ; optional "<dev>:" prefix (same idiom as label.s).
-    tya
-    clc
-    adc #<CommandBuffer
-    sta PrintPtrLo
-    lda #>CommandBuffer
-    adc #0
-    sta PrintPtrHi
-
-    ldx #PrintPtrLo
-    lda #DOS_PARSE_PREFIX
-    jsr OS_API
-    sta DeviceNum
-
-    ; Recompute y from the (possibly prefix-advanced) pointer.
-    lda PrintPtrLo
-    sec
-    sbc #<CommandBuffer
-    tay
-
-pcSkipSpaces2:
-    lda CommandBuffer, y
-    cmp #' '
-    bne pcEndSpaces2
-    iny
-    jmp pcSkipSpaces2
-pcEndSpaces2:
-    cmp #0
-    beq pcNoArgs            ; nothing after the device prefix -> incomplete
-
-    ; --- Capture the name portion up to a comma. Cap the write at 40
-    ; chars but keep scanning past that so an overlong name still reaches
-    ; the comma correctly and fails length validation below, rather than
-    ; being misreported as "no comma found". ---
-    ldx #0
-pcNameLoop:
-    lda CommandBuffer, y
-    beq pcNoComma            ; ran off the end without a comma -> incomplete
-    cmp #','
-    beq pcNameFound
-    cpx #40
-    bcs pcNameNoWrite
-    sta NameBuf, x
-    inx
-pcNameNoWrite:
-    iny
-    jmp pcNameLoop
-pcNameFound:
-    iny                      ; skip the comma itself
-    stx NameLen
-    lda #0
-    sta NameBuf, x
-    jsr rtrimName
-
-    ; Skip optional spaces right after the comma (UX convenience --
-    ; nothing in the spec forbids "NAME, 01").
-pcSkipSpaces3:
-    lda CommandBuffer, y
-    cmp #' '
-    bne pcEndSpaces3
-    iny
-    jmp pcSkipSpaces3
-pcEndSpaces3:
-
-    ; --- Capture the ID portion up to space/null. Same cap-and-keep-
-    ; scanning approach as the name. ---
-    ldx #0
-pcIdLoop:
-    lda CommandBuffer, y
-    beq pcIdDone
-    cmp #' '
-    beq pcIdDone
-    cpx #8
-    bcs pcIdNoWrite
-    sta IdBuf, x
-    inx
-pcIdNoWrite:
-    iny
-    jmp pcIdLoop
-pcIdDone:
-    stx IdLen
-    lda #0
-    sta IdBuf, x
-
-    ; --- CLI mode: validate strictly. Any failure is a hard error, no
-    ; reprompting (per spec). ---
-    lda DeviceNum
-    jsr validateDeviceNum
-    bcs cliErrDevice
-    jsr validateName
-    bcs cliErrName
-    jsr validateId
-    bcs cliErrId
-    jmp doConfirmAndFormat
-
-pcNoComma:
-pcNoArgs:
-    jmp needInteractive
-
-cliErrDevice:
-    ldx #<msgErrDevice
-    ldy #>msgErrDevice
-    jsr printStr
-    jmp doExit
-
-cliErrName:
-    ldx #<msgErrName
-    ldy #>msgErrName
-    jsr printStr
-    jmp doExit
-
-cliErrId:
-    ldx #<msgErrId
-    ldy #>msgErrId
-    jsr printStr
-    jmp doExit
+; INVOCATION: FORMAT <DEV>:<NAME>,<ID>  (E.G. FORMAT 8:MYDISK,01)
+; WITH NO/INCOMPLETE ARGUMENTS, FALLS BACK TO INTERACTIVE PROMPTS FOR
+; DEVICE, NAME, AND ID IN TURN (EACH REPROMPTS ON INVALID INPUT). A CLI
+; ARGUMENT THAT STRUCTURALLY PARSES (HAS A COMMA) BUT FAILS VALIDATION IS A
+; HARD ERROR -- CLI MODE DOES NOT FALL BACK TO INTERACTIVE PROMPTING.
+;
+; FULLY SELF-CONTAINED, SEGMENT-LESS, NATIVE-CASM-ONLY SOURCE FILE. NO CA65
+; BUILD (SEE THE 2026-09-02 FORMAT CASM-NATIVE MIGRATION PLAN). CONSTANTS
+; ARE DEFINED INLINE (NOT .INCLUDE'D -- CASM 0.6.2 EMITS 3-BYTE ABSOLUTE
+; FOR A ZP-VALUED CONSTANT FROM AN .INCLUDE'D FILE). PHASE 12-15 SYNTAX
+; USED FREELY: @LOCAL LABELS, NATIVE STRING/CHARACTER LITERALS, .RES.
+;
+; PETSCII NOTE: NATIVE CASM EMITS RAW UNSHIFTED PETSCII FOR A-Z ($41-$5A).
+; ON COMMAND 64'S MIXED-CASE CHARSET, KERNAL CHROUT MAPS PETSCII $41-$5A TO
+; SCREEN CODES $01-$1A -- WHICH DISPLAY *LOWERCASE*. SO THE UPPERCASE-ASCII
+; MESSAGE STRINGS BELOW RENDER LOWERCASE ON SCREEN (SAME AS LABEL). THE
+; RETIRED CA65 BUILD WROTE THE SAME TEXT AS SHIFTED PETSCII ($C1-$DA) VIA
+; ITS -T C64 CHARMAP, WHICH RENDERS UPPERCASE -- SO THIS MIGRATION FLIPS
+; FORMAT'S ON-SCREEN MESSAGE CASE FROM UPPERCASE TO LOWERCASE (SCOPING
+; DECISION 1). THE VERSION BANNER (FORMATVER.S) DELIBERATELY KEEPS THE APP
+; NAME AS SHIFTED PETSCII SO "FORMAT" STAYS AN UPPERCASE GLYPH.
+; THE DRIVE-COMMAND LITERALS LITNCOLON / LITCOMMA ARE EXPLICIT REVIEWED
+; UNSHIFTED HEX: THE 1541 NEW COMMAND'S CANONICAL BYTE IS 'N' = $4E. (THE
+; CA65 BUILD'S SHIFTED $CE IS ACCEPTED BY THE 1541 TOO -- VERIFIED -- SO
+; THIS IS A CANONICAL-BYTE CLEANUP, NOT A BUG FIX.)
 
 ; ---------------------------------------------------------------------------
-; Interactive fallback: prompt for device, name, ID in turn, each looping
-; until valid.
+; OS API -- $1000 DISPATCHER, SELECTOR IN A. FIXED OS ENTRY POINT + OS-
+; DEFINED SELECTOR VALUES (COMMAND64 API CONTRACT). NOT RELOCATION-ELIGIBLE.
 ; ---------------------------------------------------------------------------
-needInteractive:
-    jsr promptDevice
-    jsr promptName
-    jsr promptId
-    jmp doConfirmAndFormat
-
-promptDevice:
-pdRetry:
-    ldx #<msgPromptDevice
-    ldy #>msgPromptDevice
-    jsr printStr
-
-    lda #<LineBuf
-    sta BufPtrLo
-    lda #>LineBuf
-    sta BufPtrHi
-    lda #3
-    sta MaxLen
-    jsr readLine
-
-    jsr parseDeviceDigits
-    bcs pdInvalid
-    sta DeviceNum
-    jsr validateDeviceNum
-    bcs pdInvalid
-    rts
-pdInvalid:
-    ldx #<msgInvalidRetry
-    ldy #>msgInvalidRetry
-    jsr printStr
-    jmp pdRetry
-
-promptName:
-pnRetry:
-    ldx #<msgPromptName
-    ldy #>msgPromptName
-    jsr printStr
-
-    lda #<NameBuf
-    sta BufPtrLo
-    lda #>NameBuf
-    sta BufPtrHi
-    lda #40
-    sta MaxLen
-    jsr readLine
-    sty NameLen
-    jsr rtrimName
-    jsr validateName
-    bcs pnInvalid
-    rts
-pnInvalid:
-    ldx #<msgInvalidRetry
-    ldy #>msgInvalidRetry
-    jsr printStr
-    jmp pnRetry
-
-promptId:
-piRetry:
-    ldx #<msgPromptId
-    ldy #>msgPromptId
-    jsr printStr
-
-    lda #<IdBuf
-    sta BufPtrLo
-    lda #>IdBuf
-    sta BufPtrHi
-    lda #8
-    sta MaxLen
-    jsr readLine
-    sty IdLen
-    jsr validateId
-    bcs piInvalid
-    rts
-piInvalid:
-    ldx #<msgInvalidRetry
-    ldy #>msgInvalidRetry
-    jsr printStr
-    jmp piRetry
+OS_API           = $1000
+DOS_PRINT_STR    = $09      ; PRINT NUL-TERMINATED STRING (PTR IN X/Y)
+DOS_EXIT         = $4C      ; TERMINATE, RETURN TO SHELL
+DOS_PARSE_PREFIX = $57      ; PARSE TARGET-DEVICE PREFIX FROM A ZP POINTER
+DOS_SEND_COMMAND = $58      ; SEND RAW COMMAND-CHANNEL STRING, READ RESPONSE
 
 ; ---------------------------------------------------------------------------
-; Destructive-action confirmation (Y/N gate + re-typed name match), then
-; send. Falls through to doExit either way.
+; KERNAL JUMP TABLE ($FFXX) -- PUBLISHED C64 KERNAL ENTRY POINTS, FIXED ROM.
 ; ---------------------------------------------------------------------------
-doConfirmAndFormat:
-    jsr confirmDestructive
-    bcs doExit               ; aborted; message already printed
-    jsr sendFormatCommand
-
-doExit:
-    lda #DOS_EXIT
-    jsr OS_API
-
-confirmDestructive:
-    ldx #<msgConfirmPart1
-    ldy #>msgConfirmPart1
-    jsr printStr
-
-    jsr computeDevDigits
-    ldx #<DevDigits
-    ldy #>DevDigits
-    jsr printStr
-
-    ldx #<msgConfirmPart2
-    ldy #>msgConfirmPart2
-    jsr printStr
-
-cdPoll:
-    jsr KernalGetIn
-    beq cdPoll
-    pha
-    jsr KernalChROUT
-    pla
-
-    cmp #$79                 ; shifted 'Y'
-    beq cdYes
-    cmp #$59                 ; lowercase 'y' (some keyboard mapping modes)
-    beq cdYes
-
-    jsr printCrlf
-    ldx #<msgCancelled
-    ldy #>msgCancelled
-    jsr printStr
-    sec
-    rts
-
-cdYes:
-    jsr printCrlf
-    ldx #<msgReenterName
-    ldy #>msgReenterName
-    jsr printStr
-
-    lda #<ConfirmBuf
-    sta BufPtrLo
-    lda #>ConfirmBuf
-    sta BufPtrHi
-    lda #40
-    sta MaxLen
-    jsr readLine
-    sty ConfirmLen
-    jsr rtrimConfirm
-    jsr compareNames
-    bcs cdMismatch
-    clc
-    rts
-
-cdMismatch:
-    ldx #<msgMismatch
-    ldy #>msgMismatch
-    jsr printStr
-    sec
-    rts
+KERNALGETIN  = $FFE4       ; RAW KEYBOARD INPUT (NO SCREEN EDITOR)
+KERNALCHROUT = $FFD2       ; OUTPUT A CHARACTER TO THE CURRENT CHANNEL
 
 ; ---------------------------------------------------------------------------
-; Build "<dev>:N:<name>,<id>" and send it via DOS_SEND_COMMAND. No true
-; concurrent animation is possible around a single blocking KERNAL call on
-; this single-tasking CPU, so the "busy indicator" is a static message
-; printed just before the (synchronous, non-cancellable) send.
+; OS GLOBALS -- FIXED COMMAND64 ADDRESSES (MEMORY MAP).
 ; ---------------------------------------------------------------------------
-sendFormatCommand:
-    lda #0
-    sta CmdIdx
-
-    jsr computeDevDigits
-    ldx #<DevDigits
-    ldy #>DevDigits
-    jsr appendStr
-
-    ldx #<litNColon
-    ldy #>litNColon
-    jsr appendStr
-
-    ldx #<NameBuf
-    ldy #>NameBuf
-    jsr appendStr
-
-    ldx #<litComma
-    ldy #>litComma
-    jsr appendStr
-
-    ldx #<IdBuf
-    ldy #>IdBuf
-    jsr appendStr
-
-    ldx CmdIdx
-    lda #0
-    sta CmdBuf, x
-
-    ldx #<msgFormatting
-    ldy #>msgFormatting
-    jsr printStr
-
-    lda #<RespBuf
-    sta PrintPtrLo
-    lda #>RespBuf
-    sta PrintPtrHi
-    ldx #<CmdBuf
-    ldy #>CmdBuf
-    lda #DOS_SEND_COMMAND
-    jsr OS_API
-    bcs sfcTransportErr
-
-    ldx #<msgResult
-    ldy #>msgResult
-    jsr printStr
-    ldx #<RespBuf
-    ldy #>RespBuf
-    jsr printStr
-    jsr printCrlf
-    rts
-
-sfcTransportErr:
-    jsr printCrlf
-    ldx #<msgTransportErr
-    ldy #>msgTransportErr
-    jsr printStr
-    rts
+COMMANDBUFFER = $033C      ; 80-BYTE SHELL COMMAND BUFFER
+PARSEPOS      = $63         ; ZP: INDEX INTO COMMANDBUFFER PAST THE COMMAND NAME
+PRINTPTRLO    = $FB         ; OS PETPRINTSTRING / DOS_SEND_COMMAND WORKING PTR
+PRINTPTRHI    = $FC
 
 ; ---------------------------------------------------------------------------
-; Helpers
+; PETSCII CONTROL CODES
 ; ---------------------------------------------------------------------------
-
-; printStr: Input X/Y = pointer lo/hi to a null-terminated string.
-printStr:
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    rts
-
-printCrlf:
-    lda #PetCr
-    jsr KernalChROUT
-    rts
-
-; readLine: reads a line of keyboard input, echoing each char, honoring
-; PetDel as destructive backspace, terminating on PetCr.
-; Input:  BufPtrLo/Hi = destination buffer (must hold MaxLen+1 bytes)
-;         MaxLen = max characters to accept
-; Output: Y = length written; buffer null-terminated
-; Clobbers: A, X, Y
-readLine:
-    ldy #0
-rlLoop:
-    tya
-    pha
-rlPoll:
-    jsr KernalGetIn
-    beq rlPoll
-    tax
-    pla
-    tay
-    txa
-
-    cmp #PetCr
-    beq rlDone
-
-    cmp #PetDel
-    bne rlHandleChar
-    tya
-    beq rlLoop
-    dey
-    lda #PetDel
-    jsr KernalChROUT
-    jmp rlLoop
-
-rlHandleChar:
-    cpy MaxLen
-    bcs rlLoop
-
-    jsr KernalChROUT
-    sta (BufPtrLo), y
-    iny
-    jmp rlLoop
-
-rlDone:
-    lda #PetCr
-    jsr KernalChROUT
-    lda #0
-    sta (BufPtrLo), y
-    rts
-
-; appendStr: appends a null-terminated string into CmdBuf at CmdIdx,
-; advancing CmdIdx. Does not write the final terminator itself.
-; Input: X/Y = source pointer lo/hi
-; Clobbers: A, Y, BufPtrLo/Hi
-appendStr:
-    stx BufPtrLo
-    sty BufPtrHi
-    ldy #0
-asLoop:
-    lda (BufPtrLo), y
-    beq asDone
-    pha
-    ldx CmdIdx
-    pla
-    sta CmdBuf, x
-    inc CmdIdx
-    iny
-    jmp asLoop
-asDone:
-    rts
-
-; computeDevDigits: renders DeviceNum (8-11) as decimal ASCII into
-; DevDigits, null-terminated.
-computeDevDigits:
-    lda DeviceNum
-    cmp #10
-    bcc cddSingle
-    lda #'1'
-    sta DevDigits
-    lda DeviceNum
-    sec
-    sbc #10
-    clc
-    adc #'0'
-    sta DevDigits + 1
-    lda #0
-    sta DevDigits + 2
-    rts
-cddSingle:
-    clc
-    adc #'0'
-    sta DevDigits
-    lda #0
-    sta DevDigits + 1
-    rts
-
-; parseDeviceDigits: parses LineBuf (null-terminated ASCII digits, up to
-; 2 of them) into a byte value.
-; Output: A = value, Carry clear on success; Carry set on empty/non-digit/
-;         too-long input (caps at 2 digits to avoid byte wraparound).
-parseDeviceDigits:
-    lda LineBuf
-    beq pdBad
-    ldy #0
-    lda #0
-    sta TmpVal
-pdLoop:
-    lda LineBuf, y
-    beq pdDone
-    cpy #2
-    bcs pdBad
-    cmp #'0'
-    bcc pdBad
-    cmp #'9' + 1
-    bcs pdBad
-    sec
-    sbc #'0'
-    pha
-    lda TmpVal
-    asl a
-    sta TmpVal2
-    asl a
-    asl a
-    clc
-    adc TmpVal2
-    sta TmpVal
-    pla
-    clc
-    adc TmpVal
-    sta TmpVal
-    iny
-    jmp pdLoop
-pdDone:
-    cpy #0
-    beq pdBad
-    lda TmpVal
-    clc
-    rts
-pdBad:
-    sec
-    rts
-
-; validateDeviceNum: Input A = candidate device number.
-; Output: Carry clear if within [DEV_MIN, DEV_MAX], else set.
-validateDeviceNum:
-    cmp #DEV_MIN
-    bcc vdBad
-    cmp #(DEV_MAX + 1)
-    bcs vdBad
-    clc
-    rts
-vdBad:
-    sec
-    rts
-
-; validateName: checks NameBuf/NameLen against the 1-16 char length rule
-; and rejects control chars, ',' and ':'.
-validateName:
-    lda NameLen
-    cmp #1
-    bcc vnBad
-    cmp #(NAME_MAX_LEN + 1)
-    bcs vnBad
-    lda #<NameBuf
-    sta BufPtrLo
-    lda #>NameBuf
-    sta BufPtrHi
-    ldx NameLen
-    jsr validateCharset
-    bcs vnBad
-    clc
-    rts
-vnBad:
-    sec
-    rts
-
-; validateId: checks IdBuf/IdLen is exactly ID_LEN chars and rejects
-; control chars, ',' and ':'.
-validateId:
-    lda IdLen
-    cmp #ID_LEN
-    bne viBad
-    lda #<IdBuf
-    sta BufPtrLo
-    lda #>IdBuf
-    sta BufPtrHi
-    ldx IdLen
-    jsr validateCharset
-    bcs viBad
-    clc
-    rts
-viBad:
-    sec
-    rts
-
-; validateCharset: rejects bytes below $20 (control chars) and the
-; delimiter characters ',' and ':', which would corrupt the assembled
-; command string.
-; Input: BufPtrLo/Hi = buffer, X = length
-; Output: Carry set if any byte invalid
-; Clobbers: A, Y
-validateCharset:
-    cpx #0
-    beq vcOk
-    ldy #0
-vcLoop:
-    lda (BufPtrLo), y
-    cmp #$20
-    bcc vcBad
-    cmp #','
-    beq vcBad
-    cmp #':'
-    beq vcBad
-    iny
-    dex
-    bne vcLoop
-vcOk:
-    clc
-    rts
-vcBad:
-    sec
-    rts
-
-; rtrimName: strips trailing spaces from NameBuf/NameLen in place.
-rtrimName:
-    ldx NameLen
-rtnLoop:
-    cpx #0
-    beq rtnDone
-    lda NameBuf - 1, x
-    cmp #' '
-    bne rtnDone
-    dex
-    jmp rtnLoop
-rtnDone:
-    stx NameLen
-    lda #0
-    sta NameBuf, x
-    rts
-
-; rtrimConfirm: strips trailing spaces from ConfirmBuf/ConfirmLen in place
-; (mirrors rtrimName so the re-typed confirmation name is held to the same
-; rule as the original before comparing).
-rtrimConfirm:
-    ldx ConfirmLen
-rtcLoop:
-    cpx #0
-    beq rtcDone
-    lda ConfirmBuf - 1, x
-    cmp #' '
-    bne rtcDone
-    dex
-    jmp rtcLoop
-rtcDone:
-    stx ConfirmLen
-    lda #0
-    sta ConfirmBuf, x
-    rts
-
-; compareNames: Output Carry clear if NameBuf/NameLen exactly matches
-; ConfirmBuf/ConfirmLen, else Carry set.
-compareNames:
-    lda NameLen
-    cmp ConfirmLen
-    bne cnBad
-    lda NameLen
-    beq cnOk
-    tax
-cnLoop:
-    lda NameBuf - 1, x
-    cmp ConfirmBuf - 1, x
-    bne cnBad
-    dex
-    bne cnLoop
-cnOk:
-    clc
-    rts
-cnBad:
-    sec
-    rts
+PETCR  = $0D               ; CARRIAGE RETURN
+PETDEL = $14               ; DEL (INST/DEL UNSHIFTED) -- DESTRUCTIVE BACKSPACE
 
 ; ---------------------------------------------------------------------------
-; Data
+; APP-PRIVATE ZERO-PAGE SCRATCH -- $70-$8F EXTERNAL-APP RANGE.
 ; ---------------------------------------------------------------------------
-verMsg:
-    .byte "FORMAT V"
-    .byte VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."
-    .byte BUILD_NUMBER
-    .byte $0D, 0
-
-msgPromptDevice:
-    .byte "DEVICE (8-11): ", 0
-msgPromptName:
-    .byte "DISK NAME: ", 0
-msgPromptId:
-    .byte "DISK ID: ", 0
-msgInvalidRetry:
-    .byte $0D, "INVALID, TRY AGAIN.", $0D, 0
-
-msgErrDevice:
-    .byte "ERROR: DEVICE MUST BE 8-11.", $0D, 0
-msgErrName:
-    .byte "ERROR: NAME MUST BE 1-16 CHARS, NO ',' OR ':'.", $0D, 0
-msgErrId:
-    .byte "ERROR: ID MUST BE EXACTLY 2 CHARS.", $0D, 0
-
-msgConfirmPart1:
-    .byte "FORMAT DRIVE ", 0
-msgConfirmPart2:
-    .byte " - ALL DATA WILL BE LOST. CONTINUE? (Y/N) ", 0
-msgCancelled:
-    .byte "FORMAT CANCELLED.", $0D, 0
-msgReenterName:
-    .byte "RE-ENTER DISK NAME TO CONFIRM: ", 0
-msgMismatch:
-    .byte "NAME MISMATCH. FORMAT CANCELLED.", $0D, 0
-
-msgFormatting:
-    .byte "FORMATTING...", $0D, 0
-msgResult:
-    .byte "RESULT: ", 0
-msgTransportErr:
-    .byte "FORMAT FAILED (TRANSPORT ERROR).", $0D, 0
-
-litNColon:
-    .byte ":N:", 0
-litComma:
-    .byte ",", 0
+BUFPTRLO = $70            ; READLINE DESTINATION BUFFER POINTER LOW
+BUFPTRHI = $71            ; READLINE DESTINATION BUFFER POINTER HIGH
+MAXLEN   = $72            ; READLINE MAX CHARS TO ACCEPT (BUFFER IS MAXLEN+1)
 
 ; ---------------------------------------------------------------------------
-; Buffers (BSS)
+; DISK-NAME / ID LIMITS (CBM DOS CONVENTION, SEE WIKI/TASKS/FORMAT.MD)
 ; ---------------------------------------------------------------------------
-DeviceNum:   .res 1
-NameLen:     .res 1
-IdLen:       .res 1
-ConfirmLen:  .res 1
-CmdIdx:      .res 1
-TmpVal:      .res 1
-TmpVal2:     .res 1
+NAME_MAX_LEN = 16
+ID_LEN       = 2
+DEV_MIN      = 8
+DEV_MAX      = 11
 
-DevDigits:   .res 3
-NameBuf:     .res 41
-IdBuf:       .res 9
-ConfirmBuf:  .res 41
-LineBuf:     .res 4
-CmdBuf:      .res 32
-RespBuf:     .res 40
+; ---------------------------------------------------------------------------
+; ENTRY POINT
+; ---------------------------------------------------------------------------
+START:
+    LDX #<FORMATVERMSG
+    LDY #>FORMATVERMSG
+    JSR PRINTSTR
+
+    ; --- PARSE CLI ARGS: SKIP OUR OWN NAME TOKEN, THEN OPTIONAL SPACES ---
+    LDY PARSEPOS
+@PCSKIPTOKEN:
+    LDA COMMANDBUFFER,Y
+    BEQ @PCNOARGSNEAR
+    INY
+    CMP #' '
+    BNE @PCSKIPTOKEN
+
+@PCSKIPSPACES:
+    LDA COMMANDBUFFER,Y
+    CMP #' '
+    BNE @PCENDSPACES
+    INY
+    JMP @PCSKIPSPACES
+@PCENDSPACES:
+    CMP #$00
+    BNE @PCCONTINUE1
+@PCNOARGSNEAR:
+    JMP @PCNOARGS
+
+@PCCONTINUE1:
+    ; BUILD A POINTER TO COMMANDBUFFER+Y SO DOS_PARSE_PREFIX CAN STRIP AN
+    ; OPTIONAL "<DEV>:" PREFIX (SAME IDIOM AS LABEL).
+    TYA
+    CLC
+    ADC #<COMMANDBUFFER
+    STA PRINTPTRLO
+    LDA #>COMMANDBUFFER
+    ADC #$00
+    STA PRINTPTRHI
+
+    LDX #PRINTPTRLO
+    LDA #DOS_PARSE_PREFIX
+    JSR OS_API
+    STA DEVICENUM
+
+    ; RECOMPUTE Y FROM THE (POSSIBLY PREFIX-ADVANCED) POINTER.
+    LDA PRINTPTRLO
+    SEC
+    SBC #<COMMANDBUFFER
+    TAY
+
+@PCSKIPSPACES2:
+    LDA COMMANDBUFFER,Y
+    CMP #' '
+    BNE @PCENDSPACES2
+    INY
+    JMP @PCSKIPSPACES2
+@PCENDSPACES2:
+    CMP #$00
+    BEQ @PCNOARGS           ; NOTHING AFTER THE DEVICE PREFIX -> INCOMPLETE
+
+    ; --- CAPTURE THE NAME PORTION UP TO A COMMA. CAP THE WRITE AT 40 CHARS
+    ; BUT KEEP SCANNING PAST THAT SO AN OVERLONG NAME STILL REACHES THE
+    ; COMMA CORRECTLY AND FAILS LENGTH VALIDATION BELOW. ---
+    LDX #$00
+@PCNAMELOOP:
+    LDA COMMANDBUFFER,Y
+    BEQ @PCNOCOMMA           ; RAN OFF THE END WITHOUT A COMMA -> INCOMPLETE
+    CMP #','
+    BEQ @PCNAMEFOUND
+    CPX #40
+    BCS @PCNAMENOWRITE
+    STA NAMEBUF,X
+    INX
+@PCNAMENOWRITE:
+    INY
+    JMP @PCNAMELOOP
+@PCNAMEFOUND:
+    INY                      ; SKIP THE COMMA ITSELF
+    STX NAMELEN
+    LDA #$00
+    STA NAMEBUF,X
+    JSR RTRIMNAME
+
+    ; SKIP OPTIONAL SPACES RIGHT AFTER THE COMMA (UX CONVENIENCE).
+@PCSKIPSPACES3:
+    LDA COMMANDBUFFER,Y
+    CMP #' '
+    BNE @PCENDSPACES3
+    INY
+    JMP @PCSKIPSPACES3
+@PCENDSPACES3:
+
+    ; --- CAPTURE THE ID PORTION UP TO SPACE/NULL. ---
+    LDX #$00
+@PCIDLOOP:
+    LDA COMMANDBUFFER,Y
+    BEQ @PCIDDONE
+    CMP #' '
+    BEQ @PCIDDONE
+    CPX #8
+    BCS @PCIDNOWRITE
+    STA IDBUF,X
+    INX
+@PCIDNOWRITE:
+    INY
+    JMP @PCIDLOOP
+@PCIDDONE:
+    STX IDLEN
+    LDA #$00
+    STA IDBUF,X
+
+    ; --- CLI MODE: VALIDATE STRICTLY. ANY FAILURE IS A HARD ERROR. ---
+    LDA DEVICENUM
+    JSR VALIDATEDEVICENUM
+    BCS @CLIERRDEVICE
+    JSR VALIDATENAME
+    BCS @CLIERRNAME
+    JSR VALIDATEID
+    BCS @CLIERRID
+    JMP DOCONFIRMANDFORMAT
+
+@PCNOCOMMA:
+@PCNOARGS:
+    JMP NEEDINTERACTIVE
+
+@CLIERRDEVICE:
+    LDX #<MSGERRDEVICE
+    LDY #>MSGERRDEVICE
+    JSR PRINTSTR
+    JMP DOEXIT
+
+@CLIERRNAME:
+    LDX #<MSGERRNAME
+    LDY #>MSGERRNAME
+    JSR PRINTSTR
+    JMP DOEXIT
+
+@CLIERRID:
+    LDX #<MSGERRID
+    LDY #>MSGERRID
+    JSR PRINTSTR
+    JMP DOEXIT
+
+; ---------------------------------------------------------------------------
+; INTERACTIVE FALLBACK: PROMPT FOR DEVICE, NAME, ID IN TURN.
+; ---------------------------------------------------------------------------
+NEEDINTERACTIVE:
+    JSR PROMPTDEVICE
+    JSR PROMPTNAME
+    JSR PROMPTID
+    JMP DOCONFIRMANDFORMAT
+
+PROMPTDEVICE:
+@PDRETRY:
+    LDX #<MSGPROMPTDEVICE
+    LDY #>MSGPROMPTDEVICE
+    JSR PRINTSTR
+
+    LDA #<LINEBUF
+    STA BUFPTRLO
+    LDA #>LINEBUF
+    STA BUFPTRHI
+    LDA #3
+    STA MAXLEN
+    JSR READLINE
+
+    JSR PARSEDEVICEDIGITS
+    BCS @PDINVALID
+    STA DEVICENUM
+    JSR VALIDATEDEVICENUM
+    BCS @PDINVALID
+    RTS
+@PDINVALID:
+    LDX #<MSGINVALIDRETRY
+    LDY #>MSGINVALIDRETRY
+    JSR PRINTSTR
+    JMP @PDRETRY
+
+PROMPTNAME:
+@PNRETRY:
+    LDX #<MSGPROMPTNAME
+    LDY #>MSGPROMPTNAME
+    JSR PRINTSTR
+
+    LDA #<NAMEBUF
+    STA BUFPTRLO
+    LDA #>NAMEBUF
+    STA BUFPTRHI
+    LDA #40
+    STA MAXLEN
+    JSR READLINE
+    STY NAMELEN
+    JSR RTRIMNAME
+    JSR VALIDATENAME
+    BCS @PNINVALID
+    RTS
+@PNINVALID:
+    LDX #<MSGINVALIDRETRY
+    LDY #>MSGINVALIDRETRY
+    JSR PRINTSTR
+    JMP @PNRETRY
+
+PROMPTID:
+@PIRETRY:
+    LDX #<MSGPROMPTID
+    LDY #>MSGPROMPTID
+    JSR PRINTSTR
+
+    LDA #<IDBUF
+    STA BUFPTRLO
+    LDA #>IDBUF
+    STA BUFPTRHI
+    LDA #8
+    STA MAXLEN
+    JSR READLINE
+    STY IDLEN
+    JSR VALIDATEID
+    BCS @PIINVALID
+    RTS
+@PIINVALID:
+    LDX #<MSGINVALIDRETRY
+    LDY #>MSGINVALIDRETRY
+    JSR PRINTSTR
+    JMP @PIRETRY
+
+; ---------------------------------------------------------------------------
+; DESTRUCTIVE-ACTION CONFIRMATION (Y/N GATE + RE-TYPED NAME MATCH), THEN
+; SEND. FALLS THROUGH TO DOEXIT EITHER WAY.
+; ---------------------------------------------------------------------------
+DOCONFIRMANDFORMAT:
+    JSR CONFIRMDESTRUCTIVE
+    BCS DOEXIT               ; ABORTED; MESSAGE ALREADY PRINTED
+    JSR SENDFORMATCOMMAND
+
+DOEXIT:
+    LDA #DOS_EXIT
+    JSR OS_API
+
+CONFIRMDESTRUCTIVE:
+    LDX #<MSGCONFIRMPART1
+    LDY #>MSGCONFIRMPART1
+    JSR PRINTSTR
+
+    JSR COMPUTEDEVDIGITS
+    LDX #<DEVDIGITS
+    LDY #>DEVDIGITS
+    JSR PRINTSTR
+
+    LDX #<MSGCONFIRMPART2
+    LDY #>MSGCONFIRMPART2
+    JSR PRINTSTR
+
+@CDPOLL:
+    JSR KERNALGETIN
+    BEQ @CDPOLL
+    PHA
+    JSR KERNALCHROUT
+    PLA
+
+    CMP #$79                 ; ACCEPT BOTH PETSCII CASE FORMS OF THE Y KEY ($79/$59)
+    BEQ @CDYES
+    CMP #$59
+    BEQ @CDYES
+
+    JSR PRINTCRLF
+    LDX #<MSGCANCELLED
+    LDY #>MSGCANCELLED
+    JSR PRINTSTR
+    SEC
+    RTS
+
+@CDYES:
+    JSR PRINTCRLF
+    LDX #<MSGREENTERNAME
+    LDY #>MSGREENTERNAME
+    JSR PRINTSTR
+
+    LDA #<CONFIRMBUF
+    STA BUFPTRLO
+    LDA #>CONFIRMBUF
+    STA BUFPTRHI
+    LDA #40
+    STA MAXLEN
+    JSR READLINE
+    STY CONFIRMLEN
+    JSR RTRIMCONFIRM
+    JSR COMPARENAMES
+    BCS @CDMISMATCH
+    CLC
+    RTS
+
+@CDMISMATCH:
+    LDX #<MSGMISMATCH
+    LDY #>MSGMISMATCH
+    JSR PRINTSTR
+    SEC
+    RTS
+
+; ---------------------------------------------------------------------------
+; BUILD "<DEV>:N:<NAME>,<ID>" AND SEND IT VIA DOS_SEND_COMMAND. THE "BUSY
+; INDICATOR" IS A STATIC MESSAGE PRINTED JUST BEFORE THE SYNCHRONOUS SEND.
+; ---------------------------------------------------------------------------
+SENDFORMATCOMMAND:
+    LDA #$00
+    STA CMDIDX
+
+    JSR COMPUTEDEVDIGITS
+    LDX #<DEVDIGITS
+    LDY #>DEVDIGITS
+    JSR APPENDSTR
+
+    LDX #<LITNCOLON
+    LDY #>LITNCOLON
+    JSR APPENDSTR
+
+    LDX #<NAMEBUF
+    LDY #>NAMEBUF
+    JSR APPENDSTR
+
+    LDX #<LITCOMMA
+    LDY #>LITCOMMA
+    JSR APPENDSTR
+
+    LDX #<IDBUF
+    LDY #>IDBUF
+    JSR APPENDSTR
+
+    LDX CMDIDX
+    LDA #$00
+    STA CMDBUF,X
+
+    LDX #<MSGFORMATTING
+    LDY #>MSGFORMATTING
+    JSR PRINTSTR
+
+    LDA #<RESPBUF
+    STA PRINTPTRLO
+    LDA #>RESPBUF
+    STA PRINTPTRHI
+    LDX #<CMDBUF
+    LDY #>CMDBUF
+    LDA #DOS_SEND_COMMAND
+    JSR OS_API
+    BCS @SFCTRANSPORTERR
+
+    LDX #<MSGRESULT
+    LDY #>MSGRESULT
+    JSR PRINTSTR
+    LDX #<RESPBUF
+    LDY #>RESPBUF
+    JSR PRINTSTR
+    JSR PRINTCRLF
+    RTS
+
+@SFCTRANSPORTERR:
+    JSR PRINTCRLF
+    LDX #<MSGTRANSPORTERR
+    LDY #>MSGTRANSPORTERR
+    JSR PRINTSTR
+    RTS
+
+; ---------------------------------------------------------------------------
+; HELPERS
+; ---------------------------------------------------------------------------
+
+; PRINTSTR: INPUT X/Y = POINTER LO/HI TO A NUL-TERMINATED STRING.
+PRINTSTR:
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    RTS
+
+PRINTCRLF:
+    LDA #PETCR
+    JSR KERNALCHROUT
+    RTS
+
+; READLINE: READS A LINE OF KEYBOARD INPUT, ECHOING EACH CHAR, HONORING
+; PETDEL AS DESTRUCTIVE BACKSPACE, TERMINATING ON PETCR.
+; INPUT:  BUFPTRLO/HI = DESTINATION BUFFER (MUST HOLD MAXLEN+1 BYTES)
+;         MAXLEN = MAX CHARACTERS TO ACCEPT
+; OUTPUT: Y = LENGTH WRITTEN; BUFFER NUL-TERMINATED
+; CLOBBERS: A, X, Y
+READLINE:
+    LDY #$00
+@RLLOOP:
+    TYA
+    PHA
+@RLPOLL:
+    JSR KERNALGETIN
+    BEQ @RLPOLL
+    TAX
+    PLA
+    TAY
+    TXA
+
+    CMP #PETCR
+    BEQ @RLDONE
+
+    CMP #PETDEL
+    BNE @RLHANDLECHAR
+    TYA
+    BEQ @RLLOOP
+    DEY
+    LDA #PETDEL
+    JSR KERNALCHROUT
+    JMP @RLLOOP
+
+@RLHANDLECHAR:
+    CPY MAXLEN
+    BCS @RLLOOP
+
+    JSR KERNALCHROUT
+    STA (BUFPTRLO),Y
+    INY
+    JMP @RLLOOP
+
+@RLDONE:
+    LDA #PETCR
+    JSR KERNALCHROUT
+    LDA #$00
+    STA (BUFPTRLO),Y
+    RTS
+
+; APPENDSTR: APPENDS A NUL-TERMINATED STRING INTO CMDBUF AT CMDIDX,
+; ADVANCING CMDIDX. DOES NOT WRITE THE FINAL TERMINATOR ITSELF.
+; INPUT: X/Y = SOURCE POINTER LO/HI
+; CLOBBERS: A, Y, BUFPTRLO/HI
+APPENDSTR:
+    STX BUFPTRLO
+    STY BUFPTRHI
+    LDY #$00
+@ASLOOP:
+    LDA (BUFPTRLO),Y
+    BEQ @ASDONE
+    PHA
+    LDX CMDIDX
+    PLA
+    STA CMDBUF,X
+    INC CMDIDX
+    INY
+    JMP @ASLOOP
+@ASDONE:
+    RTS
+
+; COMPUTEDEVDIGITS: RENDERS DEVICENUM (8-11) AS DECIMAL ASCII INTO
+; DEVDIGITS, NUL-TERMINATED.
+COMPUTEDEVDIGITS:
+    LDA DEVICENUM
+    CMP #10
+    BCC @CDDSINGLE
+    LDA #'1'
+    STA DEVDIGITS
+    LDA DEVICENUM
+    SEC
+    SBC #10
+    CLC
+    ADC #'0'
+    STA DEVDIGITS+1
+    LDA #$00
+    STA DEVDIGITS+2
+    RTS
+@CDDSINGLE:
+    CLC
+    ADC #'0'
+    STA DEVDIGITS
+    LDA #$00
+    STA DEVDIGITS+1
+    RTS
+
+; PARSEDEVICEDIGITS: PARSES LINEBUF (NUL-TERMINATED ASCII DIGITS, UP TO 2)
+; INTO A BYTE VALUE.
+; OUTPUT: A = VALUE, CARRY CLEAR ON SUCCESS; CARRY SET ON EMPTY/NON-DIGIT/
+;         TOO-LONG INPUT (CAPS AT 2 DIGITS TO AVOID BYTE WRAPAROUND).
+PARSEDEVICEDIGITS:
+    LDA LINEBUF
+    BEQ @PDBAD
+    LDY #$00
+    LDA #$00
+    STA TMPVAL
+@PDLOOP:
+    LDA LINEBUF,Y
+    BEQ @PDDONE
+    CPY #2
+    BCS @PDBAD
+    CMP #'0'
+    BCC @PDBAD
+    CMP #$3A                 ; '9' + 1 (CASM CHAR LITERALS TAKE NO ADDEND)
+    BCS @PDBAD
+    SEC
+    SBC #'0'
+    PHA
+    LDA TMPVAL
+    ASL A
+    STA TMPVAL2
+    ASL A
+    ASL A
+    CLC
+    ADC TMPVAL2
+    STA TMPVAL
+    PLA
+    CLC
+    ADC TMPVAL
+    STA TMPVAL
+    INY
+    JMP @PDLOOP
+@PDDONE:
+    CPY #$00
+    BEQ @PDBAD
+    LDA TMPVAL
+    CLC
+    RTS
+@PDBAD:
+    SEC
+    RTS
+
+; VALIDATEDEVICENUM: INPUT A = CANDIDATE DEVICE NUMBER.
+; OUTPUT: CARRY CLEAR IF WITHIN [DEV_MIN, DEV_MAX], ELSE SET.
+VALIDATEDEVICENUM:
+    CMP #DEV_MIN
+    BCC @VDBAD
+    CMP #DEV_MAX+1
+    BCS @VDBAD
+    CLC
+    RTS
+@VDBAD:
+    SEC
+    RTS
+
+; VALIDATENAME: CHECKS NAMEBUF/NAMELEN AGAINST THE 1-16 CHAR LENGTH RULE
+; AND REJECTS CONTROL CHARS, ',' AND ':'.
+VALIDATENAME:
+    LDA NAMELEN
+    CMP #1
+    BCC @VNBAD
+    CMP #NAME_MAX_LEN+1
+    BCS @VNBAD
+    LDA #<NAMEBUF
+    STA BUFPTRLO
+    LDA #>NAMEBUF
+    STA BUFPTRHI
+    LDX NAMELEN
+    JSR VALIDATECHARSET
+    BCS @VNBAD
+    CLC
+    RTS
+@VNBAD:
+    SEC
+    RTS
+
+; VALIDATEID: CHECKS IDBUF/IDLEN IS EXACTLY ID_LEN CHARS AND REJECTS
+; CONTROL CHARS, ',' AND ':'.
+VALIDATEID:
+    LDA IDLEN
+    CMP #ID_LEN
+    BNE @VIBAD
+    LDA #<IDBUF
+    STA BUFPTRLO
+    LDA #>IDBUF
+    STA BUFPTRHI
+    LDX IDLEN
+    JSR VALIDATECHARSET
+    BCS @VIBAD
+    CLC
+    RTS
+@VIBAD:
+    SEC
+    RTS
+
+; VALIDATECHARSET: REJECTS BYTES BELOW $20 (CONTROL CHARS) AND THE
+; DELIMITER CHARACTERS ',' AND ':'.
+; INPUT: BUFPTRLO/HI = BUFFER, X = LENGTH
+; OUTPUT: CARRY SET IF ANY BYTE INVALID
+; CLOBBERS: A, Y
+VALIDATECHARSET:
+    CPX #$00
+    BEQ @VCOK
+    LDY #$00
+@VCLOOP:
+    LDA (BUFPTRLO),Y
+    CMP #$20
+    BCC @VCBAD
+    CMP #','
+    BEQ @VCBAD
+    CMP #':'
+    BEQ @VCBAD
+    INY
+    DEX
+    BNE @VCLOOP
+@VCOK:
+    CLC
+    RTS
+@VCBAD:
+    SEC
+    RTS
+
+; RTRIMNAME: STRIPS TRAILING SPACES FROM NAMEBUF/NAMELEN IN PLACE.
+RTRIMNAME:
+    LDX NAMELEN
+@RTNLOOP:
+    CPX #$00
+    BEQ @RTNDONE
+    LDA NAMEBUF-1,X
+    CMP #' '
+    BNE @RTNDONE
+    DEX
+    JMP @RTNLOOP
+@RTNDONE:
+    STX NAMELEN
+    LDA #$00
+    STA NAMEBUF,X
+    RTS
+
+; RTRIMCONFIRM: STRIPS TRAILING SPACES FROM CONFIRMBUF/CONFIRMLEN IN PLACE.
+RTRIMCONFIRM:
+    LDX CONFIRMLEN
+@RTCLOOP:
+    CPX #$00
+    BEQ @RTCDONE
+    LDA CONFIRMBUF-1,X
+    CMP #' '
+    BNE @RTCDONE
+    DEX
+    JMP @RTCLOOP
+@RTCDONE:
+    STX CONFIRMLEN
+    LDA #$00
+    STA CONFIRMBUF,X
+    RTS
+
+; COMPARENAMES: OUTPUT CARRY CLEAR IF NAMEBUF/NAMELEN EXACTLY MATCHES
+; CONFIRMBUF/CONFIRMLEN, ELSE CARRY SET.
+COMPARENAMES:
+    LDA NAMELEN
+    CMP CONFIRMLEN
+    BNE @CNBAD
+    LDA NAMELEN
+    BEQ @CNOK
+    TAX
+@CNLOOP:
+    LDA NAMEBUF-1,X
+    CMP CONFIRMBUF-1,X
+    BNE @CNBAD
+    DEX
+    BNE @CNLOOP
+@CNOK:
+    CLC
+    RTS
+@CNBAD:
+    SEC
+    RTS
+
+; ---------------------------------------------------------------------------
+; DATA
+; ---------------------------------------------------------------------------
+
+MSGPROMPTDEVICE:
+    .BYTE "DEVICE (8-11): ", $00
+MSGPROMPTNAME:
+    .BYTE "DISK NAME: ", $00
+MSGPROMPTID:
+    .BYTE "DISK ID: ", $00
+MSGINVALIDRETRY:
+    .BYTE $0D, "INVALID, TRY AGAIN.", $0D, $00
+
+MSGERRDEVICE:
+    .BYTE "ERROR: DEVICE MUST BE 8-11.", $0D, $00
+MSGERRNAME:
+    .BYTE "ERROR: NAME MUST BE 1-16 CHARS, NO ',' OR ':'.", $0D, $00
+MSGERRID:
+    .BYTE "ERROR: ID MUST BE EXACTLY 2 CHARS.", $0D, $00
+
+MSGCONFIRMPART1:
+    .BYTE "FORMAT DRIVE ", $00
+MSGCONFIRMPART2:
+    .BYTE " - ALL DATA WILL BE LOST. CONTINUE? (Y/N) ", $00
+MSGCANCELLED:
+    .BYTE "FORMAT CANCELLED.", $0D, $00
+MSGREENTERNAME:
+    .BYTE "RE-ENTER DISK NAME TO CONFIRM: ", $00
+MSGMISMATCH:
+    .BYTE "NAME MISMATCH. FORMAT CANCELLED.", $0D, $00
+
+MSGFORMATTING:
+    .BYTE "FORMATTING...", $0D, $00
+MSGRESULT:
+    .BYTE "RESULT: ", $00
+MSGTRANSPORTERR:
+    .BYTE "FORMAT FAILED (TRANSPORT ERROR).", $0D, $00
+
+; DRIVE-COMMAND LITERALS -- EXPLICIT REVIEWED UNSHIFTED BYTES (1541 NEW
+; COMMAND MATCHES 'N' = $4E; A SHIFTED $CE IS REJECTED).
+LITNCOLON:
+    .BYTE $3A, $4E, $3A, $00      ; ":N:"
+LITCOMMA:
+    .BYTE $2C, $00                ; ","
+
+; VERSION BANNER -- GENERATED AT BUILD TIME FROM FORMAT_VERSION + BUILD_FORMAT.
+; DEFINES FORMATVERMSG.
+.INCLUDE "FORMATVER.S"
+
+; ---------------------------------------------------------------------------
+; BUFFERS (INITIALIZED AT LOAD TIME VIA .RES FILL BYTES)
+; ---------------------------------------------------------------------------
+DEVICENUM:  .RES 1
+NAMELEN:    .RES 1
+IDLEN:      .RES 1
+CONFIRMLEN: .RES 1
+CMDIDX:     .RES 1
+TMPVAL:     .RES 1
+TMPVAL2:    .RES 1
+
+DEVDIGITS:  .RES 3
+NAMEBUF:    .RES 41
+IDBUF:      .RES 9
+CONFIRMBUF: .RES 41
+LINEBUF:    .RES 4
+CMDBUF:     .RES 32
+RESPBUF:    .RES 40

@@ -41,6 +41,7 @@ NATIVE_MANIFESTS = [
     REPO / "src" / "external" / "banner" / "banner.ref.hex",
     REPO / "src" / "external" / "label" / "label.ref.hex",
     REPO / "src" / "external" / "comp" / "comp.ref.hex",
+    REPO / "src" / "external" / "format" / "format.ref.hex",
 ]
 
 

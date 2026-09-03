@@ -97,6 +97,18 @@ conventions for a destructive operation.
 - [ ] Implement the busy indicator while awaiting the drive response.
 - [ ] Wire the `N:name,id` command through `DOS_SEND_COMMAND` and print the
       drive's real status response.
-- [ ] Verify in VICE: format a real (virtual) 1541 disk image end-to-end,
+- [x] Verify in VICE: format a real (virtual) 1541 disk image end-to-end,
       confirm the resulting disk mounts cleanly with the given name/ID and
-      an empty directory.
+      an empty directory. **Done 2026-09-02** during the CASM-native
+      migration (`brain/walkthroughs/2026-09-02-format-casm-native-migration.md`):
+      `FORMAT 9:REFORMATTED,AB` under VICE → `result: 00, ok,00,00`; the
+      detached image had disk name `REFORMATTED`, id `AB`, empty directory.
+      The pre-migration ca65 build was verified to format correctly the
+      same way.
+
+## Status (2026-09-02)
+
+FORMAT is implemented and shipping. As of 2026-09-02 it is **CASM-native**
+— the ca65/ld65 build is retired and `format.prg` ships from
+`src/external/format/format.ref.hex`. See `wiki/format-utility.md` and
+`brain/plans/2026-09-02-format-casm-native-migration.md`.

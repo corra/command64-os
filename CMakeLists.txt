@@ -29,7 +29,7 @@ find_package(Java REQUIRED)
 find_package(KickAss REQUIRED)
 find_package(cc1541 REQUIRED)
 find_package(Oscar64) # Optional compiler for C files
-find_package(Ca65) # Required for DEBUG/CONWAY and ca65-migrated test targets (LABEL is CASM-native)
+find_package(Ca65) # Required for DEBUG/CONWAY and ca65-migrated test targets (LABEL + FORMAT are CASM-native)
 find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff build tool
 
 # Load helper functions
@@ -124,8 +124,8 @@ set(DEBUG_ENTRY "src/external/debug/debug.s")
 file(GLOB_RECURSE EDLIN_SRCS CONFIGURE_DEPENDS "src/external/edlin/*.s" "src/external/edlin/*.inc" "include/ca65/*.inc")
 set(EDLIN_ENTRY "src/external/edlin/edlin.s")
 
-file(GLOB_RECURSE FORMAT_SRCS CONFIGURE_DEPENDS "src/external/format/*.s" "src/external/format/*.inc" "include/ca65/*.inc")
-set(FORMAT_ENTRY "src/external/format/format.s")
+# FORMAT is CASM-native (no ca65 build) — its sources are packaged onto
+# command64_format_test_d64 for live assembly, not globbed for a host target.
 
 # COMP is CASM-native (no ca65 build; ca65 retired in the 2026-09-02
 # migration) — its source is packaged onto command64_comp_test_d64 for live
@@ -220,18 +220,12 @@ else()
 endif()
 set(EDLIN_TARGET edlin)
 
-# 3b. FORMAT External Command PRG Target — sends CBM DOS's native N:name,id
-# command to a drive's command channel via the DOS_SEND_COMMAND kernel
-# primitive (see wiki/tasks/format.md, wiki/tasks/dos-send-command.md).
-# Ships unconditionally in IMAGE_PRG_TARGETS, so — like LABEL — a missing
-# ca65/ld65 toolchain fails the entire configure rather than silently
-# skipping this target.
-if(Ca65_FOUND)
-    add_ca65_app(format "${FORMAT_ENTRY}" FORMAT_SRCS 1000 "0A00")
-else()
-    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for FORMAT target")
-endif()
-set(FORMAT_TARGET format)
+# 3b. FORMAT External Command — CASM-native (ca65 build retired in the
+# 2026-09-02 migration; see brain/plans/2026-09-02-format-casm-native-migration.md).
+# FORMAT.PRG ships from the reviewed hex manifest
+# src/external/format/format.ref.hex, same model as LABEL/BANNER/DASH. The
+# manifest-derived `format` target and `command64_format_test_d64` are
+# defined further down, alongside the `banner` / `label` manifest targets.
 
 # 3d. COMP External Command — CASM-native (ca65 build retired in the
 # 2026-09-02 migration; see brain/plans/2026-09-02-comp-casm-native-migration.md).
@@ -1627,6 +1621,7 @@ set(SYNC_FILES
     debug-test-plan.md
     debug-utility.md
     edlin-utility.md
+    format-utility.md
     label-utility.md
     pacman-utility.md
     pet-sci-api.md
@@ -1782,6 +1777,37 @@ add_custom_command(
 add_custom_target(comp ALL DEPENDS "${COMP_BIN}")
 set_target_properties(comp PROPERTIES C64_PRG_PATH "${COMP_BIN}")
 set(COMP_TARGET comp)
+
+# FORMAT Production Target — CASM-native, generated from its reviewed hex
+# manifest src/external/format/format.ref.hex, same shape as LABEL's above.
+# FORMAT has no ca65 build (retired 2026-09-02; see
+# brain/plans/2026-09-02-format-casm-native-migration.md). Correctness is
+# proven by src/external/format/format-derivation.md, not by this manifest.
+# The three checked-in inputs the assembled bytes depend on (format.s,
+# FORMAT_VERSION, BUILD_FORMAT) are DEPENDS'd so an edit without a manifest
+# regeneration is a hard build failure via hex_manifest_to_bin.py's
+# --source-dir check. Regenerating format.ref.hex is a deliberate, reviewed
+# act (scripts/build_format_manifest.py), never a build step.
+set(FORMAT_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/format/format.ref.hex")
+set(FORMAT_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/format")
+set(FORMAT_BIN "${CMAKE_BINARY_DIR}/format.prg")
+add_custom_command(
+    OUTPUT "${FORMAT_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${FORMAT_MANIFEST}" "${FORMAT_BIN}"
+        "--source-dir" "${FORMAT_SOURCE_DIR}"
+    DEPENDS "${FORMAT_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${FORMAT_SOURCE_DIR}/format.s"
+        "${FORMAT_SOURCE_DIR}/FORMAT_VERSION"
+        "${FORMAT_SOURCE_DIR}/BUILD_FORMAT"
+    COMMENT "Generating FORMAT production binary from manifest"
+    VERBATIM
+)
+add_custom_target(format ALL DEPENDS "${FORMAT_BIN}")
+set_target_properties(format PROPERTIES C64_PRG_PATH "${FORMAT_BIN}")
+set(FORMAT_TARGET format)
 
 # 6. Disk images
 # TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS
@@ -2300,6 +2326,63 @@ add_custom_command(
     COMMAND "${CC1541_EXECUTABLE}" -f "label.ref" -T PRG
         -w "${LABEL_BIN}" "${LABEL_TEST_D64}"
     COMMENT "Appending LABEL sources + reviewed label.ref to command64_label_test.d64"
+    VERBATIM
+)
+
+
+# command64_format_test_d64 — dedicated disk for assembling FORMAT with
+# native CASM on the C64 (brain/plans/2026-09-02-format-casm-native-migration.md).
+# Not a production disk. `formatver.s` (the generated version-banner data) is
+# a build product written to the binary dir; it is packaged as a SEQ so
+# format.s's ".INCLUDE \"FORMATVER.S\"" resolves on the disk.
+set(FORMATVER_GEN "${CMAKE_BINARY_DIR}/formatver.s")
+add_custom_command(
+    OUTPUT "${FORMATVER_GEN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/gen_format_version.py"
+        "--version-file" "${CMAKE_SOURCE_DIR}/src/external/format/FORMAT_VERSION"
+        "--build-file" "${CMAKE_SOURCE_DIR}/src/external/format/BUILD_FORMAT"
+        "--out" "${FORMATVER_GEN}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/scripts/gen_format_version.py"
+        "${CMAKE_SOURCE_DIR}/src/external/format/FORMAT_VERSION"
+        "${CMAKE_SOURCE_DIR}/src/external/format/BUILD_FORMAT"
+    COMMENT "Generating FORMAT version banner source (formatver.s)"
+    VERBATIM
+)
+add_custom_target(format_version_src DEPENDS "${FORMATVER_GEN}")
+
+set(FORMAT_TEST_D64 "${CMAKE_BINARY_DIR}/command64_format_test.d64")
+add_c64_disk_image(command64_format_test_d64
+    OUTPUT_FILE "${FORMAT_TEST_D64}"
+    DISK_LABEL "FORMAT TEST"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 ${CASM_TARGET} ${COMP_TARGET}
+)
+add_dependencies(command64_format_test_d64 format format_version_src)
+
+add_custom_command(
+    TARGET command64_format_test_d64 PRE_BUILD
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/check_casm_source_bytes.py"
+        "${CMAKE_SOURCE_DIR}/src/external/format/format.s" "${FORMATVER_GEN}"
+    COMMENT "Verifying native-CASM FORMAT sources are uppercase ASCII"
+    VERBATIM
+)
+
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_format_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET command64_format_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "format.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/format/format.s" "${FORMAT_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "formatver.s" -T SEQ
+        -w "${FORMATVER_GEN}" "${FORMAT_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "format.ref" -T PRG
+        -w "${FORMAT_BIN}" "${FORMAT_TEST_D64}"
+    COMMENT "Appending FORMAT sources + reviewed format.ref to command64_format_test.d64"
     VERBATIM
 )
 

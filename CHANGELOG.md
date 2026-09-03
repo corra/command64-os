@@ -9,6 +9,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **FORMAT → CASM-native (2026-09-02)** — third external-application
+  migration from the CASM-native viability review. `FORMAT`'s ca65/ld65
+  build is retired; `format.prg` now ships from a reviewed hex manifest
+  (`src/external/format/format.ref.hex`). `format.s` converted to native
+  CASM (inline constants, `@local` labels, `.RES`); version banner
+  generated at build time (`scripts/gen_format_version.py` →
+  `formatver.s`) rendering `FORMAT v0.1.0.1013`. **User-visible change:**
+  all prompts/errors/results now render **lowercase** (the retired ca65
+  build shifted its string literals to render uppercase); the version
+  banner keeps `FORMAT` as an uppercase glyph. The assembled `:N:`
+  command's `N` is now the canonical `$4E` (was a shifted `$CE` under
+  ca65 — the 1541 accepts either, so formatting behaviour is unchanged;
+  verified live both ways, including an end-to-end scratch-disk format).
+  The CASM-native image is byte-identical (0 differences across all 1539
+  image bytes) to an independent same-base ca65 build of the intended
+  source; live `COMP FMT.PRG FORMAT.REF` → `FILES COMPARE OK`; R6 (159
+  entries) verified at `$3800`/`$5000`/`$9000`. New:
+  `scripts/build_format_manifest.py`,
+  `src/external/format/format-derivation.md`,
+  `command64_format_test_d64`.
 - **COMP → CASM-native (2026-09-02)** — second external-application migration
   from the CASM-native viability review
   (`brain/reviews/2026-09-01-external-applications-casm-native-viability.md`),
