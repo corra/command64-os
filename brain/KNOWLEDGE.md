@@ -3771,12 +3771,65 @@ Taskwarrior project `format`.
   (VICE) accepts `$CE` and the old build formats disks correctly. It is a
   canonical-byte cleanup (explicit reviewed protocol byte).
 - **Oracle** (`format-derivation.md`, `CANONICAL-INDEPENDENT` pending
-  reviewer sign-off): CASM image is **0-diff** vs a ca65 `$3400` build of a
+  reviewer-approved 2026-09-03): CASM image is **0-diff** vs a ca65 `$3400` build of a
   mechanically messages-forced-to-explicit-unshifted-hex transform of
   `format.s` (all 1539 image bytes). R6: 131 absolute operands + 28 `#>`
   high-byte immediates = 159 entries, `casm_r6_verify.py` PASS
   `$3800`/`$5000`/`$9000`. Live `COMP FMT.PRG FORMAT.REF` → `FILES COMPARE
   OK`; end-to-end scratch-disk format under VICE succeeded.
+
+## CONWAY → CASM-native (2026-09-03, fourth external-app migration; first multi-module)
+
+Plan/walkthrough
+`brain/{plans,walkthroughs}/2026-09-03-conway-casm-native-migration.md`;
+Taskwarrior task 44, project `conway`.
+
+- **ca65 retired for CONWAY.** `conway.prg` ships from
+  `src/external/conway/conway.ref.hex` via `hex_manifest_to_bin.py`. New:
+  `scripts/{build_conway_manifest,gen_conway_version,gen_conway_menu,check_conway_layout}.py`,
+  `src/external/conway/{CONWAY_VERSION,conway-derivation.md,conway.ref.hex}`,
+  `command64_conway_test_d64`. `common.inc`/`build_conway.inc` deleted;
+  `BUILD_CONWAY` trimmed to `1063`.
+- **Module flattening**: `conway_main.s` → `conway.s` (constants inline,
+  `@local` labels), ends with `.INCLUDE "CONWAYVER.S"` /
+  `"CONWAYMENU.S"` / `"CONWAYGRID.S"`. ca65 `.import`/`.export`/`.segment`
+  gone; one global namespace. `conway_grid.s` → **`conwaygrid.s`** — CASM's
+  `.INCLUDE` filename lookup uses ASCII `$5F` for `_` but cc1541 `-f`
+  stores it as PETSCII `$A4` → `CANNOT OPEN INPUT` (DASH avoids underscores
+  in included SEQ names for the same reason).
+- **Screen-code text**: the menu/status strings were ca65 `.CHARMAP`
+  (`screencode_mixed`) macros. CASM has no `.CHARMAP`/`.MACRO`;
+  `scripts/gen_conway_menu.py` applies the same transform (`$20-$3F`
+  identity, `$61-$7A → −$60`) and emits explicit `.BYTE` data. On-screen
+  text byte-preserved. Keep generated `.BYTE` lines ≤12 bytes: CASM's
+  source-column counter is 8-bit (`SOURCE LOCATION OVERFLOW` past 255).
+- **`.assert` guards → host script.** CASM `.ASSERT` is truthiness-only
+  (no `<=`); the ~23 layout invariants move to
+  `scripts/check_conway_layout.py` (a PRE_BUILD gate).
+- **`.INCLUDE`d constants are relocatable.** A named constant defined in an
+  `.INCLUDE`d file makes CASM emit spurious R6 entries for every
+  referencing operand — **including immediates** (`CPX #MENU_NONE_LEN`).
+  Same defect family as the ZP-absolute one (Taskwarrior 42). Fix: keep
+  ALL constants inline in `conway.s`; generators emit expected values as
+  comments and `check_conway_layout.py` re-verifies. This dropped 186 → 182
+  R6 entries.
+- **Oracle** (`conway-derivation.md`, `CANONICAL-INDEPENDENT`,
+  reviewer-approved 2026-09-03): CASM image is **0-diff** vs an independent same-base
+  (`$3400`) ca65/ld65 build of the same four sources (all 4288 image
+  bytes). R6: 182 entries (== the retired ca65 build's count),
+  `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000` with `grid0` (`$3D00`)
+  / `grid1` (`$4100`) staying page-aligned. Live `COMP CNW.PRG
+  CONWAY.REF` → `FILES COMPARE OK`; full menu / preset / rule-edit /
+  pause / clear / simulation / exit sweep under VICE.
+- **`/O:@:NAME`** — use the DOS replace prefix in the CASM output name so a
+  re-run overwrites instead of `CASM: OUTPUT WRITE FAILED`.
+- **Host-side surface + retirement path** — every CASM-native app still
+  runs host steps (`check_casm_source_bytes.py`, `gen_*_version.py`,
+  `hex_manifest_to_bin.py` + manifest, and for CONWAY `gen_conway_menu.py`
+  + `check_conway_layout.py`). What each needs from CASM to be deleted —
+  `.ASSERT` operators, `.CHARMAP`, text substitution, 4 bug fixes, and (for
+  the manifest model) a **host build of CASM** — is enumerated in
+  `brain/reviews/2026-09-03-casm-native-host-side-requirements.md`.
 
 ## C64 Platform Constraints Discovered
 

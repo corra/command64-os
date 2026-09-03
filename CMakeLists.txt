@@ -29,7 +29,7 @@ find_package(Java REQUIRED)
 find_package(KickAss REQUIRED)
 find_package(cc1541 REQUIRED)
 find_package(Oscar64) # Optional compiler for C files
-find_package(Ca65) # Required for DEBUG/CONWAY and ca65-migrated test targets (LABEL + FORMAT are CASM-native)
+find_package(Ca65) # Required for DEBUG and ca65-migrated test targets (LABEL/FORMAT/COMP/CONWAY are CASM-native)
 find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff build tool
 
 # Load helper functions
@@ -135,8 +135,10 @@ set(EDLIN_ENTRY "src/external/edlin/edlin.s")
 file(GLOB_RECURSE CASM_SRCS CONFIGURE_DEPENDS "src/external/casm/*.s" "src/external/casm/*.inc" "include/ca65/*.inc")
 set(CASM_ENTRY "src/external/casm/casm.s")
 
-file(GLOB_RECURSE CONWAY_SRCS CONFIGURE_DEPENDS "src/external/conway/*.s" "src/external/conway/*.inc" "include/ca65/*.inc")
-set(CONWAY_ENTRY "src/external/conway/conway_main.s")
+# CONWAY is CASM-native (no ca65 build; ca65 retired in the 2026-09-03
+# migration) — conway.s / conwaygrid.s are packaged onto
+# command64_conway_test_d64 for live assembly and shipped from
+# src/external/conway/conway.ref.hex, not globbed for a host target.
 
 file(GLOB_RECURSE PACMAN_SRCS CONFIGURE_DEPENDS "src/external/pacman/*.s" "src/external/pacman/*.inc" "include/ca65/*.inc")
 set(PACMAN_ENTRY "src/external/pacman/pacman_main.s")
@@ -411,20 +413,13 @@ else()
 endif()
 set(CASM_TARGET casm)
 
-# 4. CONWAY Game of Life — built with ca65/ld65 (migrated off the
-# spike/ca65-conway/ branch; see
-# brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
-# Two object files (conway_main.s / conway_grid.s) linked together by
-# ld65; CODE_ALIGN=256 because conway_grid.s embeds two page-aligned grid
-# buffers directly in CODE. Ships unconditionally in IMAGE_PRG_TARGETS, so
-# — like DEBUG/LABEL — a missing ca65/ld65 toolchain fails the entire
-# configure rather than silently skipping this target.
-if(Ca65_FOUND)
-    add_ca65_app(conway "${CONWAY_ENTRY}" CONWAY_SRCS 1040 "1400" "256")
-else()
-    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for CONWAY target")
-endif()
-set(CONWAY_TARGET conway)
+# 4. CONWAY Game of Life — CASM-native (ca65/ld65 build retired in the
+# 2026-09-03 migration; see brain/plans/2026-09-03-conway-casm-native-migration.md).
+# CONWAY.PRG now ships from the reviewed hex manifest
+# src/external/conway/conway.ref.hex, same model as LABEL/FORMAT/COMP. The
+# manifest-derived `conway` target and the `command64_conway_test_d64`
+# native-assembly disk are defined further down, alongside the other
+# manifest targets.
 
 # BANNER is CASM-native (no ca65 build) — see the manifest-derived `banner`
 # target below, alongside `dash`'s own manifest target, for the same reason.
@@ -1809,6 +1804,40 @@ add_custom_target(format ALL DEPENDS "${FORMAT_BIN}")
 set_target_properties(format PROPERTIES C64_PRG_PATH "${FORMAT_BIN}")
 set(FORMAT_TARGET format)
 
+# CONWAY Production Target — CASM-native, generated from its reviewed hex
+# manifest src/external/conway/conway.ref.hex, same shape as FORMAT's above.
+# CONWAY has no ca65 build (retired 2026-09-03; see
+# brain/plans/2026-09-03-conway-casm-native-migration.md). Correctness is
+# proven by src/external/conway/conway-derivation.md, not by this manifest.
+# The four checked-in inputs the assembled bytes depend on (conway.s,
+# conwaygrid.s, CONWAY_VERSION, BUILD_CONWAY) are DEPENDS'd so an edit
+# without a manifest regeneration is a hard build failure via
+# hex_manifest_to_bin.py's --source-dir check. Regenerating conway.ref.hex
+# is a deliberate, reviewed act (scripts/build_conway_manifest.py), never a
+# build step. (conwayver.s / conwaymenu.s are build products packaged only
+# onto the native-assembly test disk, below.)
+set(CONWAY_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/conway/conway.ref.hex")
+set(CONWAY_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/conway")
+set(CONWAY_BIN "${CMAKE_BINARY_DIR}/conway.prg")
+add_custom_command(
+    OUTPUT "${CONWAY_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${CONWAY_MANIFEST}" "${CONWAY_BIN}"
+        "--source-dir" "${CONWAY_SOURCE_DIR}"
+    DEPENDS "${CONWAY_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${CONWAY_SOURCE_DIR}/conway.s"
+        "${CONWAY_SOURCE_DIR}/conwaygrid.s"
+        "${CONWAY_SOURCE_DIR}/CONWAY_VERSION"
+        "${CONWAY_SOURCE_DIR}/BUILD_CONWAY"
+    COMMENT "Generating CONWAY production binary from manifest"
+    VERBATIM
+)
+add_custom_target(conway ALL DEPENDS "${CONWAY_BIN}")
+set_target_properties(conway PROPERTIES C64_PRG_PATH "${CONWAY_BIN}")
+set(CONWAY_TARGET conway)
+
 # 6. Disk images
 # TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS
 # itself) deliberately: test.d64 is already near its directory-entry
@@ -2383,6 +2412,84 @@ add_custom_command(
     COMMAND "${CC1541_EXECUTABLE}" -f "format.ref" -T PRG
         -w "${FORMAT_BIN}" "${FORMAT_TEST_D64}"
     COMMENT "Appending FORMAT sources + reviewed format.ref to command64_format_test.d64"
+    VERBATIM
+)
+
+
+# command64_conway_test_d64 — dedicated disk for assembling CONWAY with
+# native CASM on the C64 (brain/plans/2026-09-03-conway-casm-native-migration.md).
+# Not a production disk. conwayver.s (version data) and conwaymenu.s
+# (screen-code menu/status data, was ca65 .CHARMAP macros) are build
+# products written to the binary dir; both are packaged as SEQ so
+# conway.s's ".INCLUDE" lines resolve on the disk. The .INCLUDE'd grid half
+# is conwaygrid.s (no underscore — cc1541 -f stores '_' as PETSCII $A4,
+# which CASM's ASCII $5F filename lookup will not match).
+set(CONWAYVER_GEN "${CMAKE_BINARY_DIR}/conwayver.s")
+add_custom_command(
+    OUTPUT "${CONWAYVER_GEN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/gen_conway_version.py"
+        "--version-file" "${CMAKE_SOURCE_DIR}/src/external/conway/CONWAY_VERSION"
+        "--build-file" "${CMAKE_SOURCE_DIR}/src/external/conway/BUILD_CONWAY"
+        "--out" "${CONWAYVER_GEN}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/scripts/gen_conway_version.py"
+        "${CMAKE_SOURCE_DIR}/src/external/conway/CONWAY_VERSION"
+        "${CMAKE_SOURCE_DIR}/src/external/conway/BUILD_CONWAY"
+    COMMENT "Generating CONWAY version source (conwayver.s)"
+    VERBATIM
+)
+set(CONWAYMENU_GEN "${CMAKE_BINARY_DIR}/conwaymenu.s")
+add_custom_command(
+    OUTPUT "${CONWAYMENU_GEN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/gen_conway_menu.py"
+        "--out" "${CONWAYMENU_GEN}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/scripts/gen_conway_menu.py"
+    COMMENT "Generating CONWAY screen-code menu source (conwaymenu.s)"
+    VERBATIM
+)
+add_custom_target(conway_generated_src DEPENDS "${CONWAYVER_GEN}" "${CONWAYMENU_GEN}")
+
+set(CONWAY_TEST_D64 "${CMAKE_BINARY_DIR}/command64_conway_test.d64")
+add_c64_disk_image(command64_conway_test_d64
+    OUTPUT_FILE "${CONWAY_TEST_D64}"
+    DISK_LABEL "CONWAY TEST"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 ${CASM_TARGET} ${COMP_TARGET}
+)
+add_dependencies(command64_conway_test_d64 conway conway_generated_src)
+
+add_custom_command(
+    TARGET command64_conway_test_d64 PRE_BUILD
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/check_casm_source_bytes.py"
+        "${CMAKE_SOURCE_DIR}/src/external/conway/conway.s"
+        "${CMAKE_SOURCE_DIR}/src/external/conway/conwaygrid.s"
+        "${CONWAYVER_GEN}" "${CONWAYMENU_GEN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/check_conway_layout.py"
+    COMMENT "Verifying native-CASM CONWAY sources (uppercase ASCII + screen layout invariants)"
+    VERBATIM
+)
+
+set(WRAPPER_CC1541_CONWAY "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541_CONWAY "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_conway_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET command64_conway_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541_CONWAY} "${CC1541_EXECUTABLE}" -f "conway.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/conway/conway.s" "${CONWAY_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "conwaygrid.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/conway/conwaygrid.s" "${CONWAY_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "conwayver.s" -T SEQ
+        -w "${CONWAYVER_GEN}" "${CONWAY_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "conwaymenu.s" -T SEQ
+        -w "${CONWAYMENU_GEN}" "${CONWAY_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "conway.ref" -T PRG
+        -w "${CONWAY_BIN}" "${CONWAY_TEST_D64}"
+    COMMENT "Appending CONWAY sources + reviewed conway.ref to command64_conway_test.d64"
     VERBATIM
 )
 
