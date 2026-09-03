@@ -1,499 +1,545 @@
-; src/external/label/label.s
-; SPDX-License-Identifier: MIT
-; Copyright (c) 2026 Command64 project contributors
+; SRC/EXTERNAL/LABEL/LABEL.S
+; SPDX-LICENSE-IDENTIFIER: MIT
+; COPYRIGHT (C) 2026 COMMAND64 PROJECT CONTRIBUTORS
 ;
-; LABEL disk volume-name writer, built with ca65/ld65 (migrated from the
-; spike/ca65-label/ relocation spike; see
-; brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
-; Calls into Command64's own jump table (OS_API = $1000,
-; function-selector-in-A convention, include/ca65/command64.inc) and
-; reads OS globals (CommandBuffer/ParsePos/CurrentDevice), not just raw
-; KERNAL vectors.
+; LABEL: DISK VOLUME-NAME WRITER FOR COMMAND64 OS.
 ;
-; PETSCII note: Kick's ".encoding petscii_mixed" auto-translates mixed-case
-; source text so it displays correctly via CHROUT regardless of letter
-; case (both the $41-$5A and $C1-$DA PETSCII ranges render as the same
-; uppercase glyph in this OS's default charset). ca65 has no equivalent
-; pragma, so all message strings below are precomputed: every letter maps
-; to its uppercase ASCII/PETSCII code ($41-$5A), non-letters pass through
-; unchanged. This is NOT a ca65 tooling gap -- the drive command strings
-; (cmdInit/cmdU1/cmdBP/cmdU2) specifically MUST stay unshifted-uppercase
-; hex, since any correctly-shifted PETSCII translation (Kick's or ca65's)
-; produces bytes the 1541 command parser rejects.
-
-.include "command64.inc"
-.include "common.inc"
-
-.define VERSION_MAJOR "0"
-.define VERSION_MINOR "4"
-.define VERSION_STAGE "0"
-.include "build_label.inc"
-
-.import __MAIN_START__
-
-.segment "HEADER"
-    .word __MAIN_START__
-
-.segment "CODE"
-
-; ---------------------------------------------------------------------------
-; Entry point
-; ---------------------------------------------------------------------------
-start:
-    ldx #<verMsg
-    ldy #>verMsg
-    lda #DOS_PRINT_STR
-    jsr OS_API
-
-    lda CurrentDevice
-    sta SavedDevice
-
-    ldy ParsePos
-
-skipToken:
-    lda CommandBuffer, y
-    bne notTokenNull
-    jmp noArgErr
-notTokenNull:
-    iny
-    cmp #' '
-    bne skipToken
-
-skipSpaces:
-    lda CommandBuffer, y
-    cmp #' '
-    bne endSpaces
-    iny
-    jmp skipSpaces
-
-endSpaces:
-    cmp #0
-    beq labelNoArg
-
-    tya
-    clc
-    adc #<CommandBuffer
-    sta PrintPtrLo
-    lda #>CommandBuffer
-    adc #0
-    sta PrintPtrHi
-
-    ldx #PrintPtrLo
-    lda #DOS_PARSE_PREFIX
-    jsr OS_API
-    sta CurrentDevice
-
-    lda PrintPtrLo
-    sec
-    sbc #<CommandBuffer
-    tay
-
-skipSpacesPostPrefix:
-    lda CommandBuffer, y
-    cmp #' '
-    bne checkNullPostPrefix
-    iny
-    jmp skipSpacesPostPrefix
-checkNullPostPrefix:
-    cmp #0
-    bne labelNoPrefix
-
-labelNoArg:
-    ldx #15
-    lda #$A0
-initLabelBuf:
-    sta labelBuf, x
-    dex
-    bpl initLabelBuf
-
-    ldx #<promptMsg
-    ldy #>promptMsg
-    lda #DOS_PRINT_STR
-    jsr OS_API
-
-    ldy #0
-readLoop:
-    tya
-    pha
-pollKey:
-    jsr KernalGetIn
-    beq pollKey
-    tax
-    pla
-    tay
-    txa
-
-    cmp #PetCr
-    beq doneInput
-
-    cmp #PetDel
-    bne handleChar
-
-    tya
-    beq readLoop
-    dey
-    lda #PetDel
-    jsr KernalChROUT
-    jmp readLoop
-
-handleChar:
-    cpy #16
-    bcs readLoop
-
-    jsr KernalChROUT
-
-    sta labelBuf, y
-    iny
-    jmp readLoop
-
-doneInput:
-    lda #PetCr
-    jsr KernalChROUT
-
-    tya
-    beq cancelExit
-
-    jmp openChannels
-
-cancelExit:
-    jmp labelExit
-
-labelNoPrefix:
-countStart:
-    sty ArgIdx
-    ldx #0
-countChars:
-    lda CommandBuffer, y
-    beq countDone
-    inx
-    iny
-    cpx #17
-    bne countChars
-    jmp tooLongErr
-
-countDone:
-    ldy ArgIdx
-    ldx #0
-copyLabel:
-    lda CommandBuffer, y
-    beq padLabel
-    sta labelBuf, x
-    inx
-    iny
-    cpx #VOL_NAME_LEN
-    bne copyLabel
-    jmp openChannels
-
-padLabel:
-    lda #$A0
-    sta labelBuf, x
-    inx
-    cpx #VOL_NAME_LEN
-    bne padLabel
-
-openChannels:
-    ; Ensure LFN 15 is genuinely free before claiming it: any prior
-    ; LOAD/DIR/VOL/DELETE/RENAME/PATH in this session may have left it
-    ; open and cached by the OS's own ensureL15Open (file.asm). Without
-    ; this, the very first OPEN below can fail with "FILE ALREADY OPEN"
-    ; even though LABEL hasn't touched LFN 15 itself yet.
-    lda #DOS_RELEASE_L15
-    jsr OS_API
-
-    lda #0
-    jsr KernalSETNAM
-    lda #CMD_CHANNEL
-    ldx CurrentDevice
-    ldy #CMD_CHANNEL
-    jsr KernalSETLFS
-    jsr KernalOPEN
-    bcc openCmdOk
-    sta LastErrCode
-    jmp openErr
-openCmdOk:
-
-    ldx #CMD_CHANNEL
-    jsr KernalCHKOUT
-    ldx #0
-sendInitLoop:
-    lda cmdInit, x
-    beq sendInitDone
-    jsr KernalChROUT
-    inx
-    jmp sendInitLoop
-sendInitDone:
-    jsr KernalCLRCHN
-
-    lda #1
-    ldx #<bufName
-    ldy #>bufName
-    jsr KernalSETNAM
-    lda #DATA_CHANNEL
-    ldx CurrentDevice
-    ldy #DATA_CHANNEL
-    jsr KernalSETLFS
-    jsr KernalOPEN
-    bcc openDataOk
-    sta LastErrCode
-    lda #CMD_CHANNEL
-    jsr KernalCLOSE
-    jmp openErr
-openDataOk:
-
-    ldx #CMD_CHANNEL
-    jsr KernalCHKOUT
-    ldx #0
-sendU1Loop:
-    lda cmdU1, x
-    beq sendU1Done
-    jsr KernalChROUT
-    inx
-    jmp sendU1Loop
-sendU1Done:
-    jsr KernalCLRCHN
-
-    ldx #CMD_CHANNEL
-    jsr KernalCHKOUT
-    ldx #0
-sendBPLoop:
-    lda cmdBP, x
-    beq sendBPDone
-    jsr KernalChROUT
-    inx
-    jmp sendBPLoop
-sendBPDone:
-    jsr KernalCLRCHN
-
-    ldx #DATA_CHANNEL
-    jsr KernalCHKOUT
-    ldx #0
-writeLabel:
-    lda labelBuf, x
-    jsr KernalChROUT
-    inx
-    cpx #VOL_NAME_LEN
-    bne writeLabel
-    jsr KernalCLRCHN
-
-    ldx #CMD_CHANNEL
-    jsr KernalCHKOUT
-    ldx #0
-sendU2Loop:
-    lda cmdU2, x
-    beq sendU2Done
-    jsr KernalChROUT
-    inx
-    jmp sendU2Loop
-sendU2Done:
-    jsr KernalCLRCHN
-
-    lda #DATA_CHANNEL
-    jsr KernalCLOSE
-
-    ldx #CMD_CHANNEL
-    jsr KernalCHKIN
-    jsr KernalChRIN
-    sta statusBuf
-    jsr KernalChRIN
-    sta statusBuf+1
-
-    ldy #2
-readStatus:
-    jsr KernalREADST
-    bne readStatusDone
-    jsr KernalChRIN
-    cmp #$0D
-    beq readStatusDone
-    sta statusBuf, y
-    iny
-    cpy #38
-    bne readStatus
-readStatusDone:
-    lda #0
-    sta statusBuf, y
-    jsr KernalCLRCHN
-
-    lda statusBuf
-    cmp #'0'
-    bne closeCommandChannel
-    lda statusBuf+1
-    cmp #'0'
-    bne closeCommandChannel
-
-    ldx #CMD_CHANNEL
-    jsr KernalCHKOUT
-    ldx #0
-sendFinalInitLoop:
-    lda cmdInit, x
-    beq sendFinalInitDone
-    jsr KernalChROUT
-    inx
-    jmp sendFinalInitLoop
-sendFinalInitDone:
-    jsr KernalCLRCHN
-
-closeCommandChannel:
-    lda #CMD_CHANNEL
-    jsr KernalCLOSE
-
-    lda statusBuf
-    cmp #'0'
-    bne printDriveError
-    lda statusBuf+1
-    cmp #'0'
-    bne printDriveError
-
-    ldx #<okMsg
-    ldy #>okMsg
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jmp labelExit
-
-printDriveError:
-    ldy #0
-printErrLoop:
-    lda statusBuf, y
-    beq printErrDone
-    jsr KernalChROUT
-    iny
-    jmp printErrLoop
-printErrDone:
-    lda #$0D
-    jsr KernalChROUT
-    jmp labelExit
-
-noArgErr:
-    ldx #<reqMsg
-    ldy #>reqMsg
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jmp labelExit
-
-tooLongErr:
-    ldx #<lenMsg
-    ldy #>lenMsg
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jmp labelExit
-
-openErr:
-    ldx #<devMsg
-    ldy #>devMsg
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jsr printErrCode
-    jmp labelExit
+; FULLY SELF-CONTAINED, SEGMENT-LESS, NATIVE-CASM-ONLY SOURCE FILE. NO CA65
+; BUILD (SEE THE 2026-09-02 LABEL CASM-NATIVE MIGRATION PLAN) -- SO CASM
+; PHASE 12-15 SYNTAX IS USED FREELY: NAMED CONSTANTS, @LOCAL LABELS FOR
+; ROUTINE-INTERNAL TARGETS, AND NATIVE STRING/CHARACTER LITERALS. ALL BYTES
+; UPPERCASE ASCII (CC1541 -W COPIES HOST BYTES VERBATIM; CASM REJECTS
+; LOWERCASE $61-$7A EVEN IN COMMENTS).
+;
+; CALLS COMMAND64'S OWN JUMP TABLE (OS_API = $1000, SELECTOR IN A) AND READS
+; OS GLOBALS (COMMANDBUFFER / PARSEPOS / CURRENTDEVICE), NOT JUST RAW KERNAL
+; VECTORS.
+;
+; PETSCII NOTE: NATIVE CASM EMITS RAW UNSHIFTED PETSCII FOR A-Z ($41-$5A)
+; AND PASSES DIGITS / PUNCTUATION / SPACE THROUGH UNCHANGED, SO THE STRING
+; LITERALS BELOW PRODUCE EXACTLY THE UNSHIFTED BYTES LABEL HAS ALWAYS USED
+; FOR ITS MESSAGES. THE DRIVE-COMMAND STRINGS (CMDINIT/CMDU1/CMDBP/CMDU2)
+; STAY EXPLICIT REVIEWED HEX: THEY ARE 1541 PROTOCOL DATA (THE COMMAND
+; PARSER REJECTS ANY SHIFTED-PETSCII TRANSLATION), AND CANONICAL-BYTE-ORACLE
+; GUIDANCE PREFERS EXPLICIT REVIEWED BYTES FOR PROTOCOL PAYLOADS.
+;
+; CONSTANTS ARE DEFINED INLINE HERE, NOT IN A SEPARATE .INCLUDE FILE: CASM
+; 0.6.2 EMITS 3-BYTE ABSOLUTE ADDRESSING FOR A ZERO-PAGE-VALUED NAMED
+; CONSTANT WHOSE DEFINITION CAME FROM AN .INCLUDE'D FILE (INLINE
+; DEFINITIONS CORRECTLY SELECT ZERO PAGE). INLINE MATCHES THE BANNER
+; PRECEDENT AND DASH'S "CONSTANTS IN THE PROLOGUE" CONTRACT.
 
 ; ---------------------------------------------------------------------------
-; printErrCode
-; Prints LastErrCode (the real KERNAL error number from the failed OPEN,
-; e.g. 2 = FILE ALREADY OPEN, 5 = DEVICE NOT PRESENT) as two decimal
-; digits followed by CR. devMsg no longer claims a specific cause on its
-; own -- the real KERNAL code distinguishes a genuine device absence from
-; any other OPEN failure (see brain/plans/label-l15-cache-release.md).
+; KERNAL JUMP TABLE ($FFXX) -- PUBLISHED C64 KERNAL ENTRY POINTS, FIXED ROM
+; ADDRESSES. OUTSIDE THE LOADED IMAGE, SO NOT RELOCATION-ELIGIBLE. EACH
+; VALUE HAND-DERIVED FROM THE PUBLISHED KERNAL JUMP TABLE, THEN CROSS-
+; CHECKED (NOT COPIED) AGAINST THE CA65 HEADER.
 ; ---------------------------------------------------------------------------
-printErrCode:
-    lda LastErrCode
-    ldx #$2F
-pecTens:
-    inx
-    sec
-    sbc #10
-    bcs pecTens
-    adc #10
-    pha
-    txa
-    jsr KernalChROUT
-    pla
-    clc
-    adc #'0'
-    jsr KernalChROUT
-    lda #$0D
-    jsr KernalChROUT
-    rts
-
-labelExit:
-    lda #CMD_CHANNEL
-    jsr KernalCLOSE
-    lda #DATA_CHANNEL
-    jsr KernalCLOSE
-    lda #DOS_RELEASE_L15
-    jsr OS_API
-    lda SavedDevice
-    sta CurrentDevice
-    rts
+KERNALCHROUT  = $FFD2       ; OUTPUT A CHARACTER TO THE CURRENT CHANNEL
+KERNALGETIN   = $FFE4       ; RAW KEYBOARD INPUT (NO SCREEN EDITOR)
+KERNALCHRIN   = $FFCF       ; INPUT A CHARACTER FROM THE CURRENT CHANNEL
+KERNALSETLFS  = $FFBA       ; SET LOGICAL / FIRST / SECOND ADDRESSES
+KERNALSETNAM  = $FFBD       ; SET FILE NAME
+KERNALOPEN    = $FFC0       ; OPEN A LOGICAL FILE
+KERNALCLOSE   = $FFC3       ; CLOSE A LOGICAL FILE
+KERNALCHKIN   = $FFC6       ; SET INPUT CHANNEL TO A LOGICAL FILE
+KERNALCHKOUT  = $FFC9       ; SET OUTPUT CHANNEL TO A LOGICAL FILE
+KERNALCLRCHN  = $FFCC       ; RESTORE DEFAULT I/O CHANNELS
+KERNALREADST  = $FFB7       ; READ THE KERNAL I/O STATUS BYTE
 
 ; ---------------------------------------------------------------------------
-; Data
+; COMMAND64 OS API -- $1000 DISPATCHER, SELECTOR IN A. FIXED OS ENTRY POINT
+; AND OS-DEFINED SELECTOR VALUES (FROM THE COMMAND64 API CONTRACT). NOT
+; RELOCATION-ELIGIBLE.
+; ---------------------------------------------------------------------------
+OS_API           = $1000    ; OS API JUMP-TABLE ENTRY
+DOS_PRINT_STR    = $09       ; PRINT NUL-TERMINATED STRING (PTR IN X/Y)
+DOS_PARSE_PREFIX = $57       ; PARSE TARGET-DEVICE PREFIX FROM A ZP POINTER
+DOS_RELEASE_L15  = $5B       ; CLOSE LFN 15, CLEAR THE OS COMMAND-CHANNEL CACHE
+
+; ---------------------------------------------------------------------------
+; OS GLOBAL VARIABLES -- FIXED COMMAND64 ADDRESSES (MEMORY MAP). LOW-PAGE /
+; PAGE-3, OUTSIDE THE LOADED IMAGE, SO NOT RELOCATION-ELIGIBLE. PARSEPOS IS
+; ZERO PAGE.
+; ---------------------------------------------------------------------------
+COMMANDBUFFER = $033C       ; 80-BYTE SHELL COMMAND BUFFER (CASSETTE BUFFER)
+PARSEPOS      = $63          ; ZP: INDEX INTO COMMANDBUFFER PAST THE COMMAND NAME
+CURRENTDEVICE = $039E       ; ACTIVE DEVICE NUMBER (8..11)
+
+; ---------------------------------------------------------------------------
+; OS SHARED ZERO-PAGE POINTER -- THE PETPRINTSTRING / DOS_PARSE_PREFIX
+; WORKING POINTER AT $FB/$FC (PRE-EXISTING; LABEL PASSES #PRINTPTRLO TO
+; DOS_PARSE_PREFIX). FIXED ZP, NOT RELOCATION-ELIGIBLE.
+; ---------------------------------------------------------------------------
+PRINTPTRLO = $FB
+PRINTPTRHI = $FC
+
+; ---------------------------------------------------------------------------
+; PETSCII CONTROL CODES
+; ---------------------------------------------------------------------------
+PETCR  = $0D                ; CARRIAGE RETURN
+PETDEL = $14                ; DEL (INST/DEL UNSHIFTED) -- DESTRUCTIVE BACKSPACE
+
+; ---------------------------------------------------------------------------
+; APP-PRIVATE ZERO-PAGE SCRATCH -- $70-$8F IS THE DOCUMENTED EXTERNAL-APP
+; RANGE. FIXED ZP, NOT RELOCATION-ELIGIBLE.
+; ---------------------------------------------------------------------------
+ARGIDX      = $70           ; SAVED COMMANDBUFFER INDEX ACROSS THE COUNT LOOP
+SAVEDDEVICE = $71           ; CURRENTDEVICE SAVED ON ENTRY, RESTORED ON EXIT
+
+; ---------------------------------------------------------------------------
+; DRIVE PROTOCOL + APP-LOCAL SIZE CONSTANTS
+; ---------------------------------------------------------------------------
+CMD_CHANNEL  = 15           ; LFN + SECONDARY ADDRESS FOR THE COMMAND CHANNEL
+DATA_CHANNEL = 2            ; LFN + SECONDARY ADDRESS FOR THE DATA CHANNEL
+VOL_NAME_LEN = 16           ; CBM VOLUME NAME FIELD WIDTH (BYTES)
+PADCHAR      = $A0          ; SHIFTED SPACE -- CBM VOLUME-NAME PAD BYTE
+STATUSBUFLEN = 40           ; DRIVE ERROR-CHANNEL CAPTURE BUFFER SIZE
+
+; ---------------------------------------------------------------------------
+; ENTRY POINT
+; ---------------------------------------------------------------------------
+START:
+    LDX #<LABELVERMSG
+    LDY #>LABELVERMSG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+
+    LDA CURRENTDEVICE
+    STA SAVEDDEVICE
+
+    LDY PARSEPOS
+
+@SKIPTOKEN:
+    LDA COMMANDBUFFER,Y
+    BNE @NOTTOKENNULL
+    JMP @NOARGERR
+@NOTTOKENNULL:
+    INY
+    CMP #' '
+    BNE @SKIPTOKEN
+
+@SKIPSPACES:
+    LDA COMMANDBUFFER,Y
+    CMP #' '
+    BNE @ENDSPACES
+    INY
+    JMP @SKIPSPACES
+
+@ENDSPACES:
+    CMP #$00
+    BEQ @LABELNOARG
+
+    TYA
+    CLC
+    ADC #<COMMANDBUFFER
+    STA PRINTPTRLO
+    LDA #>COMMANDBUFFER
+    ADC #$00
+    STA PRINTPTRHI
+
+    LDX #PRINTPTRLO
+    LDA #DOS_PARSE_PREFIX
+    JSR OS_API
+    STA CURRENTDEVICE
+
+    LDA PRINTPTRLO
+    SEC
+    SBC #<COMMANDBUFFER
+    TAY
+
+@SKIPSPACESPOSTPREFIX:
+    LDA COMMANDBUFFER,Y
+    CMP #' '
+    BNE @CHECKNULLPOSTPREFIX
+    INY
+    JMP @SKIPSPACESPOSTPREFIX
+@CHECKNULLPOSTPREFIX:
+    CMP #$00
+    BNE @LABELNOPREFIX
+
+@LABELNOARG:
+    LDX #VOL_NAME_LEN-1
+    LDA #PADCHAR
+@INITLABELBUF:
+    STA LABELBUF,X
+    DEX
+    BPL @INITLABELBUF
+
+    LDX #<PROMPTMSG
+    LDY #>PROMPTMSG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+
+    LDY #$00
+@READLOOP:
+    TYA
+    PHA
+@POLLKEY:
+    JSR KERNALGETIN
+    BEQ @POLLKEY
+    TAX
+    PLA
+    TAY
+    TXA
+
+    CMP #PETCR
+    BEQ @DONEINPUT
+
+    CMP #PETDEL
+    BNE @HANDLECHAR
+
+    TYA
+    BEQ @READLOOP
+    DEY
+    LDA #PETDEL
+    JSR KERNALCHROUT
+    JMP @READLOOP
+
+@HANDLECHAR:
+    CPY #VOL_NAME_LEN
+    BCS @READLOOP
+
+    JSR KERNALCHROUT
+
+    STA LABELBUF,Y
+    INY
+    JMP @READLOOP
+
+@DONEINPUT:
+    LDA #PETCR
+    JSR KERNALCHROUT
+
+    TYA
+    BEQ @CANCELEXIT
+
+    JMP @OPENCHANNELS
+
+@CANCELEXIT:
+    JMP LABELEXIT
+
+@LABELNOPREFIX:
+@COUNTSTART:
+    STY ARGIDX
+    LDX #$00
+@COUNTCHARS:
+    LDA COMMANDBUFFER,Y
+    BEQ @COUNTDONE
+    INX
+    INY
+    CPX #VOL_NAME_LEN+1
+    BNE @COUNTCHARS
+    JMP @TOOLONGERR
+
+@COUNTDONE:
+    LDY ARGIDX
+    LDX #$00
+@COPYLABEL:
+    LDA COMMANDBUFFER,Y
+    BEQ @PADLABEL
+    STA LABELBUF,X
+    INX
+    INY
+    CPX #VOL_NAME_LEN
+    BNE @COPYLABEL
+    JMP @OPENCHANNELS
+
+@PADLABEL:
+    LDA #PADCHAR
+    STA LABELBUF,X
+    INX
+    CPX #VOL_NAME_LEN
+    BNE @PADLABEL
+
+@OPENCHANNELS:
+    ; ENSURE LFN 15 IS GENUINELY FREE BEFORE CLAIMING IT: ANY PRIOR
+    ; LOAD/DIR/VOL/DELETE/RENAME/PATH IN THIS SESSION MAY HAVE LEFT IT
+    ; OPEN AND CACHED BY THE OS'S OWN L15 BOOKKEEPING. WITHOUT THIS, THE
+    ; VERY FIRST OPEN BELOW CAN FAIL WITH "FILE ALREADY OPEN" EVEN THOUGH
+    ; LABEL HASN'T TOUCHED LFN 15 ITSELF YET.
+    LDA #DOS_RELEASE_L15
+    JSR OS_API
+
+    LDA #$00
+    JSR KERNALSETNAM
+    LDA #CMD_CHANNEL
+    LDX CURRENTDEVICE
+    LDY #CMD_CHANNEL
+    JSR KERNALSETLFS
+    JSR KERNALOPEN
+    BCC @OPENCMDOK
+    STA LASTERRCODE
+    JMP @OPENERR
+@OPENCMDOK:
+
+    LDX #CMD_CHANNEL
+    JSR KERNALCHKOUT
+    LDX #$00
+@SENDINITLOOP:
+    LDA CMDINIT,X
+    BEQ @SENDINITDONE
+    JSR KERNALCHROUT
+    INX
+    JMP @SENDINITLOOP
+@SENDINITDONE:
+    JSR KERNALCLRCHN
+
+    LDA #$01
+    LDX #<BUFNAME
+    LDY #>BUFNAME
+    JSR KERNALSETNAM
+    LDA #DATA_CHANNEL
+    LDX CURRENTDEVICE
+    LDY #DATA_CHANNEL
+    JSR KERNALSETLFS
+    JSR KERNALOPEN
+    BCC @OPENDATAOK
+    STA LASTERRCODE
+    LDA #CMD_CHANNEL
+    JSR KERNALCLOSE
+    JMP @OPENERR
+@OPENDATAOK:
+
+    LDX #CMD_CHANNEL
+    JSR KERNALCHKOUT
+    LDX #$00
+@SENDU1LOOP:
+    LDA CMDU1,X
+    BEQ @SENDU1DONE
+    JSR KERNALCHROUT
+    INX
+    JMP @SENDU1LOOP
+@SENDU1DONE:
+    JSR KERNALCLRCHN
+
+    LDX #CMD_CHANNEL
+    JSR KERNALCHKOUT
+    LDX #$00
+@SENDBPLOOP:
+    LDA CMDBP,X
+    BEQ @SENDBPDONE
+    JSR KERNALCHROUT
+    INX
+    JMP @SENDBPLOOP
+@SENDBPDONE:
+    JSR KERNALCLRCHN
+
+    LDX #DATA_CHANNEL
+    JSR KERNALCHKOUT
+    LDX #$00
+@WRITELABEL:
+    LDA LABELBUF,X
+    JSR KERNALCHROUT
+    INX
+    CPX #VOL_NAME_LEN
+    BNE @WRITELABEL
+    JSR KERNALCLRCHN
+
+    LDX #CMD_CHANNEL
+    JSR KERNALCHKOUT
+    LDX #$00
+@SENDU2LOOP:
+    LDA CMDU2,X
+    BEQ @SENDU2DONE
+    JSR KERNALCHROUT
+    INX
+    JMP @SENDU2LOOP
+@SENDU2DONE:
+    JSR KERNALCLRCHN
+
+    LDA #DATA_CHANNEL
+    JSR KERNALCLOSE
+
+    LDX #CMD_CHANNEL
+    JSR KERNALCHKIN
+    JSR KERNALCHRIN
+    STA STATUSBUF
+    JSR KERNALCHRIN
+    STA STATUSBUF+1
+
+    LDY #$02
+@READSTATUS:
+    JSR KERNALREADST
+    BNE @READSTATUSDONE
+    JSR KERNALCHRIN
+    CMP #PETCR
+    BEQ @READSTATUSDONE
+    STA STATUSBUF,Y
+    INY
+    CPY #STATUSBUFLEN-2
+    BNE @READSTATUS
+@READSTATUSDONE:
+    LDA #$00
+    STA STATUSBUF,Y
+    JSR KERNALCLRCHN
+
+    LDA STATUSBUF
+    CMP #'0'
+    BNE @CLOSECOMMANDCHANNEL
+    LDA STATUSBUF+1
+    CMP #'0'
+    BNE @CLOSECOMMANDCHANNEL
+
+    LDX #CMD_CHANNEL
+    JSR KERNALCHKOUT
+    LDX #$00
+@SENDFINALINITLOOP:
+    LDA CMDINIT,X
+    BEQ @SENDFINALINITDONE
+    JSR KERNALCHROUT
+    INX
+    JMP @SENDFINALINITLOOP
+@SENDFINALINITDONE:
+    JSR KERNALCLRCHN
+
+@CLOSECOMMANDCHANNEL:
+    LDA #CMD_CHANNEL
+    JSR KERNALCLOSE
+
+    LDA STATUSBUF
+    CMP #'0'
+    BNE @PRINTDRIVEERROR
+    LDA STATUSBUF+1
+    CMP #'0'
+    BNE @PRINTDRIVEERROR
+
+    LDX #<OKMSG
+    LDY #>OKMSG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JMP LABELEXIT
+
+@PRINTDRIVEERROR:
+    LDY #$00
+@PRINTERRLOOP:
+    LDA STATUSBUF,Y
+    BEQ @PRINTERRDONE
+    JSR KERNALCHROUT
+    INY
+    JMP @PRINTERRLOOP
+@PRINTERRDONE:
+    LDA #PETCR
+    JSR KERNALCHROUT
+    JMP LABELEXIT
+
+@NOARGERR:
+    LDX #<REQMSG
+    LDY #>REQMSG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JMP LABELEXIT
+
+@TOOLONGERR:
+    LDX #<LENMSG
+    LDY #>LENMSG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JMP LABELEXIT
+
+@OPENERR:
+    LDX #<DEVMSG
+    LDY #>DEVMSG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JSR PRINTERRCODE
+    JMP LABELEXIT
+
+; ---------------------------------------------------------------------------
+; PRINTERRCODE
+; PRINTS LASTERRCODE (THE REAL KERNAL ERROR NUMBER FROM THE FAILED OPEN,
+; E.G. 2 = FILE ALREADY OPEN, 5 = DEVICE NOT PRESENT) AS TWO DECIMAL DIGITS
+; FOLLOWED BY CR. DEVMSG NO LONGER CLAIMS A SPECIFIC CAUSE ON ITS OWN --
+; THE REAL KERNAL CODE DISTINGUISHES A GENUINE DEVICE ABSENCE FROM ANY
+; OTHER OPEN FAILURE.
+; ---------------------------------------------------------------------------
+PRINTERRCODE:
+    LDA LASTERRCODE
+    LDX #$2F                ; '0' - 1: PRE-DECREMENT SEED FOR THE TENS LOOP
+@PECTENS:
+    INX
+    SEC
+    SBC #10
+    BCS @PECTENS
+    ADC #10
+    PHA
+    TXA
+    JSR KERNALCHROUT
+    PLA
+    CLC
+    ADC #'0'
+    JSR KERNALCHROUT
+    LDA #PETCR
+    JSR KERNALCHROUT
+    RTS
+
+; ---------------------------------------------------------------------------
+; LABELEXIT -- SHARED CLEANUP + RETURN TO THE SHELL
+; ---------------------------------------------------------------------------
+LABELEXIT:
+    LDA #CMD_CHANNEL
+    JSR KERNALCLOSE
+    LDA #DATA_CHANNEL
+    JSR KERNALCLOSE
+    LDA #DOS_RELEASE_L15
+    JSR OS_API
+    LDA SAVEDDEVICE
+    STA CURRENTDEVICE
+    RTS
+
+; ---------------------------------------------------------------------------
+; DATA
 ; ---------------------------------------------------------------------------
 
-bufName:
-    .byte $23               ; '#': requests a free drive RAM buffer
+BUFNAME:
+    .BYTE '#'              ; REQUESTS A FREE DRIVE RAM BUFFER
 
-; Drive command strings as explicit hex bytes (bypasses PETSCII shifting --
-; the 1541 command parser rejects the shifted range Kick's petscii_mixed
-; would otherwise produce for uppercase source literals).
-cmdInit:
-    .byte $49, $0D, $00
+; DRIVE COMMAND STRINGS AS EXPLICIT HEX BYTES (1541 PROTOCOL DATA -- ANY
+; SHIFTED-PETSCII TRANSLATION PRODUCES BYTES THE COMMAND PARSER REJECTS).
+CMDINIT:
+    .BYTE $49, $0D, $00
 
-cmdU1:
-    .byte $55, $31, $3A, $32, $20, $30, $20, $31, $38, $20, $30, $0D, $00
+CMDU1:
+    .BYTE $55, $31, $3A, $32, $20, $30, $20, $31, $38, $20, $30, $0D, $00
 
-cmdBP:
-    .byte $42, $2D, $50, $3A, $32, $20, $31, $34, $34, $0D, $00
+CMDBP:
+    .BYTE $42, $2D, $50, $3A, $32, $20, $31, $34, $34, $0D, $00
 
-cmdU2:
-    .byte $55, $32, $3A, $32, $20, $30, $20, $31, $38, $20, $30, $0D, $00
+CMDU2:
+    .BYTE $55, $32, $3A, $32, $20, $30, $20, $31, $38, $20, $30, $0D, $00
 
-; Human-readable messages, precomputed to PETSCII (see file header comment).
-okMsg:
-    .byte $4C, $41, $42, $45, $4C, $20, $55, $50, $44, $41, $54, $45, $44
-    .byte $0D, $00
+; HUMAN-READABLE MESSAGES -- NATIVE CASM STRING LITERALS. A-Z EMIT AS
+; UNSHIFTED PETSCII ($41-$5A), BYTE-IDENTICAL TO LABEL'S HISTORICAL
+; EXPLICIT-HEX MESSAGE BYTES.
+OKMSG:
+    .BYTE "LABEL UPDATED", $0D, $00
 
-lenMsg:
-    .byte $4C, $41, $42, $45, $4C, $20, $54, $4F, $4F, $20, $4C, $4F, $4E
-    .byte $47, $20, $28, $4D, $41, $58, $20, $31, $36, $29
-    .byte $0D, $00
+LENMSG:
+    .BYTE "LABEL TOO LONG (MAX 16)", $0D, $00
 
-reqMsg:
-    .byte $4C, $41, $42, $45, $4C, $20, $4E, $41, $4D, $45, $20, $52, $45
-    .byte $51, $55, $49, $52, $45, $44
-    .byte $0D, $00
+REQMSG:
+    .BYTE "LABEL NAME REQUIRED", $0D, $00
 
-promptMsg:
-    .byte $56, $4F, $4C, $55, $4D, $45, $20, $4C, $41, $42, $45, $4C, $20
-    .byte $28, $31, $36, $20, $43, $48, $41, $52, $53, $20, $4D, $41, $58
-    .byte $29, $3F, $20
-    .byte $00
+PROMPTMSG:
+    .BYTE "VOLUME LABEL (16 CHARS MAX)? ", $00
 
-; "DRIVE ERROR " -- no trailing CR/message-specific claim: printErrCode
-; appends the real two-digit KERNAL error code and CR itself, so this
-; string never has to hardcode (and potentially misstate) a specific
-; cause the way the old "DEVICE NOT PRESENT" text always did.
-devMsg:
-    .byte $44, $52, $49, $56, $45, $20, $45, $52, $52, $4F, $52, $20
-    .byte $00
+; "DRIVE ERROR " -- NO TRAILING CR / MESSAGE-SPECIFIC CLAIM: PRINTERRCODE
+; APPENDS THE REAL TWO-DIGIT KERNAL ERROR CODE AND CR ITSELF.
+DEVMSG:
+    .BYTE "DRIVE ERROR ", $00
 
-; "LABEL V" prefix is the same proven-correct hex as the other message
-; strings above; VERSION_MAJOR/MINOR/STAGE and BUILD_NUMBER are real
-; equates (see file header), matching the shipping Kick label.asm's
-; "LABEL v" + VERSION_MAJOR + "." + VERSION_MINOR + "." + VERSION_STAGE
-; + "." + BUILD_NUMBER banner format exactly.
-verMsg:
-    .byte "LABEL V", VERSION_MAJOR, ".", VERSION_MINOR, ".", VERSION_STAGE, "."
-    .byte BUILD_NUMBER
-    .byte $0D, $00
+; VERSION BANNER -- GENERATED AT BUILD TIME FROM LABEL_VERSION + BUILD_LABEL
+; (SCOPING DECISIONS 2 + 5 OF THE MIGRATION PLAN). DEFINES LABELVERMSG.
+.INCLUDE "LABELVER.S"
 
-; Runtime buffers (initialized at load time)
-statusBuf:
-    .res 40, 0
+; RUNTIME BUFFERS (INITIALIZED AT LOAD TIME VIA .RES FILL BYTES)
+STATUSBUF:
+    .RES STATUSBUFLEN, $00
 
-labelBuf:
-    .res 16, $A0
+LABELBUF:
+    .RES VOL_NAME_LEN, PADCHAR
 
-; Real KERNAL error code from the most recent failed KernalOPEN (see
-; openErr/printErrCode) -- must be stashed immediately on return from
-; KernalOPEN, before any other KERNAL call (e.g. the CMD_CHANNEL cleanup
-; KernalCLOSE on a failed DATA_CHANNEL open) has a chance to clobber A.
-LastErrCode:
-    .res 1
+; REAL KERNAL ERROR CODE FROM THE MOST RECENT FAILED KERNALOPEN (SEE
+; @OPENERR / PRINTERRCODE) -- STASHED IMMEDIATELY ON RETURN FROM KERNALOPEN,
+; BEFORE ANY OTHER KERNAL CALL CAN CLOBBER A.
+LASTERRCODE:
+    .RES 1

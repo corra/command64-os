@@ -29,7 +29,7 @@ find_package(Java REQUIRED)
 find_package(KickAss REQUIRED)
 find_package(cc1541 REQUIRED)
 find_package(Oscar64) # Optional compiler for C files
-find_package(Ca65) # Required for DEBUG/LABEL/CONWAY and ca65-migrated test targets
+find_package(Ca65) # Required for DEBUG/CONWAY and ca65-migrated test targets (LABEL is CASM-native)
 find_package(Python3 REQUIRED COMPONENTS Interpreter) # Phase 6B: reloc.py diff build tool
 
 # Load helper functions
@@ -118,8 +118,8 @@ set(CMD64_ENTRY "src/command64.asm")
 file(GLOB_RECURSE DEBUG_SRCS CONFIGURE_DEPENDS "src/external/debug/*.s" "src/external/debug/*.inc" "include/ca65/*.inc")
 set(DEBUG_ENTRY "src/external/debug/debug.s")
 
-file(GLOB_RECURSE LABEL_SRCS CONFIGURE_DEPENDS "src/external/label/*.s" "src/external/label/*.inc" "include/ca65/*.inc")
-set(LABEL_ENTRY "src/external/label/label.s")
+# LABEL is CASM-native (no ca65 build) — its sources are packaged onto
+# command64_label_test_d64 for live assembly, not globbed for a host target.
 
 file(GLOB_RECURSE EDLIN_SRCS CONFIGURE_DEPENDS "src/external/edlin/*.s" "src/external/edlin/*.inc" "include/ca65/*.inc")
 set(EDLIN_ENTRY "src/external/edlin/edlin.s")
@@ -195,18 +195,12 @@ else()
     message(FATAL_ERROR "ca65/ld65 not found on PATH — required for DEBUG target")
 endif()
 
-# 3. LABEL External Command PRG Target — built with ca65/ld65 (migrated
-# off the spike/ca65-label/ branch; see
-# brain/plans/2026-07-08-ca65-adoption-and-spike-migration.md Phase 4).
-# Ships unconditionally in IMAGE_PRG_TARGETS, so — like DEBUG — a missing
-# ca65/ld65 toolchain fails the entire configure rather than silently
-# skipping this target.
-if(Ca65_FOUND)
-    add_ca65_app(label "${LABEL_ENTRY}" LABEL_SRCS 1032 "0700")
-else()
-    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for LABEL target")
-endif()
-set(LABEL_TARGET label)
+# 3. LABEL External Command — CASM-native (ca65 build retired in the
+# 2026-09-02 migration; see brain/plans/2026-09-02-label-casm-native-migration.md).
+# LABEL.PRG now ships from the reviewed hex manifest src/external/label/label.ref.hex,
+# same model as BANNER/DASH. The manifest-derived `label` target and the
+# `command64_label_test_d64` native-assembly disk are defined further down,
+# alongside the `banner` manifest target.
 
 # 3c. EDLIN External Command PRG Target — ported from MS-DOS 4.00 EDLIN
 # (ms-dos/v4.0/src/CMD/EDLIN/); see
@@ -1729,6 +1723,37 @@ add_custom_target(banner ALL DEPENDS "${BANNER_BIN}")
 set_target_properties(banner PROPERTIES C64_PRG_PATH "${BANNER_BIN}")
 set(BANNER_TARGET banner)
 
+# LABEL Production Target — CASM-native, generated from its reviewed hex
+# manifest src/external/label/label.ref.hex, same shape as BANNER's above.
+# LABEL has no ca65 build (retired 2026-09-02). Correctness is proven by
+# the independent byte + R6 derivation record
+# src/external/label/label-derivation.md, not by this manifest. The three
+# checked-in inputs the assembled bytes depend on (label.s, LABEL_VERSION,
+# BUILD_LABEL) are DEPENDS here so an edit without a manifest regeneration
+# is a hard build failure via hex_manifest_to_bin.py's --source-dir check,
+# not a silent stale ship. Regenerating label.ref.hex is a deliberate,
+# reviewed act (scripts/build_label_manifest.py), never a build step.
+set(LABEL_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/label/label.ref.hex")
+set(LABEL_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/label")
+set(LABEL_BIN "${CMAKE_BINARY_DIR}/label.prg")
+add_custom_command(
+    OUTPUT "${LABEL_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${LABEL_MANIFEST}" "${LABEL_BIN}"
+        "--source-dir" "${LABEL_SOURCE_DIR}"
+    DEPENDS "${LABEL_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${LABEL_SOURCE_DIR}/label.s"
+        "${LABEL_SOURCE_DIR}/LABEL_VERSION"
+        "${LABEL_SOURCE_DIR}/BUILD_LABEL"
+    COMMENT "Generating LABEL production binary from manifest"
+    VERBATIM
+)
+add_custom_target(label ALL DEPENDS "${LABEL_BIN}")
+set_target_properties(label PROPERTIES C64_PRG_PATH "${LABEL_BIN}")
+set(LABEL_TARGET label)
+
 # 6. Disk images
 # TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS
 # itself) deliberately: test.d64 is already near its directory-entry
@@ -2186,6 +2211,68 @@ add_custom_command(
     VERBATIM
 )
 add_dependencies(command64_casm_utils_d64 dash)
+
+
+# command64_label_test_d64 — dedicated disk for assembling LABEL with native
+# CASM on the C64 (see brain/plans/2026-09-02-label-casm-native-migration.md).
+# Not a production disk and not in any release flow: it exists so a reviewer
+# can reproduce the native run behind src/external/label/label.ref.hex
+# (CASM LABEL.S /O:LABEL.PRG ; COMP LABEL.PRG LABEL.REF -> FILES COMPARE OK).
+#
+# labelver.s (the generated version-banner data) is a build product written
+# to the binary dir from the two checked-in inputs; it is packaged as a SEQ
+# so label.s's ".INCLUDE \"LABELVER.S\"" resolves on the disk.
+set(LABELVER_GEN "${CMAKE_BINARY_DIR}/labelver.s")
+add_custom_command(
+    OUTPUT "${LABELVER_GEN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/gen_label_version.py"
+        "--version-file" "${CMAKE_SOURCE_DIR}/src/external/label/LABEL_VERSION"
+        "--build-file" "${CMAKE_SOURCE_DIR}/src/external/label/BUILD_LABEL"
+        "--out" "${LABELVER_GEN}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/scripts/gen_label_version.py"
+        "${CMAKE_SOURCE_DIR}/src/external/label/LABEL_VERSION"
+        "${CMAKE_SOURCE_DIR}/src/external/label/BUILD_LABEL"
+    COMMENT "Generating LABEL version banner source (labelver.s)"
+    VERBATIM
+)
+add_custom_target(label_version_src DEPENDS "${LABELVER_GEN}")
+
+set(LABEL_TEST_D64 "${CMAKE_BINARY_DIR}/command64_label_test.d64")
+add_c64_disk_image(command64_label_test_d64
+    OUTPUT_FILE "${LABEL_TEST_D64}"
+    DISK_LABEL "LABEL TEST"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 ${CASM_TARGET} ${COMP_TARGET}
+)
+add_dependencies(command64_label_test_d64 label label_version_src)
+
+# Gate the SEQ packaging on the same CASM-lexability check DASH/BANNER use.
+add_custom_command(
+    TARGET command64_label_test_d64 PRE_BUILD
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/check_casm_source_bytes.py"
+        "${CMAKE_SOURCE_DIR}/src/external/label/label.s" "${LABELVER_GEN}"
+    COMMENT "Verifying native-CASM LABEL sources are uppercase ASCII"
+    VERBATIM
+)
+
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_label_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET command64_label_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "label.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/label/label.s" "${LABEL_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "labelver.s" -T SEQ
+        -w "${LABELVER_GEN}" "${LABEL_TEST_D64}"
+    COMMAND "${CC1541_EXECUTABLE}" -f "label.ref" -T PRG
+        -w "${LABEL_BIN}" "${LABEL_TEST_D64}"
+    COMMENT "Appending LABEL sources + reviewed label.ref to command64_label_test.d64"
+    VERBATIM
+)
 
 
 # Large-source CASM fixtures whose raw .seq text does not fit on test.d64

@@ -4041,3 +4041,41 @@ Related: `casm-diagnostic-always-name-file`
 Byte-Oracle Transition WP2 unblocked. Deferred CASM defects
 tasks #39 (phantom EOF on 1-byte source) and #33 (VMM/apptable lifecycle)
 remain disclosed-and-deferred; the audit will encounter #39.
+
+# External Applications: CASM-Native Migration
+
+Program from `brain/reviews/2026-09-01-external-applications-casm-native-viability.md`.
+Recommended order: LABEL → COMP → FORMAT → CONWAY → (EDLIN) → (PACMAN, DEBUG).
+
+## LABEL (Stage 1 pilot) — Taskwarrior task 41 (project `label`)
+
+Plan/walkthrough `brain/{plans,walkthroughs}/2026-09-02-label-casm-native-migration.md`.
+Work on `main`.
+
+- [x] Increment 1 — OS loader R6 confirmation + constants
+- [x] Increment 2 — `label.s` converted to native CASM (constants inline,
+      `@local`, string/char literals, `.RES`); `LABEL_VERSION` +
+      `scripts/gen_label_version.py`; `common.inc`/`build_label.inc` dropped
+- [x] Increment 3 — live VICE: `CASM: INPUT VALIDATED`; 843/844 image bytes
+      == independent ca65 `$3400` build (1 intentional banner byte);
+      functional sweep green (name-required / too-long / interactive prompt
+      / OK write persisted to BAM / drive-error). **Found CASM defect →
+      Taskwarrior task 42** (`.INCLUDE`d ZP constant → 3-byte absolute)
+- [x] Increment 4 — `label-derivation.md` (52-entry R6 ledger reconciled),
+      `scripts/build_label_manifest.py`, `label.ref.hex`; live
+      `COMP LABEL.PRG LABEL.REF` → `FILES COMPARE OK`
+- [x] Increment 5 — CMake: ca65 target removed, manifest `label` target +
+      `command64_label_test_d64` added
+- [x] Increment 6 — fresh `cmake -B build` + full build clean; no-change
+      rebuild identical; stale-source gate verified
+- [x] Increment 7 — docs (`wiki/label-utility.md` + sync, `CHANGELOG`,
+      `KNOWLEDGE.md`, audit register), walkthrough, tracker sync
+- [x] Independent reviewer sign-off on `label-derivation.md` — user 2026-09-02
+- [x] Completion-gate approval → task 41 closed 2026-09-02; label.ref.hex CANONICAL-INDEPENDENT
+
+## CASM defect (task 42) — `.INCLUDE`d constant zero-page selection
+
+Discovered during LABEL Increment 3. A zero-page-valued named constant
+defined in an `.INCLUDE`d file assembles to 3-byte absolute; inline
+definitions correctly select zero page. Blocks a shared `.INCLUDE` of ZP
+constants for later migrations. Not fixed under the LABEL plan.
