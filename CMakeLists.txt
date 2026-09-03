@@ -127,8 +127,10 @@ set(EDLIN_ENTRY "src/external/edlin/edlin.s")
 file(GLOB_RECURSE FORMAT_SRCS CONFIGURE_DEPENDS "src/external/format/*.s" "src/external/format/*.inc" "include/ca65/*.inc")
 set(FORMAT_ENTRY "src/external/format/format.s")
 
-file(GLOB_RECURSE COMP_SRCS CONFIGURE_DEPENDS "src/external/comp/*.s" "src/external/comp/*.inc" "include/ca65/*.inc")
-set(COMP_ENTRY "src/external/comp/comp.s")
+# COMP is CASM-native (no ca65 build; ca65 retired in the 2026-09-02
+# migration) — its source is packaged onto command64_comp_test_d64 for live
+# assembly and shipped from src/external/comp/comp.ref.hex, not globbed for a
+# host target.
 
 file(GLOB_RECURSE CASM_SRCS CONFIGURE_DEPENDS "src/external/casm/*.s" "src/external/casm/*.inc" "include/ca65/*.inc")
 set(CASM_ENTRY "src/external/casm/casm.s")
@@ -231,15 +233,12 @@ else()
 endif()
 set(FORMAT_TARGET format)
 
-# 3d. COMP External Command PRG Target — raw byte-stream file comparison
-# utility. Ships unconditionally in IMAGE_PRG_TARGETS from Phase 1, so a
-# missing ca65/ld65 toolchain fails configure like the other ca65 utilities.
-if(Ca65_FOUND)
-    add_ca65_app(comp "${COMP_ENTRY}" COMP_SRCS 1000 "0800")
-else()
-    message(FATAL_ERROR "ca65/ld65 not found on PATH — required for COMP target")
-endif()
-set(COMP_TARGET comp)
+# 3d. COMP External Command — CASM-native (ca65 build retired in the
+# 2026-09-02 migration; see brain/plans/2026-09-02-comp-casm-native-migration.md).
+# COMP.PRG now ships from the reviewed hex manifest src/external/comp/comp.ref.hex,
+# same model as BANNER/LABEL/DASH. The manifest-derived `comp` target and the
+# `command64_comp_test_d64` native-assembly disk are defined further down,
+# alongside the `label` manifest target.
 
 # 3e. CASM Native 6502/6510 Assembler — Phase 1 application scaffold.
 # Ships from its first phase so launch, relocation, cleanup, and shell-return
@@ -1754,6 +1753,36 @@ add_custom_target(label ALL DEPENDS "${LABEL_BIN}")
 set_target_properties(label PROPERTIES C64_PRG_PATH "${LABEL_BIN}")
 set(LABEL_TARGET label)
 
+# COMP Production Target — CASM-native, generated from its reviewed hex
+# manifest src/external/comp/comp.ref.hex, same shape as LABEL's above.
+# COMP has no ca65 build (retired 2026-09-02). Correctness is proven by the
+# independent byte + R6 derivation record
+# src/external/comp/comp-derivation.md, not by this manifest. COMP emits no
+# version banner, so the assembled bytes depend only on comp.s; BUILD_COMP
+# (frozen at its final ca65-era value) is DEPENDS'd too so a stray edit is a
+# hard build failure via hex_manifest_to_bin.py's --source-dir check, not a
+# silent stale ship. Regenerating comp.ref.hex is a deliberate, reviewed act
+# (scripts/build_comp_manifest.py), never a build step.
+set(COMP_MANIFEST "${CMAKE_SOURCE_DIR}/src/external/comp/comp.ref.hex")
+set(COMP_SOURCE_DIR "${CMAKE_SOURCE_DIR}/src/external/comp")
+set(COMP_BIN "${CMAKE_BINARY_DIR}/comp.prg")
+add_custom_command(
+    OUTPUT "${COMP_BIN}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${COMP_MANIFEST}" "${COMP_BIN}"
+        "--source-dir" "${COMP_SOURCE_DIR}"
+    DEPENDS "${COMP_MANIFEST}"
+        "${CMAKE_SOURCE_DIR}/scripts/hex_manifest_to_bin.py"
+        "${COMP_SOURCE_DIR}/comp.s"
+        "${COMP_SOURCE_DIR}/BUILD_COMP"
+    COMMENT "Generating COMP production binary from manifest"
+    VERBATIM
+)
+add_custom_target(comp ALL DEPENDS "${COMP_BIN}")
+set_target_properties(comp PROPERTIES C64_PRG_PATH "${COMP_BIN}")
+set(COMP_TARGET comp)
+
 # 6. Disk images
 # TEST_IMAGE_PRG_TARGETS is built from this base (not IMAGE_PRG_TARGETS
 # itself) deliberately: test.d64 is already near its directory-entry
@@ -2271,6 +2300,99 @@ add_custom_command(
     COMMAND "${CC1541_EXECUTABLE}" -f "label.ref" -T PRG
         -w "${LABEL_BIN}" "${LABEL_TEST_D64}"
     COMMENT "Appending LABEL sources + reviewed label.ref to command64_label_test.d64"
+    VERBATIM
+)
+
+
+# command64_comp_test_d64 — bootstrap disk for assembling COMP with native
+# CASM before the manifest-derived shipping target replaces the ca65 target.
+# The migrated COMP cannot validate itself at this stage, so the disk carries
+# only Command64, CASM, and the reviewed native source; its output is extracted
+# and compared host-side against src/external/comp/comp-derivation.md.
+set(COMP_TEST_D64 "${CMAKE_BINARY_DIR}/command64_comp_test.d64")
+add_c64_disk_image(command64_comp_test_d64
+    OUTPUT_FILE "${COMP_TEST_D64}"
+    DISK_LABEL "COMP TEST"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 ${CASM_TARGET}
+)
+
+add_custom_command(
+    TARGET command64_comp_test_d64 PRE_BUILD
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/check_casm_source_bytes.py"
+        "${CMAKE_SOURCE_DIR}/src/external/comp/comp.s"
+    COMMENT "Verifying native-CASM COMP source is uppercase ASCII"
+    VERBATIM
+)
+
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_comp_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET command64_comp_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}" -f "comp.s" -T SEQ
+        -w "${CMAKE_SOURCE_DIR}/src/external/comp/comp.s" "${COMP_TEST_D64}"
+    COMMENT "Appending COMP source to command64_comp_test.d64"
+    VERBATIM
+)
+
+
+# command64_comp_func_test_d64 — COMP CASM-native migration Increment 5
+# functional matrix (brain/plans/2026-09-02-comp-casm-native-migration.md).
+# Carries the migrated (manifest-derived) comp.prg plus deterministic raw
+# fixture pairs from scripts/gen_comp_func_fixtures.py, and casm + the
+# established casmhello CASM fixture so COMP's repository-wide "byte-compare
+# assembler output against a trusted reference" role is exercised end to end
+# (CASM CASMHELLO.SEQ ; COMP CASMHELLO.PRG CASMHELLO.REF -> FILES COMPARE OK).
+# Self-bootable; attach to unit 8 and unit 9 for the cross-device case.
+set(COMP_FUNC_FIX_DIR "${CMAKE_BINARY_DIR}/comp_func_fixtures")
+set(COMP_FUNC_FIX_STAMP "${COMP_FUNC_FIX_DIR}/.stamp")
+add_custom_command(
+    OUTPUT "${COMP_FUNC_FIX_STAMP}"
+    COMMAND "${Python3_EXECUTABLE}"
+        "${CMAKE_SOURCE_DIR}/scripts/gen_comp_func_fixtures.py" "${COMP_FUNC_FIX_DIR}"
+    COMMAND "${CMAKE_COMMAND}" -E touch "${COMP_FUNC_FIX_STAMP}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/scripts/gen_comp_func_fixtures.py"
+    COMMENT "Generating COMP functional-matrix fixture pairs"
+    VERBATIM
+)
+add_custom_target(comp_func_fixtures DEPENDS "${COMP_FUNC_FIX_STAMP}")
+
+set(COMP_FUNC_TEST_D64 "${CMAKE_BINARY_DIR}/command64_comp_func_test.d64")
+add_c64_disk_image(command64_comp_func_test_d64
+    OUTPUT_FILE "${COMP_FUNC_TEST_D64}"
+    DISK_LABEL "COMP FUNC"
+    DISK_ID "${DISK_ID}"
+    PRGS command64 ${COMP_TARGET} ${CASM_TARGET}
+)
+add_dependencies(command64_comp_func_test_d64
+    comp_func_fixtures casm_test_fixtures casm_reference_fixtures)
+
+set(WRAPPER_CC1541 "")
+if(C64_THEME_DIR)
+    set(WRAPPER_CC1541 "${Python3_EXECUTABLE}" "${CMAKE_SOURCE_DIR}/scripts/build_event_wrapper.py"
+        "--theme-dir" "${C64_THEME_DIR}" "--target" "command64_comp_func_test_d64" "--error" "--")
+endif()
+add_custom_command(
+    TARGET command64_comp_func_test_d64 POST_BUILD
+    COMMAND ${WRAPPER_CC1541} "${CC1541_EXECUTABLE}"
+        -f "id1"   -T PRG -w "${COMP_FUNC_FIX_DIR}/id1"
+        -f "id2"   -T PRG -w "${COMP_FUNC_FIX_DIR}/id2"
+        -f "one1"  -T PRG -w "${COMP_FUNC_FIX_DIR}/one1"
+        -f "one2"  -T PRG -w "${COMP_FUNC_FIX_DIR}/one2"
+        -f "many1" -T PRG -w "${COMP_FUNC_FIX_DIR}/many1"
+        -f "many2" -T PRG -w "${COMP_FUNC_FIX_DIR}/many2"
+        -f "long1" -T PRG -w "${COMP_FUNC_FIX_DIR}/long1"
+        -f "long2" -T PRG -w "${COMP_FUNC_FIX_DIR}/long2"
+        -f "prga"  -T PRG -w "${COMP_FUNC_FIX_DIR}/prga"
+        -f "prgb"  -T PRG -w "${COMP_FUNC_FIX_DIR}/prgb"
+        -f "casmhello.seq" -T SEQ -w "${CASM_TEST_FIXTURE_DIR}/casmhello.seq"
+        -f "casmhello.ref" -T PRG -w "${CASM_REF_DIR}/casmhello.ref"
+        "${COMP_FUNC_TEST_D64}"
+    COMMENT "Appending COMP functional fixtures + casmhello to command64_comp_func_test.d64"
     VERBATIM
 )
 

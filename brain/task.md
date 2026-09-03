@@ -4073,6 +4073,62 @@ Work on `main`.
 - [x] Independent reviewer sign-off on `label-derivation.md` — user 2026-09-02
 - [x] Completion-gate approval → task 41 closed 2026-09-02; label.ref.hex CANONICAL-INDEPENDENT
 
+## COMP (Stage 2 storage case) — Taskwarrior task 42 (project `comp`)
+
+Plan `brain/plans/2026-09-02-comp-casm-native-migration.md`; task spec
+`wiki/tasks/comp-casm-native-migration.md`. Taskwarrior UUID
+`74845ecf-9e39-4253-8e78-6dfb4104d635`. Increment 1 baseline/layout record:
+`brain/reviews/2026-09-02-comp-casm-native-increment1-layout-baseline.md`.
+
+- [x] Read-only source/build/artifact survey
+- [x] User selected 208 bytes of emitted zero-filled `.RES` storage
+- [x] Detailed implementation-gated plan prepared
+- [x] Obtain explicit implementation approval
+- [x] Freeze current ca65 address/BSS/relocation and behavior baseline
+- [x] Obtain explicit approval of native layout `$3400-$3849`
+- [x] Convert `comp.s` to self-contained uppercase native CASM; inline
+      constants, adopt `@local`, emit 208-byte storage, retire `common.inc`
+- [x] Obtain explicit Increment 2 source-gate approval
+- [x] Increment 3 independent oracle: complete 1,098-byte image + 61-entry R6
+      derivation recorded in `src/external/comp/comp-derivation.md`; user
+      approved it on 2026-09-02 before native CASM output was consulted
+- [~] Increment 3 native assembly: CASM 0.6.2 b1419 assembled comp.s on
+      command64_comp_test.d64 -> 1228-byte R6 PRG byte-exact to the derivation;
+      casm_r6_verify PASS at 3 bases. Two byte-neutral Increment-2 source fixes
+      (`LSR`->`LSR A` x4; `@READERROR`/`@DONE` cross-scope -> `CFREADERROR`/
+      `BNE CMPDONE`). Source hash 34727919 -> 597b6237. Evidence:
+      `brain/reviews/2026-09-02-comp-casm-native-increment3-oracle-and-native-assembly.md`.
+      GATE: user acknowledgement of the hash move + oracle/artifact agreement.
+- [~] Increment 4 manifest + build transition: `scripts/build_comp_manifest.py`
+      + `src/external/comp/comp.ref.hex` (1228 B, sha 1a0bfbf7, CANONICAL-
+      INDEPENDENT); ca65 path removed from CMakeLists.txt; manifest-derived
+      `comp` target next to `label`, `${COMP_TARGET}` preserved. Full build
+      clean; stale-source guard hard-fails; oracle inventory 4 manifests OK.
+      Evidence: `brain/reviews/2026-09-02-comp-casm-native-increment4-manifest-and-build-transition.md`.
+      GATE: user approval of the build transition.
+- [~] Increment 5 functional + bootstrap verification: migrated comp.prg
+      driven live on `command64_comp_func_test.d64`; 12/12 matrix scenarios
+      (identical/1-mismatch/>10/size both ways/missing 1st+2nd/no-args/extra/
+      slash/PRG load-addr/CASM casmhello COMP-verify/cross-device) all as
+      expected, clean shell returns; both handles close ($70/$71=$FF on
+      open-error and mismatch-stop paths); cross-device unchanged (FILES ARE
+      DIFFERENT SIZES). New: `scripts/gen_comp_func_fixtures.py`,
+      `command64_comp_func_test_d64`. Evidence:
+      `brain/reviews/2026-09-02-comp-casm-native-increment5-functional-verification.md`.
+      GATE: user approval of the functional matrix.
+- [~] Increment 6 consolidation: fresh `rm -rf build` + configure + full build
+      clean; 16 COMP-carrying image targets build; `build/comp.prg` sha
+      1a0bfbf7 == manifest, deterministic across clean rebuild; no-change
+      rebuild no-ops; stale-source hard-fails; `casm_oracle_inventory` OK
+      (4 manifests, 71/71); `casm_r6_verify` PASS. Docs: CHANGELOG,
+      KNOWLEDGE, EXTERNAL, byte-oracle audit register, comp-command.md
+      manual-verification box, task spec. Found-not-fixed: CASM diagnostic
+      line wraps mod 256 → Taskwarrior 43. Walkthrough
+      `brain/walkthroughs/2026-09-02-comp-casm-native-migration.md`.
+- [x] Obtain derivation-review and completion-gate sign-off — user-approved
+      2026-09-02. COMP CASM-native migration CLOSED; ca65 retired, ships from
+      `src/external/comp/comp.ref.hex` (CANONICAL-INDEPENDENT).
+
 ## CASM defect (task 42) — `.INCLUDE`d constant zero-page selection
 
 Discovered during LABEL Increment 3. A zero-page-valued named constant

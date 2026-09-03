@@ -1,509 +1,546 @@
-; src/external/comp/comp.s
-; SPDX-License-Identifier: MIT
-; Copyright (c) 2026 Command64 project contributors
+; SRC/EXTERNAL/COMP/COMP.S
+; SPDX-LICENSE-IDENTIFIER: MIT
+; COPYRIGHT (C) 2026 COMMAND64 PROJECT CONTRIBUTORS
 ;
-; COMP: external raw byte-stream file comparison utility.
-; Phase 1 scope: strict "COMP FILE1 FILE2" syntax, no options, raw bytes
-; regardless of file type, 24-bit hex offsets, and 10 displayed mismatches.
+; COMP: EXTERNAL RAW BYTE-STREAM FILE COMPARISON UTILITY.
+; PHASE 1 SCOPE: STRICT "COMP FILE1 FILE2" SYNTAX, NO OPTIONS, RAW BYTES
+; REGARDLESS OF FILE TYPE, 24-BIT HEX OFFSETS, AND 10 DISPLAYED MISMATCHES.
 
-.include "command64.inc"
-.include "common.inc"
+; NATIVE-CASM SOURCE IS UPPERCASE ASCII THROUGHOUT BECAUSE CC1541 COPIES HOST
+; BYTES TO SEQ FILES VERBATIM. CONSTANTS ARE INLINE SO ZERO-PAGE-VALUED NAMES
+; SELECT ZERO-PAGE ADDRESSING UNDER CASM 0.6.2.
 
-.define VERSION_MAJOR "0"
-.define VERSION_MINOR "1"
-.define VERSION_STAGE "0"
-.include "build_comp.inc"
+; C64 KERNAL JUMP TABLE.
+KERNALCHROUT = $FFD2
 
-.import __MAIN_START__
+; COMMAND64 API ENTRY AND SELECTORS.
+OS_API         = $1000
+DOS_PRINT_STR  = $09
+DOS_OPEN_FILE  = $3D
+DOS_CLOSE_FILE = $3E
+DOS_READ_FILE  = $3F
+DOS_EXIT       = $4C
 
-.segment "HEADER"
-    .word __MAIN_START__
+; COMMAND64 GLOBALS AND SHARED ZERO-PAGE SCRATCH.
+COMMANDBUFFER = $033C
+PARSEPOS      = $63
+HEXVALLO      = $66
+HEXVALHI      = $67
+FILEHANDLE    = $6D
+PRINTPTRLO    = $FB
+PRINTPTRHI    = $FC
 
-.segment "CODE"
+PETCR = $0D
 
-; ---------------------------------------------------------------------------
-; Entry point
-; ---------------------------------------------------------------------------
-start:
-    lda #$FF
-    sta File1Handle
-    sta File2Handle
-    lda #0
-    sta OffsetLo
-    sta OffsetMid
-    sta OffsetHi
-    sta MismatchCount
-    sta StopFlag
-    sta SizeDiffFlag
+; APP-PRIVATE ZERO-PAGE SCRATCH ($70-$8F IS RESERVED FOR EXTERNAL PROGRAMS).
+FILE1HANDLE   = $70
+FILE2HANDLE   = $71
+ARGSTART      = $72
+OFFSETLO      = $73
+OFFSETMID     = $74
+OFFSETHI      = $75
+MISMATCHCOUNT = $76
+READ1COUNT    = $77
+READ2COUNT    = $78
+COMPARECOUNT  = $79
+INDEXSAVE     = $7A
+BYTE1SAVE     = $7B
+BYTE2SAVE     = $7C
+STOPFLAG      = $7D
+SIZEDIFFFLAG  = $7E
+DESTINDEX     = $7F
 
-    jsr parseArgs
-    bcc argsOk
-    jsr printParseError
-    jmp exit
+FILENAME_MAX   = 39
+CHUNK_SIZE     = 64
+MAX_MISMATCHES = 10
 
-argsOk:
-    jsr openFiles
-    bcc filesOpen
-    jmp closeAndExit
-
-filesOpen:
-    jsr compareFiles
-    jsr printSummary
-    jmp closeAndExit
-
-closeAndExit:
-    jsr closeFiles
-exit:
-    lda #DOS_EXIT
-    jsr OS_API
-
-; ---------------------------------------------------------------------------
-; parseArgs
-; Parses CommandBuffer after the external command token.
-; Output: Carry clear on success, File1Buf/File2Buf null-terminated.
-;         Carry set and A = PARSE_* on error.
-; ---------------------------------------------------------------------------
-parseArgs:
-    ldy ParsePos
-
-paSkipToken:
-    lda CommandBuffer, y
-    beq paMissing
-    cmp #' '
-    beq paAfterToken
-    iny
-    jmp paSkipToken
-
-paAfterToken:
-    jsr skipSpaces
-    lda CommandBuffer, y
-    beq paMissing
-    cmp #'/'
-    beq paOption
-
-    ldx #<File1Buf
-    stx PrintPtrLo
-    ldx #>File1Buf
-    stx PrintPtrHi
-    jsr parseToken
-    bcs paError
-
-    jsr skipSpaces
-    lda CommandBuffer, y
-    beq paMissing
-    cmp #'/'
-    beq paOption
-
-    ldx #<File2Buf
-    stx PrintPtrLo
-    ldx #>File2Buf
-    stx PrintPtrHi
-    jsr parseToken
-    bcs paError
-
-    jsr skipSpaces
-    lda CommandBuffer, y
-    bne paExtra
-
-    clc
-    lda #PARSE_OK
-    rts
-
-paMissing:
-    sec
-    lda #PARSE_MISSING
-    rts
-paExtra:
-    sec
-    lda #PARSE_EXTRA
-    rts
-paOption:
-    sec
-    lda #PARSE_OPTION
-    rts
-paError:
-    rts
-
-; Input: Y = CommandBuffer token start, PrintPtrLo/Hi = destination buffer.
-; Output: Y = first delimiter after token, Carry status.
-parseToken:
-    sty ArgStart
-    lda #0
-    sta DestIndex
-ptLoop:
-    ldy ArgStart
-    lda CommandBuffer, y
-    beq ptDone
-    cmp #' '
-    beq ptDone
-    ldx DestIndex
-    cpx #FILENAME_MAX
-    bcs ptTooLong
-    ldy DestIndex
-    sta (PrintPtrLo), y
-    inc DestIndex
-    inc ArgStart
-    jmp ptLoop
-
-ptDone:
-    lda DestIndex
-    beq ptMissing
-    tay
-    lda #0
-    sta (PrintPtrLo), y
-    ldy ArgStart
-    clc
-    lda #PARSE_OK
-    rts
-
-ptMissing:
-    sec
-    lda #PARSE_MISSING
-    rts
-ptTooLong:
-    sec
-    lda #PARSE_TOO_LONG
-    rts
-
-skipSpaces:
-    lda CommandBuffer, y
-    cmp #' '
-    bne ssDone
-    iny
-    jmp skipSpaces
-ssDone:
-    rts
-
-printParseError:
-    cmp #PARSE_OPTION
-    beq ppeOption
-    cmp #PARSE_EXTRA
-    beq ppeExtra
-    cmp #PARSE_TOO_LONG
-    beq ppeTooLong
-    jmp printUsage
-ppeOption:
-    ldx #<msgUnknownOption
-    ldy #>msgUnknownOption
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jmp printUsage
-ppeExtra:
-    ldx #<msgTooManyArgs
-    ldy #>msgTooManyArgs
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jmp printUsage
-ppeTooLong:
-    ldx #<msgNameTooLong
-    ldy #>msgNameTooLong
-    lda #DOS_PRINT_STR
-    jsr OS_API
-printUsage:
-    ldx #<msgUsage
-    ldy #>msgUsage
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    rts
+PARSE_OK       = 0
+PARSE_MISSING  = 1
+PARSE_EXTRA    = 2
+PARSE_OPTION   = 3
+PARSE_TOO_LONG = 4
 
 ; ---------------------------------------------------------------------------
-; File open/close
+; ENTRY POINT
 ; ---------------------------------------------------------------------------
-openFiles:
-    lda #0
-    sta HexValLo
-    ldx #<File1Buf
-    ldy #>File1Buf
-    lda #DOS_OPEN_FILE
-    jsr OS_API
-    bcc ofFile1Ok
-    jsr printOpenError
-    sec
-    rts
-ofFile1Ok:
-    sta File1Handle
+START:
+    LDA #$FF
+    STA FILE1HANDLE
+    STA FILE2HANDLE
+    LDA #0
+    STA OFFSETLO
+    STA OFFSETMID
+    STA OFFSETHI
+    STA MISMATCHCOUNT
+    STA STOPFLAG
+    STA SIZEDIFFFLAG
 
-    lda #0
-    sta HexValLo
-    ldx #<File2Buf
-    ldy #>File2Buf
-    lda #DOS_OPEN_FILE
-    jsr OS_API
-    bcc ofFile2Ok
-    jsr printOpenError
-    sec
-    rts
-ofFile2Ok:
-    sta File2Handle
-    clc
-    rts
+    JSR PARSEARGS
+    BCC @ARGSOK
+    JSR PRINTPARSEERROR
+    JMP @EXIT
 
-closeFiles:
-    lda File2Handle
-    cmp #$FF
-    beq cfSkip2
-    sta FileHandle
-    lda #DOS_CLOSE_FILE
-    jsr OS_API
-    lda #$FF
-    sta File2Handle
-cfSkip2:
-    lda File1Handle
-    cmp #$FF
-    beq cfDone
-    sta FileHandle
-    lda #DOS_CLOSE_FILE
-    jsr OS_API
-    lda #$FF
-    sta File1Handle
-cfDone:
-    rts
+@ARGSOK:
+    JSR OPENFILES
+    BCC @FILESOPEN
+    JMP @CLOSEANDEXIT
 
-printOpenError:
-    ldx #<msgOpenError
-    ldy #>msgOpenError
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    rts
+@FILESOPEN:
+    JSR COMPAREFILES
+    JSR PRINTSUMMARY
+    JMP @CLOSEANDEXIT
+
+@CLOSEANDEXIT:
+    JSR CLOSEFILES
+@EXIT:
+    LDA #DOS_EXIT
+    JSR OS_API
 
 ; ---------------------------------------------------------------------------
-; Compare loop
+; PARSEARGS
+; PARSES COMMANDBUFFER AFTER THE EXTERNAL COMMAND TOKEN.
+; OUTPUT: CARRY CLEAR ON SUCCESS, FILE1BUF/FILE2BUF NULL-TERMINATED.
+;         CARRY SET AND A = PARSE_* ON ERROR.
 ; ---------------------------------------------------------------------------
-compareFiles:
-cfLoop:
-    jsr readFile1
-    bcc cfRead1Ok
-    jmp cfReadError
-cfRead1Ok:
-    jsr readFile2
-    bcc cfRead2Ok
-    jmp cfReadError
-cfRead2Ok:
-    jsr setCompareCount
-    jsr compareOverlap
-    lda StopFlag
-    bne cfDone
+PARSEARGS:
+    LDY PARSEPOS
 
-    lda Read1Count
-    cmp Read2Count
-    beq cfCountsEqual
-    lda #1
-    sta SizeDiffFlag
-    ldx #<msgSizeDiff
-    ldy #>msgSizeDiff
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    jmp cmpDone
+@PASKIPTOKEN:
+    LDA COMMANDBUFFER, Y
+    BEQ @PAMISSING
+    CMP #' '
+    BEQ @PAAFTERTOKEN
+    INY
+    JMP @PASKIPTOKEN
 
-cfCountsEqual:
-    lda Read1Count
-    beq cmpDone
-    cmp #CHUNK_SIZE
-    beq cfLoop
-    ; Equal short reads mean both files ended after the same final chunk.
-cmpDone:
-    rts
+@PAAFTERTOKEN:
+    JSR SKIPSPACES
+    LDA COMMANDBUFFER, Y
+    BEQ @PAMISSING
+    CMP #'/'
+    BEQ @PAOPTION
 
-cfReadError:
-    ldx #<msgReadError
-    ldy #>msgReadError
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    lda #1
-    sta StopFlag
-    rts
+    LDX #<FILE1BUF
+    STX PRINTPTRLO
+    LDX #>FILE1BUF
+    STX PRINTPTRHI
+    JSR PARSETOKEN
+    BCS @PAERROR
 
-readFile1:
-    lda File1Handle
-    sta FileHandle
-    ldx #<Buf1
-    ldy #>Buf1
-    jsr readChunk
-    sta Read1Count
-    rts
+    JSR SKIPSPACES
+    LDA COMMANDBUFFER, Y
+    BEQ @PAMISSING
+    CMP #'/'
+    BEQ @PAOPTION
 
-readFile2:
-    lda File2Handle
-    sta FileHandle
-    ldx #<Buf2
-    ldy #>Buf2
-    jsr readChunk
-    sta Read2Count
-    rts
+    LDX #<FILE2BUF
+    STX PRINTPTRLO
+    LDX #>FILE2BUF
+    STX PRINTPTRHI
+    JSR PARSETOKEN
+    BCS @PAERROR
 
-; Input: FileHandle, X/Y = buffer.
-; Output: A = bytes read, Carry clear on success/EOF, Carry set on read error.
-readChunk:
-    lda #CHUNK_SIZE
-    sta HexValLo
-    lda #0
-    sta HexValHi
-    lda #DOS_READ_FILE
-    jsr OS_API
-    bcc rcOk
-    lda HexValLo
-    ora HexValHi
-    beq rcEof              ; read-past-EOF compatibility path
-    sec
-    lda HexValLo
-    rts
-rcEof:
-    clc
-    lda #0
-    rts
-rcOk:
-    lda HexValLo
-    clc
-    rts
+    JSR SKIPSPACES
+    LDA COMMANDBUFFER, Y
+    BNE @PAEXTRA
 
-setCompareCount:
-    lda Read1Count
-    cmp Read2Count
-    bcc sccUseA
-    lda Read2Count
-sccUseA:
-    sta CompareCount
-    rts
+    CLC
+    LDA #PARSE_OK
+    RTS
 
-compareOverlap:
-    ldx #0
-coLoop:
-    cpx CompareCount
-    beq coDone
-    lda Buf1, x
-    cmp Buf2, x
-    beq coNext
-    sta Byte1Save
-    lda Buf2, x
-    sta Byte2Save
-    stx IndexSave
-    jsr reportMismatch
-    ldx IndexSave
-    lda StopFlag
-    bne coDone
-coNext:
-    jsr incOffset24
-    inx
-    jmp coLoop
-coDone:
-    rts
+@PAMISSING:
+    SEC
+    LDA #PARSE_MISSING
+    RTS
+@PAEXTRA:
+    SEC
+    LDA #PARSE_EXTRA
+    RTS
+@PAOPTION:
+    SEC
+    LDA #PARSE_OPTION
+    RTS
+@PAERROR:
+    RTS
 
-incOffset24:
-    inc OffsetLo
-    bne ioDone
-    inc OffsetMid
-    bne ioDone
-    inc OffsetHi
-ioDone:
-    rts
+; INPUT: Y = COMMANDBUFFER TOKEN START, PRINTPTRLO/HI = DESTINATION BUFFER.
+; OUTPUT: Y = FIRST DELIMITER AFTER TOKEN, CARRY STATUS.
+PARSETOKEN:
+    STY ARGSTART
+    LDA #0
+    STA DESTINDEX
+@PTLOOP:
+    LDY ARGSTART
+    LDA COMMANDBUFFER, Y
+    BEQ @PTDONE
+    CMP #' '
+    BEQ @PTDONE
+    LDX DESTINDEX
+    CPX #FILENAME_MAX
+    BCS @PTTOOLONG
+    LDY DESTINDEX
+    STA (PRINTPTRLO), Y
+    INC DESTINDEX
+    INC ARGSTART
+    JMP @PTLOOP
 
-reportMismatch:
-    ldx #<msgCompareAt
-    ldy #>msgCompareAt
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    lda OffsetHi
-    jsr printHex8
-    lda OffsetMid
-    jsr printHex8
-    lda OffsetLo
-    jsr printHex8
-    ldx #<msgColonDollar
-    ldy #>msgColonDollar
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    lda Byte1Save
-    jsr printHex8
-    ldx #<msgSpaceDollar
-    ldy #>msgSpaceDollar
-    lda #DOS_PRINT_STR
-    jsr OS_API
-    lda Byte2Save
-    jsr printHex8
-    lda #PetCr
-    jsr KernalChROUT
+@PTDONE:
+    LDA DESTINDEX
+    BEQ @PTMISSING
+    TAY
+    LDA #0
+    STA (PRINTPTRLO), Y
+    LDY ARGSTART
+    CLC
+    LDA #PARSE_OK
+    RTS
 
-    inc MismatchCount
-    lda MismatchCount
-    cmp #MAX_MISMATCHES
-    bcc rmDone
-    lda #1
-    sta StopFlag
-    ldx #<msgStop
-    ldy #>msgStop
-    lda #DOS_PRINT_STR
-    jsr OS_API
-rmDone:
-    rts
+@PTMISSING:
+    SEC
+    LDA #PARSE_MISSING
+    RTS
+@PTTOOLONG:
+    SEC
+    LDA #PARSE_TOO_LONG
+    RTS
 
-printSummary:
-    lda StopFlag
-    bne psDone
-    lda MismatchCount
-    bne psDone
-    lda SizeDiffFlag
-    bne psDone
-    ldx #<msgOk
-    ldy #>msgOk
-    lda #DOS_PRINT_STR
-    jsr OS_API
-psDone:
-    rts
+SKIPSPACES:
+    LDA COMMANDBUFFER, Y
+    CMP #' '
+    BNE @DONE
+    INY
+    JMP SKIPSPACES
+@DONE:
+    RTS
 
-printHex8:
-    pha
-    lsr
-    lsr
-    lsr
-    lsr
-    jsr phNibble
-    pla
-    and #$0F
-phNibble:
-    cmp #10
-    bcc phnDigit
-    clc
-    adc #7
-phnDigit:
-    adc #48
-    jsr KernalChROUT
-    rts
+PRINTPARSEERROR:
+    CMP #PARSE_OPTION
+    BEQ @OPTION
+    CMP #PARSE_EXTRA
+    BEQ @EXTRA
+    CMP #PARSE_TOO_LONG
+    BEQ @TOOLONG
+    JMP PRINTUSAGE
+@OPTION:
+    LDX #<MSGUNKNOWNOPTION
+    LDY #>MSGUNKNOWNOPTION
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JMP PRINTUSAGE
+@EXTRA:
+    LDX #<MSGTOOMANYARGS
+    LDY #>MSGTOOMANYARGS
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JMP PRINTUSAGE
+@TOOLONG:
+    LDX #<MSGNAMETOOLONG
+    LDY #>MSGNAMETOOLONG
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+PRINTUSAGE:
+    LDX #<MSGUSAGE
+    LDY #>MSGUSAGE
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    RTS
 
 ; ---------------------------------------------------------------------------
-; Data
+; FILE OPEN/CLOSE
 ; ---------------------------------------------------------------------------
-msgUsage:
-    .byte "USAGE: COMP FILE1 FILE2", PetCr, 0
-msgUnknownOption:
-    .byte "UNKNOWN OPTION", PetCr, 0
-msgTooManyArgs:
-    .byte "TOO MANY ARGUMENTS", PetCr, 0
-msgNameTooLong:
-    .byte "FILE NAME TOO LONG", PetCr, 0
-msgOpenError:
-    .byte "FILE OPEN ERROR", PetCr, 0
-msgReadError:
-    .byte "READ ERROR", PetCr, 0
-msgCompareAt:
-    .byte "COMPARE ERROR AT $", 0
-msgColonDollar:
-    .byte ": $", 0
-msgSpaceDollar:
-    .byte " $", 0
-msgStop:
-    .byte "10 MISMATCHES - STOPPING", PetCr, 0
-msgSizeDiff:
-    .byte "FILES ARE DIFFERENT SIZES", PetCr, 0
-msgOk:
-    .byte "FILES COMPARE OK", PetCr, 0
+OPENFILES:
+    LDA #0
+    STA HEXVALLO
+    LDX #<FILE1BUF
+    LDY #>FILE1BUF
+    LDA #DOS_OPEN_FILE
+    JSR OS_API
+    BCC @FILE1OK
+    JSR PRINTOPENERROR
+    SEC
+    RTS
+@FILE1OK:
+    STA FILE1HANDLE
 
-.segment "BSS"
+    LDA #0
+    STA HEXVALLO
+    LDX #<FILE2BUF
+    LDY #>FILE2BUF
+    LDA #DOS_OPEN_FILE
+    JSR OS_API
+    BCC @FILE2OK
+    JSR PRINTOPENERROR
+    SEC
+    RTS
+@FILE2OK:
+    STA FILE2HANDLE
+    CLC
+    RTS
 
-File1Buf:
-    .res FILENAME_MAX + 1
-File2Buf:
-    .res FILENAME_MAX + 1
-Buf1:
-    .res CHUNK_SIZE
-Buf2:
-    .res CHUNK_SIZE
+CLOSEFILES:
+    LDA FILE2HANDLE
+    CMP #$FF
+    BEQ @SKIP2
+    STA FILEHANDLE
+    LDA #DOS_CLOSE_FILE
+    JSR OS_API
+    LDA #$FF
+    STA FILE2HANDLE
+@SKIP2:
+    LDA FILE1HANDLE
+    CMP #$FF
+    BEQ @DONE
+    STA FILEHANDLE
+    LDA #DOS_CLOSE_FILE
+    JSR OS_API
+    LDA #$FF
+    STA FILE1HANDLE
+@DONE:
+    RTS
+
+PRINTOPENERROR:
+    LDX #<MSGOPENERROR
+    LDY #>MSGOPENERROR
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    RTS
+
+; ---------------------------------------------------------------------------
+; COMPARE LOOP
+; ---------------------------------------------------------------------------
+COMPAREFILES:
+@LOOP:
+    JSR READFILE1
+    BCC @READ1OK
+    JMP CFREADERROR
+@READ1OK:
+    JSR READFILE2
+    BCC @READ2OK
+    JMP CFREADERROR
+@READ2OK:
+    JSR SETCOMPARECOUNT
+    JSR COMPAREOVERLAP
+    LDA STOPFLAG
+    BNE CMPDONE
+
+    LDA READ1COUNT
+    CMP READ2COUNT
+    BEQ @COUNTSEQUAL
+    LDA #1
+    STA SIZEDIFFFLAG
+    LDX #<MSGSIZEDIFF
+    LDY #>MSGSIZEDIFF
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    JMP CMPDONE
+
+@COUNTSEQUAL:
+    LDA READ1COUNT
+    BEQ CMPDONE
+    CMP #CHUNK_SIZE
+    BEQ @LOOP
+    ; EQUAL SHORT READS MEAN BOTH FILES ENDED AFTER THE SAME FINAL CHUNK.
+CMPDONE:
+    RTS
+
+CFREADERROR:
+    LDX #<MSGREADERROR
+    LDY #>MSGREADERROR
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    LDA #1
+    STA STOPFLAG
+    RTS
+
+READFILE1:
+    LDA FILE1HANDLE
+    STA FILEHANDLE
+    LDX #<BUF1
+    LDY #>BUF1
+    JSR READCHUNK
+    STA READ1COUNT
+    RTS
+
+READFILE2:
+    LDA FILE2HANDLE
+    STA FILEHANDLE
+    LDX #<BUF2
+    LDY #>BUF2
+    JSR READCHUNK
+    STA READ2COUNT
+    RTS
+
+; INPUT: FILEHANDLE, X/Y = BUFFER.
+; OUTPUT: A = BYTES READ, CARRY CLEAR ON SUCCESS/EOF, CARRY SET ON READ ERROR.
+READCHUNK:
+    LDA #CHUNK_SIZE
+    STA HEXVALLO
+    LDA #0
+    STA HEXVALHI
+    LDA #DOS_READ_FILE
+    JSR OS_API
+    BCC @OK
+    LDA HEXVALLO
+    ORA HEXVALHI
+    BEQ @EOF               ; READ-PAST-EOF COMPATIBILITY PATH
+    SEC
+    LDA HEXVALLO
+    RTS
+@EOF:
+    CLC
+    LDA #0
+    RTS
+@OK:
+    LDA HEXVALLO
+    CLC
+    RTS
+
+SETCOMPARECOUNT:
+    LDA READ1COUNT
+    CMP READ2COUNT
+    BCC @USEA
+    LDA READ2COUNT
+@USEA:
+    STA COMPARECOUNT
+    RTS
+
+COMPAREOVERLAP:
+    LDX #0
+@LOOP:
+    CPX COMPARECOUNT
+    BEQ @DONE
+    LDA BUF1, X
+    CMP BUF2, X
+    BEQ @NEXT
+    STA BYTE1SAVE
+    LDA BUF2, X
+    STA BYTE2SAVE
+    STX INDEXSAVE
+    JSR REPORTMISMATCH
+    LDX INDEXSAVE
+    LDA STOPFLAG
+    BNE @DONE
+@NEXT:
+    JSR INCOFFSET24
+    INX
+    JMP @LOOP
+@DONE:
+    RTS
+
+INCOFFSET24:
+    INC OFFSETLO
+    BNE @DONE
+    INC OFFSETMID
+    BNE @DONE
+    INC OFFSETHI
+@DONE:
+    RTS
+
+REPORTMISMATCH:
+    LDX #<MSGCOMPAREAT
+    LDY #>MSGCOMPAREAT
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    LDA OFFSETHI
+    JSR PRINTHEX8
+    LDA OFFSETMID
+    JSR PRINTHEX8
+    LDA OFFSETLO
+    JSR PRINTHEX8
+    LDX #<MSGCOLONDOLLAR
+    LDY #>MSGCOLONDOLLAR
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    LDA BYTE1SAVE
+    JSR PRINTHEX8
+    LDX #<MSGSPACEDOLLAR
+    LDY #>MSGSPACEDOLLAR
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+    LDA BYTE2SAVE
+    JSR PRINTHEX8
+    LDA #PETCR
+    JSR KERNALCHROUT
+
+    INC MISMATCHCOUNT
+    LDA MISMATCHCOUNT
+    CMP #MAX_MISMATCHES
+    BCC @DONE
+    LDA #1
+    STA STOPFLAG
+    LDX #<MSGSTOP
+    LDY #>MSGSTOP
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+@DONE:
+    RTS
+
+PRINTSUMMARY:
+    LDA STOPFLAG
+    BNE @DONE
+    LDA MISMATCHCOUNT
+    BNE @DONE
+    LDA SIZEDIFFFLAG
+    BNE @DONE
+    LDX #<MSGOK
+    LDY #>MSGOK
+    LDA #DOS_PRINT_STR
+    JSR OS_API
+@DONE:
+    RTS
+
+PRINTHEX8:
+    PHA
+    LSR A
+    LSR A
+    LSR A
+    LSR A
+    JSR @NIBBLE
+    PLA
+    AND #$0F
+@NIBBLE:
+    CMP #10
+    BCC @DIGIT
+    CLC
+    ADC #7
+@DIGIT:
+    ADC #48
+    JSR KERNALCHROUT
+    RTS
+
+; ---------------------------------------------------------------------------
+; DATA
+; ---------------------------------------------------------------------------
+MSGUSAGE:
+    .BYTE "USAGE: COMP FILE1 FILE2", PETCR, 0
+MSGUNKNOWNOPTION:
+    .BYTE "UNKNOWN OPTION", PETCR, 0
+MSGTOOMANYARGS:
+    .BYTE "TOO MANY ARGUMENTS", PETCR, 0
+MSGNAMETOOLONG:
+    .BYTE "FILE NAME TOO LONG", PETCR, 0
+MSGOPENERROR:
+    .BYTE "FILE OPEN ERROR", PETCR, 0
+MSGREADERROR:
+    .BYTE "READ ERROR", PETCR, 0
+MSGCOMPAREAT:
+    .BYTE "COMPARE ERROR AT $", 0
+MSGCOLONDOLLAR:
+    .BYTE ": $", 0
+MSGSPACEDOLLAR:
+    .BYTE " $", 0
+MSGSTOP:
+    .BYTE "10 MISMATCHES - STOPPING", PETCR, 0
+MSGSIZEDIFF:
+    .BYTE "FILES ARE DIFFERENT SIZES", PETCR, 0
+MSGOK:
+    .BYTE "FILES COMPARE OK", PETCR, 0
+
+FILE1BUF:
+    .RES FILENAME_MAX + 1, $00
+FILE2BUF:
+    .RES FILENAME_MAX + 1, $00
+BUF1:
+    .RES CHUNK_SIZE, $00
+BUF2:
+    .RES CHUNK_SIZE, $00

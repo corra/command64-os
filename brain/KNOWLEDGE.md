@@ -3678,6 +3678,71 @@ Taskwarrior task 41 (project `label`).
   inline definitions. Blocks a shared `.INCLUDE` of ZP constants for the
   next migrations; keep app constants inline (BANNER/DASH precedent).
 
+## COMP → CASM-native (2026-09-02, second external-app migration)
+
+Second app migrated per
+`brain/reviews/2026-09-01-external-applications-casm-native-viability.md`
+(Stage 2 — the storage-disposition case). Plan/walkthrough
+`brain/{plans,walkthroughs}/2026-09-02-comp-casm-native-migration.md`;
+Taskwarrior task 42 (project `comp`). Six user-gated increments.
+
+- **ca65 retired for COMP.** `comp.prg` ships from
+  `src/external/comp/comp.ref.hex` via `scripts/hex_manifest_to_bin.py`
+  (BANNER/LABEL/DASH model). No `add_ca65_app(comp …)`, no `comp_ref`
+  differential, no `COMP_SRCS`/`COMP_ENTRY` glob.
+  `scripts/build_comp_manifest.py` regenerates the manifest (deliberate
+  reviewed act). `command64_comp_test_d64` is the native-assembly disk;
+  `command64_comp_func_test_d64` carries the functional matrix.
+- **True BSS → emitted storage (the reason this migration existed
+  separately from LABEL).** ld65 allocated COMP's two 40-byte filename
+  buffers + two 64-byte chunk buffers as unemitted `BSS` past the image.
+  CASM has no BSS: `.RES n,$00` **emits** the bytes. Approved disposition:
+  emit all 208 bytes as zero-fill in source order after the messages.
+  Effect is file size only (890 → 1098 image bytes, 1020 → 1228 PRG) — at
+  runtime the loader still relocates to `$3800` and the image occupies
+  exactly the old `$3800–$3C49`. Fixed-memory and VMM storage were
+  rejected to keep COMP self-contained.
+- **No version banner.** COMP never emitted one; adding one would change
+  behaviour. Unused ca65 `VERSION_*` defs removed, no generated version
+  source. Manifest `source_sha256` binds `comp.s` + `BUILD_COMP` (the
+  latter frozen at its final ca65-era value `1006`; recorded so a stray
+  edit still hard-fails the build).
+- **Independent oracle first.** `src/external/comp/comp-derivation.md`
+  derives all 1098 image bytes + 122-byte / 61-entry R6 table + footer
+  from the 6502 encoding + CASM semantics + PRG/R6 framing, peer-reviewed
+  **before** native CASM output was consulted. The frozen ca65 relocation
+  structure was used only as differential evidence and exposed one omitted
+  source-site entry (`JMP @PTLOOP`, `$00B3`) in the first draft. Native
+  CASM 0.6.2 b1419 output == the reviewed oracle, all 1228 bytes exact;
+  `provenance: CANONICAL-INDEPENDENT`. (Contrast DASH, whose bytes are
+  `NATIVE-OBSERVATION` — a full COMP-sized derivation *is* practical.)
+- **Two byte-neutral conversion fixes caught by native assembly** (the
+  Increment 2 static review missed both; Increment 3 is exactly where they
+  surface):
+  1. **Bare accumulator shifts.** `PRINTHEX8` had `LSR` ×4 with no
+     operand → `CASM: INVALID ADDRESSING MODE`. CASM requires `LSR A`
+     (`ASL A`, etc.) — the explicit `A` operand. Opcode `$4A` either way.
+  2. **`@local` across a global-label scope boundary.** CASM resets the
+     `@name` namespace at every global (`NAME:`) label. `COMPAREFILES`
+     referenced `@READERROR` (defined *after* the global `CMPDONE:`, i.e.
+     a new scope) and `@DONE` (the retired ca65 `closeFiles` shared-`RTS`
+     trick). Fix: `@READERROR` → global `CFREADERROR`; `BNE @DONE` →
+     `BNE CMPDONE`. A static "every `@ref` resolves in its global's span"
+     check is the cheap pre-assembly guard.
+- **CASM diagnostic line numbers wrap mod 256** (Taskwarrior 43). The
+  `LSR` error at file line 494 reported `AT LINE 238` (494 − 256).
+  Statement counts in `P1: DONE nnnnn STATEMENTS` are not capped, but the
+  located-diagnostic line field is a byte. Watch for this when a reported
+  line looks wrong on a file over 256 lines.
+- **Behaviour unchanged.** 12-scenario live functional matrix all as
+  expected; both file handles close on every open/exit path
+  (`$70`/`$71` = `$FF`); `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000`;
+  the migrated COMP still verifies a real CASM fixture
+  (`CASM CASMHELLO.SEQ` → `COMP` its PRG vs `.REF` → `FILES COMPARE OK`).
+  The cross-device false-size defect
+  (`wiki/tasks/comp-cross-device-regression.md`) is unchanged and stays
+  open.
+
 ## C64 Platform Constraints Discovered
 
 | Finding | Impact | Resolution |

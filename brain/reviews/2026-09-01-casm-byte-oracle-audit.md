@@ -99,7 +99,7 @@ Each row records:
 | 19 | Historical evidence paths | prior review docs |
 | 20 | Re-audit trigger | what change forces re-classification |
 
-## Ledger A — fixed-byte artifacts (67 refs + 2 manifests)
+## Ledger A — fixed-byte artifacts (67 refs + 4 manifests: banner, dash, label, comp)
 
 Every row: full mechanical field data (declared vs actual bytes/SHA-256,
 generated-`.seq` hash, `CASM_REF_NAMES` membership, packaging trace) is
@@ -178,6 +178,8 @@ class (WP2 hint, WP3 confirms), provenance state, and the WP3 gap list.
 | `p1size1` | Static PRG | `CANONICAL-INDEPENDENT` | WP3 batch 1 -- source_sha256 + sha256 + reviewer added; body byte-identical |
 | `banner.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | WP4 -- full address ledger + 20-entry relocation table verified vs body (`casm_r6_verify.py` PASS) + multi-base + reviewer |
 | `dash.ref.hex` | Native Manifest (R6 PRG) | **`NATIVE-OBSERVATION`** (bytes) + `CANONICAL-INDEPENDENT` R6 relocation ledger | WP4 audit-corrected 2026-09-02 -- 3669 code bytes are reviewed native run + ca65 `DIFFERENTIAL-ONLY`; 451-entry R6 table independently derived (`casm_r6_verify.py` PASS) |
+| `label.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | 2026-09-02 LABEL CASM-native migration -- code/data via same-base ca65 differential (843/844, 1 intentional banner byte); 52-entry R6 ledger reconciled; derivation `src/external/label/label-derivation.md` |
+| `comp.ref.hex` | Native Manifest (R6 PRG) | `CANONICAL-INDEPENDENT` | 2026-09-02 COMP CASM-native migration -- full 1098-byte image + 122-byte reloc-table + footer independently derived and byte-exact to native CASM 0.6.2 b1419 (`casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000`); derivation `src/external/comp/comp-derivation.md` |
 
 ### Ledger A notes
 
@@ -307,6 +309,7 @@ metadata)` (i.e. the axis is covered but the ref needs WP3 metadata).
 | **DASH** native app | `dash.ref.hex` — bytes `NATIVE-OBSERVATION` (reviewed native run + ca65 `DIFFERENTIAL-ONLY`); R6 relocation ledger `CANONICAL-INDEPENDENT` | runtime `$3800`/`$5000`/`$9000` (DASH-MOD) | WP4 (audit-corrected 2026-09-02): full byte derivation not practical; ca65 differential retained as standing release check (WP5) |
 | **BANNER** native app | `banner.ref.hex` `CANONICAL-INDEPENDENT` | multi-base `casm_r6_verify.py` PASS | WP4 — full address ledger + 20-entry table verified vs body |
 | **LABEL** native app | `label.ref.hex` `CANONICAL-INDEPENDENT` — code/data via same-base ca65 differential (843/844 image bytes identical, 1 intentional banner byte `$3706`); 52-entry R6 ledger independently reconciled; reviewer sign-off 2026-09-02 | live `COMP LABEL.PRG LABEL.REF` → `FILES COMPARE OK` (CASM 0.6.2 b1419); `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000` | 2026-09-02 CASM-native migration; derivation `src/external/label/label-derivation.md` |
+| **COMP** native app | `comp.ref.hex` `CANONICAL-INDEPENDENT` — full 1098-byte image (683 code + 207 msg + 208 emitted `.RES` zero-fill) + 122-byte / 61-entry R6 table + footer hand-derived and byte-exact to native CASM 0.6.2 b1419; reviewer sign-off 2026-09-02 (Increment 3 gate) | native assembly on `command64_comp_test.d64` → 1228 B byte-identical to derivation; `casm_r6_verify.py` PASS `$3800`/`$5000`/`$9000` | 2026-09-02 CASM-native migration; derivation `src/external/comp/comp-derivation.md`; first program with an explicit true-BSS-to-emitted-storage disposition |
 
 **No axis is uncovered.** Every axis has at least a structural harness;
 every axis that *should* have a byte oracle has one at

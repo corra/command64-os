@@ -35,7 +35,7 @@ These programs are essential for system maintenance and early verification of th
 | `XCOPY` | Extended file and directory copy | 💤 Backlog | Medium | DOS 4.0 |
 | `FIND` | Search for a string in a file | 💤 Backlog | Low | DOS 4.0 |
 | `SORT` | Sort input data | 💤 Backlog | Low | DOS 4.0 |
-| `COMP` | Compare files as raw byte streams | ✅ v0.1.0 (Build 1004) — cross-device false size mismatch open, see `wiki/tasks/comp-cross-device-regression.md` | Low | DOS 4.0 |
+| `COMP` | Compare files as raw byte streams | ✅ v0.1.0 (Build 1006) — **CASM-native** since 2026-09-02 (ships from `src/external/comp/comp.ref.hex`, ca65 retired); cross-device false size mismatch still open, see `wiki/tasks/comp-cross-device-regression.md` | Low | DOS 4.0 |
 | `FC` | File compare with binary/text options | 💤 Backlog | Low | DOS 4.0 |
 | `ATTRIB` | Change file attributes | 💤 Backlog | Medium | DOS 4.0 |
 
